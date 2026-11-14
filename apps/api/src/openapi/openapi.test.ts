@@ -171,11 +171,15 @@ test("the card's labels are a POST whose body is a LabelEdit and whose answer a 
     { $ref: '#/components/schemas/Labelled' },
     'answers a Labelled',
   );
+  const { description: said, ...labels } = (doc.components.schemas['RunMetadata']?.properties?.['labels'] ?? {}) as {
+    description?: string;
+  };
   assert.deepEqual(
-    doc.components.schemas['RunMetadata']?.properties?.['labels'],
+    labels,
     { type: 'object', additionalProperties: { type: 'string' } },
     "a run's labels are a map of strings, the one index of extra keys the document allows",
   );
+  assert.ok(typeof said === 'string' && said.length > 0, 'and the field says what it is, for a client that reads the schema alone');
 });
 
 /** Each of the run's named actions in the document: its method on its path, the status it answers, and the component its body is. */

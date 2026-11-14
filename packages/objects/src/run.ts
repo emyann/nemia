@@ -75,12 +75,22 @@ const StepReason = Schema.Literals(STEP_REASONS);
  * of it. `namespace` and `resourceVersion` are absent on an object served before the Run had them.
  */
 export const RunMetadata = Schema.Struct({
-  name: Schema.String,
-  namespace: Schema.optionalKey(Schema.String),
-  creationTimestamp: Schema.String,
-  labels: Schema.Record(Schema.String, Schema.String),
-  resourceVersion: Schema.optionalKey(Schema.String),
-}).annotate({ identifier: 'RunMetadata' });
+  name: Schema.String.annotate({ description: "The run's id, as nemia ls lists it." }),
+  namespace: Schema.optionalKey(
+    Schema.String.annotate({
+      description: 'The factory the run was started in; default for a run of none. Absent on an object served before runs had one.',
+    }),
+  ),
+  creationTimestamp: Schema.String.annotate({ description: 'When the run was made, an ISO 8601 time.' }),
+  labels: Schema.Record(Schema.String, Schema.String).annotate({
+    description: "The labels the run is found by (-l): its workflow, its factory, and a person's own (nemia label run).",
+  }),
+  resourceVersion: Schema.optionalKey(
+    Schema.String.annotate({
+      description: 'Opaque, moved by every change of what is served of the run: hand it back to a watch to read on from there.',
+    }),
+  ),
+}).annotate({ identifier: 'RunMetadata', description: "The run's name, its factory, when it was made, and its labels." });
 export type RunMetadata = typeof RunMetadata.Type;
 
 /**
@@ -135,7 +145,10 @@ export const RunSpec = Schema.Struct({
   after: Strings,
   context: Strings,
   from: Schema.NullOr(Schema.Struct({ inbox: Schema.String })),
-}).annotate({ identifier: 'RunSpec' });
+}).annotate({
+  identifier: 'RunSpec',
+  description: 'What the run was asked to do: its brief, its workflow, and where it works. Never changes.',
+});
 export type RunSpec = typeof RunSpec.Type;
 
 /** A check's verdict as codes (`CheckVerdict`, check.ts). */
@@ -487,14 +500,30 @@ export type StepCost = typeof StepCost.Type;
  * what its sessions read, who it waits on, its gates, a warning on its folder, and the kinds it is behind the files on.
  */
 export const RunStatus = Schema.Struct({
-  status: Schema.Literals(RUN_STATUSES),
-  phase: Schema.Literals(RUN_PHASES),
-  reason: Schema.Literals(RUN_REASONS),
-  on: Schema.NullOr(Schema.Literals(WAIT_ON)),
-  via: Schema.NullOr(Schema.Literals(ANSWER_VIA)),
-  moving: Schema.Boolean,
-  cost: Schema.NullOr(Spent),
-  atWork: Schema.NullOr(Schema.Struct({ ms: Schema.Finite, since: NullString, endedAt: NullString })),
+  status: Schema.Literals(RUN_STATUSES).annotate({
+    description:
+      'The run in one word, worked out from its steps on every pass: running, succeeded, failed, cancelled, awaiting approval (stopped at a gate), or waiting (stopped on a person for anything else).',
+  }),
+  phase: Schema.Literals(RUN_PHASES).annotate({ description: 'Where the run is in its life, as a code: the phase its reason stands in.' }),
+  reason: Schema.Literals(RUN_REASONS).annotate({
+    description: 'Why the run is in its phase, as a code. A run stopped on a person takes the reason of its first step that waits.',
+  }),
+  on: Schema.NullOr(Schema.Literals(WAIT_ON)).annotate({
+    description:
+      'What the run waits on, set exactly when its reason is Waiting: run (the runs its hold names), hold (a hold only a person lifts). Null otherwise.',
+  }),
+  via: Schema.NullOr(Schema.Literals(ANSWER_VIA)).annotate({
+    description:
+      'Where an awaited answer is asked, set only when its reason is AwaitingAnswer: session (a question in a live session) or closeout (a step signed off blocked). Null otherwise.',
+  }),
+  moving: Schema.Boolean.annotate({
+    description: 'Whether anything of the run is in flight or due: a session or check at work, or something the next pass would file.',
+  }),
+  cost: Schema.NullOr(Spent).annotate({ description: 'What every try of every step has cost together; null until one was measured.' }),
+  atWork: Schema.NullOr(Schema.Struct({ ms: Schema.Finite, since: NullString, endedAt: NullString })).annotate({
+    description:
+      'The time the run has spent at work, its sessions and checks together: milliseconds, since when one is at work now, and when the last ended; null while nothing of it ran.',
+  }),
   tokens: Schema.NullOr(
     Schema.Struct({
       total: Schema.Finite,
@@ -508,20 +537,33 @@ export const RunStatus = Schema.Struct({
       said: Schema.String,
       split: Schema.String,
     }),
-  ),
-  waiting: Schema.NullOr(RunWaiting),
-  holding: Schema.NullOr(RunHolding),
-  toDecide: Schema.NullOr(RunToDecide),
-  graph: ObjectGraph,
+  ).annotate({
+    description:
+      'The tokens its sessions used, every try together: the total and its parts, how many tries were measured and how many were not, and both said in words; null until one was measured.',
+  }),
+  waiting: Schema.NullOr(RunWaiting).annotate({
+    description: "The runs this run's first steps wait on to land (nemia start --after); null where it waits on none.",
+  }),
+  holding: Schema.NullOr(RunHolding).annotate({
+    description:
+      'The hold a person put on the run (nemia hold): the runs it waits for and whether it needs a person; null where nobody holds it.',
+  }),
+  toDecide: Schema.NullOr(RunToDecide).annotate({
+    description: 'What a person has to decide of the run now, as nemia decide says it; null where nothing.',
+  }),
+  graph: ObjectGraph.annotate({ description: "The run's steps as a graph: its nodes, the edges between them, and its roots." }),
   timeline: Schema.Struct({
     rounds: List(TimelineTotal),
     run: TimelineTotal,
     slot: Schema.NullOr(Schema.Struct({ from: Schema.String, filedAt: NullString, ms: NullNumber, queued: Schema.String })),
+  }).annotate({
+    description:
+      "Where the run's time went as a whole: each round of its loops, the run in total, and how long it waited for a run slot before its first task was filed.",
   }),
-  steps: List(RunStepStatus),
-  startedAt: NullString,
-  cancelledAt: NullString,
-  cancelledBy: Schema.optionalKey(Actor),
+  steps: List(RunStepStatus).annotate({ description: "Each step of the run as it stands now, in the workflow's order." }),
+  startedAt: NullString.annotate({ description: "When the run's first task was filed; null while nothing of it was." }),
+  cancelledAt: NullString.annotate({ description: 'When a person called the run off (nemia cancel); null where nobody did.' }),
+  cancelledBy: Schema.optionalKey(Actor.annotate({ description: 'Who called the run off, where the caller was known.' })),
   pruned: Schema.NullOr(
     Schema.Struct({
       at: Schema.String,
@@ -529,20 +571,38 @@ export const RunStatus = Schema.Struct({
       artifacts: Schema.NullOr(Schema.Struct({ at: Schema.String, bytes: Schema.Finite })),
       said: Schema.optionalKey(Schema.String),
     }),
-  ),
-  onDisk: Schema.Struct({ worktrees: Schema.Boolean, files: Schema.Boolean }),
-  holdUntil: Strings,
-  read: Schema.NullOr(Schema.Struct({ said: Schema.String, peak: PeakMark, rebuilt: Schema.Finite })),
-  waitingOnYou: Strings,
-  waitingOnYouWords: Strings,
-  gates: Strings,
-  warning: NullString,
-  kinds: List(RunDrift),
+  ).annotate({
+    description:
+      'What nemia prune removed of the run: when, each worktree with the bytes it held, its files directory where --artifacts took it, and the prune in words; null for a run never pruned.',
+  }),
+  onDisk: Schema.Struct({ worktrees: Schema.Boolean, files: Schema.Boolean }).annotate({
+    description: "What of the run is still on disk: its worktrees, and its steps' files directory.",
+  }),
+  holdUntil: Strings.annotate({ description: 'The runs the hold on this run waits for; empty where it names none or nobody holds it.' }),
+  read: Schema.NullOr(Schema.Struct({ said: Schema.String, peak: PeakMark, rebuilt: Schema.Finite })).annotate({
+    description:
+      'What its sessions read into their context: in words, the largest read of one session, and how many times a context was rebuilt; null where none was measured.',
+  }),
+  waitingOnYou: Strings.annotate({ description: 'The steps a person has to act on, by name; empty where none waits on one.' }),
+  waitingOnYouWords: Strings.annotate({ description: 'What each of those steps waits on a person for, in words, one line a step.' }),
+  gates: Strings.annotate({
+    description: "The steps of the run that are gates: each one's closeout waits for an approval before anything after it is filed.",
+  }),
+  warning: NullString.annotate({ description: "A warning about the run's workflow folder, in words; null where there is none." }),
+  kinds: List(RunDrift).annotate({
+    description:
+      'The agents, skills and workflow the run pinned that have changed in the files since: each with the revision pinned and the one now.',
+  }),
   /**
    * Where its work ended up (`resultBranches`): the branches of its result steps that have one, named as soon as one does, landed or
    * not; left out where none has.
    */
-  result: Schema.optionalKey(Strings),
+  result: Schema.optionalKey(
+    Strings.annotate({
+      description:
+        "The branches the run's work ended up on, named as soon as a result step has one, landed or not. Left out where none has.",
+    }),
+  ),
   /**
    * The parts of the board's frame, present on a list asked by a field (`?fieldSelector=status.state…` or `status.outcome…`) alone and
    * measured to its `metadata.asOf`: a plain list, a run read alone and their watches never carry them. Its state in the list
@@ -551,22 +611,56 @@ export const RunStatus = Schema.Struct({
    * (`stepCosts`, `waitingSince`, for a waiting run, null otherwise or where it is not dated); when its work stopped and how it ended
    * (`finishedAt`, `outcome`, for a finished run, null otherwise).
    */
-  state: Schema.optionalKey(Schema.Literals(RUN_STATES)),
-  wallMs: Schema.optionalKey(Schema.Finite),
-  clock: Schema.optionalKey(Schema.NullOr(RunClock)),
-  stepCosts: Schema.optionalKey(Schema.NullOr(List(StepCost))),
-  waitingSince: Schema.optionalKey(NullString),
-  finishedAt: Schema.optionalKey(NullString),
-  outcome: Schema.optionalKey(Schema.NullOr(Schema.Literals(RUN_OUTCOMES))),
+  state: Schema.optionalKey(
+    Schema.Literals(RUN_STATES).annotate({
+      description:
+        "The run's state in a list asked by fieldSelector: waiting (on a person), inFlight, or finished. Present on such a list alone.",
+    }),
+  ),
+  wallMs: Schema.optionalKey(
+    Schema.Finite.annotate({
+      description:
+        "The run's wall time in milliseconds, from its creation until its work stopped, or until the list's asOf for one still going. Present on a list asked by fieldSelector alone.",
+    }),
+  ),
+  clock: Schema.optionalKey(
+    Schema.NullOr(RunClock).annotate({
+      description:
+        "Where the run's wall time went, frozen at its finish for a finished run; null where a task of it does not read. Present on a list asked by fieldSelector alone.",
+    }),
+  ),
+  stepCosts: Schema.optionalKey(
+    Schema.NullOr(List(StepCost)).annotate({
+      description: "Each step's cost, for a run that waits on a person; null otherwise. Present on a list asked by fieldSelector alone.",
+    }),
+  ),
+  waitingSince: Schema.optionalKey(
+    NullString.annotate({
+      description:
+        "When the run's present wait on a person began; null for a run that does not wait or whose wait is not dated. Present on a list asked by fieldSelector alone.",
+    }),
+  ),
+  finishedAt: Schema.optionalKey(
+    NullString.annotate({
+      description: "When a finished run's work stopped; null for one not finished. Present on a list asked by fieldSelector alone.",
+    }),
+  ),
+  outcome: Schema.optionalKey(
+    Schema.NullOr(Schema.Literals(RUN_OUTCOMES)).annotate({
+      description:
+        "How a finished run ended: succeeded, failed, cancelled, or undecided (its result waits on a person's decision); null for one not finished. Present on a list asked by fieldSelector alone.",
+    }),
+  ),
 })
+  .annotate({ description: 'The run as it stands now, judged on this read.' })
   .check(RUN_CODES)
   .annotate({ identifier: 'RunStatus' });
 export type RunStatus = typeof RunStatus.Type;
 
 /** The run as one object: `nemia/v1`'s `Run`. */
 export const Run = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Run'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version of the objects this api serves.' }),
+  kind: Schema.Literal('Run').annotate({ description: 'The kind of this object: a run, one pass of a workflow.' }),
   metadata: RunMetadata,
   spec: RunSpec,
   status: RunStatus,

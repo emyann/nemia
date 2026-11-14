@@ -21,7 +21,11 @@ export const Actor = Schema.Struct({
   token: Schema.optionalKey(Schema.String),
   run: Schema.optionalKey(Schema.String),
   step: Schema.optionalKey(Schema.String),
-}).annotate({ identifier: 'Actor' });
+}).annotate({
+  identifier: 'Actor',
+  description:
+    'Who made a write: the person, under the name of the token they presented, or an agent, by its standing token or by the session of the run and step it works in.',
+});
 export type Actor = typeof Actor.Type;
 
 /**

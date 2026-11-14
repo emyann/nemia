@@ -3,37 +3,18 @@
  * verb (`pauseModeOf`), never carried; the events that move it (`PauseEvent`), and what each does in each mode (`pauseMove`), proved
  * law by law (contracts/pause-machine.contract.ts). The verbs and the pass that write the pause's file ask `pauseMove` before they
  * write (`pause/pause.store.ts`), so a move it does not make is one nothing writes; what the pause does in each mode is a table over the
- * modes (`SESSIONS_UNDER`, `DRAIN_OF`), so a mode added here with no line there fails the typecheck. `pauseDiagram` prints it for the
- * package's README, between `diagram:pause` markers. Pure.
+ * modes (`SESSIONS_UNDER`, `DRAIN_OF`), so a mode added with no line there fails the typecheck. The machine's words — its modes, its
+ * events, a move — are the contract's, which this file takes and hands on: the contract is written first and reads nothing of the
+ * code. `pauseDiagram` prints it for the package's README, between `diagram:pause` markers. Pure.
  *
  * Whether a process holds the pause is a fact beside the mode, not a mode: it decides when a `lapse` is seen, and nothing else.
  */
-import type { PauseMoved } from '../../contracts/pause-machine.contract.ts';
+import type { PauseEvent, PauseMode, PauseMove, PauseMoved } from '../../contracts/pause-machine.contract.ts';
 
-/**
- * What a store's pause gives the sessions at work: `none` where no pause stands; `holding`, a pause with no timeout, under which each
- * runs on to its end (a take-over's own); `draining`, a pause with a timeout, under which each stops when its tool call ends and is cut
- * once the timeout passes; `cut`, a timeout of 0, under which each call is cut at once. Under each of the three nothing new starts.
- */
-export type PauseMode = 'none' | 'holding' | 'draining' | 'cut';
+export type { PauseEvent, PauseMode, PauseMove, PauseRefusal } from '../../contracts/pause-machine.contract.ts';
 
 /** A mode a pause stands in: every mode but `none`. */
 export type PausedMode = Exclude<PauseMode, 'none'>;
-
-/**
- * What moves a store's pause: a pause put with no timeout (`put`), with one (`put-timeout`) or at once (`put-now`); the timeout of the
- * pause that stands cut to 0 (`cut`); a person's resume (`resume`); and the end of the process that holds the pause (`lapse`).
- */
-export type PauseEvent = 'put' | 'put-timeout' | 'put-now' | 'cut' | 'resume' | 'lapse';
-
-/** How a move is refused: a pause that stands in the way (`Conflict`), or none to act on (`Missing`). */
-export type PauseRefusal = 'Conflict' | 'Missing';
-
-/** What an event does to a store in a mode: moves it to another, leaves it as it stands, or is refused. */
-export type PauseMove =
-  | { readonly kind: 'edge'; readonly to: PauseMode }
-  | { readonly kind: 'stays' }
-  | { readonly kind: 'refused'; readonly as: PauseRefusal };
 
 /** Every mode, in the order the diagram names them. */
 export const PAUSE_MODES: readonly PauseMode[] = ['none', 'holding', 'draining', 'cut'];

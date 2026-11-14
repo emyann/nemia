@@ -11,10 +11,17 @@ export const API_VERSION = 'nemia/v1';
 /**
  * A schema that says what it is where its own description never reaches the document: `Schema.Number`, whose JSON side is a union with
  * the non-finite words, and `Schema.Unknown`, written as `{}`. Described as a union of that one member, which reads and writes the same.
+ *
+ * @param member The schema described.
+ * @param description What the field it is holds, as a client reads the schema alone.
  */
 export const describedOne = <S extends Schema.Top>(member: S, description: string) => Schema.Union([member]).annotate({ description });
 
-/** A number that says what it is (`describedOne`). */
+/**
+ * A number that says what it is (`describedOne`).
+ *
+ * @param description What the field it is holds, as a client reads the schema alone.
+ */
 export const describedNumber = (description: string) => describedOne(Schema.Number, description);
 
 /** The namespace an object is in when nobody names one. */

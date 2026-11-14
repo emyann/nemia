@@ -853,7 +853,6 @@
   "packages/objects/src/meta.ts": 1,
   "packages/objects/src/readiness.ts": 3,
   "packages/objects/src/reads.ts": 1,
-  "packages/objects/src/run.ts": 2,
   "packages/objects/src/table.ts": 1,
   "packages/objects/src/token.ts": 1,
   "packages/objects/src/watch.ts": 1,

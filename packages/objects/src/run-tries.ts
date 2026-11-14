@@ -86,6 +86,8 @@ export type StepCloseout = typeof StepCloseout.Type;
 /**
  * The names a narrowing query lists — `?fields=` of a closeout's `output`, `?diffs=` of a decision's paths — as JSON:API spells a sparse
  * fieldset: comma-separated, each name trimmed, an empty one naming none, `*` naming every one. Pure.
+ *
+ * @param fields The query's text, as it was sent.
  */
 export const fieldsNamed = (fields: string): string[] =>
   fields
@@ -112,6 +114,10 @@ export type BodyPage = { readonly from: number; readonly limit: number };
  * fields `fields` names — every one where it names `*`, and where it is not given those whose JSON is at most `SHORT_FIELD` characters —
  * those it left out named in `outputLeftOut`; the closeout as it came (`raw`) kept where `fields` names `*`, its `body` cut to the same
  * page (`rawPaged`), else left out, as null. Pure.
+ *
+ * @param closeout The closeout read whole.
+ * @param fields The names `?fields=` lists (`fieldsNamed`), or undefined where it was not given.
+ * @param body The page of its `body` asked for: the character it starts at, and how many it holds at most.
  */
 export const closeoutNarrowed = (
   closeout: StepCloseout,

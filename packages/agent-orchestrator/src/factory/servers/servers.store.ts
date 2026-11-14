@@ -42,7 +42,11 @@ const FactoryServersSchema = Schema.StructWithRest(Schema.Struct({ servers: Sche
   Schema.Record(Schema.String, Schema.Unknown),
 ]);
 
-/** The file the factory `name`'s servers are kept in, under the store `home`. Refused (`Invalid`): a name that is no factory's. */
+/**
+ * The file the factory `name`'s servers are kept in, under the store `home`. Refused (`Invalid`): a name that is no factory's.
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export function factoryServersFile(home: string, name: string): string {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
@@ -52,6 +56,8 @@ export function factoryServersFile(home: string, name: string): string {
 /**
  * The factory `name`'s servers, or `undefined` where none was written. Refused (`Invalid`), naming the file, its first wrong field and
  * the command that writes it again, where it does not read as a record.
+ * @param home The store's root.
+ * @param name The factory's name.
  */
 export function readFactoryServers(home: string, name: string): FactoryServersFile | undefined {
   const file = factoryServersFile(home, name);
@@ -77,7 +83,11 @@ export function readFactoryServers(home: string, name: string): FactoryServersFi
   return read.success;
 }
 
-/** The factory `name`'s servers, `{}` where none was written: what a caller that only reads them takes. */
+/**
+ * The factory `name`'s servers, `{}` where none was written: what a caller that only reads them takes.
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export const factoryServers = (home: string, name: string): FactoryServers => readFactoryServers(home, name)?.servers ?? {};
 
 /**
@@ -88,6 +98,9 @@ export const factoryServers = (home: string, name: string): FactoryServers => re
  *
  * A record with no server is removed, with whatever else it held: the record is the servers, and a stamp of a record that no longer
  * exists is no fact. So a re-read finds none rather than an empty map.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param servers The factory's servers by name, all of them; none removes the record.
  */
 export function writeFactoryServers(home: string, name: string, servers: FactoryServers): void {
   const file = factoryServersFile(home, name);
@@ -118,6 +131,7 @@ export const BUILTIN_SERVERS = path.join(import.meta.dirname, '..', '..', '..', 
  *
  * An absent folder is an empty list, never a throw, since git commits no empty directory; and a file that does not read is left out
  * rather than failing the read, since one bad builtin file must not blank the add form.
+ * @param dir The folder the builtin servers' files are read from, the package's `BUILTIN_SERVERS` in use.
  */
 export const builtinServers = (dir: string): readonly BuiltinServer[] => {
   let files: string[];

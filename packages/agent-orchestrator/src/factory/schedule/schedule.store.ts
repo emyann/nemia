@@ -9,7 +9,10 @@ import type { Schedule } from '../factory.ts';
 import type { ScheduleTry } from './schedule.ts';
 import { writeWhole } from '../../whole-file/whole-file.store.ts';
 
-/** Where the tick keeps its tries of the factories' schedules: `$WF_ROOT/schedules`, a folder per factory. */
+/**
+ * Where the tick keeps its tries of the factories' schedules: `$WF_ROOT/schedules`, a folder per factory.
+ * @param home The store's root.
+ */
 export const schedulesDir = (home: string): string => path.join(home, 'schedules');
 
 /** The try file of the schedule of `workflow` in `factory`. */
@@ -27,7 +30,12 @@ const ScheduleTrySchema = Schema.StructWithRest(
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
 
-/** The tick's kept try of the schedule of `workflow` in `factory`; none when there is no file, or it does not read as one. */
+/**
+ * The tick's kept try of the schedule of `workflow` in `factory`; none when there is no file, or it does not read as one.
+ * @param home The store's root.
+ * @param factory The factory's name.
+ * @param workflow The name of the workflow the schedule starts.
+ */
 export function readScheduleTry(home: string, factory: string, workflow: string): ScheduleTry | undefined {
   try {
     const decoded = Schema.decodeUnknownResult(ScheduleTrySchema)(JSON.parse(fs.readFileSync(tryFile(home, factory, workflow), 'utf8')));
@@ -37,14 +45,24 @@ export function readScheduleTry(home: string, factory: string, workflow: string)
   }
 }
 
-/** The tick's try of the schedule of `workflow` in `factory`, written whole: a hidden file renamed over it. */
+/**
+ * The tick's try of the schedule of `workflow` in `factory`, written whole: a hidden file renamed over it.
+ * @param home The store's root.
+ * @param factory The factory's name.
+ * @param workflow The name of the workflow the schedule starts.
+ * @param tried The try to keep: the fire it was for, when, and the run it started or why it did not.
+ */
 export function putScheduleTry(home: string, factory: string, workflow: string, tried: ScheduleTry): void {
   const file = tryFile(home, factory, workflow);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeWhole(file, `${JSON.stringify(tried, null, 2)}\n`);
 }
 
-/** The cron `cron` read in the zone `tz`, the machine's when none, or why it does not read: `Cron.parse`'s own words. */
+/**
+ * The cron `cron` read in the zone `tz`, the machine's when none, or why it does not read: `Cron.parse`'s own words.
+ * @param cron The cron expression.
+ * @param tz The time zone it is read in, or undefined for the machine's.
+ */
 export function cronOf(cron: string, tz: string | undefined): Cron.Cron | { error: string } {
   const parsed = Cron.parse(cron, tz);
   return Result.isSuccess(parsed) ? parsed.success : { error: parsed.failure.message };
@@ -54,6 +72,8 @@ export function cronOf(cron: string, tz: string | undefined): Cron.Cron | { erro
  * The fires of `schedule` around `now`, in milliseconds: the latest at or before it, to the second (`Cron.prev` alone is strict, and would
  * see a pass landing on a fire one fire late), and the next after it; or why there are none: a cron that does not read, or one that reads
  * and never fires, such as the 30th of February, which `Cron` says by throwing.
+ * @param schedule The schedule: its cron and its time zone, the machine's where it names none.
+ * @param now The time the fires are read around, in milliseconds since the epoch.
  */
 export function firesOf(schedule: Pick<Schedule, 'cron' | 'tz'>, now: number): { latest: number; next: number } | { error: string } {
   const cron = cronOf(schedule.cron, schedule.tz);

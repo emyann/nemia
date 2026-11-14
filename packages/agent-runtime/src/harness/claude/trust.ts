@@ -15,10 +15,15 @@ export const claudeConfigFile = (): string =>
 /**
  * The path Claude Code keeps its trust of the folder `dir` under: the root of the repository's main checkout where `repository` names
  * it, which a subfolder and a linked worktree are trusted by, else the folder itself, each resolved.
+ * @param dir The folder a session runs in.
+ * @param repository The root of the repository's main checkout; absent where the folder is in no repository.
  */
 export const claudeTrustKey = (dir: string, repository?: string): string => path.resolve(repository ?? dir);
 
-/** Whether `key` is the home directory, whose trust Claude Code holds for one session and never keeps in its file. */
+/**
+ * Whether `key` is the home directory, whose trust Claude Code holds for one session and never keeps in its file.
+ * @param key The path a trust is kept under (`claudeTrustKey`).
+ */
 export const claudeNeverKeeps = (key: string): boolean => key === path.resolve(os.homedir());
 
 /** `value` as an object with keys, or undefined for anything else, an array included. */
@@ -28,6 +33,8 @@ const record = (value: unknown): Record<string, unknown> | undefined =>
 /**
  * Whether `file` (Claude Code's `.claude.json` by default) says the folder `dir` was trusted: its `projects` entry for the folder's
  * resolved path with `hasTrustDialogAccepted: true`. False for a file that is not there or does not read as such an object.
+ * @param dir The folder asked about.
+ * @param file The `.claude.json` to read; Claude Code's own (`claudeConfigFile`) unless given.
  */
 export const claudeTrusts = (dir: string, file: string = claudeConfigFile()): boolean => {
   let parsed: unknown;
@@ -51,6 +58,8 @@ type TrustText = { readonly trusted: true } | { readonly text: string } | { read
  * had. Answers `trusted` where the key is already true, and `unread` for a text that is no JSON object, or whose `projects` or entry
  * for `key` is no object. Pure.
  * Exported only for the tests that import it.
+ * @param text The `.claude.json`'s text, as read.
+ * @param key The path the trust is kept under (`claudeTrustKey`).
  */
 export function claudeTrustText(text: string, key: string): TrustText {
   let parsed: unknown;
@@ -121,6 +130,9 @@ function replaced(file: string, was: Buffer, text: string, read: (file: string) 
  * replaced. A session may rewrite the file at any moment, so the new text replaces the file only while it still holds the bytes read
  * (`read`, the file's bytes by default), and the write starts again where it does not, five times at most. Refuses, writing nothing, a
  * file that does not read (`claudeTrustText`) and one that changed every time, each in words that name what to do.
+ * @param key The path the trust is kept under (`claudeTrustKey`).
+ * @param file The `.claude.json` to read and write; Claude Code's own (`claudeConfigFile`) unless given.
+ * @param read What reads the file's bytes, null where it is not there; the file's own bytes unless a test hands its own.
  */
 export function claudeTrust(key: string, file: string = claudeConfigFile(), read: (file: string) => Buffer | null = bytesOf): TrustWritten {
   const byHand = `run Claude Code in ${key} once and accept its prompt`;

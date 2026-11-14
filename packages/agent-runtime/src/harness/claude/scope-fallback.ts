@@ -59,6 +59,10 @@ const spawnedOf = (stdin: PassThrough, stdout: PassThrough, events: EventEmitter
 /**
  * Starts `o.command` behind `scope`, falling back to it bare. `started` is told each process started, scoped then bare, before it is
  * handed on; `bare` is told why, where the scope was refused.
+ * @param scope The argv the command is run behind to start it in its scope.
+ * @param o What the SDK asks to start: the command, its arguments, its folder, its environment and the signal that aborts it.
+ * @param started Told each process started, scoped then bare.
+ * @param bare Told why the scope was refused, where it was.
  */
 export const scopedOrBare = (
   scope: readonly string[],

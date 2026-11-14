@@ -43,6 +43,15 @@ const alwaysOption = (suggestions: PermissionUpdate[]): AskOption => ({
   description: `Run this call, and save what Claude Code suggests: ${suggestions.map(updateOf).join('; ')}.`,
 });
 
+/**
+ * The ask a call Claude Code would prompt for is held as: one question, titled by what the SDK handed over, whose choices are Allow
+ * once, Always allow where the SDK suggests rules to save and does not suppress them, and Deny.
+ * @param id The call's id, the ask's own.
+ * @param at When the call was held, ISO.
+ * @param tool The tool's name, as the call names it.
+ * @param input The call's input, read for a shell call's command.
+ * @param offer What the SDK handed `canUseTool` about the prompt: its words, its hints and the rules it suggests saving.
+ */
 export const permissionAskOf: PermissionAskOf = (id, at, tool, input, offer) => {
   const suggestions = offer.suggestions ?? [];
   const always = offer.suppressAlwaysAllowRule !== true && suggestions.length > 0;
@@ -74,6 +83,13 @@ export const permissionAskOf: PermissionAskOf = (id, at, tool, input, offer) => 
   };
 };
 
+/**
+ * What the held call returns to the SDK for the person's answer: Allow once runs it, Always allow runs it and saves the suggested rules
+ * where they were offered, Deny or an empty answer refuses it, and any other words refuse it with those words as what the session is
+ * told.
+ * @param held What the held call kept while it waited: its input, whether Always was offered, and the SDK's suggestions.
+ * @param given The person's answer, a choice's label or words of their own; absent where no answer reached the call (`ASK_CUT`).
+ */
 export const permissionAnswered: PermissionAnswered = (held, given) => {
   if (given === undefined) return { behavior: 'deny', message: ASK_CUT };
   if (given === PERMISSION_ONCE) return { behavior: 'allow', updatedInput: held.input };

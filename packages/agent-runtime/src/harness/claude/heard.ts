@@ -44,12 +44,17 @@ const HeardSchema = Schema.Struct({
 const decodeInfo = Schema.decodeUnknownOption(RateLimitInfoSchema);
 const decodeHeard = Schema.decodeUnknownOption(HeardSchema);
 
-/** Where the store at `root` keeps the newest event its Claude Code sessions heard: one file, for every session. */
+/**
+ * Where the store at `root` keeps the newest event its Claude Code sessions heard: one file, for every session.
+ * @param root The store's root folder.
+ */
 export const claudeHeardFile = (root: string): string => path.join(root, 'quota', 'claude.json');
 
 /**
  * What an event's `rate_limit_info` says, received at `at` (ms since the epoch): each window of its `unifiedWindows`, its use in percent
  * to a tenth, its reset ISO or null, and its status. Null where it does not decode, or names no window. Pure.
+ * @param info The event's `rate_limit_info`, as the SDK handed it, undecoded.
+ * @param at When the event was received, in ms since the epoch.
  */
 export function heardOf(info: unknown, at: number): HeardQuota | null {
   const decoded = Option.getOrNull(decodeInfo(info));
@@ -64,7 +69,10 @@ export function heardOf(info: unknown, at: number): HeardQuota | null {
   return { at: new Date(at).toISOString(), limits };
 }
 
-/** The newest reading the store's sessions heard, kept on `file`; null where none is, or it does not decode. */
+/**
+ * The newest reading the store's sessions heard, kept on `file`; null where none is, or it does not decode.
+ * @param file The store's heard file (`claudeHeardFile`).
+ */
 export const readHeard = (file: string): HeardQuota | null => {
   const held = decodedFile(file, decodeHeard);
   return held && { at: held.at, limits: held.limits.map((l) => ({ ...l })) };
@@ -74,6 +82,9 @@ export const readHeard = (file: string): HeardQuota | null => {
  * Keeps the event `info` a session received at `at` on `file`, written whole, where it names a window (`heardOf`) and no reading received
  * later is kept there already: sessions run side by side, and the newest is the one the plan is at. Answers whether it was kept. Never
  * throws: what a session hears of the plan is not worth its turn, so a write that fails answers `false` and leaves the reading before it.
+ * @param file The store's heard file (`claudeHeardFile`).
+ * @param info The event's `rate_limit_info`, as the SDK handed it, undecoded.
+ * @param at When the session received the event, in ms since the epoch.
  */
 export const keepHeard = (file: string, info: unknown, at: number): boolean => {
   const heard = heardOf(info, at);

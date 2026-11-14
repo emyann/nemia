@@ -31,6 +31,8 @@ export type HoldIO = { holdFile: string; drainFile: string; holdMs: number; hold
  * - The matchers leave `onFailure` (SDK 0.3.317 and after) at its default, `continue`: a hold is not a fence, so a callback that throws
  *   lets its call go on to the permission flow, where `block` would stop every call of the session on one failed read of the drain. Every
  *   callback here and in the attached session's (`hooksOf`) returns on every path: one that returns nothing counts as failing.
+ * @param io The job's hold file, the store's sessions' drain file, the hold's bound and the poll, both in ms.
+ * @param ended Called once the job parks, to end its session.
  */
 export const jobHoldOf = (io: HoldIO, ended: () => void) => {
   const calls: CallsInFlight = new Map();

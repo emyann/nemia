@@ -7,7 +7,11 @@
 import type { DeliveryKept, SubscriptionDelivered } from '../../contracts/subscription-status.contract.ts';
 import type { KeptDelivery } from '../subscription/index.ts';
 
-/** Where the deliverer is with a subscription, as its status says it. */
+/**
+ * Where the deliverer is with a subscription, as its status says it.
+ * @param sub The subscription, whose task and start the file must match.
+ * @param kept The deliverer's file read down, or undefined where it has none: then the cursor is the subscription's start.
+ */
 export const subscriptionDelivered: SubscriptionDelivered = (sub, kept) => {
   if (kept === undefined || kept.of.task !== sub.task || kept.of.from !== sub.from) return { cursor: sub.from, pending: 0 };
   return {
@@ -17,7 +21,10 @@ export const subscriptionDelivered: SubscriptionDelivered = (sub, kept) => {
   };
 };
 
-/** The deliverer's file read down to what the status says of it: whose it is, its cursor, its digest's length, and its first fold's ms. */
+/**
+ * The deliverer's file read down to what the status says of it: whose it is, its cursor, its digest's length, and its first fold's ms.
+ * @param kept The deliverer's file as the store keeps it.
+ */
 export const deliveryKept = (kept: KeptDelivery): DeliveryKept => ({
   of: { task: kept.of.task, from: kept.of.from },
   cursor: kept.cursor,

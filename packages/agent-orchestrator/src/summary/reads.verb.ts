@@ -45,7 +45,11 @@ export const viewsOf = Effect.fn('viewsOf')(function* (run: Run, reader: Engine)
   return views satisfies Views;
 });
 
-/** The first task of a run's whose journal a read left out (`viewsFor`), and why; undefined for a run whose every task read. */
+/**
+ * The first task of a run's whose journal a read left out (`viewsFor`), and why; undefined for a run whose every task read.
+ * @param run The run whose tasks were read.
+ * @param unreadable Why each task whose journal did not read did not, by task id.
+ */
 export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string; why: string } | undefined {
   for (const taskId of runTasks(run)) {
     const why = unreadable.get(taskId);
@@ -114,6 +118,8 @@ export const viewsFor = Effect.fn('viewsFor')(function* (e: Engine, runs: readon
  * The engine as a request that has read `views` sees it: `view` answers from them, and everything else is the engine's own. What the
  * `parentRead` is handed on the list and on a run's detail, so reading the runs a run waits on observes no harness again — the
  * list is what the Factory polls. A task the read did not see, filed since, is viewed.
+ * @param e The engine.
+ * @param views The engine's views of the tasks the request read.
  */
 export const seenBy = (e: Engine, views: Views): Engine => ({
   ...e,
@@ -157,6 +163,8 @@ const stopped = (why: string): string => (/[.!?]$/.test(why) ? why : `${why}.`);
  * `nemia start`. So a folder that does not read is a warning, not a failure of the request. On a run that froze its workflow, the warning
  * says nothing the page draws comes from the folder. On a run that froze none, it is the folder's words alone: such a run is not judged
  * (`judgedUnlessUnreadable` answers `unloadedWords`), and its page says that instead.
+ * @param run The run whose workflow folder is read.
+ * @param home The store's root folder.
  */
 export function workflowsOf(run: Run, home: string): { steps: StepSpec[]; warning: null } | { steps: null; warning: string } {
   const { fills, unread } = factoryRead(run, home);
@@ -184,6 +192,7 @@ export function workflowsOf(run: Run, home: string): { steps: StepSpec[]; warnin
 /**
  * `workflowsOf` for each run it is asked about, each folder loaded once for the life of the reader: one for a request, so a list of many
  * runs of a handful of folders loads a handful, and none is kept past it, since no stamp watches a folder.
+ * @param home The store's root folder.
  */
 export function folderReader(home: string): (run: Run) => ReturnType<typeof workflowsOf> {
   const loaded = new Map<string, ReturnType<typeof workflowsOf>>();
@@ -207,6 +216,8 @@ export function folderReader(home: string): (run: Run) => ReturnType<typeof work
  * not shown: the tick never files it, and drawn, it would wait for ever and make a root of the graph the
  * run froze — `driftOf` names it instead. On a record that froze none, the folder, whose added steps the
  * tick does file.
+ * @param run The run, whose record's steps come first.
+ * @param workflows The steps of the workflow the tick reads, or null where it does not read.
  */
 export function stepNames(run: Run, workflows: readonly StepSpec[] | null): string[] {
   const added = (run.workflow ?? workflows ?? []).map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
@@ -217,14 +228,23 @@ export function stepNames(run: Run, workflows: readonly StepSpec[] | null): stri
  * The steps a run is judged by: the workflow it froze at `nemia start`, in the order its steps run, as the tick reads it
  * (`frozenStepsOf`), and for a record that froze none, the folder. A record whose folder does not read is
  * judged from the record alone, a `bare` step each.
+ * @param run The run, whose frozen workflow is read first.
+ * @param folder The steps of the run's folder, or null where it does not read.
  */
 export const judgedSteps = (run: Run, folder: readonly StepSpec[] | null): readonly StepSpec[] =>
   frozenStepsOf(run) ?? folder ?? Object.keys(run.steps).map(bare);
 
-/** A step nothing defines: all the record says of it is its name, with no `after`, `check:` or `output:`. */
+/**
+ * A step nothing defines: all the record says of it is its name, with no `after`, `check:` or `output:`.
+ * @param name The step's name on the record.
+ */
 export const bare = (name: string): StepSpec => ({ name, after: [], body: '' });
 
-/** The agent a run tried, when it is a try: started from a folder directly under `tries/`. Null for every other run. */
+/**
+ * The agent a run tried, when it is a try: started from a folder directly under `tries/`. Null for every other run.
+ * @param run The run, whose workflow folder is asked of.
+ * @param home The store's root folder, whose `tries/` folder is looked in.
+ */
 export function tryOf(run: Pick<Run, 'workflowDir'>, home: string): { agent: string } | null {
   const dir = path.resolve(run.workflowDir);
   return path.dirname(dir) === path.resolve(triesDir(home)) ? { agent: path.basename(dir) } : null;

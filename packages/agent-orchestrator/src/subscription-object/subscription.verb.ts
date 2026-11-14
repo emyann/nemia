@@ -18,6 +18,10 @@ import { deliveryKept, subscriptionDelivered } from './subscription.ts';
 /**
  * The object of the subscription `listed`, of where the deliverer is with it (`delivered`, its file read down, or undefined where none
  * is), born at `born`, with the words of why the deliverer's file did not read where it did not (`error`).
+ * @param listed The subscription as the store lists it.
+ * @param delivered The deliverer's file read down, or undefined where none is or it did not read.
+ * @param born When the subscription was made, an ISO timestamp.
+ * @param error Why the deliverer's file did not read, or undefined where it read or there is none.
  */
 export const subscriptionObjectOf = (listed: Listed, delivered: DeliveryKept | undefined, born: string, error?: string): Subscription => {
   const { task, selectors, digestEvery, from, scope } = listed.subscription;

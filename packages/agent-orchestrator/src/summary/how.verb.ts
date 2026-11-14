@@ -9,6 +9,7 @@ import type { SummaryHow } from './summary.verb.ts';
 /**
  * How a read of the list reads, as the inbox's do: the store the program is given, the informer its caller keeps, verified as the
  * program's settings say (`WF_VERIFY_REST`); a caller that keeps none judges every run.
+ * @param kept What the caller keeps across reads, whose informer memo of the runs is used; undefined for a caller that keeps none.
  */
 export const howOf = (kept?: Kept) =>
   Effect.gen(function* () {

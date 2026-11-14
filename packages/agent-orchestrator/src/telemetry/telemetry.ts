@@ -37,6 +37,7 @@ export const DEFAULT_SERVICE_NAME = 'nemia';
  * The OTLP export `env` asks for: its endpoint, `OTEL_EXPORTER_OTLP_ENDPOINT`, without a trailing `/`, its service,
  * `OTEL_SERVICE_NAME` or `nemia`, and each signal's interval its `EXPORT_INTERVALS` variable gives; one that is no whole number of ms
  * from 1 is left to the exporter, and said by `exportIntervalRefusalOf`. Answers undefined, no export, when the endpoint is unset or blank.
+ * @param env The process's environment.
  */
 export function otlpOf(env: Readonly<Record<string, string | undefined>>): Otlp | undefined {
   const url = env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim().replace(/\/+$/, '');
@@ -49,7 +50,10 @@ export function otlpOf(env: Readonly<Record<string, string | undefined>>): Otlp 
   return { url, serviceName: env.OTEL_SERVICE_NAME?.trim() || DEFAULT_SERVICE_NAME, every };
 }
 
-/** Why an `EXPORT_INTERVALS` variable of `env` is not read, in a sentence that names the fix, or `undefined` when each is read or unset. */
+/**
+ * Why an `EXPORT_INTERVALS` variable of `env` is not read, in a sentence that names the fix, or `undefined` when each is read or unset.
+ * @param env The process's environment.
+ */
 export function exportIntervalRefusalOf(env: Readonly<Record<string, string | undefined>>): string | undefined {
   for (const name of Object.values(EXPORT_INTERVALS)) {
     const ms = intervalOf(env, name);
@@ -66,6 +70,7 @@ const TOOL_DETAILS = 'NEMIA_TOOL_DETAILS';
  * Where the sessions the engine starts export, as the runtime takes it: the collector `env` names (`otlpOf`), and `toolDetails` when
  * `NEMIA_TOOL_DETAILS` is `1`, for each session to export its tools' inputs too (a command's text, a file's path, an error's words).
  * Answers undefined, no export, without a collector, whatever `NEMIA_TOOL_DETAILS` says; any value but `1` leaves the inputs off.
+ * @param env The process's environment.
  */
 export function sessionTelemetryOf(
   env: Readonly<Record<string, string | undefined>>,
@@ -75,7 +80,10 @@ export function sessionTelemetryOf(
   return env[TOOL_DETAILS]?.trim() === '1' ? { endpoint: otlp.url, toolDetails: true } : { endpoint: otlp.url };
 }
 
-/** Why `env`'s `NEMIA_TOOL_DETAILS` asks nothing, in a sentence that names the fix, or `undefined` when it is unset, blank, `0` or `1`. */
+/**
+ * Why `env`'s `NEMIA_TOOL_DETAILS` asks nothing, in a sentence that names the fix, or `undefined` when it is unset, blank, `0` or `1`.
+ * @param env The process's environment.
+ */
 export function toolDetailsRefusalOf(env: Readonly<Record<string, string | undefined>>): string | undefined {
   const value = env[TOOL_DETAILS];
   if (value === undefined || ['', '0', '1'].includes(value.trim())) return undefined;
@@ -85,6 +93,8 @@ export function toolDetailsRefusalOf(env: Readonly<Record<string, string | undef
 /**
  * The labels a step's task is filed with and its spans and logs say: the run `run`, and the step's own (`stepKeys`): its factory, its
  * workflow, the step and its agent, the same its metrics are kept by. Its sessions' telemetry says them beside the runtime's own task.
+ * @param run The run the step is of.
+ * @param step The step.
  */
 export const stepLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, step: StepSpec): StepLabels => ({
   run: run.id,
@@ -97,24 +107,36 @@ export type StepLabels = StepKeys & { run: string };
 /**
  * The labels a run is known by whatever the step, from the same source as a step's (`runKeys`): its id, its factory and its workflow.
  * What a line of the feed about the run itself carries.
+ * @param run The run.
  */
 export const runLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>): Pick<StepLabels, 'run' | 'factory' | 'workflow'> => ({
   run: run.id,
   ...runKeys(run),
 });
 
-/** Where an OTLP collector at `otlp` takes traces. */
+/**
+ * Where an OTLP collector at `otlp` takes traces.
+ * @param otlp The OTLP export, whose collector's address is read.
+ */
 export const tracesUrl = (otlp: Otlp): string => `${otlp.url}/v1/traces`;
 
-/** Where an OTLP collector at `otlp` takes logs. */
+/**
+ * Where an OTLP collector at `otlp` takes logs.
+ * @param otlp The OTLP export, whose collector's address is read.
+ */
 export const logsUrl = (otlp: Otlp): string => `${otlp.url}/v1/logs`;
 
-/** Where an OTLP collector at `otlp` takes metrics. */
+/**
+ * Where an OTLP collector at `otlp` takes metrics.
+ * @param otlp The OTLP export, whose collector's address is read.
+ */
 export const metricsUrl = (otlp: Otlp): string => `${otlp.url}/v1/metrics`;
 
 /**
  * A log's `message` as `nemia up` prints it: the time of `date`, `HH:MM:SS` in UTC, two spaces, then the message — its parts joined by a
  * space when it was logged as several, each as it is when a string, else as JSON.
+ * @param message The log's message: a string, or an array of its parts.
+ * @param date When the log was made.
  */
 export function lineOf(message: unknown, date: Date): string {
   const parts = Array.isArray(message) ? message : [message];

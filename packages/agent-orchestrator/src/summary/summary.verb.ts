@@ -216,6 +216,9 @@ export type JudgedRun = Omit<JudgedFields, 'atWork' | 'tokens'>;
 /**
  * A run's judged fields (`JudgedFields`): `judge`'s reading of the run as a door carries it (`runSaid`), and its time at work and tokens
  * off the views the judgement read (`atWork`, `runTokens`). The one assembly of them: the list's row and the run's object each call it.
+ * @param run The run, read down to its steps.
+ * @param judged The judgement's reading of the run.
+ * @param views The engine's views of the tasks the judgement read.
  */
 export function judgedFields(run: Pick<Run, 'steps'>, judged: JudgedRun, views: Views): JudgedFields {
   return {
@@ -266,6 +269,7 @@ function stepSince(run: Run, name: string, views: Views): string | null {
 /**
  * A run's summary but when it started, which is read off the feed on each request: off its judgement (`Judgement`), the one the run's
  * object reads too, so the list's row and the object say the run alike (Q18). Pure but for `home`, where a try's agent is read from.
+ * @param home The store's root folder, where a try's agent is read from.
  */
 export function summaryOf({ run, names, steps, views, judged }: Judgement, home: string): Omit<RunSummary, 'startedAt'> {
   const agentOf = (name: string) => steps.find((step) => step.name === name)?.agent?.name ?? null;

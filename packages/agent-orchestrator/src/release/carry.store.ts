@@ -24,7 +24,10 @@ export const pinnedHarnesses = (): PinnedHarness[] =>
     declaration.needs === undefined ? [] : [{ name, needs: declaration.needs }],
   );
 
-/** The folder of the tools folder each harness is installed under, `<tools>/harnesses/<name>/<version>/`. */
+/**
+ * The folder of the tools folder each harness is installed under, `<tools>/harnesses/<name>/<version>/`.
+ * @param home The store's folder.
+ */
 export const harnessesDir = (home: string): string => path.join(toolsDir(home), 'harnesses');
 
 /** Whether `file` is a folder (`directory`) or a file (`file`), followed through a link; false where nothing is there. */
@@ -48,6 +51,8 @@ const deactivated = (home: string, name: string): boolean => isA(path.join(harne
 /**
  * The harnesses of `pinned` the tools folder of the store at `home` holds activated: a `<tools>/harnesses/<name>/` folder of each, with
  * no removal's mark in it (`deactivated`).
+ * @param home The store's folder.
+ * @param pinned The harnesses whose adapters declare needs, every one where absent.
  */
 export const activatedHarnesses = (home: string, pinned: readonly PinnedHarness[] = pinnedHarnesses()): string[] =>
   pinned.filter((h) => isA(path.join(harnessesDir(home), h.name), 'directory') && !deactivated(home, h.name)).map((h) => h.name);
@@ -55,6 +60,10 @@ export const activatedHarnesses = (home: string, pinned: readonly PinnedHarness[
 /**
  * The program `program` that the tree at `tree` carries in a platform package of this machine — `node_modules/<scope>/<name>-<platform>-
  * <arch>/<program>`, or one with no scope — the first by name; undefined where it carries none.
+ * @param tree The release's tree whose `node_modules` is searched.
+ * @param program The program's file name, as the harness's needs name it.
+ * @param platform The platform of the package, this machine's where absent.
+ * @param arch The architecture of the package, this machine's where absent.
  */
 export function bundledProgramIn(
   tree: string,
@@ -73,16 +82,26 @@ export function bundledProgramIn(
     .find((file) => isA(file, 'file'));
 }
 
-/** The harnesses of `pinned` some tree of `trees` carries its program of (`bundledProgramIn`). */
+/**
+ * The harnesses of `pinned` some tree of `trees` carries its program of (`bundledProgramIn`).
+ * @param trees The release trees searched.
+ * @param pinned The harnesses whose adapters declare needs, every one where absent.
+ */
 export const bundledHarnesses = (trees: readonly string[], pinned: readonly PinnedHarness[] = pinnedHarnesses()): string[] =>
   pinned.filter((h) => trees.some((tree) => bundledProgramIn(tree, h.needs.program) !== undefined)).map((h) => h.name);
 
-/** The trees of the releases installed in the store at `home` (`installedReleases`): each `releases/<tag>/`, never the pointer. */
+/**
+ * The trees of the releases installed in the store at `home` (`installedReleases`): each `releases/<tag>/`, never the pointer.
+ * @param home The store's folder.
+ */
 export const releaseTrees = (home: string): string[] => installedReleases(home).map((r) => releaseDir(r.tag, home));
 
 /**
  * What the store at `home` holds of the harnesses: activated in its tools folder, and carried by any of `trees` — but one a person
  * deactivated (`deactivated`), which an older release's tree still carrying it brings back neither way.
+ * @param home The store's folder.
+ * @param trees The release trees searched for bundled programs.
+ * @param pinned The harnesses whose adapters declare needs, every one where absent.
  */
 export const harnessesHeld = (
   home: string,
@@ -96,6 +115,8 @@ export const harnessesHeld = (
 /**
  * Whether the harness `harness` is at this release's pin in the store at `home`: the tools folder's `bin/<program>` resolves into its
  * pin's folder, `<tools>/harnesses/<name>/<pin>/`, as its install and an adoption at the pin both link it.
+ * @param home The store's folder.
+ * @param harness The harness and its needs, whose pin and program are read.
  */
 export function atPin(home: string, harness: PinnedHarness): boolean {
   try {
@@ -119,6 +140,10 @@ export type CarryRan = { readonly harnesses: readonly HarnessCarried[]; readonly
  * at its pin already (`atPin`) is said and left; each other's `install` runs in turn, synchronously, as `sh -c` in the store's folder over
  * `env`, with `NEMIA_TOOLS` the tools folder and its `bin/` first on PATH, its output the process's. Each is said by `say`, and the
  * carry ends 1 once any install fails, after trying the rest.
+ * @param home The store's folder, where each install runs.
+ * @param env The environment each install runs over.
+ * @param tree The tree of the release this code runs from.
+ * @param say Where each line said of a harness goes, the console where absent.
  */
 export function carryHarnesses(
   home: string,
@@ -190,6 +215,10 @@ export type Adopted = { readonly name: string; readonly version: string; readonl
  * version read off its bundling package, `bundledVersionOf`), by a copy beside it renamed into place so no reader meets half of it, and
  * linked as `<tools>/bin/<program>`. A harness whose program the folder holds, one a person deactivated (`deactivated`), or one no tree
  * carries, is left. Answers what it adopted.
+ * @param home The store's folder.
+ * @param trees The release trees searched, the first that carries a program giving it.
+ * @param platform The platform of the package, this machine's where absent.
+ * @param arch The architecture of the package, this machine's where absent.
  */
 export function adoptBundled(
   home: string,

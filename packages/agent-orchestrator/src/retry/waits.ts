@@ -41,6 +41,7 @@ export const WAITS_ON_PERSON: Record<StepReason, boolean> = {
  * What waits on the person in a step's standing (`retryable`'s answer), in words they read, or undefined where nothing does: its reason
  * (`WAITS_ON_PERSON`), a session asking through its harness said as such; a try that sends the work back from a gate (`sendsBack`); a
  * try past its cap (`raise`).
+ * @param standing What `retryable` answers of the step.
  */
 export function waitsOnPerson(standing: ReturnType<typeof retryable>): string | undefined {
   if (WAITS_ON_PERSON[standing.reason]) return standing.via === 'session' ? 'its session waits on you' : `it is ${standing.status}`;

@@ -107,9 +107,19 @@ type Judged = Asked &
  * and needs no `--budget`. A step the run tries again itself is told so before any of these, so no refusal's fix is a `--budget` that
  * would be refused next.
  *
+ * @param steps The run's steps.
+ * @param run The run's record.
+ * @param name The step the ask names.
+ * @param how How the try is asked for.
+ * @param phaseOf The phase of a task by its id.
+ * @param closeoutOf The closeout of a step by its name: left out, none has one.
+ * @param askedCloseout What the engine says of the closeout a task was asked for: left out, none was asked.
+ * @param verdictOf The verdict of a step's check by its name: left out, none has one.
+ * @param asks The asks of the run already waiting: left out, none.
  * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`). Left out, a step whose session is blocked is
  *   running, and refused.
  * @param spendOf What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and `--budget` is refused on every one.
+ * @param checkKillOf What the machine's OOM killer did to each step's current check: left out, it killed nothing.
  * @param tipOf Where each branch of the run is now (`blockedRecheck`): left out, no blocked step may be rechecked, each told why.
  */
 export function retryRefusal(

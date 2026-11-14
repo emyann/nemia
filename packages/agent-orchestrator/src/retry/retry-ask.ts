@@ -23,7 +23,10 @@ export type { RetryMode };
  */
 export const FORMER_MODES = { nudge: 'continue' } as const satisfies Readonly<Record<string, RetryMode>>;
 
-/** A mode or a try's cause under the word it has now: a former spelling (`FORMER_MODES`) as its mode, anything else as it is. Pure. */
+/**
+ * A mode or a try's cause under the word it has now: a former spelling (`FORMER_MODES`) as its mode, anything else as it is. Pure.
+ * @param value The mode or cause as it was read.
+ */
 export const upgradeMode = (value: unknown): unknown =>
   typeof value === 'string' && Object.hasOwn(FORMER_MODES, value) ? FORMER_MODES[value as keyof typeof FORMER_MODES] : value;
 
@@ -34,6 +37,7 @@ export const upgradeMode = (value: unknown): unknown =>
  * the try continues that one rather than starting cold. For a later turn of a task held open, that is the session that signed the turn
  * before, which asked the question the turn answered. Undefined for a task with no attempt, and for one whose last attempt started cold and
  * left no id. Pure; typed by what it reads, so this file imports no runtime.
+ * @param attempts The attempts of the task before the try, or undefined where there is no task.
  */
 export const continuesFrom = (
   attempts: ReadonlyArray<{ nativeId: string | null; resumeFrom?: string }> | undefined,
@@ -49,7 +53,10 @@ export const continuesFrom = (
  */
 export type { TryCause };
 
-/** An ask file's JSON with its mode in the word it has now (`upgradeMode`), before its schema reads it. Pure. */
+/**
+ * An ask file's JSON with its mode in the word it has now (`upgradeMode`), before its schema reads it. Pure.
+ * @param read An ask file's JSON, as parsed.
+ */
 export const upgradeAsk = (read: unknown): unknown =>
   isObject(read) && !Array.isArray(read) && Object.hasOwn(read, 'mode') ? { ...read, mode: upgradeMode(Reflect.get(read, 'mode')) } : read;
 
@@ -78,6 +85,7 @@ export const TRY_CAUSES = [
  * A run record's tries under the name their cause has now: a try an older tick wrote with `then` holds it as `cause`, and no `then`, so
  * the record is written back with `cause` alone (`runRecord`, before its schema reads it). Pure: a new value, `raw` untouched; what is not
  * a try is left as it is, for the schema to refuse.
+ * @param raw A run record's JSON, as parsed.
  */
 export const upgradeTries = (raw: unknown): unknown => {
   const steps: unknown = isObject(raw) ? Reflect.get(raw, 'steps') : undefined;
@@ -189,6 +197,8 @@ export type Retry = {
  * Why a message cannot ride on this ask, in words that say what to do instead — or null. Pure, and asked before anything about the
  * run: an empty message, which would put an empty answer in the brief; and a message on `--recheck`, which files no session to read it.
  * A message on a step that did not sign off blocked is not refused: a person may have something to say to a step whose check refused.
+ * @param how How the try is asked for, its message among it.
+ * @param command The command a refusal names, `nemia retry <runId> <step>` where absent.
  */
 export function messageRefusal(how: RetryHow, command = 'nemia retry <runId> <step>'): string | null {
   if (how.message === undefined) return null;
@@ -207,6 +217,7 @@ const anew = (t: EarlierTry): boolean => t.cause === 'round' || t.cause === 'mer
  * The tries `retries:` has filed for a step in the round it is on, a recheck it filed (`retried`) among them. A person's do not
  * count: `retries` is what the run may spend on its own word. Nor do an earlier round's: a round is new work for the step, and its
  * check may refuse it afresh — and so is a merge.
+ * @param record The step's record, or undefined where the run has none of it.
  */
 export const retriesSpent = (record: StepRecord | undefined): number => {
   let spent = 0;
@@ -217,6 +228,7 @@ export const retriesSpent = (record: StepRecord | undefined): number => {
 /**
  * The sign-off asks the run has filed for a step in the round it is on: at most one (`retriesDue`). Counted as `retriesSpent` counts,
  * from the step's record — so a restart, a person's try in between, or a second tick never files another — and new at each round.
+ * @param record The step's record, or undefined where the run has none of it.
  */
 export const signoffsSpent = (record: StepRecord | undefined): number => {
   let spent = 0;
@@ -228,6 +240,9 @@ export const signoffsSpent = (record: StepRecord | undefined): number => {
  * Whether the run continues an `unsigned` step itself, once a round (`signoffsSpent`): its session ended without the closeout it was asked
  * for (`asked`, the engine's word), its closeout named a file the run did not have (`lackedOf`), or its envelope was `refused`
  * (`envelopeRefusals`). Not a closeout short of a declared field alone, which a reminder would not mend.
+ * @param record The step's record.
+ * @param asked What the engine says of the closeout the session was asked for.
+ * @param refused Whether the closeout's envelope was refused, false where absent.
  */
 export const signoffDue = (record: StepRecord, asked: CloseoutAsked, refused = false): boolean =>
   (asked === 'unsigned' || lackedOf(record).length > 0 || refused) && signoffsSpent(record) < 1;
@@ -235,10 +250,15 @@ export const signoffDue = (record: StepRecord, asked: CloseoutAsked, refused = f
 /**
  * How a try was asked for, as a person types it: `--continue`, `--fresh`, `--model <m>`,
  * `--recheck`.
+ * @param how The try's mode, and the model a `--model` named.
  */
 export const modeWord = (how: { mode: RetryMode; model?: string }): string => (how.model ? `--model ${how.model}` : `--${how.mode}`);
 
-/** The note that says a try, and on whose word: `retries:`, an ask to sign off, or `nemia retry` and what it was typed with. */
+/**
+ * The note that says a try, and on whose word: `retries:`, an ask to sign off, or `nemia retry` and what it was typed with.
+ * @param r The try to file.
+ * @param step The step's spec, whose `retries:` is said.
+ */
 export const tryWord = (r: Retry, step: StepSpec): string =>
   `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}${r.mode === 'recheck' ? ', its check run again: the machine ran out of memory' : ''}` : r.by === 'signoff' ? 'an ask to sign off, once a round' : askedWord(r)}`;
 
@@ -254,6 +274,9 @@ const askedWord = (r: Retry): string =>
  * A step's record once a try is filed: the current try moved behind, with what replaced it, and the new one in
  * its place — the re-filed step's task, or for a recheck the same task, with its check still to file and what was read of its files
  * (`StepRecord.filesRead`) kept. Pure.
+ * @param record The step's record, whose current try is moved behind.
+ * @param retry The try filed.
+ * @param taskId The new task's id; absent for a recheck, which keeps the same task.
  */
 export function nextTry(record: StepRecord, retry: Retry, taskId?: string): StepRecord {
   const { check, tries = [], handedOff: _, landed: __, filesRead, ...rest } = record;
@@ -280,6 +303,8 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
  * continued that session since — a continue, a `retries:` try, a sign-off ask, a round — and the step's own where none did. A recheck is
  * the same try. What a continuation is filed with, since a model is part of the prompt the session cached: a continue after `--model
  * sonnet` on the step's `opus` would rebuild it. Only a fresh try — `--fresh`, or `--model` — starts a session on another.
+ * @param step The step's spec, whose own model is read.
+ * @param record The step's record, or undefined where the run has none of it.
  */
 export function sessionModel(step: StepSpec, record: StepRecord | undefined): string | undefined {
   for (const t of [...(record?.tries ?? [])].reverse()) {
@@ -294,16 +319,24 @@ export function sessionModel(step: StepSpec, record: StepRecord | undefined): st
  * behind it on the same task that were not a recheck, which replaces only the check. Zero for a step on a task of its own. Pure: counted
  * off the record, as the turns the runtime has journalled are counted off its view (`answersIn`), so a turn a pass gave and died before
  * writing down is found (`adoptTries`).
+ * @param record The step's record, or undefined where the run has none of it.
  */
 export const turnsOf = (record: StepRecord | undefined): number =>
   (record?.tries ?? []).filter((t) => t.taskId === record?.taskId && t.cause !== 'recheck').length;
 
-/** The asks a record already answers — each names a try its step has reached. The tick consumes these. */
+/**
+ * The asks a record already answers — each names a try its step has reached. The tick consumes these.
+ * @param run The run's record.
+ * @param asks The asks of the run, waiting.
+ */
 export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => asks.filter((a) => a.try <= tryOf(run, a.step));
 
 /**
  * A try due now, as `nemia ls` and `nemia decide` say it — and, for a step whose session the tick stops first, that it does:
  * `its blocked session` while its harness says so, and `its session` once it works again (`runsOn`).
+ * @param step The step's spec.
+ * @param run The run's record.
+ * @param r The try due.
  */
 export const dueNote = (step: StepSpec, run: Run, r: Retry): string => {
   if (r.by === 'ask') return askedNote(r);
@@ -333,6 +366,9 @@ const pausedNote = (r: Retry): string =>
  * The ask a step's current try answers: a person's ask for exactly that try, with a message, honoured the way it asked — the try
  * before it replaced by that mode, on that model. Pure. Read off the ask files, waiting and consumed (`readAnswers` in record.store.ts),
  * because the record keeps no message: the run's json stays the tick's, and what a person said stays in their own file.
+ * @param run The run's record.
+ * @param step The step's name.
+ * @param answers The run's ask files, waiting and consumed.
  */
 export function answerOf(run: Run, step: string, answers: readonly RetryAsk[]): RetryAsk | undefined {
   const last = run.steps[step]?.tries?.at(-1);

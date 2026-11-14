@@ -26,6 +26,7 @@ export type Ran = { from: number; to: number | null };
  * The intervals one task ran in, turn by turn as `timeline`'s `ranOf` counts them: a turn's first spawn to its last end, an attempt that
  * never started (`unstartable`) left out. The last turn of a task neither settled nor held open and signed (`signedAndHeld`) still runs
  * when it has no end; a turn that has none otherwise is left out, as one the record does not say the end of.
+ * @param view The engine's view of the task.
  */
 export function ranIn(view: TaskClock): Ran[] {
   const turns = new Map<number, AttemptClock[]>();
@@ -42,7 +43,10 @@ export function ranIn(view: TaskClock): Ran[] {
   });
 }
 
-/** The length of the union of intervals that all ended. */
+/**
+ * The length of the union of intervals that all ended.
+ * @param spans The intervals, each from and to in ms since the epoch.
+ */
 export function unionMs(spans: ReadonlyArray<{ from: number; to: number }>): number {
   let ms = 0;
   let reach = -Infinity;
@@ -54,12 +58,17 @@ export function unionMs(spans: ReadonlyArray<{ from: number; to: number }>): num
   return ms;
 }
 
-/** How long one task ran, off the engine's view of it: the union of its turns that ended (`ranIn`), a turn still running left out. */
+/**
+ * How long one task ran, off the engine's view of it: the union of its turns that ended (`ranIn`), a turn still running left out.
+ * @param view The engine's view of the task.
+ */
 export const ranMs = (view: TaskClock): number => unionMs(ranIn(view).flatMap((s) => (s.to === null ? [] : [{ from: s.from, to: s.to }])));
 
 /**
  * A run's time at work (`AtWork`), off the engine's views of its tasks: every step's, every check's, every earlier try's (`runTasks`).
  * `views` may hold other runs' tasks too, and a task it does not hold — one the engine has no record of — ran nothing. Pure.
+ * @param run The run's steps, whose tries name its tasks.
+ * @param views The engine's views of tasks, by task id.
  */
 export function atWork(run: Pick<Run, 'steps'>, views: ReadonlyMap<string, TaskClock>): AtWork {
   const spans = [...new Set(runTasks(run))].flatMap((id) => {
@@ -119,6 +128,8 @@ const ran = (view: TaskClock | undefined): boolean => Boolean(view?.state.attemp
 /**
  * The tokens a run's sessions used (`RunTokens`), off the engine's views of their tasks (`taskUsage`); null where no session that ran
  * measured any, so nobody reads a 0 nobody counted. A session that never spawned used nothing, and is in neither count. Pure.
+ * @param run The run's steps, whose tries name its sessions' tasks.
+ * @param views The engine's views of tasks, by task id.
  */
 export function runTokens(run: Pick<Run, 'steps'>, views: ReadonlyMap<string, TaskClock>): RunTokens | null {
   const sessions = [...new Set(Object.values(run.steps).flatMap((record) => sessionTasks(record)))].filter((id) => ran(views.get(id)));
@@ -153,6 +164,7 @@ export function runTokens(run: Pick<Run, 'steps'>, views: ReadonlyMap<string, Ta
 /**
  * When a try ended: its check's end; where it has no check, its session's, or, for a try that answered an earlier try's session, the end
  * of the turn it ran (`TurnSpan`). Null while any of them is in flight, and for a recheck's try whose check was never filed.
+ * @param t The try on the timeline.
  */
 export const tryEndOf = (t: TimelineTry): string | null => (t.check ? t.check.endedAt : (t.session?.endedAt ?? t.turn?.endedAt ?? null));
 
@@ -165,6 +177,10 @@ const msBetween = (from: string | null, to: string): number | null => (from ? Ma
  * approved before it is filed (an ending in the checkout at a gate), from the latest end of the steps it waits on before the approval.
  * Null with no approval. The one rule of a gate's wait: `nemia stats`, the tick's metric (`gateWaits`) and the run's `gate` row
  * (`timelineRows`) all read it.
+ * @param run The run's approvals.
+ * @param tl The run's timeline (`timeline`).
+ * @param step The step approved: its name and the steps it waits on.
+ * @param t The try approved, on the timeline.
  */
 export function gateWaitOf(
   run: Pick<Run, 'approvals'>,

@@ -13,7 +13,11 @@ import type { Untrusted } from './trust.ts';
 /** How many places are asked of at once. */
 const AT_ONCE = 4;
 
-/** The repository `dir` is in as `place` answers it, undefined for a folder in none; or why it was not answered. */
+/**
+ * The repository `dir` is in as `place` answers it, undefined for a folder in none; or why it was not answered.
+ * @param place The place asked for the repository's root.
+ * @param dir The folder whose repository is asked.
+ */
 export const rootOf = (place: Place, dir: string): Effect.Effect<{ readonly root: string | undefined } | { readonly unasked: string }> =>
   Effect.map(place.ask('root', { dir }), (outcome) =>
     'answer' in outcome ? { root: outcome.answer.root ?? undefined } : { unasked: unansweredWords(outcome) },

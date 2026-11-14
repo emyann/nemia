@@ -77,9 +77,16 @@ export type WordView = TaskClock & {
 /**
  * Whether the engine's word for a task says its harness blocked the session — `needs-human` — waiting on a person with nothing signed: the
  * one place outside `views/` the word is compared (`harnessBlocked` reads it off a view); a word elsewhere is said, never compared.
+ * @param word The engine's word for the task; null or undefined where it says none.
  */
 export const blockedWord = (word: string | null | undefined): boolean => word === 'needs-human';
 
+/**
+ * The phase a task stands in, off the engine's view of it: `unknown` for a task the engine has no record of, its settled end once it
+ * settled, `succeeded` for one held open that signed (`signedAndHeld`), `running` once an attempt began and `pending` while it waits for
+ * one.
+ * @param v The engine's view of the task; undefined where it has none.
+ */
 export const phaseOfView = (v: WordView | undefined): TaskPhase => {
   if (!v) return 'unknown';
   if (v.state.settled) return v.state.settled;
@@ -91,6 +98,7 @@ export const phaseOfView = (v: WordView | undefined): TaskPhase => {
 /**
  * Whether a task held open waits for a person's word now — `input-required`: its turn signed, nobody closed it, and nothing runs. What the
  * tick answers (`e.answer`) or closes (`e.close`), and nothing else is. Off views already read.
+ * @param views The engine's views of tasks, by task id.
  */
 export const waitsForWord =
   (views: ReadonlyMap<string, WordView>) =>
@@ -103,6 +111,8 @@ export const waitsForWord =
  * runtime reads back as `former: 'unsigned'`. A `failed` end with `closedOut: false` and no `former` is a session that broke, not a
  * missing statement, and is never continued; nor is an end with no `closedOut` key: a `succeeded` with no closeout on a journal that says
  * nothing of it is not unsigned.
+ * @param state The task's state, which says whether it asked for a closing statement.
+ * @param a The attempt; undefined for none, which never ended unsigned.
  */
 export const unsignedEnd = (state: WordView['state'], a: WordAttempt | undefined): boolean =>
   state.closeoutSchema !== undefined &&
@@ -116,6 +126,8 @@ export const unsignedEnd = (state: WordView['state'], a: WordAttempt | undefined
  * `failed`, `unsigned` — the orchestrator's word, off the runtime's `closedOut: false` (`unsignedEnd`) — and any other is as the runtime
  * recorded it. The one writer of those words for a surface that shows an attempt's end, so every surface says the same: never read an
  * attempt's raw `reason` for `unsigned` or `budget`.
+ * @param state The task's state, which says whether it asked for a closing statement.
+ * @param a The attempt.
  */
 export const endWords = (state: WordView['state'], a: WordAttempt): { ended: EngineOutcome | null; reason: AttemptEnd | null } =>
   a.limit === 'budget'
@@ -128,6 +140,7 @@ export const endWords = (state: WordView['state'], a: WordAttempt): { ended: Eng
  * The engine's own word for a task's phase, off views already read — but `unknown` for a task it has no record of, as `phaseOfView` has it:
  * the engine folds that task to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight. What `nemia ls`
  * prints beside a step, and what the feed words it from (`feedPhase`).
+ * @param views The engine's views of tasks, by task id.
  */
 export const engineWord =
   (views: ReadonlyMap<string, WordView>) =>
@@ -138,6 +151,7 @@ export const engineWord =
  * The engine's word for one task (`engineWord`) — but `succeeded` for a task held open that was closed after it signed, which the engine
  * calls `between-attempts` until its next pass settles it: `phaseOfView` reads it as settled already, and the tick files what follows on
  * it, so `nemia ls` and the board saying a session still going would disagree with the run for that pass. Exported for the api's `wordOf`.
+ * @param v The engine's view of the task; undefined where it has none.
  */
 export const wordOfView = (v: WordView | undefined): EnginePhase | 'unknown' =>
   !v?.state.brief ? 'unknown' : v.phase !== 'input-required' && signedAndHeld(v) ? 'succeeded' : v.phase;
@@ -146,6 +160,7 @@ export const wordOfView = (v: WordView | undefined): EnginePhase | 'unknown' =>
  * A session the runtime holds parked at a tool call's end under the store's pause, beside its phase and never inside it: held back at
  * its hook (`heldBack`, with the call it stopped `after` where its harness kept it), or ended parked with the call it `cut`, its
  * continuation not yet started. Undefined for a task that is neither, or settled.
+ * @param v The engine's view of the task; undefined where it has none.
  */
 export const parkedOf = (v: WordView | undefined): { after?: string; cut?: string } | undefined => {
   if (!v || v.state.settled) return undefined;
@@ -161,6 +176,7 @@ export const parkedOf = (v: WordView | undefined): { after?: string; cut?: strin
  * person gave it (`answer`). What says how the step's session stands now — its closeout, whether it signed, what it was denied, whether
  * it was killed at its memory limit — since an answered task keeps the attempts of the turns before it, and the turn it answered signed
  * `blocked`.
+ * @param state The task's attempts and the answers a person gave it.
  */
 export const currentTurn = <A extends { turn?: number }>(state: { attempts: readonly A[]; inputs?: readonly unknown[] }): A[] =>
   state.attempts.filter((a) => (a.turn ?? 0) === (state.inputs?.length ?? 0));
@@ -169,6 +185,7 @@ export const currentTurn = <A extends { turn?: number }>(state: { attempts: read
  * The memory record of the last attempt of a task's current turn (`currentTurn`) in which the kernel's OOM killer ended a process, at
  * its limit or because the machine ran out (`oomKills` of 1 or more); undefined where none was, or the attempts carry no record — a
  * former journal, or a task under no limit. Read off the view on every pass, never off a transition.
+ * @param v The engine's view of the task; undefined where it has none.
  */
 export const killedMemoryOf = (v: WordView | undefined): AttemptMemory | undefined =>
   v

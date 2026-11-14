@@ -19,13 +19,23 @@ export { cliPath, factoryFlag, FROM, versionFlag, writerSpec } from 'objects';
 /** What a writer writes: an agent, a workflow, or a skill. */
 export type YoursKind = 'agents' | 'workflows' | 'skills';
 
-/** Your workflows, in the store `home`: where a workflow of yours is a folder. */
+/**
+ * Your workflows, in the store `home`: where a workflow of yours is a folder.
+ * @param home The store's root folder.
+ */
 export const yourWorkflowsDir = (home: string): string => path.join(home, 'workflows');
 
-/** Your library of skills, in the store `home`: where a skill of yours is a folder. */
+/**
+ * Your library of skills, in the store `home`: where a skill of yours is a folder.
+ * @param home The store's root folder.
+ */
 export const yourSkillsDir = (home: string): string => path.join(home, 'workflows', SKILLS_FOLDER);
 
-/** The folder a writer of `kind` writes into, in the store `home`. */
+/**
+ * The folder a writer of `kind` writes into, in the store `home`.
+ * @param kind What is written: agents, skills or workflows.
+ * @param home The store's root folder.
+ */
 export const yoursOf = (kind: YoursKind, home: string): string =>
   kind === 'agents' ? path.join(home, 'workflows', AGENTS_FOLDER) : kind === 'skills' ? yourSkillsDir(home) : yourWorkflowsDir(home);
 
@@ -56,6 +66,11 @@ function copyWords(kind: YoursKind, name: string | null, yours: string, theirs: 
 /**
  * Why `who` does not write the repository's `kind` (`name`, where one is named): only yours is written, in the store `home`, and nothing
  * into a checkout. Says the copy a person makes by hand, from yours into `repo`'s, the placeholder `<repo>` where none is known.
+ * @param who The command that writes, said in the refusal.
+ * @param kind What is written: agents, skills or workflows.
+ * @param name The name of what is written; null where none is named.
+ * @param repo The repository's folder; empty where none is known, said as the placeholder `<repo>`.
+ * @param home The store's root folder.
  */
 export function repoWriteRefusal(who: string, kind: YoursKind, name: string | null, repo: string, home: string): string {
   const yours = yoursOf(kind, home);
@@ -71,6 +86,13 @@ export type FactoryTarget = { factory: string | undefined; treeOf: (factory: str
  * Why `who` does not write the `kind` of the place `from`, or null for yours, and for `factory` with a factory named where the writer
  * takes one (`target`): the repository's (`repoWriteRefusal`); `factory` with no `--factory`; `--factory` beside `yours`, which writes
  * the store's; and a place that is none of them, which names those the writer takes.
+ * @param who The command that writes, said in the refusal.
+ * @param kind What is written: agents, skills or workflows.
+ * @param from The place asked for: `yours`, `repo`, `factory` or a word that is none of them.
+ * @param name The name of what is written; null where none is named.
+ * @param repo The repository's folder; empty where none is known, said as the placeholder `<repo>`.
+ * @param home The store's root folder.
+ * @param target The factory the writer is pointed at by `--factory`; undefined for a writer that takes none.
  */
 export function yoursOnlyRefusal(
   who: string,
@@ -96,6 +118,13 @@ export function yoursOnlyRefusal(
 /**
  * The folder `who` writes the `kind` of the place `from` into: yours (`yoursOf`), or the same under the tree of the factory `target` names
  * (`target.treeOf`, which refuses a factory that has none). Refused (`Invalid`) as `yoursOnlyRefusal` says.
+ * @param who The command that writes, said in the refusal.
+ * @param kind What is written: agents, skills or workflows.
+ * @param from The place asked for: `yours`, `repo`, `factory` or a word that is none of them.
+ * @param name The name of what is written; null where none is named.
+ * @param repo The repository's folder; empty where none is known, said as the placeholder `<repo>`.
+ * @param home The store's root folder.
+ * @param target The factory `--factory` names and how its tree is found; undefined for a writer that takes none.
  */
 export function yoursOrRefused(
   who: string,
@@ -111,7 +140,11 @@ export function yoursOrRefused(
   return from === 'factory' && target?.factory !== undefined ? yoursOf(kind, target.treeOf(target.factory)) : yoursOf(kind, home);
 }
 
-/** The text under `key`, or undefined where none was given. */
+/**
+ * The text under `key`, or undefined where none was given.
+ * @param args The command's parsed arguments.
+ * @param key The argument's name.
+ */
 export const writerText = (args: Args, key: string): string | undefined => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;

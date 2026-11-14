@@ -28,6 +28,8 @@ export type TurnSpan = { asked: boolean; heldFrom: string | null; spawnedAt: str
  * The turn try `i` of `tries` is, of the session an earlier try filed. Null for a try on a task of its own, and for one a recheck
  * reached, which ran its check again and no turn. The turn is the count of the tries behind it on its task that were not replaced by a
  * recheck: the order the runtime numbers a held task's turns in, from 0.
+ * @param tries A step's tries, in the order they were filed.
+ * @param i The index in `tries` of the try asked about.
  */
 export function turnOf(tries: readonly TurnTry[], i: number): number | null {
   const behind = tries.slice(0, i).filter((t) => t.taskId === tries[i]?.taskId);
@@ -47,6 +49,9 @@ const signedBlocked = (a: TurnAttempt | undefined): boolean => {
  * The span of `turn` among a task's `attempts` (`TurnSpan`): an attempt with no turn is of turn 0. Where the runtime skipped the turn,
  * or the task has no attempt, each time is null and nothing was asked. The task's last turn has ended only once the task is `over`,
  * settled or signed and waiting on a person: an attempt of it that ended before may be followed by another.
+ * @param attempts The attempts of the task the turn is of, in order.
+ * @param turn The turn asked about, from 0.
+ * @param over Whether the task is settled, or signed and waiting on a person.
  */
 export function turnSpanOf(attempts: readonly TurnAttempt[], turn: number, over: boolean): TurnSpan {
   const own = attempts.filter((a) => (a.turn ?? 0) === turn);
@@ -64,6 +69,7 @@ export function turnSpanOf(attempts: readonly TurnAttempt[], turn: number, over:
  * How long a run waited on a person's answer before the turn of try `t`, in ms: from the end of the turn that signed off blocked to
  * this one's first spawn, never negative. Null for a try that is no turn, a turn that answers no blocked sign-off (work sent back from
  * a gate, whose wait was at that gate), and one whose two times are not both known.
+ * @param t The try, with the span of its turn where it is one.
  */
 export function answerWaitOf(t: { turn?: TurnSpan }): number | null {
   const turn = t.turn;

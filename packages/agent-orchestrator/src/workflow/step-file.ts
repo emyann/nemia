@@ -111,6 +111,13 @@ const wordsAbove = (agent: Agent, factoryRules: string | undefined) => ({
  * agent, whose brief leaves the machine.
  *
  * A file that says no `place:` is refused before any line is judged against its agent (`placeRequired`): no agent gives a step its place.
+ * @param name The step's name, said in a refusal.
+ * @param text The step file's text.
+ * @param read Answers for a file beside the step, relative to its folder, or undefined where there is none; left out, none is read.
+ * @param agents The agents a step's `agent:` line, or a hire, is read from; left out, none is.
+ * @param skills The skills found in each place, which an agent's or a step's skill is looked up in.
+ * @param hired The agent a factory hires into the step; undefined for none.
+ * @param rules The factory's rules told to the step's agent; undefined for none.
  */
 export function parseWorkflow(
   name: string,
@@ -261,7 +268,13 @@ function agentStepRefusal(
   if (skills) for (const skill of step.skills) foundSkill(`${line} adds the skill \`${skill}\``, "this step's", skill, skills);
 }
 
-/** The folder of the skill `skill` that step `step`'s agent names, or why not: none of the places has it, or two of one repository do. */
+/**
+ * The folder of the skill `skill` that step `step`'s agent names, or why not: none of the places has it, or two of one repository do.
+ * @param step The step's name, said in the refusal.
+ * @param agent The agent's name.
+ * @param skill The skill's name.
+ * @param skills The skills found in each place.
+ */
 export function skillAt(step: string, agent: string, skill: string, skills: SkillsFound): string {
   return foundSkill(`${step}: \`agent: ${agent}\` gives the skill \`${skill}\``, "the agent's", skill, skills);
 }
@@ -331,6 +344,12 @@ function notAnAgent(step: string, name: string, there: readonly string[], hired:
  * key read under a former name (`FORMER_KEYS`) by that name, so a refusal quotes the line as the file has it. `resume: x` adds `x` to
  * `after`. `merged` is the output `parseWorkflow` resolved from a step and its agent, read in place of `meta.output`. Refused:
  * `model: inherit`, what Claude Code's `/agents` wizard writes for the parent's model, since a step's session has no parent.
+ * @param name The step's name, said in a refusal.
+ * @param meta The step's keys as written.
+ * @param body The step file's body.
+ * @param read Answers for a file beside the step, relative to its folder, or undefined where there is none; left out, none is read.
+ * @param spelled Each key read under a former name, by that name.
+ * @param merged The output resolved from the step and its agent; undefined to read `meta.output`.
  */
 export function stepFrom(
   name: string,
@@ -416,6 +435,9 @@ function autoRefusal(step: string, harness: string | undefined, model: string | 
  * `auto`, or any mode but `auto`. Such a session says
  * `default` from its first turn, and a job denies every call `default` would ask about, which no line of the step says. The one wording
  * for the load's refusal (`autoRefusal`) and a retry's on another model (`retryRefusal`). Pure.
+ * @param harness The step's harness; undefined for the default one.
+ * @param model The model the session runs on; undefined for the harness's default.
+ * @param permissionMode The mode the step names; undefined for none.
  */
 export function autoDropped(
   harness: string | undefined,
@@ -485,6 +507,7 @@ const EMPTY_IS_UNSET: readonly StepKey[] = [
  *
  * A step with no key and a body that opens on `---` is written after a frontmatter of one blank line: with none before it, the body
  * would be read as the frontmatter, and after an empty one, as its block.
+ * @param step The step to write.
  */
 export function renderStep(step: StepDraft): string {
   const unknown = Object.keys(step).find(

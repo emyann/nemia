@@ -56,6 +56,7 @@ const FIELDS = [
  * Several attempts' usage as one. A count is the sum only when every attempt measured it: a sum over
  * the attempts that happened to be counted would under-report, and read as the whole. The peak is the
  * largest, by the same rule: an attempt that measured none may have been the largest.
+ * @param usages Each attempt's usage; null or undefined for one that measured none.
  */
 export function sumUsage(usages: ReadonlyArray<Consumed | null | undefined>): Consumed | undefined {
   if (!usages.length) return undefined;
@@ -79,6 +80,8 @@ export function sumUsage(usages: ReadonlyArray<Consumed | null | undefined>): Co
  * the same tokens at twenty times a read's price, and the one input count hides it. Judged on the first response alone, since the
  * attempt's writes in all grow with its work, warm or not. Never for an attempt that started cold, whose first writes are its cache, nor
  * one whose runner did not see its first response.
+ * @param u The attempt's usage; null or undefined where nobody measured it.
+ * @param resumed Whether the attempt continued an earlier session.
  */
 export const rebuiltCache = (u: Consumed | null | undefined, resumed: boolean): boolean =>
   resumed &&
@@ -93,6 +96,8 @@ export const LARGE_CONTEXT = 200_000;
  * Where a peak stands against a step's `context:` cap: `cap` once the session reached it — it compacted, which a harness does well short
  * of its window, or its peak got there — and `large` past `LARGE_CONTEXT` on a step with none. Null otherwise, and where nobody measured
  * either.
+ * @param u The session's usage; null or undefined where nobody measured it.
+ * @param cap The step's `context:` cap, in tokens; undefined for a step with none.
  */
 export function peakMark(u: Consumed | null | undefined, cap: number | undefined): PeakMark | null {
   const peak = u?.peakContextTokens;
@@ -116,6 +121,8 @@ const compactedWords = (n: number): string => `compacted${n === 1 ? '' : n === 2
  * are nearly all of an attempt's input and priced twenty-fold apart, and the largest context it carried. The peak says where it reached
  * a step's `context:` cap — compacting says it did — or passed 200k with none, and a resumed attempt that rebuilt its cache says so. Empty
  * where nothing measured any of it: a runner that counted none says nothing, rather than 0.
+ * @param u The session's usage; null or undefined where nobody measured it.
+ * @param cap The step's `context:` cap, in tokens; undefined for a step with none.
  */
 export function readWords(u: Consumed | null | undefined, cap?: number): string {
   if (!u) return '';
@@ -136,7 +143,10 @@ export function readWords(u: Consumed | null | undefined, cap?: number): string 
   ].join(' · ');
 }
 
-/** A count for a person, to three figures: 112000 → 112k, 6350000 → 6.35M. */
+/**
+ * A count for a person, to three figures: 112000 → 112k, 6350000 → 6.35M.
+ * @param n The count.
+ */
 export function count(n: number): string {
   for (const [of, unit] of [
     [1e9, 'B'],
@@ -148,7 +158,10 @@ export function count(n: number): string {
   return String(n);
 }
 
-/** A duration for a person, as the operator measures one: `58s`, `19m42s`, `1h05m`, `2d03h`. */
+/**
+ * A duration for a person, as the operator measures one: `58s`, `19m42s`, `1h05m`, `2d03h`.
+ * @param ms The duration, in ms; below 0 reads as 0.
+ */
 export function durationWord(ms: number): string {
   const s = Math.floor(Math.max(0, ms) / 1000);
   const two = (n: number) => String(n).padStart(2, '0');
@@ -167,6 +180,7 @@ export function durationWord(ms: number): string {
  * The api and tool time go beside the counts once either was measured, and each says not measured where the
  * other was, and neither is said where nothing timed it. A measured time under a
  * second reads `<1s`, never `0s`.
+ * @param u The step's usage; undefined where nobody measured it.
  */
 export function usedLines(u: Consumed | undefined): string[] {
   const read = readWords(u);

@@ -56,6 +56,9 @@ const placesOf = ({ repo }: Pick<Where, 'repo'>, home: string | undefined): Plac
  * would read it: its agents and skills looked for in the factory's repository, the one a run of it works on — its tree where it names
  * none — and in `home`, and its steps filled with the factory's hires into them and its rules (`factoryFills`). Refused as
  * `templatedTreeOf` refuses the factory.
+ * @param home The store's root folder.
+ * @param name The templated factory's name.
+ * @param workflow The workflow's name.
  */
 export function factoryWriteOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
   const { factory, tree } = templatedAtOnce(home, name, 'nemia workflows write');
@@ -66,6 +69,9 @@ export function factoryWriteOf(home: string, name: string, workflow: string): { 
  * Where `nemia workflows write` reads the draft folder of the workflow `workflow` for the templated factory `name` from, in the store
  * `home`: as `factoryWriteOf` judges the write, but with the factory's tree as the store, whose `workflows/` holds the agents its hires
  * name.
+ * @param home The store's root folder.
+ * @param name The templated factory's name.
+ * @param workflow The workflow's name.
  */
 export function factoryDraftOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
   return factoryDraftIn(home, templatedAtOnce(home, name, 'nemia workflows write').factory, workflow);
@@ -77,6 +83,10 @@ export function factoryDraftOf(home: string, name: string, workflow: string): { 
  * into read as if its file named that agent. A factory made from a template looks in its tree, as the store, whose `workflows/` holds the
  * agents its hires name, and in the repository `repo` — else its first, else its tree; any other in `repo` and `home`. What
  * `POST /api/workflows/read` reads a draft with under `?factory=`, and `factoryDraftOf` for a templated factory named.
+ * @param home The store's root folder.
+ * @param factory The factory: its name, its hires, its tree and its repositories.
+ * @param workflow The workflow's name.
+ * @param repo The repository the draft is read in; undefined: a templated factory's first, else its tree, and none for any other factory.
  */
 export function factoryDraftIn(
   home: string,

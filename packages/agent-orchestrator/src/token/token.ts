@@ -16,6 +16,11 @@ export type { CallerOf, StandingRecord, TokenHolder, TokenRecord } from '../../c
 /**
  * The caller a request is, from whether it presented a token, what its route needs of one, the standing record the store keeps of it
  * (null: none), the record the store keeps of it as a session's (null: none) and whether that session's try is live.
+ * @param presented Whether the request presented a token.
+ * @param need What the request's route needs of a token.
+ * @param standing The standing record the store keeps of the token; null: none.
+ * @param record The record the store keeps of the token as a session's; null: none.
+ * @param live Whether that session's try is live.
  */
 export const callerOf: CallerOfToken = (presented, need, standing, record, live) => {
   if (!presented) return need === 'none' ? { kind: 'person', token: null } : { kind: 'refused', reason: 'token-required' };

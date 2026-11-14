@@ -268,6 +268,8 @@ test("an agent answers a gate's questions over the port as the tools say: decide
     const said = (tools.find((t) => t.name === name)?.description ?? '').split('\n').find((line) => line.startsWith('answers: '));
     assert.ok(said?.includes('title') && said.includes('labels'), `${name}'s description says what answers is matched against`);
   }
+  const approve = tools.find((t) => t.name === 'approve')?.inputSchema.properties ?? {};
+  assert.ok('off' in approve, 'approve takes off: an approval taken back, as nemia approve --off');
   const decided = await client.callTool({ name: 'decide', arguments: { runId: id } });
   assert.notEqual(decided.isError, true, textOf(decided));
   const { questions } = decided.structuredContent as Decidable;

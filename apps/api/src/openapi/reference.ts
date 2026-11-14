@@ -14,6 +14,18 @@ import type { ApiEnv } from '../layer.ts';
 /** The page's path, beside the document's. */
 export const REFERENCE_PATH = '/openapi';
 
+/**
+ * Where a page whose request client is on sends each request it tries, the address it is for in `scalar_url` (Scalar's own proxy
+ * protocol): the page forwards it, so the browser crosses no origin whatever address a person gives.
+ */
+export const REFERENCE_PROXY_PATH = '/proxy';
+
+/**
+ * The name of the security scheme a page whose request client is on gives its document — the api's bearer token — and selects for every
+ * request it tries, so a token typed once is sent with each one after it.
+ */
+export const TOKEN_SCHEME = 'token';
+
 /** Where the api serves the viewer's script, read from the installed package. */
 export const REFERENCE_SCRIPT_PATH = '/openapi/scalar.js';
 
@@ -23,8 +35,14 @@ export const REFERENCE_SCRIPT_PATH = '/openapi/scalar.js';
  */
 export const REFERENCE_BUNDLE = new URL('./browser/standalone.js', import.meta.resolve('@scalar/api-reference'));
 
-/** The page and the viewer's script, the script's text given by `script`. */
-export const referenceOf = (script: () => Promise<string>) =>
+/**
+ * The page and the viewer's script.
+ * @param script Gives the text of the viewer's script.
+ * @param client Whether the viewer's request client is on: off on the api's own page, where a request would act on the store behind
+ * it unasked; on for the page a person starts to try an api they name (`browseApp`), where the token scheme is selected for every
+ * request and the token typed is kept by the browser for that page, so it is typed once.
+ */
+export const referenceOf = (script: () => Promise<string>, client = false) =>
   new Hono<ApiEnv>()
     .get(REFERENCE_SCRIPT_PATH, async (c) => c.body(await script(), 200, { 'content-type': 'text/javascript; charset=utf-8' }))
     .get(
@@ -36,8 +54,10 @@ export const referenceOf = (script: () => Promise<string>) =>
         darkMode: true,
         withDefaultFonts: false,
         telemetry: false,
-        hideClientButton: true,
-        hideTestRequestButton: true,
+        hideClientButton: !client,
+        hideTestRequestButton: !client,
+        persistAuth: client,
+        ...(client ? { proxyUrl: REFERENCE_PROXY_PATH, authentication: { preferredSecurityScheme: TOKEN_SCHEME } } : {}),
         agent: { disabled: true },
         mcp: { disabled: true },
         showDeveloperTools: 'never',

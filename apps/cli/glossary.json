@@ -19,7 +19,7 @@
     },
     {
       "term": "Client verb",
-      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/src/route.ts`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`, `channel`, the feed pushed into a Claude Code session, and `server`, the daemon a context names asked about itself, `nemia server upgrade` upgrading it through its api, `apps/cli/src/server/upgrade.ts`): no process answers it, so it asks the api whatever else is typed, says its own help. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
+      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/src/verbs.ts`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`, `channel`, the feed pushed into a Claude Code session, and `server`, the daemon a context names asked about itself, `nemia server upgrade` upgrading it through its api, `apps/cli/src/server/upgrade.ts`): no process answers it, so it asks the api whatever else is typed, says its own help. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
       "type": "ClientVerb"
     },
     {

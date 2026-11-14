@@ -20,11 +20,26 @@
  * laws for a client verb below (`clientVerbsAskTheApi`), so the same words never upgrade one machine under one context and another
  * under the next.
  *
- * The verb lists, `Route` and `Routed` are `src/route.ts`'s, imported here: no shipped source reads a value of a contract, which loads
+ * The verb lists are `src/verbs.ts`'s and `objects`', imported here, and `Route` and `Routed` this contract's, which `src/route.ts`
+ * hands on: no shipped source reads a value of a contract, which loads
  * the verifier (`tools/guards/test/no-contract-values.test.ts`).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import { CLIENT_VERBS, MACHINE_VERBS, MOVED_COMMANDS, READ_VERBS, type Route, type Routed } from '../src/route.ts';
+import { MACHINE_VERBS, MOVED_COMMANDS } from 'objects';
+import { CLIENT_VERBS, READ_VERBS } from '../src/verbs.ts';
+
+/**
+ * Where a command goes: the api, the orchestrator's CLI in a process of its own on this machine, or refused — `--local`, and a word
+ * stranded under a remote context, each naming what to type instead. `forwarded`, the old path spawned against another machine's api,
+ * is retired and never answered: it stays a word of the type only for the contract's law that holds it so (`nothingIsForwarded`, below).
+ */
+export type Route = 'api' | 'process' | 'forwarded' | 'refused';
+
+/**
+ * A command as the route reads it: the name it opens with, whether `--local` was typed, whether it asks for its help, and whether the
+ * context in use names a remote daemon (`remote`; false, this machine's store).
+ */
+export type Routed = { readonly name: string; readonly local: boolean; readonly help: boolean; readonly remote: boolean };
 
 /** Whether `name` is one of `READ_VERBS`: a read the client asks the api for, whose help is still the old path's. */
 const reads: readonly string[] = READ_VERBS;

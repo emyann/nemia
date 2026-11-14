@@ -21,23 +21,13 @@ import {
   workflowNameRefusal,
   repoNameRefusal,
   reposNamed,
-  type Schedule,
 } from '../factory.ts';
+import type { WiringRefused } from '../../../contracts/wiring.contract.ts';
+import { withName, hiresInto, withHire, withEntry, withoutEntry } from './dictionaries.ts';
 
-/**
- * A change of a factory's wiring, by its verb: a workflow attached or detached, an agent hired into a step `<workflow>/<step>` or fired
- * from it, a workflow's schedule written or taken back.
- */
-export type WiringChange =
-  | { readonly verb: 'attach'; readonly workflow: string; readonly repo?: string }
-  | { readonly verb: 'detach'; readonly workflow: string }
-  | { readonly verb: 'hire'; readonly step: string; readonly agent: string }
-  | { readonly verb: 'fire'; readonly step: string }
-  | { readonly verb: 'schedule'; readonly workflow: string; readonly schedule: Schedule }
-  | { readonly verb: 'unschedule'; readonly workflow: string };
+export { withName, hiresInto, withHire, withEntry, withoutEntry } from './dictionaries.ts';
 
-/** What a change of wiring is refused as: a name or a state that cannot take it (`Invalid`), or what it names is not there (`Missing`). */
-export type WiringRefused = { readonly kind: 'Invalid' | 'Missing'; readonly message: string };
+export type { WiringChange, WiringRefused } from '../../../contracts/wiring.contract.ts';
 
 /** The workflow a hire's step `<workflow>/<step>` names. */
 const workflowOfStep = (step: string): string => step.slice(0, step.indexOf('/'));
@@ -48,28 +38,6 @@ const holds = (dict: Readonly<Record<string, unknown>>, key: string): boolean =>
 /** The steps of `workflow` a factory's `hires` hire into. */
 const hiredInto = (hires: Readonly<Record<string, string>>, workflow: string): string[] =>
   Object.keys(hires).filter((step) => step.startsWith(`${workflow}/`));
-
-/** `names` with `name`, sorted, each named once. */
-export const withName = (names: readonly string[], name: string): string[] => [...new Set([...names, name])].sort();
-
-/** Whether `hires` hire into a step of the workflow `workflow`: a hire's key is `<workflow>/<step>`. */
-export const hiresInto = (hires: Readonly<Record<string, string>>, workflow: string): boolean =>
-  Object.keys(hires).some((step) => step.startsWith(`${workflow}/`));
-
-/** `hires` with `agent` hired into `step`, an earlier hire there replaced. */
-export const withHire = (hires: Readonly<Record<string, string>>, step: string, agent: string): Record<string, string> => ({
-  ...hires,
-  [step]: agent,
-});
-
-/** `dict` with `value` at `key`, an earlier one there replaced. */
-export const withEntry = <V>(dict: Readonly<Record<string, V>>, key: string, value: V): Record<string, V> => ({ ...dict, [key]: value });
-
-/** `dict` with no entry at `key`. */
-export const withoutEntry = <V>(dict: Readonly<Record<string, V>>, key: string): Record<string, V> => {
-  const { [key]: _gone, ...rest } = dict;
-  return rest;
-};
 
 /** What each verb did, as its refusal says it was not done. */
 const DONE = { attach: 'attached', detach: 'detached', schedule: 'scheduled', unschedule: 'unscheduled' } as const;

@@ -13,36 +13,18 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
-import type { ContextOf } from '../contracts/context.contract.ts';
+import type { Chosen, ClientConfig, Context, ContextOf } from '../contracts/context.contract.ts';
+import { LOCAL_CONTEXT } from './local-context.ts';
 import { Refused } from './refused.ts';
 
-/** The name that always means this machine's store, whatever the file holds. */
-export const LOCAL_CONTEXT = 'local';
+export type { Chosen, ClientConfig, Context } from '../contracts/context.contract.ts';
+export { LOCAL_CONTEXT } from './local-context.ts';
 
 /** The variable that names a context for a single command, over the file's. */
 export const CONTEXT_VARIABLE = 'NEMIA_CONTEXT';
 
 /** The verb that reads and writes the client's config: `nemia config <use-context|set-context|get-contexts|current-context|headers>`. */
 export const CONFIG_VERB = 'config';
-
-/** A context of the client's config: its name, the daemon's address (`http(s)://host:port`) and a person's token for it. */
-export type Context = { readonly name: string; readonly server: string; readonly token: string };
-
-/**
- * The client's config as read: its contexts, the name of the one in use, if any, and a person's token for this machine's own daemon
- * (`localToken`, `local-token` in the file), presented there over the store's credential (`storeCredential`, where.ts).
- */
-export type ClientConfig = {
-  readonly contexts: readonly Context[];
-  readonly current: string | undefined;
-  readonly localToken?: string;
-};
-
-/** Which daemon a command asks: this machine's store, a remote daemon by its context, or refused for a name the file does not hold. */
-export type Chosen =
-  | { readonly kind: 'local' }
-  | { readonly kind: 'remote'; readonly name: string; readonly server: string; readonly token: string }
-  | { readonly kind: 'refused'; readonly name: string };
 
 /** Which daemon a command asks, from the config and the name `NEMIA_CONTEXT` holds, trimmed, if any: pure. */
 export const contextOf: ContextOf = (config, asked) => {

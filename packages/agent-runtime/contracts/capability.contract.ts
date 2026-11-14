@@ -7,10 +7,49 @@
  * harness, Claude Code's included: a new harness is its declaration and its driver. A runner a consumer brings as its own declares
  * nothing (`can: undefined`) and is asked nothing, as `harnessRefusalOf` asks it nothing today.
  *
- * The three types (`Capability`, `HarnessDeclared`, `VerbHarness`) are `src/harness/declaration.ts`'s.
+ * The three types (`Capability`, `HarnessDeclared`, `VerbHarness`) are this contract's, which `src/harness/declaration.ts` hands on.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { Capability, HarnessDeclared, VerbHarness } from '../src/harness/declaration.ts';
+
+/**
+ * A word a harness's declaration lists: a key of a task's config it takes, a kind of session it keeps, or an Engine verb it answers.
+ *
+ * - `contextTokens`, `claudeFlags` (a task's `config.claude`, carried whole), `codexArgs` (`config.codex`), `commandArgs` (`command`,
+ *   `niceness`, `terminationMessagePath`), `env`, `readOnlyMount`, `writableMount`, `callAdmission`, `projectMcp`, `enabledSkills`,
+ *   `memoryLimit`, `bridge` (a session bridged to a remote control): a task's config it takes;
+ * - `keepsOpen`: a session kept open until stopped (`restartPolicy: 'Always'`); `holdsCalls`: a call held open for a person (`mayAsk`);
+ * - `interrupt`, `answerAsk`, `quota`, `mcp` (`mcpState`, `mcpSignIn`, `mcpSignInState`, `mcpSignOut`), `hold`, `drain` (its sessions'
+ *   calls held, and their deadlines paused, while the store's drain stands): an Engine verb it answers.
+ */
+export type Capability =
+  | 'contextTokens'
+  | 'claudeFlags'
+  | 'codexArgs'
+  | 'commandArgs'
+  | 'env'
+  | 'readOnlyMount'
+  | 'writableMount'
+  | 'callAdmission'
+  | 'projectMcp'
+  | 'enabledSkills'
+  | 'memoryLimit'
+  | 'bridge'
+  | 'keepsOpen'
+  | 'holdsCalls'
+  | 'interrupt'
+  | 'answerAsk'
+  | 'quota'
+  | 'mcp'
+  | 'hold'
+  | 'drain';
+
+/** One harness of an engine, by the name it is configured under, and what it declares: `undefined` for a runner of the consumer's. */
+export type HarnessDeclared = { readonly name: string; readonly can: readonly Capability[] | undefined };
+
+/** The harness an Engine verb goes to, or why none: a name the engine has not, one that does not declare the verb, or none that does. */
+export type VerbHarness =
+  | { readonly kind: 'taken'; readonly name: string }
+  | { readonly kind: 'refused'; readonly reason: 'unknown' | 'undeclared' | 'none' };
 
 /** Whether `harness` declares `capability`: a runner of the consumer's declares nothing. */
 const declares = (harness: HarnessDeclared, capability: Capability): boolean =>

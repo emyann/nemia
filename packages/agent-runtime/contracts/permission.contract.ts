@@ -11,6 +11,7 @@
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
+import type { SessionAsk } from '../src/core/index.ts';
 import {
   ASK_CUT,
   commandOf,
@@ -18,11 +19,30 @@ import {
   PERMISSION_DENIED,
   PERMISSION_DENY,
   PERMISSION_ONCE,
-  type PermissionAnswer,
-  type PermissionAsk,
-  type PermissionHeld,
-  type PermissionOffer,
-} from '../src/harness/claude/permission.ts';
+} from '../src/harness/claude/permission-words.ts';
+
+/** What the SDK hands `canUseTool` about a prompt, as the ask reads it: its words, its two hints, and the rules it suggests saving. */
+export type PermissionOffer = {
+  title?: string;
+  displayName?: string;
+  description?: string;
+  decisionReason?: string;
+  blockedPath?: string;
+  defaultToNo?: boolean;
+  suppressAlwaysAllowRule?: boolean;
+  suggestions?: PermissionUpdate[];
+};
+
+/** A permission held for a person, as the session's asks carry it: one question, its choices the three answers. */
+export type PermissionAsk = Extract<SessionAsk, { kind: 'permission' }>;
+
+/** What the held call keeps while it waits: the call's input, whether always was offered, and the SDK's suggestions. */
+export type PermissionHeld = { input: Record<string, unknown>; always: boolean; suggestions: PermissionUpdate[] };
+
+/** What the held call returns to the SDK: the two members of the SDK's permission result, as this flow gives them. */
+export type PermissionAnswer =
+  | { behavior: 'allow'; updatedInput: Record<string, unknown>; updatedPermissions?: PermissionUpdate[] }
+  | { behavior: 'deny'; message: string };
 
 /**
  * The command a shell call was typed with, read off its input. The verifier models no `===` of a value typed `unknown`, which a call's

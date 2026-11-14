@@ -11,7 +11,12 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { StepStatus } from '../src/record/record.ts';
-import type { StepTransition } from '../src/step-machine/step-machine.ts';
+
+/**
+ * What a pair of a step's words is: no move (`stays`), a move the machine draws, named by the event that makes it (`edge`), or
+ * one it does not draw (`refused`), which the replay fails on.
+ */
+export type StepTransition = { kind: 'stays' } | { kind: 'edge'; event: string } | { kind: 'refused' };
 
 /** A step's word: `StepStatus` itself, `skipped` (a node on a route not taken) and `sent` (a workflow node that filed its card) in it. */
 export type StepWord = StepStatus;

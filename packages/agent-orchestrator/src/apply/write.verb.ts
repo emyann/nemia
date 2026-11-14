@@ -36,7 +36,7 @@ import { FactoryDoor, filedFactory } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { ownAgentRefusal } from '../factory/wiring/own-agent.store.ts';
 import { wire } from '../factory/wiring/wire.verb.ts';
-import { withoutEntry } from '../factory/wiring/wiring.ts';
+import { withoutEntry } from '../factory/wiring/index.ts';
 import { treeDir, type ProposalNeeds, type ProposalPlace } from '../propose/current.verb.ts';
 import { AGENTS_FOLDER } from '../step/step.ts';
 import type { Entry } from '../factory/applied/applied.store.ts';

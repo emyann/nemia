@@ -1,5 +1,9 @@
 import { BIND_PUBLIC_VARIABLE, bindExposure, everyOf, kindOfBind, MAX_EVERY_MS } from 'agent-orchestrator';
-import type { BindOf } from '../contracts/bind.contract.ts';
+import type { BindOf, BindRefusal } from '../contracts/bind.contract.ts';
+import { asked, isAddress, LOOPBACK } from './address/address.ts';
+
+export type { Bind, BindRefusal } from '../contracts/bind.contract.ts';
+export { asked, isAddress, LOOPBACK } from './address/address.ts';
 
 /** The port the api listens on when `PORT` is not set and it ticks: the daemon's, the one the web app's preview points at. */
 export const DEFAULT_PORT = 8787;
@@ -37,38 +41,6 @@ export function argsOf(argv: readonly string[]): { ticks: false } | { ticks: tru
 
 /** Whether the api's process ticks the store, read off its arguments (`argsOf`), refused as it refuses them. */
 export const ticksOf = (argv: readonly string[]): boolean => argsOf(argv).ticks;
-
-/** The address the api listens on where no other is asked for: this machine's loopback. */
-export const LOOPBACK = '127.0.0.1';
-
-/** Why a bind is refused: not an IP address, or an address beyond this machine on a store not marked exposed. */
-export type BindRefusal = 'not-an-address' | 'unexposed';
-
-/** Where the api listens, or why it may not where it was asked. */
-export type Bind = { readonly kind: 'bound'; readonly host: string } | { readonly kind: 'refused'; readonly reason: BindRefusal };
-
-/** An IPv4 address in dotted decimal, each of its four numbers from 0 to 255 with no leading zero. */
-const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
-
-/** The characters an IPv6 address is written in: hex digits, colons, and the dots of an IPv4 address at its end. */
-const IPV6_TEXT = /^[0-9A-Fa-f:.]+$/;
-
-/**
- * Whether `text` is an IP address: v4 in dotted decimal, or v6 as a URL's host reads one between brackets (WHATWG's parser, global, so
- * this file reaches nothing of the machine). An IPv6 zone (`%eth0`) is none.
- */
-export const isAddress = (text: string): boolean => {
-  if (IPV4.test(text)) return true;
-  if (!text.includes(':') || !IPV6_TEXT.test(text)) return false;
-  try {
-    return new URL(`http://[${text}]/`).hostname !== '';
-  } catch {
-    return false;
-  }
-};
-
-/** The text `value` asks for, its white space left out: blank where it is unset. */
-export const asked = (value: string | undefined): string => value?.trim() ?? '';
 
 /** Whether `host` is this machine's loopback alone, v4 or v6. */
 const loopbackAddress = (host: string): boolean => host === LOOPBACK || host === '::1';

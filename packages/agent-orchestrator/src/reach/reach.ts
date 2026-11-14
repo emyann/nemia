@@ -4,36 +4,19 @@
  * gated step itself (`factsOf`, `facts.ts`), and some of them never hold at some gates: an ending approved before it runs has no
  * closeout and no check when it is approved, and a step with no check never has one that passed. Pure; the laws are its contract's.
  */
-import type { NeverHolds, RuleReaches, SuggestedFor, UnmetNow } from '../../contracts/reach.contract.ts';
+import type { SuggestedFor, Unmet, UnmetNow } from '../../contracts/reach.contract.ts';
 import { CONDITION_WORDS, CONDITIONS, type Condition, type Facts, type GateRule as PolicyRule } from '../auto/index.ts';
+import type { GateSite, NeverWhy } from '../../contracts/never-holds.contract.ts';
+import { neverHolds } from './never-holds.ts';
+import { ruleReaches } from './rule-reaches.ts';
 
-/**
- * A gate of a workflow, as reach reads it: the workflow and the step gated, whether the step is approved before it is filed, an ending
- * on the base branch with a gate (`approvedFirst`), and whether it has a check (`hasCheck`).
- */
-export type GateSite = { workflow: string; step: string; approvedFirst: boolean; hasCheck: boolean };
+export { ruleReaches } from './rule-reaches.ts';
 
-/** Why a condition can never hold at a gate: the step is approved before it runs, or it has no check to pass. */
-export type NeverWhy = 'approved-before-it-runs' | 'no-check';
+export { neverHolds } from './never-holds.ts';
 
-/** What keeps a rule from letting an answer through in a run's facts: the conditions it needs that do not hold, and its dollar line. */
-export type Unmet = { conditions: Condition[]; overLine: boolean };
+export type { Unmet } from '../../contracts/reach.contract.ts';
 
-/**
- * Why `condition` can never hold at `site`, or null where it can: the agent recommending it and its check passing never hold at an
- * ending approved before it runs, and its check passing never holds at a step with no check. Pure.
- */
-export const neverHolds: NeverHolds = (site, condition) => {
-  if (site.approvedFirst && (condition === 'recommends' || condition === 'checked')) return 'approved-before-it-runs';
-  if (!site.hasCheck && condition === 'checked') return 'no-check';
-  return null;
-};
-
-/** Whether `rule` could ever approve at `site`: it approves, covers the gated step, and needs no condition that never holds there. Pure. */
-export const ruleReaches: RuleReaches = (rule, site) =>
-  rule.answer === 'approve' &&
-  (rule.steps === undefined || rule.steps.includes(site.step)) &&
-  rule.when.every((c) => neverHolds(site, c) === null);
+export type { GateSite, NeverWhy } from '../../contracts/never-holds.contract.ts';
 
 /** A step's name as a rule's id may hold it: lowercase letters and digits, every other run of characters a dash. */
 function slugOf(step: string): string {

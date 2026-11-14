@@ -2153,6 +2153,9 @@ of pure code sits beside it.
 | `src/index.ts` | the export list of `agent-runtime`, by name, all Effect — the boundary; `decide` is not on it |
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the phase a person reads (`endOf`, `TaskPhase`, `LIVE_PHASE`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
 | `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |
+| `src/core/state.ts` | the runtime's state of a task and what the machine sees of it, as data (`State`, `Attempt`, `Event`, `Sighting`, `Now`, `Action`): read by `decide` and its contracts, and handed on by `domain.ts` |
+| `src/core/name.ts` | the join key a session is named by before it is spawned (`nameFor`), read by `domain.ts` and its contracts |
+| `src/core/waiting.ts` | whether a task waits on a person's answer (`waitsForInput`) or on the layer above's word to start its turn (`awaitsAdmission`, `admissionOf`), read by `domain.ts` and its contracts |
 | `src/core/attempt-fold.ts` | an event about one attempt written into that attempt's fold (`foldInto`), for `fold`: pure |
 | `src/core/cap.ts` | a spend cap handed on, pure: the cap less what was spent (`capLeft`) and whether that is a cap spent whole (`capSpent`), for a holder's take-up of an attached session and for a parked job's continuation, whose cap is its turn's less what the parked attempts it continues spent (`parkedCapLeft`) — asked by the engine and the holder, so `decide` reads no spend |
 | `src/core/restart.ts` | how a task restarts inside itself, pure: a long-lived task's back-off, a kubelet's (`RESTART_BACKOFF`, `backoffOf`), and the words a restarted session or a parked job's continuation is told (`RESTART_WORDS`, `PARKED_WORDS`, `cutWords`), re-exported by `domain.ts` |
@@ -2177,7 +2180,9 @@ of pure code sits beside it.
 | `src/core/engine/image.ts` | the code an attempt in flight runs on and its harness's version, journalled whenever its sighting says other than the record (`image`, `imageFacts`) |
 | `src/core/engine/noted.ts` | what a task's sighting says of its attempt in flight, gathered for the record before `decide` reads the fold (`notedOf`) |
 | `src/core/engine/filing.ts` | filing a task, admitting, stopping, answering and closing it, each with what it refuses (`refusalOf`): a fact journalled for the pass to act on |
+| `src/core/engine/stop-refusal.ts` | why a stop is refused (`stopRefusalOf`, `StopRefused`), read by `requestStop` and its contract, and handed on by `filing.ts` |
 | `src/core/engine/append-refusal.ts` | the Task door's rules for one append, pure and proved (`contracts/journal.contract.ts`): a task filed once, under an id a file can be named by, written to only once filed, and started at `attempts.length + 1` |
+| `src/core/engine/append-refusals.ts` | why the Task door refuses an append, a list and its word (`APPEND_REFUSALS`, `AppendRefusalReason`), read by the door and its contract |
 | `src/core/engine/stamped.ts` | the moment an entry is journalled (`stamped`), on the wall clock and the monotonic one, and a spawn's entry stamped with it |
 | `src/core/engine/journal.ts` | append-only JSONL per task, plus the board-wide feed; `upgrade`, which reads a line written before an event's shape changed in today's, whoever's store it is — nothing on disk is rewritten |
 | `src/core/engine/feed.ts` | the files store's feed: read from a cursor that keeps its place for ever (`readFeed`), rotated so a forgotten task's lines go (`rotateFeed`: a head with its first cursor, `feed.jsonl`, and the lines before it kept in `feed.sealed.jsonl`), and every append and rotation one at a time under `feed.lock` (`withFeedLock`, `FEED_LOCK_WAIT_MS`) |
@@ -2189,6 +2194,7 @@ of pure code sits beside it.
 | `src/core/engine/tally.ts` | what the runtime's own reads and spawns have cost the process, as running totals (`Engine.io()`): a thin wrapper around its readers and `sh`, not a syscall tracer |
 | `src/core/engine/index.ts` | the face of `core/engine/`: the engine's verbs, journal, memo and tally, as the face takes them |
 | `src/harness/seam.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript`, `say`, `forget` and `kept` — the `Runner` service, the free harness `testOps`, and `composite`: dispatch by harness, merge what they all see |
+| `src/harness/origin-kinds.ts` | where a transcript event came from, a list and its word (`ORIGIN_KINDS`, `TranscriptOriginKind`), read by the seam and its contract |
 | `src/harness/forget.ts` | what every harness's `forget` and `kept` share (`forgetFiles`, `keptOf`): the files it keeps of a session, removed or, dry, listed, what it leaves that is not its own, and the same files named for a measure |
 | `src/harness/error.ts` | `RunnerError`, the one error a harness fails with, beneath the seam and every runner, whichever verb it was asked |
 | `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
@@ -2202,6 +2208,7 @@ of pure code sits beside it.
 | `src/harness/trust.ts` | a harness's trust of a folder, off the harness's own file: whether it is given (`trustedFolder`), what it is in a person's words (`folderTrust`) and the act of giving it (`trustFolder`), each `undefined` for a harness that keeps no trust |
 | `src/harness/telemetry.ts` | where an engine's sessions export (`Telemetry`), the runner that tells each spawn (`telemetered`), the trace context of the span that filed a task (`traceparentOf`), and the variables no child inherits from the engine's process (`withoutTelemetry`) |
 | `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
+| `src/harness/mcp-transports.ts` | the transports of an MCP server, a list and its word (`MCP_TRANSPORTS`, `McpTransport`), read by `mcp.ts` and its contract |
 | `src/harness/mcp-state.ts` | the state of each server a caller hands — connected, needs-auth, failed, pending, disabled — read in one short-lived Claude Code session (`mcpServersRead`), with a look that failed and a state word this runtime does not know both answering unread |
 | `src/harness/mcp-callback.ts` | whether a pasted address completes a waiting MCP sign-in (`callbackRefusal`, proved by `contracts/mcp-callback.contract.ts`): read by `new URL` (`pastedOf`) and compared with the redirect the sign-in asked for, before the held session is handed it |
 | `src/harness/mcp-sign-in.ts` | a remote server signed in to and out of on Claude Code: the client secret stored in Claude Code's own store by a `claude mcp add --scope local` child with the secret in its environment alone, a held session asked `mcpAuthenticate` and watched until `connected` (or handed a pasted callback, `submit`), and the sign-in cleared by an add with no secret, then `claude mcp remove --scope local` |
@@ -2217,6 +2224,7 @@ of pure code sits beside it.
 | `src/harness/claude/session-bridge.ts` | the claude.ai bridge of an attached session, behind one door: the SDK's undeclared `enableRemoteControl` read off the `query()` object, its answer decoded, and refused in words where it is absent |
 | `src/harness/claude/attached-session.ts` | one attached session over `query()`: its input, its hooks for the call in flight and the drain, `canUseTool`, its capture |
 | `src/harness/claude/permission.ts` | a call Claude Code would prompt for, held as an ask (`permissionAskOf`) and the person's answer turned into `canUseTool`'s result (`permissionAnswered`), proved by `contracts/permission.contract.ts` |
+| `src/harness/claude/permission-words.ts` | the words a permission ask is shown in and answered by, and the command a shell call was typed with (`commandOf`), read by `permission.ts` and its contract |
 | `src/harness/claude/attached-follow.ts` | an attached session followed live (`pushesOf`): the fan-out its message loop feeds, what each follower is said — its state, its text as it is written, its transcript's events with their cursor — and when a follow ends |
 | `src/harness/claude/attached-file.ts` | an attached session's run file, its stop, the drain, and the two notes a resumed session is told |
 | `src/harness/claude/session-options.ts` | a task as the SDK's `Options` (`attachedOptions`): the job's fence, folders, servers, model, budget and schema |

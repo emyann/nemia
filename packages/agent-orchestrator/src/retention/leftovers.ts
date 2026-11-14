@@ -6,24 +6,12 @@
  * `retention.verb.ts` sweeps.
  */
 import type { UpgradeLeftovers } from '../../contracts/leftovers.contract.ts';
+import type { Leftovers } from '../../contracts/leftovers.contract.ts';
+import { LOGS_KEPT_DAYS, LOGS_KEPT_MS } from './kept.ts';
 
-/** How many days a build log is kept after it was last written, long enough to read why an upgrade failed. */
-export const LOGS_KEPT_DAYS = 30;
+export { LOGS_KEPT_DAYS, LOGS_KEPT_MS, LAST_DATE_MS } from './kept.ts';
 
-/** `LOGS_KEPT_DAYS` in milliseconds. */
-export const LOGS_KEPT_MS = LOGS_KEPT_DAYS * 24 * 60 * 60 * 1000;
-
-/** The last moment a `Date` can hold, in milliseconds since the epoch: no file's time is later. */
-export const LAST_DATE_MS = 8.64e15;
-
-/** A pid-named entry under `releases/`: its name, and whether the process its name ends on is alive. */
-export type PidEntry = { readonly name: string; readonly live: boolean };
-
-/** A build log under `releases/.logs/`: its name, and when it was last written, in whole milliseconds since the epoch. */
-export type BuildLog = { readonly name: string; readonly modifiedMs: number };
-
-/** What a sweep removes of the leftovers: the entries under `releases/` and the logs under `releases/.logs/`, by name. */
-export type Leftovers = { readonly entries: readonly string[]; readonly logs: readonly string[] };
+export type { PidEntry, BuildLog, Leftovers } from '../../contracts/leftovers.contract.ts';
 
 /** The leftovers to remove: each entry whose process is gone, each log older than `LOGS_KEPT_MS` at `nowMs`. */
 export const leftovers: UpgradeLeftovers = (entries, logs, nowMs) => ({

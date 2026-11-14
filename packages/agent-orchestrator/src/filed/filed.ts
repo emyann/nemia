@@ -12,7 +12,13 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { fenceReach, unruledIn } from 'agent-runtime/vocabulary';
 import { filedSettings, SETTINGS_HARNESS } from '../harness-settings/harness-settings.ts';
 import { splitServers, type FactoryServer, type FactoryServers } from '../factory/servers/index.ts';
-import type { HandedFolders, HandedRunMounts } from '../../contracts/handed-runs.contract.ts';
+import type { HandedRunMounts } from '../../contracts/handed-runs.contract.ts';
+import type { HandedRunFolders } from '../../contracts/handed-folders.contract.ts';
+import { handedFolders } from './handed-folders/handed-folders.ts';
+
+export { handedFolders } from './handed-folders/handed-folders.ts';
+
+export type { HandedRunFolders } from '../../contracts/handed-folders.contract.ts';
 
 /**
  * The harness's arguments a step is filed with, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow the
@@ -262,13 +268,6 @@ export const inputsMounts = (
 ): Mount[] => (dir !== undefined && local(step.harness) && !isFolderTeam(steps) ? [{ path: dir, readOnly: true }] : []);
 
 /**
- * A run this one is handed (`--from`, a card's `from:`, the run that routed on to it), as the pass found its folders on disk when it
- * files a step: its id, and its `artifacts/` and its `inputs/`, each absolute and present only where it is a directory now (a run given
- * no input has no `inputs/`; a run forgotten has neither).
- */
-export type HandedRunFolders = { run: string; artifacts?: string; inputs?: string };
-
-/**
  * The folders of each run this one is handed (`found`), each read-only, for a step whatever steps it comes after: it reads another run's
  * work and writes none of it, and Read, Grep and Glob reach them. Only the folders found are mounted. None on a harness fenced by a
  * sandbox, which reads the disk already, nor on a remote agent, filed no local field; the default harness (no `harness:`) is fenced by
@@ -278,17 +277,6 @@ export const handedRunMounts: HandedRunMounts = (step, found) =>
   !isRemoteHarness(step.harness) && (step.harness === undefined || !sandboxed(step.harness))
     ? handedFolders(found).map((folder) => ({ path: folder, readOnly: true }))
     : [];
-
-/**
- * Each folder the pass found of the runs a run is handed (`found`), by its absolute path: each run's `artifacts/`, then each run's
- * `inputs/`.
- */
-export const handedFolders: HandedFolders = (found) => {
-  const folders: string[] = [];
-  for (const f of found) if (f.artifacts !== undefined) folders.push(f.artifacts);
-  for (const f of found) if (f.inputs !== undefined) folders.push(f.inputs);
-  return folders;
-};
 
 /**
  * The run's copy of its workflow folder (`dir`, its absolute path, undefined where the record names none), read-only, for a step whose

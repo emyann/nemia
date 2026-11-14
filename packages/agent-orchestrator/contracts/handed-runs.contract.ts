@@ -10,8 +10,9 @@ import { assume, type Implementation, spec } from '@emyann/tsverify';
 import { isRemoteHarness } from '../src/harness/harness.ts';
 import type { Mount } from '../src/record/record.ts';
 import type { StepSpec } from '../src/step/step.ts';
-import { handedFolders, type HandedRunFolders } from '../src/filed/filed.ts';
+import { handedFolders } from '../src/filed/handed-folders/handed-folders.ts';
 import { sandboxed } from '../src/workflow/index.ts';
+import type { HandedRunFolders } from './handed-folders.contract.ts';
 
 /**
  * Whether a harness is fenced by a sandbox (`sandboxed`), read off the runtime's declarations, which the purity check cannot see into:
@@ -88,26 +89,6 @@ const cardsRefusalSpec = spec<
 
 /** The function's type, which the code takes: it then imports nothing of tsverify. */
 export type CardsRefusal = Implementation<typeof cardsRefusalSpec>;
-
-const handedFoldersSpec = spec<(found: readonly HandedRunFolders[]) => string[]>({
-  ensures: {
-    onlyTheirs: {
-      description: "Only a handed run's artifacts and inputs folders, as the pass found them, are listed",
-      condition: ({ input: [found], output }) => output.every((p) => found.some((f) => f.artifacts === p || f.inputs === p)),
-    },
-    everyArtifacts: {
-      description: "Every handed run's artifacts folder the pass found is listed",
-      condition: ({ input: [found], output }) => found.every((f) => f.artifacts === undefined || output.includes(f.artifacts)),
-    },
-    everyInputs: {
-      description: "Every handed run's inputs folder the pass found is listed",
-      condition: ({ input: [found], output }) => found.every((f) => f.inputs === undefined || output.includes(f.inputs)),
-    },
-  },
-});
-
-/** The type of each folder the pass found of the runs a run is handed, by its absolute path (`handedFolders`, src/filed/filed.ts). */
-export type HandedFolders = Implementation<typeof handedFoldersSpec>;
 
 /** Each folder the pass found of `found`, by its absolute path: the code's own list, whose laws are above. */
 const foundPaths = (found: readonly HandedRunFolders[]): string[] => handedFolders(found);

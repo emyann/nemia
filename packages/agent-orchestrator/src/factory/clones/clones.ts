@@ -5,6 +5,9 @@
  */
 import path from 'node:path';
 import type { CloneTargetOf } from '../../../contracts/clone-target.contract.ts';
+import { joinedFolder } from './clone-folder.ts';
+
+export { joinedFolder } from './clone-folder.ts';
 
 export type { CloneTarget } from '../../../contracts/clone-target.contract.ts';
 
@@ -72,12 +75,6 @@ const named = (text: string): string => {
   const ended = opened.endsWith('/') ? opened.slice(0, opened.length - 1) : opened;
   return ended.endsWith('.git') ? ended.slice(0, ended.length - 4) : ended;
 };
-
-/**
- * A clone's folder of its host and path. The folder `cloneTarget` answers is judged whole after it is joined, so its contract proves
- * the judgement over the folder as one value (`assume`, pure) rather than over the join.
- */
-export const joinedFolder = (host: string, rest: string): string => host + '/' + rest;
 
 /** Whether a clone's folder stays under `clones/`: relative, a host and a path at least, no segment empty, `.` or `..`. */
 const staysUnder = (folder: string): boolean =>

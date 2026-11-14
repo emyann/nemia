@@ -548,7 +548,7 @@ export type { Pin } from './revisions/revisions.ts';
 export { definitionRevision, ledgerOf } from './revisions/revisions.store.ts';
 export { chatAnswer, chatHistory, chatRead, chatSay, chatStop, FILES_CHECK_MS, followChat, RECORD_BEAT_MS } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatFollow, ChatFollowed, ChatHistory, ChatReads, ChatSent } from './chat/chat.verb.ts';
-export type { Ask, AskEvent, AskOption, AskPick, AskQuestion, ChatEvent, Presence } from './chat/chat.ts';
+export type { Ask, AskEvent, AskOption, AskPick, AskQuestion, ChatEvent, Presence } from './chat/index.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';
 
 import * as RunModel from './record/record.model.ts';
@@ -593,7 +593,7 @@ export { PASSES } from './meter/passes.verb.ts';
 export { SERIES } from './series/commands.verb.ts';
 export { SUBSCRIBE, UNSUBSCRIBE } from './subscription/subscription.verb.ts';
 export { FACTORY_ADD } from './factory/factory.verb.ts';
-export { cloneTarget } from './factory/clones/clones.ts';
+export { cloneTarget } from './factory/clones/index.ts';
 export { FACTORY_VOLUME_ADD, FACTORY_VOLUME_RM } from './factory/volume/volume.verb.ts';
 export { FACTORY_APPLY, reconcileOnce } from './factory/applied/applied.verb.ts';
 export { FACTORY_ADOPT } from './adopt/adopt.verb.ts';

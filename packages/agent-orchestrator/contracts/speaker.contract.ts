@@ -1,53 +1,26 @@
 /**
  * Who speaks to a long-lived session in its chat (agent-orchestrator, src/chat/chat.ts): the person, or an agent named as itself
  * (`Speaker`), which is the caller the request's token says (`stepSpeaker`, step-speaker.contract.ts). A name an agent may speak under
- * (`speakerNameRefusal`); whether words from a speaker are taken (`speakerRefusal`); whether a request that still says who its words are
+ * (`speakerNameRefusal`, speaker-name.contract.ts); whether words from a speaker are taken (`speakerRefusal`); whether a request that still
+ * says who its words are
  * from, a field retired for the caller's own token, is refused (`fromRefusal`); and the words the keeper says them to the session in
  * (`framedFor`).
  *
  * The laws are the card's: an agent's words are never said nor shown as the person's, and who speaks is who holds the token, never who
  * the words say they are from. The words of each refusal are nobody's law, only its kind.
  *
- * The types and constants the laws read are `src/chat/chat.ts`'s, and so is the `speakerNameRefusal` that `speakerRefusal`'s laws read.
+ * The types the laws read are this contract's, which `src/chat/chat.ts` hands on; the constants are `src/chat/speaker-words.ts`'s; and the
+ * `speakerNameRefusal` that `speakerRefusal`'s laws read is `src/chat/speaker-name.ts`'s, proved by `speaker-name.contract.ts`.
  */
-import { assume, type Implementation, spec } from '@emyann/tsverify';
-import {
-  PERSON_FRAME,
-  RESERVED_SPEAKERS,
-  SPEAKER_NAME_MAX,
-  type Speaker,
-  type SpeakerRefused,
-  speakerNameRefusal,
-  wellSpelt,
-} from '../src/chat/chat.ts';
+import { type Implementation, spec } from '@emyann/tsverify';
+import { speakerNameRefusal } from '../src/chat/speaker-name.ts';
+import { PERSON_FRAME } from '../src/chat/speaker-words.ts';
 
-/** The characters a name takes, which no law reads (`speakerNameRefusal`'s `open`): declared pure, and nothing more. */
-export const spelt = assume(wellSpelt, { pure: true });
+/** Who wrote words to a task's chat: the person, or an agent, by the name it speaks under. An entry with none is the person's. */
+export type Speaker = { kind: 'person' } | { kind: 'agent'; name: string };
 
-const speakerNameRefusalSpec = spec<(name: string) => string | undefined>({
-  /**
-   * The characters a name takes — lowercase letters, digits, `.`, `_`, `-` and `/`, opening with a letter or a digit — are a pattern,
-   * which the verifier does not read (tsverify's `docs/reads.md`: a string's `replace` and the like "not modeled", and no regular
-   * expression): which other names are refused is left to the code, and held by its tests (`src/chat/chat.test.ts`).
-   */
-  open: ['output'],
-  ensures: {
-    emptyRefused: {
-      description: 'An empty name is no name an agent speaks under',
-      condition: ({ input: [name], output }) => name.length > 0 || output !== undefined,
-    },
-    longRefused: {
-      description: 'A name longer than SPEAKER_NAME_MAX is refused',
-      condition: ({ input: [name], output }) => name.length <= SPEAKER_NAME_MAX || output !== undefined,
-    },
-    reservedRefused: {
-      description: 'No agent speaks under a name that reads as the person or as the session’s own agent',
-      condition: ({ input: [name], output }) => !RESERVED_SPEAKERS.includes(name) || output !== undefined,
-    },
-  },
-});
-/** `speakerNameRefusal`'s type, which `src/chat/chat.ts` takes: why `name` is no name an agent speaks under, or undefined. */
-export type SpeakerNameRefusal = Implementation<typeof speakerNameRefusalSpec>;
+/** Why words from a speaker are not taken: `Invalid`, what is given is wrong. */
+export type SpeakerRefused = { kind: 'Invalid'; message: string };
 
 /** Whether `speaker` is an agent whose name is one an agent speaks under. */
 const wellNamedAgent = (speaker: Speaker): boolean => speaker.kind === 'agent' && speakerNameRefusal(speaker.name) === undefined;
@@ -117,5 +90,5 @@ const framedForSpec = spec<(speaker: Speaker, text: string) => string>({
     },
   },
 });
-/** `framedFor`'s type, which `src/chat/chat.ts` takes: the words `text` from `speaker` are said to the session in. */
+/** `framedFor`'s type, which `src/chat/framed.ts` takes: the words `text` from `speaker` are said to the session in. */
 export type FramedFor = Implementation<typeof framedForSpec>;

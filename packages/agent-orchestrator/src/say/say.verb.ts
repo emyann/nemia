@@ -9,7 +9,7 @@ import { EngineService, asked, type Engine } from '../runtime-client.ts';
 import { tryOf, type Run, type SaidBefore } from '../record/record.ts';
 import { saidAhead, sayRefusal, type Said } from './say.ts';
 import type { Caller } from '../caller/index.ts';
-import { framedForStep, stepSpeaker, type Speaker } from '../chat/chat.ts';
+import { framedForStep, stepSpeaker, type Speaker } from '../chat/index.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { Conflict } from '../refusal/refusal.ts';

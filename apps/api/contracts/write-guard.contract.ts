@@ -24,12 +24,31 @@
  * of the same host carries it; only the board's own page, `same-origin`, or no browser, writes by it.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
-import { loopback, saysJson, type WriteRefusal, type WriteRequest } from '../src/guard.ts';
+import { loopback } from '../src/address/address.ts';
+import { saysJson } from '../src/media/media.ts';
+
+/**
+ * A request as the guard reads it: its method, its `Host`, `Sec-Fetch-Site` and `Content-Type` headers, each absent where not sent,
+ * whether it presents a bearer token (`bearer`), and whether it presents a token by the board's cookie alone (`cookie`, `TOKEN_COOKIE`,
+ * with no bearer beside it).
+ */
+export type WriteRequest = {
+  readonly method: string;
+  readonly host: string | undefined;
+  readonly site: string | undefined;
+  readonly contentType: string | undefined;
+  readonly bearer: boolean;
+  readonly cookie: boolean;
+};
+
+/** Which refusal a write meets: another host, another site, or a body that is not JSON. */
+export type WriteRefusal = 'host' | 'site' | 'media';
 
 /**
  * Whether a header names this machine's loopback (`localhost`, `127.0.0.1` or `[::1]`, on any port, in any case), and whether one says a
  * JSON body (`application/json`, its parameters and case left out): patterns and case folds, which the verifier does not read (a regular
- * expression, `toLowerCase`), so each is the code's (`src/guard.ts`), declared pure and nothing more, and the laws read the same two the
+ * expression, `toLowerCase`), so each is the code's (`src/address/address.ts`, `src/media/media.ts`), declared pure and nothing more, and
+ * the laws read the same two the
  * code calls. Which spellings each takes is held by its tests (`src/guard.test.ts`).
  */
 export const loopbackName = assume(loopback, { pure: true });

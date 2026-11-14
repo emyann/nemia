@@ -8,7 +8,7 @@
  * (`test/journal-walks.ts`) holds that the door passes them.
  */
 import { spec, type Implementation } from '@emyann/tsverify';
-import type { AppendRefusalReason } from '../src/core/engine/append-refusal.ts';
+import type { AppendRefusalReason } from '../src/core/engine/append-refusals.ts';
 
 /** The most attempts a task may count, past which a count plus one would round: `Number.MAX_SAFE_INTEGER`. */
 const MOST_STARTS = 9_007_199_254_740_991;

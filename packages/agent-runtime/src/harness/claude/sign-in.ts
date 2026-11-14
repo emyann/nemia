@@ -20,15 +20,9 @@ import { withoutTelemetry } from '../telemetry.ts';
 import { quote, WORDS_QUOTE } from '../../core/quote.ts';
 import { claudeExecutableOf } from '../mcp-sign-in.ts';
 import { CLAUDE_SIGN_IN } from './vocabulary.ts';
+import type { ClaudeSignInAsk, ClaudeSignIn } from '../../../contracts/claude-sign-in.contract.ts';
 
-/** One ask of `claude auth status`, as its child ended. */
-export type ClaudeSignInAsk =
-  | { readonly kind: 'exited'; readonly code: number; readonly loggedIn: boolean | undefined }
-  | { readonly kind: 'timed-out' }
-  | { readonly kind: 'not-run' };
-
-/** What the ask says of the machine's sign-in. */
-export type ClaudeSignIn = 'signed-in' | 'signed-out' | 'timed-out' | 'unknown';
+export type { ClaudeSignInAsk, ClaudeSignIn } from '../../../contracts/claude-sign-in.contract.ts';
 
 /** How long `claude auth status` is given to answer before the spawn is refused for want of an answer (`claudeSignedOutRefusal`). */
 export const CLAUDE_SIGN_IN_MS = 15_000;

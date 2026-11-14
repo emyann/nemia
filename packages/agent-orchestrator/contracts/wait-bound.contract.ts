@@ -7,7 +7,10 @@
  * there. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import { WAIT_DEFAULT_MS, WAIT_MAX_MS, type WaitBound } from '../src/await/await.ts';
+import { WAIT_DEFAULT_MS, WAIT_MAX_MS } from '../src/await/wait-limits.ts';
+
+/** The bound, or why the one given is refused: `not-positive`, none to wait; `above-max`, longer than a caller's call lives. */
+export type WaitBound = { readonly ms: number } | { readonly refused: 'not-positive' | 'above-max' };
 
 const waitBoundSpec = spec<(asked: number | undefined) => WaitBound>({
   requires: ({ input: [asked] }) => asked === undefined || Number.isFinite(asked),

@@ -8,7 +8,7 @@ import { spec } from '@emyann/tsverify/effect';
 import type { Effect } from 'effect';
 import { fold, verbTakes } from '../src/core/domain.ts';
 import type { Journal, JournalError } from '../src/core/engine/journal.ts';
-import { stopRefusalOf, type StopRefused } from '../src/core/engine/filing.ts';
+import { stopRefusalOf, type StopRefused } from '../src/core/engine/stop-refusal.ts';
 import type { TaskId } from '../src/core/model.ts';
 
 /**

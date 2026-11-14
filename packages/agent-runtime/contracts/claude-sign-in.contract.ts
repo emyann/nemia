@@ -9,10 +9,18 @@
  * carries no boolean one), a run killed at its bound, or a child that never ran or ended by a signal. The words of each answer, and
  * what the spawn does on `timed-out` and `unknown`, are the caller's.
  *
- * The two types (`ClaudeSignInAsk`, `ClaudeSignIn`) are `src/harness/claude/sign-in.ts`'s.
+ * The two types (`ClaudeSignInAsk`, `ClaudeSignIn`) are this contract's, which `src/harness/claude/sign-in.ts` hands on.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { ClaudeSignIn, ClaudeSignInAsk } from '../src/harness/claude/sign-in.ts';
+
+/** One ask of `claude auth status`, as its child ended. */
+export type ClaudeSignInAsk =
+  | { readonly kind: 'exited'; readonly code: number; readonly loggedIn: boolean | undefined }
+  | { readonly kind: 'timed-out' }
+  | { readonly kind: 'not-run' };
+
+/** What the ask says of the machine's sign-in. */
+export type ClaudeSignIn = 'signed-in' | 'signed-out' | 'timed-out' | 'unknown';
 
 /** Whether the ask ended with an exit the command documents as signed in: 0, its JSON not saying otherwise. */
 const saysIn = (ask: ClaudeSignInAsk): boolean => ask.kind === 'exited' && ask.code === 0 && ask.loggedIn !== false;

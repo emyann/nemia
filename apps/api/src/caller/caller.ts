@@ -22,24 +22,17 @@ import { deleteCookie } from 'hono/cookie';
 import { PERSON, PlaceService, sessionCaller, type ProposalCaller, type TokenNeed } from 'agent-orchestrator';
 import { Forbidden, TOKEN_COOKIE, type TokenRefusal } from 'objects';
 import type { NeedOf } from '../../contracts/token-need.contract.ts';
+import { MCP_PATH, PAIR_PATH } from './paths.ts';
 import { bearerOf, cookieTokenOf } from '../guard.ts';
 import { type ApiEnv, type Served, traceOf } from '../layer.ts';
 import { Engine, runPlaced, StoreConfig, StoreRoot } from '../store.ts';
+
+export { MCP_PATH, PAIR_PATH } from './paths.ts';
 
 /** A request whose token the api refuses, with the reason where it presented one: the api's 401 (`objects`' `Unauthorized`). */
 export class Unauthorized extends TaggedError('Unauthorized')<{ readonly message: string; readonly reason?: TokenRefusal }> {
   readonly exitCode = 2;
 }
-
-/** The MCP port's path: it and every path under it need a standing token, one the person minted. */
-export const MCP_PATH = '/mcp';
-
-/**
- * The pairing routes' path: asking for a pairing, claiming it with the secret it was answered, and claiming a first-visit link
- * (`src/pairing/pairing.ts`). A client that holds no token yet reaches them, exposed or not: each judges its own secret, and none
- * answers with the store's data. `/api/pairings`, the person's list and approval, is not under it.
- */
-export const PAIR_PATH = '/api/pair';
 
 /** The paths the api answers on, each with every path under it: the objects' routes and the OpenAPI document and its page. */
 export const API_PATHS = ['/api', '/openapi'] as const;

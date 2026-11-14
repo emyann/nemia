@@ -9,6 +9,8 @@ import type { Agents, SkillsFound } from '../agents/agents.ts';
 import type { WorkflowDirRefusal } from '../../contracts/workflow-dir.contract.ts';
 import type { WorkflowVersionRefusal } from '../../contracts/workflow-version.contract.ts';
 
+export type { WorkflowThere, VersionRefused } from '../../contracts/workflow-version.contract.ts';
+
 /**
  * Why `name` cannot be a step's name, or `undefined` when it can. A step is its file, `<name>.md`, in its workflow's folder, and other
  * steps name it in `after:`, `input:`, `resume:` and `loop:`: so a name is one file's in that folder, not hidden, not the README's, and one
@@ -197,12 +199,6 @@ export function readmeDescription(text: string): string | null {
   }
   return null;
 }
-
-/** What is at a workflow's folder before a write or a removal: nothing, a file, or a folder at its version (`workflowVersion`). */
-export type WorkflowThere = { kind: 'none' } | { kind: 'file' } | { kind: 'folder'; version: string };
-
-/** A refusal of a workflow's write or removal: the kind the api answers it with, and its words. */
-export type VersionRefused = { kind: 'Invalid' | 'Conflict' | 'Missing'; message: string };
 
 /**
  * Why `dir` cannot be a workflow's folder as the Workflow door is addressed by it (`WorkflowDir`), or null where it can: absolute and

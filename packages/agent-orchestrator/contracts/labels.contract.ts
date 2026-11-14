@@ -5,7 +5,17 @@
  * code computes, which tsverify does not read: `src/labels/labels.test.ts` holds those sentences, a row each.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { Edited, LabelChange, Labels } from '../src/labels/labels.ts';
+
+/** A person's labels: a key to its value, Kubernetes' `map[string]string`. */
+export type Labels = Readonly<Record<string, string>>;
+
+/** One edit of a map, as kubectl spells it: `key=value` sets the key, `key-` removes it. */
+export type LabelChange =
+  | { readonly key: string; readonly op: 'set'; readonly value: string }
+  | { readonly key: string; readonly op: 'remove' };
+
+/** What `labelEdits` answers: the map after the edits, or why they were refused. */
+export type Edited = { readonly labels: Labels } | { readonly refused: string };
 
 /** A map read at any key, which may be missing: the contracts are read without `noUncheckedIndexedAccess`. */
 type Read = Readonly<Record<string, string | undefined>>;

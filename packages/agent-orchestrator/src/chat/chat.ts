@@ -8,14 +8,19 @@
  * Pure. The files are `chat.store.ts`'s, the reads and the person's writes `chat.verb.ts`, and the delivery the keeper's
  * (`say.verb.ts`).
  */
-import type { FramedFor, FromRefusal, SpeakerNameRefusal, SpeakerRefusal } from '../../contracts/speaker.contract.ts';
+import type { FromRefusal, Speaker, SpeakerRefusal } from '../../contracts/speaker.contract.ts';
 import type { FramedForStep, StepSpeaker } from '../../contracts/step-speaker.contract.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { AGENT_OPENS, AGENT_WRITES } from '../say/say.ts';
-
-export { AGENT_OPENS, AGENT_WRITES } from '../say/say.ts';
 import { blockedWord, type EnginePhase } from '../views/views-words.ts';
 import type { CallState, ChatFrom, SaidAfter } from 'objects';
+import { framedFor } from './framed.ts';
+import { speakerNameRefusal } from './speaker-name.ts';
+
+export type { Speaker, SpeakerRefused } from '../../contracts/speaker.contract.ts';
+export { AGENT_OPENS, AGENT_WRITES } from '../say/agent-frame/agent-frame.ts';
+export { framedFor } from './framed.ts';
+export { speakerNameRefusal } from './speaker-name.ts';
+export { PERSON_FRAME, RESERVED_SPEAKERS, SPEAKER_NAME_MAX, wellSpelt } from './speaker-words.ts';
 
 /**
  * Who a message is from (`ChatFrom`, objects' `CHAT_FROM`): the task's agent (`agent`), the person, the keeper, whose words are a quiet
@@ -164,48 +169,6 @@ export type ChatSources = {
   phase: EnginePhase | null;
 };
 
-/** Who wrote words to a task's chat: the person, or an agent, by the name it speaks under. An entry with none is the person's. */
-export type Speaker = { kind: 'person' } | { kind: 'agent'; name: string };
-
-/** Why words from a speaker are not taken: `Invalid`, what is given is wrong. */
-export type SpeakerRefused = { kind: 'Invalid'; message: string };
-
-/** The words the person's own are said to the task in, before the words themselves, as the keeper has always said them. */
-export const PERSON_FRAME = 'The person writes from the board: ';
-
-/** The longest name an agent speaks under. */
-export const SPEAKER_NAME_MAX = 64;
-
-/** The names no agent speaks under: each would read, to the task or to the person, as the person or as the task's own agent. */
-export const RESERVED_SPEAKERS: readonly string[] = ['person', 'the-person', 'you', 'me', 'nemia', 'keeper', 'agent'];
-
-/** The characters a name opens with. */
-const NAME_OPENS = 'abcdefghijklmnopqrstuvwxyz0123456789';
-
-/** The characters a name takes after its first: lowercase letters, digits, `.`, `_`, `-` and `/`. */
-const NAME_TAKES = `${NAME_OPENS}._-/`;
-
-/** Whether `name` opens with a lowercase letter or a digit and holds only the characters `NAME_TAKES` holds. */
-export const wellSpelt = (name: string): boolean => {
-  if (!NAME_OPENS.includes(name.charAt(0))) return false;
-  for (let i = 1; i < name.length; i++) if (!NAME_TAKES.includes(name.charAt(i))) return false;
-  return true;
-};
-
-/**
- * Why `name` is no name an agent speaks under, or undefined where it is one: 1 to `SPEAKER_NAME_MAX` characters, spelt as `wellSpelt`
- * says, and none of `RESERVED_SPEAKERS`. Pure.
- */
-export const speakerNameRefusal: SpeakerNameRefusal = (name) => {
-  if (name.length === 0) return 'The name is empty: name the agent that speaks, such as `operator`.';
-  if (name.length > SPEAKER_NAME_MAX) return `The name is ${name.length} characters: name the agent in at most ${SPEAKER_NAME_MAX}.`;
-  if (RESERVED_SPEAKERS.includes(name))
-    return `\`${name}\` reads as the person or as the task's own agent: name the agent that speaks as itself, such as \`operator\`.`;
-  if (!wellSpelt(name))
-    return `\`${name}\` is no name an agent speaks under: use lowercase letters, digits, \`.\`, \`_\`, \`-\` and \`/\`, opening with a letter or a digit.`;
-  return undefined;
-};
-
 /**
  * Why words from `speaker` are not taken, or null where they are. The person's are taken whatever token of theirs carried them, the
  * board's cookie, a shell's or a script's; an agent's, whose token says who it is, under a name an agent speaks under, refused `Invalid`
@@ -232,13 +195,6 @@ export const fromRefusal: FromRefusal = (from) =>
         message: `Words no longer say which agent they are from (\`${from.name}\`): an agent speaks with a token of its own, which the person mints with \`${AGENT_TOKEN_FORM}\`, and its words are its own by that token. Send no \`from\` (no \`--as\`).`,
       }
     : null;
-
-/**
- * The words `text` from `speaker` are said to the task in, so it knows who wrote them: the person's as they always were
- * (`PERSON_FRAME`), an agent's under its name and never as the person's. Pure.
- */
-export const framedFor: FramedFor = (speaker, text) =>
-  speaker.kind === 'person' ? PERSON_FRAME + text : AGENT_OPENS + speaker.name + AGENT_WRITES + text;
 
 /**
  * Who words to a step's session (`nemia say`, the api's `say`, `src/say/say.verb.ts`), or to her chat (`chatSay`), are from, off the

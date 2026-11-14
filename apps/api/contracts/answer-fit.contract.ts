@@ -7,7 +7,7 @@
  * `PAGE_MOST` long, where half of it is a whole number exactly. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import { PAGE_MOST } from '../src/mcp/bound.ts';
+import { PAGE_MOST } from '../src/mcp/page.ts';
 
 /** What the port does with an answer: answer it, ask again for a page of `limit`, or refuse it with how to narrow it. */
 export type AnswerFit = { readonly kind: 'answer' } | { readonly kind: 'smaller'; readonly limit: number } | { readonly kind: 'refuse' };

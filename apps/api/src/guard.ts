@@ -38,21 +38,13 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { Forbidden, TOKEN_COOKIE, UnsupportedMediaType } from 'objects';
-import type { WriteRefused } from '../contracts/write-guard.contract.ts';
+import type { WriteRefusal, WriteRefused, WriteRequest } from '../contracts/write-guard.contract.ts';
+import { loopback } from './address/address.ts';
+import { mediaOf, saysJson } from './media/media.ts';
 
-/**
- * A request as the guard reads it: its method, its `Host`, `Sec-Fetch-Site` and `Content-Type` headers, each absent where not sent,
- * whether it presents a bearer token (`bearer`), and whether it presents a token by the board's cookie alone (`cookie`, `TOKEN_COOKIE`,
- * with no bearer beside it).
- */
-export type WriteRequest = {
-  readonly method: string;
-  readonly host: string | undefined;
-  readonly site: string | undefined;
-  readonly contentType: string | undefined;
-  readonly bearer: boolean;
-  readonly cookie: boolean;
-};
+export type { WriteRefusal, WriteRequest } from '../contracts/write-guard.contract.ts';
+export { loopback } from './address/address.ts';
+export { saysJson } from './media/media.ts';
 
 /** What a request's `Authorization` header presents: no header (`undefined`), a bearer token, or a header of another shape (`null`). */
 export function bearerOf(header: string | undefined): string | undefined | null {
@@ -66,24 +58,6 @@ export const cookieTokenOf = (c: Context): string | undefined => {
   const token = getCookie(c, TOKEN_COOKIE);
   return token === undefined || token === '' ? undefined : token;
 };
-
-/** Which refusal a write meets: another host, another site, or a body that is not JSON. */
-export type WriteRefusal = 'host' | 'site' | 'media';
-
-/**
- * The names a write with no token may be addressed to: this machine's loopback, on any port. Such a write is a pairing's alone, every
- * other route needing a token (`needOf`, src/caller/caller.ts), whatever address the api is bound to (`NEMIA_BIND`, port.ts).
- */
-const LOOPBACK_HOST = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i;
-
-/** Whether `host` names this machine's loopback, on any port, in any case, the white space around it left out. */
-export const loopback = (host: string): boolean => LOOPBACK_HOST.test(host.trim());
-
-/** The media type `type` says, its parameters (`; charset=utf-8`), its case and its white space left out. */
-const mediaOf = (type: string): string => type.split(';')[0]?.trim().toLowerCase() ?? '';
-
-/** Whether `type` says a JSON body: `application/json`, whatever its parameters, case and white space. */
-export const saysJson = (type: string): boolean => mediaOf(type) === 'application/json';
 
 /**
  * Why a write is refused before its body is read, or null: its host first, neither where it presents a bearer token or the board's

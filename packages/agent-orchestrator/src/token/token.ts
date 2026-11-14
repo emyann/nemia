@@ -9,13 +9,9 @@
  */
 import type { CallerOfToken } from '../../contracts/session-caller.contract.ts';
 
-export type { CallerOf, StandingRecord, TokenHolder, TokenRecord } from '../../contracts/session-caller.contract.ts';
+export type { TokenNeed } from '../../contracts/session-caller.contract.ts';
 
-/**
- * What a request's route needs of a token: `none`, a request with none being the person (an in-process program; no route the api answers);
- * `token`, any live one (every route the api answers); `standing`, one the person minted, held by the person or an agent (the MCP port).
- */
-export type TokenNeed = 'none' | 'token' | 'standing';
+export type { CallerOf, StandingRecord, TokenHolder, TokenRecord } from '../../contracts/session-caller.contract.ts';
 
 /**
  * The caller a request is, from whether it presented a token, what its route needs of one, the standing record the store keeps of it

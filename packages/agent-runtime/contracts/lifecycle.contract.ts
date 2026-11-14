@@ -4,7 +4,8 @@
  * rather than as a second copy of the code. Read in place.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import { type State, waitsForInput } from '../src/core/domain.ts';
+import type { State } from '../src/core/state.ts';
+import { waitsForInput } from '../src/core/waiting.ts';
 import type { LifecycleState } from '../src/core/lifecycle.ts';
 
 const lifecycleSpec = spec<(state: State) => LifecycleState>({

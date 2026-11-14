@@ -21,17 +21,25 @@ import {
   repoNameRefusal,
   reposNamed,
   type Factory,
+  type Schedule,
 } from '../src/factory/factory.ts';
-import {
-  hiresInto,
-  withEntry,
-  withHire,
-  withName,
-  withoutEntry,
-  type WiringChange,
-  type WiringRefused,
-} from '../src/factory/wiring/wiring.ts';
+import { hiresInto, withEntry, withHire, withName, withoutEntry } from '../src/factory/wiring/dictionaries.ts';
 import { accepted } from './laws.ts';
+
+/**
+ * A change of a factory's wiring, by its verb: a workflow attached or detached, an agent hired into a step `<workflow>/<step>` or fired
+ * from it, a workflow's schedule written or taken back.
+ */
+export type WiringChange =
+  | { readonly verb: 'attach'; readonly workflow: string; readonly repo?: string }
+  | { readonly verb: 'detach'; readonly workflow: string }
+  | { readonly verb: 'hire'; readonly step: string; readonly agent: string }
+  | { readonly verb: 'fire'; readonly step: string }
+  | { readonly verb: 'schedule'; readonly workflow: string; readonly schedule: Schedule }
+  | { readonly verb: 'unschedule'; readonly workflow: string };
+
+/** What a change of wiring is refused as: a name or a state that cannot take it (`Invalid`), or what it names is not there (`Missing`). */
+export type WiringRefused = { readonly kind: 'Invalid' | 'Missing'; readonly message: string };
 
 export const hireNamed = assume(hireRefusal, { pure: false });
 export const workflowNamed = assume(workflowNameRefusal, { pure: true });

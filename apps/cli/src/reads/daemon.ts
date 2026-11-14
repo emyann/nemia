@@ -11,11 +11,18 @@ import { Refused } from '../refused.ts';
 /** The verb, as a person types it. */
 export const DAEMON_VERB = 'daemon';
 
-/** What `nemia daemon` prints of the api's answer: its line, or, `json`, its state, holder, pid and url as one JSON line. */
+/**
+ * What `nemia daemon` prints of the api's answer: its line, or, `json`, its state, holder, pid and url as one JSON line.
+ * @param answer The api's answer of `GET /api/daemon`.
+ * @param json Whether `--json` was typed, which prints the one JSON line.
+ */
 export const daemonLines = (answer: Daemon, json: boolean): readonly string[] =>
   json ? [JSON.stringify({ state: answer.kind, by: answer.by, pid: answer.pid, url: answer.url })] : [answer.line];
 
-/** `nemia daemon` on the words after its name: `--json` alone, anything else refused, exit 2, naming its usage. */
+/**
+ * `nemia daemon` on the words after its name: `--json` alone, anything else refused, exit 2, naming its usage.
+ * @param args The words typed after `daemon`.
+ */
 export async function daemon(args: readonly string[]): Promise<number> {
   const stray = args.find((arg) => arg !== '--json');
   if (stray !== undefined) throw new Refused(`nemia daemon does not take ${stray}: nemia daemon [--json].`);

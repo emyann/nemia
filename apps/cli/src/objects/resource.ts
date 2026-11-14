@@ -5,5 +5,10 @@
  */
 import type { ResourceNamed } from '../../contracts/resource.contract.ts';
 
+/**
+ * The resource `word` names among `resources`: a kind's own, by its plural or singular name; refused, `unknown`, where none is.
+ * @param resources The resources discovery lists, sub-resources among them.
+ * @param word The word typed, put in lower case by the caller.
+ */
 export const resourceNamed: ResourceNamed = (resources, word) =>
   resources.find((r) => !r.name.includes('/') && (r.name === word || r.singularName === word)) ?? { refused: 'unknown' };

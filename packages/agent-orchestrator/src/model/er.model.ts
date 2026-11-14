@@ -119,6 +119,7 @@ const drawEntity = (model: ErModel, entity: Schema.Top): { block: string[]; rela
  * many under an array or a record); one holding an id is the entity's PK, or an FK, drawn from the entity the id names, or from
  * a node named by the id itself when it is another layer's, to the holder (`Owner ||--o{ Holder`: beautiful-mermaid reads no `}o`);
  * an array or a record of ids is an FK drawn the same way.
+ * @param model The layer's model: its entities in the order drawn, and the entity each id names.
  */
 export const erDiagram = (model: ErModel): string => {
   const drawn = model.entities.map((entity) => drawEntity(model, entity));

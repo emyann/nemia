@@ -40,13 +40,19 @@ export const NEMIA_SELECTORS: readonly string[] = ['waits=person', 'reason=ToolD
  */
 export const NEMIA_DIGEST_EVERY = 1440;
 
-/** The task her session is filed under when some factory is put above `manual` at `since`: `nemia-` and the time's digits. */
+/**
+ * The task her session is filed under when some factory is put above `manual` at `since`: `nemia-` and the time's digits.
+ * @param since When some factory was put above `manual`, an ISO time.
+ */
 export const nemiaTaskId = (since: string): string => `nemia-${since.replace(/[^0-9]/g, '')}`;
 
 /**
  * The harness's settings her session is filed with, as JSON: her ask and deny rules (`rules`); `NEMIA_DAEMON_START=off` (`DEMAND_OFF`),
  * so a `nemia` she types never starts a daemon beside the one that keeps her; and the search path `searchPath` with the folder `bin`
  * first and only there, so the `nemia` she types is the bin of the daemon that keeps her. No path where `bin` is undefined. Pure.
+ * @param rules Her ask and deny rules.
+ * @param bin The folder of the daemon's own `nemia` bin, or undefined where none was found: no path.
+ * @param searchPath The search path to put `bin` first on, as the daemon's PATH.
  */
 export function nemiaSettings(
   rules: { readonly ask: readonly string[]; readonly deny: readonly string[] },
@@ -63,7 +69,10 @@ export function nemiaSettings(
 /** The usage the refusals of `nemia level` end on. */
 export const LEVEL_FORM = FACTORY_LEVEL_FORM;
 
-/** Why `word` is no level `nemia level` sets, or undefined where it is one. Pure. */
+/**
+ * Why `word` is no level `nemia level` sets, or undefined where it is one. Pure.
+ * @param word The level as the person typed it.
+ */
 export function levelRefusal(word: string): string | undefined {
   if ((LEVELS as readonly string[]).includes(word)) return undefined;
   return `${JSON.stringify(word)} is no level: ${LEVEL_FORM}.`;
@@ -122,6 +131,9 @@ const isOpen = (task: HerTask | undefined): boolean => task !== undefined && !ta
  * Where she is (`NemiaState`), off the levels (`keeping`), her task's record (`task`, absent where none is filed under her id) and her
  * subscription (`subscribed`): kept only once it tells her task and carries her floor and her selectors, so one put before the floor, or
  * before a selector of hers was added, is put again. Pure.
+ * @param keeping What the keeper reads of the levels and her folder.
+ * @param task Her task's record, or undefined where none is filed under her id.
+ * @param subscribed Her subscription, or undefined where she has none.
  */
 export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaState {
   if (!keeping.above) return isOpen(task) || subscribed !== undefined ? 'leaving' : 'off';
@@ -139,6 +151,9 @@ export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscrib
  * is owed (`answered`); at `leaving`, stop the open task and drop the subscription; at `stopped`, drop a subscription left; else
  * nothing, at `untrusted` too: a session filed in a folder her harness does not trust would be refused at its start. A task settled
  * from outside is never filed again: the person said so by stopping it. Pure.
+ * @param keeping What the keeper reads of the levels, her folder, her session and the chat.
+ * @param task Her task's record, or undefined where none is filed under her id.
+ * @param subscribed Her subscription, or undefined where she has none.
  */
 export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaAct[] {
   const state = nemiaState(keeping, task, subscribed);
@@ -156,7 +171,11 @@ export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed
   ];
 }
 
-/** The instruction her session is filed with: her builtin instruction `body`, then the person's `custom` words where there are any. */
+/**
+ * The instruction her session is filed with: her builtin instruction `body`, then the person's `custom` words where there are any.
+ * @param body Her builtin instruction.
+ * @param custom The person's custom words for her, or undefined where there are none.
+ */
 export const nemiaPrompt = (body: string, custom: string | undefined): string =>
   `${[body.trim(), ...(custom === undefined ? [] : [custom])].join('\n\n')}\n`;
 
@@ -167,6 +186,9 @@ export type ToldCustom = { words?: string };
  * Whether the person's custom words `now` differ from those her session has: those of the keeper's record `told`; where it kept none yet,
  * for a session filed before it kept one, whether her filed instruction `filed` ends with them. Her builtin instruction is never compared,
  * and with no record no removal is owed: whether she had words is unknown. Pure.
+ * @param told The keeper's record of the words her session has, or undefined where it kept none.
+ * @param now The person's custom words now, or undefined where there are none.
+ * @param filed Her filed instruction, or undefined where none was written.
  */
 export const customChanged = (told: ToldCustom | undefined, now: string | undefined, filed: string | undefined): boolean =>
   told === undefined ? now !== undefined && !(filed ?? '').endsWith(`\n\n${now}\n`) : told.words !== now;
@@ -174,6 +196,7 @@ export const customChanged = (told: ToldCustom | undefined, now: string | undefi
 /**
  * What her open task is told once the person's custom instruction for her changed: the words `custom` whole, which replace those she was
  * started with, or, where undefined, that they were removed and she has none. Pure.
+ * @param custom The person's custom words now, or undefined where they were removed.
  */
 export const toldCustom = (custom: string | undefined): string =>
   custom === undefined
@@ -239,7 +262,10 @@ export const nemiaGraph = (): NemiaGraph => ({
   verbs: NEMIA_VERBS.map((v) => ({ ...v, from: [...v.from] })),
 });
 
-/** Her machine as a Mermaid state diagram, edges then verbs, held in the package's `docs/features.md` between `diagram:nemia` markers. */
+/**
+ * Her machine as a Mermaid state diagram, edges then verbs, held in the package's `docs/features.md` between `diagram:nemia` markers.
+ * @param graph Her machine as plain data, `nemiaGraph()` when absent.
+ */
 export const nemiaDiagram = (graph: NemiaGraph = nemiaGraph()): string =>
   [
     'stateDiagram-v2',

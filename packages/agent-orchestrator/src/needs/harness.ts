@@ -21,6 +21,9 @@ export type { HarnessVersionWord, RunNeeding, StepHarness };
 /**
  * The harnesses a run needs, from its frozen steps (`StepHarness`): each that a step running a session runs on — the one it names, else
  * `defaultHarness` — among `withNeeds`, the harnesses whose adapters declare needs, in `withNeeds`' order and each once.
+ * @param steps The run's frozen steps, each with whether it runs a session and the harness it names.
+ * @param defaultHarness The harness a step that names none runs on.
+ * @param withNeeds The harnesses whose adapters declare needs, in their order.
  */
 export const harnessesOfRun: HarnessesOfRun = (steps, defaultHarness, withNeeds) => {
   const out: string[] = [];
@@ -28,7 +31,11 @@ export const harnessesOfRun: HarnessesOfRun = (steps, defaultHarness, withNeeds)
   return out;
 };
 
-/** The unfinished runs whose needs name `need`, each once in the order given: what a fix that takes `need` away waits on. */
+/**
+ * The unfinished runs whose needs name `need`, each once in the order given: what a fix that takes `need` away waits on.
+ * @param need The name of the need the fix takes away.
+ * @param unfinished The unfinished runs, each with the needs it names.
+ */
 export const runsHoldingRemoval: RunsHoldingRemoval = (need, unfinished) => {
   const out: string[] = [];
   for (const r of unfinished) if (r.needs.includes(need) && !out.includes(r.run)) out.push(r.run);
@@ -37,21 +44,36 @@ export const runsHoldingRemoval: RunsHoldingRemoval = (need, unfinished) => {
 
 /**
  * What the read says of the version a harness answered (`found`) against `pin`: `tested` at the pin, `untested` else, `unread` with none.
+ * @param found The version the harness answered, or undefined where it answered none.
+ * @param pin The version this release was tested with.
  */
 export const harnessVersionWord: HarnessVersionWordOf = (found, pin) =>
   found === undefined ? 'unread' : found === pin ? 'tested' : 'untested';
 
-/** The first `x.y.z` in what a harness's version command printed, or undefined where it printed none. */
+/**
+ * The first `x.y.z` in what a harness's version command printed, or undefined where it printed none.
+ * @param printed What the harness's version command printed.
+ */
 export const versionIn = (printed: string): string | undefined => /\d+\.\d+\.\d+/.exec(printed)?.[0];
 
-/** The name of a harness's sign-in need: `<harness>-sign-in`. */
+/**
+ * The name of a harness's sign-in need: `<harness>-sign-in`.
+ * @param harness The harness's name.
+ */
 export const signInNeedOf = (harness: string): string => `${harness}-sign-in`;
 
-/** The harnesses of `declarations` that declare needs, in their order: those a person installs and signs in. */
+/**
+ * The harnesses of `declarations` that declare needs, in their order: those a person installs and signs in.
+ * @param declarations Each harness's declaration, by its name.
+ */
 export const harnessesWithNeeds = (declarations: Readonly<Record<string, HarnessDeclaration>>): string[] =>
   Object.entries(declarations).flatMap(([name, d]) => (d.needs === undefined ? [] : [name]));
 
-/** Which harness, and which of its two needs, the need named `need` is, among `declarations`; undefined for a need of no harness. */
+/**
+ * Which harness, and which of its two needs, the need named `need` is, among `declarations`; undefined for a need of no harness.
+ * @param need The need's name.
+ * @param declarations Each harness's declaration, by its name.
+ */
 export const harnessOfNeed = (
   need: string,
   declarations: Readonly<Record<string, HarnessDeclaration>>,
@@ -80,10 +102,18 @@ export const DEACTIVATED = 'deactivated';
 /** The mark of `harness` as a shell word, under `NEMIA_TOOLS`, which every check and fix is run with. */
 const markOf = (harness: string): string => `"$NEMIA_TOOLS/harnesses/${harness}/${DEACTIVATED}"`;
 
-/** The install of `harness` as it is run: its mark taken away (`DEACTIVATED`), then its adapter's `install`. */
+/**
+ * The install of `harness` as it is run: its mark taken away (`DEACTIVATED`), then its adapter's `install`.
+ * @param harness The harness's name.
+ * @param needs What its adapter declares of its install and sign-in.
+ */
 export const harnessInstallCommand = (harness: string, needs: HarnessNeeds): string => `rm -f ${markOf(harness)} && {\n${needs.install}\n}`;
 
-/** The removal of `harness` as it is run: its adapter's `remove`, then its mark left in its folder (`DEACTIVATED`). */
+/**
+ * The removal of `harness` as it is run: its adapter's `remove`, then its mark left in its folder (`DEACTIVATED`).
+ * @param harness The harness's name.
+ * @param needs What its adapter declares of its install and sign-in.
+ */
 export const harnessRemoveCommand = (harness: string, needs: HarnessNeeds): string =>
   `{\n${needs.remove}\n} && mkdir -p "$NEMIA_TOOLS/harnesses/${harness}" && : > ${markOf(harness)}`;
 
@@ -94,6 +124,8 @@ export const harnessRemoveCommand = (harness: string, needs: HarnessNeeds): stri
  * the fixes its adapter declares in order, one a person types (`typed`) of kind `typed`. Where `token` names the harness, the fix that
  * makes its token is offered with the command that keeps it after it (`<maker> && <keep>`). A harness that declares none (a command, a
  * remote agent) gives none.
+ * @param declarations Each harness's declaration, by its name.
+ * @param token How the default harness's token is kept, or undefined where none is.
  */
 export function harnessNeedsOf(declarations: Readonly<Record<string, HarnessDeclaration>>, token?: TokenKept): Need[] {
   return Object.entries(declarations).flatMap(([name, d]): Need[] => {

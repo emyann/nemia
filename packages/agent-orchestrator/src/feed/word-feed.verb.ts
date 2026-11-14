@@ -28,6 +28,13 @@ type Admitted = { waiting: Wait[]; held: RunSlot | undefined; parent: (id: strin
 /**
  * The feed's words for the run and each step (`feedWords`), off what the pass read before it filed anything: `behind` is what the pass
  * read of a pinned run's next filing against its pins (`behindNow`), offered as a one-shot (`behindOf`).
+ * @param run The run's record.
+ * @param r What the pass read of the run (`readRun`): its steps, the engine's views and the person's answers.
+ * @param assessed What `assess` judged of the run.
+ * @param admission What the pass's admission said: who the run waits on, the slot that holds it, and the runs a hold waits for.
+ * @param checkout The run whose base step holds the repository's checkout this run waits for, or undefined where none does.
+ * @param lifted When the hold the pass lifted itself this pass was put, or undefined where it lifted none.
+ * @param behind What the pass read of a pinned run's next filing against its pins; none where not given.
  */
 export function wordFeed(
   run: Run,

@@ -53,6 +53,7 @@ export const FeedHub = Context.Reference<PubSub.PubSub<FeedPublished> | undefine
 /**
  * One hub for the process, made once by its layer and shut down as the layer's scope closes: sliding, so a publish never waits for a
  * reader, and a reader that takes nothing costs at most `capacity` lines of memory, the oldest dropped first.
+ * @param capacity The most lines the hub holds for a reader that lags, 1024 where not given.
  */
 export const feedHubLayer = (capacity = 1024): Layer.Layer<never> =>
   Layer.effect(FeedHub, Effect.acquireRelease(PubSub.sliding<FeedPublished>(capacity), PubSub.shutdown));
@@ -290,6 +291,7 @@ const wakeAll = (at: Following, taken: NonEmptyReadonlyArray<FeedPublished | und
  *
  * Fails with the refusal of a cursor the feed cannot be read from (exit 2): not a whole number, inside a line, or past the end — a feed
  * cut under the cursor, truncated below it or replaced, whether before the stream opens or while it is open.
+ * @param from The cursor to read from, in bytes of the feed.
  */
 export const followFeed = (from: number, { beat = '1 second' }: { beat?: Duration.Input } = {}): Stream.Stream<Followed, Refusal> =>
   Stream.unwrap(

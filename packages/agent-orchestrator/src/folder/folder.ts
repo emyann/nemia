@@ -15,6 +15,7 @@ export type { WorkflowThere, VersionRefused } from '../../contracts/workflow-ver
  * Why `name` cannot be a step's name, or `undefined` when it can. A step is its file, `<name>.md`, in its workflow's folder, and other
  * steps name it in `after:`, `input:`, `resume:` and `loop:`: so a name is one file's in that folder, not hidden, not the README's, and one
  * a list can hold. What `writeWorkflow` refuses a step with before it writes; a folder read from disk has its names from its files already.
+ * @param name The name asked for, as given: anything, since a writer's draft is not typed.
  */
 export function stepNameRefusal(name: unknown): string | undefined {
   const fix = 'Name it as its file is named, without .md — implement, say.';
@@ -37,12 +38,16 @@ export function stepNameRefusal(name: unknown): string | undefined {
   return undefined;
 }
 
-/** Where the agents a workflow's steps name are: `agents/`, beside the workflow's folder — `workflows/agents` for `workflows/dev`. */
+/**
+ * Where the agents a workflow's steps name are: `agents/`, beside the workflow's folder — `workflows/agents` for `workflows/dev`.
+ * @param workflowDir The workflow's folder.
+ */
 export const agentsDir = (workflowDir: string): string => path.join(path.dirname(path.resolve(workflowDir)), AGENTS_FOLDER);
 
 /**
  * Why `dir` is not a workflow because it is the folder of agents, of skills or of carried files, or `undefined` for one with another
  * name.
+ * @param dir The folder named as a workflow.
  */
 export function agentsFolderRefusal(dir: string): string | undefined {
   if (path.basename(path.resolve(dir)) === CARRIED_FOLDER) {
@@ -58,6 +63,8 @@ export function agentsFolderRefusal(dir: string): string | undefined {
 /**
  * The refusal of a file that is a link, where a folder's files are meant to be its own: `what` says whose, and what following it would do.
  * `writeWorkflow`'s words for a linked step, and `loadAgents`' for a linked agent.
+ * @param file The path of the file that is a link.
+ * @param what Whose the file is and what following the link would do, as the rest of a sentence.
  */
 export const linkRefusal = (file: string, what: string): string =>
   `${file} is a link, and ${what} Replace the link with a file of its own — remove the link and copy what it pointed at into its place, rm <file> && cp <target> <file> — or take it out of the folder.`;
@@ -79,7 +86,10 @@ export const stillNeeded = {
     ].join(', then ')}.`,
 };
 
-/** What a refusal of a write over something there adds: the version it is at, which a write given it changes; nothing for none. */
+/**
+ * What a refusal of a write over something there adds: the version it is at, which a write given it changes; nothing for none.
+ * @param version The version of what is there, or null where it has none.
+ */
 export const takenAt = (version: string | null): string =>
   version === null ? '' : `: it is at version ${version}, and a write given that version changes it`;
 
@@ -97,25 +107,40 @@ export const workflowStale = {
 /**
  * Why a new workflow is not written to `dir`, which is there already: a workflow at version `version`, which a write given it changes, or
  * a file that is no workflow (`version` null).
+ * @param dir The folder written to.
+ * @param version The version of the workflow there, or null for a file that is no workflow.
  */
 export const workflowTaken = (dir: string, version: string | null): string =>
   version === null
     ? `${dir} is there, and is not a workflow: a workflow is a folder of steps. Name the workflow otherwise.`
     : `${dir} is a workflow already, at version ${version}: a write given that version changes it. Give the new one another name, or write this one with that version.`;
 
-/** Why the workflow at `dir` is not removed while `users` need it (`stillNeeded`): each of them, and that nothing was removed. */
+/**
+ * Why the workflow at `dir` is not removed while `users` need it (`stillNeeded`): each of them, and that nothing was removed.
+ * @param dir The workflow's folder.
+ * @param users One sentence for each thing that still needs it, each naming the command that frees it.
+ */
 export const workflowInUse = (dir: string, users: readonly string[]): string =>
   `${dir} is still needed: ${users.join(' ')} Nothing was removed.`;
 
-/** Why a workflow written to `dir` with no steps is refused: a workflow has one at least. */
+/**
+ * Why a workflow written to `dir` with no steps is refused: a workflow has one at least.
+ * @param dir The folder written to.
+ */
 export const noStepsRefusal = (dir: string): string =>
   `no steps to write to ${dir}, and a workflow has at least one. To remove the workflow, remove its folder.`;
 
-/** Why a workflow with two steps named `name` is refused: a step is its file. */
+/**
+ * Why a workflow with two steps named `name` is refused: a step is its file.
+ * @param name The name two steps share.
+ */
 export const twiceRefusal = (name: string): string =>
   `two steps are named ${name}, and a step is its file, ${name}.md. Rename one of them.`;
 
-/** The files of a folder that are steps: every `.md` but its README, sorted. */
+/**
+ * The files of a folder that are steps: every `.md` but its README, sorted.
+ * @param entries The names the folder holds.
+ */
 export const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) => f.endsWith('.md') && !isReadme(f)).sort();
 
 /**
@@ -136,6 +161,9 @@ export type Found = { readonly agents: Agents; readonly skills: SkillsFound };
  * The step `name` rendered as `text`, without its `agent:` line where it names the very agent `fills` hires into it: a draft read with
  * its factory's hires is resolved with the hired agent, and a step whose own file named it too would be refused as hired twice
  * (`attachedAgent`), so the line can only be the hire's. Any other step as it is.
+ * @param name The step's name.
+ * @param text The step's file, as written.
+ * @param fills What a factory gives the workflow's steps, or undefined where none gives any.
  */
 export function hiredLineOut(name: string, text: string, fills: Fills | undefined): string {
   const hire = hireOf(fills, name);
@@ -148,7 +176,11 @@ export function hiredLineOut(name: string, text: string, fills: Fills | undefine
   return `---\n${kept.join('\n')}${text.slice(end + 1)}`;
 }
 
-/** The hire `fills` makes into the step `step`, or undefined for none. */
+/**
+ * The hire `fills` makes into the step `step`, or undefined for none.
+ * @param fills What a factory gives the workflow's steps, or undefined where none gives any.
+ * @param step The step's name.
+ */
 export function hireOf(fills: Fills | undefined, step: string): Hire | undefined {
   if (!fills || !Object.hasOwn(fills.agents, step)) return undefined;
   const agent = fills.agents[step];
@@ -165,6 +197,11 @@ export function hireOf(fills: Fills | undefined, step: string): Hire | undefined
  *
  * What `loadWorkflows` reads a folder with, and what `writeWorkflow` checks one with before a byte of it is written: one reading, so a
  * folder written is refused for what a folder read would be, in the same words.
+ * @param files Each step's name and the text of its file.
+ * @param read The text of a file beside the steps by its path, or undefined where it cannot be read; none where not given.
+ * @param agents The agents `agent:` may name; none where not given.
+ * @param skills The skills those agents may be given; none where not given.
+ * @param fills The agents a factory hires into the steps and its rules; none where not given.
  */
 export function parseFolder(
   files: ReadonlyArray<readonly [name: string, text: string]>,
@@ -184,6 +221,7 @@ export function parseFolder(
  *
  * A heading is the README's title, not a paragraph, and a frontmatter block is not prose, so both are passed over. Null when the README has
  * nothing else. Pure: `workflowDescription` (`folder.store.ts`) reads the README and asks this.
+ * @param text The README's text.
  */
 export function readmeDescription(text: string): string | null {
   text = text
@@ -204,6 +242,7 @@ export function readmeDescription(text: string): string | null {
  * Why `dir` cannot be a workflow's folder as the Workflow door is addressed by it (`WorkflowDir`), or null where it can: absolute and
  * normalized as `path.resolve` leaves it, so one folder has one id, not the root, and not the folder of agents or of skills beside the
  * workflows (`agentsFolderRefusal`). Pure, and proved by `contracts/workflow-dir.contract.ts`.
+ * @param dir The folder's path.
  */
 export const workflowDirRefusal: WorkflowDirRefusal = (dir) => {
   const fix = 'Name the folder as `workflowFolder` resolves it: an absolute path, as path.resolve leaves it.';
@@ -236,6 +275,10 @@ export const workflowDirRefusal: WorkflowDirRefusal = (dir) => {
  * `Missing`; a write over a file, or over a folder with no version, a `Conflict` (`workflowTaken`); a removal of a folder with no
  * version `Invalid`; and an act given a version the folder is no longer at a `Conflict` (`workflowStale`). A removal where no folder is
  * goes on, to the remover's own refusal. Pure, and proved by `contracts/workflow-version.contract.ts`.
+ * @param dir The workflow's folder.
+ * @param does What is asked of it: a write or a removal.
+ * @param there What is at the folder now: nothing, a file, or a folder at its version.
+ * @param given The version the folder was read at, or undefined where none was given.
  */
 export const workflowVersionRefusal: WorkflowVersionRefusal = (dir, does, there, given) => {
   if (there.kind === 'none') {
@@ -262,12 +305,14 @@ export const workflowVersionRefusal: WorkflowVersionRefusal = (dir, does, there,
  * Whether a file's name is markdown, in any case, as the README (`isReadme`) and a draft's carried names (`carriedNameRefusal`) are
  * judged: a Workflow's spec carries markdown as its steps and its README, never among the folder's other files, and a whole write never
  * removes it.
+ * @param name The file's name.
  */
 export const isMarkdown = (name: string): boolean => name.toLowerCase().endsWith('.md');
 
 /**
  * A file's bytes as text a person can read, or null where they are not text (a NUL, or not UTF-8). A Workflow's spec carries the text
  * files of its folder (`spec.files`), and a write given them leaves every other file alone.
+ * @param bytes The file's bytes.
  */
 export function textIn(bytes: Uint8Array): string | null {
   if (bytes.includes(0)) return null;

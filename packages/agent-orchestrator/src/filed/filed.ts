@@ -37,6 +37,11 @@ export type { HandedRunFolders } from '../../contracts/handed-folders.contract.t
  * session's environment (`stepFilesEnv`), and the harness's own arguments (`own`) last, a step's settings given its factory's harness
  * settings beneath its own (`ownWith`). The runtime judges no budget:
  * `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`). Pure.
+ * @param step The step to file, as the run froze it.
+ * @param steps Every step of the run's workflow, as the run froze them.
+ * @param run The run's record: its gates, mounts, volumes, harness settings and labels.
+ * @param t What the filing chooses and the caller read for it: the model and cap, the run's folders, the harness's own arguments, the
+ * deny list of an ending and the factory's servers.
  */
 export const filedConfig = <Own extends object>(
   step: StepSpec,
@@ -168,6 +173,8 @@ const stepFilesOf = (step: Pick<StepSpec, 'name'>, runArtifacts: string): string
  * agent, filed no local field. Nor where the harness's permission rules cannot carry a character of its path (`unruledIn`, a store root
  * holding a `(`): the deny that holds it read-only could not name it, and the session runs as it did before, rather than the step being
  * refused. No other step's folder: those are the handed ones (`handedMounts`).
+ * @param step The step to file.
+ * @param runArtifacts The run's artifacts folder, absolute, under which the step's files directory is.
  */
 export const ownMounts = (step: StepSpec, runArtifacts: string): Mount[] => {
   const own = stepFilesOf(step, runArtifacts);
@@ -207,6 +214,10 @@ export type FiledFolders = {
  * `t.runArtifacts` (`handedMounts`), the store's folders its `reads:` names, the inbox at `t.inbox` (`readsMounts`), the run's inputs
  * folder at `t.inputs`, given only for a run given inputs or cards (`inputsMounts`), and the folders of each run it is handed at
  * `t.runs` (`handedRunMounts`), on every step and not the roots alone, since they are read off the run's frozen record. Pure.
+ * @param step The step to file.
+ * @param steps Every step of the run's workflow.
+ * @param t The run's folders, absolute: its artifacts, the inbox, its inputs, its copies of its workflow folder and carried files, and
+ * the folders of the runs it is handed; each optional one absent where the run has none.
  */
 export const filedFolders = (
   step: StepSpec,
@@ -251,6 +262,8 @@ const local = (harness: string | undefined): boolean => !isRemoteHarness(harness
  * The store's folders a step's `reads:` names, each read-only: the inbox (`inbox`, its absolute path) when it names it. It reads the
  * cards and writes none of them, whatever its fence. None on a harness fenced by a sandbox, which reads the disk already, nor on a remote
  * agent, filed no local field.
+ * @param step The step to file: its harness and its `reads:`.
+ * @param inbox The store's inbox folder, absolute.
  */
 export const readsMounts = (step: Pick<StepSpec, 'harness' | 'reads'>, inbox: string): Mount[] =>
   local(step.harness) && step.reads?.includes('inbox') ? [{ path: inbox, readOnly: true }] : [];
@@ -260,6 +273,9 @@ export const readsMounts = (step: Pick<StepSpec, 'harness' | 'reads'>, inbox: st
  * reads the files `nemia start --input` gave the run and writes none of them. None on a harness fenced by a sandbox, which reads the disk
  * already, nor on a remote agent, filed no local field, nor in a folder team (`isFolderTeam`), whose steps read the copy in their own
  * folder.
+ * @param step The step to file: its harness.
+ * @param steps Every step of the run's workflow, which says whether it is a folder team.
+ * @param dir The run's inputs folder, absolute, or undefined for a run given no input.
  */
 export const inputsMounts = (
   step: Pick<StepSpec, 'harness'>,
@@ -272,6 +288,8 @@ export const inputsMounts = (
  * work and writes none of it, and Read, Grep and Glob reach them. Only the folders found are mounted. None on a harness fenced by a
  * sandbox, which reads the disk already, nor on a remote agent, filed no local field; the default harness (no `harness:`) is fenced by
  * its mode (`local`, spelled out so its proof reads no declaration).
+ * @param step The step to file: its harness.
+ * @param found Each run this one is handed and its folders, as the pass found them on disk.
  */
 export const handedRunMounts: HandedRunMounts = (step, found) =>
   !isRemoteHarness(step.harness) && (step.harness === undefined || !sandboxed(step.harness))
@@ -285,6 +303,8 @@ export const handedRunMounts: HandedRunMounts = (step, found) =>
  * which reads the disk already, on a harness fenced by neither — a command, whose session reads the disk unfenced, and which may hold
  * no mount — nor on a remote agent, filed no local field. Nor where the harness's permission rules cannot carry a character of its path
  * (`unruledIn`), as for the step's own files directory (`ownMounts`): the session is still told the folder (`WORKFLOW_FILES`).
+ * @param step The step to file: its harness.
+ * @param dir The run's copy of the folder to mount, absolute, or undefined where the record names none.
  */
 export const workflowMounts = (step: Pick<StepSpec, 'harness'>, dir: string | undefined): Mount[] => {
   const harness = step.harness ?? DEFAULT_HARNESS;
@@ -317,6 +337,11 @@ const serversOf = (
 /** `mounts` as a config holds them: the key, or none for no folder. */
 const mountsOf = (mounts: Mount[]): { mounts?: Mount[] } => (mounts.length ? { mounts } : {});
 
-/** The model a try runs on: a fresh one on the model it asked for, or the step's; any other on the one its session was started on. */
+/**
+ * The model a try runs on: a fresh one on the model it asked for, or the step's; any other on the one its session was started on.
+ * @param step The step, whose `model` a try runs on where it asked for none and its session says none.
+ * @param record The step's record, whose tries say the model its session was started on; undefined for a step with none.
+ * @param how How the try runs: fresh or continued, and the model it asked for.
+ */
 export const tryModel = (step: StepSpec, record: StepRecord | undefined, how: Pick<RetryHow, 'mode' | 'model'>): string | undefined =>
   how.mode === 'fresh' ? (how.model ?? step.model) : sessionModel(step, record);

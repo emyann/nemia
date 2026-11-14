@@ -835,27 +835,28 @@ test(
   },
 );
 
+/** Each of the step part's stories, by the state its step stands in: its card's kind, its frame's hue, and its one action. */
 const STEP_CARDS = [
-  ['board-stepcard--at-work', 'work', 'alive', 'Open the step'],
-  ['board-stepcard--at-a-gate', 'gate', 'yours', 'Read and approve'],
-  ['board-stepcard--done', 'done', 'none', 'Open the step'],
-  ['board-stepcard--to-come', 'come', 'none', 'Open the step'],
-  ['board-stepcard--failed', 'failed', 'none', 'Open the step'],
+  ['board-steppart--to-come', 'come', 'none', 'Open the step'],
+  ['board-steppart--at-work', 'work', 'alive', 'Open the step'],
+  ['board-steppart--waits-on-you', 'gate', 'yours', 'Read and approve'],
+  ['board-steppart--done', 'done', 'none', 'Open the step'],
 ] as const;
 
 test(
-  "a step's card in each state: its frame in the step's hue, a meter only where a spend is measured, and its one action",
+  "a step's card, its part at M, in each state: its frame in the step's hue, a meter only where a spend is measured, and its one action",
   WAITED,
   async () => {
-    const page = await openParts(browser, built, 'dark', '?part=StepCard');
+    const page = await openParts(browser, built, 'dark', '?part=StepPart');
     try {
       for (const [id, kind, hue, action] of STEP_CARDS) {
-        const card = page.locator(story(id));
-        assert.equal(await card.locator('[data-cut-frame]').first().getAttribute('data-cut-frame'), hue, `${id}: its frame's hue`);
+        const card = page.locator(`${story(id)} [data-step-part="M"]`);
+        const frame = page.locator(`${story(id)} [data-cut-frame]`).filter({ has: page.locator('[data-step-part="M"]') });
+        assert.equal(await frame.getAttribute('data-cut-frame'), hue, `${id}: its frame's hue`);
         assert.equal(await card.locator('[data-step-card]').getAttribute('data-step-kind'), kind);
         assert.equal(await card.locator('[data-step-facts] dd').count(), 5, `${id}: the five facts, whole`);
         const meter = await card.locator('[data-step-spend="meter"]').count();
-        assert.equal(meter, kind === 'work' || kind === 'come' ? 0 : 1, `${id}: a meter where a spend and its budget are measured`);
+        assert.equal(meter, kind === 'gate' || kind === 'done' ? 1 : 0, `${id}: a meter where a spend and its budget are measured`);
         if (meter === 1) {
           const [spent, fact] = await Promise.all(
             [
@@ -873,7 +874,7 @@ test(
         }
         assert.equal(await card.getByRole('link', { name: action }).count(), 1, `${id}: one action, ${action}`);
       }
-      assert.match((await page.locator(story(STEP_CARDS[0][0])).textContent()) ?? '', /not measured yet/);
+      assert.match((await page.locator(`${story(STEP_CARDS[1][0])} [data-step-part="M"]`).textContent()) ?? '', /not measured yet/);
     } finally {
       await page.context().close();
     }

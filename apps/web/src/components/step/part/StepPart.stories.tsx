@@ -170,7 +170,7 @@ const stepOf = (codes: Codes, tries: StepTry[], gated = false): StepView => ({
   budget: null,
   raise: null,
   tries,
-  shown: tries.at(-1)?.try ?? 1,
+  shown: tries.at(-1)?.try ?? null,
   timeline: [],
 });
 
@@ -237,11 +237,18 @@ const runOf = (step: StepView): RunDetail => ({
   },
 });
 
+/** `step` with its spend measured against a budget: the head's meter. */
+const measured = (step: StepView): StepView => ({
+  ...step,
+  spent: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
+  budget: { usd: 5, said: '$5', of: '$1.25 of $5', over: false },
+});
+
 const RUNS = {
-  toCome: runOf(stepOf(CODES.come, [tryOf(1, CODES.come, false, null)])),
+  toCome: runOf(stepOf(CODES.come, [])),
   atWork: runOf(stepOf(CODES.work, [tryOf(1, CODES.work, false, null)])),
-  waitsOnYou: runOf(stepOf(CODES.gate, [tryOf(1, CODES.gate, true, PLAN)], true)),
-  done: runOf(stepOf(CODES.done, [tryOf(1, CODES.done, true, PLAN)])),
+  waitsOnYou: runOf(measured(stepOf(CODES.gate, [tryOf(1, CODES.gate, true, PLAN)], true))),
+  done: runOf(measured(stepOf(CODES.done, [tryOf(1, CODES.done, true, PLAN)]))),
   tryAgain: runOf(
     stepOf(CODES.work, [tryOf(1, CODES.refused, true, { ...PLAN, summary: 'A first plan.' }, false), tryOf(2, CODES.work, false, null)]),
   ),

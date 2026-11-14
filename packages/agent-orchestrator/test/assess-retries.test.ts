@@ -52,6 +52,7 @@ import { endWords, phaseOfView } from '../src/views/views-words.ts';
 import type { Verdict } from '../src/check/check.ts';
 import type { StepSpec } from '../src/workflow.ts';
 import { retryOffers } from '../src/retry/retry.ts';
+import { retriesNamed } from '../src/retry/index.ts';
 import { aRead, listing, names, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
@@ -1904,4 +1905,231 @@ test("closeoutOf, deniedOf and closeoutAsked of a task held open: its current tu
     assert.equal(closeoutAsked(new Map([['t', view([unsigned], 1)]]))('t'), true),
   );
   await t.test('and of this turn, it is', () => assert.equal(closeoutAsked(new Map([['t', view([unsigned], 0)]]))('t'), 'unsigned'));
+});
+
+test("a blocked step's failed check run again (`blockedRecheck`): only on the commit it judged, as the same try, standing on its check", async (t) => {
+  const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
+  const [implement] = CHECKED;
+  const BRANCH = 'wf/r-1/implement';
+  /** Try 1 signed done and its check `c1`, filed on `c0ffee1`, failed; try 2, `t2`, continued by retries, signed off blocked. */
+  const blockedAfter = (o: { handedOff?: boolean; tip?: string | null; tries?: EarlierTry[] } = {}): RepositoryRun =>
+    run(
+      {},
+      {
+        steps: {
+          implement: {
+            taskId: 't2',
+            branch: BRANCH,
+            ...(o.handedOff === false ? {} : { handedOff: 't2' }),
+            tries: o.tries ?? [
+              { taskId: 't1', check: { taskId: 'c1', ...(o.tip === null ? {} : { tip: o.tip ?? 'c0ffee1' }) }, cause: 'retries' },
+            ],
+          },
+          review: { taskId: null },
+        },
+      },
+    );
+  const settled = { t1: 'succeeded', c1: 'failed', t2: 'succeeded' } as const;
+  const blocked = () => said('blocked');
+  const at = (tip: string | undefined) => (branch: string) => (branch === BRANCH ? tip : undefined);
+  const modes = (r: Run, p: Record<string, TaskPhase> = settled, tip: string | null = 'c0ffee1') =>
+    retryable(
+      implement!,
+      r,
+      phases(p),
+      blocked,
+      () => true,
+      CHECKED,
+      () => false,
+      undefined,
+      undefined,
+      at(tip),
+    ).modes;
+
+  await t.test('the ways a blocked step is tried: --recheck beside a session only where nothing changed since the failed check', () => {
+    assert.deepEqual(modes(blockedAfter()), ['continue', 'fresh', 'recheck']);
+    assert.deepEqual(modes(blockedAfter(), settled, 'beefcafe'), ['continue', 'fresh'], 'the branch moved');
+    assert.deepEqual(modes(blockedAfter(), settled, null), ['continue', 'fresh'], 'the branch unread');
+    assert.deepEqual(modes(blockedAfter(), { ...settled, c1: 'succeeded' }), ['continue', 'fresh'], 'the check behind passed');
+    assert.deepEqual(modes(blockedAfter({ handedOff: false })), ['continue', 'fresh'], 'not yet handed off');
+    assert.deepEqual(modes(blockedAfter({ tip: null })), ['continue', 'fresh'], 'a check filed before its commit was kept');
+    assert.deepEqual(modes(blockedAfter({ tries: [] })), ['continue', 'fresh'], 'no check behind it');
+  });
+
+  await t.test(
+    "a person's ask is due as a recheck on the unchanged branch, never on a moved one, and retries: never rechecks a blocked step",
+    () => {
+      const due = (tip: string | undefined, asks: RetryAsk[]) =>
+        assess(aRead(CHECKED, blockedAfter(), { phaseOf: phases(settled), signedOff: blocked, asked: () => true, asks, tipOf: at(tip) }))
+          .retry;
+      const ask: RetryAsk = { step: 'implement', try: 3, mode: 'recheck', at: '2026-11-13T10:00:00.000Z' };
+      assert.deepEqual(due('c0ffee1', [ask]), [{ step: 'implement', try: 3, mode: 'recheck', by: 'ask' }]);
+      assert.deepEqual(due('beefcafe', [ask]), []);
+      assert.deepEqual(due('c0ffee1', []), []);
+    },
+  );
+
+  await t.test('nemia retry --recheck: taken on the unchanged branch; on a moved one refused, naming both commits and a session', () => {
+    const refusal = (tip: string | undefined, r: Run = blockedAfter(), p: Record<string, TaskPhase> = settled) =>
+      retryRefusal(
+        CHECKED,
+        r,
+        'implement',
+        { mode: 'recheck' },
+        phases(p),
+        blocked,
+        () => true,
+        undefined,
+        [],
+        () => false,
+        undefined,
+        undefined,
+        at(tip),
+      );
+    assert.equal(refusal('c0ffee1'), null);
+    names(refusal('beefcafe'), 'c0ffee1', 'beefcafe', 'nemia retry r-1 implement --message');
+  });
+
+  await t.test('no refusal of a blocked step’s --recheck names a command that would itself be refused', () => {
+    const cases: Array<[string, Run, Record<string, TaskPhase>, string | undefined]> = [
+      ['moved', blockedAfter(), settled, 'beefcafe'],
+      ['unrecorded', blockedAfter({ tip: null }), settled, 'c0ffee1'],
+      ['no failed check', blockedAfter({ tries: [] }), settled, 'c0ffee1'],
+      ['passed behind', blockedAfter(), { ...settled, c1: 'succeeded' }, 'c0ffee1'],
+      ['unread', blockedAfter(), settled, undefined],
+      ['not handed off', blockedAfter({ handedOff: false }), settled, 'c0ffee1'],
+    ];
+    for (const [why, r, p, tip] of cases) {
+      const judge = (how: RetryHow) =>
+        retryRefusal(
+          CHECKED,
+          r,
+          'implement',
+          how,
+          phases(p),
+          blocked,
+          () => true,
+          undefined,
+          [],
+          () => false,
+          undefined,
+          undefined,
+          at(tip),
+        );
+      const refused = judge({ mode: 'recheck' });
+      assert.ok(refused, `${why}: refused`);
+      for (const named of retriesNamed(refused.replaceAll('"<answer>"', '"the flag ships as --dry"'), 'r-1')) {
+        assert.equal(judge(named.how), null, `${why}: ${JSON.stringify(named)} is refused itself`);
+      }
+    }
+    const [named] = retriesNamed('Ask for another session instead: nemia retry r-1 implement --recheck', 'r-1');
+    assert.ok(named, 'the old words name a command');
+    const refusedItself = retryRefusal(
+      CHECKED,
+      blockedAfter(),
+      'implement',
+      named.how,
+      phases(settled),
+      blocked,
+      () => true,
+      undefined,
+      [],
+      () => false,
+      undefined,
+      undefined,
+      at('beefcafe'),
+    );
+    assert.ok(refusedItself, 'a refusal that named a --recheck on a moved branch would name a refused command');
+  });
+
+  await t.test(
+    'rechecked, the blocked try stands on its check: checking, then verified or failed (check), and retries: continue it',
+    () => {
+      const rechecked = (check?: string): Run => {
+        const r = blockedAfter();
+        const record = nextTry(r.steps.implement!, { step: 'implement', try: 3, mode: 'recheck', by: 'ask' });
+        return { ...r, steps: { ...r.steps, implement: { ...record, ...(check ? { check: { taskId: check } } : {}) } } };
+      };
+      const status = (r: Run, p: Record<string, TaskPhase>, closeout = blocked) =>
+        stepStatus(implement!, r, phases(p), closeout, () => true, CHECKED);
+      assert.equal(status(blockedAfter(), settled), 'blocked', 'never rechecked, it stays blocked');
+      assert.equal(status(rechecked(), settled), 'checking', 'its check not yet filed');
+      assert.equal(status(rechecked('c3'), { ...settled, c3: 'running' }), 'checking');
+      assert.equal(status(rechecked('c3'), { ...settled, c3: 'succeeded' }), 'verified');
+      assert.equal(status(rechecked('c3'), { ...settled, c3: 'failed' }), 'failed (check)');
+      const due = assess(
+        aRead(CHECKED, rechecked('c3'), {
+          phaseOf: phases({ ...settled, c3: 'failed' }),
+          signedOff: blocked,
+          asked: () => true,
+          verdictOf: () => 1,
+        }),
+      ).retry;
+      assert.deepEqual(due, [{ step: 'implement', try: 4, mode: 'continue', by: 'retries' }]);
+    },
+  );
+
+  await t.test('nemia decide offers --recheck first on the unchanged branch, and says the refusal of the nemia retry a needs names', () => {
+    const read = (tip: string, signedOff = blocked) =>
+      aRead(CHECKED, blockedAfter(), { phaseOf: phases(settled), signedOff, asked: () => true, tipOf: at(tip) });
+    const d = decision(read('c0ffee1'), nothingShipped);
+    const [offer] = retryOffers(
+      CHECKED,
+      blockedAfter(),
+      d,
+      phases(settled),
+      blocked,
+      () => true,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      at('c0ffee1'),
+    );
+    assert.equal(offer?.command, 'nemia retry r-1 implement --recheck');
+    const needs = () => ({ ...said('blocked'), needs: 'Re-run the check: nemia retry r-1 implement --recheck' });
+    const refusedOn = (tip: string) => (name: string) => {
+      const [named] = retriesNamed(needs().needs, 'r-1');
+      if (!named) return undefined;
+      return (
+        retryRefusal(
+          CHECKED,
+          blockedAfter(),
+          name,
+          named.how,
+          phases(settled),
+          needs,
+          () => true,
+          undefined,
+          [],
+          () => false,
+          undefined,
+          undefined,
+          at(tip),
+        ) ?? undefined
+      );
+    };
+    const moved = answerLines(
+      CHECKED,
+      blockedAfter(),
+      decision(read('beefcafe', needs), nothingShipped),
+      phases(settled),
+      needs,
+      () => true,
+      undefined,
+      refusedOn('beefcafe'),
+    );
+    names(moved.implement, 'nemia retry r-1 implement --message', 'beefcafe');
+    const still = answerLines(
+      CHECKED,
+      blockedAfter(),
+      decision(read('c0ffee1', needs), nothingShipped),
+      phases(settled),
+      needs,
+      () => true,
+      undefined,
+      refusedOn('c0ffee1'),
+    );
+    assert.equal(still.implement, 'to answer it:  nemia retry r-1 implement --message "<answer>"');
+  });
 });

@@ -70,7 +70,9 @@ cancelled, skipped or neutral (`PERSONS_EXIT`, `exec.ts`); a job GitHub cut off 
 the job's annotation that says it exceeded its maximum execution time makes it a red, the work's, re-run once as any red. The implement step's `checkFailurePolicy:` names that code (`FailStep`,
 `onExitCodes: In [78]`), so the run files no try on it: the step waits on the person, `failed (check)`, and `nemia decide` offers
 `nemia retry <run> implement --recheck` first, once the person has answered it. The implement step's note tells the try to change
-nothing on a failure it finds is not its change's (a flake, a failure the base has too), and to say so in `needs`. What the run can tell spends no try and waits on a person at once: a
+nothing on a failure it finds is not its change's: a flake or the machine, signed off `done` again, which runs the check again within
+`retries:`; a failure the base has too, signed off `blocked` and said in `needs`. A person can then run the check of a blocked step
+again, `nemia retry <run> implement --recheck`, where its branch has not moved since that check failed. What the run can tell spends no try and waits on a person at once: a
 step over its budget, a call denied under `denials: fail`, a check that did not finish, a blocked sign-off. Past the second try, a
 refusal waits on a person as it did before.
 

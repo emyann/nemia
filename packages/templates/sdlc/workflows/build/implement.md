@@ -41,10 +41,12 @@ hands you, as data, the command, its exit and the last lines of what it printed 
 failed each. Make the work pass it, never weaken it, merge the base again, and sign off as before. A refusal only a person can answer — no `gh` or none logged in, no `origin`, a draft or wrongly based pull
 request, the label rules, CI that never judged the commit — exits 78, which this step's `checkFailurePolicy:` names: the run does not
 try you again on it and waits on the person, so you are not asked about it. Where a failure has nothing to do
-with your change (it fails on the base too, or it is a flake), change nothing, and say why in `needs`. On GitHub, a refusal that
-says the base's `${{ parameters.ciCheck }}` is red too, at the commit your branch holds, names the base's jobs that did not pass:
-read the failing lines against them, and where a failure is the base's, change nothing for it and say so in `needs`. The `nemia retry … --recheck`
-line a refusal ends with is for the person, once your tries are spent. Past the retries, past the step's budget, or when the check did
+with your change (a flake, the machine out of memory), change nothing and sign off `done` as before, saying why in `summary`: signing
+off again runs the check again, as far as this step's `retries:` allow, and only a session that signs off is asked. On GitHub, a refusal
+that says the base's `${{ parameters.ciCheck }}` is red too, at the commit your branch holds, names the base's jobs that did not pass:
+read the failing lines against them, and where a failure is the base's, change nothing for it and sign off `blocked`, saying so in
+`needs`: only a try that merges the base once it is fixed clears it. The `nemia retry … --recheck` line a refusal ends with is the
+person's, once your tries are spent, never a line for your `needs`. Past the retries, past the step's budget, or when the check did
 not finish, the run waits on a person.
 
 **Merge the base before you sign off**, on every try: the base moves while you work, and a base you did not merge is one the

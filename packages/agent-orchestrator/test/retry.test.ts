@@ -72,6 +72,9 @@ const aRepo = (): string => {
   return repo;
 };
 
+/** The commit a run's branch is at in the test place: what a check filed on it records (`CheckTask.tip`). */
+const filedOn = (r: RepositoryRun): string | null => stage.place().world.tip(r.repo, r.branch);
+
 /** A workflow folder of one step `implement`, with the frontmatter lines it is given. */
 const implementOnly = (lines: string[] = []): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
@@ -531,7 +534,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
           taskId: `${id()}-implement`,
           workspace: run.repo,
           branch: run.branch,
-          check: { taskId: check1() },
+          check: { taskId: check1(), tip: filedOn(run) },
           handedOff: `${id()}-implement`,
         },
         "`taskId` is still the step's own task, which apps/api reads; it is handed off in the pass that filed its check",
@@ -599,7 +602,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
         taskId: try2(),
         workspace: run.repo,
         branch: run.branch,
-        tries: [{ taskId: `${id()}-implement`, check: { taskId: check1() }, cause: 'retries' }],
+        tries: [{ taskId: `${id()}-implement`, check: { taskId: check1(), tip: filedOn(run) }, cause: 'retries' }],
       });
       assert.match(spec.brief, /^## Try 2\n/);
       assert.deepEqual(JSON.parse(/\n```json\n([\s\S]*?)\n```/.exec(spec.brief)![1]), {
@@ -795,12 +798,12 @@ test('a check that ended stopped spends no retry, and `nemia retry --recheck` ru
     assert.deepEqual([pass.tried, pass.checked, pass.filed], [['implement'], ['implement'], []]);
     assert.deepEqual(b.filings, [`${run.id}-implement`, check1(), check2()], 'a check, and no step');
     assert.equal(b.tasks.get(check2())!.spec.harness, 'check');
-    const rechecked = [{ taskId: `${run.id}-implement`, check: { taskId: check1() }, cause: 'recheck' }];
+    const rechecked = [{ taskId: `${run.id}-implement`, check: { taskId: check1(), tip: filedOn(run) }, cause: 'recheck' }];
     assert.deepEqual(filedAs(runRecord(ROOT, run.id).steps.implement), {
       taskId: `${run.id}-implement`,
       workspace: run.repo,
       branch: run.branch,
-      check: { taskId: check2() },
+      check: { taskId: check2(), tip: filedOn(run) },
       tries: rechecked,
     });
   });
@@ -840,7 +843,7 @@ test('a session cut off at its budget before its check ran: `nemia retry --reche
       taskId: session(),
       workspace: run.repo,
       branch: run.branch,
-      check: { taskId: check2() },
+      check: { taskId: check2(), tip: filedOn(run) },
       tries: [{ taskId: session(), cause: 'recheck' }],
     });
   });
@@ -1607,7 +1610,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
     assert.deepEqual(pass.tried, ['implement']);
     assert.ok(pass.notes.includes('implement: try 2 — nemia retry --continue --budget 10'), pass.notes.join('\n'));
     assert.deepEqual(runRecord(ROOT, run.id).steps.implement?.tries, [
-      { taskId: implement(), check: { taskId: `${implement()}-check` }, cause: 'continue', budget: 10 },
+      { taskId: implement(), check: { taskId: `${implement()}-check`, tip: filedOn(run) }, cause: 'continue', budget: 10 },
     ]);
     const spec = b.tasks.get(try2())!.spec;
     assert.deepEqual([spec.resumeFrom, spec.config?.budgetUsd], [`native-${implement()}`, 5.75], 'a resume is charged its own spend');
@@ -1836,7 +1839,7 @@ test('a check the machine killed under its own limit is run again by `retries:`,
     assert.deepEqual(b.filings, [`${run.id}-implement`, check1(), check2()], 'a check, and no session');
     assert.equal(b.tasks.has(`${run.id}-implement-try2`), false);
     assert.deepEqual(filedAs(runRecord(ROOT, run.id).steps.implement).tries, [
-      { taskId: `${run.id}-implement`, check: { taskId: check1() }, cause: 'recheck', retried: true },
+      { taskId: `${run.id}-implement`, check: { taskId: check1(), tip: filedOn(run) }, cause: 'recheck', retried: true },
     ]);
     assert.deepEqual(retryAsks(run.id), [], 'nobody asked for it');
     fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), before);
@@ -1847,9 +1850,13 @@ test('a check the machine killed under its own limit is run again by `retries:`,
     assert.equal(b.filings.filter((f) => f === check2()).length, 1);
     assert.equal(b.tasks.has(`${run.id}-implement-try2`), false, 'and no session looked for, or filed');
     assert.deepEqual(filedAs(runRecord(ROOT, run.id).steps.implement).tries, [
-      { taskId: `${run.id}-implement`, check: { taskId: check1() }, cause: 'recheck', retried: true },
+      { taskId: `${run.id}-implement`, check: { taskId: check1(), tip: filedOn(run) }, cause: 'recheck', retried: true },
     ]);
-    assert.deepEqual(runRecord(ROOT, run.id).steps.implement?.check, { taskId: check2() });
+    assert.deepEqual(
+      runRecord(ROOT, run.id).steps.implement?.check,
+      { taskId: check2() },
+      'an adopted check keeps no commit: the pass that filed it read it, and died before writing it down',
+    );
   });
   await s.test('the machine kills it again: its retries spent, it waits on you, and `nemia decide` offers --recheck first', async () => {
     ended(check2(), 'failed', squeezed);

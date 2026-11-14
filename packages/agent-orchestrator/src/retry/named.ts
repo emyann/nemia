@@ -8,11 +8,11 @@ import type { RetryHow } from './retry-ask.ts';
 /** A `nemia retry` a text names: the step, and how it asks for its try. */
 export type RetryNamed = { step: string; how: RetryHow };
 
-/** `nemia retry <run> <step>` (or `wf retry`), and the rest of its line, up to a backtick or the line's end. */
-const COMMAND = /\b(?:nemia|wf) retry ([\w.-]+) ([\w-]+)([^\n`]*)/g;
+/** `nemia retry <run> <step>`, and the rest of its line, up to a backtick or the line's end. */
+const COMMAND = /\bnemia retry ([\w.-]+) ([\w-]+)([^\n`]*)/g;
 
 /** A flag of `nemia retry` and its value where it takes one: a word, or a quoted text. */
-const FLAG = /--(recheck|fresh|continue|model|budget|message)\b(?:[ =]("[^"]*"|'[^']*'|\S+))?/g;
+const FLAG = /--(recheck|fresh|continue|model|budget|message)\b(?:[ =]("[^"]*"|'[^']*'|(?!--)\S+))?/g;
 
 /** Whether a value is a placeholder a person fills (`<answer>`), which names no message. */
 const placeholder = (value: string): boolean => /^<[^>]*>$/.test(value);

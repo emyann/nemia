@@ -102,6 +102,11 @@ When a check refuses a step, `retries` says how many times the run sends the wor
 tells it why. A person can try a step again too, with `nemia retry`: continuing the session with a message, starting fresh, on another
 model, or just running its check again.
 
+A check can fail for a reason outside the work: the machine out of memory, a test that varies from run to run. A session continued
+after such a refusal changes nothing and signs off as before, and the run runs the check again, as far as `retries` allows. A session
+that signed off blocked instead, with nothing committed since the check failed, can have that check run again with `nemia retry
+--recheck`: the run compares the commit the check judged with where the branch is now, and takes it only where they are the same.
+
 A check can also say which of its exit codes mean a refusal only you can answer, such as a tool that is not signed in: its check
 failure policy, read the way a Kubernetes Job reads its pod failure policy, its rules in order and the first that holds deciding. On
 such a code the run tries nothing on its own and spends no try: the step waits on you, and `nemia decide` offers to run its check again

@@ -137,6 +137,7 @@ const HOLDS: Array<[RegExp, (file: string) => string]> = [
   [/^carried\/ci-log\.ts$/, () => 'export function failures'],
   [/^carried\/exec\.ts$/, () => 'export function run'],
   [/^carried\/refresh\.ts$/, () => 'export function refresh'],
+  [/^carried\/rerun\.ts$/, () => 'export function rerunOnce'],
   [/^(?:carried|workflows\/[\w-]+)\/[\w-]+\.ts$/, (file) => `node ${path.basename(file)}`],
   [/^workflows\/[\w-]+\/[\w-]+\.md$/, (file) => STEP_HOLDS[path.basename(file, '.md')] ?? 'a step the guard knows'],
 ];

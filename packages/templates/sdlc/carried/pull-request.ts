@@ -2,9 +2,9 @@
  * `node pull-request.ts <verb>` — the one door through which a run's change reaches GitHub: the push of this run's own branch, and the pull
  * request CI judges. A Bash prefix rule cannot tell `git push origin wf/…` from `git push origin main`, and no agent may type either, so
  * the act is this script, read from the run's frozen carried files (`$WF_CARRIED_FILES`) as `probe.ts` is, and `gh` is denied whole to
- * the agents that run it. It imports its siblings `ci-log.ts`, the pure rules of a failing job's log and of how a check reads, and
- * `exec.ts`, how a command is run and CI waited on, and no other: a run freezes the carried folder whole, so they are beside it wherever
- * it runs.
+ * the agents that run it. It imports its siblings `ci-log.ts`, the pure rules of a failing job's log and of how a check reads,
+ * `exec.ts`, how a command is run and CI waited on, and `rerun.ts`, the one re-run of a red that the landing's receipt asks too, and
+ * no other: a run freezes the carried folder whole, so they are beside it wherever it runs.
  *
  * - `open --title <t> --body-file <f> --labels "<rules>"`, which the engineer types once a round after merging the base: it pushes her
  *   branch to `origin` and opens the pull request with the title and body she wrote, or updates the one that is open, never a draft and
@@ -72,7 +72,7 @@
  * the base's. A hint, never a verdict: a read that fails, or a base pending, green or unreported, adds nothing, and the refusal stays
  * the work's, never the person's because of it. A green head's wait asks nothing of the base.
  */
-import { PASSED, type Seen, JOBS, checkKey, failures, latest, linkOf, listing, nameOf, pending, seenOf, verdict } from './ci-log.ts';
+import { PASSED, type Seen, JOBS, failures, latest, linkOf, listing, nameOf, pending, seenOf, verdict } from './ci-log.ts';
 import {
   PERSONS_EXIT,
   POLL_SECONDS,
@@ -88,6 +88,7 @@ import {
   seconds,
   sleep,
 } from './exec.ts';
+import { type Rerun, jobIdOf, judgedRed, rerunOnce, rerunSaid, runIdOf, seenAfter } from './rerun.ts';
 
 /**
  * A refusal only a person can answer — the machine, the repository on GitHub, the factory's rules, or CI that never judged — which no
@@ -128,7 +129,8 @@ const STEP = 'implement';
 /**
  * An entry of a head's check rollup, as `gh pr view --json statusCheckRollup` gives one: a check run, or a status context, each field
  * absent where gh exports none. `startedAt` is when a check run started; Go's zero time (`0001-01-01T00:00:00Z`) for one still queued.
- * Apart from `landing.ts`'s on purpose: a re-run of a red is asked by its workflow, so this one reads `workflowName`.
+ * Apart from `landing.ts`'s on purpose: the rollup names each check run's workflow, which REST's check runs do not, so this one reads
+ * `workflowName`, telling apart two jobs of one name in two workflows.
  */
 type Entry = Partial<Record<EntryField, string>>;
 type EntryField = 'name' | 'context' | 'status' | 'state' | 'conclusion' | 'detailsUrl' | 'targetUrl' | 'workflowName' | 'startedAt';
@@ -370,15 +372,6 @@ function rollup(number: number): Entry[] {
   return parsed<{ statusCheckRollup?: Entry[] }>(`the checks of #${number}`, text).statusCheckRollup ?? [];
 }
 
-/** The job GitHub's own URL names for `entry` (`…/actions/runs/<run>/job/<id>`); none where its URL names no job. */
-const jobIdOf = (entry: Entry): string | undefined => /\/job\/(\d+)/.exec(linkOf(entry))?.[1];
-
-/**
- * The workflow run GitHub's own URL names for `entry`: a job's (`…/actions/runs/<run>/job/<id>`), or the run's own
- * (`…/actions/runs/<run>`), which is what the rollup entry of a run started by `workflow_dispatch` links; none where it is no Actions run.
- */
-const runIdOf = (entry: Entry): string | undefined => /\/actions\/runs\/(\d+)(?:[/?#]|$)/.exec(linkOf(entry))?.[1];
-
 /** A job of a workflow run, as `gh api repos/{owner}/{repo}/actions/runs/<id>/jobs` gives one. */
 type Job = { id?: number; name?: string; status?: string; conclusion?: string | null; html_url?: string };
 
@@ -593,12 +586,6 @@ function push(args: string[]): string[] {
   return [said, proven, 'note' in plan ? plan.note : relabelled(pr, plan)];
 }
 
-/**
- * Whether a rollup entry is over and judged the commit red: a verdict that is no pass, and not cancelled, skipped or neutral, which judge
- * nothing — CI's or a person's to run again, not the branch's to answer.
- */
-const judgedRed = (entry: Entry): boolean => !pending(entry) && ![PASSED, 'CANCELLED', 'SKIPPED', 'NEUTRAL'].includes(verdict(entry));
-
 /** A check run or a status context as REST gives one (`commits/<sha>/check-runs`, `commits/<sha>/status`); apart: it is spread whole. */
 type Rest = Partial<Record<string, string>>;
 
@@ -713,54 +700,6 @@ function retried<T>(what: string, value: () => T, began: number, retry: string):
     }
   }
 }
-
-/** What the wait re-ran of a red head: the workflow runs, their red jobs as they were, and the lines that say why a run was not re-run. */
-type Rerun = { runs: string[]; was: Entry[]; lines: string[] };
-
-/**
- * The failed jobs of each workflow run a red entry of `ours`, the CI context's, names re-run, once, where it failed; none asked of a
- * context pending, green, or only cancelled, skipped or neutral. Once: only a run GitHub says is on its first attempt (`run_attempt`), so
- * whichever invocation asks, a run is re-run once at most. A run whose attempt cannot be read, or whose re-run `gh` refuses, is not, and
- * a red entry that names no Actions job cannot be; each is said in a line. `entries`, the head's latest checks, give the jobs re-run.
- */
-function rerunOnce(ours: readonly Entry[], entries: readonly Entry[]): Rerun | undefined {
-  const red = ours.filter(judgedRed);
-  if (seenOf(ours) !== 'failed' || !red.length) return undefined;
-  const lines = red.filter((entry) => !runIdOf(entry)).map((entry) => `  not re-run: ${nameOf(entry)} names no job of an Actions run`);
-  const runs = [...new Set(red.flatMap((entry) => runIdOf(entry) ?? []))].filter((id) => {
-    const attempt = hinted<{ run_attempt?: number }>(read('api', `repos/{owner}/{repo}/actions/runs/${id}`))?.run_attempt;
-    const asked = attempt === 1 ? read('run', 'rerun', id, '--failed') : undefined;
-    const not = asked
-      ? `\`gh run rerun ${id} --failed\` failed: ${asked.err.split('\n')[0]}`
-      : `its attempt is ${attempt ?? 'unread'}, not 1`;
-    if (asked?.status !== 0) lines.push(`  not re-run: run ${id}, as ${not}`);
-    return asked?.status === 0;
-  });
-  return { runs, was: entries.filter((entry) => judgedRed(entry) && runs.includes(runIdOf(entry) ?? '')), lines };
-}
-
-/**
- * Which run of a check `entry` is: its job's id, or, for an entry that links only its workflow run (a dispatched run's), that link and
- * when it started, since a re-run keeps the run's link and starts the job again.
- */
-const attemptOf = (entry: Entry): string => jobIdOf(entry) ?? `${linkOf(entry)}@${entry.startedAt ?? ''}`;
-
-/** How a job the wait re-ran ended the second time, by `entries`: empty while GitHub still shows its first time, which is no verdict. */
-function second(entries: readonly Entry[], was: Entry): string {
-  const now = entries.find((entry) => checkKey(entry) === checkKey(was));
-  return !now || attemptOf(now) === attemptOf(was) ? '' : (verdict(now) || now.status || 'no verdict').toLowerCase();
-}
-
-/** What the wait re-ran and how each job ended the second time, then why any run was not re-run; nothing where it asked nothing. */
-function rerunSaid(rerun: Rerun | undefined, entries: readonly Entry[]): string[] {
-  if (!rerun?.runs.length) return rerun?.lines ?? [];
-  const jobs = rerun.was.map((was) => `${nameOf(was)}: ${second(entries, was) || 'not replaced yet'}`);
-  return [`  re-ran the failed jobs of run ${rerun.runs.join(', ')} once; the second time, ${jobs.join(', ')}`, ...rerun.lines];
-}
-
-/** How the CI context's entries `ours` read now, where a job the wait re-ran still shows its first time in `entries`: not over yet. */
-const seenAfter = (rerun: Rerun | undefined, entries: readonly Entry[], ours: readonly Entry[]): Seen =>
-  rerun?.was.some((was) => !second(entries, was)) ? 'pending' : seenOf(ours);
 
 /** What a refusal at the bound says after the re-run's lines, where a re-run was still running: the work's, answered by no change. */
 const RERUNNING =

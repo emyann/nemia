@@ -55,6 +55,7 @@ import { readAndAdopt } from '../adopt/run-adopt.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { runOver } from '../run-ending/run-ending.ts';
 
 /**
  * One pass's work: the steps it filed, the steps whose checks it filed, the steps it tried again, and where the run stands — and `notes`,
@@ -298,7 +299,7 @@ function markedOnce(run: Run, r: RunRead): ReturnType<typeof onceFacts> {
  * was ever filed of, which has no timeline and is left as it is.
  */
 const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, status: Assessment['status']) {
-  if (run.runTimed !== false || !hasStarted(run) || (status !== 'succeeded' && status !== 'cancelled')) return undefined;
+  if (run.runTimed !== false || !hasStarted(run) || !runOver(status)) return undefined;
   const facts = timelineFacts(run, r.steps, yield* everyTryOf(e, run, r.views), status);
   return facts ?? undefined;
 });

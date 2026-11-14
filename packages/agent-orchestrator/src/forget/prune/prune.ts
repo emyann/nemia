@@ -16,6 +16,8 @@ import type { Decision } from '../../decide/decide.ts';
 import { engineWords, type EngineForgetting } from '../forgetting/forgetting.ts';
 import type { Untaken, UntakenWhy } from '../../../contracts/sweep-untaken.contract.ts';
 import type { LeftBehindOf, LeftProcess, LeftVerdict, SweptRun } from '../../../contracts/left-behind.contract.ts';
+import { runOver } from '../../run-ending/run-ending.ts';
+import type { RunStatusWord } from 'objects';
 
 /** What is kept of a pruned run, after `prunedWords`: its files too, unless `nemia prune --artifacts` removed them. */
 export const prunedKept = (pruned: Pruned): string =>
@@ -227,7 +229,7 @@ function storeLines(p: Pruning): string[] {
 }
 
 /** A run as a pass answered it, as far as the daemon's rule reads it: the run, its status, and whether the pass found it at rest. */
-export type Answered = { readonly run: Run; readonly status: string; readonly feed: { readonly atRest?: true } };
+export type Answered = { readonly run: Run; readonly status: RunStatusWord; readonly feed: { readonly atRest?: true } };
 
 /**
  * The runs the daemon may free of their worktrees, by id, among what a pass answered: at rest, succeeded or cancelled, and a
@@ -237,9 +239,7 @@ export type Answered = { readonly run: Run; readonly status: string; readonly fe
  * a succeeded run is merged is not read here: the prune's own judgement refuses one that is not (`pruneRefusal`).
  */
 export const freeable = (answers: readonly Answered[]): string[] =>
-  answers
-    .filter((a) => a.feed.atRest === true && (a.status === 'succeeded' || a.status === 'cancelled') && isRepositoryRun(a.run))
-    .map((a) => a.run.id);
+  answers.filter((a) => a.feed.atRest === true && runOver(a.status) && isRepositoryRun(a.run)).map((a) => a.run.id);
 
 /**
  * The candidates one sweep judges: up to `bound` of those not judged yet, in order; and once every one has been, one of them, each in

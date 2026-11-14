@@ -41,6 +41,7 @@ import { filesStoreAt } from '../src/record/files.store.ts';
 import { listedRow, stepRow, told } from './typed.ts';
 import { shownNote, shownStatus, type RunsListed } from '../src/list/list.ts';
 import { forgetTyped } from './forgetting.ts';
+import type { RunStatusWord } from 'objects';
 
 const ROOT = scratch('wf-free-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -683,7 +684,7 @@ test(
 );
 
 test('the rule as data: which answers are candidates, which a sweep takes, and what is said of one left', async (t) => {
-  const answer = (id: string, status: string, atRest: boolean, repo = true) => ({
+  const answer = (id: string, status: RunStatusWord, atRest: boolean, repo = true) => ({
     run: (repo ? { id, repo: '/r' } : { id, place: { kind: 'folder' } }) as never,
     status,
     feed: atRest ? { atRest: true as const } : {},

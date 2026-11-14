@@ -752,6 +752,13 @@ one:
 - **What a state means elsewhere is a table over the states** — the words said of it, what a pass does under it — typed
   `Record<State, …>`, so a state added with no line fails the typecheck. A reader never re-derives the state from the facts.
 
+**Where a state is worked out and never written, there is no move to ask for.** A run's status is `assess`'s reading of its steps on
+every pass: nothing writes it, so it has no event and no writer, and the second and third parts above do not apply to it. What applies
+is the first and the last: one closed type every reader takes (objects' `RunStatusWord`), and what a status means as a table over it
+that each reader asks in place of a list of its own (`RUN_ENDING`, `packages/agent-orchestrator/src/run-ending/run-ending.ts`: the
+readers that asked "is this run over" had parted on a failed run, which has ended and can be tried again). The moves of such a thing
+are its parts' — a run's steps — and a person's marks on it (called off, held, pruned), which are written, and take the whole shape.
+
 The store's pause is the first written so (`packages/agent-orchestrator/src/pause-machine/pause-machine.ts`, `pause.store.ts`). The runtime's task
 lifecycle has the first two parts on a table the contract trusts; the step, the proposal and Nemia's session each have a drawing that
 their writers do not ask.

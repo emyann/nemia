@@ -41,7 +41,7 @@ const GRACE = '100 millis';
 const runId = (name: string): string => `${name}-${randomUUID().slice(0, 8)}`;
 
 /** A run a pass answered, as far as the sweep reads it: its id, its status, and whether the pass found it at rest. */
-const answered = (id: string, status: string, atRest: boolean): Answered => ({
+const answered = (id: string, status: Answered['status'], atRest: boolean): Answered => ({
   run: { id, steps: {} } as never,
   status,
   feed: atRest ? { atRest: true } : {},

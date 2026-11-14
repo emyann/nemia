@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { waitsOnYou } from '../../../src/lib/factory.ts';
-import { fed, photograph, themeOf, isRunAction, rowsAnswered } from '../board.ts';
+import { fed, openRunMenu, partOf, photograph, themeOf, isRunAction, rowsAnswered } from '../board.ts';
 import { cardOf } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
@@ -28,13 +28,13 @@ export default {
     const word = `held until a person lifts it (why: ${WHY}; by ${os.userInfo().username})`;
     const theme = await themeOf(page);
     const section = page.locator('section[aria-label="Held"]');
-    const approve = page.locator(`article > section#step-${gated}`).getByRole('button', { name: 'Approve', exact: true });
+    const approve = partOf(page, gated).getByRole('button', { name: 'Approve', exact: true });
     await expectCount(section, 0, `before the hold, ${id}'s page says no hold`);
     await expectVisible(approve, `before the hold, ${gated}'s Approve is offered`);
     if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page puts one — ${hold} is there`);
 
     try {
-      await page.locator('[data-hold-open]').click();
+      await (await openRunMenu(page)).locator('[data-hold-open]').click();
       const dialog = page.getByRole('dialog', { name: `Hold ${id}` });
       const put = dialog.getByRole('button', { name: 'Hold', exact: true });
       await expectVisible(put, 'the form offers Hold');
@@ -75,8 +75,9 @@ export default {
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
 
-      await section.getByRole('button', { name: 'Lift…', exact: true }).click();
-      await section.getByRole('button', { name: 'Lift', exact: true }).click();
+      const menu = await openRunMenu(page);
+      await menu.getByRole('button', { name: 'Lift…', exact: true }).click();
+      await menu.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(section, 0, 'the lift takes it back, and the page says no hold');
       if (fs.existsSync(hold)) throw new Refused(`the lift removed ${hold} — it is still there`);
       await expectVisible(approve, `and ${gated}'s Approve is offered again`);

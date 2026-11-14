@@ -6,6 +6,7 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import type { Schema } from 'effect';
 import {
+  StepFile,
   StepPath as StepPathAnswer,
   StepStreamEvent,
   StepTranscript as StepTranscriptAnswer,
@@ -127,4 +128,26 @@ export const stepPathQuery = (
     placeholderData: keepPreviousData,
     staleTime: tryNumber === null ? 0 : Infinity,
     refetchInterval: (query) => poll(query.state.data),
+  });
+
+/** The route and the name a served file's `url` ends in (`…/artifacts/<name>`, `…/files/<name>`); none for another address. */
+const SERVED = /^\/api\/runs\/([^/]+)\/steps\/([^/]+)\/(artifacts|files)\/([^/]+)$/;
+
+/**
+ * The text of a file a step's closeout named or its folder holds, read by the address the api served it under (`url`), for the viewer's
+ * sheet: its bytes as UTF-8. Read once a sheet shows it, and again each time one does, since a step that runs again writes it again.
+ */
+export const stepFileQuery = (url: string) =>
+  queryOptions({
+    queryKey: ['step-file', url],
+    queryFn: async (): Promise<string> => {
+      const [, runId, step, route, file] = SERVED.exec(url) ?? [];
+      if (runId === undefined || step === undefined || file === undefined)
+        throw new Error(`${url} is not the address of a step's file: open it from its step's part.`);
+      const params = { runId: decodeURIComponent(runId), step: decodeURIComponent(step), file: decodeURIComponent(file) };
+      const served = await call((c) => (route === 'files' ? c.steps.file({ params }) : c.steps.artifact({ params })), read(StepFile));
+      return new TextDecoder().decode(served.body);
+    },
+    staleTime: 0,
+    retry: false,
   });

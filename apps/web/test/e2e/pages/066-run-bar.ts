@@ -71,8 +71,9 @@ async function oldLink(page: Page): Promise<void> {
 }
 
 /**
- * A press on a node shows it, the same node again closes it, another switches it and keeps the tab, and the empty canvas closes it. In a
- * window as wide as `WIDE`, where the sheet leaves the run's steps room beside it, the canvas narrows beside it and is fitted whole.
+ * A press on a node shows it, the same node again closes it, another switches it, its part then its conversation in one scroll, and the
+ * empty canvas closes it. In a window as wide as `WIDE`, where the sheet leaves the run's steps room beside it, the canvas narrows beside
+ * it and is fitted whole.
  */
 async function presses(page: Page): Promise<void> {
   const was = page.viewportSize();
@@ -98,11 +99,18 @@ async function pressed(page: Page): Promise<void> {
 
   await nodeOf(page, FIRST).click();
   const first = await expectShows(page, FIRST, `a click on ${FIRST} shows it again`);
-  await first.getByRole('tab', { name: 'Details' }).click();
+  await expectCount(first.getByRole('tab'), 0, 'the bar is one scroll, with no tabs');
+  await expectVisible(
+    first.locator(`[data-step-scope="${FIRST}"] > :first-child article[data-step-part="L"][data-step-name="${FIRST}"]`),
+    `its part whole, at L, first`,
+  );
   await nodeOf(page, OTHER).click();
   const other = await expectShows(page, OTHER, `a click on ${OTHER} switches the bar to it`);
   await expectCount(stepBar(page, FAKE.id, FIRST), 0, `and ${FIRST} is no longer shown`);
-  await expectVisible(other.getByRole('tab', { name: 'Details', selected: true }), 'the tab picked is kept as the bar switches step');
+  await expectVisible(
+    other.locator(`[data-step-scope="${OTHER}"] > section:last-child[aria-label="Its conversation"]`),
+    `${OTHER}'s bar draws its part, then its conversation under it`,
+  );
   await expectVisible(graphOf(page).locator(`.react-flow__node.selected[data-id="${OTHER}"]`), `${OTHER}'s node is drawn selected`);
 
   await settled(page);
@@ -175,7 +183,8 @@ async function expectNoConversation(page: Page, assertion: string): Promise<void
 /**
  * The bar's Open, and a double click on a node, each open the step's session. The first click opens the sheet beside the page, which
  * narrows the canvas and fits it again under the second click, wherever that lands, and the step's session still opens. The step has no
- * session that started, so neither its Activity tab nor its session page asks for its conversation, and each says it has none.
+ * session that started, so neither its conversation under its part nor its session page asks for its conversation, and each says it has
+ * none.
  */
 async function opens(page: Page): Promise<void> {
   const asked: string[] = [];
@@ -197,10 +206,11 @@ async function opened(page: Page): Promise<void> {
   await nodeOf(page, OTHER).click();
   const bar = await expectShows(page, OTHER, `a click on ${OTHER} shows it`);
   const where = await bar.boundingBox();
-  await bar.getByRole('tab', { name: 'Activity' }).click();
   await expectVisible(
-    bar.getByText('No session of it has started, so there is no conversation yet.', { exact: true }),
-    `the Activity tab of ${OTHER}, none of whose sessions started, says it has no conversation yet`,
+    bar
+      .locator('section[aria-label="Its conversation"]')
+      .getByText('No session of it has started, so there is no conversation yet.', { exact: true }),
+    `the conversation of ${OTHER}, none of whose sessions started, says it has none yet, under its part`,
   );
   await idle(page);
   await bar.getByRole('link', { name: 'Open', exact: true }).click();
@@ -237,10 +247,10 @@ async function keepsTheStart(page: Page): Promise<void> {
 export default {
   /**
    * A run's canvas and the frame's side sheet: an old `?step=` link lands on the bar, the canvas the page's whole width; a click on a node
-   * shows it, the same node again closes it, another switches it with the tab kept, and the nodes are fitted clear of the bar; the empty
-   * canvas closes it, but never the start of a run; Enter and Escape do as a click and Close, and Escape gives the focus back to the node;
-   * Open and a double click open the step's session, its second click landing where the narrowed canvas put it, and a step with no session
-   * asks no conversation.
+   * shows it, the same node again closes it, another switches it, the bar one scroll with no tabs, and the nodes are fitted clear of the
+   * bar; the empty canvas closes it, but never the start of a run; Enter and Escape do as a click and Close, and Escape gives the focus
+   * back to the node; Open and a double click open the step's session, its second click landing where the narrowed canvas put it, and a
+   * step with no session asks no conversation.
    */
   name: 'run-bar',
   route: RUN,

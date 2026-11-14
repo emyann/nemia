@@ -23,8 +23,11 @@ export type RunTokens = NonNullable<RunStatusAnswer['tokens']>;
 /** An edge of the run's graph as its pages draw it: what a step waits on, and a loop; never what it is handed (`input`). */
 type RunViewEdge = Exclude<RunStatusAnswer['graph']['edges'][number], { kind: 'input' }>;
 
-/** A step as the run froze it. Null where the run froze none of it. */
-export type StepSpecView = Omit<RunSpecStep, 'name' | 'input'>;
+/**
+ * A step as the run froze it. Null where the run froze none of it. `input`, the steps whose declared output it is handed, is what puts a
+ * packet on an edge into it (`packetsOf`, canvas.ts); optional for a step built with none, as the board's test fixtures build one.
+ */
+export type StepSpecView = Omit<RunSpecStep, 'name' | 'input'> & { readonly input?: RunSpecStep['input'] };
 
 /** What the engine filed a step's current try with. */
 export type StepFiledView = NonNullable<RunStepStatus['filed']>;
@@ -70,7 +73,7 @@ export type RunView = Pick<
 /** The view's spec of a step, from the object's frozen step; null for a step the run froze none of. */
 const specOf = (s: RunSpecStep | undefined): StepSpecView | null => {
   if (!s) return null;
-  const { name: _name, input: _input, ...rest } = s;
+  const { name: _name, ...rest } = s;
   return rest;
 };
 

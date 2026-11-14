@@ -13,7 +13,7 @@ import {
 } from '../../lib/api/decision.ts';
 import { type RetryMode } from '../../lib/api/asks.ts';
 import type { RunDetail, StepView } from '../../lib/runView';
-import { answersOf, askedOf, askedSaid, type Answer } from '../../lib/asks';
+import { askedSaid, type Answer } from '../../lib/asks';
 import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../../lib/decide';
 import { cn } from '../../lib/utils';
 import { MODES, Refusal, useAsk } from './Ask';
@@ -27,35 +27,23 @@ import { OFFERS } from '../../lib/words';
 import { BUTTON, TEXTAREA } from '../../lib/classes';
 
 /**
- * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what the CLI's `decide` shows a
- * person — read once for the run's state (`decisionQuery`), only while the run has something to decide, and shown when the api says
- * there is. The answers keep their place in one frame while the decision is read, refused or drawn, so a row keeps what was typed in it
- * and the refusal of its ask. A step whose next try a person asked for has that try's note there (`askedOf`) — a run that still runs
- * with a try asked of a session the harness blocked, continued from the banner, has that note and nothing to decide. An api that
- * refuses says why, here.
+ * What the command line's decide shows a person of the run `run`, under the run's asks (`AsksOfYou`): read once for the run's state
+ * (`decisionQuery`), only while the run has something to decide, and drawn when the api says there is. An api that refuses says why,
+ * here. The answers themselves are each in its step's part (`PartAsks`), never here.
  */
 export function Decide({ run }: { run: RunDetail }) {
   const decidable = decidableRun(run);
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable });
-  const offers = answersOf(run);
-  const asked = run.steps.flatMap((step) => {
-    const one = askedOf(run, step.name);
-    return one ? [{ step: step.name, ...one }] : [];
-  });
-  const answers = offers.length + asked.length > 0 ? <Offers runId={run.id} offers={offers} asked={asked} steps={run.steps} /> : null;
-  const body =
-    decidable && error ? (
+  if (decidable && error)
+    return (
       <p className="text-body-medium text-failure">
         Could not read what there is to decide: {error.message} <code>{run.decide}</code> reads it from the command line.
       </p>
-    ) : decidable && isDecidable(data) ? (
-      <DecisionParts runId={run.id} decision={data} run={run} />
-    ) : null;
-  if (!answers && !body) return null;
+    );
+  if (!decidable || !isDecidable(data)) return <p className="text-body-medium text-muted-foreground">Nothing to decide on it now.</p>;
   return (
     <DecideFrame>
-      {answers}
-      {body}
+      <DecisionParts runId={run.id} decision={data} run={run} />
     </DecideFrame>
   );
 }
@@ -67,9 +55,8 @@ function DecideFrame({ children }: { children: ReactNode }) {
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
         <p className="text-body-small text-muted-foreground">
-          What there is to decide on this run. Copy a command to run it yourself. An answer given here runs its step's command, as the
-          command line would: a try, a round, or approving a loop's work as it stands with your reason; each row says what the tick does
-          with it.
+          What there is to decide on this run. Copy a command to run it yourself; each step's own answer is in its part, where the board
+          runs its command as the command line would.
         </p>
       </div>
       {children}

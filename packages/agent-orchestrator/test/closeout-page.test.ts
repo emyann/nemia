@@ -15,6 +15,12 @@ import type { Run } from '../src/run.ts';
 import type { StepSpec } from '../src/workflow.ts';
 import { closeoutIn } from '../src/resource/tries.verb.ts';
 import { artifactOf, folderFiles, valueOf } from '../src/resource/files.store.ts';
+import { toldOf } from '../src/resource/told.verb.ts';
+import { approvedSection, fromSection, retrySection } from '../src/brief/brief-sections.ts';
+import { fromRunSection } from '../src/brief/handed.ts';
+import { artifactsContract } from '../src/artifacts/artifacts.ts';
+import type { PlaceService } from '../src/place/place.store.ts';
+import { run as aRun } from './assessed.ts';
 import { STORE } from './ambient.ts';
 
 const RUN = { id: 'r-closeout', steps: {} } as unknown as Run;
@@ -61,6 +67,26 @@ test("closeoutIn: a step's closeout read in either version", async (t) => {
   });
 });
 
+test('closeoutIn: the shape of each field it serves', async (t) => {
+  const properties = { pr: { type: ['string', 'null'] }, notes: { type: 'string' } };
+  const output = { file: 'o.json', schema: { type: 'object', properties, required: ['pr', 'notes'], additionalProperties: false } };
+  const said = { apiVersion: 'nemia/v1', outcome: 'done', summary: 's', artifacts: [], pr: 'https://x.test/pr/1', notes: 'n' };
+  const served = (step: StepSpec) =>
+    closeoutIn(STORE, RUN, 'implement', step, 't1', new Map([['t1', { state: { attempts: [{ closeout: said }] } }]]) as unknown as Views, [
+      step,
+    ])!;
+  await t.test('a step whose output marked a field `link` serves its shape', () => {
+    const c = served({ ...STEP, output: { ...output, shapes: { pr: 'link' } } } as unknown as StepSpec);
+    assert.deepEqual(c.shapes, { pr: 'link' });
+    assert.deepEqual(Object.keys(c.schema), ['pr', 'notes']);
+  });
+  await t.test('a run frozen before shapes were kept serves none, and still reads', () => {
+    const c = served({ ...STEP, output } as unknown as StepSpec);
+    assert.equal(c.shapes, undefined);
+    assert.equal(c.output.pr, 'https://x.test/pr/1');
+  });
+});
+
 test("what a step's values and files link: valueOf, folderFiles, artifactOf", async (t) => {
   await t.test('valueOf links an http(s) address', () => {
     assert.equal(valueOf({ name: 'a', value: 'http://x.test/a' }).link, 'http://x.test/a');
@@ -77,7 +103,7 @@ test("what a step's values and files link: valueOf, folderFiles, artifactOf", as
     fs.writeFileSync(path.join(dir, 'closeout.json'), '{}');
     fs.writeFileSync(path.join(dir, 'notes.md'), 'n');
     assert.deepEqual(
-      folderFiles(RUN, 'implement', dir).files.map((f) => f.path),
+      folderFiles(RUN, 'implement', dir, 'artifacts').files.map((f) => f.path),
       [path.join(dir, 'notes.md')],
     );
   });
@@ -99,5 +125,71 @@ test("what a step's values and files link: valueOf, folderFiles, artifactOf", as
     assert.deepEqual(artifactOf(STORE, pictures, 'design', '/tmp/playwright-mcp/page-1.png'), {
       path: '/tmp/playwright-mcp/page-1.png',
     });
+  });
+});
+
+test('what a step was told: its task cut back into the sections the run composed, each with whose words it carries', async (t) => {
+  const findings = { type: 'array', items: { type: 'string' } };
+  const design = {
+    name: 'design',
+    after: [],
+    body: 'd',
+    gate: true,
+    output: { file: 'd.json', schema: { type: 'object', properties: { findings }, required: ['findings'], additionalProperties: false } },
+  } as unknown as StepSpec;
+  const implement = { name: 'implement', after: ['design'], input: ['design'], body: 'i' } as unknown as StepSpec;
+  const steps = [design, implement];
+  const record = aRun(
+    { design: 't-d', implement: 't-i' },
+    {
+      id: 'r-told',
+      workflow: steps,
+      after: ['parent-a1'],
+      approvals: [{ step: 'design', try: 1, at: '2026-01-01T00:00:00Z', message: 'Go on.' }],
+    },
+  );
+  const said = { outcome: 'done' as const, summary: 's', artifacts: [], output: { findings: ['one'] } };
+  const parent = { run: 'parent-a1', asked: 'Lay the ground.', steps: [], how: 'waited' as const, landed: true };
+  const refusal = { command: 'npm test', verdict: 1 as const, stdout: '## not a heading of the brief', stderr: '' };
+  const task = [
+    'Opened by the run.',
+    '',
+    '## What was asked for',
+    '',
+    'Add a flag.',
+    '',
+    '## From nowhere',
+    '',
+    'A heading of the card that names no step of the run.',
+    fromSection('design', steps, () => said),
+    approvedSection(implement, record, steps),
+    retrySection(implement, { try: 2, by: 'retries', mode: 'fresh', resumed: false, status: 'failed', refusal }),
+    fromRunSection(parent),
+    artifactsContract('/a/implement'),
+  ].join('\n');
+  const views = new Map([['t-i', { state: { brief: task } }]]) as unknown as Views;
+  const parts = toldOf(record, 'implement', null, views, {} as PlaceService['Service']).taskParts ?? [];
+  await t.test('each section is cut with its source, and a step or check part names the step that gave it', () => {
+    assert.deepEqual(
+      parts.map((p) => (p.kind === 'from' ? ['from', p.run, p.how] : [p.source, p.step])),
+      [
+        ['run', undefined],
+        ['person', undefined],
+        ['step', 'design'],
+        ['person', undefined],
+        ['run', undefined],
+        ['check', 'implement'],
+        ['from', 'parent-a1', 'waited'],
+        ['run', undefined],
+      ],
+    );
+  });
+  await t.test("a card's heading that names no step stays inside the person's part", () => {
+    const asked = parts[1];
+    assert.ok(asked.kind === 'text' && asked.text.includes('## From nowhere'));
+  });
+  await t.test('the parts, joined, give the task back', () => {
+    const texts = parts.map((p) => (p.kind === 'text' ? p.text : `## From run ${p.run}\n${p.body}`));
+    assert.equal(texts.join('\n'), task);
   });
 });

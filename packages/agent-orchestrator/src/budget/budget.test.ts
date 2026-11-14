@@ -62,13 +62,16 @@ test('expandShapes and budgetFields: the `budgets` shape of a step’s `output:`
   });
   await t.test('the loader expands a marked field to the strict schema, its description kept, and knows it by its schema', () => {
     assert.deepEqual(design.output?.schema.properties.budgets, { ...BUDGETS_SCHEMA, description: 'd' });
-    assert.deepEqual(expandShapes({ caps: { 'x-shape': 'budgets' } }), { properties: { caps: BUDGETS_SCHEMA } });
+    assert.deepEqual(expandShapes({ caps: { 'x-shape': 'budgets' } }), {
+      properties: { caps: BUDGETS_SCHEMA },
+      shapes: { caps: 'budgets' },
+    });
     assert.deepEqual(budgetFields(design), ['budgets']);
   });
   await t.test('REFUSED: a shape it does not know still, naming the shapes there are', () => {
     const read = expandShapes({ open: { 'x-shape': 'poll' } });
     assert.ok('error' in read);
-    names(read.error, '`open`', '"poll"', '`questions`', '`budgets`');
+    names(read.error, '`open`', '"poll"', '`questions`', '`budgets`', '`link`', '`commit`');
     assert.throws(
       () =>
         parseWorkflow('design', '---\noutput: d.json\n---\nx\n', () =>

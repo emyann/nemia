@@ -1,7 +1,7 @@
 /**
  * Every word the board says to a person of a step's state, of a run's wait and of how a run ended, in one place: where the board's words
  * differ from the code's (`awaiting-approval` is `waits on you`, `cancelled` is `called off`), they are translated here and nowhere else.
- * `status.ts` reads a step's codes into its state, `runWords.ts` and `stepCard.ts` compose; each reads its words from here. No word here is
+ * `status.ts` reads a step's codes into its state, `runWords.ts` and `stepPart.ts` compose; each reads its words from here. No word here is
  * the runtime's: a person hovering over a chip reads what the state means to them, never how it is kept.
  */
 import type { ProposalPhase } from 'objects';

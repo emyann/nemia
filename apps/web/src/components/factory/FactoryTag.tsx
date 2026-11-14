@@ -3,6 +3,7 @@ import { Factory } from 'lucide-react';
 import { DEFAULT_NAMESPACE } from 'objects';
 import { cn } from '@/lib/utils';
 import { RouteLink } from '../agent/AgentParts';
+import { focusRing } from '@/components/ui/ds/utils';
 
 const TAG = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-body-small leading-none font-medium whitespace-nowrap';
 const NAMED = 'border-sage bg-surface-variant text-on-surface-variant';
@@ -39,7 +40,7 @@ export function FactoryTag({ name, linked = false }: { name: string; linked?: bo
       params={{ factory: name }}
       data-factory-tag={name}
       aria-label={`Factory ${name}`}
-      className={cn(TAG, NAMED, 'outline-none hover:border-on-surface-variant focus-visible:ring-2 focus-visible:ring-ring/50')}
+      className={cn(TAG, NAMED, 'hover:border-on-surface-variant', focusRing())}
     >
       {mark}
       {name}

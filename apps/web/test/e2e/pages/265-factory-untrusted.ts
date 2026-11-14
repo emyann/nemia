@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { barValue } from '../../../src/lib/bar.ts';
-import { factoriesAnswered, photograph, themeOf } from '../board.ts';
+import { factoriesAnswered, openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES, FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -62,6 +62,7 @@ export default {
       await photograph(page, path.join(OUT, `factory-untrusted-bar-${await themeOf(page)}.png`), { fullPage: true });
 
       await visit(page, RUN);
+      await openFold(partOf(page, FAKE.refused), 'detail');
       const cause = denied.locator(`[data-denied-cause="${FACTORY}"]`);
       await expectVisible(cause.getByText(place), `${FAKE.refused}'s denied row names the untrusted place as the likely cause`);
       await expectTexts(cause.locator('code'), [trust], 'with the line that trusts it');
@@ -75,6 +76,7 @@ export default {
       await expectVisible(page.locator(`[data-factory-bar="${FACTORY}"] [data-runs]`), "trusted, the factory's bar is drawn");
       await expectCount(page.locator('[data-untrusted]'), 0, 'and neither its settings nor its bar says a place is untrusted');
       await visit(page, RUN);
+      await openFold(partOf(page, FAKE.refused), 'detail');
       await expectVisible(denied.locator('[data-denied]'), `${FAKE.refused}'s denied row still names its calls`);
       await expectCount(page.locator('[data-denied-cause]'), 0, 'and names no cause');
     } finally {

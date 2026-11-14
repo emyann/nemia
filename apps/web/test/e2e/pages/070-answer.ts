@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
+import { fed, openFold, partOf, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -43,7 +43,7 @@ export default {
         await route.continue();
       });
       await refused.goto(page.url(), { waitUntil: 'load' });
-      const refusedRow = refused.locator(`section[aria-label="Answer"] [data-step="${FAKE.blocked}"]`);
+      const refusedRow = partOf(refused, FAKE.blocked).locator(`[data-part-asks] [data-offer="answer"][data-step="${FAKE.blocked}"]`);
       const refusedBox = refusedRow.getByRole('textbox', { name: `Your answer to ${FAKE.blocked}` });
       await expectVisible(refusedBox, `the answer box for ${FAKE.blocked}, with a file that is no ask at its try's name`);
       await refusedBox.fill(ANSWER);
@@ -61,11 +61,12 @@ export default {
           `the package refuses to write over the file at try 2's name — the api answered ${answered.status()}: ${JSON.stringify(error)}`,
         );
       }
+      const decide = await openFold(refused.locator('[data-asks]'), 'decide');
       const decided = refused.waitForResponse((r) => decisionRead(new URL(r.url())), { timeout: WAIT_MS });
       release();
       await decided;
       await expectVisible(
-        refused.locator('section[aria-label="Decide"] section[aria-label="Commands"]'),
+        decide.locator('section[aria-label="Decide"] section[aria-label="Commands"]'),
         'what there is to decide is drawn after the refusal: its row is drawn again',
       );
       await expectVisible(refusedRow.locator('[data-refused]'), 'the refusal is shown beside the box, not swallowed');
@@ -97,8 +98,8 @@ export default {
       fs.rmSync(file, { force: true });
     }
 
-    const decide = page.locator('section[aria-label="Decide"]');
-    const row = decide.locator(`section[aria-label="Answer"] [data-step="${FAKE.blocked}"]`);
+    const part = partOf(page, FAKE.blocked);
+    const row = part.locator(`[data-part-asks] [data-offer="answer"][data-step="${FAKE.blocked}"]`);
     const box = row.getByRole('textbox', { name: `Your answer to ${FAKE.blocked}` });
     await expectVisible(box, `the answer box for ${FAKE.blocked}`);
     const send = row.getByRole('button', { name: 'Answer and continue' });
@@ -110,15 +111,17 @@ export default {
 
     const note = 'try 2 asked (--continue, with your answer) — the next tick files it';
     await expectVisible(
-      decide.locator(`[data-asked][data-step="${FAKE.blocked}"] [data-note]`, { hasText: note }),
-      `the step's row says what wf ls says once the run is read again (${note})`,
+      part.locator('[data-part-asks] [data-note]', { hasText: note }),
+      `the step's part says what wf ls says once the run is read again (${note})`,
     );
-    const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.blocked, exact: true }) });
-    await expectVisible(section.locator('[data-note]', { hasText: note }), `${FAKE.blocked}'s section says it too`);
+    await expectVisible(
+      page.locator(`section[aria-label="Asks of you"] [data-ask="asked"][data-step="${FAKE.blocked}"]`, { hasText: note }),
+      `the asks at the top of the page say it too`,
+    );
     await expectCount(
-      page.locator(`section[aria-label="Waiting on you"] [data-step="${FAKE.blocked}"]`),
+      page.locator(`section[aria-label="Asks of you"] [data-ask="needs"][data-step="${FAKE.blocked}"]`),
       0,
-      'and the banner no longer names it: nobody waits on you for it',
+      'and they no longer say it asks: nobody waits on you for it',
     );
     const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
     if (written?.mode !== 'continue' || written?.message !== ANSWER) {

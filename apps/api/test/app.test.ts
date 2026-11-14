@@ -612,7 +612,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       /** What the engine was filed with, not the brief recomposed from today's folder and record. */
       told: filedBrief('t-2'),
       layers: null,
-      taskParts: [{ kind: 'text', text: filedBrief('t-2') }],
+      taskParts: [{ kind: 'text', text: filedBrief('t-2'), source: 'run' }],
     });
     assert.deepEqual(await triesOf(app, 'r-2', 'implement'), firstTry({ ...implementTry, closeout: blockedCloseout }));
     assert.deepEqual(stepOf(run, 'implement'), {
@@ -839,6 +839,7 @@ const frozenSpecs = {
     deadlineSeconds: null,
     loop: 'implement',
     rounds: 2,
+    fields: [{ name: 'again', shape: null }],
   },
 };
 
@@ -921,7 +922,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       body: null,
       told: filedBrief('t-6'),
       layers: null,
-      taskParts: [{ kind: 'text', text: filedBrief('t-6') }],
+      taskParts: [{ kind: 'text', text: filedBrief('t-6'), source: 'run' }],
     });
     assert.deepEqual((await linesOf(app, 'r-6')).steps.original, {
       approve: 'nemia approve r-6 original',

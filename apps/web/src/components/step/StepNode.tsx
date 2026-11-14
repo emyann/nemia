@@ -14,6 +14,8 @@ import { PERSON } from '../../lib/words';
 import type { Routed } from '../../lib/routing';
 import type { Frozen } from '../../lib/frozen';
 import { TextLink } from '../look';
+import type { StepPartModel } from '../../lib/stepPart';
+import { PartGave } from './part/PartGave';
 
 /**
  * `index` is the step's place in the run's order, which is the order the CLI's `ls` lists it in. `waitingOnYou` is whether the
@@ -31,6 +33,8 @@ export type StepNodeData = {
   routes?: string[];
   taken?: string | null;
   routed?: Routed | null;
+  /** What its part says it gave, of the try it shows (`stepPartOf`): its first item takes the line of what it runs on once given. */
+  gave?: StepPartModel['gave'];
 };
 export type StepFlowNode = Node<StepNodeData, 'step'>;
 
@@ -39,6 +43,8 @@ export type StepFlowNode = Node<StepNodeData, 'step'>;
  *
  * `w-56` is narrower than the layering's column, which leaves room for the arrow between columns.
  *
+ * - Under its name, what it runs on; once it gave something, the first of what it gave in its place (its part's Gave at the node's
+ *   size, S).
  * - Its attempt's time moves every second while it counts, and every 30 s otherwise.
  * - It is drawn as a human gate when it is one (`waitsAtGate`), a step that signed off blocked or a loop out of rounds, and the run's
  *   `waitingOnYou` names it: a step a person has sent round or asked to retry keeps its word until the tick files what they asked for,
@@ -96,7 +102,7 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
         <p className="mt-0.5 truncate text-body-medium font-semibold" title={step.name}>
           {step.name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{nodeLine(node, spec)}</p>
+        <RunsOnOrGave step={step} gave={data.gave} line={nodeLine(node, spec)} />
       </div>
 
       {node && <RouteBand node={node} routes={data.routes} taken={data.taken} routed={data.routed} />}
@@ -148,6 +154,21 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
       <Handle id={LOOP_TARGET} type="target" position={Position.Bottom} isConnectable={false} className="opacity-0" />
     </div>
   );
+}
+
+/** Whether a step gave anything yet, of the try it shows: a field given, a file or a value. */
+const gaveAny = (gave: Exclude<StepPartModel['gave'], 'none'>): boolean =>
+  gave.fields.some((f) => f.given) || gave.files.length > 0 || gave.values.length > 0;
+
+/** The line under the node's name: the first of what the step gave, once it gave something, else what it runs on (`line`). */
+function RunsOnOrGave({ step, gave, line }: { step: StepNodeData['step']; gave: StepNodeData['gave']; line: string }) {
+  if (gave && gave !== 'none' && gaveAny(gave))
+    return (
+      <div className="mt-0.5">
+        <PartGave step={step} gave={gave} size="S" />
+      </div>
+    );
+  return <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{line}</p>;
 }
 
 /**

@@ -144,7 +144,9 @@ it will cost declares `{ "x-shape": "budgets", "description": "…" }` beside th
 gate, once, in dollars above zero, `why` the figures the amount went by. The gate shows them beside the closeout, and approving it makes
 them those steps' caps, with any amount the person changed (`nemia approve <run> <step> --budget <step>=<amount>`); a cap above a step's
 own `budget:` is said there, and never approved unasked. A closeout whose budgets name another step, or no amount, is refused back to its
-session.
+session. Two more shapes say what a plain string holds, each a string or null: `{ "x-shape": "link" }`, an address the board draws as a
+link, and `{ "x-shape": "commit" }`, a commit's hash it draws as the commit. Any other field is drawn by its own schema. A marker stands
+for the whole schema of its field: only `description` may sit beside it.
 
 ## Check it
 

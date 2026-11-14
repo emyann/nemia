@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page, Route } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { openFold, photograph, themeOf } from '../board.ts';
 import { expectInside, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -85,12 +85,16 @@ async function expectLink(link: Locator, where: string): Promise<void> {
     throw new Refused(`${where}'s link opens ${LINK} in a new tab with no referrer — it is ${JSON.stringify({ href, target, rel })}`);
 }
 
-/** The run's page, its object answered bridged for `FAKE.unverified` with `bridge`; read once loaded. */
+/**
+ * The run's page, its object answered bridged for `FAKE.unverified` with `bridge`: that step's spec, in its part's Detail, opened once
+ * loaded.
+ */
 async function onRun(page: Page, bridge: typeof UP | typeof DOWN): Promise<Locator> {
   await page.route(isDetail, answered(bridgedStep(bridge)));
   await page.goto(new URL(`/runs/${FAKE.id}`, page.url()).href, { waitUntil: 'load' });
   await idle(page);
-  return page.locator(`#step-${FAKE.unverified}`);
+  const detail = await openFold(page.locator(`#step-${FAKE.unverified}`), 'detail');
+  return openFold(detail, 'spec');
 }
 
 /**

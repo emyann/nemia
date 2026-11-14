@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, openRunMenu, partOf, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
@@ -66,18 +66,16 @@ export default {
       await idle(page);
       const section = page.locator('section[aria-label="Held"]');
       await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${literal(word)}$`) }), `the run's page says ${word}`);
-      await section.getByRole('button', { name: 'Lift…', exact: true }).click();
-      await expectVisible(section.getByText(`Lift the hold on ${id}?`), 'the first press asks');
+      const menu = await openRunMenu(page);
+      await menu.getByRole('button', { name: 'Lift…', exact: true }).click();
+      await expectVisible(menu.getByText(`Lift the hold on ${id}?`), "the first press, in the run's menu, asks");
       if (!fs.existsSync(hold)) throw new Refused('the first press lifts nothing: the hold is still on disk');
       await settled(page);
       await photograph(page, path.join(OUT, `lift-run-asking-${theme}.png`), { fullPage: true });
-      await section.getByRole('button', { name: 'Lift', exact: true }).click();
+      await menu.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(section, 0, 'the second press lifts, and the page says no hold');
       lifted('the run page');
-      await expectVisible(
-        page.locator(`article > section#step-${gated}`).getByRole('button', { name: 'Approve', exact: true }),
-        `and offers ${gated}'s Approve again`,
-      );
+      await expectVisible(partOf(page, gated).getByRole('button', { name: 'Approve', exact: true }), `and offers ${gated}'s Approve again`);
       await expectCount(page.locator('[role="alert"][data-lift-refused]'), 0, 'with no refusal said');
       await settled(page);
       await photograph(page, path.join(OUT, `lift-lifted-${theme}.png`), { fullPage: true });

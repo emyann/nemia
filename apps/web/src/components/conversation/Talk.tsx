@@ -108,7 +108,7 @@ export function Talk<Own>({
 
   const drawn = drawnCount(items);
   useEffect(() => {
-    if (atEnd || followingLatest.current) end.current?.scrollIntoView({ block: 'end' });
+    if (atEnd || followingLatest.current) toLatest(box.current, 'instant');
   }, [atEnd, drawn, writing, height]);
 
   return (
@@ -141,9 +141,17 @@ export function Talk<Own>({
         )}
         <div ref={end} aria-hidden="true" className="h-px shrink-0" />
       </div>
-      {!atEnd && <Jump unread={unread} marks={marks} onJump={() => end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })} />}
+      {!atEnd && <Jump unread={unread} marks={marks} onJump={() => toLatest(box.current, 'smooth')} />}
     </div>
   );
+}
+
+/**
+ * The talk's box `box` scrolled to its end: that box alone, never what holds it, so a talk under a step's part (the bar, the step's page)
+ * leaves their scroll where the person put it, as `scrollIntoView` would not.
+ */
+function toLatest(box: HTMLElement | null, behavior: ScrollBehavior): void {
+  box?.scrollTo({ top: box.scrollHeight, behavior });
 }
 
 /** The scrolling shell a conversation with nothing said yet stands its own greeting in. */

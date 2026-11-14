@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator } from 'playwright';
-import { openDebug, photograph, sidebar, themeOf } from '../board.ts';
+import { LEDGER, openDebug, partOf, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectInView, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -31,10 +31,10 @@ export default {
    * seeded and writes nothing.
    */
   name: 'debug-wide',
-  route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
+  route: `/runs/${FAKE.id}`,
   expect: async (page) => {
     await sidebar(page);
-    const { panel, lifecycle } = await openDebug(page, `${FAKE.id}-${SESSION.step}`);
+    const { panel, lifecycle } = await openDebug(partOf(page.locator(LEDGER), SESSION.step), `${FAKE.id}-${SESSION.step}`);
     await panel.getByRole('list', { name: 'The path' }).locator('li').nth(2).getByRole('button').click();
     await expectVisible(lifecycle.locator('[data-state="working"][data-lit]'), 'scrubbed in the panel to its third entry: working lit');
     await idle(page);

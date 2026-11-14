@@ -5,6 +5,7 @@
  * (`RunLines`), under the names the board's components read.
  */
 import { useMemo } from 'react';
+import { useSearch } from '@tanstack/react-router';
 import {
   useQueries,
   useQuery,
@@ -21,10 +22,12 @@ import type { WorkflowPageAddress } from './api/address.ts';
 import { readGone, runLinesQuery, runObjectQuery, stepToldQuery, stepTriesQuery, type RunLines, type StepCommands } from './api/run.ts';
 import { stepStamp } from './lifecyclePath.ts';
 import type { Frozen } from './frozen.ts';
+import { triesOf, tryShown, type TryChoices } from './tryAddress.ts';
 
 /**
- * One step of a run's detail: the step (`RunStep`), its lines, what it was told, and its tries whole, with its current try's closeout, or
- * why it could not be read. Its closeout and its tries are typed as the tries' reads have them (`api/tries.ts`), read only.
+ * One step of a run's detail: the step (`RunStep`), its lines, what it was told, and its tries whole, with the try it shows (`shown`, the
+ * address's choice where it has that try, else its current: `tryShown`) and that try's closeout, or why it could not be read. Its closeout
+ * and its tries are typed as the tries' reads have them (`api/tries.ts`), read only.
  */
 export type StepView = RunStep & {
   readonly commands: StepCommands;
@@ -35,6 +38,8 @@ export type StepView = RunStep & {
   readonly closeout: Frozen<StepCloseout> | null;
   readonly unreadable: Frozen<StepUnreadable> | null;
   readonly tries: readonly Frozen<StepTryRead>[];
+  /** The number of the try every surface draws of the step; null for a step with no try. */
+  readonly shown: number | null;
 };
 
 /**
@@ -55,9 +60,14 @@ export type RunDetail = Omit<RunView, 'steps'> & {
 /** No lines for a step the lines name none of: a step not frozen, which the api builds none for. */
 const NO_LINES: StepCommands = { approve: '', retry: '', say: '' };
 
-/** One step of the detail, from the step, the lines, its tries whole and what it was told. */
-const stepViewOf = (step: RunStep, lines: RunLines, tries: readonly StepTry[], told: StepTold | null): StepView => {
-  const current = tries.find((t) => t.current);
+/** One step of the detail, from the step, the lines, its tries whole, what it was told, and the try the address asks it to show. */
+const stepViewOf = (step: RunStep, lines: RunLines, tries: readonly StepTry[], told: StepTold | null, asked: number | null): StepView => {
+  const shown = tryShown(
+    tries.map((t) => t.try),
+    tries.find((t) => t.current)?.try ?? null,
+    asked,
+  );
+  const drawn = tries.find((t) => t.try === shown);
   return {
     ...step,
     commands: lines.steps[step.name] ?? NO_LINES,
@@ -65,21 +75,23 @@ const stepViewOf = (step: RunStep, lines: RunLines, tries: readonly StepTry[], t
     told: told?.told ?? null,
     layers: told?.layers ?? null,
     taskParts: told?.taskParts ?? null,
-    closeout: current?.closeout ?? null,
-    unreadable: current?.unreadable ?? null,
+    closeout: drawn?.closeout ?? null,
+    unreadable: drawn?.unreadable ?? null,
     tries,
+    shown,
   };
 };
 
 /**
  * The detail of a run (`RunDetail`): its view (`runViewOf`), its lines, and each step with its tries and what it was told — none and
- * nothing for a step whose sub-resources were not read.
+ * nothing for a step whose sub-resources were not read — showing the try `chosen` names for it (the address's `?try=`), else its current.
  */
 export const runDetailOf = (
   object: Run,
   lines: RunLines,
   tries: Readonly<Record<string, readonly StepTry[] | undefined>>,
   told: Readonly<Record<string, StepTold | null | undefined>>,
+  chosen: TryChoices = {},
 ): RunDetail => {
   const view = runViewOf(object);
   return {
@@ -88,7 +100,15 @@ export const runDetailOf = (
     decide: lines.decide,
     refresh: lines.refresh,
     workflowPage: lines.workflowPage,
-    steps: view.steps.map((step) => stepViewOf(step, lines, tries[step.name] ?? [], told[step.name] ?? null)),
+    steps: view.steps.map((step) =>
+      stepViewOf(
+        step,
+        lines,
+        tries[step.name] ?? [],
+        told[step.name] ?? null,
+        Object.hasOwn(chosen, step.name) ? (chosen[step.name] ?? null) : null,
+      ),
+    ),
   };
 };
 
@@ -111,6 +131,14 @@ const readsOf = <T>(results: UseQueryResult<T>[]): { data: Array<T | undefined>;
   data: dataOf(results),
   error: results.find((r) => r.data === undefined && r.error)?.error ?? null,
 });
+
+/**
+ * The try each step shows, as the address names it (`?try=`, validated at the root): the same on every surface of the page. None where no
+ * route matches, as in a part rendered on its own, which then shows each step's current try.
+ */
+function useChosenTries(): string | undefined {
+  return useSearch({ strict: false, shouldThrow: false, select: (search: { try?: string }) => search.try });
+}
 
 /** No steps, for a run whose object is not read yet: one array for the module's life. */
 const NO_STEPS: readonly RunStepStatus[] = [];
@@ -141,12 +169,13 @@ function useStepReads(
   return { tries: tries.data, told: told.data, error: tries.error ?? told.error };
 }
 
-/** The detail of `object` with its lines and its steps' reads, each step's by its name. */
+/** The detail of `object` with its lines and its steps' reads, each step's by its name, each showing the try `chosen` names for it. */
 const detailOf = (
   object: Run,
   lines: RunLines,
   tries: ReadonlyArray<readonly StepTry[] | undefined>,
   told: ReadonlyArray<StepTold | null | undefined>,
+  chosen: TryChoices,
 ): RunDetail => {
   const steps = object.status.steps;
   return runDetailOf(
@@ -154,6 +183,7 @@ const detailOf = (
     lines,
     Object.fromEntries(steps.map((step, i) => [step.name, tries[i]])),
     Object.fromEntries(steps.map((step, i) => [step.name, told[i]])),
+    chosen,
   );
 };
 
@@ -166,7 +196,8 @@ export function useRunView(id: string): { view: RunDetail; error: unknown } {
   const { data: object, error } = useSuspenseQuery(runObjectQuery(id));
   const { data: lines } = useSuspenseQuery(runLinesQuery(id));
   const { tries, told } = useStepReads(id, object.status.steps);
-  const view = useMemo(() => detailOf(object, lines, tries, told), [object, lines, tries, told]);
+  const chosen = useChosenTries();
+  const view = useMemo(() => detailOf(object, lines, tries, told, triesOf(chosen)), [object, lines, tries, told, chosen]);
   return { view, error };
 }
 
@@ -181,12 +212,13 @@ export function useRunRead(id: string): { view: RunDetail | undefined; error: un
   const { tries, told, error: stepError } = useStepReads(id, object.data?.status.steps ?? NO_STEPS);
   const run = object.data;
   const said = lines.data;
+  const chosen = useChosenTries();
   const view = useMemo(
     () =>
       run && said && tries.every((t) => t !== undefined) && told.every((t) => t !== undefined)
-        ? detailOf(run, said, tries, told)
+        ? detailOf(run, said, tries, told, triesOf(chosen))
         : undefined,
-    [run, said, tries, told],
+    [run, said, tries, told, chosen],
   );
   return { view, error: object.error ?? lines.error ?? stepError };
 }

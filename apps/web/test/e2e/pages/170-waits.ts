@@ -1,4 +1,4 @@
-import { cancelledAt, sidebar } from '../board.ts';
+import { cancelledAt, openFold, sidebar } from '../board.ts';
 import { expectCount, expectVisible, settled } from '../checks.ts';
 import { DIAMOND } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -19,13 +19,15 @@ export default {
     await expectVisible(banner.locator('[data-advice]', { hasText: advice }), 'and what wf decide leaves you to do, word for word');
     await expectVisible(banner.locator(`a[href="/runs/${cancelled.id}"]`), `${cancelled.id} is linked to its page`);
     await expectVisible(
-      page.locator('[data-fact="started"] dd', { hasText: /^not yet$/ }),
+      (await openFold(page.locator('section[aria-label="Receipts"]'), 'where')).locator('[data-fact="started"] dd', {
+        hasText: /^not yet$/,
+      }),
       `${orphan.id} has not started, whatever time has passed since it was created: nothing of it is filed`,
     );
     await expectCount(
-      page.locator('section[aria-label="Decide"]'),
+      page.locator('[data-fold="decide"]'),
       0,
-      'no Decide section: nothing of the run is filed, and wf decide offers nothing else',
+      'no Decide fold: nothing of the run is filed, and wf decide offers nothing else',
     );
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     await expectVisible(

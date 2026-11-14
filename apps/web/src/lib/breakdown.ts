@@ -3,7 +3,7 @@
  * and its tokens by kind. A breakdown adds up to its tile: its parts, then a last line for what no part covers, absent when that is
  * nothing. Pure.
  */
-import type { RunTokens, Spent } from './api/judged.ts';
+import type { RunTokens, RunView, Spent } from './api/judged.ts';
 import type { RunClock, StepCost } from './api/runs.ts';
 import { durationWords } from './duration.ts';
 import { dollars } from './money.ts';
@@ -146,5 +146,33 @@ export function tokensBreakdown(tokens: TokenCounts, cost?: string): Breakdown {
       'Each kind is billed at its own rate, reads from the cache at the lowest.',
       ...(least ? ['A session measured no tokens: these are the least they were.'] : []),
     ].join(' '),
+  };
+}
+
+/** A round of a loop on the clock, or the run's whole time, as the run's timeline totals them. */
+type RoundTotal = Pick<RunView['timeline']['run'], 'loop' | 'round' | 'ranMs' | 'ran' | 'wall'>;
+
+/**
+ * How many rounds the run went: the furthest round any loop of it reached (`timeline.rounds`), one for a run started with no loop, none
+ * before it started.
+ */
+export const roundsOf = (rounds: readonly RoundTotal[], started: boolean): number =>
+  rounds.reduce((most, r) => Math.max(most, r.round ?? 1), started ? 1 : 0);
+
+/**
+ * The rounds tile's breakdown: each round of each loop and how long its sessions and checks ran, the wall time of the run its foot; none
+ * for a run with no loop, whose one round is the run.
+ */
+export function roundsBreakdown(rounds: readonly RoundTotal[], run: RoundTotal, head: string): Breakdown | null {
+  if (!rounds.length) return null;
+  return {
+    head,
+    rows: rounds.map((r) => ({
+      what: `${r.loop ?? 'loop'} round ${r.round ?? 1}`,
+      amount: r.ranMs,
+      said: r.ran,
+      none: r.ranMs <= 0,
+    })),
+    foot: `Wall time ${run.wall}.`,
   };
 }

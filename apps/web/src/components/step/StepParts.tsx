@@ -18,9 +18,9 @@ import { AsWritten, KeyTable } from '../field/FilePage';
 import { FactoryTag } from '../factory/FactoryTag';
 import { Markdown } from '../markdown/Markdown';
 import { Told, type LayerHomes } from './Told';
+import { focusRing } from '../ui/ds/utils';
 
-const LINK =
-  'rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
+const LINK = cn('rounded-sm underline decoration-outline underline-offset-2 hover:decoration-foreground', focusRing());
 
 /**
  * The step's agent: the one the factory picked hires into it, marked as hired (`data-hired`); else the one its file names, or that it names

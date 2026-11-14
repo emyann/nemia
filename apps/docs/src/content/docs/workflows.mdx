@@ -74,6 +74,15 @@ more fields with `output`, beside its agent's own, each field declared once, and
 a step signs off, the run keeps its whole closeout as a file named closeout.json in the step's files directory, where the steps after it read it. Claude Code gives the answer through its `StructuredOutput` tool, and Codex through its output
 schema. A step that signs off `blocked` stops what waits on it, and says so to the person.
 
+The board draws each field of `output` by its schema: words, a list, a table, a yes or no, a number. A field can name a shape instead
+of a schema, `{ "x-shape": "<shape>", "description": "…" }`, which the run expands to that shape's schema before the harness reads it,
+and the board draws it as that shape:
+
+- `questions`: questions a person answers by choosing among options, on the board or with `nemia retry --message`.
+- `budgets`: the caps a gated step proposes for the steps after it (see _What a step may spend_).
+- `link`: an address, or null for none, drawn as a link.
+- `commit`: a commit's hash, or null for none, drawn as the commit.
+
 ## The check
 
 The run does not take the agent's word that the work is done. A step's check is a command the run executes after the step signs off,

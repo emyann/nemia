@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, themeOf, isRunAction } from '../board.ts';
+import { fed, openRunMenu, photograph, runMenuActions, themeOf, isRunAction } from '../board.ts';
 import { cardOf } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
@@ -34,7 +34,7 @@ export default {
     if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page puts one — ${hold} is there`);
 
     try {
-      await page.locator('[data-hold-open]').click();
+      await (await openRunMenu(page)).locator('[data-hold-open]').click();
       const dialog = page.getByRole('dialog', { name: `Hold ${id}` });
       await expectVisible(dialog.locator(`[data-hold-run="${until}"]`), `the form offers ${until}, a run of the same repository`);
       await expectCount(dialog.locator(`[data-hold-run="${id}"]`), 0, `and not ${id} itself`);
@@ -59,8 +59,11 @@ export default {
       if (JSON.stringify([written.until, written.why, written.by]) !== JSON.stringify([[until], WHY, os.userInfo().username]))
         throw new Refused(`the hold's file says the runs ticked, the why and the api's user — it says ${JSON.stringify(written)}`);
       await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${literal(word)}$`) }), `the page says ${word}`);
-      await expectVisible(section.getByRole('button', { name: 'Lift…', exact: true }), 'and offers Lift… in its Held section');
-      await expectCount(page.locator('[data-hold-open]'), 0, 'and no Hold…: a held run is held once');
+      const actions = await runMenuActions(page);
+      if (!actions.includes('lift') || actions.includes('hold'))
+        throw new Refused(`the run's menu offers Lift… and no Hold…: a held run is held once — it offers ${actions.join(', ')}`);
+      await expectVisible((await openRunMenu(page)).getByRole('button', { name: 'Lift…', exact: true }), "and Lift… is in the run's menu");
+      await page.keyboard.press('Escape');
       await expectCount(page.locator('[role="alert"][data-hold-refused]'), 0, 'with no refusal said');
       await idle(page);
       await settled(page);
@@ -77,11 +80,13 @@ export default {
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
 
-      await section.getByRole('button', { name: 'Lift…', exact: true }).click();
-      await section.getByRole('button', { name: 'Lift', exact: true }).click();
+      const menu = await openRunMenu(page);
+      await menu.getByRole('button', { name: 'Lift…', exact: true }).click();
+      await menu.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(section, 0, 'the lift takes it back, and the page says no hold');
       if (fs.existsSync(hold)) throw new Refused(`the lift removed ${hold} — it is still there`);
-      await expectVisible(page.locator('[data-hold-open]'), 'and offers Hold… again');
+      await expectVisible((await openRunMenu(page)).locator('[data-hold-open]'), "and the run's menu offers Hold… again");
+      await page.keyboard.press('Escape');
     } finally {
       await takeBack(page, hold, id, gated);
     }

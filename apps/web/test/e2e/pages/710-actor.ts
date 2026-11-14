@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectTexts, idle, settled } from '../checks.ts';
 import { HELD, REGATED, regatedFiles, writeRegated } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -19,8 +19,9 @@ export default {
   /**
    * Who made a write is drawn beside it, in objects' words of the actor: REGATED is written with plan's approval made by the person on
    * the token `laptop`, and held until HELD by the agent `operator` on its token `ops`, each as its file keeps the actor. The run's page
-   * says each under the write — plan's approval, `the person, on laptop`, and the hold, `operator, by its token ops` — then both files
-   * are taken back, from the runs page so no read finds the run gone, and the feed told: every page after reads the store as seeded.
+   * says each under the write — plan's approval, in its part's Detail, `the person, on laptop`, and the hold, `operator, by its token
+   * ops` — then both files are taken back, from the runs page so no read finds the run gone, and the feed told: every page after reads
+   * the store as seeded.
    */
   name: 'actor',
   route: '/runs',
@@ -38,7 +39,8 @@ export default {
       fed(REGATED.id, 'held');
       await page.goto(new URL(`/runs/${REGATED.id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
-      const byPerson = page.locator('section[aria-label="The approval of plan"] [data-actor="person"]');
+      const detail = await openFold(partOf(page, 'plan'), 'detail');
+      const byPerson = detail.locator('section[aria-label="The approval of plan"] [data-actor="person"]');
       await expectTexts(byPerson, ['the person, on laptop'], "plan's approval says the person made it, on the token laptop");
       const byAgent = page.locator('section[aria-label="Held"] [data-actor="agent"]');
       await expectTexts(byAgent, ['operator, by its token ops'], 'the hold says the agent operator put it, by its token ops');

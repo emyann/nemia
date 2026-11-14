@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, sidebar, themeOf, stepBar } from '../board.ts';
+import { fed, openFold, partOf, photograph, sidebar, themeOf, stepBar } from '../board.ts';
 import { expectCount, expectDrawn, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { png } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -233,12 +233,12 @@ function writeRun(root: string): string[] {
 }
 
 /**
- * The step's inspector, on its Output tab: what a click on its node opens, the click sent to the node where it is, whatever lies over it.
+ * The step's inspector, its part whole: what a click on its node opens, the click sent to the node where it is, whatever lies over it.
  */
 async function outputOf(page: Page, step: string) {
   await page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="${step}"]`).dispatchEvent('click');
   const inspector = stepBar(page, OUTCOME.id, step);
-  await inspector.getByRole('tab', { name: 'Output' }).click();
+  await expectVisible(partOf(inspector, step), `${step}'s bar draws its part`);
   return inspector;
 }
 
@@ -263,10 +263,10 @@ async function photographInspector(page: Page, inspector: ReturnType<Page['locat
 
 export default {
   /**
-   * A run whose steps each ended another way, and the Output tab of each: the outcome and who said it first, then each field drawn by its
-   * shape — findings, a plan, replies, a blocked step's needs, the machine's reason there is no statement, and JSON for the rest — and Raw,
-   * the statement as the engine recorded it, whole, in place of the drawing. The page leaves the run before it takes it back, so no poll
-   * asks for a run that is gone.
+   * A run whose steps each ended another way, and the part of each in its bar: the outcome and who said it in Said, then each declared
+   * field in Gave drawn by the widget its schema picks — a table, prose, a list, a yes or no, and JSON for the rest — replies, a blocked
+   * step's needs, the machine's reason there is no statement, and in the Detail, the statement as the engine recorded it, whole. The page
+   * leaves the run before it takes it back, so no poll asks for a run that is gone.
    */
   name: 'outcome',
   route: '/runs',
@@ -277,7 +277,7 @@ export default {
       await page.goto(new URL(`/runs/${OUTCOME.id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
 
-      const again = page.locator('section[aria-label="Answer"] [data-offer="try-again"][data-step="quiet"]');
+      const again = partOf(page, 'quiet').locator('[data-part-asks] [data-offer="try-again"][data-step="quiet"]');
       await expectVisible(
         again.filter({ hasText: 'quiet gave no closeout the run accepts — none, one short of a field it declares, or one naming a file' }),
         'the row that offers a try of an unsigned step says the three ways a closeout is not accepted, and where to read which',
@@ -285,101 +285,102 @@ export default {
       await photograph(again, path.join(OUT, `outcome-unsigned-offer-${await themeOf(page)}.png`));
 
       const review = await outputOf(page, 'review');
-      await expectVisible(review.locator('[data-outcome="done"][data-by="agent"]'), 'review opens on its outcome, done, said by the agent');
-      const places = review.locator('table[data-kind="findings"] th[data-place]');
-      await expectCount(places, 3, 'its findings are a table, a row each');
-      for (const [i, place] of [
-        'apps/web/src/components/conversation/ToolContent.tsx:142',
-        'apps/web/test/e2e/pages/250-outcome.ts',
-        'apps/web/src/lib/outcome.ts:48',
-      ].entries()) {
-        const text = await places.nth(i).textContent();
-        if (text !== place)
-          throw new Refused(`finding ${i + 1}'s place reads ${place}, a null line the file alone — it reads ${JSON.stringify(text)}`);
-      }
       await expectVisible(
-        review.locator('table[data-kind="findings"] strong', { hasText: 'without an ellipsis' }),
-        "a finding's text is the markdown it is",
+        review.locator('[data-part-said] [data-outcome="done"][data-by="agent"]'),
+        'review says its outcome, done, said by the agent',
       );
-      await expectVisible(review.locator('section[data-field="again"] [data-yesno="no"]'), '`again` is a no');
+      const findings = review.locator('[data-part-gave] section[data-field="findings"][data-widget="table"]');
+      const files = findings.locator('td[data-cell="file"]');
+      await expectCount(files, 3, 'its findings are a table, a row each');
+      for (const [i, [file, line]] of [
+        ['apps/web/src/components/conversation/ToolContent.tsx', '142'],
+        ['apps/web/test/e2e/pages/250-outcome.ts', 'null'],
+        ['apps/web/src/lib/outcome.ts', '48'],
+      ].entries()) {
+        const text = (await files.nth(i).textContent())?.trim();
+        if (text !== file) throw new Refused(`finding ${i + 1}'s file reads ${file} — it reads ${JSON.stringify(text)}`);
+        const at = (await findings.locator('td[data-cell="line"]').nth(i).textContent())?.trim();
+        if (at !== line)
+          throw new Refused(`finding ${i + 1}'s line reads ${line}, a null one said as null — it reads ${JSON.stringify(at)}`);
+      }
+      await expectVisible(findings.locator('strong', { hasText: 'without an ellipsis' }), "a finding's text is the markdown it is");
+      await expectVisible(review.locator('section[data-field="again"][data-widget="yesNo"] [data-yesno="no"]'), '`again` is a no');
       await expectVisible(
         review.locator('section[data-field="again"]', { hasText: 'true when a finding is worth another round' }),
         "beside what it means, from review's schema",
       );
       await photographInspector(page, review, 'review');
 
-      const raw = review.getByRole('switch');
-      await review.locator('label', { hasText: /^Raw$/ }).click();
-      if (!(await raw.isChecked())) throw new Refused('the Raw switch is on once its label is pressed');
+      const detail = await openFold(partOf(review, 'review'), 'detail');
       await expectVisible(
-        review.locator('pre[data-raw]', { hasText: '"findings": [' }),
-        'Raw shows the statement as it came, its findings as JSON',
+        detail.locator('section[aria-label="As it came"] pre[data-raw]', { hasText: '"findings": [' }),
+        'its Detail holds the statement as it came, its findings as JSON',
       );
-      await expectCount(review.locator('table[data-kind="findings"]'), 0, 'in place of the drawing');
       await photographInspector(page, review, 'review-raw');
-      await review.locator('label', { hasText: /^Raw$/ }).click();
-      await expectCount(review.locator('pre[data-raw]'), 0, 'and pressed again, the drawing is back');
 
       const plan = await outputOf(page, 'plan');
       await expectVisible(
-        plan.locator('section[data-field="approach"][data-kind="markdown"] strong', { hasText: 'JSON' }),
-        "plan's approach is markdown",
+        plan.locator('section[data-field="approach"][data-widget="prose"] strong', { hasText: 'JSON' }),
+        "plan's approach is prose, its markdown drawn",
       );
       await expectVisible(
-        plan.locator('table[data-kind="table"] th[data-place]', { hasText: 'apps/web/src/lib/outcome.ts' }),
-        'its files a table, the path over the change',
+        plan.locator('section[data-field="files"][data-widget="table"] td[data-cell="path"]', { hasText: 'apps/web/src/lib/outcome.ts' }),
+        'its files a table, the path beside the change',
       );
-      await expectCount(plan.locator('section[data-field="steps"][data-kind="list"] li'), 3, 'its steps a list');
-      await expectCount(plan.locator('section[data-field="risks"][data-kind="list"] li'), 1, 'and its risks');
+      await expectCount(plan.locator('section[data-field="steps"][data-widget="list"] li'), 3, 'its steps a list');
+      await expectCount(plan.locator('section[data-field="risks"][data-widget="list"] li'), 1, 'and its risks');
       await photographInspector(page, plan, 'plan');
 
       const implement = await outputOf(page, 'implement');
+      const gave = implement.locator('[data-part-gave]');
+      await expectVisible(
+        gave.locator('section[data-field="screenshots"][data-widget="list"] li', { hasText: 'runs-light.png' }),
+        'the screenshots implement names are listed where the field names them',
+      );
       await expectDrawn(
-        implement.locator('section[data-field="screenshots"] img[alt="runs-light.png"]'),
-        'a screenshot implement names among its artifacts is drawn where the field names it',
+        gave.locator('[data-artifacts] img[alt="runs-light.png"]'),
+        'and drawn once, as a thumbnail among the files it named',
       );
       await expectVisible(
-        implement.locator('section[data-field="replies"] li[data-answer="fixed"] [data-slot="badge"]', { hasText: 'fixed' }),
+        gave.locator('li[data-answer="fixed"] [data-slot="badge"]', { hasText: 'fixed' }),
         'its replies answer with a badge: fixed',
       );
-      await expectVisible(
-        implement.locator(`section[data-field="replies"] li[data-answer="won't fix"] [data-slot="badge"]`, { hasText: "won't fix" }),
-        "and won't fix",
-      );
+      await expectVisible(gave.locator(`li[data-answer="won't fix"] [data-slot="badge"]`, { hasText: "won't fix" }), "and won't fix");
       await photographInspector(page, implement, 'implement');
 
       const ask = await outputOf(page, 'ask');
-      await expectVisible(ask.locator('[data-outcome="blocked"][data-by="agent"]'), 'ask opens on blocked, said by the agent');
-      await expectVisible(ask.locator('[data-needs] strong', { hasText: 'The outcome' }), 'and what it needs, as the markdown it wrote');
+      await expectVisible(ask.locator('[data-part-said] [data-outcome="blocked"][data-by="agent"]'), 'ask says blocked, said by the agent');
+      await expectVisible(
+        ask.locator('[data-part-said] [data-needs] strong', { hasText: 'The outcome' }),
+        'and what it needs, as the markdown it wrote',
+      );
       await photographInspector(page, ask, 'ask');
 
       const quiet = await outputOf(page, 'quiet');
+      const quietDetail = await openFold(partOf(quiet, 'quiet'), 'detail');
       await expectVisible(
-        quiet.locator('[data-outcome="unsigned"][data-by="machine"]'),
-        "quiet has no statement: the machine's reason, unsigned",
+        quietDetail.locator('[data-outcome="unsigned"][data-by="machine"]'),
+        "quiet has no statement: its Detail gives the machine's reason, unsigned",
       );
-      await expectVisible(quiet.locator('[data-reason]', { hasText: OUTCOME.reason }), 'said in a sentence');
+      await expectVisible(quietDetail.locator('[data-reason]', { hasText: OUTCOME.reason }), 'said in a sentence');
       await photographInspector(page, quiet, 'quiet');
 
       const odd = await outputOf(page, 'odd');
       await expectVisible(
-        odd.locator('section[data-field="matrix"][data-kind="json"] pre'),
+        odd.locator('section[data-field="matrix"][data-widget="json"] pre'),
         'an array of arrays is shown as the JSON it came as, under its name',
       );
       await expectVisible(
-        odd.locator('section[data-field="weights"][data-kind="json"] pre', { hasText: '"findings": 0.7' }),
-        'and so is an object',
+        odd.locator('section[data-field="weights"]', { hasText: '0.7' }),
+        'and an object is drawn under its name, every value of it read',
       );
       await photographInspector(page, odd, 'odd');
 
       const garbled = await outputOf(page, 'garbled');
+      await expectVisible(garbled.locator('[data-part-said] [data-outcome="unreadable"][data-by="unreadable"]'), 'garbled says unreadable');
+      await expectVisible(garbled.locator('[data-part-said] [data-reason]', { hasText: 'could not be read' }), 'and why, in a sentence');
       await expectVisible(
-        garbled.locator('[data-outcome="unreadable"][data-by="unreadable"]'),
-        'garbled opens on unreadable, said by the agent',
-      );
-      await expectVisible(garbled.locator('[data-reason]', { hasText: 'could not be read' }), 'and why, in a sentence');
-      await expectVisible(
-        garbled.locator('section[aria-label="As it came"] pre[data-raw]', { hasText: OUTCOME.garbled }),
+        garbled.locator('[data-part-said] section[aria-label="As it came"] pre[data-raw]', { hasText: OUTCOME.garbled }),
         'then the statement whole, as it came',
       );
       await photographInspector(page, garbled, 'garbled');

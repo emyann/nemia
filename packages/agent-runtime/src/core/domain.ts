@@ -497,11 +497,25 @@ export type Event =
       traceparent?: string;
       /**
        * What its process tree may use of the host, a container's `resources`: `limits.memory`, held by a cgroup of its own. The
-       * task's own, else its engine's `defaultLimits` as they were at filing. Carried for the runner, never read by `decide`.
+       * task's own, as filed (on a journal an older runtime wrote, its engine's defaults written then): a task with none takes its
+       * engine's defaults as each attempt starts (`starting`). Carried for the runner, never read by `decide`.
        */
       resources?: TaskResources;
     }
-  | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string; nudge?: string; mono?: Monotonic }
+  | {
+      kind: 'starting';
+      at: string;
+      attempt: number;
+      resumeFrom?: string;
+      nudge?: string;
+      mono?: Monotonic;
+      /**
+       * What the attempt's process tree runs under (`runsUnder`, `core/admission.ts`): the task's own, else its engine's defaults in
+       * force as it starts, as a LimitRange's land on a Pod when it is created. Absent where it runs under none, and on a journal an
+       * older runtime wrote, whose attempt ran under its `filed` resources. Carried for the runner, never read by `decide`.
+       */
+      resources?: TaskResources;
+    }
   | { kind: 'spawned'; at: string; attempt: number; error?: string; mono?: Monotonic }
   | {
       kind: 'ended';
@@ -564,6 +578,11 @@ export type Attempt = {
   startedAt: string;
   /** The same moment on the monotonic clock, when the engine that journalled it read one. */
   startedMono?: Monotonic;
+  /**
+   * What its process tree runs under, as its `starting` entry recorded: the task's own, else its engine's defaults in force then.
+   * Absent where it runs under none, and on an attempt an older runtime started, which ran under the task's `filed` resources.
+   */
+  resources?: TaskResources;
   /** Null until the spawn call returned: the window a crash can land in. */
   spawnedAt: string | null;
   /** The spawn's moment on the monotonic clock, when the engine that journalled it read one. */
@@ -711,6 +730,14 @@ export type State = {
   settled: Outcome | null;
 };
 
+/** The optional parts of the attempt a `starting` event `e` opens on `s`: its monotonic start, what it is told and runs under, its turn. */
+const startedParts = (s: State, e: Extract<Event, { kind: 'starting' }>) => ({
+  ...(e.mono ? { startedMono: e.mono } : {}),
+  ...(e.nudge ? { nudge: e.nudge } : {}),
+  ...(e.resources ? { resources: e.resources } : {}),
+  ...(s.inputs.length ? { turn: s.inputs.length } : {}),
+});
+
 /**
  * Ends the attempt `a` as the `ended` event `e` says: an empty list of skills, files or denials kept — measured, none — though an empty
  * one of denials never takes away a denial seen while it ran (`denied`), and an end with no usage keeping what was counted while it ran
@@ -801,17 +828,15 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.attempts.push({
           n: e.attempt,
           startedAt: e.at,
-          ...(e.mono ? { startedMono: e.mono } : {}),
           spawnedAt: null,
           ended: null,
           endedAt: null,
           reason: null,
           nativeId: null,
           resumeFrom: e.resumeFrom,
-          ...(e.nudge ? { nudge: e.nudge } : {}),
           usage: null,
           exitCode: null,
-          ...(s.inputs.length ? { turn: s.inputs.length } : {}),
+          ...startedParts(s, e),
         });
         break;
       case 'stop-requested':

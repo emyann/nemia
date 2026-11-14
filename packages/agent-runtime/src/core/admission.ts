@@ -14,6 +14,7 @@ import type {
   MachineMemory,
   Waiter,
 } from '../../contracts/admission.contract.ts';
+import type { RunsUnder, Sizing } from '../../contracts/runs-under.contract.ts';
 import type { TaskPhase } from './session.ts';
 import type { TaskResources } from './domain.ts';
 import { memoryBytesOf } from './memory.ts';
@@ -28,6 +29,7 @@ export type {
   MachineMemory,
   Waiter,
 } from '../../contracts/admission.contract.ts';
+export type { RunsUnder, Sizing } from '../../contracts/runs-under.contract.ts';
 
 /**
  * The room the machine has for newcomers before a pass admits any, in bytes: the lesser of its total less the floor and what every
@@ -98,7 +100,13 @@ export type AdmissionView = {
   id: string;
   phase: TaskPhase;
   admission?: 'queued' | 'admitted';
-  state: { harness?: string; filedAt?: string; priority?: number; resources?: TaskResources };
+  state: {
+    harness?: string;
+    filedAt?: string;
+    priority?: number;
+    resources?: TaskResources;
+    attempts?: readonly { ended: unknown; resources?: TaskResources }[];
+  };
 };
 
 /**
@@ -113,7 +121,32 @@ export type AdmissionRule = {
   unschedulable?: () => boolean;
   poolOf: (harness: string | undefined) => string;
   machine?: () => MachineMemory | undefined;
+  /**
+   * The engine's defaults for a task of `harness` that names no resources of its own, as it holds them now, as a LimitRange's: asked
+   * at each admission and at each attempt's start (`runsUnder`), so a resize reaches every task not yet started. Absent, or answering
+   * `undefined` (a remote agent's task, whose process no cgroup of ours holds), a task with none runs under none.
+   */
+  defaultsOf?: (harness: string | undefined) => TaskResources | undefined;
 };
+
+/**
+ * What a task's process tree runs under, and so what admission counts it at: an attempt in flight keeps what its `starting` entry
+ * recorded (one an older runtime started recorded none, and runs under its filing); with none in flight, the task's own resources,
+ * else the engine's defaults in force now, as a LimitRange's land on a Pod only when it is created. Proved by
+ * `contracts/runs-under.contract.ts`.
+ */
+export const runsUnder: RunsUnder = ({ filed, inFlight, defaults }: Sizing) =>
+  inFlight !== null ? (inFlight.resources ?? filed) : (filed ?? defaults);
+
+/** The attempt of a task's view still in flight, its last while it has not ended, or `null`. */
+const inFlightOf = (view: AdmissionView): { resources: TaskResources | undefined } | null => {
+  const last = view.state.attempts?.at(-1);
+  return last === undefined || last.ended !== null ? null : { resources: last.resources };
+};
+
+/** What admission counts a task at, in bytes: what it runs under (`runsUnder`) as `rule` holds its defaults now (`needBytesOf`). */
+const needOf = (view: AdmissionView, rule: AdmissionRule): number =>
+  needBytesOf(runsUnder({ filed: view.state.resources, inFlight: inFlightOf(view), defaults: rule.defaultsOf?.(view.state.harness) }));
 
 /**
  * What a task needs of the machine's memory, in bytes, as admission counts it: its request (`resources.requests.memory`), else its
@@ -176,7 +209,8 @@ const byTurn = (a: AdmissionView, b: AdmissionView): number => {
 
 /**
  * The queued tasks to admit, and why each other one waits: the tasks holding a slot (`holdsSlot`), each with its pool, its need
- * (`needBytesOf`) and whether its process is there (`working`, `quiescent`), and the waiting tasks in turn (`byTurn`), handed to
+ * (`needOf`, the engine's defaults now for one with none of its own and no attempt in flight) and whether its process is there
+ * (`working`, `quiescent`), and the waiting tasks in turn (`byTurn`), handed to
  * `admitting` with the machine as `rule.machine` reads it once. Nothing running is stopped for a waiting task; no ceiling admits
  * nothing, and nor does a rule `unschedulable` says true of as the pass asks it, each saying no wait.
  */
@@ -185,12 +219,12 @@ export function toAdmit(views: readonly AdmissionView[], rule: AdmissionRule): A
   if (ceiling === undefined || rule.unschedulable?.()) return { admit: [], waits: [] };
   const holders = views.filter(holdsSlot).map((v): Holder => ({
     pool: poolOf(v.state.harness),
-    needBytes: needBytesOf(v.state.resources),
+    needBytes: needOf(v, rule),
     running: v.phase === 'working' || v.phase === 'quiescent',
   }));
   const waiting = views
     .filter((w) => w.admission === 'queued')
     .sort(byTurn)
-    .map((v): Waiter => ({ id: v.id, pool: poolOf(v.state.harness), needBytes: needBytesOf(v.state.resources) }));
+    .map((v): Waiter => ({ id: v.id, pool: poolOf(v.state.harness), needBytes: needOf(v, rule) }));
   return admitting({ ceiling, machine: rule.machine?.() ?? null, holders, waiting });
 }

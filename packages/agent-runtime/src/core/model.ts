@@ -105,6 +105,7 @@ export const Attempt = Schema.Struct({
   nativeId: Schema.NullOr(SessionId.OnRead),
   resumeFrom: Schema.optional(SessionId.OnRead),
   nudge: Schema.optional(Schema.String),
+  resources: Schema.optional(ResourcesSchema),
   ...SaidAtEnd,
   closedOut: Schema.optional(Schema.Boolean),
   former: Schema.optional(Schema.Literals(FORMER_REASONS)),

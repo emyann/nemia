@@ -647,12 +647,12 @@ const TAKEN: Array<{
     holds: (filed) => assert.equal(filed.config?.contextTokens, 16_000),
   },
   {
-    name: "the engine's default memory limit, written onto a task filed with none, as a LimitRange's default onto a Pod",
+    name: "the engine's default memory limit is never written onto a task filed with none: it lands on each attempt as it starts, as a LimitRange's default on a Pod when it is created",
     door: 'limited',
     spec: {},
     holds: (filed, view) => {
-      assert.deepEqual(filed.resources, { limits: { memory: '6Gi' } }, 'on the record, so a new default never changes it');
-      assert.deepEqual(view.state.resources, { limits: { memory: '6Gi' } });
+      assert.equal('resources' in filed, false, 'off the record, so a resize reaches it while it waits');
+      assert.equal(view.state.resources, undefined);
     },
   },
   {

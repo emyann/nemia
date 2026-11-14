@@ -58,6 +58,7 @@ erDiagram
     SessionId nativeId FK
     SessionId resumeFrom FK "optional"
     string nudge "optional"
+    object resources "optional"
     unknown closeout "optional"
     boolean closedOut "optional"
     unsigned former "optional"

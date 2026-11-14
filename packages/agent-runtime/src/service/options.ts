@@ -13,6 +13,7 @@ import { DEFAULT_HARNESSES } from './default-harnesses.ts';
 import { memoryBytesOf, memoryQuantityRefusal } from '../core/memory.ts';
 import { machineMemory, type MachineReading } from './machine.ts';
 import type { AdmissionRule } from '../core/admission.ts';
+import type { TaskResources } from '../core/domain.ts';
 import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
 import { CAPABILITIES, type HarnessDeclaration } from '../harness/declaration.ts';
 import { CLAUDE_DECLARATION } from '../harness/claude/vocabulary.ts';
@@ -54,16 +55,17 @@ export type Pooled = { pool?: string };
  */
 export type EngineOptions = {
   /**
-   * The memory limit a task filed with none of its own is filed with, as a LimitRange's default is written into a Pod at admission:
-   * a Kubernetes quantity (`Resources`). Written onto the task's `filed` event, so the journal says what each ran under and a new
-   * default never changes a task already filed. Refused at `Engine.layer` unless `memoryBytesOf` reads it. Absent: no default.
+   * The memory limit a task filed with no resources of its own runs under, as a LimitRange's default lands on a Pod when it is
+   * created: a Kubernetes quantity (`Resources`). Never written onto the task: applied as each attempt starts and recorded on its
+   * `starting` event, so the journal says what each ran under, a resize reaches every task not yet started, and an attempt
+   * already started keeps its own. Refused at `Engine.layer` unless `memoryBytesOf` reads it. Absent: no default.
    */
   defaultLimits?: { memory: string };
   /**
-   * The memory request a task filed with no resources of its own is filed with, as a LimitRange's defaultRequest: a Kubernetes
-   * quantity, written onto its `filed` event beside `defaultLimits`, and what admission counts the task at against the machine
-   * (`reserved`). Refused at `Engine.layer` unless `memoryBytesOf` reads it, and when above `defaultLimits.memory`. Absent: a task
-   * with no request of its own is counted at its limit, else at nothing.
+   * The memory request a task filed with no resources of its own runs under, as a LimitRange's defaultRequest: a Kubernetes
+   * quantity, applied beside `defaultLimits` as each attempt starts, and what admission counts the task at against the machine
+   * (`reserved`), as the engine holds it when it admits. Refused at `Engine.layer` unless `memoryBytesOf` reads it, and when above
+   * `defaultLimits.memory`. Absent: a task with no request of its own is counted at its limit, else at nothing.
    */
   defaultRequests?: { memory: string };
   /**
@@ -229,8 +231,9 @@ export type TaskSpec = {
   /**
    * What the task's process tree may use, a container's `resources`: `limits.memory` alone, a Kubernetes quantity (`8Gi`, `512Mi`,
    * `4G`). Its harness and every child it starts run in a cgroup of their own under it, and a process that passes it is ended by the
-   * kernel there alone; the attempt says so (`Attempt.memory`). Absent: the engine's `defaultLimits`, else no limit. Taken by every
-   * harness that runs a process here, refused on a remote agent's; any other key is refused.
+   * kernel there alone; the attempt says so (`Attempt.memory`). Absent: the engine's `defaultLimits` as it holds them when each
+   * attempt starts, else no limit. Taken by every harness that runs a process here, refused on a remote agent's; any other key is
+   * refused.
    */
   resources?: Resources;
 };
@@ -293,30 +296,6 @@ export const handleOf = (events: readonly Event[], attempt: number): string | un
 export const isSpec = (h: HarnessConfig): h is HarnessSpec => typeof h === 'object' && 'command' in h;
 /** A remote A2A agent: an object that is neither a spec (`command`) nor a runner (`spawn`). */
 export const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'object' && h !== null && !('command' in h) && !('spawn' in h);
-
-/**
- * `task` with the engine's default limits and requests written on where it was filed with no `resources` of its own, as a
- * LimitRange's defaults are written into a Pod at admission: none on a remote agent's, whose process is the other party's and no
- * cgroup of ours holds, so a default never makes a remote task unfileable (a limit the task asks for itself there is refused,
- * `harnessRefusalOf`).
- */
-export const limitedBy = <T extends TaskSpec & { harness: string }>(
-  defaults: Pick<EngineOptions, 'defaultLimits' | 'defaultRequests'>,
-  task: T,
-  harnesses: Record<string, HarnessConfig>,
-): T => {
-  const { defaultLimits, defaultRequests } = defaults;
-  const h = own(harnesses, task.harness);
-  if ((defaultLimits === undefined && defaultRequests === undefined) || task.resources !== undefined || h === undefined || isRemote(h))
-    return task;
-  return {
-    ...task,
-    resources: {
-      ...(defaultLimits ? { limits: { memory: defaultLimits.memory } } : {}),
-      ...(defaultRequests ? { requests: { memory: defaultRequests.memory } } : {}),
-    },
-  };
-};
 
 /**
  * What the harness `h` declares it can do: Claude Code's declaration for the literal `'claude'`, a spec's own `can` (with its range of
@@ -571,11 +550,21 @@ const machineOf = (options: EngineOptions): AdmissionRule['machine'] => {
 
 /**
  * What an engine over `options` admits under (`Admission`): its `maxConcurrent`, its `unschedulable`, the machine it reads while
- * `reserved` is given (`machineOf`), and the pool each of `harnesses` counts in — the `pool` it names, else its own name; a task with
- * no harness counts in `default`.
+ * `reserved` is given (`machineOf`), the pool each of `harnesses` counts in — the `pool` it names, else its own name; a task with
+ * no harness counts in `default` — and the defaults a task with no resources of its own runs under (`defaultsOf`): `defaultLimits`
+ * and `defaultRequests`, for a harness of `harnesses` that runs a process here, never a remote agent's, whose process the other
+ * party's and no cgroup of ours holds.
  */
 export const admissionOf = (options: EngineOptions, harnesses: Record<string, HarnessConfig>) => {
   const machine = machineOf(options);
+  const { defaultLimits, defaultRequests } = options;
+  const defaults: TaskResources | undefined =
+    defaultLimits === undefined && defaultRequests === undefined
+      ? undefined
+      : {
+          ...(defaultLimits ? { limits: { memory: defaultLimits.memory } } : {}),
+          ...(defaultRequests ? { requests: { memory: defaultRequests.memory } } : {}),
+        };
   return Layer.succeed(Admission)({
     ...(options.maxConcurrent !== undefined ? { ceiling: options.maxConcurrent } : {}),
     ...(options.unschedulable !== undefined ? { unschedulable: options.unschedulable } : {}),
@@ -584,6 +573,14 @@ export const admissionOf = (options: EngineOptions, harnesses: Record<string, Ha
       const h = harness !== undefined && Object.hasOwn(harnesses, harness) ? harnesses[harness] : undefined;
       return typeof h === 'object' && h !== null && typeof h.pool === 'string' ? h.pool : (harness ?? 'default');
     },
+    ...(defaults !== undefined
+      ? {
+          defaultsOf: (harness: string | undefined) => {
+            const h = harness === undefined ? undefined : own(harnesses, harness);
+            return h === undefined || isRemote(h) ? undefined : defaults;
+          },
+        }
+      : {}),
   });
 };
 

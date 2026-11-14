@@ -17,6 +17,9 @@ export type { RouteTable, TablePick } from '../../contracts/route-table.contract
 /**
  * The route the table holds for the producer's value, when the value is a string with a row of the table's own naming a declared route;
  * else none. A value spelled as a prototype key ("constructor") has no row.
+ * @param table The condition's table eval: the producer's field and its rows, each a value to a route.
+ * @param routes The routes the condition declares.
+ * @param value The producer's value of the table's field, of any type.
  */
 export const tableRoute: TableRoute = (table, routes, value) => {
   if (typeof value !== 'string' || !Object.hasOwn(table.table, value)) return { kind: 'unsigned' };
@@ -24,7 +27,12 @@ export const tableRoute: TableRoute = (table, routes, value) => {
   return row !== undefined && routes.includes(row) ? { kind: 'route', route: row } : { kind: 'unsigned' };
 };
 
-/** A script condition's read: only a clean exit whose answer names a declared route is a route; every other case a word of its own. */
+/**
+ * A script condition's read: only a clean exit whose answer names a declared route is a route; every other case a word of its own.
+ * @param verdict What the script exited with: its exit code, or `unfinished` where it did not end.
+ * @param answer The answer the script wrote, or undefined where it wrote none.
+ * @param routes The routes the condition declares.
+ */
 export const scriptRoute: ScriptRoute = (verdict, answer, routes) => {
   if (verdict === 'unfinished') return { kind: 'stopped' };
   if (verdict !== 0) return { kind: 'failed' };
@@ -33,7 +41,12 @@ export const scriptRoute: ScriptRoute = (verdict, answer, routes) => {
   return routes.includes(answer.route) ? { kind: 'route', route: answer.route } : { kind: 'unsigned' };
 };
 
-/** What a node not yet filed does on this pass, from its `when:`, its condition's answer and its parents' words. */
+/**
+ * What a node not yet filed does on this pass, from its `when:`, its condition's answer and its parents' words.
+ * @param when The node's `when:` routes, or undefined on a node with none.
+ * @param answered The route its condition answered, or undefined where it has not.
+ * @param parents The words of the node's parents (`StepStatus`), as this pass reads them.
+ */
 export const nodeFate: NodeFate = (when, answered, parents) => {
   if (when !== undefined && answered !== undefined && !when.includes(answered)) return 'skipped';
   if (parents.length > 0 && parents.every((p) => p === 'skipped')) return 'skipped';
@@ -47,9 +60,17 @@ export const nodeFate: NodeFate = (when, answered, parents) => {
 /** What kind of node a step is: a condition (`routes:`), a route to a workflow (`workflow:`), or a step. */
 export type { NodeKind };
 
+/**
+ * What kind of node a step is: a condition (`routes:`), a route to a workflow (`workflow:`), or a step.
+ * @param step The step read: its `routes` and its `workflow`.
+ */
 export const nodeKind = (step: Pick<StepSpec, 'routes' | 'workflow'>): NodeKind =>
   step.routes !== undefined ? 'condition' : step.workflow !== undefined ? 'workflow' : 'step';
 
-/** The one condition among a `when:` node's parents (load holds there is exactly one); undefined on a node with no `when:`. */
+/**
+ * The one condition among a `when:` node's parents (load holds there is exactly one); undefined on a node with no `when:`.
+ * @param step The node read: its `when:` and its parents.
+ * @param steps The workflow's steps, among which its parents are.
+ */
 export const conditionOf = (step: StepSpec, steps: readonly StepSpec[]): StepSpec | undefined =>
   step.when === undefined ? undefined : steps.find((s) => step.after.includes(s.name) && s.routes !== undefined);

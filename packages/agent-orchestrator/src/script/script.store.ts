@@ -13,13 +13,19 @@ import { scriptRoute, type ScriptAnswer, type ScriptRead } from '../route/index.
 /** A task's last attempt, as far as a script condition reads it: its exit and the answer file the runtime kept. */
 export type AttemptOf = (taskId: string) => { exitCode?: number | null; reason?: string | null; terminationMessage?: string } | undefined;
 
-/** The last attempt of each task the pass viewed. */
+/**
+ * The last attempt of each task the pass viewed.
+ * @param views The views of the tasks the pass viewed, by task id: their attempts.
+ */
 export const attemptIn =
   (views: ReadonlyMap<string, { state: { attempts: readonly NonNullable<ReturnType<AttemptOf>>[] } }>): AttemptOf =>
   (taskId) =>
     views.get(taskId)?.state.attempts.at(-1);
 
-/** A condition whose eval is a script. */
+/**
+ * A condition whose eval is a script.
+ * @param step The step read, or undefined where there is none.
+ */
 export const isScript = (step: StepSpec | undefined): step is StepSpec & { routes: string[] } =>
   step?.routes !== undefined && step.route?.kind === 'script';
 
@@ -33,6 +39,7 @@ const AnswerSchema = Schema.Struct({
 /**
  * The answer a script left, or undefined where it left none the run can use: no text, text that is not one JSON object, an answer with
  * both `route` and `unsure` or with neither, or a field of the wrong type.
+ * @param text The text of the script's answer file, or undefined where it left none.
  */
 export function scriptAnswerOf(text: string | undefined): ScriptAnswer | undefined {
   if (text === undefined) return undefined;
@@ -50,7 +57,12 @@ export function scriptAnswerOf(text: string | undefined): ScriptAnswer | undefin
   return undefined;
 }
 
-/** What a script condition's task said, off its last attempt: its exit verdict and its answer file, decoded (`scriptRoute`). */
+/**
+ * What a script condition's task said, off its last attempt: its exit verdict and its answer file, decoded (`scriptRoute`).
+ * @param step The condition read.
+ * @param run The run whose record holds the condition's current task.
+ * @param attemptOf The last attempt of each task the pass viewed (`attemptIn`).
+ */
 export function scriptRead(step: StepSpec, run: Run, attemptOf: AttemptOf): ScriptRead | undefined {
   const taskId = run.steps[step.name]?.taskId;
   if (!isScript(step) || !taskId || taskId !== stepTaskId(run, step.name, tryOf(run, step.name))) return undefined;
@@ -62,6 +74,10 @@ export function scriptRead(step: StepSpec, run: Run, attemptOf: AttemptOf): Scri
  * The pass's closeouts, with each script condition's answer read as its closeout: a route as a `done` one whose output is the route, an
  * unsure answer as a `blocked` one that needs its words, so the step reads as one that signed so (`unverified`, `blocked`). Every other
  * read (no answer, an undeclared route, a failed or stopped script) leaves it none, and its task's phase says the rest.
+ * @param steps The workflow's steps: which of them are script conditions.
+ * @param attemptOf The last attempt of each task the pass viewed (`attemptIn`).
+ * @param run The run whose record holds each condition's current task.
+ * @param closeoutOf How each step signed off as the pass read it, or undefined where it has not: what every other step reads.
  */
 export const scriptCloseouts =
   (steps: readonly StepSpec[], attemptOf: AttemptOf, run: Run, closeoutOf: (step: string) => Closeout | undefined) =>

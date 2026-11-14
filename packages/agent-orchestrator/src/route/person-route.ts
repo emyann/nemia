@@ -7,12 +7,19 @@ import type { Run, StepRecord } from '../record/record.ts';
 /** A person's route for a condition's try, as `runRecord` reads it from its file (`routeAsk`): the route named, and when. */
 export type PersonRoute = { step: string; try: number; route: string; at: string };
 
-/** The name of a person's route file in a run's asks folder, `route-<step>-<n>`, beside its approvals: what `nemia route` writes. */
+/**
+ * The name of a person's route file in a run's asks folder, `route-<step>-<n>`, beside its approvals: what `nemia route` writes.
+ * @param step The condition's name.
+ * @param n The try of the condition the route is for.
+ */
 export const routeAsk = (step: string, n: number): string => `route-${step}-${n}`;
 
 /**
  * The routes people named for a run's conditions (`routeAsk`), from the names in its asks folder `dir` and a reader of a file there: a file
  * that names no route, or no time it was given, routes nothing. Never consumed: read on every pass, as an approval is. Pure.
+ * @param dir The run's asks folder.
+ * @param names The names of the files in that folder, or undefined where it has none.
+ * @param read A reader of a file there, by its path: what it holds as JSON, or why it could not be read.
  */
 export function personRoutes(
   dir: string,
@@ -30,7 +37,11 @@ export function personRoutes(
   });
 }
 
-/** The run with each person's route laid on its condition's record, for the try the condition is on: it wins over any other answer. */
+/**
+ * The run with each person's route laid on its condition's record, for the try the condition is on: it wins over any other answer.
+ * @param run The run whose step records are routed.
+ * @param routes The routes people named (`personRoutes`).
+ */
 export const withRoutes = <R extends Pick<Run, 'steps'>>(run: R, routes: readonly PersonRoute[]): R => {
   const steps = { ...run.steps };
   for (const r of routes) {
@@ -41,7 +52,10 @@ export const withRoutes = <R extends Pick<Run, 'steps'>>(run: R, routes: readonl
   return { ...run, steps };
 };
 
-/** A record without a person's route on any step, which is their file's and never the record's: what a rewrite writes. Pure. */
+/**
+ * A record without a person's route on any step, which is their file's and never the record's: what a rewrite writes. Pure.
+ * @param run The record a rewrite writes.
+ */
 export const unrouted = <R extends Pick<Run, 'steps'>>(run: R): R => ({
   ...run,
   steps: Object.fromEntries(

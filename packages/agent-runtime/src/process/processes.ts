@@ -57,6 +57,7 @@ const processOf = (pid: number, uid: number, wanted: ReadonlySet<string>): Proce
  * This user's processes as `/proc` reads them now, each with the variables of `variables` its environment holds. A process gone or
  * unreadable mid-read is skipped, never an error; where there is no `/proc` (off Linux) there is none. A kernel thread has no
  * environment and is another user's (root's), so it is never listed.
+ * @param variables The names of the environment variables to read of each process; one it lacks is left out of its `env`.
  */
 export const processesNow = (variables: readonly string[]): ProcessNow[] => {
   const uid = process.getuid?.();
@@ -83,6 +84,8 @@ export type ProcessToEnd = { readonly pid: number; readonly start: string };
 /**
  * Sends `signal` to each process whose start still matches what was read: a pid another process has taken since is left alone. Answers
  * the pids signalled; one gone in between, or refused the signal, is not among them.
+ * @param processes The processes to signal, each by its pid and the start read of it.
+ * @param signal The signal to send.
  */
 export const endProcesses = (processes: readonly ProcessToEnd[], signal: 'SIGTERM' | 'SIGKILL'): number[] => {
   const signalled: number[] = [];

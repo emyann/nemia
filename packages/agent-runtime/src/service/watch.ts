@@ -10,6 +10,9 @@ import type { EngineShape } from './engine.ts';
  * cannot or an event that is dropped, one drain at a time: a push heard while a drain runs has that drain read the feed again before it
  * ends, so a write that raced it is not left for the interval. A feed entry skipped as no runtime's, and any failure, goes to `onError`.
  * Succeeds at once with a handle whose `stop` ends it.
+ * @param feed The engine's feed, read from a cursor.
+ * @param subscribe The store's signal of a write, handed a callback and answering its unsubscribe; undefined for a store that cannot
+ *   signal, read on the interval alone.
  */
 export const watchOf =
   (feed: EngineShape['feed'], subscribe?: (onChange: () => void) => () => void): EngineShape['watch'] =>

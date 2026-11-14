@@ -15,7 +15,11 @@ export type Harnessed = {
   readonly can: readonly Capability[];
 };
 
-/** Each harness of `harnesses` with the runner the engine made for it, by name. */
+/**
+ * Each harness of `harnesses` with the runner the engine made for it, by name.
+ * @param harnesses The engine's harnesses, each by its name.
+ * @param runners The runners the engine made, by harness; a harness with none is left out.
+ */
 export const harnessedOf = (harnesses: Record<string, HarnessConfig>, runners: Record<string, SeamOps>): Record<string, Harnessed> =>
   Object.fromEntries(
     Object.entries(harnesses).flatMap(([name, config]) => {
@@ -24,7 +28,11 @@ export const harnessedOf = (harnesses: Record<string, HarnessConfig>, runners: R
     }),
   );
 
-/** Why an engine has no harness to take a task that names none: its `defaultHarness`, or its first, is not one of its harnesses. */
+/**
+ * Why an engine has no harness to take a task that names none: its `defaultHarness`, or its first, is not one of its harnesses.
+ * @param fallback The harness named to take a task that names none.
+ * @param harnesses The engine's harnesses, each by its name.
+ */
 export const noFallbackRefusal = (fallback: string, harnesses: Record<string, HarnessConfig>): string => {
   const names = Object.keys(harnesses);
   return names.length
@@ -32,7 +40,11 @@ export const noFallbackRefusal = (fallback: string, harnesses: Record<string, Ha
     : '`harnesses` names none, so no task has anywhere to run. Give at least one harness, or leave `harnesses` out for the defaults.';
 };
 
-/** Whether the harness `name` of `harnesses` is a remote agent, which is A2A already. */
+/**
+ * Whether the harness `name` of `harnesses` is a remote agent, which is A2A already.
+ * @param harnesses The engine's harnesses, each by its name.
+ * @param name The name of the harness asked.
+ */
 export const remoteIn = (harnesses: Record<string, HarnessConfig>, name: string): boolean => {
   const config = own(harnesses, name);
   return config !== undefined && isRemote(config);

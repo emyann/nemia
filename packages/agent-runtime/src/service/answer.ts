@@ -33,7 +33,10 @@ export type Answering = { id: string; answers: Record<string, string> };
 /** What an ask answered came to: when it was answered, and of which attempt. Nothing of it is journalled. */
 export type AskAnswered = { at: string; attempt: number };
 
-/** Why the harness `name` is refused an answer to an ask: it declares none, or its runner holds no call open. */
+/**
+ * Why the harness `name` is refused an answer to an ask: it declares none, or its runner holds no call open.
+ * @param name The harness's name.
+ */
 export const noCallHeld = (name: string): string =>
   `the \`${name}\` harness holds no call open for a person to answer: a question of its session's is denied where no person is there.`;
 
@@ -58,6 +61,9 @@ const ANSWER: WrittenVerb<AnswerRefused, AnswerUnsent, NonNullable<Harnessed['ru
 /**
  * `answerAsk` over the engine's journal (`read`, `go`), its runners and harnesses, and the harness a task runs on (`harnessOf`), as
  * `Engine.answerAsk` describes it.
+ * @param go Runs an effect with the engine's journal and runners provided.
+ * @param read Reads a task's journal, by its id.
+ * @param harnessOf The harness that answers for a task in a given state.
  */
 export const answerVerbOf = (
   go: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.Effect<A, E>,

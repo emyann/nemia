@@ -9,10 +9,16 @@ export class OutputRefused extends Schema.TaggedError<OutputRefused>()('OutputRe
   message: Schema.String,
 }) {}
 
-/** The words `output` refuses a `stream` that is neither with. */
+/**
+ * The words `output` refuses a `stream` that is neither with.
+ * @param stream The `stream` `output` was handed.
+ */
 export const notAStream = (stream: unknown): string => `\`${String(stream)}\` is not a stream: ask for \`stdout\` or \`stderr\`.`;
 
-/** The words `output` refuses a `lastBytes` that is no whole number above 0 with. */
+/**
+ * The words `output` refuses a `lastBytes` that is no whole number above 0 with.
+ * @param lastBytes The `lastBytes` `output` was handed.
+ */
 export const notACount = (lastBytes: unknown): string =>
   `\`lastBytes: ${String(lastBytes)}\` is not a count of bytes: give a whole number above 0, or none for the whole stream.`;
 
@@ -20,6 +26,8 @@ export const notACount = (lastBytes: unknown): string =>
  * `output` over the engine's journal and runners: refuses, in this order, a `stream` that is not `stdout` or `stderr`, a
  * `lastBytes` that is not a whole number above 0, a task the journal has no record of, and a harness without `output`. Then
  * the stream of the task's latest attempt, by the name the engine chose for it, or `undefined` before an attempt. Observes nothing.
+ * @param read Reads a task's journal, by its id.
+ * @param harnessOf The harness that answers for a task in a given state.
  */
 export const outputVerbOf = (
   read: (taskId: string) => Effect.Effect<readonly Event[], JournalError>,

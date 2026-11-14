@@ -8,6 +8,7 @@ import type { EngineShape } from './engine.ts';
 /**
  * `sweep` and `removeBody` over `go`, the engine's store: each the store's own (`JournalShape`), behind a refusal of an argument it
  * does not take. `sweep` takes nothing or `{ yes }`, a boolean; `removeBody` one body's reference.
+ * @param go Runs an effect with the engine's journal, its store, provided.
  */
 export const bodyVerbsOf = (
   go: <A, E>(e: Effect.Effect<A, E, Journal>) => Effect.Effect<A, E>,

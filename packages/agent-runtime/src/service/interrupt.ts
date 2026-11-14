@@ -27,7 +27,10 @@ export class InterruptUnsent extends Schema.TaggedError<InterruptUnsent>()('Inte
 /** What to do instead of ending a turn that cannot be ended. */
 const STOP = 'Stop the task (`ae stop`) to end its session, or leave the turn to finish.';
 
-/** Why the harness `name` is refused an interrupt: it declares none, or its runner has none. */
+/**
+ * Why the harness `name` is refused an interrupt: it declares none, or its runner has none.
+ * @param name The harness's name.
+ */
 export const notInterruptible = (name: string): string =>
   `the \`${name}\` harness cannot end a turn without ending its session: only a session on streaming input takes it. ${STOP}`;
 
@@ -49,6 +52,9 @@ const INTERRUPT: WrittenVerb<InterruptRefused, InterruptUnsent, NonNullable<Harn
 /**
  * `interrupt` over the engine's journal (`read`, `go`), its runners and harnesses, and the harness a task runs on (`harnessOf`), as
  * `Engine.interrupt` describes it.
+ * @param go Runs an effect with the engine's journal and runners provided.
+ * @param read Reads a task's journal, by its id.
+ * @param harnessOf The harness that answers for a task in a given state.
  */
 export const interruptVerbOf = (
   go: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.Effect<A, E>,

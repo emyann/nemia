@@ -16,6 +16,7 @@ const RUNNER_VERBS: readonly (readonly [Capability, keyof RunnerOps])[] = [
 /**
  * What the harness `config` declares it answers: its declaration's `can` (`declarationOf`), or, for a runner of the consumer's, which
  * has none, the verbs it has an op for — a runner is never asked a verb it cannot answer, and never refused one it can.
+ * @param config The harness as configured.
  */
 export const canOf = (config: HarnessConfig): readonly Capability[] => {
   const declared = declarationOf(config);
@@ -24,17 +25,28 @@ export const canOf = (config: HarnessConfig): readonly Capability[] => {
   return RUNNER_VERBS.filter(([, op]) => config[op] !== undefined).map(([verb]) => verb);
 };
 
-/** Each harness of `harnesses`, in the engine's order, with what it declares (`canOf`). */
+/**
+ * Each harness of `harnesses`, in the engine's order, with what it declares (`canOf`).
+ * @param harnesses The engine's harnesses, each by its name.
+ */
 export const declaredOf = (harnesses: Record<string, HarnessConfig>): HarnessDeclared[] =>
   Object.entries(harnesses).map(([name, config]) => ({ name, can: canOf(config) }));
 
-/** The harness a task that names none runs on: `defaultHarness`, else the first configured, else the runtime's default. */
+/**
+ * The harness a task that names none runs on: `defaultHarness`, else the first configured, else the runtime's default.
+ * @param harnesses The engine's harnesses, each by its name.
+ * @param defaultHarness The engine's `defaultHarness`, or undefined where it names none.
+ */
 export const fallbackOf = (harnesses: Record<string, HarnessConfig>, defaultHarness: string | undefined): string =>
   defaultHarness ?? Object.keys(harnesses)[0] ?? DEFAULT_HARNESS;
 
 /**
  * The harness `verb` goes to: the one `name`d, or with none named the default harness where it declares the verb, else the first
  * that does — or why none: a name not among `declared`, one that does not declare the verb, or none that does.
+ * @param verb The Engine verb asked.
+ * @param name The name of the harness asked, or undefined where none is named.
+ * @param declared The engine's harnesses, each with what it declares.
+ * @param fallback The default harness, asked first where none is named.
  */
 export const verbHarnessIn = (
   verb: Capability,

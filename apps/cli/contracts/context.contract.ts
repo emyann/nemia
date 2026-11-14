@@ -10,7 +10,27 @@
  * decides no law over `String.prototype.trim` (each came back unknown, out of work, at the default budget).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import { type Chosen, type ClientConfig, type Context, LOCAL_CONTEXT } from '../src/context.ts';
+import { LOCAL_CONTEXT } from '../src/local-context.ts';
+
+/** A context of the client's config: its name, the daemon's address (`http(s)://host:port`) and a person's token for it. */
+export type Context = { readonly name: string; readonly server: string; readonly token: string };
+
+/**
+ * The client's config as read: its contexts, the name of the one in use, if any, and a person's token for this machine's own daemon
+ * (`localToken`, `local-token` in the file), presented there over the store's credential (`storeCredential`, where.ts).
+ */
+export type ClientConfig = {
+  readonly contexts: readonly Context[];
+  readonly current: string | undefined;
+  readonly localToken?: string;
+};
+
+/** Which daemon a command asks: this machine's store, a remote daemon by its context, or refused for a name the file does not hold. */
+export type Chosen =
+  | { readonly kind: 'local' }
+  | { readonly kind: 'remote'; readonly name: string; readonly server: string; readonly token: string }
+  | { readonly kind: 'refused'; readonly name: string };
+
 
 /** The name a command asks for: `NEMIA_CONTEXT` where it is set and not empty, else the file's own. */
 const named = (config: ClientConfig, asked: string | undefined): string | undefined =>

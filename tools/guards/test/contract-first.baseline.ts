@@ -11,8 +11,6 @@ export const READS_ITS_CODE: readonly string[] = [
   'apps/api/contracts/bind.contract.ts',
   'apps/api/contracts/token-need.contract.ts',
   'apps/api/contracts/write-guard.contract.ts',
-  'apps/cli/contracts/context.contract.ts',
-  'apps/cli/contracts/route.contract.ts',
   'packages/agent-orchestrator/contracts/adopt.contract.ts',
   'packages/agent-orchestrator/contracts/budget.contract.ts',
   'packages/agent-orchestrator/contracts/clone-target.contract.ts',

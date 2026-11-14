@@ -4,11 +4,34 @@
  * verbs and the pass that write that file ask this function first (`pause/pause.store.ts`): the laws below say every answer it gives,
  * so the result is open nowhere, and the store's own test walks each pair of a mode and an event against the file.
  *
+ * The machine's words are declared here and taken by the code, so this file reads nothing of `src` and stands before the code does.
+ *
  * The laws are a person's: a store paused is not paused again, a pause is lifted by a resume or by its holder's end and by nothing else,
  * and a cut is never given its time back.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { PauseEvent, PauseMode, PauseMove } from '../src/pause-machine/pause-machine.ts';
+
+/**
+ * What a store's pause gives the sessions at work: `none` where no pause stands; `holding`, a pause with no timeout, under which each
+ * runs on to its end (a take-over's own); `draining`, a pause with a timeout, under which each stops when its tool call ends and is cut
+ * once the timeout passes; `cut`, a timeout of 0, under which each call is cut at once. Under each of the three nothing new starts.
+ */
+export type PauseMode = 'none' | 'holding' | 'draining' | 'cut';
+
+/**
+ * What moves a store's pause: a pause put with no timeout (`put`), with one (`put-timeout`) or at once (`put-now`); the timeout of the
+ * pause that stands cut to 0 (`cut`); a person's resume (`resume`); and the end of the process that holds the pause (`lapse`).
+ */
+export type PauseEvent = 'put' | 'put-timeout' | 'put-now' | 'cut' | 'resume' | 'lapse';
+
+/** How a move is refused: a pause that stands in the way (`Conflict`), or none to act on (`Missing`). */
+export type PauseRefusal = 'Conflict' | 'Missing';
+
+/** What an event does to a store in a mode: moves it to another, leaves it as it stands, or is refused. */
+export type PauseMove =
+  | { readonly kind: 'edge'; readonly to: PauseMode }
+  | { readonly kind: 'stays' }
+  | { readonly kind: 'refused'; readonly as: PauseRefusal };
 
 /** The events that put a pause, each naming what the pause gives a call in flight. */
 const puts = (event: PauseEvent): boolean => event === 'put' || event === 'put-timeout' || event === 'put-now';

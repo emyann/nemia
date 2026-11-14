@@ -10,7 +10,7 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { TokenNeed } from 'agent-orchestrator';
-import { MCP_PATH, PAIR_PATH } from '../src/caller/caller.ts';
+import { MCP_PATH, PAIR_PATH } from '../src/caller/paths.ts';
 
 /** Whether `path` is `root` or a path under it. */
 const under = (path: string, root: string): boolean => path === root || path.startsWith(root + '/');

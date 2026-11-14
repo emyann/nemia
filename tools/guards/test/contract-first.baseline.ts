@@ -7,10 +7,6 @@
  * contract off here in the same commit. A contract is never added.
  */
 export const READS_ITS_CODE: readonly string[] = [
-  'apps/api/contracts/answer-fit.contract.ts',
-  'apps/api/contracts/bind.contract.ts',
-  'apps/api/contracts/token-need.contract.ts',
-  'apps/api/contracts/write-guard.contract.ts',
   'packages/agent-orchestrator/contracts/adopt.contract.ts',
   'packages/agent-orchestrator/contracts/budget.contract.ts',
   'packages/agent-orchestrator/contracts/clone-target.contract.ts',

@@ -8,15 +8,10 @@
 import type { AnswerFitOf } from '../../contracts/answer-fit.contract.ts';
 
 export type { AnswerFit } from '../../contracts/answer-fit.contract.ts';
+export { PAGE_MOST } from './page.ts';
 
 /** The most characters an answer of the port holds: under the 50,000 past which a host saves a result to a file, with margin. */
 export const ANSWER_BOUND = 40_000;
-
-/**
- * The longest page the port judges (`answerFit` is asked of a page no longer, the port taking a longer one as this): within it, half a
- * page is a whole number the verifier proves exact.
- */
-export const PAGE_MOST = 1_000_000;
 
 /** The page a list tool asks for where its call gives no `limit`. */
 export const PORT_PAGE = 20;

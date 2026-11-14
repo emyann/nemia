@@ -162,6 +162,7 @@ erDiagram
     TryCause cause
     string model "optional"
     enum paused "optional"
+    enum retried "optional"
     number budget "optional"
   }
   Round {

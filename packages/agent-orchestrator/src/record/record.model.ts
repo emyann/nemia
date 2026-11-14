@@ -58,6 +58,7 @@ export const Try = Schema.Struct({
   cause: TryCause,
   model: Schema.optional(Schema.String),
   paused: Schema.optional(Schema.Literal(true)),
+  retried: Schema.optional(Schema.Literal(true)),
   budget: Schema.optional(Schema.Number),
 }).annotate({ identifier: 'Try' });
 export type Try = typeof Try.Type;

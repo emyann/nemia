@@ -60,9 +60,10 @@ export const EMPTY_VIEW = {
   signedOff: (): Closeout | undefined => undefined,
   asked: () => false as const,
   verdictOf: () => undefined,
+  checkKillOf: () => undefined,
   sessionBlocked: () => false,
   spendOf: () => undefined,
-} satisfies Pick<AssessRead, 'phaseOf' | 'signedOff' | 'asked' | 'verdictOf' | 'sessionBlocked' | 'spendOf'>;
+} satisfies Pick<AssessRead, 'phaseOf' | 'signedOff' | 'asked' | 'verdictOf' | 'checkKillOf' | 'sessionBlocked' | 'spendOf'>;
 
 /** The engine's phase of each task id, `unknown` for one it does not hold. */
 export const phases = (m: Record<string, TaskPhase>) => (id: string) => m[id] ?? 'unknown';

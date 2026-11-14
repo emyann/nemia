@@ -54,6 +54,7 @@ const EarlierTrySchema = Kept({
   model: Schema.optional(Schema.String),
   budget: Schema.optional(Schema.Finite),
   paused: Schema.optional(Schema.Literal(true)),
+  retried: Schema.optional(Schema.Literal(true)),
 });
 
 const Aborted = { aborted: Schema.String, refusedOn: Schema.optional(Schema.String) };

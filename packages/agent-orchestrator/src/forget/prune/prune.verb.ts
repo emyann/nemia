@@ -261,7 +261,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
   const git = yield* standingLive([run]);
   const placed = yield* PlaceService;
   const { read } = yield* readAndAdopt(e, run, { steps, unrecorded: true });
-  const { phaseOf, signedOff: reader, asked, verdictOf, asks, roundAsks: rounds, spendOf } = read;
+  const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, asks, roundAsks: rounds, spendOf } = read;
   const askAt = (a: AskName) => runsAtOnce(home).asks.where(run.id, a);
   const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
   const checkout = statusMemo(headsOver(git), placed);
@@ -284,6 +284,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
       'prune',
       merging(run, steps, checkout),
       pruneAgain(run.id, flags),
+      checkKillOf,
     ),
     owed: handOffOwed(steps, run, phaseOf),
   };

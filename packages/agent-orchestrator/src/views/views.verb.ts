@@ -39,6 +39,7 @@ import { continuesFrom } from '../retry/index.ts';
 import { verbOf } from '../engine-verbs/engine-verbs.verb.ts';
 import { blockedWord, currentTurn, killedMemoryOf, phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
 import { outOfMemory } from '../out-of-memory/out-of-memory.ts';
+import type { CheckKillOf } from '../retry/index.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { ranOnWords, sessionRanOn } from '../release/index.ts';
@@ -378,6 +379,18 @@ export const exitVerdicts =
   };
 
 /**
+ * What the kernel's OOM killer did to each step's current check, and whose memory ran out (`outOfMemory` over `killedMemoryOf`), off the
+ * check's view on every pass: undefined where it killed nothing of it, or the step has no check. Read by `retriesDue`, which runs a check
+ * the machine killed again (`CheckKillOf`).
+ */
+export const checkKills =
+  (views: ReadonlyMap<string, TaskView>, run: Run): CheckKillOf =>
+  (step) => {
+    const taskId = run.steps[step]?.check?.taskId;
+    return taskId ? outOfMemory(killedMemoryOf(views.get(taskId)), undefined) : undefined;
+  };
+
+/**
  * The harness's own id for the session a try after the task continues — what `--resume` takes: its last session's, or, where the harness
  * never named that one, the session it was started to continue (`continuesFrom`).
  */
@@ -644,6 +657,7 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
     signedOff: closeoutReader(views, record, steps),
     asked: closeoutAsked(views),
     verdictOf: exitVerdicts(views, record),
+    checkKillOf: checkKills(views, record),
     sessionBlocked: harnessBlocked(views),
     spendOf: spendReader(views),
     asks,

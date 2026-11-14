@@ -57,10 +57,10 @@ const adoptChecks = Effect.fnUntraced(function* (e: Engine, read: RunRead) {
  * try behind it was filed on.
  */
 const adoptTries = Effect.fnUntraced(function* (e: Engine, read: RunRead) {
-  const { run, steps, views, phaseOf, signedOff: closeoutOf, asked, verdictOf, asks, spendOf } = read;
+  const { run, steps, views, phaseOf, signedOff: closeoutOf, asked, verdictOf, checkKillOf, asks, spendOf } = read;
   const adopted: string[] = [];
   const pins = { run, reads: { steps } };
-  for (const r of retriesDue(steps, run, phaseOf, closeoutOf, asked, verdictOf, asks, () => false, spendOf)) {
+  for (const r of retriesDue(steps, run, phaseOf, closeoutOf, asked, verdictOf, asks, () => false, spendOf, checkKillOf)) {
     const held = run.steps[r.step];
     const current = held?.taskId;
     const step = steps.find((s) => s.name === r.step);

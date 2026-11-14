@@ -18,7 +18,15 @@ import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.t
 import { stepsOf } from '../steps/steps.verb.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
+import {
+  checkKills,
+  closeoutAsked,
+  closeoutReader,
+  exitVerdicts,
+  harnessBlocked,
+  spendReader,
+  taskPhasesRead,
+} from '../views/views.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { landingDenies } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
@@ -83,6 +91,7 @@ export const retryRun = Effect.fn('retry')(function* (
       asks,
       blocked,
       spendOf,
+      checkKills(views, run),
     );
 
   const refused = refusal((yield* (yield* RunDoor).asks.read(RunId.read(id))).asks);

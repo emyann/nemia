@@ -166,12 +166,12 @@ const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: str
   if (!steps) {
     const { views } = yield* taskPhasesRead(run).pipe(over(e));
     const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
-    const { phaseOf, signedOff: reader, asked, verdictOf, spendOf } = readersOf(views, run, []);
-    return { run, steps, unfrozen, views, phaseOf, asks, rounds, reader, asked, verdictOf, spendOf };
+    const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, spendOf } = readersOf(views, run, []);
+    return { run, steps, unfrozen, views, phaseOf, asks, rounds, reader, asked, verdictOf, checkKillOf, spendOf };
   }
   const { read } = yield* readAndAdopt(e, run, { steps, unrecorded: true });
-  const { views, phaseOf, signedOff: reader, asked, verdictOf, spendOf, asks, roundAsks: rounds } = read;
-  return { run, steps, unfrozen, views, phaseOf, asks, rounds, reader, asked, verdictOf, spendOf };
+  const { views, phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, spendOf, asks, roundAsks: rounds } = read;
+  return { run, steps, unfrozen, views, phaseOf, asks, rounds, reader, asked, verdictOf, checkKillOf, spendOf };
 });
 
 /** The ids of the engine's tasks `nemia rm` forgets of `run` as `readForgetting` adopts it: each task it names (`runTasks`), once. */
@@ -216,7 +216,7 @@ function refusalOf(home: string, id: string, f: Forgetting, git: BranchReader, p
     .runs.list()
     .filter((o) => o.id !== id);
   const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
-  const { phaseOf, reader, asked, verdictOf, asks, rounds, spendOf } = f;
+  const { phaseOf, reader, asked, verdictOf, checkKillOf, asks, rounds, spendOf } = f;
   return forgetRefusal(
     steps,
     run,
@@ -232,6 +232,8 @@ function refusalOf(home: string, id: string, f: Forgetting, git: BranchReader, p
     standings,
     'rm',
     merging(run, steps, statusMemo(headsOver(git), place)),
+    `nemia rm ${run.id}`,
+    checkKillOf,
   );
 }
 

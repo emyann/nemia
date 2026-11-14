@@ -11,11 +11,16 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   never a cast or a default the contract does not give. A dictionary read stays a plain read, its `undefined` handled, with no
   `Object.hasOwn` guard put in front of it: that changes what a prototype key reads. The tests' own `test/tsconfig.json` leaves the
   flag off.
-- **The one surface at a glance needs no daemon and no token**: `npm run api:page` serves the reference page alone on this machine's
-  loopback (`bin/page.ts` over `src/openapi/browse.ts`, port 8790, `PORT` moves it), each operation a command links named `nemia <command>` with its MCP
-  tool, who answers for it when an agent calls it, and its help; `npm run api` prints the same table in a terminal — command, tool,
-  endpoint, what it takes and answers — and `npm run api -- <group>` one group (`src/openapi/overview.ts`). Both read the command
-  table (`COMMAND_WORDS`) and the document, never a store; `node apps/api/src/openapi/print.ts` prints the whole document.
+- **The one surface is browsed, and tried, from a page a person starts**: `npm run api:page [-- <url>]` serves the reference page alone
+  on this machine's loopback (`bin/page.ts` over `src/openapi/browse.ts`, port 8790, `PORT` moves it), each operation a command links
+  named `nemia <command>` with its MCP tool, who answers for it when an agent calls it, and its help. Its request client is on, where
+  the api's own page keeps it off: a request tried on the page is sent to the page (`REFERENCE_PROXY_PATH`), which forwards it to the
+  address set on the page under Server — the api at `<url>` to begin with, this machine's daemon where none is given — with the token
+  typed under Authentication — selected for every request, and kept by the browser for that page, so it is typed once — and no other
+  header of the browser's, and says each one on a line of its terminal with its status, time
+  and size. Only the page itself may ask (`sec-fetch-site`, `origin`): a request another site's page sends is refused. Browsing needs no daemon and no token; a request needs the api and a
+  token of its store. `npm run api` prints the table in a terminal — command, tool, endpoint, what it takes and answers — and
+  `npm run api -- <group>` one group (`src/openapi/overview.ts`); `node apps/api/src/openapi/print.ts` prints the whole document.
 - **The OpenAPI document has a page to browse it beside it**: `GET /openapi` (`src/openapi/reference.ts`) is Scalar's reference, drawn
   in the browser from the document at `OPENAPI_PATH`, never a copy, so a route the document gains shows there with nothing to change.
   The page reaches no host but the api: its script is the installed `@scalar/api-reference` bundle, read by `app.ts` and served at `/openapi/scalar.js`

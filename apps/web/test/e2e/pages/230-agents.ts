@@ -148,6 +148,7 @@ export default {
       );
       await back.click();
       await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
+      await idle(page);
     } finally {
       takeBack();
     }

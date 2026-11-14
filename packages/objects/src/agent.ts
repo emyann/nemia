@@ -17,6 +17,9 @@ const Text = Schema.NullOr(Schema.String);
 /** Where an agent of a step is, by the place a start reads it from. */
 const AgentPlace = Schema.Literals(['repo', 'yours']);
 
+/** Where a step an agent fills is read from: either place an agent is, or the tree of a factory made from a template (`factory`). */
+const FillPlace = Schema.Literals(['factory', 'repo', 'yours']);
+
 /**
  * An agent as its file says it: `role:`, `description:`, its harness keys (`keys`, each line as written), `skills:` and `mcp:` as their
  * lines write them, `harnessPrompt:`, the schema its `output:` names (its file and text) and its instructions (`instructions`, the body).
@@ -35,7 +38,7 @@ export type AgentSpec = typeof AgentSpec.Type;
 
 /** A step that names the agent (`usedBy`), and one it fills in the factory, hired or by its own `agent:` line (`fills`). */
 export const AgentUser = Schema.Struct({ from: AgentPlace, workflow: Schema.String, step: Schema.String });
-export const AgentFill = Schema.Struct({ from: AgentPlace, workflow: Schema.String, step: Schema.String, hired: Schema.Boolean });
+export const AgentFill = Schema.Struct({ from: FillPlace, workflow: Schema.String, step: Schema.String, hired: Schema.Boolean });
 
 /**
  * A skill the agent gives, as its line names it: the origin a start finds it in (null where none, `foundIn` then the folder the repository

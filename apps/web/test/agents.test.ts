@@ -54,6 +54,7 @@ const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   source: '',
   version: 'v1',
   usedBy: [],
+  fills: [],
   error: null,
   untried: null,
   ...fields,

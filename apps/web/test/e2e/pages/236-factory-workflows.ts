@@ -13,8 +13,11 @@ const { good, yours } = WORKFLOWS;
 const TREED = 'treed';
 /** The template it is made from, as `nemia factory apply` writes it into its file. */
 const TEMPLATE = { source: '/drafts/team', version: '0.1.0', params: {} };
-/** The workflow only its tree has, of one step, whose agent is the tree's own. */
-const OWN = { name: 'tree-only', step: 'only' };
+/**
+ * The workflow only its tree has: a step whose agent is the tree's own, by its `agent:` line, and a step that names none, which the
+ * factory's wiring hires the tree's own agent into.
+ */
+const OWN = { name: 'tree-only', step: 'only', hired: 'hired' };
 /** What its tree's `dev` says of itself, which the checkout's does not, and its one step, which the checkout's lacks. */
 const SHADOW = { description: "The tree's own dev, which shadows the checkout's.", step: 'draft' };
 
@@ -42,11 +45,12 @@ function written(): () => void {
   };
   put(
     path.join(folder, 'tree', 'factory.json'),
-    `${JSON.stringify({ workflows: [good.name, OWN.name, yours.name], hires: { [`${yours.name}/${yours.steps[0]}`]: AGENTS.seeded.name } }, null, 2)}\n`,
+    `${JSON.stringify({ workflows: [good.name, OWN.name, yours.name], hires: { [`${yours.name}/${yours.steps[0]}`]: AGENTS.seeded.name, [`${OWN.name}/${OWN.hired}`]: TREE_AGENT.name } }, null, 2)}\n`,
   );
   put(path.join(workflows, good.name, 'README.md'), `${SHADOW.description}\n`);
   put(path.join(workflows, good.name, `${SHADOW.step}.md`), stepFile('Draft it.'));
   put(path.join(workflows, OWN.name, `${OWN.step}.md`), `---\nagent: ${TREE_AGENT.name}\nplace: git\n---\nDo the one thing.\n`);
+  put(path.join(workflows, OWN.name, `${OWN.hired}.md`), '---\nplace: git\n---\nDo the hired thing.\n');
   put(
     path.join(workflows, 'agents', `${TREE_AGENT.name}.md`),
     `---\nharness: claude\nmodel: sonnet\nskills: [${TREE_SKILL.name}]\n---\n${TREE_AGENT.body}\n`,
@@ -187,6 +191,17 @@ export default {
         `the tree's own ${TREE_AGENT.name} opens on its page in ${TREED} and says a factory's own agent changes the factory's way`,
       );
       await expectCount(agentPage.getByRole('button', { name: /^(Save|Remove…?)$/ }), 0, 'and offers no Save and no Remove');
+      await expectCount(
+        agentPage.locator(`[data-used-by] a[data-node="${OWN.name}/${OWN.step}"]`),
+        1,
+        `and it names the step of its tree it fills in ${TREED}, once`,
+      );
+      const hired = agentPage.locator(`[data-used-by] a[data-node="${OWN.name}/${OWN.hired}"]`);
+      await expectCount(hired, 1, `and the step of its tree ${TREED} hires it into, which no step's own line names`);
+      await expectVisible(
+        agentPage.locator(`[data-used-by] a[href="/workflows/factory/${OWN.name}/${OWN.hired}?factory=${TREED}"]`),
+        `linked to its page in ${TREED}`,
+      );
       await expectVisible(
         agentPage.locator(`[data-given-skill="${TREE_SKILL.name}"] [data-skill-from="factory"]`),
         `its ${TREE_SKILL.name} is found in its tree, as a start in ${TREED} finds it, and said to be the factory's`,

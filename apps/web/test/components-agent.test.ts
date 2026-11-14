@@ -41,6 +41,7 @@ test("an agent's form shows its card read-only, generated from its skills: an en
     source: '',
     version: 'v1',
     usedBy: [],
+    fills: [],
     error: null,
     untried: null,
     cardError: null,
@@ -157,6 +158,7 @@ const composing = {
   source: '',
   version: 'v1',
   usedBy: [],
+  fills: [],
   error: null,
   untried: null,
   cardError: null,
@@ -561,6 +563,7 @@ const character = {
   mcp: null,
   card: [{ id: 'grilling', name: 'Grilling', description: 'Asks until the plan holds.', tags: ['interview'] }],
   usedBy: [{ from: 'repo', workflow: 'intake', step: 'ask' }],
+  fills: [],
 };
 
 const agentCard = async (agent: Record<string, unknown>) => {
@@ -669,6 +672,12 @@ test("a link to a repository's agent, or to a node of a repository's workflow, k
       { from: 'repo' as const, workflow: 'dev', step: 'implement' },
       { from: 'yours' as const, workflow: 'mine', step: 'plan' },
     ],
+    fills: [
+      { from: 'factory' as const, workflow: 'dev', step: 'implement', hired: false },
+      { from: 'factory' as const, workflow: 'build', step: 'review', hired: true },
+      { from: 'factory' as const, workflow: 'build', step: 'review', hired: false },
+      { from: 'yours' as const, workflow: 'mine', step: 'ship', hired: true },
+    ],
   };
   const html = renderToStaticMarkup(
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
@@ -676,4 +685,15 @@ test("a link to a repository's agent, or to a node of a repository's workflow, k
   );
   assert.match(html, /href="\/workflows\/repo\/dev\/implement\?factory=treed"/, "a repository's node, in the page's factory");
   assert.match(html, /href="\/workflows\/yours\/mine\/plan"/, 'a node of yours, with none');
+  assert.match(html, /href="\/workflows\/yours\/mine\/ship\?factory=treed"/, 'a step of yours the factory hires it into, in that factory');
+  assert.equal(
+    html.match(/href="\/workflows\/factory\/build\/review\?factory=treed"/g)?.length,
+    1,
+    'a step the factory fills, in its factory, once',
+  );
+  assert.equal(
+    html.match(/data-node="dev\/implement"/g)?.length,
+    1,
+    'a step both named and filled, once, whichever origin each reads it from',
+  );
 });

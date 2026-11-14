@@ -54,12 +54,16 @@ const ROLE_KEYS: readonly AgentRoleKey[] = [
 /** A node that names an agent: the step of a workflow in the agent's own place. */
 export type AgentUser = { from: Extract<DefinitionOrigin, 'repo' | 'yours'>; workflow: string; step: string };
 
+/** A step an agent fills, hired or named by its own `agent:` line: read from either place, or from a factory's own tree (`factory`). */
+export type AgentFill = { from: Extract<DefinitionOrigin, 'factory' | 'repo' | 'yours'>; workflow: string; step: string; hired: boolean };
+
 /**
  * An agent as the board reads it, off its Agent object: its keys as its file writes them, its instructions, the result schema its
  * `output:` names, what it says it can do — its card's skills, generated from the skills it gives (one entry each, read off each SKILL.md,
  * or one made from its description when it gives none), null with `cardError` saying why where none can be made — the skills its sessions
  * are given and its harness prompt as its lines write them (null for none), its file as written, the version a write carries, the nodes
- * that name it, and the parser's refusal of a file that does not read. `from` is where it is read from (`status.origin`).
+ * that name it, the steps it fills in the factory read, and the parser's refusal of a file that does not read. `from` is where it is
+ * read from (`status.origin`).
  */
 export type AgentListing = {
   name: string;
@@ -87,6 +91,7 @@ export type AgentListing = {
   /** What its file held when it was read (its `metadata.resourceVersion`): a write carries it back. */
   version: string;
   usedBy: AgentUser[];
+  fills: AgentFill[];
   error: string | null;
   /**
    * Why it cannot be tried from the board — the repository's, a name a try's folder cannot take, a harness the try's Claude Code fence does
@@ -125,6 +130,7 @@ export const agentViewOf = (agent: Agent): LibraryAgent => {
     source: status.source,
     version: agent.metadata.resourceVersion,
     usedBy: status.usedBy.map((u) => ({ ...u })),
+    fills: status.fills.map((f) => ({ ...f })),
     error: status.error,
     untried: status.untried ? { ...status.untried } : null,
     factories: [...status.factories],

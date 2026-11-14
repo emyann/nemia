@@ -217,7 +217,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   Nemia with this repository's words taken out, under its own semver recorded in `released.json`, and the tests that hold it
   (`packages/templates/CLAUDE.md`). The nemia factory runs on it; its overlays (pictures, this repository's fences, checks and
   skills) live in the factory's own tree, out of git. sdlc's `agents/`: Iris (product engineer), Seldon (software architect), Grace
-  (lead software engineer, who builds a wide card through subagents and fills implement in `build` and `quick`), Agora (code
+  (lead software engineer, who builds a card herself in one session and fills implement in `build` and `quick`), Agora (code
   reviewer), Otto (release engineer), Argus (janitor). And four workflows: `intake` (an idea to an intent), `build` (an intent to main,
   started `--after` the intake run), `quick` (a card that settles its change, whatever its size, to main: implement, then a review whose
   pass files an ungated land, as `packages/templates/sdlc/workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox

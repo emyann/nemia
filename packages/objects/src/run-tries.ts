@@ -187,7 +187,7 @@ export const StepTry = Schema.Struct({
     description:
       'What a person said to this try when they asked for it (nemia retry --message); null for a try nobody answered, and for every first try.',
   }),
-  answeredBy: Schema.optionalKey(Actor.annotate({ description: 'Who gave that answer, where it was recorded.' })),
+  answeredBy: Schema.optionalKey(Actor),
 })
   .check(STEP_CODES)
   .annotate({ identifier: 'StepTry' });

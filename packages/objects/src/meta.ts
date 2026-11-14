@@ -35,7 +35,9 @@ export const DEFAULT_NAMESPACE = 'default';
 export const ObjectMeta = Schema.Struct({
   name: Schema.String.annotate({ description: 'Its name, unique in its namespace for its kind.' }),
   namespace: Schema.optionalKey(
-    Schema.String.annotate({ description: 'The namespace it is in; absent for the default one, or for a kind that has none.' }),
+    Schema.String.annotate({
+      description: 'The namespace it is in, default where nobody gave one; absent for a kind no namespace holds (cluster-scoped).',
+    }),
   ),
   labels: Schema.optionalKey(
     Schema.Record(Schema.String, Schema.String).annotate({

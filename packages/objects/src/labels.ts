@@ -28,7 +28,11 @@ export type LabelEdit = typeof LabelEdit.Type;
 export const Labelled = Schema.Struct({
   kind: Schema.Literals(['Run', 'Card']).annotate({ description: 'What was labelled: a run or a card.' }),
   name: Schema.String.annotate({ description: "Its name: the run's id or the card's name." }),
-  labels: Labels.annotate({ description: 'Its person labels after the edit.' }),
-  was: Labels.annotate({ description: 'Its person labels before the edit.' }),
-}).annotate({ identifier: 'Labelled' });
+  labels: Labels,
+  was: Labels,
+}).annotate({
+  identifier: 'Labelled',
+  description:
+    'What an edit of labels did: the run or the card, by its name, and its person labels after the edit (labels) and before it (was).',
+});
 export type Labelled = typeof Labelled.Type;

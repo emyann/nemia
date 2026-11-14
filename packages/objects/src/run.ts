@@ -1,7 +1,8 @@
 /**
  * The run as one object, as Kubernetes spells a resource: `apiVersion`, `kind`, `metadata`, the frozen record a run was started with
- * (`spec`) and what the orchestrator judges of it now (`status`); its sub-resources' answers, each a Schema of its own (`StepTries`,
- * `StepTry`, `TryCloseout`, `StepTold`); and a person's labels on a run or a card, with an edit of them and what it answers (`Labels`,
+ * (`spec`) and what the orchestrator judges of it now (`status`). Its sub-resources' answers are each a Schema of its own beside it: a
+ * step's tries and closeouts in `run-tries.ts` (`StepTries`, `StepTry`, `TryCloseout`), what a step was told in `run-told.ts`
+ * (`StepTold`); and a person's labels on a run or a card, with an edit of them and what it answers, in `labels.ts` (`Labels`,
  * `LabelEdit`, `Labelled`). The orchestrator builds each from a run's records and holds its own types equal to them
  * (`packages/agent-orchestrator/src/object/run.model.ts`); the words each field is one of are `words.ts`'s.
  *

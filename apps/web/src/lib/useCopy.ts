@@ -9,6 +9,8 @@ export type CopySaid = 'copy' | 'copied' | 'failed';
 /**
  * Copies `text` to the clipboard and tells `say` what came of it — `copied`, or `failed` where the clipboard refused it or the page has
  * none, as outside a secure context — then `copy` again `COPY_REST_MS` later. Returns what stops it: nothing is said after that.
+ * @param text The text to copy.
+ * @param say Told what the control says, each time that changes.
  */
 export function copyAndSay(text: string, say: (said: CopySaid) => void): () => void {
   let stopped = false;
@@ -32,6 +34,7 @@ export function copyAndSay(text: string, say: (said: CopySaid) => void): () => v
 /**
  * The board's one copy control's state: `copy` copies `text`, and `said` says so for `COPY_REST_MS` — or that it could not, so a person
  * selects it instead — then rests. A second press starts the moment again; leaving the page stops it.
+ * @param text The text the control copies.
  */
 export function useCopy(text: string): { said: CopySaid; copy: () => void } {
   const [said, setSaid] = useState<CopySaid>('copy');

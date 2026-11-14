@@ -24,6 +24,7 @@ import type { StepView } from './runView';
  * turn before it under the same id, as a task held open and answered is, whose answer waits for a slot with no attempt on its turn yet.
  * Null for a step not filed, and for one filed whose session has not started — waiting for a slot, or a task the engine has no record
  * of — which has none to read. `tries` are the step's, each with its own turn's attempts.
+ * @param step The step: its task's id, its attempts, and its tries, each with its task's id and its attempts.
  */
 export const sessionToRead = (
   step: Pick<StepView, 'taskId' | 'attempts'> & { tries: readonly Pick<StepTry, 'taskId' | 'attempts'>[] },
@@ -80,6 +81,8 @@ const keyOf = (event: TranscriptEvent) => `${event.kind}:${event.id}`;
  *
  * The stream sends an event again when a reader reconnects partway through a read, and the engine reads a transcript
  * that was replaced from its start; either way each event is kept once.
+ * @param known The events already read.
+ * @param incoming The events the stream sent since.
  */
 export function mergeEvents(known: readonly TranscriptEvent[], incoming: readonly TranscriptEvent[]): TranscriptEvent[] {
   const merged = [...known];
@@ -100,6 +103,7 @@ export function mergeEvents(known: readonly TranscriptEvent[], incoming: readonl
 /**
  * The events as turns, by the rules the file's head gives. A result whose call is not in what was read — a transcript cut short at its
  * start — is still shown, as a call of an unknown tool; a `text` event that says nothing is no pause between calls.
+ * @param events The transcript's events, in order.
  */
 export function foldTranscript(events: readonly TranscriptEvent[]): Turn[] {
   const turns: Turn[] = [];
@@ -164,6 +168,7 @@ export function foldTranscript(events: readonly TranscriptEvent[]): Turn[] {
  * has been. A call in the tail with no result may still be answered while the session is live: Claude Code writes a batch of
  * parallel calls a line each, and their results after all of them, so every call of a batch waits at once. Before the tail,
  * the session has moved on, and a call with no result had none.
+ * @param turns The conversation's turns, in order.
  */
 export function tailStart(turns: readonly Turn[]): number {
   for (let i = turns.length - 1; i >= 0; i--) {
@@ -219,6 +224,8 @@ const firstAfter = (events: readonly TranscriptEvent[], said: Said): number => {
  * event's the session's: a line before the mark was there before the words, whenever it is stamped. Matched in the order said, each thing
  * said to one event at most: words said twice are two arrivals. Words the transcript does not show — queued behind a prompt nobody answers,
  * or set aside — have none, and every other line stays the session's. Nothing said leaves the events as they were.
+ * @param events The session's transcript events, in order.
+ * @param said What was said to the session, off the engine's journal of the step's task.
  */
 export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[]): { events: TranscriptEvent[]; said: Heard[] } {
   const taken = new Set<number>();
@@ -240,6 +247,8 @@ export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[
  * shows that, and otherwise when they were said — before the first turn that came after, and after a fold that began before, since a fold
  * is one line. Words after everything the transcript has are last. Nothing said leaves the turns as they were. Placed by time, since a turn
  * holds no mark to stand after: an arrival by the session's own clock, as its turns are, and only words not seen yet by the api's.
+ * @param turns The conversation's turns, in order.
+ * @param said What was said to the session, each with when it reached it where `heardIn` found that, null or absent where not.
  */
 export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { arrived?: string | null }>): Turn[] {
   const placed = (s: { at: string; arrived?: string | null }) => Date.parse(s.arrived ?? s.at);
@@ -295,6 +304,7 @@ const inputOf = (call: ToolCall): Record<string, unknown> =>
 /**
  * The one thing a call was about, for its line — a command, a file, a pattern, an address — on one line. Null when its input names none. A
  * command Codex gives as its argv, `['/bin/bash', '-lc', 'npm test']`, is its last word.
+ * @param call The tool call.
  */
 export function detailOf(call: ToolCall): string | null {
   const input = inputOf(call);
@@ -314,12 +324,15 @@ const SUMMARY_MAX = 120;
 /**
  * A summary's one line as the board draws it, as text: a markdown heading's marks dropped, since a closeout given before v1 opens its
  * summary with its body's first line, often a heading, which its body draws as one beneath it.
+ * @param summary The summary's line.
  */
 export const summaryShown = (summary: string): string => summary.replace(/^#{1,6}\s+/, '');
 
 /**
  * Whether `body` opens with `summary`: its first non-empty line, a heading's marks dropped, begins with the summary as drawn, a cut one
  * up to its ellipsis. A reader that draws the body whole then draws no summary line above it, which would say the line twice.
+ * @param summary The closeout's summary.
+ * @param body The closeout's body, or null where it has none.
  */
 export function bodyLeadsWith(summary: string, body: string | null): boolean {
   if (!body) return false;
@@ -337,6 +350,7 @@ export function bodyLeadsWith(summary: string, body: string | null): boolean {
 /**
  * A summary as every reader shows it: its first non-empty line, trimmed, and when that is longer than `SUMMARY_MAX` it is cut at the
  * last space that leaves room for an ellipsis, or hard where it has none, and ends `…`.
+ * @param text The summary as given.
  */
 export function summaryLine(text: string): string {
   const line =
@@ -364,6 +378,10 @@ type Closeout = {
   values: Array<{ name: string; value: string }>;
 };
 
+/**
+ * The closeout a call gives (`Closeout`), or null where its input is no closeout.
+ * @param call The tool call that gives the closeout.
+ */
 export function closeoutOf(call: ToolCall): Closeout | null {
   const input = inputOf(call);
   if (typeof input.outcome !== 'string' || typeof input.summary !== 'string') return null;

@@ -95,6 +95,9 @@ const workOf = (key: string, turns: readonly FoldedTurn[], running: boolean): Co
  * `live` is whether the session may still add to it: a call with no result in the conversation's tail (`tailStart`) may still be answered
  * while it is, since a batch of parallel calls is answered after all of it, and had no answer once it is not. Pure: a node test proves the
  * whole mapping without a browser.
+ * @param turns The session's transcript, folded into turns (`lib/transcript.ts`).
+ * @param who The name drawn on the session's own words.
+ * @param live Whether the session may still add to it.
  */
 export function sessionItems(turns: readonly Turn[], who: string, live: boolean): ConversationItem<SessionOwn>[] {
   const tail = tailStart(turns);

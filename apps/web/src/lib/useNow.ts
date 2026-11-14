@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
  * For a clock on the page that has to move between refetches: a refetch that brings back the same
  * run re-renders nothing. It is read again at once when `everyMs` changes, so the first render at a new
  * pace shows no time older than that pace.
+ * @param everyMs How often the time is read again, in milliseconds.
  */
 export function useNow(everyMs: number): number {
   const [now, setNow] = useState(Date.now);

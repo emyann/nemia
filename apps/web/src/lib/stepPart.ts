@@ -121,6 +121,9 @@ const KIND_OF: Record<Exclude<StepPhase, 'pending' | 'stopped'>, StepKind> = {
  * A step's kind, by its phase (`KIND_OF`): at work while it or its check runs, at a gate while it waits on a person, done, failed, and
  * for a step to come or stopped, done where a session of it ran, else to come. A step a person's hold of the run stops (`held`) asks
  * nothing of anyone while the hold stands: no gate, as a step to come.
+ * @param phase The step's phase.
+ * @param state The step's state as the board draws it (`stepState`).
+ * @param ran Whether a session of the step ran: a try of it has a task.
  */
 export function kindOf(phase: StepPhase, state: StepState, ran: boolean): StepKind {
   if (phase === 'pending' || phase === 'stopped' || state === 'held') return ran ? 'done' : 'come';
@@ -338,6 +341,9 @@ type PartAsks = {
  * What the step asks of a person while its state waits on one, or the run says it waits on one for it (`waitedOn`, a check failed
  * among them), and what it waits for whatever its state; none where it asks nothing. A step that waits on a person asks even where none
  * of the five says what (a check failed, a loop out of rounds, a budget past): its part answers it there (`offersOf`).
+ * @param step The step, as the run's view has it.
+ * @param state The step's state as the board draws it (`stepState`).
+ * @param waitedOn Whether the run says it waits on a person for this step.
  */
 export function asksOf(step: StepView, state: StepState, waitedOn: boolean): PartAsks | None {
   const yours = waitsOnYou(state) || waitedOn;
@@ -490,6 +496,7 @@ const heldKey = (listed: StepArtifact): string => ('name' in listed ? listed.nam
 /**
  * Every file of a step, each once: those its closeout named, by the path it named — served where a folder lists its copy — then those
  * its artifacts folder and its folder hold that it did not name, each name once across the two.
+ * @param step The step, as the run's view has it.
  */
 export function stepFilesOf(step: StepView): { named: StepArtifact[]; unnamed: StepArtifact[] } {
   const listed = [...(step.artifactsFolder?.files ?? []), ...step.files];
@@ -569,12 +576,19 @@ const packetStepOf = (step: StepView): PacketStep => ({
   files: step.closeout?.artifacts.length ?? 0,
 });
 
-/** Every packet of the run's view, each counted from its giver's shown try (`packetsOf`). */
+/**
+ * Every packet of the run's view, each counted from its giver's shown try (`packetsOf`).
+ * @param view The run's view, its steps.
+ */
 export const packetsOfView = (view: Pick<RunDetail, 'steps'>): Packet[] => packetsOf(view.steps.map(packetStepOf));
 
 /**
  * The part of the step `step` of the run's view `view`, of the try each step shows (`StepView.shown`, the address's choice): its head
  * (`headOf`), and once the step is in the view, what it asks, got, said and gave, and its detail; each `none` where it does not apply.
+ * @param view The run's own answer.
+ * @param step The step's name.
+ * @param now The instant now, which the step's time and gate are said against.
+ * @param agents The agents, each by name and role, once read; undefined before.
  */
 export function stepPartOf(
   view: RunDetail,
@@ -599,6 +613,10 @@ export function stepPartOf(
   };
 }
 
-/** The slots `size` draws of `part`, in `PART_SLOTS`' order, each with what it says. */
+/**
+ * The slots `size` draws of `part`, in `PART_SLOTS`' order, each with what it says.
+ * @param part The step's part.
+ * @param size The size the part is drawn at.
+ */
 export const slotsOf = (part: StepPartModel, size: PartSize): Array<{ slot: PartSlot; value: StepPartModel[PartSlot] }> =>
   PART_SLOTS.filter((slot) => SLOTS_AT[size].has(slot)).map((slot) => ({ slot, value: part[slot] }));

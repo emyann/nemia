@@ -8,6 +8,8 @@ const NONE: Size = { width: 0, height: 0 };
  * How big `frame` is drawn, across and down, read before the first paint and again each time it changes size, on either side. A new
  * answer only when the size moved, so a re-render costs nothing. `drawn` is whether the frame is on the page: it is watched again each
  * time that turns true.
+ * @param frame The element whose size is read.
+ * @param drawn Whether the frame is on the page.
  */
 export function useFrameSize(frame: RefObject<HTMLElement | null>, drawn: boolean): Size {
   const [size, setSize] = useState(NONE);

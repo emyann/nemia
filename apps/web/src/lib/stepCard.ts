@@ -43,6 +43,7 @@ const orNull = <T>(fact: T | None): Exclude<T, None> | null => (fact === 'none' 
 /**
  * The card of the step `step` of `run`: what the run's row knows at once (its state, its agent), and once the run's own answer is read,
  * its tries, time, facts, spend and note.
+ * @param input The run's row, the step's name, the run's own answer once read, the agents once read, and the instant now.
  */
 export function stepCardOf(input: StepCardInput): StepCardFacts {
   const head = headOf(input);

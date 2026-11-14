@@ -23,6 +23,7 @@ export const AREA_WORDS: Record<ReadinessArea, string> = {
 /**
  * The pieces of a read grouped by area, the areas in the order `objects` lists them (`READINESS_AREAS`) and each piece in the read's own
  * order; an area with none left out.
+ * @param pieces The read's pieces, each with its area.
  */
 export function piecesByArea<P extends { area: ReadinessArea }>(pieces: readonly P[]): Array<{ area: ReadinessArea; pieces: P[] }> {
   return READINESS_AREAS.map((area) => ({ area, pieces: pieces.filter((piece) => piece.area === area) })).filter(
@@ -42,6 +43,7 @@ const TRAILING = /[.,;:!?)\]}]+$/;
 /**
  * `text` cut into its runs of plain text and its URLs, in order, each URL without the punctuation that closes the sentence it ends
  * (`see https://x.dev/a.` links `https://x.dev/a`). Joined back, the runs are `text` whole.
+ * @param text A fix's printed output.
  */
 export function linkedParts(text: string): OutputPart[] {
   const parts: OutputPart[] = [];
@@ -60,6 +62,8 @@ export function linkedParts(text: string): OutputPart[] {
 /**
  * The code a fix's output shows, by the pattern its need declares (`code`, a regular expression's source): the last match in `output`,
  * its first group where the pattern has one; none where nothing matches, no pattern is declared, or the pattern is no expression.
+ * @param output The fix's printed output.
+ * @param pattern The regular expression's source the need declares, or undefined where it declares none.
  */
 export function codeIn(output: string, pattern: string | undefined): string | undefined {
   if (pattern === undefined || pattern === '') return undefined;
@@ -77,19 +81,38 @@ export function codeIn(output: string, pattern: string | undefined): string | un
   return found;
 }
 
-/** The answers a fix asks for, each name to what was typed; whether every one is given, trimmed. */
+/**
+ * The answers a fix asks for, each name to what was typed; whether every one is given, trimmed.
+ * @param asks The fix's asks, each by its name.
+ * @param answers What was typed, by ask name.
+ */
 export const answered = (asks: readonly { name: string }[], answers: Readonly<Record<string, string>>): boolean =>
   asks.every((ask) => (answers[ask.name] ?? '').trim() !== '');
 
-/** The answers a fix is started with: each ask's name to what was typed, trimmed. */
+/**
+ * The answers a fix is started with: each ask's name to what was typed, trimmed.
+ * @param asks The fix's asks, each by its name.
+ * @param answers What was typed, by ask name.
+ */
 export const answersOf = (asks: readonly { name: string }[], answers: Readonly<Record<string, string>>): Record<string, string> =>
   Object.fromEntries(asks.map((ask) => [ask.name, (answers[ask.name] ?? '').trim()]));
 
-/** The key a fix is started and said under: its piece's factory, workflow and name, and its index among the piece's fixes. */
+/**
+ * The key a fix is started and said under: its piece's factory, workflow and name, and its index among the piece's fixes.
+ * @param piece The piece the fix belongs to.
+ * @param fix The fix.
+ * @param i The fix's index among the piece's fixes, taken where the fix carries no index of its own.
+ */
 export const fixKeyOf = (piece: ReadinessPiece, fix: ReadinessFix, i: number): string =>
   [piece.factory ?? '', piece.workflow ?? '', piece.name, String(fix.index ?? i)].join('/');
 
-/** What starts `fix` of `piece`, the `i`th of its fixes, with `answers` to its asks. */
+/**
+ * What starts `fix` of `piece`, the `i`th of its fixes, with `answers` to its asks.
+ * @param piece The piece the fix belongs to.
+ * @param fix The fix to start.
+ * @param i The fix's index among the piece's fixes, taken where the fix carries no index of its own.
+ * @param answers What was typed, by ask name.
+ */
 export const startOf = (piece: ReadinessPiece, fix: ReadinessFix, i: number, answers: Readonly<Record<string, string>>): FixStart => ({
   need: piece.name,
   ...(piece.factory === undefined ? {} : { factory: piece.factory }),
@@ -101,6 +124,7 @@ export const startOf = (piece: ReadinessPiece, fix: ReadinessFix, i: number, ans
 /**
  * The fixes a piece offers as the list draws them: a piece in place only what takes it away (`removes`, a harness deactivated), any
  * other every fix but that, each with its index among the piece's fixes.
+ * @param piece The read's piece whose fixes are drawn.
  */
 export const shownFixes = (piece: ReadinessPiece): Array<{ fix: ReadinessFix; i: number }> =>
   piece.fixes.flatMap((fix, i) => ((fix.kind === 'removes') === (piece.state === 'met') ? [{ fix, i }] : []));
@@ -114,7 +138,10 @@ const BROWSERS: ReadonlyArray<readonly [RegExp, string]> = [
   [/Safari\//, 'safari'],
 ];
 
-/** The client name a browser pairs under, `board-<browser>`, the name of the token its claim mints; `board` for one unknown. */
+/**
+ * The client name a browser pairs under, `board-<browser>`, the name of the token its claim mints; `board` for one unknown.
+ * @param userAgent The browser's user agent string.
+ */
 export function clientNameOf(userAgent: string): string {
   const browser = BROWSERS.find(([mark]) => mark.test(userAgent))?.[1];
   return browser === undefined ? 'board' : `board-${browser}`;
@@ -123,13 +150,19 @@ export function clientNameOf(userAgent: string): string {
 /** The query key a first-visit link carries its secret in (`<base>/?link=<secret>`). */
 const LINK_KEY = 'link';
 
-/** The secret of the first-visit link `href` carries, none where it carries none. */
+/**
+ * The secret of the first-visit link `href` carries, none where it carries none.
+ * @param href The page's whole address.
+ */
 export function linkSecretOf(href: string): string | undefined {
   const secret = new URL(href).searchParams.get(LINK_KEY);
   return secret === null || secret === '' ? undefined : secret;
 }
 
-/** `href` without its first-visit link, as the address bar shows it after: its path, its other keys and its hash kept. */
+/**
+ * `href` without its first-visit link, as the address bar shows it after: its path, its other keys and its hash kept.
+ * @param href The page's whole address.
+ */
 export function withoutLink(href: string): string {
   const url = new URL(href);
   url.searchParams.delete(LINK_KEY);
@@ -140,6 +173,8 @@ export function withoutLink(href: string): string {
  * Whether the Setup page asks which harness to activate: while no harness's install piece is in place on the server and the person has
  * not skipped the question in this browser (`skipped`). Read from the read as it is now, so a harness activated from the shell takes the
  * question away. Proved by `contracts/harness-ask.contract.ts`.
+ * @param pieces The readiness read's pieces.
+ * @param skipped Whether the person skipped the question in this browser.
  */
 export const harnessAsked: HarnessAsked = (pieces, skipped) =>
   !skipped && !pieces.some((p) => p.harness !== undefined && p.harness.part === 'install' && p.state === 'met');
@@ -150,6 +185,7 @@ export type HarnessChoiceRow<P> = { name: string; install: P; signIn?: P };
 /**
  * The harnesses the read declares, one row each in the order the read first names it, each with its install piece and its sign-in
  * piece (`harness.part`); a piece of no harness is left out, and so is a harness the read gives no install piece, which nothing activates.
+ * @param pieces The readiness read's pieces.
  */
 export function harnessChoices<P extends { harness?: { name: string; part: 'install' | 'sign-in' } }>(
   pieces: readonly P[],

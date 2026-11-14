@@ -178,6 +178,9 @@ export const HELD_TO_COME: Pick<PersonWords, 'rail' | 'meaning'> = {
 /**
  * The rail word and meaning of a step by its state, by what it waits on where a state has a wait of its own (the pause's), and by whether
  * a person holds the run (`runHeld`), which a step not started waits on. `runHeld` has no default, as `stepState`'s has none.
+ * @param state The step's state.
+ * @param on What the step waits on, or null where it waits on nothing.
+ * @param runHeld Whether a person holds the run.
  */
 export const stateWordsOf = (state: StepState, on: WaitOn | null, runHeld: boolean): Pick<PersonWords, 'rail' | 'meaning'> => {
   if (state === 'waiting' && on === 'pause') return PAUSED;
@@ -188,6 +191,10 @@ export const stateWordsOf = (state: StepState, on: WaitOn | null, runHeld: boole
 /**
  * What a chip says on hover: what its state means; for a step the store's pause parked, the api's sentence, which names the call it
  * stopped after or the call cut, where it says more than the rail word; then the step's note, when it has one.
+ * @param state The step's state.
+ * @param meaning What the state means, in words.
+ * @param message The api's sentence of the step, or undefined where it says none.
+ * @param note The step's note, or null where it has none.
  */
 export const chipTitle = (state: StepState, meaning: string, message: string | undefined, note: string | null): string =>
   [meaning, state === 'paused' && message && message !== PERSON.paused.rail ? message : null, note || null]

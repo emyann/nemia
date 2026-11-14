@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
+import { fed, openFold, partOf, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { LOOPING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -27,20 +27,20 @@ export default {
     if (fs.existsSync(asks))
       throw new Refused(`the store is as seeded before the page presses anything — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
     const seededRecord = fs.readFileSync(recordFile, 'utf8');
-    const decide = page.locator('section[aria-label="Decide"]');
-    const row = decide.locator(`section[aria-label="Answer"] [data-offer="enough"][data-kind="approve"][data-step="${step}"]`);
+    const decide = (await openFold(page.locator('[data-asks]'), 'decide')).locator('section[aria-label="Decide"]');
+    const row = partOf(page, step).locator(`[data-part-asks] [data-offer="enough"][data-kind="approve"][data-step="${step}"]`);
     const form = row.locator(`form[aria-label="Approve ${step} as it stands"]`);
     const reason = form.getByRole('textbox', { name: `Why ${step}'s work is good enough as it stands` });
     const press = form.getByRole('button', { name: 'Approve as it stands', exact: true });
     const copied = decide.locator('[data-command="approve"]');
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     const chip = graph.locator(`.react-flow__node[data-id="${step}"] [data-state="exhausted"]`);
-    const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: step, exact: true }) });
-    const waiting = page.getByText(`Waiting on you: ${step}`);
+    const section = partOf(page, step);
+    const waiting = page.locator(`section[aria-label="Asks of you"] li[data-step="${step}"]`);
 
     await expectVisible(
       row.locator('code', { hasText: `nemia approve ${id} ${step} --message "<why>"` }),
-      `the Answer section offers ${step}'s own approve line, with the reason a loop's requires`,
+      `${step}'s part offers its own approve line, with the reason a loop's requires`,
     );
     await expectVisible(
       copied.locator('code', { hasText: `nemia approve ${id} ${step} --message "<why>"` }),
@@ -86,12 +86,12 @@ export default {
         throw new Refused(`the api writes nothing of the run's record — ${recordFile} changed`);
 
       await expectVisible(
-        section.locator('[data-note]', { hasText: `accepted as it stands at ${took.at}, its findings open` }),
+        (await openFold(section, 'detail')).locator('[data-note]', { hasText: `accepted as it stands at ${took.at}, its findings open` }),
         `${step}'s note says it was accepted as it stands, as wf ls says it`,
       );
       await expectCount(chip, 0, `${step} no longer reads rounds exhausted`);
       await expectCount(waiting, 0, `the run's page no longer says ${step} is waiting on you`);
-      await expectCount(row, 0, 'and the Answer section offers its approval no more');
+      await expectCount(row, 0, 'and its part offers its approval no more');
       await settled(page);
       await photograph(page, path.join(OUT, `accept-accepted-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
@@ -101,10 +101,7 @@ export default {
 
     await expectVisible(chip, `with the acceptance taken back, ${step} reads rounds exhausted again`);
     await expectVisible(waiting, `and ${step} is waiting on you again`);
-    await expectVisible(
-      row.locator('code', { hasText: `nemia approve ${id} ${step}` }),
-      'and the Answer section offers its approval again',
-    );
+    await expectVisible(row.locator('code', { hasText: `nemia approve ${id} ${step}` }), 'and its part offers its approval again');
     await settled(page);
   },
 } satisfies PageSpec;

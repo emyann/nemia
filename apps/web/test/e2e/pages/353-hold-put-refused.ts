@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, themeOf, isRunAction } from '../board.ts';
+import { fed, openRunMenu, photograph, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -28,7 +28,7 @@ export default {
       const { problems } = watch(refused);
       await refused.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(refused);
-      await refused.locator('[data-hold-open]').click();
+      await (await openRunMenu(refused)).locator('[data-hold-open]').click();
       const dialog = refused.getByRole('dialog', { name: `Hold ${id}` });
       await dialog.locator(`label[data-hold-run="${until}"]`).click();
       const [answered] = await Promise.all([

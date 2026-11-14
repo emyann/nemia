@@ -1,21 +1,21 @@
 /**
  * Who made a write, on the board (src/components/actor/Actor.tsx): one line in objects' words of the actor (`actorWords`), a glyph of the
- * person or an agent beside it, drawn under a gate's approval, a try's answer and a hold, and nothing where the served object carries no
- * actor (a record written before actors were said). And the Tokens page's words of a token (src/lib/tokens.ts) and its reads
- * (src/lib/api/tokens.ts): `GET /api/tokens` decoded, `DELETE /api/tokens/{name}` sent, an agent's 403 rejected as the refusal it is.
- * `npm run e2e` reads them on the pages (`700-tokens.ts`, `710-actor.ts`).
+ * person or an agent beside it, drawn under a gate's approval, a try's answer in its part's Said and a hold, and nothing where the
+ * served object carries no actor (a record written before actors were said). And the Tokens page's words of a token (src/lib/tokens.ts)
+ * and its reads (src/lib/api/tokens.ts): `GET /api/tokens` decoded, `DELETE /api/tokens/{name}` sent, an agent's 403 rejected as the
+ * refusal it is. `npm run e2e` reads them on the pages (`700-tokens.ts`, `710-actor.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './tsx.ts';
-import { at, routedWith, textsOf, threeTries } from './markup-fixtures.ts';
+import { at, routedWith, runWith, textsOf, threeTries } from './markup-fixtures.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
 const { actorWords } = await import('objects');
 const { Actor } = await import('../src/components/actor/Actor.tsx');
 const { Approved } = await import('../src/components/gate/Gate.tsx');
-const { TryCloseouts } = await import('../src/components/step/Closeout.tsx');
+const { PartSaid } = await import('../src/components/step/part/PartSaid.tsx');
 const { RunWait } = await import('../src/components/run/RunWait.tsx');
 const { holderWord, reachWord } = await import('../src/lib/tokens.ts');
 const { retireToken, tokensQuery } = await import('../src/lib/api/tokens.ts');
@@ -50,20 +50,17 @@ test("a gate's approval says who approved it, and an approval of an older record
   assert.deepEqual(actorsIn(older), []);
 });
 
-test("a try's answer says who answered it, in the try shown and in an earlier one folded", () => {
+test("a try's answer says who answered it, in its part's Said for the try shown, and no one where its try says none", () => {
   const tries = threeTries.map((t) => ({
     ...t,
     answer: t.try === 3 ? null : 'Fix the test.',
     ...(t.try === 2 ? { answeredBy: ACTORS[3] } : {}),
   }));
-  const shown = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[1], none: '-' }));
-  assert.deepEqual(
-    actorsIn(shown),
-    [['agent', 'review, of r-1/plan']],
-    'try 2 shown: its answer and who gave it; try 1 answered by no one said',
-  );
-  const folded = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2], none: '-' }));
-  assert.deepEqual(actorsIn(folded), [['agent', 'review, of r-1/plan']], 'try 2 folded under the current: the same');
+  const step = { ...runWith(null).steps[0], tries };
+  const said = { kind: 'closeout', outcome: 'done', summary: 's', account: null, needs: null } as const;
+  const saidOf = (shown: number) => renderToStaticMarkup(createElement(PartSaid, { step: { ...step, shown }, said }));
+  assert.deepEqual(actorsIn(saidOf(2)), [['agent', 'review, of r-1/plan']], 'try 2 shown: its answer and who gave it');
+  assert.deepEqual(actorsIn(saidOf(1)), [], 'try 1 shown: answered by no one said');
 });
 
 test('a hold says who put it, where its file says', async () => {

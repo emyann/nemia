@@ -13,6 +13,7 @@ import {
   answeredSection,
   approvedSection,
   fromSection,
+  headingOf,
   loopSection,
   retriedInRound,
   retrySection,
@@ -111,7 +112,7 @@ const saidBeforeOf = (step: StepSpec, run: Run, retry?: RetryBriefing, round?: R
  * said before it ran and a person's decisions), and the tree the run installed, never the spec again.
  */
 const resumedBrief = (step: StepSpec, handed: readonly string[], tree: readonly string[]): string =>
-  opened(step) + handed.join('') + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '');
+  opened(step) + handed.join('') + (tree.length ? ['', headingOf('Where to look'), '', ...tree].join('\n') : '');
 
 /** What a continued session is told of its tree, which the run provisioned again under it: under its own heading, or nothing. */
 const resumedLook = (tree: readonly string[]): string => (tree.length ? ['', '', '## Where to look', '', ...tree, ''].join('\n') : '');
@@ -234,13 +235,13 @@ export function composeBrief(
   const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders, run.cards);
   const request = [run.brief, ...mountsLine(step, run, folders), ...(inputs ? ['', INPUTS_HEADING, '', inputs] : [])];
   const opening = [opened(step), ''];
-  const parts = [...opening, '## What was asked for', '', ...request, ...saidBefore, ...handed.parents, ...handed.decided];
+  const parts = [...opening, headingOf('What was asked for'), '', ...request, ...saidBefore, ...handed.parents, ...handed.decided];
 
   if (step.after.length > 1 && !endsOnBase(step) && !inFolder) {
     return [
       ...parts,
       '',
-      '## What is in this workspace',
+      headingOf('What is in this workspace'),
       '',
       `The work of ${step.after.join(' and ')} has been merged into this branch.`,
       ...conflictLines(merge),
@@ -250,7 +251,7 @@ export function composeBrief(
     ].join('\n');
   }
 
-  if (earlier.length || tree.length || endsOnBase(step) || inFolder) parts.push('', '## Where to look', '');
+  if (earlier.length || tree.length || endsOnBase(step) || inFolder) parts.push('', headingOf('Where to look'), '');
   if (inFolder) {
     parts.push(
       'This step works in a folder the run made for it: what you leave there, and name in `artifacts`, is what the steps after you and the person who decides receive.',
@@ -446,7 +447,7 @@ export function remoteBrief(
   const given = (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf));
   return [
     ...opening,
-    '## What was asked for',
+    headingOf('What was asked for'),
     '',
     run.brief,
     ...inputs,
@@ -469,10 +470,10 @@ function remoteTrySection(step: StepSpec, r: RetryBriefing): string {
         : `A person asked for this try (\`nemia retry\`)${r.message !== undefined ? ', with what they said below' : ''}.`;
   return [
     '',
-    `## Try ${r.try}`,
+    headingOf('Try <n>', r.try),
     '',
     `The last try of this step ended \`${r.status}\`. ${who} This is a new task: nothing of the last one is continued, so do the work asked for above.`,
-    ...(r.message !== undefined ? ['', '## Your answer', '', ...fenced(r.message, 'text')] : []),
+    ...(r.message !== undefined ? ['', headingOf('Your answer'), '', ...fenced(r.message, 'text')] : []),
   ].join('\n');
 }
 

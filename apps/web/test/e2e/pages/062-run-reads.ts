@@ -43,7 +43,7 @@ export default {
     try {
       await page.reload({ waitUntil: 'load' });
       await sidebar(page);
-      await expectVisible(page.locator(`section#step-${MOVES}`), `the run's page draws ${MOVES}'s section`);
+      await expectVisible(page.locator(`article#step-${MOVES}`), `the run's page draws ${MOVES}'s part in its ledger`);
       await idle(page);
       const loaded = [...asked];
       for (const read of [object, lines, ...NEIGHBOUR.steps.flatMap((step) => [sub(step, 'tries'), sub(step, 'told')])]) {

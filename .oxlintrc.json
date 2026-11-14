@@ -546,12 +546,6 @@
       }
     },
     {
-      "files": ["apps/web/src/components/step/StepInspector.tsx"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
       "files": ["apps/web/src/components/step/StepNode.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 84, "skipBlankLines": true, "skipComments": true }],
@@ -588,12 +582,6 @@
       "files": ["apps/web/src/lib/gate.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 37]
-      }
-    },
-    {
-      "files": ["apps/web/src/lib/outcome.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 18]
       }
     },
     {

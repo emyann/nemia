@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
+import { fed, openFold, partOf, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { budgetWord, dollars } from '../../../src/lib/money.ts';
 import { BUDGETING, writeBudgeting } from '../seed.ts';
@@ -105,8 +105,11 @@ export default {
       if (file.budgets?.[above.step] !== above.usd || file.budgets[under.step] !== under.given || Object.keys(file.budgets).length !== 2)
         throw new Refused(`the approval holds the proposal's caps with the person's over them — it holds ${JSON.stringify(file)}`);
 
-      const caps = page.locator(`section[aria-label="The approval of ${gated}"] section[data-gate-budgets="approved"]`);
-      await expectVisible(caps, `read again, ${gated}'s approval shows the caps it set`);
+      const caps = partOf(page, gated).locator(
+        `[data-part-detail] section[aria-label="The approval of ${gated}"] section[data-gate-budgets="approved"]`,
+      );
+      await openFold(partOf(page, gated), 'detail');
+      await expectVisible(caps, `read again, ${gated}'s approval, in its Detail, shows the caps it set`);
       await expectRows(caps, { above: `$${above.usd}`, under: `$${under.given}` }, 'approved');
       await expectVisible(
         caps.locator(`[data-budget="${under.step}"] [data-amount]`, { hasText: `$${under.given.toFixed(2)}` }),

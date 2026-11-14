@@ -2,7 +2,7 @@
  * What a step was told, a sub-resource of a run (`GET /api/runs/:runId/steps/:step/told`): its brief by layer and its task by part.
  */
 import { Schema } from 'effect';
-import { HANDED_HOW, TOLD_VIA } from './words.ts';
+import { HANDED_HOW, TASK_SOURCES, TOLD_VIA } from './words.ts';
 
 const List = <S extends Schema.Top>(item: S) => Schema.mutable(Schema.Array(item));
 const Strings = List(Schema.String);
@@ -23,9 +23,17 @@ const ToldLayers = Schema.Struct({
   via: Schema.Literals(TOLD_VIA),
 });
 
-/** A part of a step's task (`TaskPart`, told.verb.ts): its own text, or a run's section, with how the run was handed. */
+/**
+ * A part of a step's task (`TaskPart`, told.verb.ts): its own text, with where it came from (`source`) and, for a step's or a check's,
+ * the step that gave it (`step`), each absent where the read did not cut it; or a run's section, with how the run was handed.
+ */
 const TaskPart = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('text'), text: Schema.String }),
+  Schema.Struct({
+    kind: Schema.Literal('text'),
+    text: Schema.String,
+    source: Schema.optionalKey(Schema.Literals(TASK_SOURCES)),
+    step: Schema.optionalKey(Schema.String),
+  }),
   Schema.Struct({
     kind: Schema.Literal('from'),
     run: Schema.String,

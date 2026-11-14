@@ -12,7 +12,7 @@ import { type Bridge, bridgeOf } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { remoteAgents } from '../runtime-client.ts';
 import { runsInOf } from './runs-in.ts';
-import type { HandedHow, RunsInBy } from 'objects';
+import type { HandedHow, RunsInBy, TaskSource } from 'objects';
 
 /**
  * What the engine filed a step's current try with, off its record of the task: what the step runs with where its workflow
@@ -79,15 +79,22 @@ function briefOf(
 }
 
 /**
- * A part of a step's task (`handedParts`): its own text, or a `## From run <id>` section, with `how` the run was handed it as its record
- * says — `waited` for a run it waited on (`after`), `read` for one handed as context (`context`) — and none for a run the record names in
- * neither.
+ * A part of a step's task (`handedParts`): a section's text with whose words it carries (`source`, which the cut always gives and
+ * objects' Schema keeps optional), or a `## From run <id>` section, with `how` the
+ * run was handed it as its record says — `waited` for a run it waited on (`after`), `read` for one handed as context (`context`) — and none
+ * for a run the record names in neither.
  */
-export type TaskPart = { kind: 'text'; text: string } | (Extract<HandedPart, { kind: 'from' }> & { how?: HandedHow });
+export type TaskPart =
+  | { kind: 'text'; text: string; source?: TaskSource; step?: string }
+  | (Extract<HandedPart, { kind: 'from' }> & { how?: HandedHow });
 
-/** `task` split into its parts (`handedParts`), each `## From run` section's `how` read off `run`. */
-function taskPartsOf(run: Run, task: string): TaskPart[] {
-  return handedParts(task).map((part) => {
+/**
+ * `task`, step `name`'s, split into its parts (`handedParts`) at the headings the run writes, a `<step>` of one named by a step the run
+ * froze — or, on a record that froze none, of `workflows` — and each `## From run` section's `how` read off `run`.
+ */
+function taskPartsOf(run: Run, name: string, workflows: readonly StepSpec[] | null, task: string): TaskPart[] {
+  const steps = (run.workflow ?? workflows ?? []).map((s) => s.name);
+  return handedParts(task, steps, name).map((part) => {
     if (part.kind === 'text') return part;
     if (run.after?.includes(part.run)) return { ...part, how: 'waited' };
     return run.context?.includes(part.run) ? { ...part, how: 'read' } : part;
@@ -110,7 +117,7 @@ export function toldOf(
   const frozen = run.workflow?.find((s) => s.name === name);
   const layers = frozen ? toldLayers(frozen, told) : null;
   const task = layers?.task ?? told;
-  return { told, layers, taskParts: task === null ? null : taskPartsOf(run, task) };
+  return { told, layers, taskParts: task === null ? null : taskPartsOf(run, name, workflows, task) };
 }
 
 /**

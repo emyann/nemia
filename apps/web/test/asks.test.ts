@@ -7,7 +7,6 @@ import assert from 'node:assert/strict';
 import {
   answersOf,
   askedOf,
-  decideDrawn,
   askedSaid,
   gateOffered,
   needLine,
@@ -179,17 +178,7 @@ test('needOf: what a step needs from a person — its question, its blocked sess
         asked: { try: 2, mode: 'continue', model: null, message: 'Store it first.', stopFirst: false },
       });
       assert.deepEqual(answersOf(run([sent], [])), [], 'sent back, its try is asked: nothing left to offer');
-      assert.deepEqual(askedOf(run([sent], []), 'plan'), { try: 2, note }, 'the Decide section notes it, as any try asked');
-      assert.equal(
-        decideDrawn({ ...run([sent], []), status: 'running' }),
-        true,
-        'and the page draws the Decide section for that note, though the run runs and nothing waits on you',
-      );
-      assert.equal(
-        decideDrawn({ ...run([step('plan', 'running')], []), status: 'running' }),
-        false,
-        'nothing asked, nothing to decide: none',
-      );
+      assert.deepEqual(askedOf(run([sent], []), 'plan'), { try: 2, note }, "its part and the run's asks note it, as any try asked");
       assert.equal(stepAnchor('plan'), 'step-plan');
     },
   );

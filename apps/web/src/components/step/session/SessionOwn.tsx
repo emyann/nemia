@@ -1,15 +1,14 @@
 /**
  * What a step's session has that the one turn shape has no arm for, drawn through the family's one escape hatch (`drawOwn`), as her
  * asks are hers: the brief it was told, folded to a line that opens, so the session's own words are read before what it was handed; the
- * words a person said to it while it ran, as their own bubble with where they reached the session; and its closeout.
+ * words a person said to it while it ran, as their own bubble with where they reached the session; and its closeout, one line that links
+ * to what it said, drawn once in the step's part.
  *
  * It lives in the step session's own folder, not the family's: a brief, a told turn and a closeout are one conversation's alone, and
  * the family folder holds what both conversations draw. Every data mark is written under the prefix its caller names (`mark`).
  */
 import { FlagIcon, ScrollTextIcon, SendIcon } from 'lucide-react';
 import { CodeBlock } from '@/components/ai-elements/code-block';
-import { Markdown } from '@/components/markdown/Markdown';
-import { CutFrame } from '@/components/look';
 import {
   TraceCollapsible,
   TraceCollapsibleContent,
@@ -21,7 +20,8 @@ import {
 import { Who } from '@/components/conversation/Said';
 import { mark } from '@/lib/conversation';
 import { container } from '@/lib/meaning';
-import { bodyLeadsWith, closeoutOf, CLOSEOUT_TOOL, summaryShown, type ToolCall } from '@/lib/transcript';
+import { closeoutOf, type ToolCall } from '@/lib/transcript';
+import { focusRing } from '@/components/ui/ds/utils';
 import type { SessionOwn as Own } from '@/lib/sessionItems';
 import { cn } from '@/lib/utils';
 
@@ -90,68 +90,61 @@ function Told({ told, marks }: { told: Extract<Own, { what: 'told' }>; marks: st
 }
 
 /**
- * The step's closeout, named: its outcome, summary and body, what it needs, the files it left and the values it handed on — or, in any
- * other shape, the statement as given. A harness that refused it says so beneath.
+ * The part's Said slot of the step `step`, in what holds both the part and the talk (`data-step-scope`), scrolled to its top: that scroll
+ * alone is moved, as `scrollIntoView` would move the window too and carry the page's header out of view.
  */
-function Closeout({ call, marks }: { call: ToolCall; marks: string }) {
+function toSaid(from: HTMLElement, step: string): void {
+  const scope = from.closest<HTMLElement>(`[data-step-scope]`);
+  const said = (scope ?? document).querySelector(`[data-part-said="${CSS.escape(step)}"]`);
+  if (!said) return;
+  if (!scope) return said.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const top = said.getBoundingClientRect().top - scope.getBoundingClientRect().top + scope.scrollTop;
+  scope.scrollTo({ top: Math.max(0, top - SAID_MARGIN), behavior: 'smooth' });
+}
+
+/** The room left above the Said slot once it is scrolled to: the slot's own `scroll-mt-4`. */
+const SAID_MARGIN = 16;
+
+/**
+ * The step's closeout, in one line: that it signed off and how, linking to what it said, drawn once, in its part above the talk (`Said`);
+ * in any other shape, the statement as given; a harness that refused it says so beneath.
+ */
+function Closeout({ call, step, marks }: { call: ToolCall; step: string; marks: string }) {
   const closeout = closeoutOf(call);
   const refused = call.result?.isError === true ? call.result.text : null;
   return (
-    <CutFrame size={12} className="w-full">
-      <section {...mark(marks, 'closeout')} aria-label="Closeout" className="flex flex-col gap-2 px-3.5 py-3 text-body-medium">
-        <header className="flex flex-wrap items-center gap-2">
-          <FlagIcon aria-hidden="true" className="size-4 text-on-surface-variant" />
-          <h3 className="text-title-small">Closeout</h3>
-          <span className="font-mono text-body-small text-on-surface-variant">{CLOSEOUT_TOOL}</span>
-          {closeout && (
-            <span
-              {...mark(marks, 'outcome', closeout.outcome)}
-              className={cn('px-2 py-0.5 font-mono text-body-small', closeout.outcome === 'blocked' ? container.yours : container.grey)}
-            >
-              {closeout.outcome}
-            </span>
-          )}
-        </header>
-        {closeout ? (
-          <Said closeout={closeout} marks={marks} />
-        ) : (
-          <CodeBlock code={JSON.stringify(call.input ?? null, null, 2)} language="json" />
+    <section {...mark(marks, 'closeout')} aria-label="Closeout" className="flex flex-col gap-1 text-body-medium">
+      <p className="flex flex-wrap items-center gap-2">
+        <FlagIcon aria-hidden="true" className="size-4 text-on-surface-variant" />
+        <span className="text-title-small">Closeout</span>
+        {closeout && (
+          <span
+            {...mark(marks, 'outcome', closeout.outcome)}
+            className={cn('px-2 py-0.5 font-mono text-body-small', closeout.outcome === 'blocked' ? container.yours : container.grey)}
+          >
+            {closeout.outcome}
+          </span>
         )}
-        {refused !== null && <p className="whitespace-pre-wrap text-body-small text-failure">The harness refused it: {refused}</p>}
-      </section>
-    </CutFrame>
-  );
-}
-
-/** What a closeout in the shape every step's is asked for says: its summary, its body, what it needs, its files and its values. */
-function Said({ closeout, marks }: { closeout: NonNullable<ReturnType<typeof closeoutOf>>; marks: string }) {
-  return (
-    <>
-      {!bodyLeadsWith(closeout.summary, closeout.body) && <p {...mark(marks, 'summary')}>{summaryShown(closeout.summary)}</p>}
-      {closeout.body !== null && <Markdown>{closeout.body}</Markdown>}
-      {closeout.needs !== null && (
-        <div {...mark(marks, 'needs')} className="text-yours">
-          <p className="text-title-small">Needs:</p>
-          <Markdown>{closeout.needs}</Markdown>
-        </div>
-      )}
-      {closeout.artifacts.length > 0 && (
-        <p className="text-body-small text-on-surface-variant">
-          Artifacts: <span className="font-mono">{closeout.artifacts.join(', ')}</span>
-        </p>
-      )}
-      {closeout.values.map((value) => (
-        <p key={value.name} className="text-body-small text-on-surface-variant">
-          {value.name}: <span className="font-mono">{value.value}</span>
-        </p>
-      ))}
-    </>
+        {closeout && (
+          <button
+            type="button"
+            {...mark(marks, 'to-said')}
+            onClick={(event) => toSaid(event.currentTarget, step)}
+            className={cn('text-body-small underline underline-offset-2', focusRing())}
+          >
+            Read what it said, above
+          </button>
+        )}
+      </p>
+      {!closeout && <CodeBlock code={JSON.stringify(call.input ?? null, null, 2)} language="json" />}
+      {refused !== null && <p className="whitespace-pre-wrap text-body-small text-failure">The harness refused it: {refused}</p>}
+    </section>
   );
 }
 
 /** One of the step session's own items, by what it is. */
-export function SessionOwn({ own, marks }: { own: Own; marks: string }) {
+export function SessionOwn({ own, step, marks }: { own: Own; step: string; marks: string }) {
   if (own.what === 'brief') return <Brief text={own.text} marks={marks} />;
   if (own.what === 'told') return <Told told={own} marks={marks} />;
-  return <Closeout call={own.call} marks={marks} />;
+  return <Closeout call={own.call} step={step} marks={marks} />;
 }

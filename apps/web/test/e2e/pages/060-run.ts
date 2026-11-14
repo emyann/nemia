@@ -1,16 +1,17 @@
 import path from 'node:path';
-import { photograph, sidebar, stepBar, themeOf } from '../board.ts';
+import { openFold, partOf, photograph, sidebar, stepBar, themeOf } from '../board.ts';
 import { OUT } from '../world.ts';
-import { expectCount, expectDrawn, expectInside, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
+import { expectCount, expectDrawn, expectInside, expectUncut, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
 export default {
   /**
-   * The run page of the seeded run: its header and step graph, the gate that asks and the check that refused, the calls its harness
-   * denied, the Decide section read out of the run's real repository, what each session used and the mode it runs in, the timeline off
-   * the engine's attempts and the filing each task's view carries, and the step inspector's Details, Activity and Output tabs. It ends
-   * with tokens' Output open for the photograph, its image served as a PNG never cached and opened full-size in a tab of its own.
+   * The run page of the seeded run: its asks and header, its step graph, the gate that asks and the check that refused, the calls its
+   * harness denied, the Decide section read out of the run's real repository (folded under the asks), each step's answer in its own
+   * part, what each session used and the mode it runs in (a part's Detail), the timeline off the engine's attempts and the filing each
+   * task's view carries (a receipt), and the step bar's one scroll: the part whole, then its conversation. It ends with tokens' part in
+   * the bar for the photograph, its picture a thumbnail served as a PNG never cached, opened in the viewer's sheet.
    *
    * The revisions band is photographed where it is read, before any sheet is open: the step sheet the page ends on covers the right third
    * of the page, so the whole-page picture shows neither the band's last tag nor its step-level line.
@@ -19,9 +20,10 @@ export default {
   route: `/runs/${FAKE.id}`,
   expect: async (page) => {
     await sidebar(page);
+    const where = await openFold(page.locator('section[aria-label="Receipts"]'), 'where');
     await expectVisible(
-      page.locator(`article header a[href="/workflows"][data-workflow="${FAKE.workflow}"]`),
-      `the run's header names its workflow (${FAKE.workflow}), a folder the board pages on no address, linked to the Workflows page`,
+      where.locator(`a[href="/workflows"][data-workflow="${FAKE.workflow}"]`),
+      `the run's receipt of where it ran names its workflow (${FAKE.workflow}), a folder the board pages on no address, linked to the Workflows page`,
     );
     await expectCount(page.locator('[data-from]'), 0, 'a run started with no card says it came from none');
     const behind = page.locator('section[aria-label="The revisions this run is behind on"]');
@@ -50,18 +52,19 @@ export default {
       `${FAKE.blocked}'s node says what it asks (${SESSION.closeout.needs})`,
     );
     await expectVisible(
-      page.locator(`section[aria-label="Waiting on you"] [data-need="asks"][data-step="${FAKE.blocked}"]`, {
+      page.locator(`section[aria-label="Asks of you"] [data-ask="needs"][data-step="${FAKE.blocked}"]`, {
         hasText: `${FAKE.blocked} asks: ${SESSION.closeout.needs}`,
       }),
-      `the banner says what ${FAKE.blocked} asks`,
+      `the asks of you say what ${FAKE.blocked} asks`,
     );
     await expectVisible(
       graph.locator(`.react-flow__node[data-id="${FAKE.refused}"] [data-state="failed-check"]`),
       `${FAKE.refused}'s refused check is a red chip on the run's graph`,
     );
+    const refusedDetail = await openFold(partOf(page, FAKE.refused), 'detail');
     await expectVisible(
-      page.locator('section[aria-label="Check"]').getByText(FAKE.said),
-      `the run's page shows how ${FAKE.refused}'s check's output ended`,
+      refusedDetail.locator('section[aria-label="Check"]').getByText(FAKE.said),
+      `the run's page shows how ${FAKE.refused}'s check's output ended, in its part's Detail`,
     );
     await expectCount(
       graph.locator('.react-flow__edge animateMotion'),
@@ -76,16 +79,22 @@ export default {
     await expectCount(graph.locator('[data-denied]'), 1, `no other step was denied a call, and no other node says so`);
     const calls = FAKE.denied.denials.map((d) => `${d.tool}(${d.what})`).join(', ');
     await expectVisible(
-      page.locator(`#step-${FAKE.refused} [data-fact="denied"] [data-denied]`, { hasText: calls }),
-      `${FAKE.refused}'s section names each call denied (${calls})`,
+      refusedDetail.locator(`[data-fact="denied"] [data-denied]`, { hasText: calls }),
+      `${FAKE.refused}'s part names each call denied (${calls}), in its Detail`,
     );
-    await expectCount(page.locator('[data-fact="denied"]'), 1, 'and no other section has a denied row');
+    for (const step of FAKE.steps) await openFold(partOf(page, step), 'detail');
+    await expectCount(page.locator('[data-fact="denied"]'), 1, "and no other step's Detail has a denied row");
 
-    await expectVisible(
-      page.locator(`article > header + section[aria-label="Decide"] + section[aria-label="The run's steps as a graph"]`),
-      'the Decide section, what wf decide shows, sits between the header and the canvas',
-    );
-    const decide = page.locator('section[aria-label="Decide"]');
+    const asks = page.locator('[data-asks]');
+    const decide = (await openFold(asks, 'decide')).locator('section[aria-label="Decide"]');
+    await expectVisible(decide, 'the Decide section, what wf decide shows, is a fold under the asks of you');
+    const order = await page.evaluate(() => {
+      const at = (selector: string) => document.querySelector(selector);
+      const marks = ['[data-asks]', 'header[data-run-header]', `section[aria-label="The run's steps as a graph"]`].map(at);
+      return marks.every((m, i) => m && (i === 0 || marks[i - 1]!.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING));
+    });
+    if (!order)
+      throw new Refused('the asks of you, with Decide folded under them, come before the header, and the header before the canvas');
     await expectVisible(
       decide.locator(`[data-touched="${FAKE.branch}"]`),
       `the Decide section reads the run's result branch (${FAKE.branch})`,
@@ -148,45 +157,46 @@ export default {
       0,
       'no button among the commands but one that copies',
     );
-    const answers = decide.locator('section[aria-label="Answer"]');
-    const answer = answers.locator(`[data-offer="answer"][data-step="${FAKE.blocked}"]`);
+    const answer = partOf(page, FAKE.blocked).locator(`[data-part-asks] [data-offer="answer"][data-step="${FAKE.blocked}"]`);
     await expectVisible(
       answer.getByRole('textbox', { name: `Your answer to ${FAKE.blocked}` }),
-      `an answer box for ${FAKE.blocked}, which asks`,
+      `an answer box for ${FAKE.blocked}, which asks, in what its part asks of you`,
     );
     await expectVisible(answer.getByRole('button', { name: 'Answer and continue' }), 'and its button');
     await expectVisible(answer.getByRole('radio', { name: /^a new session/ }), 'a new session as an option to the nudge');
-    const again = answers.locator(`[data-offer="try-again"][data-step="${FAKE.refused}"]`);
-    await expectVisible(again.getByRole('button', { name: 'Try again' }), `Try again for ${FAKE.refused}, whose check refused`);
-    await expectVisible(again.getByRole('radio', { name: /^its check again/ }), 'its check run again as an option');
-    await expectCount(
-      decide.locator('button:not([data-copy])'),
-      await answers.locator('button').count(),
-      "every other button in the Decide section is an answer's",
+    const again = partOf(page, FAKE.refused).locator(`[data-part-asks] [data-offer="try-again"][data-step="${FAKE.refused}"]`);
+    await expectVisible(
+      again.getByRole('button', { name: 'Try again' }),
+      `Try again for ${FAKE.refused}, whose check refused, in its part`,
     );
+    await expectVisible(again.getByRole('radio', { name: /^its check again/ }), 'its check run again as an option');
+    await expectCount(decide.locator('[data-offer]'), 0, "the Decide section holds no answer: each is in its step's part");
 
-    const tokens = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.unverified, exact: true }) });
+    const tokens = partOf(page, FAKE.unverified);
+    await openFold(tokens.locator('[data-part-detail]'), 'spec');
     await expectVisible(
       tokens.locator('dd', { hasText: FAKE.used }),
-      `${FAKE.unverified}'s section says what its session used in wf decide's words (${FAKE.used})`,
+      `${FAKE.unverified}'s part's Detail says what its session used in wf decide's words (${FAKE.used})`,
     );
     await expectVisible(
       tokens.locator('[data-mark="default"]', { hasText: 'workspace-write · default' }),
       `${FAKE.unverified}'s spec says the sandbox its Codex session runs in, filed with none: its harness's choice, marked default (workspace-write · default)`,
     );
-    const review = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: 'review', exact: true }) });
+    const review = partOf(page, 'review');
+    await openFold(review.locator('[data-part-detail]'), 'spec');
     await expectVisible(
       review.locator('[data-fact="sandbox"] dd', { hasText: /^read-only$/ }),
       "review's spec says its sandbox under Codex's name, read-only, read off a record that says permissionMode: read-only",
     );
     await expectCount(review.locator('[data-fact="permission mode"]'), 0, 'and no permission mode, which codex has not');
-    const blocked = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.blocked, exact: true }) });
+    const blocked = partOf(page, FAKE.blocked);
+    await openFold(blocked.locator('[data-part-detail]'), 'spec');
     await expectVisible(
       blocked.locator('[data-mark="default"]', { hasText: 'auto · default' }),
       `${FAKE.blocked}'s spec says the mode its Claude Code session runs in (auto · default)`,
     );
 
-    const timeline = page.locator('section[aria-label="Timeline"]');
+    const timeline = (await openFold(page.locator('section[aria-label="Receipts"]'), 'timeline')).locator('section[aria-label="Timeline"]');
     const exactly = (text: string) => new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
     for (const [step, [queued, ran]] of Object.entries(FAKE.timeline.sessions)) {
       const row = timeline.locator(`tr[data-step="${step}"][data-task="session"][data-at="ended"]`);
@@ -229,12 +239,9 @@ export default {
     await expectCount(timeline.locator('tr[data-total^="round-"]'), 0, "one round: the run's total alone");
     await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
     const inspected = stepBar(page, FAKE.id, FAKE.unverified);
-    await expectVisible(
-      inspected.getByRole('tab', { name: 'Output', selected: true }),
-      `${FAKE.unverified}'s inspector opens on Output: it has signed off`,
-    );
-    await inspected.getByRole('tab', { name: 'Details' }).click();
-    await expectVisible(inspected.locator('dd', { hasText: FAKE.used }), `the inspector's Details say what ${FAKE.unverified} used`);
+    await expectVisible(inspected.locator(`[data-part-gave="L"]`), `${FAKE.unverified}'s inspector draws what it gave: it has signed off`);
+    await openFold(partOf(inspected, FAKE.unverified), 'detail');
+    await expectVisible(inspected.locator('dd', { hasText: FAKE.used }), `the inspector's Detail says what ${FAKE.unverified} used`);
     await inspected.getByRole('button', { name: 'Close', exact: true }).click();
     await expectCount(inspected, 0, "the inspector's Close closes it, and the canvas widens again");
 
@@ -249,96 +256,108 @@ export default {
 
     await graph.locator(`.react-flow__node[data-id="${SESSION.step}"]`).click();
     const inspector = stepBar(page, FAKE.id, SESSION.step);
-    await inspector.getByRole('tab', { name: 'Activity' }).click();
-
+    const talk = inspector.locator('section[aria-label="Its conversation"]');
+    await expectVisible(partOf(inspector, SESSION.step).locator('[data-part-said]'), `${SESSION.step}'s bar draws its part whole first`);
+    await expectCount(inspector.getByRole('tab'), 0, 'in one scroll, with no tabs');
     await expectVisible(
-      inspector.locator('[data-session-turn="folded"]', { hasText: SESSION.folded }),
-      `${SESSION.step}'s Activity tab draws its conversation by the family, the calls folded into one line (${SESSION.folded})`,
+      talk.locator('[data-session-turn="folded"]', { hasText: SESSION.folded }),
+      `${SESSION.step}'s conversation, under its part, is drawn by the family, the calls folded into one line (${SESSION.folded})`,
     );
     await expectVisible(
-      inspector.locator('[data-session-talk].gap-2'),
-      `${SESSION.step}'s Activity tab draws the talk compact, closer than the session's own page`,
+      talk.locator('[data-session-talk].gap-2'),
+      `${SESSION.step}'s bar draws the talk compact, closer than the session's own page`,
     );
-    await expectVisible(inspector.locator('[data-session-closeout]'), `${SESSION.step}'s Activity tab ends with its closeout`);
+    await expectVisible(talk.locator('[data-session-closeout]'), `${SESSION.step}'s conversation ends with its closeout's line`);
     await expectVisible(
-      inspector.locator(`a[href="/runs/${FAKE.id}/steps/${SESSION.step}"]`, { hasText: 'Open the session' }),
-      `${SESSION.step}'s Activity tab links to its session's page`,
+      talk.locator(`a[href="/runs/${FAKE.id}/steps/${SESSION.step}"]`, { hasText: 'Open the session' }),
+      `${SESSION.step}'s conversation links to its session's page`,
     );
     await settled(page);
     await photograph(page, path.join(OUT, `run-activity-${await themeOf(page)}.png`), { fullPage: true });
 
     await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
     const output = stepBar(page, FAKE.id, FAKE.unverified);
-    await output.getByRole('tab', { name: 'Output' }).click();
-    const palette = output.locator(`img[alt="${FAKE.artifacts.image}"]`);
-    await expectDrawn(palette, `${FAKE.unverified}'s Output tab draws the image it named inline (${FAKE.artifacts.image})`);
-    const full = output.locator('a[target="_blank"]', { has: page.locator(`img[alt="${FAKE.artifacts.image}"]`) });
-    await expectCount(full, 1, `${FAKE.artifacts.image} is inside a link that opens it in a new tab`);
+    const gave = partOf(output, FAKE.unverified).locator('[data-part-gave="L"]');
+    const palette = gave.locator(`img[alt="${FAKE.artifacts.image}"]`);
+    await expectDrawn(palette, `${FAKE.unverified}'s part in the bar draws the image it named as a thumbnail (${FAKE.artifacts.image})`);
+    const thumb = gave.locator('a[data-opens-view]', { has: page.locator(`img[alt="${FAKE.artifacts.image}"]`) });
+    await expectCount(thumb, 1, `${FAKE.artifacts.image} is inside a link that opens it in the viewer's sheet`);
     await expectVisible(
-      output.locator('a[target="_blank"]', { hasText: FAKE.artifacts.text }),
-      `the text file it named is a link (${FAKE.artifacts.text})`,
+      gave.locator('a[data-opens-view]', { hasText: FAKE.artifacts.text }),
+      `the text file it named is a link to its viewer (${FAKE.artifacts.text})`,
     );
     await expectVisible(
-      output.getByText(FAKE.artifacts.path, { exact: true }),
+      gave.getByText(FAKE.artifacts.path, { exact: true }),
       `a path on its branch is shown as it gave it (${FAKE.artifacts.path})`,
     );
+    const row = partOf(page.locator('section[aria-label="Every step"]'), FAKE.unverified);
     await expectDrawn(
-      page.locator(`article > section [aria-label="Artifacts"] img[alt="${FAKE.artifacts.image}"]`),
-      `${FAKE.unverified}'s section on the run's page draws the image too`,
+      row.locator(`[data-part-gave] img[alt="${FAKE.artifacts.image}"]`),
+      `${FAKE.unverified}'s row of the ledger on the run's page draws the image too`,
     );
     await expectVisible(
-      page.locator(`article > section [data-value="${FAKE.envelope.value.name}"] a[href="${FAKE.envelope.value.value}"]`, {
+      row.locator(`[data-value="${FAKE.envelope.value.name}"] a[href="${FAKE.envelope.value.value}"]`, {
         hasText: FAKE.envelope.value.value,
       }),
-      `${FAKE.unverified}'s section on the run's page draws the value it handed on, linked, beside its files`,
+      `${FAKE.unverified}'s row on the run's page draws the value it handed on, linked, beside its files`,
     );
+    const said = output.locator('[data-part-said]');
     await expectVisible(
-      output.locator('[data-body]', { hasText: FAKE.envelope.summary }),
-      `${FAKE.unverified}'s whole v1 summary leads its body, so nothing it wrote is lost`,
+      said.locator('[data-summary]', { hasText: FAKE.envelope.cut.replace(/…$/, '') }),
+      `${FAKE.unverified}'s Said opens with its summary`,
     );
-    await expectCount(
-      output.locator('[data-summary]'),
-      0,
-      `and its cut line (${FAKE.envelope.cut}) is not drawn above the body that opens with it`,
-    );
-    await expectVisible(output.locator('[data-body] strong', { hasText: 'sky' }), 'its body is drawn as markdown');
+    await expectCount(said.locator('[data-body]'), 0, 'its account one fold down, closed');
+    const account = await openFold(said, 'account');
     await expectVisible(
-      output.locator(`[data-value="${FAKE.envelope.value.name}"] a[href="${FAKE.envelope.value.value}"][target="_blank"]`, {
+      account.locator('[data-body]', { hasText: FAKE.envelope.summary }),
+      `${FAKE.unverified}'s whole v1 summary leads its account, so nothing it wrote is lost`,
+    );
+    await expectVisible(account.locator('[data-body] strong', { hasText: 'sky' }), 'its account is drawn as markdown');
+    await expectVisible(
+      gave.locator(`[data-value="${FAKE.envelope.value.name}"] a[href="${FAKE.envelope.value.value}"][target="_blank"]`, {
         hasText: FAKE.envelope.value.value,
       }),
       `the value it handed on is labelled ${FAKE.envelope.value.name} and links to its address`,
     );
     await photograph(output, path.join(OUT, `run-envelope-${await themeOf(page)}.png`));
-    const served = await page.request.get(new URL((await full.getAttribute('href')) ?? '', page.url()).href);
+    const src = new URL((await palette.getAttribute('src')) ?? '', page.url()).href;
+    const served = await page.request.get(src);
     const headers = served.headers();
     if (served.status() !== 200 || headers['content-type'] !== 'image/png' || headers['cache-control'] !== 'no-store') {
       throw new Refused(
         `the api serves ${FAKE.artifacts.image}, through the proxy the page reads it by, as a PNG, never cached — it answered ${served.status()}, ${headers['content-type']}, cache-control ${headers['cache-control']}`,
       );
     }
-    const [tab] = await Promise.all([page.context().waitForEvent('page'), full.click()]);
+    const tab = await page.context().newPage();
     try {
-      await tab.waitForLoadState();
-      await expectDrawn(
-        tab.locator('img'),
-        `${FAKE.artifacts.image} opens full-size in a tab of its own, drawn under the api's sandboxing policy`,
-      );
+      await tab.goto(src);
+      await expectDrawn(tab.locator('img'), `${FAKE.artifacts.image} opened alone is drawn under the api's sandboxing policy`);
     } finally {
       await tab.close();
     }
+    const opens = await thumb.getAttribute('data-opens-view');
+    await thumb.click();
+    await page.waitForURL((url) => url.searchParams.get('view') === `${FAKE.unverified}/${opens}`, { timeout: WAIT_MS });
+    await expectDrawn(
+      page.locator(`[data-viewer-sheet] img[data-viewer="picture"][alt="${FAKE.artifacts.image}"]`),
+      `a press on the thumbnail opens ${FAKE.artifacts.image} in the viewer's sheet, by the address`,
+    );
+    await page.goBack();
+    await expectCount(page.locator('[data-viewer-sheet]'), 0, 'Back closes the sheet');
     await settled(page);
 
     await output.getByRole('button', { name: 'Close', exact: true }).click();
     await expectCount(output, 0, "tokens' bar closes, and uncovers theme");
     await graph.locator('.react-flow__node[data-id="theme"]').click();
     const theme = stepBar(page, FAKE.id, 'theme');
-    await theme.getByRole('tab', { name: 'Output' }).click();
+    const themeSaid = theme.locator('[data-part-said]');
     await expectVisible(
-      theme.locator('[data-body]', { hasText: FAKE.envelope.v0.more }),
-      "theme's v0 closeout reads its whole text as its body",
+      themeSaid.locator('[data-summary]', { hasText: FAKE.envelope.v0.first }),
+      "theme's v0 closeout says its first line as its summary",
     );
-    await expectVisible(theme.locator('[data-body]', { hasText: FAKE.envelope.v0.first }), 'which opens with its first line, its summary');
-    await expectCount(theme.locator('[data-summary]'), 0, 'so the summary is said once, in the body, not again above it');
+    const themeAccount = await openFold(themeSaid, 'account');
+    await expectVisible(themeAccount.locator('[data-body]', { hasText: FAKE.envelope.v0.more }), 'and reads its whole text as its account');
+    await expectVisible(themeAccount.locator('[data-body]', { hasText: FAKE.envelope.v0.first }), 'which opens with its first line');
     await settled(page);
   },
 } satisfies PageSpec;

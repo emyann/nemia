@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { actorWords, type Actor } from 'objects';
-import { fed, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
+import { fed, partOf, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { ASKED } from '../seed.ts';
@@ -144,12 +144,12 @@ const chosenOn = (form: ReturnType<Page['locator']>, title: string): Promise<str
 
 export default {
   /**
-   * A run whose steps ask questions as data. A done step's are drawn read-only on its Output tab, each option it recommends marked. A
-   * blocked step's are a form under Decide: an option for each answer, radios where it takes one and checkboxes where several, nothing
-   * chosen, and `Answer and continue` held until each question has an answer. `Choose the recommended answers` chooses the one recommended
-   * and leaves the question without one as it was; a box ticked there and words of the person's own beside it, the answers go to the api,
-   * which writes them as the next try's message, in the package's words. The page leaves the run before it takes it back, so no poll asks
-   * for a run that is gone.
+   * A run whose steps ask questions as data. A done step's are drawn read-only in what its part gave, each option it recommends marked. A
+   * blocked step's are a form in what its part asks of you: an option for each answer, radios where it takes one and checkboxes where
+   * several, nothing chosen, and `Answer and continue` held until each question has an answer. `Choose the recommended answers` chooses the
+   * one recommended and leaves the question without one as it was; a box ticked there and words of the person's own beside it, the answers
+   * go to the api, which writes them as the next try's message, in the package's words. The page leaves the run before it takes it back, so
+   * no poll asks for a run that is gone.
    */
   name: 'questions',
   route: '/runs',
@@ -164,8 +164,7 @@ export default {
 
       await page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="design"]`).dispatchEvent('click');
       const inspector = stepBar(page, id, 'design');
-      await inspector.getByRole('tab', { name: 'Output' }).click();
-      const asked = inspector.locator('section[data-questions="open"]');
+      const asked = inspector.locator('[data-part-gave] section[data-questions="open"]');
       await expectVisible(asked.locator(`li[data-question="${done.title}"]`), "design's question is drawn under its field, read-only");
       for (const label of done.recommended)
         await expectVisible(
@@ -179,9 +178,9 @@ export default {
       await inspector.getByRole('button', { name: 'Close', exact: true }).click();
       await expectCount(inspector, 0, "the inspector's Close closes it, and the page widens again");
 
-      const row = page.locator(`section[aria-label="Decide"] li[data-offer="answer"][data-questions][data-step="spec"]`);
+      const row = partOf(page, 'spec').locator(`[data-part-asks] li[data-offer="answer"][data-questions][data-step="spec"]`);
       const form = row.getByRole('form', { name: 'Answer spec' });
-      await expectVisible(form, 'spec, blocked, asks its questions as a form under Decide');
+      await expectVisible(form, 'spec, blocked, asks its questions as a form in what its part asks of you');
       await expectVisible(row.locator('[data-said]', { hasText: QUESTIONS.needs }), 'beside what it needs');
       await expectCount(
         form.locator(`fieldset[data-question="${cut.title}"] input[type="radio"]`),
@@ -239,8 +238,8 @@ export default {
       if (ask.mode !== 'continue' || !ask.actor || ask.message !== lines.join('\n\n'))
         throw new Refused(`the answers are the next try's message, in the package's words — ${file} holds ${JSON.stringify(ask)}`);
       await expectVisible(
-        page.locator(`section[aria-label="Decide"] [data-asked][data-step="spec"]`),
-        "spec's row says its try was asked for",
+        partOf(page, 'spec').locator(`[data-part-asks] [data-asked][data-step="spec"]`),
+        "spec's part says its try was asked for",
       );
     } finally {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });

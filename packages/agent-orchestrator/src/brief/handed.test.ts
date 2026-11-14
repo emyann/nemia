@@ -6,8 +6,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { contextSection, fromRunSection, handedParts, handedSection, type ParentCloseout } from './handed.ts';
 import { composeBrief } from './brief.ts';
+import { TASK_HEADINGS } from './brief-sections.ts';
 import type { StepSpec } from '../step/step.ts';
 import { run, step, STEPS } from '../../test/assessed.ts';
 
@@ -175,4 +178,55 @@ test('what a root is handed of other runs: each section in its words, composed a
       assert.equal(parts[3].kind === 'text' && parts[3].text, '## Afterwards\nSign off.');
     },
   );
+});
+
+/**
+ * The headings the package's source writes outside the table, each with why the cut need not know it: the layers above a step's
+ * task, which the task starts after (`toldLayers`); Nemia's own agent's verbs, a prompt and no step's task; and the builder and the cut
+ * themselves.
+ */
+const NO_TASK_HEADING: Record<string, string> = {
+  'src/workflow/layers.ts': "the layers' headings open a brief, above its task",
+  'src/nemia/verbs.verb.ts': "Nemia's own agent's prompt, no step's task",
+  'src/brief/brief-sections.ts': 'headingOf writes each heading from the table',
+  'src/brief/handed.ts': 'the cut reads a heading, it writes none',
+  'src/brief/parts.ts': 'the brief cut for the runtime to keep, at any heading',
+};
+
+test('every heading a source writes into a task is one the cut knows (TASK_HEADINGS)', () => {
+  const pkg = path.resolve(import.meta.dirname, '../..');
+  const shapes = Object.keys(TASK_HEADINGS).map(
+    (h) =>
+      new RegExp(
+        `^## ${h
+          .split(/(<[a-z]+>)/)
+          .map((p) => (/^<[a-z]+>$/.test(p) ? '.+' : p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+          .join('')}$`,
+      ),
+  );
+  const unknown: string[] = [];
+  const seen = new Set<string>();
+  for (const dir of ['src', 'place']) {
+    for (const file of fs.readdirSync(path.join(pkg, dir), { recursive: true, encoding: 'utf8' })) {
+      const at = `${dir}/${file.split(path.sep).join('/')}`;
+      if (!at.endsWith('.ts') || at.endsWith('.test.ts') || NO_TASK_HEADING[at]) continue;
+      for (const line of fs.readFileSync(path.join(pkg, at), 'utf8').split('\n')) {
+        if (/^\s*(\*|\/\/|\/\*)/.test(line)) continue;
+        for (const [, written] of Array.from(line.matchAll(/'(## [^'\n]*)'|"(## [^"\n]*)"|`(## (?:[^`\\]|\\.)*)`/g), (m) => [
+          m[0],
+          m[1] ?? m[2] ?? m[3] ?? '',
+        ])) {
+          const heading = written
+            .replace(/\$\{[^}]*\}/g, 'X')
+            .split('\\n')[0]
+            .replace(/\\`/g, '`')
+            .trimEnd();
+          seen.add(heading);
+          if (!shapes.some((shape) => shape.test(heading))) unknown.push(`${at}: ${heading}`);
+        }
+      }
+    }
+  }
+  assert.ok(seen.size >= 10, `the scan read the headings the source writes: ${[...seen].join(', ')}`);
+  assert.deepEqual(unknown, [], 'add each to TASK_HEADINGS with whose words its section carries');
 });

@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { DebugPanel } from '@/components/step/DebugPanel';
+import { useQuery } from '@tanstack/react-query';
+import { StepPart } from '@/components/step/part/StepPart';
 import { SessionRetryingBand, SessionStoppedBand, SessionUnreadableBand } from '@/components/step/session/SessionBand';
 import { SessionComposer } from '@/components/step/session/SessionComposer';
 import { SessionQuiet, SessionTalk } from '@/components/step/session/SessionTalk';
 import { RunGone } from '@/components/run/RunGone';
-import { StatusChip, StepNote } from '@/components/step/StatusChip';
+import { agentsQuery } from '@/lib/api/agents';
 import { readGone } from '@/lib/api/gone';
 import { type Said } from '@/lib/api/asks';
 import { loadRun, useRunView, type RunDetail, type StepView } from '@/lib/runView';
@@ -87,14 +88,16 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
 }
 
 /**
- * The session of `step` in `run`: its header, its Debug panel, the bands over its talk, its talk, and the composer under it — which is
- * drawn only while there is a session to say anything to, the stopped band standing in its place where there is not (`sayable`).
+ * The session of `step` in `run`: its header — the way back to its run, its name and whether it is followed live — then its part whole
+ * (`StepPart` at L, its Debug in its detail), and under it the bands over its talk, its talk, and the composer under it — which is drawn
+ * only while there is a session to say anything to, the stopped band standing in its place where there is not (`sayable`). The part and the
+ * talk scroll together under the header, the talk held to 60% of the window so it keeps its own latest and its way back to it, the composer
+ * staying in view.
  *
- * The transcript is told whether the step waits on a person's word — its session over, nothing of it running — and never whether the
- * run is held: a hold (the CLI's
- * `hold`) answers nothing, and the session runs or rests as it did. What this page said that the run, as last read, does not have yet is
- * kept with the task it was said to, so a later try starts afresh. Words the transcript shows reaching the session are drawn once, as what
- * was said, where they reached it (`heardIn`).
+ * The transcript is told whether the step waits on a person's word — its session over, nothing of it running — and never whether the run is
+ * held: a hold (the CLI's `hold`) answers nothing, and the session runs or rests as it did. What this page said that the run, as last read,
+ * does not have yet is kept with the task it was said to, so a later try starts afresh. Words the transcript shows reaching the session are
+ * drawn once, as what was said, where they reached it (`heardIn`).
  */
 function Session({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
@@ -113,13 +116,13 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
     return withSaid(foldTranscript(heard.events), heard.said);
   }, [following.events, said]);
   const say = sayable(run, step);
+  const agents = useQuery(agentsQuery);
   return (
     <div className="flex h-[calc(100svh-var(--frame-top)-var(--frame-lines))] min-h-96 flex-col">
       <header aria-label="The step" className="shrink-0 space-y-1 border-b px-4 py-3">
         <BackToRun run={run} />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="font-semibold">{step.name}</h1>
-          <StatusChip codes={step} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
           {following.live && (
             <span
               data-following
@@ -131,14 +134,19 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
             </span>
           )}
         </div>
-        <StepNote note={step.note} />
       </header>
-      <DebugPanel run={run} step={step} />
       <div className="mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col gap-3 px-4 pt-3 pb-4">
-        {following.retrying !== null && <SessionRetryingBand why={following.retrying} />}
-        {following.error !== null && <SessionUnreadableBand why={following.error} />}
-        {!say.open && <SessionStoppedBand why={say.why} />}
-        <SessionBody step={step} following={following} turns={turns} />
+        <div data-step-scope={step.name} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+          <div className="shrink-0">
+            <StepPart view={run} step={step.name} size="L" agents={agents.data} here />
+          </div>
+          {following.retrying !== null && <SessionRetryingBand why={following.retrying} />}
+          {following.error !== null && <SessionUnreadableBand why={following.error} />}
+          {!say.open && <SessionStoppedBand why={say.why} />}
+          <div className="flex h-[60svh] min-h-80 shrink-0 flex-col">
+            <SessionBody step={step} following={following} turns={turns} />
+          </div>
+        </div>
         {say.open && (
           <SessionComposer
             runId={run.id}

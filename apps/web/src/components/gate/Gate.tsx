@@ -1,13 +1,15 @@
 import { useId, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { decisionQuery } from '../../lib/api/decision.ts';
-import { type Question, type StepCloseout } from '../../lib/api/tries.ts';
+import { type Question } from '../../lib/api/tries.ts';
 import { type QuestionAnswer, type RetryMode } from '../../lib/api/asks.ts';
 import type { RunDetail, StepView } from '../../lib/runView';
 import { askedSaid } from '../../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../../lib/decide';
 import { cn } from '../../lib/utils';
-import { Artifacts, HandedOn, Statement } from '../step/Closeout';
+import { stepAnchor } from '../../lib/asks';
+import { RouteLink } from '../agent/AgentParts';
+import { LINK } from '../step/Facts';
 import { MODES, Refusal, useAsk } from './Ask';
 import { answersFrom, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import { when } from '../step/Facts';
@@ -22,9 +24,6 @@ import { Actor } from '../actor/Actor';
 type StepGate = NonNullable<StepView['gate']>;
 /** A person's approval of the try a gated step is on. */
 type StepApproval = NonNullable<StepGate['approval']>;
-
-/** The closeout and the decision side by side once the page column has room for both, one under the other below it. */
-const SIDE_BY_SIDE = '@3xl/page:grid @3xl/page:grid-cols-2 @3xl/page:items-start @3xl/page:gap-4 @3xl/page:space-y-0';
 
 /**
  * A step waiting at its gate, beside the closeout it handed on: the two things the CLI's `ls` says a person can do. Approve, with a box for
@@ -42,13 +41,11 @@ const SIDE_BY_SIDE = '@3xl/page:grid @3xl/page:grid-cols-2 @3xl/page:items-start
  * the only word there is to say. `acts` says the gate is an ending's: approving runs it rather than letting what follows be filed, and the
  * words given with the approval are the terms it acts on (`approvedSection`), not something handed to steps after it.
  *
- * `closeout` is what is being approved, where the gate is drawn beside it: the step's summary and each field it declared (`HandedOn`, the
- * Output tab's drawing) — for a plan its approach, then its files, steps and risks — beside Approve and Send back, since it is the one
- * thing a person must read before either: left of the answer where the page is wide, above it where it is not. The inspector's gate has
- * none: its Output tab is where the closeout is.
+ * What is being approved — the step's summary and each field it declared — is its part's Said and Gave, drawn beside the gate in the
+ * step's part (`components/step/part`), so the gate draws none of it.
  *
- * `questions` are what the step's closeout asks as data, each of its question fields in turn: answered by choosing, in the answer column
- * above Approve (`GateQuestions`), and then left out of what it handed on, so each question is drawn once. Approve waits until every one
+ * `questions` are what the step's closeout asks as data, each of its question fields in turn: answered by choosing, above Approve
+ * (`GateQuestions`). Approve waits until every one
  * has a choice or words, and sends the answers with its words as their note (`approvalBody`); Send back to the gated step carries them
  * too, all or none (`sendBackBody`). The api checks them against what the step asks now and writes them in the package's words.
  *
@@ -69,7 +66,6 @@ export function Gate({
   acts = false,
   onto = null,
   framed = true,
-  closeout = null,
   questions = [],
   budgets,
 }: {
@@ -83,7 +79,6 @@ export function Gate({
   onto?: string | null;
   /** False where what the gate asks is said above it already (the inspector's brief): no sentence of its own, and no box around it. */
   framed?: boolean;
-  closeout?: Frozen<StepCloseout> | null;
   questions?: readonly Frozen<Question>[];
   /** The step's gate's budgets (`step.gate.budgets`): drawn with a field each while they are its proposal. */
   budgets?: Frozen<GateBudgets> | null;
@@ -117,33 +112,23 @@ export function Gate({
     >
       {framed && <GateSentence step={step} back={back} acts={acts} />}
 
-      <div className={cn('space-y-4', closeout && SIDE_BY_SIDE)}>
-        {closeout && (
-          <section aria-label={`What ${step} handed on`} className="min-w-0 space-y-2 rounded border border-outline-variant bg-card p-3">
-            <h3 className="text-label-medium text-muted-foreground">
-              What <span className="font-semibold text-foreground">{step}</span> handed on, which you approve
-            </h3>
-            <HandedOn closeout={closeout} answeredBeside={questions.length > 0} />
-          </section>
+      <div className="min-w-0 space-y-4">
+        {questions.length > 0 && <GateQuestions step={step} questions={questions} draft={draft} onDraft={setDraft} />}
+        <GateBudgetFields step={step} budgets={budgets} amounts={amounts} onAmounts={setAmounts} field={field} />
+        <ApproveForm
+          step={step}
+          acts={acts}
+          onto={onto}
+          approveLine={approveLine}
+          field={field}
+          approval={approval}
+          busy={busy}
+          budgeting={budgeting}
+          {...answering}
+        />
+        {back.length > 0 && (
+          <SendBackForm step={step} back={back} to={to} onTo={setTo} field={field} sendBack={sendBack} busy={busy} {...answering} />
         )}
-        <div className="min-w-0 space-y-4">
-          {questions.length > 0 && <GateQuestions step={step} questions={questions} draft={draft} onDraft={setDraft} />}
-          <GateBudgetFields step={step} budgets={budgets} amounts={amounts} onAmounts={setAmounts} field={field} />
-          <ApproveForm
-            step={step}
-            acts={acts}
-            onto={onto}
-            approveLine={approveLine}
-            field={field}
-            approval={approval}
-            busy={busy}
-            budgeting={budgeting}
-            {...answering}
-          />
-          {back.length > 0 && (
-            <SendBackForm step={step} back={back} to={to} onTo={setTo} field={field} sendBack={sendBack} busy={busy} {...answering} />
-          )}
-        </div>
       </div>
     </section>
   );
@@ -510,11 +495,11 @@ export const endsTheRun = (step: Pick<StepView, 'spec'>): boolean => step.spec?.
  * What an ending step would act on, beside its gate: the run's result, for the person deciding whether to let it run.
  *
  * Where each result branch stands against the base branch and how much it changed, in the package's words (`branchWord`, `countsLine`,
- * off the run's decision, which the Decide section on this page has already read for this state of the run); then, for each step the
- * ending waits on — the steps a send-back goes to (`sendBackTo`) — the closeout it handed on, rendered, with the files it named. That is
- * the whole of what there is to read: the ending has run nothing and said nothing. The counts sit under each branch — `3 files: +14 −1`,
- * or the sentence saying what the run changed is not known — as the CLI's `decide` prints them beside the branch; the steps waited on are
- * read in the run's order off the graph the api gives, whatever the ending's spec reads.
+ * off the run's decision, read once for this state of the run); then, for each step the ending waits on — the steps a send-back goes to
+ * (`sendBackTo`) — a link to that step's part on the run's page (`#step-<name>`), where what it gave is drawn once, with its summary
+ * beside it. The counts sit under each branch — `3 files: +14 −1`, or the sentence saying what the run changed is not known — as the
+ * CLI's `decide` prints them beside the branch; the steps waited on are read in the run's order off the graph the api gives, whatever
+ * the ending's spec reads.
  */
 export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidableRun(run) });
@@ -552,24 +537,18 @@ export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
         )}
       </div>
 
-      {work.map((one) => (
-        <div key={one.name} className="min-w-0 space-y-2 border-t border-outline-variant pt-3">
-          <h3 className="text-label-medium text-muted-foreground">
-            What <span className="font-semibold text-foreground">{one.name}</span> handed on
-          </h3>
-          {one.closeout ? (
-            <Statement closeout={one.closeout} />
-          ) : (
-            <p className="text-body-small text-muted-foreground">It signed off with nothing to read.</p>
-          )}
-          {one.closeout && (
-            <div aria-label={`Artifacts of ${one.name}`} className="text-body-small text-muted-foreground">
-              Artifacts:
-              <Artifacts artifacts={one.closeout.artifacts} />
-            </div>
-          )}
-        </div>
-      ))}
+      {work.length > 0 && (
+        <ul aria-label="The work it acts on" className="space-y-1 border-t border-outline-variant pt-3">
+          {work.map((one) => (
+            <li key={one.name} data-acts-on={one.name} className="break-words">
+              <RouteLink to="/runs/$runId" params={{ runId: run.id }} hash={stepAnchor(one.name)} className={LINK}>
+                What {one.name} gave
+              </RouteLink>
+              {one.closeout && <span className="text-body-small text-muted-foreground"> — {one.closeout.summary}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

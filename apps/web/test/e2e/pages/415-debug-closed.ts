@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, openDebug, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, LEDGER, openDebug, partOf, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -17,7 +17,7 @@ export default {
    * to the turn's end, input-required is lit and that route is not taken. Taken back the same way.
    */
   name: 'debug-closed',
-  route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
+  route: `/runs/${FAKE.id}`,
   expect: async (page) => {
     await sidebar(page);
     const { id } = FAKE;
@@ -27,7 +27,7 @@ export default {
     const record = path.join(store!, 'runs', `${id}.json`);
     const journal = path.join(store!, 'engine', 'tasks', `${review}.jsonl`);
     const seeded = fs.readFileSync(record, 'utf8');
-    const { panel, lifecycle } = await openDebug(page, first);
+    const { panel, lifecycle } = await openDebug(partOf(page.locator(LEDGER), SESSION.step), first);
     await expectVisible(lifecycle.locator('[data-state="completed"][data-lit]'), `${step}'s task settled: completed lit`);
     await idle(page);
     const close = lifecycle.locator('[data-route="input-required->ending"]');

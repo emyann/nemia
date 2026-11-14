@@ -8,10 +8,12 @@ import { type WaitOn } from 'objects';
 import { useRunRead } from '@/lib/runView';
 import { barSaid } from '@/lib/runWords';
 import type { StepState } from '@/lib/status';
-import { stepCardOf, type StepCardInput } from '@/lib/stepCard';
+import { headOf } from '@/lib/stepPart';
 import { cardOpened, previewSide, useACardOpen, useSheetPreview, type PreviewSide } from '@/lib/useSheetPreview';
 import { cn, focusRing } from '@/components/ui/ds/utils';
-import { StepCard } from './StepCard';
+import { CutFrame } from '../look';
+import { PartHead } from './part/PartHead';
+import { StepPart } from './part/StepPart';
 
 /** The run a rail belongs to, as its row on the list gives it. */
 type RailRun = Pick<RunView, 'id' | 'cancelledAt' | 'holding' | 'steps'>;
@@ -23,14 +25,20 @@ type RailStep = { name: string; state: StepState; on: WaitOn | null };
 const BAR_BUTTON = cn('-my-3 grid h-8 w-full cursor-pointer content-center outline-none', focusRing());
 
 /**
- * The card of a step, read once it opens: the run's own answer (one read a run, held by the query's cache) and the agents, at the
- * instant the run was read; while they are read, what the row already knows.
+ * The card of a step, its part at M, read once it opens: the run's own answer (one read a run, held by the query's cache) and the agents,
+ * at the instant the run was read; while they are read, the head of what the row already knows.
  */
 function OpenedCard({ run, step, asOf }: { run: RailRun; step: string; asOf: Date }) {
   const detail = useRunRead(run.id);
   const agents = useQuery(agentsQuery);
-  const input: StepCardInput = { run, step, detail: detail.view, agents: agents.data, now: asOf };
-  return <StepCard facts={stepCardOf(input)} />;
+  if (detail.view) return <StepPart view={detail.view} step={step} size="M" agents={agents.data} now={asOf} />;
+  return (
+    <CutFrame size={24} className="w-[416px] max-w-full">
+      <div className="p-4">
+        <PartHead head={headOf({ run, step, agents: agents.data, now: asOf })} size="M" />
+      </div>
+    </CutFrame>
+  );
 }
 
 /**

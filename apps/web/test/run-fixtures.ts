@@ -263,6 +263,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
       answer: null,
     },
   ],
+  shown: 2,
   timeline: [
     {
       try: 1,

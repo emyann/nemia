@@ -11,7 +11,6 @@ import type { RunView } from './api/judged.ts';
 import type { RunToDecide } from './api/judged.ts';
 import type { RunDetail, StepView } from './runView';
 import { stepState } from './status.ts';
-import { decidableRun } from './decide.ts';
 import type { Frozen } from './frozen.ts';
 
 /** A step as the list gives it, or as a run's detail does, with what a session the harness blocked said last. */
@@ -52,7 +51,7 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
 }
 
 /**
- * Each step's need, in the run's order: what the Factory's card and the run's banner say.
+ * Each step's need, in the run's order: what the Factory's card says.
  *
  * Without the ending step whose gate the run's to-decide line already says, as the CLI's `ls` leaves it out of `→ waiting on you`
  * (cli/main.ts): that line names the step and the command that approves it, and the same step is not asked for twice.
@@ -72,7 +71,8 @@ export const needsOf = (
  * last>` — and at a gate, the CLI `ls`'s own words, which name the step: `approve plan`. The wait before the last line: it is why the
  * session has not moved, and the line is only the last thing it happened to say.
  *
- * What a person does about the wait is not here — a card has one line and a node has one line, and `advice` needs its own (`NeedsBanner`).
+ * What a person does about the wait is not here — a card has one line and a node has one line, and `advice` needs its own (the step's
+ * part, `PartAsks`).
  */
 export const needText = (need: Need): string => {
   if (need.kind === 'asks') return `asks: ${need.needs}`;
@@ -86,7 +86,7 @@ export const needText = (need: Need): string => {
  * a wait on it, the wait alone (`waiting for a permission prompt`). It is the one fact this page has nowhere else at a glance — the chip
  * above the line already says the session asks, and `blocked by the harness: ` is twenty-four characters, which would leave room for a
  * few of the wait's. The whole of it, with what the session said last, is the line's `title`
- * and the banner's. Every other need, and a harness that said nothing about what for, reads as it does anywhere else.
+ * and the step's part's. Every other need, and a harness that said nothing about what for, reads as it does anywhere else.
  */
 export const needNodeText = (need: Need): string => (need.kind === 'harness' && need.waitingFor ? need.waitingFor.words : needText(need));
 
@@ -98,7 +98,7 @@ export const needNodeText = (need: Need): string => (need.kind === 'harness' && 
 export const deniedNodeText = (calls: readonly string[]): string => `denied ${calls.length} call${calls.length === 1 ? '' : 's'}`;
 
 /**
- * A need with the step it is of, as the card and the banner say it: `implement asks: <needs>`, `implement is blocked by the harness: <…>`,
+ * A need with the step it is of, as the card says it: `implement asks: <needs>`, `implement is blocked by the harness: <…>`,
  * and `approve plan`, whose words name their step already.
  */
 export const needLine = (need: Need): string =>
@@ -112,15 +112,12 @@ export const needLine = (need: Need): string =>
  */
 export const gateOffered = (step: Pick<StepView, 'approve'>, runCancelled: boolean): boolean => Boolean(step.approve) && !runCancelled;
 
-/** Where a step's section is on its run's page, as a URL's hash: what the banner's `approve plan` links to, where Approve is. */
+/** Where a step's section is on its run's page, as a URL's hash: what the run's asks link to, where its part answers them. */
 export const stepAnchor = (step: string): string => `step-${step}`;
 
 /** The questions a step's closeout asks as data, each of its question fields in turn, in the schema's order; none without a closeout. */
 export const askedIn = (closeout: Frozen<Pick<StepCloseout, 'questions'>> | null | undefined): Frozen<Question>[] =>
   closeout?.questions.flatMap((a) => a.questions) ?? [];
-
-/** What an offer presses: a key of the step's `commands`, the api's line for it (`commands.retry`, `commands.approve`, `commands.say`). */
-export type OfferKind = keyof StepView['commands'];
 
 /**
  * What a run's page offers for a step, by why it waits (`case`), each with the command it presses (`kind`), whose line is the api's
@@ -139,7 +136,7 @@ export type OfferKind = keyof StepView['commands'];
  *              its loop's round, the CLI's `retry --round --budget`. `message` is its word, with the amounts; `unfinished` whether its
  *              check did not finish
  *   continue   the harness blocked its session, with nothing signed: a continue, with something to say if you like, which the package takes
- *              as the CLI's `retry` does — the tick stops the session, then files the try. The banner offers it, beside what the session
+ *              as the CLI's `retry` does — the tick stops the session, then files the try. Its part offers it, beside what the session
  *              said last
  *   enough     a loop out of rounds, waiting on you: its work taken as it stands, with your reason — the CLI's `approve` of a loop
  *
@@ -165,7 +162,7 @@ export type Offer =
 /** Why a step waits, as its offer says it. */
 export type OfferCase = Offer['case'];
 
-/** What the Decide section offers: every offer but `continue`, which the banner makes beside the need it answers. */
+/** What a step's part answers with a row (`AnswerRow`): every offer but `continue`, which its part makes with `Continue`. */
 export type Answer = Exclude<Offer, { case: 'continue' }>;
 
 /** A run that can be offered anything: called off or held by a person, it is offered nothing. */
@@ -219,20 +216,12 @@ export function askedOf(run: Offerable, step: string): { try: number; note: stri
 }
 
 /**
- * Whether a run's page draws its Decide section: there is something to decide (`decidableRun`), something to answer (`answersOf`), or a
- * try a person asked for, which the section notes until the tick files it (`askedOf`) — a run that runs again once its step is answered
- * waits on nobody, and its note would else go with the section the moment the run is read again.
- */
-export const decideDrawn = (run: Offerable & Pick<RunDetail, 'status'>): boolean =>
-  decidableRun(run) || answersOf(run).length > 0 || run.steps.some((step) => askedOf(run, step.name) !== null);
-
-/**
  * The amount a raise's box starts at: the first whole dollar above what the package says the budget has to pass (`StepRaise.above`) — $5
  * for a step whose tries cost $4.25, $4 for one ended at a $3 cap. A person changes it; the package refuses one not above, in its words.
  */
 export const raiseTo = (above: number): number => Math.floor(above) + 1;
 
-/** What the Decide section offers, in the run's order: every offer but Continue, which the banner makes (`Answer`). */
+/** The offers answered by a row, in the run's order: every offer but Continue (`Answer`). */
 export const answersOf = (run: Offerable): Answer[] => offersOf(run).filter((offer): offer is Answer => offer.case !== 'continue');
 
 /**

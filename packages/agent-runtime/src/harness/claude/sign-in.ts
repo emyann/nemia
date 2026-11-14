@@ -38,7 +38,10 @@ export type AuthStatus = typeof AuthStatusSchema.Type;
 
 const decodeStatus = Schema.decodeUnknownOption(AuthStatusSchema);
 
-/** The answer `stdout` carries, or `undefined` where it is not JSON of that shape: unread, never read as signed out. */
+/**
+ * The answer `stdout` carries, or `undefined` where it is not JSON of that shape: unread, never read as signed out.
+ * @param stdout What `auth status` printed on its stdout.
+ */
 export const authStatusOf = (stdout: string): AuthStatus | undefined => {
   let parsed: unknown;
   try {
@@ -49,7 +52,10 @@ export const authStatusOf = (stdout: string): AuthStatus | undefined => {
   return Option.getOrUndefined(decodeStatus(parsed));
 };
 
-/** What one ask's end says of the sign-in: the exit and the JSON as Claude Code documents them. */
+/**
+ * What one ask's end says of the sign-in: the exit and the JSON as Claude Code documents them.
+ * @param ask How the ask ended: its exit code and `loggedIn` where it exited, else that it timed out or did not run.
+ */
 export const claudeSignInOf: ClaudeSignInOf = (ask) => {
   if (ask.kind === 'timed-out') return 'timed-out';
   if (ask.kind === 'not-run') return 'unknown';
@@ -62,6 +68,7 @@ export const claudeSignInOf: ClaudeSignInOf = (ask) => {
 /**
  * How a Claude Code at `executable` is started: a script under this runtime's node, a binary as it is — the rule the Agent SDK starts
  * `pathToClaudeCodeExecutable` by, so the ask runs the Claude Code the session would.
+ * @param executable The path of the Claude Code to start.
  */
 export const claudeLaunch = (executable: string): { cmd: string; args: string[] } =>
   ['.js', '.mjs', '.ts', '.tsx', '.jsx'].includes(path.extname(executable))
@@ -94,6 +101,10 @@ const askClaudeSignIn = (executable: string, r: SpawnRequest, ms: number): Asked
  * Claude Code `AE_CLAUDE_EXECUTABLE` names, else `<harnessBin>/claude`, else the SDK's bundled one, else the one on PATH
  * (`claudeExecutableOf`), `unknown` where none is found or it does not start. What a caller that is no session reads, to say whether a
  * session would start; as the spawn's ask, it cannot see a credential that no longer works.
+ * @param env The environment the ask runs under, read for `AE_CLAUDE_EXECUTABLE`.
+ * @param ms How long the ask is given to answer, in ms; `CLAUDE_SIGN_IN_MS` unless given.
+ * @param cwd The folder the ask runs in; absent, this process's.
+ * @param harnessBin The folder a Claude Code is looked for in where no variable names one.
  */
 export const claudeSignIn = (env: NodeJS.ProcessEnv, ms: number = CLAUDE_SIGN_IN_MS, cwd?: string, harnessBin?: string): ClaudeSignIn => {
   const claude = claudeExecutableOf(env.AE_CLAUDE_EXECUTABLE ?? process.env.AE_CLAUDE_EXECUTABLE, harnessBin);
@@ -106,6 +117,10 @@ export const claudeSignIn = (env: NodeJS.ProcessEnv, ms: number = CLAUDE_SIGN_IN
  * one, else the one on PATH (`claudeExecutableOf`); with none found, or one
  * that does not start or answers neither way, nothing is refused, and the spawn fails in its own words as before. An ask with no
  * answer within `ms` refuses, saying so: the sign-in is unknown, and a Claude Code that hangs would hang the session too.
+ * @param r The spawn request, whose working root and `config.env` the ask runs under.
+ * @param executable The engine's Claude Code; absent where it names none.
+ * @param ms How long the ask is given to answer, in ms; `CLAUDE_SIGN_IN_MS` unless given.
+ * @param harnessBin The folder a Claude Code is looked for in where neither `executable` nor the variable names one.
  */
 export const claudeSignedOutRefusal = (
   r: SpawnRequest,

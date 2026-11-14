@@ -229,7 +229,10 @@ export const CLAUDE_OWNED_FLAGS: readonly string[] = [
   'addDir',
 ];
 
-/** A camelCase key as Claude Code's flag: `appendSystemPromptFile` is `--append-system-prompt-file`. */
+/**
+ * A camelCase key as Claude Code's flag: `appendSystemPromptFile` is `--append-system-prompt-file`.
+ * @param key The flag's key in `config.claude`, in camelCase.
+ */
 export const claudeFlagName = (key: string): string => `--${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
 
 /**
@@ -237,6 +240,7 @@ export const claudeFlagName = (key: string): string => `--${key.replace(/[A-Z]/g
  * A mount (`additionalDirectories`, `--add-dir`) grants writes as well as reads where the mode lets a session write, and a deny beats every
  * allow and every mode: it holds the folder read-only under `dontAsk`, `acceptEdits`, `auto` and `bypassPermissions`, a Bash redirection
  * into it included (measured on Claude Code 2.1.288).
+ * @param config The task's spawn config, read for its disallowed tools and its mounts; absent, none.
  */
 export const claudeDenies = (config: SpawnRequest['config']): string[] => [
   ...(config?.disallowedTools ?? []),
@@ -248,6 +252,7 @@ export const claudeDenies = (config: SpawnRequest['config']): string[] => [
  * `Edit(//<path>/**)`. `dontAsk` refuses a write under an added folder that no allow names, `Edit(**)` included, since it resolves
  * against the session's cwd; the allow lets the Edit tool and a Bash redirection write there. `auto` writes there without it
  * (measured on Claude Code 2.1.288).
+ * @param config The task's spawn config, read for its allowed tools and its mounts; absent, none.
  */
 export const claudeAllows = (config: SpawnRequest['config']): string[] => [
   ...(config?.allowedTools ?? []),
@@ -290,7 +295,10 @@ const claudeAdmissionRefusal = (task: Omit<SpawnRequest, 'name'>): string | unde
   return `\`claude.settings\` is given as ${JSON.stringify(settings)}, and admission is merged into the session's settings as a hook: the runtime rewrites no file. Give the settings as a JSON object, like {"env":{"CI":"1"}}, or leave admission off.`;
 };
 
-/** Settings given as JSON, as an object; undefined for a file's path or JSON that is no object. */
+/**
+ * Settings given as JSON, as an object; undefined for a file's path or JSON that is no object.
+ * @param settings The task's `claude.settings`, as JSON or a file's path.
+ */
 export const settingsObject = (settings: string): Record<string, unknown> | undefined => {
   try {
     const read: unknown = JSON.parse(settings);
@@ -303,12 +311,14 @@ export const settingsObject = (settings: string): Record<string, unknown> | unde
 /**
  * Whether a task asks for its session bridged to claude.ai (`config.claude.remoteControl`): opened on the SDK's control request at the
  * session's first message, a job's and a long-lived session's alike (`session-bridge.ts`), and never spelt as a flag.
+ * @param task The task, read for its `config.claude.remoteControl`.
  */
 export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
 
 /**
  * What Claude Code cannot be asked for, Codex's own arguments, a mount whose rule it cannot write and admission beside settings it
  * cannot merge among it, as a sentence that says what to write instead.
+ * @param task The task as filed, its name left out.
  */
 export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
   const { permissionMode, effort } = task.config ?? {};
@@ -331,6 +341,7 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
 /**
  * A worktree name for this attempt. Derived from the session name when the task did not pick one,
  * so it is stable, greppable, and — the point — never absent.
+ * @param r The spawn request, read for its `config.worktree` and its session name.
  */
 export const worktreeName = (r: SpawnRequest): string =>
   typeof r.config?.worktree === 'string' ? r.config.worktree : r.name.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');

@@ -193,6 +193,7 @@ const askedOf = (r: SpawnRequest): AttachedOptions => ({
  *
  * Throws, in words that say what to do, for a flag of `config.claude` given more than one value, which `extraArgs` cannot repeat, and
  * for the two prompt files given together or a prompt file that cannot be read (`promptOf`).
+ * @param r The spawn request whose task's options are translated.
  */
 export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
   const c = r.config;

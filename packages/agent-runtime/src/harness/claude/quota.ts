@@ -40,7 +40,10 @@ const SESSION_KEYS = new Set([
   'CLAUDE_PID',
 ]);
 
-/** The environment an ask runs in: `env`, without what a Claude Code session hands its children (`SESSION_KEYS`). */
+/**
+ * The environment an ask runs in: `env`, without what a Claude Code session hands its children (`SESSION_KEYS`).
+ * @param env The environment to take from; this process's unless given.
+ */
 export function usageEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(env).filter(([key]) => !SESSION_KEYS.has(key)));
 }
@@ -56,6 +59,8 @@ export const EXECUTABLE_VARIABLE = 'AE_CLAUDE_EXECUTABLE';
  * names as `EXECUTABLE_VARIABLE`, which a job inherits from the engine and runs; else `undefined`: `claudeQuota` then asks the one in
  * the engine's `harnessBin` where there is one, as a job's spawn does, and otherwise the Agent SDK's own — the native CLI it bundles for
  * this platform. Never resolved on PATH: a `claude` there may be another version, or signed in as another account. Pure.
+ * @param named The engine's `claudeExecutable`; absent where it names none.
+ * @param env The environment read for `EXECUTABLE_VARIABLE`; this process's unless given.
  */
 export const quotaExecutable = (named: string | undefined, env: NodeJS.ProcessEnv = process.env): string | undefined =>
   named ?? (env[EXECUTABLE_VARIABLE] || undefined);
@@ -67,6 +72,8 @@ export const quotaExecutable = (named: string | undefined, env: NodeJS.ProcessEn
  * no session written, should a version write one for a session that never had a turn; no MCP server but one named here (none); and none
  * of the user's settings, which load plugins and their hooks and sync skills to disk on each start. `command` is the Claude Code to ask
  * (`quotaExecutable`), and where it is `undefined` the option is left off, so the SDK drives its own, as a job does.
+ * @param command The Claude Code to ask; absent, the SDK's own.
+ * @param env The environment the ask runs in, before its session keys and telemetry are taken out; this process's unless given.
  */
 export const usageOptions = (command?: string, env: NodeJS.ProcessEnv = process.env): Options => ({
   cwd: os.tmpdir(),
@@ -152,6 +159,10 @@ export const TOKEN_VARIABLE = 'CLAUDE_CODE_OAUTH_TOKEN';
  * service gave nothing for, or why it cannot be read. Pure. The SDK resolves the control response's `response` — the usage itself — so
  * this reads that and not the control response around it, which only the SDK sees. A plan whose `rate_limits` are null is
  * `unanswered`, as the SDK's type for this answer says: "or null when unavailable".
+ * @param usage The usage the SDK resolved, undecoded.
+ * @param env The environment the ask ran in, read for `TOKEN_VARIABLE`; empty unless given.
+ * @param program The Claude Code asked, as a path a person types to run it by hand; null where none can be named.
+ * @param heard What the store's sessions last heard of the plan, carried on a `token` answer; null where nothing was.
  */
 export function quotaOfUsage(
   usage: unknown,
@@ -193,6 +204,8 @@ const saidIn = (message: string): string => {
  * Why an ask that threw has no answer. Claude Code refusing the question — a version whose control request this is not — is `unknown`,
  * in its own words; no Claude Code to ask is `missing`; anything else is `failed`, with the exit code or the signal the SDK read where
  * it read one, and what the child said on its stderr (`saidIn`).
+ * @param error What the ask threw, undecoded.
+ * @param program The Claude Code asked, as a path a person types to run it by hand; null where none can be named.
  */
 export function quotaOfRefusal(error: unknown, program: string | null = null): HarnessQuota {
   const { errorClass, exitCode, signal, message } = (isObject(error) ? error : {}) as SdkError;

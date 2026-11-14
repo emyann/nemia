@@ -135,6 +135,7 @@ export type Live = {
 /**
  * Ends the turn of the session `live` through the SDK's control request, which only a session on streaming input takes: it leaves the
  * session answering under the same id, its turn ending with a result of its own. Answers whether the request was sent at all.
+ * @param live The session at work in this process; absent where this process runs none by that name.
  */
 export const interruptTurn = async (live: Live | undefined): Promise<boolean> => {
   const ask = live?.q?.interrupt;
@@ -174,6 +175,10 @@ export type HookHold = {
  * Answers what the hook answers a main-thread call that comes, or waited, as its session is ended: nothing, once its signal or `ends`
  * says it is over — the end interrupts the turn with this call unanswered, as Claude Code leaves it; let through, the call would run
  * while the session is being ended. Otherwise the call is written in flight (`callStarted`) and `undefined` answered: the hook's own.
+ * @param hold Whether a new call is held, whether the session is being ended, what a wait is told, the poll and the calls in flight.
+ * @param input The hook's input, as the SDK handed it.
+ * @param id The call's id as the hook names it; absent, the call is not kept in flight.
+ * @param signal The call's own signal, aborted where the SDK gives the call up.
  */
 export const heldAtHook = async (
   hold: HookHold,
@@ -311,6 +316,7 @@ const askedOf = async (
  * answered, so the call's own result carries their answer to the session; denied, naming what happens instead (`ASK_CUT`), where none
  * came — the holder let the session go, or the turn was ended, and the answer is owed to the session as words.
  * Exported only for the tests that import it.
+ * @param given The questions asked and the person's answers by question; absent where no answer reached the call.
  */
 export const askHookOutput = (given: { questions: AskQuestion[]; answers: Record<string, string> } | undefined) => ({
   hookSpecificOutput: {
@@ -358,6 +364,9 @@ const rewrite = (root: string, live: Live, patch: Partial<AttachedRun> = {}): vo
  * The turn of `live` cut by the sessions' drain in its call to `tool`: the cut kept on its run file, then the SDK's interrupt sent
  * (`interruptTurn`), which ends the turn with a result of its own and leaves the session answering under its id, its input open
  * for the words it is told once the drain is lifted (`toldCut`). Nothing where the session is let go.
+ * @param root The engine's store root, where the session's run file is.
+ * @param live The session at work in this process.
+ * @param tool The name of the tool whose call the drain cut.
  */
 export const cutTurn = async (root: string, live: Live, tool: string): Promise<boolean> => {
   if (live.letGo) return false;
@@ -369,6 +378,8 @@ export const cutTurn = async (root: string, live: Live, tool: string): Promise<b
  * The session `live`, cut by the sessions' drain, told so once the drain is lifted: `cutWords` of the call it cut pushed on its input
  * as words it must answer, a turn of their own, and the cut cleared. Nothing where it stands uncut or is let go; a session whose
  * input has closed has the cut cleared alone, as there is no one to tell.
+ * @param root The engine's store root, where the session's run file is.
+ * @param live The session at work in this process.
  */
 export const toldCut = (root: string, live: Live): void => {
   const cut = live.run.cut;
@@ -568,6 +579,8 @@ const turnEnded = (root: string, live: Live, m: Extract<SDKMessage, { type: 'res
  *
  * Words pushed on an open session's input begin a turn, so its run file is written `working` with them: a session that heard and stayed
  * `idle` would be read as waiting on a person while it answers, and no turn of it could be ended.
+ * @param root The engine's store root, where the session's say file and run file are.
+ * @param live The session at work in this process.
  */
 export const hear = (root: string, live: Live): void => {
   if (live.input.closed || live.letGo) return;
@@ -585,7 +598,11 @@ export const hear = (root: string, live: Live): void => {
   rewrite(root, live, { heard: end, ...(live.open ? { state: 'working' as const } : {}) });
 };
 
-/** Waits until the process `pid` is gone, read every `everyMs`. */
+/**
+ * Waits until the process `pid` is gone, read every `everyMs`.
+ * @param pid The process waited on; absent, nothing is waited on.
+ * @param everyMs How often it is read again, in ms; `GONE_POLL_MS` unless given.
+ */
 export const gone = async (pid: number | undefined, everyMs: number = GONE_POLL_MS): Promise<void> => {
   for (;;) {
     if (pid === undefined || !alive(pid)) return;
@@ -596,12 +613,16 @@ export const gone = async (pid: number | undefined, everyMs: number = GONE_POLL_
 /**
  * Kills whatever is left in the scope a session's run file `recorded`, where `scopeToEnd` allows it (`endScopeIn`): by its
  * `cgroup.kill`, at once, as its group is killed, so a process its commands started out of the group goes with it.
+ * @param recorded The scope's folder the session's run file recorded (`cgroup`); absent where it ran in none.
  */
 export const endScopeOf = (recorded: string | undefined): void => {
   if (recorded !== undefined && scopeToEnd(recorded, cgroupNow('self'))) endScopeIn(recorded, 'SIGKILL');
 };
 
-/** Kills the process group `pid` leads, and whatever is left of it: nothing when it is gone. */
+/**
+ * Kills the process group `pid` leads, and whatever is left of it: nothing when it is gone.
+ * @param pid The pid of the group's leader; absent, nothing is killed.
+ */
 export const killGroup = (pid: number | undefined): void => {
   if (pid === undefined) return;
   try {
@@ -653,6 +674,12 @@ const spawnerOf =
  * whose `config.claude` flag is given two values or whose checkout's `.mcp.json` is not JSON, and a spawn refused that way must leave
  * nothing behind — a run file saying `state: 'working'` with this holder's pid would be read by every later pass as a held, open
  * sighting of a session `query()` never started, which `releaseFinished` never takes because it never finishes.
+ * @param root The engine's store root, where the session's files are.
+ * @param r The spawn request the session runs.
+ * @param run The session's run file, as first written.
+ * @param first The first words on the session's input.
+ * @param options Whether a call is held and how often that is read, the Claude Code to run, the session to resume, who is pushed
+ *   each message, and the scope to run in.
  */
 export const startSession = (
   root: string,

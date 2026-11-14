@@ -171,6 +171,7 @@ const parsed = (text: string): unknown => {
 /**
  * The kind of the line `text`: one of `PRINTED`'s when it is a JSON object of that kind, `'other'` for a JSON object of another kind
  * or subtype, and `undefined` for a line that is no JSON object (stderr, a line torn mid-write, prose). Decodes nothing.
+ * @param text One line of the session's output.
  */
 export const printedKindOf = (text: string): PrintedKind | 'other' | undefined => {
   const value = parsed(text);
@@ -193,6 +194,8 @@ const refusal = (at: number, kind: PrintedKind, value: unknown, error: Schema.Sc
  * The lines of `kinds` in what a session's stream printed, decoded, in the order printed: `{ lines }`; or why the output is refused
  * (`wrong`, a sentence that names the line, its kind, its first wrong field and the fix, and quotes at most 60 characters of what it
  * found there). A line is parsed only when it names one of `kinds`' types.
+ * @param output What the session's stream printed, line by line.
+ * @param kinds The line kinds to decode; every other line is left unread.
  */
 export const printedLinesOf = (output: string, kinds: readonly PrintedKind[]): { lines: PrintedLine[] } | { wrong: string } => {
   const types = [...new Set(kinds.map((k) => `"${k.split(' ')[0]}"`))];
@@ -212,13 +215,22 @@ export const printedLinesOf = (output: string, kinds: readonly PrintedKind[]): {
 /** A line of `kind`, as its schema in `PRINTED` decodes it. */
 export type Printed<K extends PrintedKind> = (typeof PRINTED)[K]['Type'];
 
-/** The mode an `init` line names, in the runtime's word (`ranIn`): Claude Code's `permissionMode`. */
+/**
+ * The mode an `init` line names, in the runtime's word (`ranIn`): Claude Code's `permissionMode`.
+ * @param line The decoded `init` line.
+ */
 export const initRanIn = (line: Printed<'system init'>): string | undefined => line.permissionMode;
 
-/** The mode a `status` line names, in the runtime's word (`ranIn`): Claude Code's `permissionMode`, absent from most of them. */
+/**
+ * The mode a `status` line names, in the runtime's word (`ranIn`): Claude Code's `permissionMode`, absent from most of them.
+ * @param line The decoded `status` line.
+ */
 export const statusRanIn = (line: Printed<'system status'>): string | undefined => line.permissionMode;
 
-/** A `status` line as a capture keeps it: the mode it names, and nothing else a reader does not read. */
+/**
+ * A `status` line as a capture keeps it: the mode it names, and nothing else a reader does not read.
+ * @param ranIn The mode the line named.
+ */
 export const statusLineText = (ranIn: string): string => JSON.stringify({ type: 'system', subtype: 'status', permissionMode: ranIn });
 
 /** An `init` line as a capture keeps it, off what a reader reads of it: the mode under Claude Code's own key. */
@@ -230,6 +242,7 @@ export const initLineText = ({ ranIn, ...read }: InitRead): string =>
  * the text block at its index, a block written whole. Read off the event's own fields, so the same reading serves a line decoded
  * from a kept stdout (`claudePartials`) and an event handed by the Agent SDK as it comes (`attached-follow.ts`).
  *
+ * @param event The `stream_event`'s event, unchecked.
  * @returns nothing for anything else — a piece of a tool call's input among them, so a partial never carries unvalidated input
  */
 export const partialMarksOf = (event: unknown): PartialMark[] => {

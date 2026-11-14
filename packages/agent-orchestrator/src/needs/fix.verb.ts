@@ -50,7 +50,10 @@ export const FIX_TAIL_BYTES = 16_384;
 /** How often a follow of a fix's output reads it again while the fix runs (`followFix`). */
 export const FIX_FOLLOW_MS = 500;
 
-/** The variable an ask's answer reaches a fix's command in: `NEMIA_ANSWER_` and its name in capitals, any other character `_`. */
+/**
+ * The variable an ask's answer reaches a fix's command in: `NEMIA_ANSWER_` and its name in capitals, any other character `_`.
+ * @param name The ask's name, as the fix declares it.
+ */
 export const answerVariable = (name: string): string => `NEMIA_ANSWER_${name.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
 
 /**
@@ -329,6 +332,7 @@ const unfinishedNeeding = Effect.fnUntraced(function* (
 /**
  * The phase of a job filed as a command task — a fix, an upgrade (`upgrade-job.verb.ts`) — off its task's view: as it settled (`succeeded`,
  * else `failed`), `running` once an attempt began, else `pending`.
+ * @param view The task's view, or undefined where the runtime has none: `pending`.
  */
 export const commandPhaseOf = (view: TaskView | undefined): FixPhase => {
   if (view === undefined) return 'pending';
@@ -393,6 +397,8 @@ export type FixFollowed = { readonly kind: 'output'; readonly text: string } | {
  * The fix `id`'s output followed as it grows (`FIX_FOLLOW_MS`): each piece it printed since the last read, once and in order, from its
  * first byte, then its end (`ended`, `fixOf`), after which the stream is over. Refused (`Missing`) for an id no fix was started under.
  * Read off the runtime's kept stream every time, never remembered past the follow: a reader that comes back reads it whole again.
+ * @param id The fix's id.
+ * @param everyMs How long to wait between reads while the fix runs, in ms, `FIX_FOLLOW_MS` when absent.
  */
 export const followFix = (id: string, everyMs: number = FIX_FOLLOW_MS) =>
   Effect.gen(function* () {

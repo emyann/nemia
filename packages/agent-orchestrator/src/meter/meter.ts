@@ -29,7 +29,10 @@ export const FORMER_PHASE_WORDS = ['git'] as const;
 export type FormerPhase = (typeof FORMER_PHASE_WORDS)[number];
 export const FORMER_PHASES: { readonly [P in FormerPhase]: Phase } = { git: 'place' };
 
-/** Whether a word is a phase of today's (`PHASES`). */
+/**
+ * Whether a word is a phase of today's (`PHASES`).
+ * @param word The word to judge, as a stored series line or a caller carries it.
+ */
 export const isPhase = (word: string): word is Phase => (PHASES as readonly string[]).includes(word);
 
 /**
@@ -82,6 +85,9 @@ export const NOTHING_SEEN: Seen = { runs: 0, tasks: 0, queued: 0, admitted: 0, w
  * with its admission and when it was filed, and `running` the sessions at work by harness. A session at work counts once, in `running`;
  * one admitted and not yet started is its view's. The wait is the oldest queued view's, one with no time of filing left out. A report that
  * carries neither reads as none.
+ * @param report The runtime's pass report: its views, the tasks not settled, and its sessions at work by harness, either absent read as
+ * none.
+ * @param now The time to measure the oldest queued view's wait from, in ms since the epoch.
  */
 export const sessionsOf = (
   report: {
@@ -104,14 +110,21 @@ export const sessionsOf = (
 /** A pass's cost as it reads back off disk: what it saw is absent from a file an older tick wrote, which kept none of it. */
 export type PassCostRead = Omit<PassCost, keyof Seen> & Partial<Seen>;
 
-/** A pass's cost from its counts: the totals summed from the phases. */
+/**
+ * A pass's cost from its counts: the totals summed from the phases.
+ * @param c The pass's counts, phase by phase, without its totals.
+ */
 export const passCost = (c: Omit<PassCost, 'bytes' | 'spawned'>): PassCost => ({
   ...c,
   bytes: PHASES.reduce((n, p) => n + c.phases[p].bytes, 0),
   spawned: PHASES.reduce((n, p) => n + c.phases[p].spawned, 0),
 });
 
-/** The phases that took longest, longest first, at most `n`, leaving out any that took no time. */
+/**
+ * The phases that took longest, longest first, at most `n`, leaving out any that took no time.
+ * @param phases Each phase's time, in ms.
+ * @param n How many phases to keep at most, 3 when absent.
+ */
 export const heaviest = (phases: Record<Phase, { ms: number }>, n = 3): Array<{ phase: Phase; ms: number }> =>
   PHASES.map((phase) => ({ phase, ms: phases[phase].ms }))
     .filter((p) => p.ms > 0)
@@ -136,7 +149,12 @@ export type Interval = {
   overheadMs: number;
 };
 
-/** The interval with one more pass in it — a new one, from `now`, when there was none. */
+/**
+ * The interval with one more pass in it — a new one, from `now`, when there was none.
+ * @param interval The interval so far, or undefined when none is open.
+ * @param cost The pass to add.
+ * @param now When the pass ended, in ms since the epoch: the new interval's start when there was none.
+ */
 export const addPass = (interval: Interval | undefined, cost: PassCost, now: number): Interval => {
   const i = interval ?? {
     from: now,
@@ -160,13 +178,21 @@ export const addPass = (interval: Interval | undefined, cost: PassCost, now: num
   };
 };
 
-/** Whether the interval has run its length, so `nemia up` says its line and starts another. */
+/**
+ * Whether the interval has run its length, so `nemia up` says its line and starts another.
+ * @param interval The interval so far, or undefined when none is open (never due).
+ * @param now The time now, in ms since the epoch.
+ * @param every The interval's length in ms, `STATS_EVERY_MS` when absent.
+ */
 export const summaryDue = (interval: Interval | undefined, now: number, every = STATS_EVERY_MS): boolean =>
   interval !== undefined && now - interval.from >= every;
 
 const msWord = (ms: number): string => (ms >= 100 ? `${Math.round(ms)}` : ms >= 10 ? ms.toFixed(1) : ms.toFixed(2));
 
-/** Bytes as a person reads them: `812 B`, `14.2 kB`, `3.1 MB`. */
+/**
+ * Bytes as a person reads them: `812 B`, `14.2 kB`, `3.1 MB`.
+ * @param n The count of bytes.
+ */
 export const bytesWord = (n: number): string =>
   n < 1000 ? `${n} B` : n < 1_000_000 ? `${(n / 1000).toFixed(1)} kB` : `${(n / 1_000_000).toFixed(1)} MB`;
 
@@ -175,6 +201,8 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
 /**
  * `nemia up`'s line for an interval: how many passes, what a pass took on average and at most, the three heaviest phases over the interval,
  * the bytes read and the processes started, and what measuring cost.
+ * @param i The interval to say.
+ * @param now The time now, in ms since the epoch: the interval's end.
  */
 export const summaryLine = (i: Interval, now: number): string => {
   const heavy = heaviest(Object.fromEntries(PHASES.map((p) => [p, { ms: i.phases[p] }])) as Record<Phase, { ms: number }>);
@@ -194,7 +222,10 @@ const seenLines = ({ runs, tasks, queued, admitted, phases }: PassCostRead): str
           `and made ${plural(phases.journals.reads, 'journal read')}`,
       ];
 
-/** The last pass, phase by phase and harness by harness, for `nemia up --stats` and `nemia tick --stats`. */
+/**
+ * The last pass, phase by phase and harness by harness, for `nemia up --stats` and `nemia tick --stats`.
+ * @param c The last pass's cost, as read back off disk.
+ */
 export const breakdownLines = (c: PassCostRead): string[] => {
   const rows = PHASES.map((p) => [
     p,
@@ -253,7 +284,11 @@ export type CheckLabels = { factory: string; workflow: string; step: string; age
 /** What a pass is kept with beside its cost: the quota read, the checks filed in it, and the last reading of the store's disk. */
 export type AlsoKept = { quota?: Reading; checks?: readonly CheckLabels[]; disk?: DiskReading };
 
-/** A pass's cost as it is kept among the recent passes (`RecentPass`), with what it is kept with (`AlsoKept`). */
+/**
+ * A pass's cost as it is kept among the recent passes (`RecentPass`), with what it is kept with (`AlsoKept`).
+ * @param c The pass's cost.
+ * @param also What the pass is kept with, nothing when absent.
+ */
 export const recentOf = (c: PassCost, also: AlsoKept = {}): RecentPass => ({
   at: c.at,
   ms: c.ms,
@@ -284,7 +319,11 @@ export const READ_BOUNDS: readonly number[] = [0, 1, 2, 5, 10, 25, 50, 100, 250,
 /** One bucket of passes: those over the bound before and at most `le` ms, `le` null for the last, which has no bound. */
 export type PassBucket = { le: number | null; count: number };
 
-/** The passes counted into the buckets of `bounds`, each in the first whose bound it does not pass, and one past the last for the rest. */
+/**
+ * The passes counted into the buckets of `bounds`, each in the first whose bound it does not pass, and one past the last for the rest.
+ * @param recent The recent passes, each with its time in ms.
+ * @param bounds The buckets' upper bounds in ms, ascending, `PASS_BOUNDS` when absent.
+ */
 export const passHistogram = (recent: readonly Pick<RecentPass, 'ms'>[], bounds: readonly number[] = PASS_BOUNDS): PassBucket[] => {
   const counts = Array.from({ length: bounds.length + 1 }, () => 0);
   for (const { ms } of recent) {
@@ -298,7 +337,10 @@ export const passHistogram = (recent: readonly Pick<RecentPass, 'ms'>[], bounds:
 /** One phase over the recent passes: its time a pass, on average, and its share of all their time. */
 export type PassPart = { phase: Phase; ms: number; share: number };
 
-/** Each phase over `recent` (`PassPart`), heaviest first, the phases' own order between equals; none for no pass. */
+/**
+ * Each phase over `recent` (`PassPart`), heaviest first, the phases' own order between equals; none for no pass.
+ * @param recent The recent passes, each with its time and each phase's time in ms.
+ */
 export const passParts = (recent: readonly Pick<RecentPass, 'ms' | 'phases'>[]): PassPart[] => {
   if (!recent.length) return [];
   const whole = recent.reduce((n, r) => n + r.ms, 0);
@@ -320,7 +362,10 @@ export type PassSummary = Omit<Seen, 'waitMs' | 'load'> & {
   at: string;
 };
 
-/** The recent passes' summary (`PassSummary`), null for none. */
+/**
+ * The recent passes' summary (`PassSummary`), null for none.
+ * @param recent The recent passes, oldest first.
+ */
 export const passSummary = (recent: readonly RecentPass[]): PassSummary | null => {
   const latest = recent.at(-1);
   if (!latest) return null;
@@ -353,7 +398,10 @@ export type PassesRead = {
   bounds: readonly number[];
 };
 
-/** The answer of the recent passes `recent` (`PassesRead`). */
+/**
+ * The answer of the recent passes `recent` (`PassesRead`).
+ * @param recent The recent passes, oldest first.
+ */
 export const passesRead = (recent: RecentPass[]): PassesRead => ({
   recent,
   histogram: passHistogram(recent),

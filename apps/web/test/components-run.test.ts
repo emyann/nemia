@@ -686,6 +686,37 @@ test('the result of a run called off, or ended, before its final steps gave says
   assert.match(ended, /<p data-result-ended="ended"/);
 });
 
+test('the result of a routed run that ended on its workflow node is the card it sent, linked, and never that the run ended before', async () => {
+  const { RunResult } = await import('../src/components/run/RunResult.tsx');
+  const handoff = step({ name: 'handoff', phase: 'succeeded', reason: 'Sent', on: null, via: null, verdict: null, closeout: null });
+  const run = detailOf({
+    status: 'succeeded',
+    holding: null,
+    graph: { roots: ['handoff'], edges: [], nodes: [{ name: 'handoff', kind: 'workflow', workflow: 'dev' }] },
+    steps: [{ ...handoff, message: 'sent → r-1-handoff' }],
+  });
+  const html = await routedWith(createElement(RunResult, { run }));
+  assert.match(html, /data-run-result="gave"/);
+  assert.match(html, /<p data-result-sent="r-1-handoff"[\s\S]*?<a [^>]*href="\/inbox\/r-1-handoff"/, 'the card it sent, linked');
+  assert.doesNotMatch(html, /data-result-ended/);
+});
+
+test('the result of a run that ended with its final steps done and nothing given says they finished, not that they never gave', async () => {
+  const { RunResult } = await import('../src/components/run/RunResult.tsx');
+  const done = step({
+    name: 'review',
+    ...coded('verified ✓'),
+    closeout: { ...step().closeout!, summary: '', output: {}, artifacts: [], values: [] },
+  });
+  const run = detailOf({ status: 'succeeded', holding: null, graph: { roots: ['review'], edges: [] }, steps: [done] });
+  const html = await routedWith(createElement(RunResult, { run }));
+  assert.match(html, /<p data-result-ended="ended"/);
+  assert.ok(
+    textsOf(html).some((t) => t.includes('finished')),
+    'its last steps finished',
+  );
+});
+
 test("the header: the brief's first line for a title, where the run stands, its id to copy, and three tiles — took, cost, rounds", async () => {
   const { RunHeader } = await import('../src/components/run/RunHeader.tsx');
   const html = await routedWith(createElement(RunHeader, { run: atGate({}, { brief: '# Make the floor clear\n\nMore.' }) }));

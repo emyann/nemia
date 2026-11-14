@@ -7,6 +7,7 @@ import type { ResultOf, ResultStep, Stands } from '../../contracts/run-result.co
 import type { RunDetail, StepView } from './runView.ts';
 import { meaningOf } from './meaning.ts';
 import { movingInto, isLive } from './canvas.ts';
+import { nodeKinds } from './routing.ts';
 import { satisfiesAfter, stateDrawn, stepState, type StepState } from './status.ts';
 
 /** Where the run stands, in the order the box says it: waiting on a person first, then failed, then at work, else to come. */
@@ -47,15 +48,17 @@ const gaveOf = (step: StepView): boolean => {
 
 /**
  * The run's steps as the box reads them, in the run's order: each final where no `after` or route edge leaves it (a loop's edge back
- * leads to no step after it), where it stands (`standsOf`), and whether its shown try gave.
+ * leads to no step after it), where it stands (`standsOf`), and whether it gave: its shown try's closeout, or, for a node that is no
+ * plain step — a workflow node, which files a card, or a condition, which takes a route — what it did, which no session signs off.
  */
 export function resultStepsOf(view: RunDetail): ResultStep[] {
   const before = new Set(view.graph.edges.filter((e) => e.kind !== 'loop').map((e) => e.from));
+  const nodes = nodeKinds(view.graph);
   return view.steps.map((step) => ({
     name: step.name,
     final: !before.has(step.name),
     stands: standsOf(stepState(step, view.cancelledAt !== null, view.holding != null)),
-    gave: gaveOf(step),
+    gave: nodes.has(step.name) || gaveOf(step),
   }));
 }
 

@@ -81,3 +81,47 @@ test('runEndOf: called off by its status or its moment, ended once its status en
     ['calledOff', 'calledOff', 'ended', 'ended', null, null],
   );
 });
+
+/** A routed run that ended on its workflow node: plan, then a condition the table answered, then `handoff`, which sent a card. */
+const routedRun = () =>
+  detail({
+    holding: null,
+    graph: {
+      roots: ['plan'],
+      edges: [
+        { from: 'plan', to: 'triage', kind: 'after' },
+        { from: 'triage', to: 'handoff', kind: 'route', route: 'web' },
+      ],
+      nodes: [
+        { name: 'plan', kind: 'step' },
+        { name: 'triage', kind: 'condition' },
+        { name: 'handoff', kind: 'workflow', workflow: 'dev' },
+      ],
+    },
+    steps: [
+      step({ name: 'plan', ...coded('verified ✓') }),
+      step({ name: 'triage', ...coded('succeeded'), message: 'routed: web', closeout: null }),
+      step({
+        name: 'handoff',
+        phase: 'succeeded',
+        reason: 'Sent',
+        on: null,
+        via: null,
+        verdict: null,
+        message: 'sent → r-1-handoff',
+        closeout: null,
+      }),
+    ],
+  });
+
+test('resultStepsOf: a node that runs no session gave what it did, so a routed run ending on its workflow node gave the card it sent', () => {
+  assert.deepEqual(
+    resultStepsOf(routedRun()).map((s) => [s.name, s.final, s.stands, s.gave]),
+    [
+      ['plan', false, 'done', true],
+      ['triage', false, 'done', true],
+      ['handoff', true, 'done', true],
+    ],
+  );
+  assert.deepEqual(resultOf(resultStepsOf(routedRun())), { kind: 'gave', steps: ['handoff'] });
+});

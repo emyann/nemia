@@ -14,7 +14,8 @@ export type Stands = 'done' | 'yours' | 'failed' | 'working' | 'toCome' | 'skipp
 
 /**
  * A step of the run, in the run's order: its name, whether it is final (no step comes after it on the graph), where it stands, and
- * whether its shown try gave anything: the summary it signed off with, a declared field, a file or a value.
+ * whether it gave anything: its shown try's summary, a declared field, a file or a value, or, for a node that runs no session, what
+ * it did (the card it sent, the route it took).
  */
 export type ResultStep = { readonly name: string; readonly final: boolean; readonly stands: Stands; readonly gave: boolean };
 

@@ -12,7 +12,8 @@ const AT_WORK = 'implement';
 export default {
   /**
    * The run's result, beside its ask: DIAMOND's running run has given nothing yet, and its result says it is at work, naming the step
-   * at work as a link to its part. SHAPED, whose final step `build` has given, draws that step's fields as their widgets — its link, its
+   * at work as a link to its part. DIAMOND's run called off before anything of it was filed says it was called off, never what is to
+   * come. SHAPED, whose final step `build` has given, draws that step's fields as their widgets — its link, its
    * commit, its table and its list — and its files, under its name linked to its part, and says nothing of where it stands. SHAPED is
    * written for the visit and taken back.
    */
@@ -28,6 +29,17 @@ export default {
     );
     await settled(page);
     await photograph(page.locator('section[data-run-ask]').locator('..'), path.join(OUT, `run-result-working-${await themeOf(page)}.png`));
+
+    await page.goto(new URL(`/runs/${DIAMOND.cancelled.id}`, page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    const off = page.locator('section[data-run-result] [data-result-ended="calledOff"]');
+    await expectVisible(off.getByText('called off'), 'a run called off before its final steps gave says it was called off');
+    await expectCount(page.locator('section[data-run-result] [data-result-stands]'), 0, 'and never that they are still to come');
+    await settled(page);
+    await photograph(
+      page.locator('section[data-run-ask]').locator('..'),
+      path.join(OUT, `run-result-called-off-${await themeOf(page)}.png`),
+    );
 
     const written = writeShaped(store!);
     const { id, step } = SHAPED;

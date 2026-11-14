@@ -18,10 +18,12 @@ orchestrator, the api, the board and the client import it through its one entry,
   schema, inside `Schema.optionalKey(…)` for an optional one, since the document a client, the reference page and the MCP port's tools
   read holds no comment. A field that is another schema whole (a bare `$ref` in the document) keeps no word of its own, so that
   schema's own `description` says it, set where it is defined: annotated where it is used, a schema with an `identifier` becomes a
-  second component, `<Name>_1`, whose every field is owed again. On a schema that takes a `.check(…)`, the description goes before the
-  check: after it, the document drops it. So does `Schema.Number`'s own description, and `Schema.Unknown`'s: a number is described by
-  `describedNumber`, an unknown by `describedOne` (`src/meta.ts`). `test/described.test.ts` counts the properties still said nowhere, per schema, in `test/described.baseline.json`,
-  which only shrinks: describe a field and lower its count in the same commit (`node test/described.test.ts --print` prints today's).
+  second component, `<Name>_1`, whose every field is owed again, and `test/one-component.test.ts` refuses one but those the
+  `httpApiStatus: 201` pipes make today. On a schema that takes a `.check(…)`, the description goes before the check: after it, the
+  document drops it. So does `Schema.Number`'s own description, and `Schema.Unknown`'s: a number is described by `describedNumber`, an
+  unknown by `describedOne` (`src/meta.ts`). `test/described.test.ts` counts the properties still said nowhere, per schema, in
+  `test/described.baseline.json`, which only shrinks: describe a field and lower its count in the same commit (`node
+  test/described.test.ts --print` prints today's).
 
 - **`nemia/v1` is additions only.** A key added to an object is optional, and no key changes its meaning or its type under the same
   `apiVersion`: a reader of an older store, or an older client, reads the object still. A change that breaks a reader is a new

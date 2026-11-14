@@ -255,9 +255,9 @@ test("a run forgotten loses its record and every person's file and its directory
   const run = made('r-forget');
   const other = made('r-forget-other');
   for (const id of [run.id, other.id]) {
+    filesStore.holds.put(id, ['x'], {});
     filesStore.runs.cancel(id);
     pruned(id);
-    filesStore.holds.put(id, ['x'], {});
     filesStore.asks.write(id, { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at } });
     fs.mkdirSync(path.join(runsDir(ROOT), id, 'artifacts'), { recursive: true });
     fs.writeFileSync(path.join(runsDir(ROOT), id, 'artifacts', 'x'), 'x');

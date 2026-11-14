@@ -30,6 +30,7 @@ import {
   fileNames,
   heldIn,
   holdFile,
+  marksAt,
   unheldFile,
   listRuns,
   lstatOf,
@@ -58,6 +59,7 @@ import {
 import { mergeSpent } from '../merge/merge.ts';
 import { keptRecords, type RecordMemo } from '../rest/index.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
+import { runMarkMove } from '../run-marks/run-marks.ts';
 
 /** Each ask, by which it is: the file it is written at, by run, step and number, and its reader, as the tick reads it. */
 const ASKS: Record<
@@ -348,9 +350,17 @@ function dropFiles(home: string, id: string): string | null {
   }
 }
 
-/** Write the prune marker whole, or remove it for `undefined`. */
-const writePruned = (home: string, id: string, marker: Pruned | undefined): void =>
-  marker ? fs.writeFileSync(pruneFile(home, id), JSON.stringify(marker, null, 2)) : fs.rmSync(pruneFile(home, id), { force: true });
+/**
+ * Write the prune marker whole, or remove it for `undefined`, as the machine answers the prune or its taking back on the marks that
+ * stand (`runMarkMove`): a prune of a run already pruned writes what it recorded since, and a prune taken back of a run not pruned
+ * has nothing to remove.
+ */
+const writePruned = (home: string, id: string, marker: Pruned | undefined): void => {
+  const move = runMarkMove(marksAt(home, id), marker ? 'prune' : 'unprune');
+  if (move.kind === 'refused') return;
+  if (marker) fs.writeFileSync(pruneFile(home, id), JSON.stringify(marker, null, 2));
+  else fs.rmSync(pruneFile(home, id), { force: true });
+};
 
 /**
  * The inbox: cards before they are started, one `<name>.md` per card (`parseInboxCard` in inbox.ts), in the store beside `runs/` — not in a

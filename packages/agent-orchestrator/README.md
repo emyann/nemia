@@ -3159,6 +3159,35 @@ stateDiagram-v2
 ```
 <!-- diagram:pause:end -->
 
+A run's status is never written: a pass works it out from its steps (`assess`). What a person does to a run as a whole is written,
+each in a file of its own beside the record: that it is called off (`nemia cancel`), held (`nemia hold`) or pruned (`nemia prune`). The
+marks a run carries are read from those files on every pass and by every verb (`runMarkOf`), and the store that writes them asks
+`runMarkMove` (`src/run-marks/run-marks.ts`, proved by `contracts/run-marks.contract.ts`) before each write:
+
+<!-- diagram:run-marks:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/run-marks/run-marks.ts').then((m) => console.log(m.runMarksDiagram()))" -->
+```mermaid
+stateDiagram-v2
+  [*] --> open
+  open --> held: held
+  open --> called-off: called off
+  open --> pruned: pruned
+  held --> open: its hold lifted
+  held --> called-off-held: called off
+  held --> pruned-held: pruned
+  called-off --> called-off-pruned: pruned
+  called-off-held --> called-off: its hold lifted
+  called-off-held --> called-off-pruned-held: pruned
+  pruned --> called-off-pruned: called off
+  pruned --> open: its prune taken back
+  pruned-held --> pruned: its hold lifted
+  pruned-held --> called-off-pruned-held: called off
+  pruned-held --> held: its prune taken back
+  called-off-pruned --> called-off: its prune taken back
+  called-off-pruned-held --> called-off-pruned: its hold lifted
+  called-off-pruned-held --> called-off-held: its prune taken back
+```
+<!-- diagram:run-marks:end -->
+
 ## A plan as a folder of cards: `wf start <folder>`
 
 A person who describes a plan in prose (parse the flag, then store it and document it, then show it) writes it as

@@ -757,7 +757,9 @@ every pass: nothing writes it, so it has no event and no writer, and the second 
 is the first and the last: one closed type every reader takes (objects' `RunStatusWord`), and what a status means as a table over it
 that each reader asks in place of a list of its own (`RUN_ENDING`, `packages/agent-orchestrator/src/run-ending/run-ending.ts`: the
 readers that asked "is this run over" had parted on a failed run, which has ended and can be tried again). The moves of such a thing
-are its parts' — a run's steps — and a person's marks on it (called off, held, pruned), which are written, and take the whole shape.
+are its parts' — a run's steps — and a person's marks on it (called off, held, pruned), which are written, and take the whole shape
+(`packages/agent-orchestrator/src/run-marks/run-marks.ts`): one word for each set of the three, so no set of files is unreadable, one
+move function the writers of those files ask, and what a set means to a pass as a table over the words.
 
 The store's pause is the first written so (`packages/agent-orchestrator/src/pause-machine/pause-machine.ts`, `pause.store.ts`). The runtime's task
 lifecycle has the first two parts on a table the contract trusts; the step, the proposal and Nemia's session each have a drawing that

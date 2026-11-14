@@ -17,6 +17,7 @@ import { spentAcceptances, spentApprovals, workStands, type RoundAsk } from '../
 import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore, TakenBack, Unheld } from '../record/record.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Actor } from 'objects';
+import { runMarkMove, runMarkOf, type RunMark } from '../run-marks/run-marks.ts';
 import { RunDoor, cardStartedTwice, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
 
 /** Where the stand-in says a run's files are: the root its paths are named under, as the files' are under `WF_ROOT`. */
@@ -73,6 +74,10 @@ const stateOf = (): State => ({
   forgetting: new Map(),
   versions: new Map(),
 });
+
+/** The marks the stand-in holds of `id` (`runMarkOf`), which each writer of one asks the machine with, as the files' writers do. */
+const marksIn = (st: State, id: string): RunMark =>
+  runMarkOf({ cancelled: st.cancelled.has(id), pruned: st.pruned.has(id), held: st.holds.has(id) });
 
 /** A change to what the stand-in holds of `id`: its stamp moves. */
 const touch = (st: State, id: string): void => void st.versions.set(id, (st.versions.get(id) ?? 0) + 1);
@@ -169,6 +174,7 @@ function runsOf(st: State): RunsLayer['runs'] {
     filesAt: () => undefined,
     dropFiles: () => null,
     prune: (id, marker) => {
+      if (runMarkMove(marksIn(st, id), marker ? 'prune' : 'unprune').kind === 'refused') return;
       if (marker) st.pruned.set(id, structuredClone(marker));
       else st.pruned.delete(id);
       touch(st, id);
@@ -275,6 +281,7 @@ function asksGroup(st: State): RunsLayer['asks'] {
 function holdsOf(st: State): RunsLayer['holds'] {
   return {
     lift: (id, at, actor) => {
+      if (runMarkMove(marksIn(st, id), 'lift').kind !== 'edge') return false;
       if (st.holds.get(id)?.at !== at) return false;
       if (actor) st.unheld.set(id, { since: at, actor: structuredClone(actor) });
       st.holds.delete(id);
@@ -282,7 +289,7 @@ function holdsOf(st: State): RunsLayer['holds'] {
       return true;
     },
     put: (id, until, { why, by, actor }) => {
-      if (st.holds.has(id)) return null;
+      if (runMarkMove(marksIn(st, id), 'hold').kind !== 'edge') return null;
       const hold: Hold = {
         at: new Date().toISOString(),
         until: [...until],

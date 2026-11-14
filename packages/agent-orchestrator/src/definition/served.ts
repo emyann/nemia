@@ -26,6 +26,12 @@ import type { DefinitionWriteRefusal } from '../../contracts/definition-write.co
 export type { DefinitionFound, DefinitionListed, DefinitionOrigin, DefinitionServed } from '../../contracts/definition-served.contract.ts';
 export type { DefinitionWrite, WriteRefused, WriteThere, WriteWay } from '../../contracts/definition-write.contract.ts';
 
+/**
+ * Of the origins that hold one name, the one served — the first, or, with an origin asked, that origin where it holds the name — and the
+ * first that shadows it; null where none is served.
+ * @param held The origins that hold the name, in the lookup order (`LOOKUP`).
+ * @param asked The origin asked for, or undefined for the first that holds the name.
+ */
 export const definitionServed: DefinitionServedOf = (held, asked) => {
   const first = held.at(0);
   if (first === undefined) return null;
@@ -39,9 +45,18 @@ export const definitionServed: DefinitionServedOf = (held, asked) => {
  */
 export const LOOKUP = ['factory', 'repo', 'yours', 'builtin'] as const satisfies readonly DefinitionOrigin[];
 
-/** The origins that hold `name` among `found`, in the lookup order. */
+/**
+ * The origins that hold `name` among `found`, in the lookup order.
+ * @param found Every definition found, by name and origin.
+ * @param name The definition's name.
+ */
 export const heldOrigins: HeldOriginsOf = (found, name) => LOOKUP.filter((o) => found.some((f) => f.name === name && f.origin === o));
 
+/**
+ * A namespace's list: every name among `found` served once, in the order first found, each with its origin served and what shadows it.
+ * @param found Every definition found, by name and origin.
+ * @param asked The origin asked for, or undefined for the first that holds each name; a name that origin does not hold is left out.
+ */
 export const definitionsServed = (found: readonly DefinitionFound[], asked: DefinitionOrigin | undefined): DefinitionListed[] =>
   found
     .filter((f, i) => found.slice(0, i).every((g) => g.name !== f.name))
@@ -68,6 +83,12 @@ const NOT_YOURS =
 /** The namespace every definition of yours is served and written in. */
 const DEFAULT = 'default';
 
+/**
+ * Why the api refuses a write of a definition, with the way to make it instead, or null where it writes it.
+ * @param namespace The namespace the write is sent to.
+ * @param does What the write does: create, replace, remove or act.
+ * @param there The origin that holds the name served now, or `none` where nothing does.
+ */
 export const definitionWriteRefusal: DefinitionWriteRefusal = (namespace, does, there) => {
   if (does !== 'create' && there === 'factory') return { kind: 'Invalid', way: 'factory', message: FACTORYS_WAY };
   if (namespace !== DEFAULT)

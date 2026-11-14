@@ -23,25 +23,35 @@ export class StoreRoot extends Context.Service<StoreRoot, string>()('orchestrato
  * The root `env` names (`wfRoot`: `WF_ROOT`, or `~/.agent-workflows` when unset), as the layer that gives it. Refuses `env`'s relative
  * `WF_ROOT` in `wfRoot`'s own words. `env` is required: only a file that has an environment to hand — an entry, or a test — may call
  * this, and a module that loads cannot.
+ * @param env The environment the root is read from, as `process.env` holds it.
  */
 export const storeRootLayer = (env: Env): Layer.Layer<StoreRoot> => StoreRoot.layer(wfRoot(env));
 
-/** Both services a program reads the store by, from `env`: its root (`StoreRoot`, `WF_ROOT`) and its settings (`StoreConfig`). */
+/**
+ * Both services a program reads the store by, from `env`: its root (`StoreRoot`, `WF_ROOT`) and its settings (`StoreConfig`).
+ * @param env The environment the root and the settings are read from, as `process.env` holds it.
+ */
 export const storeConfigLayer = (env: Env): Layer.Layer<StoreRoot | StoreConfig> =>
   Layer.merge(storeRootLayer(env), StoreConfig.layer(settingsOf(env)));
 
 /**
  * The tools folder of the store at `home`, `<home>/tools`: where a fix installs a tool with no root, given to it as `NEMIA_TOOLS`, its
  * `bin/` first on the daemon's PATH (`toolsBinDir`), so every session, check and fix the daemon starts finds what was installed there.
+ * @param home The store's directory.
  */
 export const toolsDir = (home: string): string => path.join(home, 'tools');
 
-/** The folder of the tools folder whose programs the daemon finds first on its PATH: `<home>/tools/bin`. */
+/**
+ * The folder of the tools folder whose programs the daemon finds first on its PATH: `<home>/tools/bin`.
+ * @param home The store's directory.
+ */
 export const toolsBinDir = (home: string): string => path.join(toolsDir(home), 'bin');
 
 /**
  * `pathValue` (a PATH) led by the tools folder's `bin/` of the store at `home` and ended by the folder of the Node this process runs, each
  * once: a release's Node is on nobody's PATH, and a harness's install runs its `npm` and `node`. Every other entry keeps its order.
+ * @param home The store's directory, whose tools folder leads the PATH.
+ * @param pathValue The PATH to lead, entries split by the platform's delimiter, or undefined for none.
  */
 export const pathLedByTools = (home: string, pathValue: string | undefined): string => {
   const bin = toolsBinDir(home);

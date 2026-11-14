@@ -26,6 +26,8 @@ export type Instant = { at: number; mono?: Monotonic };
  * How many milliseconds passed from `from` to `to`: the monotonic difference when both carry a reading of the same boot, the wall-clock
  * difference otherwise — a reading missing on either side, or the two from different boots. The runtime's `elapsedMs`, copied with
  * `Monotonic`.
+ * @param from The earlier moment.
+ * @param to The later moment.
  */
 export const elapsedMs = (from: Instant, to: Instant): number =>
   from.mono && to.mono && from.mono.boot === to.mono.boot ? to.mono.ms - from.mono.ms : to.at - from.at;
@@ -91,10 +93,16 @@ export type LeaseRelease = { kind: 'checkout' | 'install'; root: string; tag?: s
  */
 export type Identity = 'same' | 'other' | 'unknown' | 'gone';
 
-/** A holder's kind as a line says it: `api`, or `nemia up`. */
+/**
+ * A holder's kind as a line says it: `api`, or `nemia up`.
+ * @param kind The holder's kind.
+ */
 export const holderName = (kind: HolderKind): string => (kind === 'up' ? 'nemia up' : kind);
 
-/** A holder named for a person: `the api of pid 12 at http://127.0.0.1:8787`, `the api of pid 12`, or `the nemia up of pid 12`. */
+/**
+ * A holder named for a person: `the api of pid 12 at http://127.0.0.1:8787`, `the api of pid 12`, or `the nemia up of pid 12`.
+ * @param file The holder's lease: its kind, its pid and the url it serves at, if any.
+ */
 export const holderWords = (file: Pick<DaemonFile, 'by' | 'pid' | 'url'>): string =>
   file.by === 'api' ? `the api of pid ${file.pid}${file.url ? ` at ${file.url}` : ''}` : `the nemia up of pid ${file.pid}`;
 
@@ -119,7 +127,10 @@ export const STALE_PASSES = 10;
  */
 export const STALE_FLOOR_MS = 15 * 60_000;
 
-/** How long a holder of interval `every` may be silent before it reads as stalled: ten of its intervals, never under fifteen minutes. */
+/**
+ * How long a holder of interval `every` may be silent before it reads as stalled: ten of its intervals, never under fifteen minutes.
+ * @param every The holder's pass interval, in milliseconds.
+ */
 export const staleAfterMs = (every: number): number => Math.max(STALE_PASSES * every, STALE_FLOOR_MS);
 
 /**
@@ -134,6 +145,7 @@ export const DEFAULT_EVERY_MS = 4_000;
  * `nemia up [ms]`'s interval, or why it is refused. A whole number of milliseconds from 1 to `MAX_EVERY_MS`: the interval is written into
  * the file, and one that does not read there — `-5`, or `1e400`, which JSON writes as `null` — would make the daemon no holder while it
  * ticks.
+ * @param arg The interval as typed, in milliseconds, or undefined where none was given.
  */
 export function everyOf(arg: string | undefined): { every: number } | { refusal: string } {
   if (arg === undefined) return { every: DEFAULT_EVERY_MS };
@@ -182,6 +194,7 @@ const stampsOf = (file: DaemonFile): Instant[] =>
  * Judge the file as read, `undefined` when there is no file, at `now` (both clocks), with `identify` answering what the process table says
  * of the file's pid. A stop said is read before the process, so a reused pid does not hold a store its daemon gave up; a process gone or
  * another before staleness, so a crash frees the store at once.
+ * @param read The file as read, or undefined where there is none.
  */
 export function daemonStanding(
   read: DaemonRead | undefined,
@@ -204,7 +217,11 @@ export function daemonStanding(
   return { kind, file, last, quiet, identity };
 }
 
-/** The holder that keeps `self` off the store — a daemon ticking that is not `self` — or undefined when the store is free to it. */
+/**
+ * The holder that keeps `self` off the store — a daemon ticking that is not `self` — or undefined when the store is free to it.
+ * @param standing Where the store stands (`daemonStanding`).
+ * @param self The pid of the process asking.
+ */
 export const holderAgainst = (standing: DaemonStanding, self: number): Standing | undefined =>
   standing.kind === 'ticking' && standing.file.pid !== self ? standing : undefined;
 
@@ -212,6 +229,8 @@ export const holderAgainst = (standing: DaemonStanding, self: number): Standing 
  * When a holder last passed, in words: `last pass 3s ago (2026-09-22T10:00:04.000Z)`, or `no pass completed yet, started 3s ago (…)` — and,
  * when its beat is more than two intervals past that, that a pass is under way and when the process was last heard from, so a pass that
  * runs long, or never ends, is read as that and not as a daemon at rest.
+ * @param file The holder's lease.
+ * @param now The time to measure ages at, in epoch milliseconds.
  */
 export function lastPassWords(file: DaemonFile, now: number): string {
   const ago = (t: string) => `${durationWord(now - Date.parse(t))} ago (${t})`;
@@ -237,6 +256,10 @@ const stopWords = ({ file, identity }: Pick<Standing, 'file' | 'identity'>): str
  * Why a daemon — `nemia up`, or the api (`verb`) — or a `nemia tick` by hand may not tick `store`, held by `holder` of either kind: which
  * one, its pid, url, where and since when, its last pass, how to stop it, and when it would be taken over on its own. An api is told it can
  * serve beside it with `--no-tick`. A hand tick has no force: a live daemon runs the same pass within its interval.
+ * @param standing The holder that ticks the store.
+ * @param verb Who asks: `nemia up`, the api, or a `nemia tick` by hand.
+ * @param store The store's directory, as the line names it.
+ * @param now The time to measure ages at, in epoch milliseconds.
  */
 export function holdRefusal(standing: Standing, verb: 'up' | 'api' | 'tick', store: string, now: number): string {
   const holder = standing.file;
@@ -260,7 +283,12 @@ const goneWords = ({ identity }: Standing): string =>
     ? `whose process is gone — that pid is another process's now, started after the nemia up that wrote ${DAEMON_FILE}`
     : 'whose process is gone';
 
-/** What a daemon says of the holder it took the store from, when that was not a clean stop — or undefined when there is nothing to say. */
+/**
+ * What a daemon says of the holder it took the store from, when that was not a clean stop — or undefined when there is nothing to say.
+ * @param replaced Where the store stood before the daemon took it.
+ * @param store The store's directory, as the line names it.
+ * @param now The time to measure ages at, in epoch milliseconds.
+ */
 export function takeoverLine(replaced: DaemonStanding, store: string, now: number): string | undefined {
   if (replaced.kind === 'unreadable') return `took ${store} over from a ${DAEMON_FILE} that did not read as a holder`;
   if (replaced.kind === 'gone')
@@ -277,6 +305,9 @@ export function takeoverLine(replaced: DaemonStanding, store: string, now: numbe
 /**
  * What a daemon of kind `self` says when, at the start of a pass, the store names another holder: it stops rather than be a second
  * writer.
+ * @param by The lease of the holder that took the store over, or undefined where the store names none.
+ * @param store The store's directory, as the line names it.
+ * @param self The kind of the daemon that stops; `up` by default.
  */
 export const takenFromLine = (by: DaemonFile | undefined, store: string, self: HolderKind = 'up'): string =>
   by
@@ -293,6 +324,8 @@ const at = (file: DaemonFile): string => (file.url ? ` at ${file.url}` : '');
 /**
  * `nemia ls`'s last line: whether a daemon is ticking the store, which — the api, with its url, or a `nemia up` — and when its last pass
  * was. The line starts with the holder's kind, `daemon` when the store names none.
+ * @param standing Where the store stands (`daemonStanding`).
+ * @param now The time to measure ages at, in epoch milliseconds.
  */
 export function daemonLine(standing: DaemonStanding, now: number): string {
   switch (standing.kind) {
@@ -316,19 +349,30 @@ export function daemonLine(standing: DaemonStanding, now: number): string {
   }
 }
 
-/** The file's text, as `nemia up` writes it. */
+/**
+ * The file's text, as `nemia up` writes it.
+ * @param file The lease to write.
+ */
 export const daemonText = (file: DaemonFile): string => `${JSON.stringify(file, null, 2)}\n`;
 
 /** Whether a daemon ticks the store, read off its lease at `at`, with its line (`daemonLine`): what `nemia watch` says when it changes. */
 export type Liveness = { state: 'up' | 'down'; at: string; text: string };
 
-/** The store's liveness at `now`: `up` while a daemon is ticking it, `down` while none is — stopped, gone, stalled, unreadable or none. */
+/**
+ * The store's liveness at `now`: `up` while a daemon is ticking it, `down` while none is — stopped, gone, stalled, unreadable or none.
+ * @param standing Where the store stands (`daemonStanding`).
+ * @param now The time to measure ages at, in epoch milliseconds.
+ */
 export const livenessLine = (standing: DaemonStanding, now: number): Liveness => ({
   state: standing.kind === 'ticking' ? 'up' : 'down',
   at: new Date(now).toISOString(),
   text: daemonLine(standing, now),
 });
 
-/** A liveness line as `nemia watch` prints it: `12:00:00  daemon down  · <its daemon line>`, or one JSON object, which no cursor has. */
+/**
+ * A liveness line as `nemia watch` prints it: `12:00:00  daemon down  · <its daemon line>`, or one JSON object, which no cursor has.
+ * @param l The liveness to print.
+ * @param json Whether to print it as one JSON object; false by default.
+ */
 export const livenessWords = (l: Liveness, json = false): string =>
   json ? JSON.stringify({ liveness: l.state, at: l.at, note: l.text }) : `${l.at.slice(11, 19)}  daemon ${l.state}  · ${l.text}`;

@@ -188,6 +188,8 @@ export type Decided = {
  * `lines`, a line by step, each of a person's word — an approval at a gate, a loop accepted as it stands — followed by who gave it
  * (`by`, the word's actor, in `actorWords`) where its file names one: `approved 10:04Z — "go" · by the person, on laptop`. A step with
  * no such word — a gate still awaiting its approval — has no actor, and its line is kept as it is.
+ * @param lines Each step's line, by step name.
+ * @param by Who gave the step's word, or undefined where its file names nobody or it has no word.
  */
 export const saidBy = (lines: Record<string, string>, by: (step: string) => Actor | undefined): Record<string, string> =>
   Object.fromEntries(
@@ -278,6 +280,9 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
 /**
  * The refusal of the first `nemia retry` a step's `needs` names that the store would refuse (`retriesNamed`, judged by `retryRefusal` on
  * the reading `nemia decide` holds), said beside its answer (`answerLines`), or undefined.
+ * @param steps The workflow's steps.
+ * @param run The run's record.
+ * @param read The reading `nemia decide` holds of the run, which the store's refusals are judged on; the answer takes the step's name.
  */
 export const needsRefusedOf =
   (steps: readonly StepSpec[], run: Run, read: AssessRead) =>

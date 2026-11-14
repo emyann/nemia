@@ -150,6 +150,9 @@ function once(landed: (branch: string) => Landed): (branch: string) => Landed {
  *
  * Off the one read of the run (`AssessRead`) and its assessment (`assessed`, `assess` on that read where a caller has not judged it): each
  * step's standing is the assessment's (`stepWords`), so `nemia decide` stands no step the pass does not.
+ * @param read The one read of the run: its steps, its record and what the store says of each of its tasks.
+ * @param landed Asks git whether a result branch is on the base branch.
+ * @param assessed The run's assessment off `read`; `assess` on it by default.
  */
 export function decision(read: AssessRead, landed: (branch: string) => Landed, assessed: Assessment = assess(read)): Decision {
   const { steps, run, phaseOf, signedOff: closeoutOf, asked: askedCloseout, verdictOf, spendOf, checkout } = read;
@@ -252,6 +255,11 @@ const budgetStopped = (run: Run, name: string, spendOf: SpendOf): boolean => {
  * by price (`readWords`: `read 21.4M · wrote 412k · peak 167k`, its peak against the step's `context:`) — and for a step whose tries ran
  * more than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. `not measured` where nobody
  * measured, never $0, and nothing of what it read where nobody counted that.
+ * @param step The step's spec, or undefined where the workflow no longer has it.
+ * @param run The run's record.
+ * @param name The step's name.
+ * @param used What the step's current try used, or undefined where nothing was read of it.
+ * @param spendOf What each task spent, by its id, or undefined where nothing is recorded of it.
  */
 export function costLine(step: StepSpec | undefined, run: Run, name: string, used: Consumed | undefined, spendOf: SpendOf): string {
   const current = used?.costUsd !== undefined ? dollars(used.costUsd) : 'not measured';
@@ -270,6 +278,8 @@ export function costLine(step: StepSpec | undefined, run: Run, name: string, use
 /**
  * The run's `cost` on `nemia decide`, after its steps: every step's tries together (`runSpend`), with how many ended sessions have no cost
  * on them — or `not measured`. Pure. None before any session has ended.
+ * @param run The run's record.
+ * @param spendOf What each task spent, by its id, or undefined where nothing is recorded of it.
  */
 export function runCostLines(run: Run, spendOf: SpendOf): string[] {
   const said = runCostWords(run, spendOf);
@@ -279,6 +289,8 @@ export function runCostLines(run: Run, spendOf: SpendOf): string[] {
 /**
  * What the run has cost, in `runCostLines`' words without their label: `run $12.40`, with how many ended attempts had no cost on them, or
  * `run not measured`; null before any attempt has ended.
+ * @param run The run's record.
+ * @param spendOf What each task spent, by its id, or undefined where nothing is recorded of it.
  */
 export function runCostWords(run: Run, spendOf: SpendOf): string | null {
   const spent = runSpend(run, spendOf);
@@ -368,6 +380,10 @@ function gateChoices(steps: readonly StepSpec[], run: Run, waiting: readonly str
  * (`merges`) is offered no land it nor drop it: its ending step is what merges, one approval away.
  *
  * Every command is a bare `nemia` or `git -C` line, never a sentence: an offer's is the one it was made with.
+ * @param steps The workflow's steps.
+ * @param run The run's record.
+ * @param d The run's decision.
+ * @param offers The once-more, approve and send-back offers for its steps, round's then retry's.
  */
 export function choicesOf(steps: readonly StepSpec[], run: Run, d: Decision, offers: readonly Offer[]): DecideCommand[] {
   if (d.kind !== 'awaiting') return [];

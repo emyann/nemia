@@ -29,7 +29,10 @@ const PART_OF: Readonly<Record<string, DiskPart>> = {
   metrics: 'series',
 };
 
-/** The part a name of the store's root is: its own for a part's folder, `other` for any other. */
+/**
+ * The part a name of the store's root is: its own for a part's folder, `other` for any other.
+ * @param name A name directly under the store's root.
+ */
 export const partOf = (name: string): DiskPart => (Object.hasOwn(PART_OF, name) ? PART_OF[name] : undefined) ?? 'other';
 
 /**
@@ -73,6 +76,8 @@ const isPicture = (name: string): boolean => {
  * The kind of a root of `part` (`DiskRoot`): `name` is its name under a part kept by run, absent for the part's folder itself or a
  * part walked whole. Under `runs`, a name with a dot is beside a record, `<id>.json` the record and any other a person's mark; a
  * name with none is a run's folder, whose own blocks are `runs-other` and whose names are each told by `kindIn`.
+ * @param part The root's part.
+ * @param name Its name under a part kept by run, or undefined for the part's folder or a part walked whole.
  */
 export function kindAt(part: DiskPart, name?: string): DiskKind {
   if (part === 'worktrees') return name === 'node_modules' ? 'dependencies' : 'checkout';
@@ -89,6 +94,8 @@ export function kindAt(part: DiskPart, name?: string): DiskKind {
  * The kind of the name `name` inside a folder of kind `kind`: under `runs-other`, a run's folder, `artifacts`, `agents` and `inputs`
  * are their kinds; under the handed files a picture by its end is `pictures` and any other name `handed`; under a checkout a name
  * `node_modules` is `dependencies`, and everything under it; any other name keeps its folder's kind.
+ * @param kind The kind of the folder the name is in.
+ * @param name The name inside it.
  */
 export function kindIn(kind: DiskKind, name: string): DiskKind {
   if (kind === 'runs-other') return (Object.hasOwn(RUN_FOLDERS, name) ? RUN_FOLDERS[name] : undefined) ?? 'runs-other';
@@ -100,6 +107,8 @@ export function kindIn(kind: DiskKind, name: string): DiskKind {
 /**
  * The run a name under a part kept by run belongs to, among `ids`: the id the name is, else the longest id the name starts with before
  * a `.`, as the files beside a record are named. Undefined for a name of no run known.
+ * @param name A name under a part kept by run.
+ * @param ids The ids of the runs known.
  */
 export function runOf(name: string, ids: ReadonlySet<string>): string | undefined {
   if (ids.has(name)) return name;
@@ -168,6 +177,11 @@ const told = (roots: readonly DiskRoot[], walked: Walked, ids: ReadonlySet<strin
  * order and then the order met, each the sum of its roots' bytes of that kind. A root of a run among `ids` is its factory's
  * (`factoryOf`); any other is its part's alone. What did not read under a root is on its own kind's entry, and an entry none of whose
  * roots read has no `bytes`, never zero.
+ * @param roots The roots of the walk.
+ * @param walked What the walk read of each root, in the roots' order.
+ * @param runs The ids of the runs known, and the factory of each by its id, undefined where it has none.
+ * @param space The bytes free on the store's file system and the file system's size.
+ * @param at When the reading was taken, an ISO stamp.
  */
 export function readingOf(
   roots: readonly DiskRoot[],
@@ -243,6 +257,9 @@ const inOrder = (entries: readonly DiskEntry[]): DiskEntry[] => {
  *
  * A kind a task holds nothing of adds no entry. With `kept` undefined, an ask that failed, `engine` stays whole in `engine-other` and
  * `sessions` is one entry with no bytes and one name unread. In order (`inOrder`).
+ * @param entries A walk's entries.
+ * @param kept What the runtime keeps of each task, or undefined where the ask failed.
+ * @param factoryOf The factory of a task's run, by the task's id, or undefined where it has none.
  */
 export function withKept(
   entries: readonly DiskEntry[],
@@ -274,6 +291,9 @@ export function withKept(
 /**
  * The `DISK_RUNS_NAMED` runs that hold the most among `roots`, largest first: each named root's bytes summed by its run over the parts
  * kept by run, a name of no run among `ids` under its own name. One that holds nothing is left out.
+ * @param roots The roots of the walk.
+ * @param walked What the walk read of each root, in the roots' order.
+ * @param runs The ids of the runs known, and the factory of each by its id, undefined where it has none.
  */
 export function largestOf(
   roots: readonly DiskRoot[],
@@ -293,11 +313,17 @@ export function largestOf(
     .slice(0, DISK_RUNS_NAMED);
 }
 
-/** An entry's part, factory and kind as one key, and back. */
+/**
+ * An entry's part, factory and kind as one key, and back.
+ * @param entry The entry's part, factory and kind.
+ */
 export const entryKey = (entry: Pick<DiskEntry, 'part' | 'factory' | 'kind'>): string =>
   JSON.stringify([entry.part, entry.factory ?? null, entry.kind ?? null]);
 
-/** The part, factory and kind a key of `entryKey` names. */
+/**
+ * The part, factory and kind a key of `entryKey` names.
+ * @param key A key `entryKey` made.
+ */
 export const entryOf = (key: string): Pick<DiskEntry, 'part' | 'factory' | 'kind'> => {
   const [part, factory, kind] = JSON.parse(key) as [DiskPart, string | null, DiskKind | null];
   return { part, ...(factory === null ? {} : { factory }), ...(kind === null ? {} : { kind }) };
@@ -307,6 +333,8 @@ export const entryOf = (key: string): Pick<DiskEntry, 'part' | 'factory' | 'kind
  * The keys of `said` (`entryKey`) that no entry of `entries` has: the label sets said before and gone now. One whose entry is there and
  * did not read is not gone: it is unread, and keeps what was last said of it; nor is any kind of a part and factory one of whose entries
  * did not read, since what that root held, by kind, is not known.
+ * @param said The keys said before.
+ * @param entries The entries of the reading now.
  */
 export const vanished = (said: ReadonlySet<string>, entries: readonly DiskEntry[]): string[] => {
   const now = new Set(entries.map(entryKey));
@@ -317,6 +345,9 @@ export const vanished = (said: ReadonlySet<string>, entries: readonly DiskEntry[
   });
 };
 
-/** The names that did not read in each part of `entries`, every part said, zero where all read. */
+/**
+ * The names that did not read in each part of `entries`, every part said, zero where all read.
+ * @param entries The entries of a reading.
+ */
 export const unreadByPart = (entries: readonly DiskEntry[]): Array<{ part: DiskPart; unread: number }> =>
   DISK_PARTS.map((part) => ({ part, unread: entries.reduce((n, entry) => n + (entry.part === part ? entry.unread : 0), 0) }));

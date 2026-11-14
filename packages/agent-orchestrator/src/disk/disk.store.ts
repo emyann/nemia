@@ -35,6 +35,7 @@ function runRoots(part: DiskPart, at: string): DiskRoot[] {
  *
  * @returns The roots, the store's own first.
  * @throws When the store's root does not list: there is nothing to size, and a reading of nothing would say the store is empty.
+ * @param home The store's directory (`WF_ROOT`).
  */
 export function storeRoots(home: string): DiskRoot[] {
   const names = fs.readdirSync(home);
@@ -51,6 +52,7 @@ export function storeRoots(home: string): DiskRoot[] {
 /**
  * The room on the file system that holds the store: the bytes free to this process, and the file system's size. Inside a virtual
  * machine it is the machine's own disk, whatever the host has left.
+ * @param home The store's directory (`WF_ROOT`).
  */
 export function storeFree(home: string): { free: number; size: number } {
   const stat = fs.statfsSync(home);

@@ -52,7 +52,10 @@ function factoryArgsRefusal(args: Args): string | null {
   return null;
 }
 
-/** Whether `args` ask a write of a level: a level, a factory's, a raise or its end. Bare (or `--factory` alone) reads. */
+/**
+ * Whether `args` ask a write of a level: a level, a factory's, a raise or its end. Bare (or `--factory` alone) reads.
+ * @param args The command line's arguments, by key.
+ */
 export const levelWritten = (args: Args): boolean =>
   textIn(args, 'level') !== undefined || args['end'] === true || textIn(args, 'for') !== undefined;
 

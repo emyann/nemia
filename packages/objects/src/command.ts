@@ -17,7 +17,10 @@ export class CommandRefused extends Error {
   override readonly name = 'CommandRefused';
 }
 
-/** Dollars written as digits above zero (`5`, `2.50`), or undefined: no unit, no sign, no exponent. */
+/**
+ * Dollars written as digits above zero (`5`, `2.50`), or undefined: no unit, no sign, no exponent.
+ * @param written The amount as typed, blanks around it allowed.
+ */
 export function dollarsOf(written: string): number | undefined {
   const value = written.trim();
   const n = /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : NaN;
@@ -151,7 +154,13 @@ const usage = (message: string): never => {
   throw new CommandRefused(message);
 };
 
-/** An amount flag's value as a number (`dollarsOf`), or refused in `flag`'s words, saying what it takes: above zero, in digits. */
+/**
+ * An amount flag's value as a number (`dollarsOf`), or refused in `flag`'s words, saying what it takes: above zero, in digits.
+ * @param text The flag's value as typed, or undefined where it was given none.
+ * @param takes What the flag takes, said in its refusal.
+ * @param form The command's form, which ends the refusal.
+ * @param flag The flag's spelling, as the refusal names it.
+ */
 export function amountOf(text: string | undefined, takes: string, form: string, flag = '--budget'): number {
   const amount = text === undefined ? undefined : dollarsOf(text);
   if (amount === undefined)
@@ -300,6 +309,8 @@ const strayFlag = (spec: Spec, arg: string): boolean =>
  * spec's own words: an argument it does not take — a flag it has none of, wherever it stands (said as `missing` where a required argument
  * is short and the spec says it, but for `flagFirst`), one the api alone takes (`Flag.only`), and a positional past those it takes — a
  * value flag with no value, given twice, or with one of the command's own flags for its value, and two ways.
+ * @param spec The command's positionals, flags and its own refusals.
+ * @param argv The command line's words after the command's name.
  */
 export function parseArgv(spec: Spec, argv: readonly string[]): Args | undefined {
   const rest = spec.positionals.find((p) => p.takes === 'rest');
@@ -350,6 +361,9 @@ const flagWords = (flag: Flag, value: Args[string]): string[] => {
  * The command line that names `command` on these arguments, as a refusal says what to type: `nemia retry r-1 implement`, `nemia rm a b`. A
  * positional not given is said as the usage says it (`unsaid`); a rest is left out. `flags`, by their keys, are said after the positionals
  * in the order the spec lists them: `nemia factory add <name> --repo <path>`; a key no flag of the spec has is left out.
+ * @param command The command's name and its spec, whose positionals and flags are said.
+ * @param args The positionals given, by their keys.
+ * @param flags The flags to say, by their keys; none by default.
  */
 export function commandLine(command: Pick<CommandWords, 'name' | 'spec'>, args: Args, flags: Args = {}): string {
   const said = (value: Args[string]) => (Array.isArray(value) ? value.join(' ') : String(value));
@@ -363,7 +377,10 @@ export function commandLine(command: Pick<CommandWords, 'name' | 'spec'>, args: 
 /** The column the help's lines under a command start at. */
 const HELP_INDENT = ' '.repeat(31);
 
-/** The commands' lines of `nemia`'s help, in the table's order: each usage, then its help lines under it; none the CLI does not serve. */
+/**
+ * The commands' lines of `nemia`'s help, in the table's order: each usage, then its help lines under it; none the CLI does not serve.
+ * @param table The commands, in the order the help lists them.
+ */
 export const helpOf = (table: readonly Pick<CommandWords, 'name' | 'usage' | 'help' | 'only'>[]): string =>
   table
     .filter((c) => c.only?.side !== 'api')

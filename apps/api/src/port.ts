@@ -22,6 +22,7 @@ export const NO_TICK = '--no-tick';
  * whole milliseconds, as `nemia up [ms]` takes it (`everyOf`), it ticks at that; with `--no-tick` it ticks nothing. Anything else — an
  * interval beside `--no-tick` among it — is refused (exit 2), naming the flag and the interval there are, rather than read as a daemon
  * started by mistake.
+ * @param argv The process's arguments after the program.
  */
 export function argsOf(argv: readonly string[]): { ticks: false } | { ticks: true; every: number } {
   const [only] = argv;
@@ -39,7 +40,10 @@ export function argsOf(argv: readonly string[]): { ticks: false } | { ticks: tru
   );
 }
 
-/** Whether the api's process ticks the store, read off its arguments (`argsOf`), refused as it refuses them. */
+/**
+ * Whether the api's process ticks the store, read off its arguments (`argsOf`), refused as it refuses them.
+ * @param argv The process's arguments after the program.
+ */
 export const ticksOf = (argv: readonly string[]): boolean => argsOf(argv).ticks;
 
 /** Whether `host` is this machine's loopback alone, v4 or v6. */
@@ -52,6 +56,8 @@ const loopbackAddress = (host: string): boolean => host === LOOPBACK || host ===
  * but a store the person has not marked exposed is one they have not said may be reached from beyond this machine, so it is refused
  * there; a value that is no address is refused rather than read as the default, which would listen somewhere the operator did not ask
  * for.
+ * @param value The NEMIA_BIND setting, or undefined where it is unset.
+ * @param exposed Whether the store is marked exposed.
  */
 export const bindOf: BindOf = (value, exposed) => {
   const host = asked(value);
@@ -69,7 +75,11 @@ const BIND_WORDS: Readonly<Record<BindRefusal, (value: string) => string>> = {
     `NEMIA_BIND=${value} listens beyond this machine on a store not marked exposed, which you have not said may be reached from another machine. Mark the store exposed (WF_EXPOSED=1, in the service's environment) and mint yourself a token (nemia token add <name>), or unset NEMIA_BIND for ${LOOPBACK}.`,
 };
 
-/** The host the api listens on (`bindOf`), or its refusal thrown (exit 2) in words that name the variable to set. */
+/**
+ * The host the api listens on (`bindOf`), or its refusal thrown (exit 2) in words that name the variable to set.
+ * @param value The NEMIA_BIND setting, or undefined where it is unset.
+ * @param exposed Whether the store is marked exposed.
+ */
 export function hostOf(value: string | undefined, exposed: boolean): string {
   const bind = bindOf(value, exposed);
   if (bind.kind === 'bound') return bind.host;
@@ -81,6 +91,8 @@ export function hostOf(value: string | undefined, exposed: boolean): string {
  * `NEMIA_BIND_PUBLIC=1`, which `nemia service install --bind <address> --public` writes) as `bindExposure` judges it, the same judgement
  * `nemia service install` makes; or its refusal thrown (exit 2), naming the variable to set and the install that writes it. A loopback,
  * private or shared address listens as before.
+ * @param host The host, as hostOf bound it.
+ * @param acknowledged Whether a wildcard or public address is acknowledged.
  */
 export function acknowledgedHost(host: string, acknowledged: boolean): string {
   if (bindExposure(kindOfBind(host), acknowledged) === 'listen') return host;
@@ -96,6 +108,7 @@ export function acknowledgedHost(host: string, acknowledged: boolean): string {
 /**
  * The host the lease records for a server bound on `host`, which a client of the store reaches it at: every interface (`0.0.0.0`, `::`)
  * at the loopback, an IPv6 address in brackets, as a URL writes one, and any other as it is.
+ * @param host The host the server is bound on.
  */
 export const leaseHostOf = (host: string): string => {
   if (host === '0.0.0.0' || host === '::') return LOOPBACK;
@@ -108,6 +121,8 @@ export const leaseHostOf = (host: string): string => {
  *
  * Anything else is refused rather than read as the default, which for `PORT=80a` would be a server on the port the person was trying to
  * stay off.
+ * @param value The PORT setting, or undefined where it is unset.
+ * @param ticks Whether the api ticks the store; true by default.
  */
 export function portOf(value: string | undefined, ticks = true): number {
   const text = value?.trim() ?? '';

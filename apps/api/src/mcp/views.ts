@@ -133,6 +133,8 @@ async function follow(app: Fetching, followed: Followed, from: Request, told: (u
  * The views of a port over `appOf()`'s fetch, each new event told by `told` (the SDK handler's `notify.resourceUpdated`). A hold judges
  * the holder's token by a page of one; the first opens the view at that page's end and follows it (`follow`); `release` lets one go, the
  * last aborting the watch. A view closed by the api tells each holder (`closed`) and is dropped.
+ * @param appOf What gives the app whose fetch reads the views.
+ * @param told What is told each URI that has a new event.
  */
 export function feedViews(appOf: () => Fetching, told: (uri: string) => void): FeedViews {
   const views = new Map<string, Followed>();

@@ -47,7 +47,11 @@ export const ENDPOINTS: readonly Endpoint[] = Object.values(Api.groups)
   }))
   .sort((a, b) => namesIn(a.path) - namesIn(b.path));
 
-/** The endpoint that serves `method` on `path` (its query left off), or none where no endpoint of the `Api` does. */
+/**
+ * The endpoint that serves `method` on `path` (its query left off), or none where no endpoint of the `Api` does.
+ * @param method The request's HTTP method.
+ * @param path The request's path, its query left off.
+ */
 export const endpointOf = (method: string, path: string): Endpoint | undefined =>
   ENDPOINTS.find((endpoint) => endpoint.method === method && endpoint.pattern.test(path));
 
@@ -55,6 +59,9 @@ export const endpointOf = (method: string, path: string): Endpoint | undefined =
  * A request's route as its pattern, from the routes Hono matched it to (`matched`, in the order they were registered, the middleware's
  * wildcard left out): the first route before the mount, which answered it or handed it on; else its endpoint's path, where only the
  * mount (`MOUNT`, which matches every path under `/api/`) did; none where neither did.
+ * @param matched The routes Hono matched the request to, in the order they were registered.
+ * @param method The request's HTTP method: a HEAD is read as a GET.
+ * @param path The request's path.
  */
 export const routeAt = (matched: readonly string[], method: string, path: string): string | undefined => {
   const route = matched.find((one) => one !== MOUNT);

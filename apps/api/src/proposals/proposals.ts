@@ -17,7 +17,10 @@ import { answeredWriteIn } from '../objects/refused.ts';
 import { listed } from '../definitions/served.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 
-/** Where a proposal is judged and applied: the store's root, whose factories say their own repositories. */
+/**
+ * Where a proposal is judged and applied: the store's root, whose factories say their own repositories.
+ * @param s The request's services, its caller and the place it is answered in.
+ */
 export const placeOf = (s: Served): ProposalPlace => ({ home: s.home });
 
 export const proposalsHandlers = readsBounded(Api, 'proposals', (handlers) =>

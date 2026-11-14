@@ -33,6 +33,7 @@ const WILDCARD = '/*';
  * depends on when it is read. The first route matched is the one that answered, or handed it on to the mount, whichever handler is
  * running; a request only the mount serves is said under its endpoint's path (`routeAt`, objects/endpoints.ts), never the mount's
  * wildcard, which every path under `/api/` matches.
+ * @param c The request's context.
  */
 export const routeOf = (c: Context<ApiEnv>): string | undefined =>
   routeAt(
@@ -43,7 +44,10 @@ export const routeOf = (c: Context<ApiEnv>): string | undefined =>
     pathOf(c),
   );
 
-/** The HTTP attributes of `c` once it is answered: its method, its path, its status, and its route where one matched. */
+/**
+ * The HTTP attributes of `c` once it is answered: its method, its path, its status, and its route where one matched.
+ * @param c The request's context, once it is answered.
+ */
 export const attributesOf = (c: Context<ApiEnv>): RequestAttributes => {
   const route = routeOf(c);
   return {
@@ -54,7 +58,10 @@ export const attributesOf = (c: Context<ApiEnv>): RequestAttributes => {
   };
 };
 
-/** How long a request took or a stream was open, in the daemon's words: whole milliseconds under a second, else seconds to one decimal. */
+/**
+ * How long a request took or a stream was open, in the daemon's words: whole milliseconds under a second, else seconds to one decimal.
+ * @param ms How long, in milliseconds.
+ */
 export const tookOf = (ms: number): string => (ms < 1_000 ? `${Math.round(ms)}ms` : `${(ms / 1_000).toFixed(1)}s`);
 
 /** How a request of `status` is said: an answer at Info, a refusal (4xx) at Warning, a failure (5xx) at Error. */
@@ -127,6 +134,8 @@ const answered = Effect.fnUntraced(function* (c: Context<ApiEnv>, next: () => Pr
  * Every request said and traced, on the app's runtime (`c.var.runtime`), so the line goes through the logger the app's layer holds and the
  * span through its tracer. Registered after the middleware that puts the runtime on the request and before every router, so the route the
  * router matched is already known: Hono matches before it runs a handler, and `matchedRoutes` holds every line the request matched.
+ * @param c The request's context, carrying the app's runtime.
+ * @param next The rest of the request's handling.
  */
 export const saidRequest: MiddlewareHandler<ApiEnv> = (c, next) => {
   const span = spanOf(c);

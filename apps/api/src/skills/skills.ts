@@ -76,13 +76,19 @@ export type SkillRow = {
 /** One place the picker lists, in the order an agent of yours finds a name, the builtin last: its skills by name. */
 export type SkillPlace = { from: SkillSource; dir: string; skills: SkillRow[] };
 
-/** The repository's own skills folder, the one its sessions are given, which the skills page lists first of the repository's. */
+/**
+ * The repository's own skills folder, the one its sessions are given, which the skills page lists first of the repository's.
+ * @param repo The repository's folder.
+ */
 export const repoSkillsDir = (repo: string): string => path.join(path.resolve(repo), '.claude', SKILLS_FOLDER);
 
 /** Nemia's builtin skills: the orchestrator package's `skills/`, none while the package has no such folder. */
 export { BUILTIN_SKILLS };
 
-/** Your library: the store's `workflows/skills/`, where the board copies a skill. */
+/**
+ * Your library: the store's `workflows/skills/`, where the board copies a skill.
+ * @param home The store's root folder.
+ */
 export const librarySkills = (home: string): string => path.join(home, 'workflows', SKILLS_FOLDER);
 
 /** A folder of yours: where an agent of yours finds what a workflow of yours finds, its places named or none. */
@@ -101,7 +107,12 @@ export type YourSkills = {
   readonly builtin: { readonly dir: string; readonly names: readonly string[] };
 };
 
-/** What `listSkills` lists, read through the Agent and Skill doors on the program's services: `YourSkills`. */
+/**
+ * What `listSkills` lists, read through the Agent and Skill doors on the program's services: `YourSkills`.
+ * @param repo The repository whose places are read, or undefined where the request reads none.
+ * @param home The store's root folder, whose library is read.
+ * @param builtin The folder of Nemia's builtin skills; BUILTIN_SKILLS by default.
+ */
 export const yourSkillsRead = (repo: string | undefined, home: string, builtin: string = BUILTIN_SKILLS) =>
   Effect.gen(function* () {
     const door = yield* SkillDoor;
@@ -112,7 +123,10 @@ export const yourSkillsRead = (repo: string | undefined, home: string, builtin: 
     } satisfies YourSkills;
   });
 
-/** A factory's tree's folder of workflows (`<tree>/workflows`), whose `agents/` and `skills/` are the factory's own. */
+/**
+ * A factory's tree's folder of workflows (`<tree>/workflows`), whose `agents/` and `skills/` are the factory's own.
+ * @param tree The factory's tree folder.
+ */
 export const treeWorkflows = (tree: string): string => path.join(path.resolve(tree), 'workflows');
 
 /** Whether the skill folder `dir` is one of the factory's own, in the `skills/` of its tree `tree`; never where there is no tree. */
@@ -122,6 +136,9 @@ const inTree = (dir: string, tree: string | undefined): boolean =>
 /**
  * Which place a skill's folder is in, by the folder of skills it sits in; `null` for none of them, and for the repository's where there
  * is no repository.
+ * @param dir The skill's folder.
+ * @param repo The repository's folder, or undefined where there is none.
+ * @param home The store's root folder, whose library is one of the places.
  */
 export function sourceOf(dir: string, repo: string | undefined, home: string): SkillSource | null {
   const parent = path.dirname(path.resolve(dir));
@@ -137,6 +154,9 @@ export function sourceOf(dir: string, repo: string | undefined, home: string): S
  * named with its folder, read from that folder's own skills, or any other found beneath `repo` in a place the board lists nothing for.
  * Null for a skill of a place the board pages (`sourceOf`), for the repository's own folder, for a folder outside it, and where there is
  * no repository.
+ * @param dir The skill's folder.
+ * @param repo The repository's folder, or undefined where there is none.
+ * @param home The store's root folder.
  */
 export function foundInOf(dir: string, repo: string | undefined, home: string): string | null {
   if (repo === undefined || sourceOf(dir, repo, home) !== null) return null;
@@ -144,13 +164,19 @@ export function foundInOf(dir: string, repo: string | undefined, home: string): 
   return parts[0] === '' || parts[0] === '..' || path.isAbsolute(parts.join(path.sep)) ? null : parts.join('/');
 }
 
-/** Each skill folder of `dirs` read now, through the table's `skills` (`SKILLS_LIST`) at the request's store, by folder. */
+/**
+ * Each skill folder of `dirs` read now, through the table's `skills` (`SKILLS_LIST`) at the request's store, by folder.
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param dirs The skill folders to read.
+ */
 export const readsOf = (s: Served, dirs: readonly string[]): Promise<Record<string, SkillRead>> =>
   s.inRequest(SKILLS_LIST.handler({ skills: dirs }));
 
 /**
  * The version of the skill in the folder `dir`, null where none reads, and the other text files of its folder, by path, as the package
  * reads them through its Skill door (`SKILLS_READ`).
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param dir The skill's folder.
  */
 export const skillShownAt = async (
   s: Served,
@@ -163,6 +189,8 @@ export const skillShownAt = async (
 /**
  * The reading of the folder `dir` among `reads`, which the table's `skills` gives for each folder it was asked: thrown, naming the
  * folder, where it gave none.
+ * @param reads The readings the table gave, by folder.
+ * @param dir The folder whose reading is asked.
  */
 export function readAt(reads: Record<string, SkillRead>, dir: string): SkillRead {
   const read = reads[dir];
@@ -170,7 +198,14 @@ export function readAt(reads: Record<string, SkillRead>, dir: string): SkillRead
   return read;
 }
 
-/** One skill as the picker lists it: the package's reading of its folder (`read`), where it is, and who gives it. */
+/**
+ * One skill as the picker lists it: the package's reading of its folder (`read`), where it is, and who gives it.
+ * @param name The skill's name.
+ * @param dir The skill's folder.
+ * @param from The place it is in.
+ * @param usedBy The agents of yours that give it; none by default.
+ * @param found Where it was found when no page of the board's lists it, its folder from the repository's root; null by default.
+ */
 export function skillRow(
   name: string,
   dir: string,
@@ -182,7 +217,10 @@ export function skillRow(
   return { name, from, dir, entry, error, preload, cost, usedBy, found };
 }
 
-/** The agents of yours (`agents`, `yourAgentsFound`), by name, each with the skills its `skills:` gives: the ones that read. */
+/**
+ * The agents of yours (`agents`, `yourAgentsFound`), by name, each with the skills its `skills:` gives: the ones that read.
+ * @param agents The agents of yours, by name, each read or the error it did not read with.
+ */
 export function yourAgentsSkills(agents: Agents): Array<[string, string[]]> {
   return [...agents].flatMap(([name, agent]) => (agent instanceof Error ? [] : [[name, agent.skills ?? []] as [string, string[]]]));
 }
@@ -197,6 +235,10 @@ export function yourAgentsSkills(agents: Agents): Array<[string, string[]]> {
  * listed in yours with the package's refusal as its `error`. Any other skill the package refuses — a link in it that is not followed, rules
  * that do not read — is listed in the place its folder is in (`skillDirIn`, `sourceOf`), unread where a link is refused, with that refusal.
  * Each folder is read by `readSkills` (`readsOf`, on a request).
+ * @param readSkills What reads the skill folders it is given, by folder.
+ * @param repo The repository's folder, or undefined where the request reads none.
+ * @param home The store's root folder, whose library is yours.
+ * @param yoursRead What yourSkillsRead read: the skills an agent of yours finds, your agents and the builtin skills.
  */
 export async function listSkills(
   readSkills: (dirs: readonly string[]) => Promise<Record<string, SkillRead>>,
@@ -269,6 +311,11 @@ export type GivenSkill = {
  * finds them). A skill no place has is a row with the refusal the card says; one found in the repository where the board pages nothing,
  * as a skill named with its folder is, reads `from: null` and its folder in `foundIn`. One found in the `skills/` of the factory's tree
  * `tree`, where an agent of that tree finds it first, is the factory's.
+ * @param skills The skills the agent gives, in its order.
+ * @param found Where a start finds each.
+ * @param repo The repository's folder, or undefined where there is none.
+ * @param home The store's root folder.
+ * @param tree The factory's tree folder, or undefined where it has none.
  */
 export function givenSkills(
   skills: readonly string[],
@@ -338,7 +385,12 @@ export const skillUsers = Effect.fnUntraced(function* (dir: string, name: string
   return users;
 });
 
-/** A draft from a skill as sent, refused (400) when it has a key no skill has: each value is then judged by the package, in its words. */
+/**
+ * A draft from a skill as sent, refused (400) when it has a key no skill has: each value is then judged by the package, in its words.
+ * @param skill The skill as sent.
+ * @param route The route, as a refusal names it.
+ * @param shape The shape a skill is sent in, as a refusal says it.
+ */
 export function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, shape: string): SkillDraft | Refusal {
   const unknown = Object.keys(skill).filter((key) => !Object.hasOwn(SKILL_KEYS, key));
   if (unknown.length) {
@@ -361,6 +413,9 @@ export function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, sh
  * A SKILL.md, the file `file` of the skill `name` holding `text`, as the Skill's spec: its draft (`skillDraftOf`), or, where it does not
  * read as one, its body alone — the text after its frontmatter, or all of it where that does not read either — and why (`unread`, the
  * package's words), so a skill of yours can be mended from what it says. The one reading of a SKILL.md into a spec.
+ * @param file The SKILL.md's path, as a refusal names it.
+ * @param name The skill's name.
+ * @param text The SKILL.md's text.
  */
 export function skillSpecOf(file: string, name: string, text: string): { spec: SkillSpec; unread: string | null } {
   try {
@@ -385,6 +440,8 @@ function bodyOf(file: string, text: string): string {
 /**
  * A skill of yours written into the library through the table's `skills write` (`SKILLS_WRITE`): `change` at the `version` it was read at,
  * none for a skill made, `name` the skill's name on the path. Throws what the package refuses, which the one map answers by its kind.
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param change The skill's change, as the table's write takes it.
  */
 export async function written(s: Served, change: SkillChange, { version, name }: { version: string | null; name?: string }): Promise<void> {
   const input = { from: 'yours', change, ...(version !== null && { version }), ...(name !== undefined && { name }) };

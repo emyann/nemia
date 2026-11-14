@@ -43,19 +43,26 @@ export const API_PATHS = ['/api', '/openapi'] as const;
  */
 const under = (path: string, root: string): boolean => path === root || path.startsWith(root + '/');
 
-/** Whether `path` is the MCP port's, or under it. */
+/**
+ * Whether `path` is the MCP port's, or under it.
+ * @param path The request's path.
+ */
 export const onPort = (path: string): boolean => under(path, MCP_PATH);
 
 /** Whether `path` is a pairing route's (`PAIR_PATH`), or under it. */
 const onPairing = (path: string): boolean => under(path, PAIR_PATH);
 
-/** Whether `path` is one the api answers on (`API_PATHS`): any other but the port's is a page of the board (board/board.ts). */
+/**
+ * Whether `path` is one the api answers on (`API_PATHS`): any other but the port's is a page of the board (board/board.ts).
+ * @param path The request's path.
+ */
 export const answered = (path: string): boolean => API_PATHS.some((root) => under(path, root));
 
 /**
  * What a request to `path` needs of a token: a standing one on the MCP port; none on a pairing route (`PAIR_PATH`), which judges its own
  * secret; a token, any live one, on a route the api answers, exposed or not; and none on a page of the board, which carries no data of
  * the store, so that a browser with no token loads the page that asks for one.
+ * @param path The request's path.
  */
 export const needOf: NeedOf = (path) => (onPort(path) ? 'standing' : onPairing(path) ? 'none' : answered(path) ? 'token' : 'none');
 
@@ -77,6 +84,9 @@ const REFUSED_WORDS: Readonly<Record<TokenRefusal, string>> = {
  * refused, `Unauthorized`. A request with no token is the person (`PERSON`, what an in-process program is) only on a route that needs none
  * (a pairing route, which judges its own secret, and a page of the board, which carries no data of the store); on any other the package
  * refuses it.
+ * @param c The request's context, whose app's engine and store are asked.
+ * @param token The token the request presents, or undefined where it presents none.
+ * @param need What the request's route needs of a token (needOf).
  */
 export async function callerBy(
   c: Parameters<MiddlewareHandler<ApiEnv>>[0],
@@ -103,6 +113,8 @@ export async function callerBy(
  * route has of a token (`needOf`) judged with the token it presents. A refusal on the MCP port says `WWW-Authenticate: Bearer`, as a
  * client of the port reads it; a refusal of a token presented by the board's cookie alone clears the cookie, so a browser holding one
  * gone stale (its token removed with `nemia token rm`) sends none after, and the board's token page asks for another.
+ * @param c The request's context, given the caller.
+ * @param next The rest of the request's handling, reached once the caller is put.
  */
 export const callerGate: MiddlewareHandler<ApiEnv> = async (c, next) => {
   let caller: ProposalCaller;
@@ -138,6 +150,9 @@ async function callerOfRequest(c: Parameters<MiddlewareHandler<ApiEnv>>[0]): Pro
  * A route that is the person's alone: throws `Forbidden` (403, reason `person-only`) unless the caller of `route` is the person, as an
  * agent — its session, or a token the person minted for it — must not act on the machine outside its agent's fence (approve a pairing,
  * make a first-visit link, mint a token, start a need's fix). Its words name `instead`, what the person types with their own `nemia`.
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param route The route the request reached, as the refusal names it.
+ * @param instead The command the person types to do it, as the refusal names it.
  */
 export const personOnly = (s: Served, route: string, instead: string): void => {
   if (s.caller.kind === 'person') return;

@@ -162,16 +162,24 @@ function keyValue(step: StepSpec, key: StepKey): string | null {
 /**
  * Every key a step may set, a row each, in `STEP_KEYS`' order: set or not, so a person reads what the step could say as well as what it
  * does.
+ * @param step The step, as the loader read it.
  */
 export const keyRows = (step: StepSpec): KeyRow[] =>
   STEP_KEYS.map((key) => ({ key, value: keyValue(step, key), meaning: STEP_KEY_MEANINGS[key] }));
 
-/** The file of the step `name` in the workflow folder `dir`, as written: frontmatter and all. */
+/**
+ * The file of the step `name` in the workflow folder `dir`, as written: frontmatter and all.
+ * @param dir The workflow's folder.
+ * @param name The step's name.
+ */
 export const stepSourceOf = (dir: string, name: string): string => fs.readFileSync(path.join(dir, `${name}.md`), 'utf8');
 
 /**
  * Where workflows are read from, in the order they are listed: the repository's, then yours — and, in a factory made from a template, its
  * `tree` first, read as the repository's and shadowing its folder of the same name, as a start looks for a bare name.
+ * @param repo The repository's folder.
+ * @param home The store's root folder, whose workflows/ is yours.
+ * @param tree The factory's tree folder, or undefined where it was made from no template.
  */
 export const sourcesOf = (repo: string, home: string, tree?: string): Array<{ from: WorkflowSource; dir: string }> => [
   ...(tree !== undefined ? [{ from: 'repo' as const, dir: path.join(tree, 'workflows') }] : []),
@@ -187,6 +195,12 @@ const unshadowed = <T extends { from: WorkflowSource }>(found: readonly T[], nam
  * Each folder `dirs` names, loaded as a start on `repo` would load it — with none, as one in yours alone — in `factory` with its hires and
  * rules (`foldersLoaded`, what the table's `workflows` runs), by folder. The factory is handed whole, so one the store does not hold — a
  * template's render — loads as a factory applied from it would.
+ * @param e The engine the loading runs over.
+ * @param on The place, the store's settings and the trace the program runs with (runPlaced).
+ * @param dirs The folders to load.
+ * @param repo The repository a start would run on, or undefined for none.
+ * @param home The store's root folder.
+ * @param factory The factory to load them in, with its hires and rules; undefined for none.
  */
 export const loadedOf = async (
   e: Engine['Service'],
@@ -197,7 +211,11 @@ export const loadedOf = async (
   factory?: Factory,
 ) => (await runPlaced({ ...on, home }, e, foldersLoaded(dirs, placesOf(repo, home), factory))) as Record<string, FolderLoaded>;
 
-/** The loading of the folder `dir` among `loaded`, which `loadedOf` gives for each folder it was asked: thrown, naming it, where none. */
+/**
+ * The loading of the folder `dir` among `loaded`, which `loadedOf` gives for each folder it was asked: thrown, naming it, where none.
+ * @param loaded The loadings loadedOf gave, by folder.
+ * @param dir The folder whose loading is asked.
+ */
 export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: string): FolderLoaded {
   const folder = loaded[dir];
   if (folder === undefined) throw new Error(`The table's \`workflows\` gave no loading of '${dir}', which it was asked to load.`);
@@ -209,6 +227,12 @@ export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: st
  * it, and in one made from a template, its tree's first (`sourcesOf`). Loads every folder, so each can say whether it reads, and, in a
  * factory, which steps its hires leave unfilled. Each folder's version is read through the doors over `inRequest`, the request's services
  * (`Served`), or a test's root given.
+ * @param e The engine the loading runs over.
+ * @param on The place, the store's settings and the trace the program runs with (runPlaced).
+ * @param repo The repository's folder.
+ * @param home The store's root folder.
+ * @param inRequest What runs a program over the request's services, which read each folder's version.
+ * @param factory The factory whose attached workflows alone are listed; undefined for every one.
  */
 export async function listWorkflows(
   e: Engine['Service'],
@@ -249,6 +273,8 @@ export type InRequest = <A, E>(program: Effect.Effect<A, E, StoreRoot>) => Promi
  * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `nemia start --repo <repo>` looks: the
  * repository's `.claude/`, then yours (`lookupRoots`). The listing, a folder's version and the builder's judgement all read with these, so
  * the board shows a folder as a start would read it. With no repository (the default factory with no `?repo=`), yours alone.
+ * @param repo The repository's folder, or undefined where there is none.
+ * @param home The store's root folder.
  */
 export const placesOf = (repo: string | undefined, home: string): Places => (repo === undefined ? { home } : { repo, home });
 
@@ -256,6 +282,12 @@ export const placesOf = (repo: string | undefined, home: string): Places => (rep
  * One folder as the board lists it, read from disk now, its steps as the table's `workflows` loaded them (`loaded`): what the listing
  * has for it, and what the builder answers a write with. In `factory`, its steps are read with the factory's hires, and those left with no
  * agent named (`unfilled`). Its `version` is the folder's now (`workflowVersion`), read by the caller over the request's services.
+ * @param name The workflow's name.
+ * @param from Where it is read from.
+ * @param dir The workflow's folder.
+ * @param loaded Its steps as the table loaded them, or why they did not load.
+ * @param version The folder's version now.
+ * @param factory The factory whose hires fill its steps; undefined for none.
  */
 export function listed(
   name: string,
@@ -307,6 +339,7 @@ export function listed(
 /**
  * A step as the listing has it, in a factory whose hires into its workflow are `hires`, by step: resolved, what its file sets itself where
  * an agent gives it the rest, and the agent hired into it.
+ * @param hires The agent hired into each step, by step.
  */
 export const listedStep =
   (hires: ReadonlyMap<string, string>) =>
@@ -388,6 +421,10 @@ const boundsOf = (step: StepSpec) => ({
   budget: step.budget ?? null,
 });
 
+/**
+ * A step's spec as the listing has it: each key it sets, null where it sets none.
+ * @param step The step, as the loader read it.
+ */
 export const specOf = (step: StepSpec): WorkflowStepSpec => ({
   ...listsOf(step),
   ...wiringOf(step),
@@ -440,6 +477,11 @@ const routeLine = (route: NonNullable<StepSpec['route']>): string => {
  * The workflow folder a start names, found among the folders the sources have — never joined from what was sent, so no
  * name reaches a folder outside them — or why not: none of that name, or one in each source and no `from` to choose. In a factory made
  * from a template, its `tree` is looked in first.
+ * @param name The workflow's name the start names.
+ * @param from The source to choose, or undefined for either.
+ * @param repo The repository's folder.
+ * @param home The store's root folder.
+ * @param tree The factory's tree folder, looked in first, or undefined where it was made from no template.
  */
 export function folderOf(
   name: string,
@@ -477,6 +519,8 @@ export function folderOf(
  * What the agent a step is read with says it can do, generated from its skills, found where the load found them (`cardSkills`): null for a
  * step with no agent, one the folder's places do not have, and one whose card the package refuses. `found` is what the folder's places
  * hold, read through the Agent and Skill doors by the handler.
+ * @param step The step, as the loader read it.
+ * @param found What the folder's places hold: their agents and skills.
  */
 export function agentSkillsOf(step: StepSpec, found: { readonly agents: Agents; readonly skills: SkillsFound }): AgentSkill[] | null {
   const attached = step.agent ? found.agents.get(step.agent.name) : undefined;

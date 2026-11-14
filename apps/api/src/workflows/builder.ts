@@ -64,7 +64,10 @@ const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter(
  */
 export type YourAgents = { readonly names: readonly string[]; readonly agents: Agents };
 
-/** Yours' agents read through the Agent door: the folder listed, and the agents a workflow of yours alone finds. */
+/**
+ * Yours' agents read through the Agent door: the folder listed, and the agents a workflow of yours alone finds.
+ * @param home The store's root folder, whose workflows/ is yours.
+ */
 export const yourAgentsRead = (home: string) =>
   Effect.gen(function* () {
     const door = yield* AgentDoor;
@@ -120,6 +123,8 @@ function harnessChoices(home: string): readonly string[] {
  * `remote` is how a step names a remote A2A agent, `harness: <prefix><name>`, and the keys such a step may not set, which the form leaves
  * off it (`REMOTE_REFUSED_KEYS`). The harness's `choices` offer each agent the store's `a2a-agents.json` declares beside the local
  * harnesses; `byHarness` has none of them, since a remote agent takes none of those words.
+ * @param yours Your agents: the names listed and the agents a workflow of yours finds.
+ * @param home The store's root folder, read for the harnesses offered.
  */
 export const keyForm = (yours: YourAgents, home: string): KeyForm => ({
   keys: STEP_KEYS.map((key) => ({
@@ -148,6 +153,8 @@ export type BuildRefused = { error: string; steps: string[] };
  * The steps of `names` a refusal of the package's names, which the board shows it by. `validate`'s cycle lists the steps that wait on each
  * other; `stepNameRefusal` and a name given twice name the name; every other refusal of a step opens on its name — `review: …`, or
  * `review is in two loops` — the longest name first, so `review-2: …` is not taken for `review`'s.
+ * @param message The package's refusal.
+ * @param names The steps' names the request sent.
  */
 export function stepsNamed(message: string, names: readonly string[]): string[] {
   const [, cycle] = /^these steps wait on each other: (.+)$/.exec(message) ?? [];
@@ -208,6 +215,10 @@ const TYPES: Readonly<Record<KeyKind, { is: (value: unknown) => boolean; said: s
  * keys its file sets and its note — a role key `own.keys` does not name is its agent's, and is not written, since written it would pin the
  * agent's value in the step; its wiring is always its own.
  * Sent without `own`, every key it sets is its own and `body` is its note (the package's `StepDraft`, whose `agent` is a name).
+ * @param step The step as the request sent it.
+ * @param at Where the step is in the request (step 2), as a refusal names it.
+ * @param route The route, as a refusal names it.
+ * @param shape The shape a request is sent in, as a refusal says it.
  */
 export function draftOf(step: StepBody, at: string, route: string, shape: string): StepDraft | Refusal {
   const { name, spec = {}, body, own } = step;
@@ -229,6 +240,10 @@ export function draftOf(step: StepBody, at: string, route: string, shape: string
   return { ...draft, name, body: mine ? mine.body : body } as StepDraft;
 }
 
+/**
+ * Whether key is one an agent may set on a step (ROLE_KEYS).
+ * @param key A key of a step's spec.
+ */
 export const isRoleKey = (key: string): boolean => (ROLE_KEYS as readonly string[]).includes(key);
 
 /** A schema a save writes beside the steps: its file's name and its text, as it is written. */
@@ -238,6 +253,9 @@ export type SchemaFile = { file: string; text: string };
  * The schemas a PUT carries, or why not: a file that is not a schema's (400, `schemaNameRefusal`) or given twice (400, its refusal
  * saying the route's `shape`). Each text is written ending in a line break, as a file is. Whether it is a schema a step can name is judged
  * with the steps.
+ * @param schemas The schemas the PUT carries, or undefined for none.
+ * @param route The route, as a refusal names it.
+ * @param shape The shape a request is sent in, as a refusal says it.
  */
 export function schemasOf(schemas: readonly SchemaFile[] | undefined, route: string, shape: string): SchemaFile[] | Refusal {
   const out: SchemaFile[] = [];
@@ -334,6 +352,8 @@ export type SchemaWas = { file: string; was: string | undefined };
  * returned can tell. A file gone, or that cannot be read, is written back.
  *
  * Exported for the test, which reads and refuses each of those three.
+ * @param dir The workflow's folder.
+ * @param written Each schema the save wrote, and what its file held before, undefined where there was none.
  */
 export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void {
   for (const { file, was } of written) {
@@ -389,6 +409,10 @@ export type Writing = {
  *
  * Given `files`, a Workflow's `spec.files`, they are the whole set of the folder's other text files: carried to the package with the
  * schemas pasted beside them, `whole`, so a text file neither names is removed, and a picture is left.
+ * @param steps The steps to write, as the package's drafts.
+ * @param readme The folder's README, or undefined to leave it.
+ * @param schemas The schemas pasted for it; none by default.
+ * @param files The folder's other files, written whole with the schemas where given; undefined leaves them as they are.
  */
 export async function write(
   { e, placeService, config, trace, name, dir, repo, home, changes, inRequest }: Writing,
@@ -467,6 +491,7 @@ export async function write(
  * folder store moves them: when a file was last written (the epoch where it cannot be read), the names of the `.md` files directly in a
  * folder, the folders holding a SKILL.md (a link among them), a SKILL.md's text (none for a link the picker refused, and the disk's words
  * for one it cannot read), and a folder's files by path.
+ * @param at The file's path.
  */
 export const writtenAt = (at: string): string => {
   try {
@@ -476,6 +501,10 @@ export const writtenAt = (at: string): string => {
   }
 };
 
+/**
+ * The names of the .md files directly in a folder, sorted, without their extension; none where it cannot be read.
+ * @param dir The folder.
+ */
 export const markdownNamesIn = (dir: string): string[] => {
   try {
     return fs
@@ -488,6 +517,10 @@ export const markdownNamesIn = (dir: string): string[] => {
   }
 };
 
+/**
+ * The folders directly in a folder that hold a SKILL.md, a link among them, sorted; none where it cannot be read.
+ * @param dir The folder.
+ */
 export const skillFoldersIn = (dir: string): string[] => {
   try {
     return fs
@@ -500,6 +533,11 @@ export const skillFoldersIn = (dir: string): string[] => {
   }
 };
 
+/**
+ * A skill folder's SKILL.md text: none for a link the picker refused, and the disk's words for one it cannot read.
+ * @param dir The skill's folder.
+ * @param refused Whether the picker refused the skill, so a link is not followed.
+ */
 export const skillTextOf = (dir: string, refused: boolean): { text: string } | { unread: string | null } => {
   try {
     if (refused && fs.lstatSync(dir).isSymbolicLink()) return { unread: null };
@@ -509,6 +547,11 @@ export const skillTextOf = (dir: string, refused: boolean): { text: string } | {
   }
 };
 
+/**
+ * Every file under a folder, by its path from that folder, sorted.
+ * @param dir The folder the paths are said from.
+ * @param under The folder inside it to list, by its path from it; the folder itself by default.
+ */
 export const filesUnder = (dir: string, under = ''): string[] =>
   fs
     .readdirSync(path.join(dir, under), { withFileTypes: true })

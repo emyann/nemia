@@ -66,6 +66,8 @@ const cellText = (cell: unknown): string =>
  * The lines of `table` as `asked`: the columns of priority 0, every column when wide, the `Labels` column with its labels, and a column
  * per label key read off each row's object, as `kubectl get` prints them — each column's name in capitals over its cells, padded to the
  * widest, three spaces apart; its header, then a line per row; no line where it has no row. Pure.
+ * @param table The table, its columns and rows.
+ * @param asked How it is asked: wide, with its labels, and the label keys to show as columns.
  */
 export function tableLines(table: Table, asked: TableAsked): string[] {
   if (table.rows.length === 0) return [];

@@ -40,6 +40,7 @@ export type Actor = typeof Actor.Type;
 /**
  * An actor in the words a person reads: `the person, on laptop`; `the person`; `operator, by its token ops`; `reviewer, of <run>/<step>`;
  * or the agent's name alone.
+ * @param actor Who did it, a person or an agent, with the token or the run and step it acted by.
  */
 export function actorWords(actor: Actor): string {
   if (actor.kind === 'person') return actor.token === undefined ? 'the person' : `the person, on ${actor.token}`;

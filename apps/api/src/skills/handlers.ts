@@ -48,6 +48,8 @@ type Row = Pick<SkillRow, 'dir' | 'entry' | 'error' | 'preload' | 'cost'>;
 /**
  * The skills of the factory's tree (`<tree>/workflows/skills`), each held at `origin` — `factory` in a namespace, `builtin` for a
  * template's render — read here; none where the factory has no tree. The one reader of a tree's skills.
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param origin The origin each skill is held at.
  */
 export async function treeSkillsHeld(s: Served, origin: Origin): Promise<Held<Row>[]> {
   const tree = s.factory?.tree === undefined ? undefined : path.join(s.factory.tree, 'workflows', SKILLS_FOLDER);
@@ -96,6 +98,9 @@ function specOf({ dir, error }: Row, name: string): { spec: SkillSpec; unread: s
 /**
  * The objects of the skills `served`, read now: in `namespace`, with the ledger's revision, where one is given; with neither where none
  * is (a template's documents, which the ledger does not count).
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param served The skills to answer, each with its origin and what shadows it.
+ * @param namespace The namespace the objects are in, whose ledger gives each its revision; none for a template's documents.
  */
 export async function skillObjectsOf(s: Served, served: ReturnType<typeof servedOf<Row>>, namespace?: string): Promise<Skill[]> {
   const read = served.filter(({ item }) => item.error === null).map(({ item }) => item.dir);

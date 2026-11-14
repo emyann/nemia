@@ -71,6 +71,7 @@ const OBJECT_BODY_LIMIT_SAID = `${ByteSize.format(OBJECT_BODY_LIMIT)} (${Number(
 /**
  * A path no route serves, a retired one among them (`/api/factories/:factory/servers`, `…/hires/:step`, `…/schedules/:workflow`), in the
  * api's words: a 404 naming the restart that makes a client and the api one build, and where the paths it serves are listed.
+ * @param c The request's context.
  */
 export function noRoute(c: RequestContext<ApiEnv>): Response {
   return c.json(
@@ -159,12 +160,16 @@ async function inApiWords(c: RequestContext<ApiEnv>, response: Response): Promis
   return c.json({ error }, response.status);
 }
 
-/** The kind of list a GET of `path` answers — its endpoint's success a `<Kind>List` — or none where it is no list's. */
+/**
+ * The kind of list a GET of `path` answers — its endpoint's success a `<Kind>List` — or none where it is no list's.
+ * @param path The request's path.
+ */
 export const listAt = (path: string): string | undefined => endpointOf('GET', path)?.kinds.find((kind) => kind.endsWith('List'));
 
 /**
  * The web handler of the `Api`, its layer built in the app runtime's memo map: every group's handlers, so a group left out does not
  * compile.
+ * @param runtime The app's runtime, in whose memo map the layer is built.
  */
 export const objectsHandler = (runtime: ApiRuntime) =>
   HttpRouter.toWebHandler(
@@ -207,6 +212,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
 /**
  * The mount over the app's runtime: each request in `served`, handed to the `Api`'s web handler with the request's services
  * (`ServedNow`), its answer in the api's words (`inApiWords`); a GET of a list through `watchable`.
+ * @param runtime The app's runtime, whose handler serves the Api.
  */
 export function mount(runtime: ApiRuntime): (c: RequestContext<ApiEnv>) => Promise<Response> {
   const { handler } = objectsHandler(runtime);

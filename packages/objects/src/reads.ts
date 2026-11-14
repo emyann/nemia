@@ -184,6 +184,8 @@ type ApiRead = {
  * Each GET endpoint of `api` whose read `reads` does not bound, in words: one with no entry, a `page` whose query takes no `limit` or no
  * `continue`, an entry naming a narrowing key its endpoint's query does not take, and a `one` or `part` read that names neither a key nor
  * why it is left whole is allowed only as `one`. Empty for an Api every read of which is bounded. Pure.
+ * @param api The Api whose GET endpoints are read.
+ * @param reads How each read is bounded, by group and endpoint name; READS by default.
  */
 export const readsUnbounded = (api: ApiRead, reads: Readonly<Record<string, ReadBound>> = READS): string[] =>
   Object.values(api.groups).flatMap((group) =>

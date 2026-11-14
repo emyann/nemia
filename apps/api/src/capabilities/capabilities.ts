@@ -90,6 +90,8 @@ export const HOME_REPO = path.resolve(import.meta.dirname, '..', '..', '..', '..
  * an install (`running`), the repository it was built from where that is a folder on disk, and its own checkout otherwise. None where the
  * install's `source` is no folder — an install unpacked from a published archive, whose source is the address it was downloaded from: an
  * address is never a folder, so it is never joined into one.
+ * @param env The api's environment, read for HKB_REPO.
+ * @param running The install the api runs from, or undefined where it runs no install.
  */
 export const repoOf = (env: NodeJS.ProcessEnv, running?: Running): string | undefined => {
   const given = env.HKB_REPO?.trim();
@@ -119,6 +121,7 @@ const MCP_JSON = '.mcp.json';
  * A server not enabled is not started: a GET does not run a command the person has not turned on, which is what enabling a project
  * server is for. Each server enabled is asked through `asker`, the app's `McpAsker` on a request; with none, through an asker of this
  * call's own, which asks each afresh.
+ * @param repo The repository's folder, whose skills, agents, servers and rules are read.
  */
 export async function capabilitiesOf(
   repo: string,
@@ -227,6 +230,10 @@ function namesIn(repo: string, dir: string, warnings: string[]): string[] {
  * `description`, each read through the package's one frontmatter reader and taken only where it is text. Null when there is no such file.
  * A frontmatter the reader refuses (one that never closes, or YAML in neither form) is a warning naming the file, and the file is still
  * listed by `fallback` with no description, as a harness still loads a skill whose YAML fails.
+ * @param repo The repository's folder.
+ * @param source The file's path in the repository.
+ * @param fallback The name it is listed by where its frontmatter names none.
+ * @param warnings The list a warning about the file is added to.
  */
 export function describedAt(repo: string, source: string, fallback: string, warnings: string[]): Described | null {
   let text: string;
@@ -441,6 +448,10 @@ type Started = Pick<Declared, 'name' | 'args'> & { command: string };
  * as the client alone does not reach it before it connects: a close during the era probe is what reaps the probe's sibling, which the
  * listing settles once it has (waited on at most `STDERR_END_MS`). The listing is given no abort signal: the client closes itself on an
  * aborted `connect` and does not wait for the server, which a close after it then misses.
+ * @param repo The repository's folder, which the server is started in.
+ * @param server The server as it is declared: its name, command and arguments, quoted in why it failed.
+ * @param launch The command, arguments and environment the server is started with.
+ * @param deadlineMs The most the ask takes, in milliseconds, before it is given up.
  */
 export const serverAsk = (repo: string, server: Started, launch: Launch, deadlineMs: number): Effect.Effect<Answer> =>
   Effect.gen(function* () {

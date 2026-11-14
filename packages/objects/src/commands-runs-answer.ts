@@ -15,7 +15,10 @@ export const ANSWER_HELP = [
   'alone; --message is then the note under your answers',
 ] as const;
 
-/** The `--answer` flag of `nemia <verb>`, given once for each question: the command line's alone, the api taking `answers` as data. */
+/**
+ * The `--answer` flag of `nemia <verb>`, given once for each question: the command line's alone, the api taking `answers` as data.
+ * @param verb The command the flag belongs to, as its refusal names it.
+ */
 export const answerFlag = (verb: 'retry' | 'approve'): Flag => ({
   flag: '--answer',
   kind: 'text',
@@ -64,6 +67,7 @@ function recheckAnswerRefusal(args: Args): string | null {
 /**
  * The refusal of `nemia retry`'s arguments before anything is read, of what needs nothing of the orchestrator: a round given answers,
  * words or a model; no step and no round; answers beside a recheck. A message or a budget a try does not take is the handler's to refuse.
+ * @param args The command line's arguments, by key.
  */
 export const retryRefusal = (args: Args): string | null =>
   args.round === true ? roundRefusal(args) : (stepRefusal(args) ?? recheckAnswerRefusal(args));
@@ -141,7 +145,10 @@ export const RETRY_WORDS = {
   only: { side: 'cli', why: "the api serves it as the Run's `retry` of `objects`' Api, calling this handler" },
 } as const satisfies CommandWords;
 
-/** The refusal of an approval's words before anything is read: `--message` given only blanks. */
+/**
+ * The refusal of an approval's words before anything is read: `--message` given only blanks.
+ * @param args The command line's arguments, by key.
+ */
 export const approveRefusal = (args: Args): string | null => {
   const message = textOf(args, 'message');
   if (args.off === true)

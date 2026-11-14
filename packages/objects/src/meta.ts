@@ -76,7 +76,11 @@ export const ListMeta = Schema.Struct({
 }).annotate({ description: 'Where a page of a list stands: the word for the next page, how many items remain, and its position.' });
 export type ListMeta = typeof ListMeta.Type;
 
-/** A page of a list of one kind: `<Kind>List`, its metadata, and its items, each an object of that kind. */
+/**
+ * A page of a list of one kind: `<Kind>List`, its metadata, and its items, each an object of that kind.
+ * @param kind The kind of the list's items, which names the list.
+ * @param item The schema of one item.
+ */
 export const listOf = <const Kind extends string, Item extends Schema.Constraint>(kind: Kind, item: Item) =>
   Schema.Struct({
     apiVersion: Schema.Literal(API_VERSION).annotate({ description: `The version the list is served under, ${API_VERSION}.` }),

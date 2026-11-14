@@ -60,6 +60,8 @@ type Reader = Engine['Service'];
  * message is led by `verb` (`output: …`), as a caller of the command line reads it (`asked`); and any other failure — a `JournalError`, a
  * `RunnerError` — as it failed, so `unreadableJournal` still recognises one task's journal. Takes no service: it is the Effect a verb of
  * the request's engine already is.
+ * @param verb The verb's name, which leads a refusal's message.
+ * @param read The verb's Effect, as the request's engine gives it.
  */
 export const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>): Promise<A> => Effect.runPromise(asked(verb, read));
 
@@ -70,6 +72,7 @@ export const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>): Promi
  * afresh on each call. A task the engine has no record of is simply absent, which reads exactly as
  * `view`'s empty state does: no brief, so `unknown`. One whose journal does not read is in `unreadable` instead, and in no view
  * (`judgedUnlessUnreadable`).
+ * @param e The engine's reader of tasks.
  */
 export async function everyView(e: Reader): Promise<{ views: Views; unreadable: Unreadable }> {
   const listed = await engineRead('list', e.list());
@@ -79,15 +82,26 @@ export async function everyView(e: Reader): Promise<{ views: Views; unreadable: 
   };
 }
 
-/** Found among the ids the store at `home` lists (`runs.find`), not read by path, so no id can name a file outside it. */
+/**
+ * Found among the ids the store at `home` lists (`runs.find`), not read by path, so no id can name a file outside it.
+ * @param home The store's root folder.
+ * @param id The run's id, as the request gives it.
+ */
 export const findRun = (home: string, id: string): Run | undefined => runsAtOnce(home).runs.find(id);
 
+/**
+ * The words of a refusal of a run this store has no record of, naming where its runs are listed.
+ * @param id The run's id, as the request gave it.
+ */
 export const noSuchRun = (id: string) =>
   `No run '${id}' in this store. GET /api/runs (or \`nemia ls\`) lists the runs it has; check WF_ROOT if you expected it here.`;
 
 /**
  * The run and the task a step's routes read — null for a step not filed yet — or why there is no such step to read: no run by
  * that id, or no step by that name on the run's page, which shows those on the record and any the folder has gained (`stepNames`).
+ * @param id The run's id, as the request gives it.
+ * @param step The step's name, as the request gives it.
+ * @param home The store's root folder.
  */
 export function taskOfStep(id: string, step: string, home: string): { run: Run; taskId: string | null } | { error: string } {
   const run = findRun(home, id);
@@ -103,6 +117,9 @@ export function taskOfStep(id: string, step: string, home: string): { run: Run; 
  * settings (`at`), its
  * spans children of the request's own on the app's tracer where `at.trace` names them (`RequestTrace`). Rejects with what the program
  * failed with or died of, as `runWith` does.
+ * @param at The place, the store's root, its settings and the trace the program runs with.
+ * @param e The engine the program runs over.
+ * @param program The package's program.
  */
 export const runPlaced = <A, E>(
   at: Placed,

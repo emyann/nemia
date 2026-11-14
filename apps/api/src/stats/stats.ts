@@ -45,6 +45,7 @@ const QUERY_KEYS: Record<QueryKey, keyof StatsAsked> = {
  *   under `WF_VERIFY_REST=1`. `?selector=`, given again for another, keeps the facts of the runs one of them takes by their labels, as
  *   `nemia stats -l` keeps them (OR across repeats, the run's whole map read as `GET /api/runs` reads it); a selector the package's
  *   grammar refuses is a 422 naming the key or the clause.
+ * @param query The request's query: the days, the key to go by, and the values each fact is kept by.
  */
 export async function statsOf(query: StatsAsked, { memo, inRequest }: Served): Promise<Stats> {
   const given = Object.fromEntries(

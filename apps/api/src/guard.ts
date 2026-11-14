@@ -46,14 +46,20 @@ export type { WriteRefusal, WriteRequest } from '../contracts/write-guard.contra
 export { loopback } from './address/address.ts';
 export { saysJson } from './media/media.ts';
 
-/** What a request's `Authorization` header presents: no header (`undefined`), a bearer token, or a header of another shape (`null`). */
+/**
+ * What a request's `Authorization` header presents: no header (`undefined`), a bearer token, or a header of another shape (`null`).
+ * @param header The Authorization header's value, or undefined where the request sends none.
+ */
 export function bearerOf(header: string | undefined): string | undefined | null {
   if (header === undefined) return undefined;
   const match = /^Bearer +(\S+)\s*$/i.exec(header.trim());
   return match?.[1] ?? null;
 }
 
-/** The token the board's cookie (`TOKEN_COOKIE`) holds, or `undefined` where the request sends none, or an empty one. */
+/**
+ * The token the board's cookie (`TOKEN_COOKIE`) holds, or `undefined` where the request sends none, or an empty one.
+ * @param c The request's context, whose cookies are read.
+ */
 export const cookieTokenOf = (c: Context): string | undefined => {
   const token = getCookie(c, TOKEN_COOKIE);
   return token === undefined || token === '' ? undefined : token;
@@ -62,6 +68,7 @@ export const cookieTokenOf = (c: Context): string | undefined => {
 /**
  * Why a write is refused before its body is read, or null: its host first, neither where it presents a bearer token or the board's
  * cookie; then its site, not where it presents a bearer token; then its body's type; a read never.
+ * @param request The request's method, host, site, content type and whether it presents a bearer token or the board's cookie.
  */
 export const writeRefused: WriteRefused = (request) => {
   if (request.method === 'GET' || request.method === 'HEAD') return null;
@@ -95,6 +102,8 @@ const answerOf = (refusal: WriteRefusal, route: string, request: WriteRequest): 
 /**
  * Every request under `/api/` but a GET or a HEAD, refused before any route reads it where `writeRefused` refuses it: 403 `{ error,
  * reason }` for its host or its site, 415 `{ error }` for a body not sent as JSON.
+ * @param c The request's context.
+ * @param next The rest of the request's handling, reached where the write is not refused.
  */
 export const writeGuard: MiddlewareHandler = async (c, next) => {
   const path = new URL(c.req.url).pathname;

@@ -11,6 +11,9 @@ export type LifecycleTransition = Effect.Success<ReturnType<Engine['Service']['p
  * The try of `step` that `asked` names — the current one when it is undefined or empty — with its task, and the turn of that task it
  * ended on: undefined for the current try, whose path runs to now. Refused with 400 for a try that is not a whole number from 1, and 404
  * for one past the current.
+ * @param run The run.
+ * @param step The step's name.
+ * @param asked The try's number, as the request gives it; undefined or empty for the current one.
  */
 export function tryOfStep(
   run: Run,
@@ -42,6 +45,8 @@ export function tryOfStep(
 /**
  * A task's path cut to the end of its turn `turn`: everything before the `input` entry that opened the turn after it. The whole path for
  * no turn, and for a turn no answer followed.
+ * @param path The task's path.
+ * @param turn The turn to cut at, counted from 0, or undefined for the whole path.
  */
 export function pathToTurn(path: readonly LifecycleTransition[], turn: number | undefined): LifecycleTransition[] {
   if (turn === undefined) return [...path];

@@ -131,6 +131,10 @@ function startOf(body: RunStart, repo: string, home: string, tree?: string): Ask
  * is; a blank one is the package's to refuse, as `nemia start <card> --brief ""` is. Answered with the run's id, what `nemia start`
  * prints of it, and the card's name — the card kept in the inbox, listed as started — and the card's `repo:` the run did not look at, as
  * `ignoredRepo`, as `nemia start` prints it. Its models, gates, no worktree and the files handed to its steps are the body's.
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param card The card's name.
+ * @param body The start's body, as the endpoint decodes it: its workflow, brief, inputs and the rest.
+ * @param factory The factory to start it in, the card's namespace's or the request's; undefined where neither names one.
  */
 export async function cardStart(s: Served, card: string, body: CardStart, factory: string | undefined): Promise<CardStarted> {
   if (s.repoNamed) throw new Refused({ message: cardRepoRefusal(card) });
@@ -188,6 +192,8 @@ const foundFactoryBy = (s: Served, wired: string | undefined): { repoFoundFactor
  * its workflow found in that factory's tree where it is made from a template, and is refused, `Invalid`, where none or two do, naming
  * the namespace to start it in; with no `?repo=` it is refused as `repoNeeded` refuses it, naming `?factory=`, never started on the
  * api's own repository.
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param body The start's body, as the endpoint decodes it.
  */
 export async function runStart(s: Served, body: RunStart): Promise<RunStarted> {
   const { home, factory } = s;

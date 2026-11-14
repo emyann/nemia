@@ -6,11 +6,12 @@
  *
  * Prose is not a constraint: a dozen comments across the runtime name a line of the SDK's own declarations, and an SDK bump rewrites
  * that file top to bottom — 0.3.270 to 0.3.308 moved every one of them, some by two hundred lines, 0.3.308 to 0.3.316 every one again,
- * 0.3.316 to 0.3.322 all but the first two, and 0.3.322 to 0.3.323 all but the first three. A citation nobody can check rots into a
- * line that says something else, and a reader who follows it is misled with no warning, which is the same class of fault as a lock
- * that fell behind a range. So each citation is named here with the identifier it stands for, and the cited line — or, for a range,
- * some line of it — must hold that identifier in the installed `sdk.d.ts`. A citation this table does not name is refused too: a new
- * one is added here, at the bump that introduced it, or it is not a citation anybody can trust.
+ * 0.3.316 to 0.3.322 all but the first two, 0.3.322 to 0.3.323 all but the first three, and 0.3.323 to 0.3.325 every one again.
+ * A citation nobody can check rots into a line that says something else, and a reader who follows it is misled with no warning,
+ * which is the same class of fault as a lock that fell behind a range. So each citation is named here with the identifier it stands
+ * for, and the cited line — or, for a range, some line of it — must hold that identifier in the installed `sdk.d.ts`. A citation this
+ * table does not name is refused too: a new one is added here, at the bump that introduced it, or it is not a citation anybody can
+ * trust.
  *
  * The line numbers belong to `test/sdk-pin.ts`'s `SDK_VERSION` alone, and are re-read at each bump. The one way to do that is to grep
  * the installed file for each identifier below.
@@ -30,32 +31,32 @@ const SDK = path.join(ROOT, 'node_modules', '@anthropic-ai', 'claude-agent-sdk',
  * claim is about a whole type or a doc comment with its field, and then the identifier is looked for anywhere inside it.
  */
 const CLAIMS: Record<string, string> = {
-  '228': 'CanUseTool',
-  '232-239': 'suggestions',
-  '315': 'matchedAskRule',
-  '1271-1287': 'McpHttpServerConfig',
-  '1319': 'McpServerConfigForProcessTransport',
-  '1335-1390': 'McpServerStatus',
-  '1778': 'env',
-  '1980': 'includePartialMessages',
-  '2046-2050': 'maxBudgetUsd',
-  '2075': 'mcpServers',
-  '2138': 'permissionPrompts',
-  '2458': 'strictMcpConfig',
-  '2459-2570': 'systemPrompt',
-  '2560-2570': 'systemPrompt',
-  '3190': 'mcpServerStatus',
-  '4842': 'appendSystemPrompt',
-  '5769': 'SDKMessageOrigin',
-  '6080': 'SDKRateLimitEvent',
-  '6093': 'SDKRateLimitInfo',
-  '6094': 'status',
-  '6280-6283': 'total_cost_usd',
-  '6424': 'SDKStatusMessage',
-  '6452': 'claude_code_version',
-  '6467': 'permissionMode',
-  '9671': 'autoCompactWindow',
-  '9878': 'claudeMdExcludes',
+  '241': 'CanUseTool',
+  '245-252': 'suggestions',
+  '328': 'matchedAskRule',
+  '1284-1300': 'McpHttpServerConfig',
+  '1332': 'McpServerConfigForProcessTransport',
+  '1348-1403': 'McpServerStatus',
+  '1791': 'env',
+  '1993': 'includePartialMessages',
+  '2059-2063': 'maxBudgetUsd',
+  '2088': 'mcpServers',
+  '2151': 'permissionPrompts',
+  '2471': 'strictMcpConfig',
+  '2472-2583': 'systemPrompt',
+  '2573-2583': 'systemPrompt',
+  '3209': 'mcpServerStatus',
+  '4874': 'appendSystemPrompt',
+  '5810': 'SDKMessageOrigin',
+  '6121': 'SDKRateLimitEvent',
+  '6134': 'SDKRateLimitInfo',
+  '6135': 'status',
+  '6343-6346': 'total_cost_usd',
+  '6492': 'SDKStatusMessage',
+  '6520': 'claude_code_version',
+  '6535': 'permissionMode',
+  '9750': 'autoCompactWindow',
+  '9957': 'claudeMdExcludes',
 };
 
 /** Every `sdk.d.ts:<n>` and `sdk.d.ts:<n>-<m>` in `text`, by the `<n>` or `<n>-<m>` it cites. */
@@ -118,17 +119,17 @@ test('every sdk.d.ts citation in our prose points at the identifier it claims', 
 });
 
 test('REFUSED: a citation one line off, a citation past the end of the file, and a citation the table does not name', () => {
-  const drifted = citationRefusals(lines, 'a/file.ts', '2137', { '2137': 'permissionPrompts' });
+  const drifted = citationRefusals(lines, 'a/file.ts', '2150', { '2150': 'permissionPrompts' });
   assert.equal(drifted.length, 1, 'a citation one line above the declaration is refused');
-  assert.match(drifted[0], /line 2137 of the installed sdk\.d\.ts/);
+  assert.match(drifted[0], /line 2150 of the installed sdk\.d\.ts/);
   assert.match(drifted[0], /Grep the installed sdk\.d\.ts for permissionPrompts/, 'and says how to correct it');
-  assert.deepEqual(citationRefusals(lines, 'a/file.ts', '2138', { '2138': 'permissionPrompts' }), [], 'and the line itself is not');
+  assert.deepEqual(citationRefusals(lines, 'a/file.ts', '2151', { '2151': 'permissionPrompts' }), [], 'and the line itself is not');
 
-  const narrowed = citationRefusals(lines, 'a/file.ts', '1271-1287', { '1271-1287': 'McpServerStatus' });
+  const narrowed = citationRefusals(lines, 'a/file.ts', '1284-1300', { '1284-1300': 'McpServerStatus' });
   assert.equal(narrowed.length, 1, 'a range that holds a different type than the one claimed is refused');
-  assert.match(narrowed[0], /no line of 1271-1287/);
+  assert.match(narrowed[0], /no line of 1284-1300/);
 
-  const unnamed = citationRefusals(lines, 'a/file.ts', '2138', {});
+  const unnamed = citationRefusals(lines, 'a/file.ts', '2151', {});
   assert.equal(unnamed.length, 1);
   assert.match(unnamed[0], /names no identifier for/, 'a citation nobody wrote a claim for is refused');
 

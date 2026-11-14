@@ -1,15 +1,16 @@
 /**
  * The ask and the result, side by side on a run's page: what was asked of the run (its brief, and the inbox card it was started from),
  * and what it gave — what the graph's final steps gave, read from the graph and never from a step's name (`resultOf`) — or until they
- * have, where the run stands, linked to the step that says it.
+ * have, where the run stands, linked to the step that says it; or, for a run called off or ended before they gave, that it ended — a
+ * step that failed still saying why.
  */
 import { stepAnchor } from '@/lib/asks';
 import { ink, type Hue } from '@/lib/meaning';
-import { resultOf, resultStepsOf } from '@/lib/runResult';
+import { resultOf, resultStepsOf, runEndOf } from '@/lib/runResult';
 import type { RunDetail } from '@/lib/runView';
 import { stepPartOf } from '@/lib/stepPart';
 import { useNow } from '@/lib/useNow';
-import { PERSON } from '@/lib/words';
+import { ENDED, PERSON } from '@/lib/words';
 import { cn } from '@/lib/utils';
 import { TextLink } from '../look';
 import { Markdown } from '../markdown/Markdown';
@@ -60,6 +61,21 @@ function Result({ run }: { run: RunDetail }) {
           <Gave key={step} run={run} step={step} now={now} />
         ))}
       </div>
+    );
+  const end = runEndOf(run);
+  if (end !== null && result.why !== 'failed')
+    return (
+      <p data-result-ended={end} className="text-body-medium">
+        Nothing given.{' '}
+        {end === 'calledOff' ? (
+          <>
+            The run was <span className={cn('font-medium', ink[ENDED.cancelled.hue])}>{ENDED.cancelled.word}</span> before its last steps
+            gave.
+          </>
+        ) : (
+          'The run ended before its last steps gave.'
+        )}
+      </p>
     );
   const { words, hue } = STANDS[result.why];
   return (

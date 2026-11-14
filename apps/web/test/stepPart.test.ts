@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunDetail } from '../src/lib/runView.ts';
-import { GOT_ORDER, PART_SLOTS, packetsOfView, slotsOf, stepPartOf, type PartSize } from '../src/lib/stepPart.ts';
+import { GOT_ORDER, PART_SLOTS, packetsOfView, slotsOf, stepFilesOf, stepPartOf, type PartSize } from '../src/lib/stepPart.ts';
 import { coded, detail, step } from './run-fixtures.ts';
 
 type Step = RunDetail['steps'][number];
@@ -14,7 +14,14 @@ type Step = RunDetail['steps'][number];
 const NOW = new Date('2026-09-30T05:20:00.000Z');
 
 /** A file served under the step's files. */
-const served = (path: string) => ({ path, name: path, url: `/api/runs/r-1/steps/design/files/${path}`, kind: 'text' as const, size: 1 });
+/** A file a step's folder lists, as the api serves it: its path in that folder, the name it is served by, and its link under `route`. */
+const served = (name: string, route: 'files' | 'artifacts' = 'artifacts') => ({
+  path: route === 'artifacts' ? `/store/runs/r-1/artifacts/design/${name}` : `/work/r-1/design/${name}`,
+  name,
+  url: `/api/runs/r-1/steps/design/${route}/${name}`,
+  kind: 'text' as const,
+  size: 1,
+});
 
 /** The closeout of `step()`, with `extra` over it. */
 const closeout = (extra: Partial<NonNullable<Step['closeout']>> = {}): NonNullable<Step['closeout']> => ({
@@ -43,10 +50,10 @@ const design = (): Step =>
       output: { verdict: 'go', pr: 'https://example.test/pr/1' },
       schema: { verdict: { type: 'string' }, pr: { type: ['string', 'null'] } },
       shapes: { pr: 'link' },
-      artifacts: [served('spec.md')],
+      artifacts: [{ path: 'spec.md' }],
       values: [],
     }),
-    files: [served('spec.md'), served('notes.txt')],
+    files: [served('spec.md', 'files'), served('notes.txt', 'files')],
     artifactsFolder: { files: [served('spec.md'), served('notes.txt'), served('shot.png')], error: null },
   });
 
@@ -235,4 +242,25 @@ test('the detail is of the try shown, and the head offers every try with it', ()
   assert.deepEqual(part.head.tries, [1, 2]);
   assert.equal(part.head.shown, 2);
   assert.equal(part.detail !== 'none' && part.detail.debug.try, 2);
+});
+
+test("a file the closeout named by its workspace path is its folders' served copy, kept under the path it named, and counted once", () => {
+  const files = stepFilesOf(design());
+  assert.deepEqual(
+    files.named.map((f) => [f.path, 'url' in f ? f.url : null]),
+    [['spec.md', '/api/runs/r-1/steps/design/artifacts/spec.md']],
+    'the relative path resolves to its name in the artifacts folder, and the viewer finds it by the path the closeout gave',
+  );
+  assert.deepEqual(
+    files.unnamed.map((f) => ('name' in f ? f.name : f.path)),
+    ['notes.txt', 'shot.png'],
+    'each held name once across the two folders, spec.md being named',
+  );
+  const named = design();
+  const absolute = { ...named, closeout: { ...named.closeout!, artifacts: [{ path: '/store/runs/r-1/artifacts/design/shot.png' }] } };
+  assert.deepEqual(
+    stepFilesOf(absolute).unnamed.map((f) => ('name' in f ? f.name : f.path)),
+    ['spec.md', 'notes.txt'],
+    'a path in the artifacts folder names its listed file by that path',
+  );
 });

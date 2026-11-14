@@ -13,7 +13,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { behind, coded, detail as detailOf, readsOf, unpinned } from './run-fixtures.ts';
+import { behind, coded, detail as detailOf, readsOf, step, unpinned } from './run-fixtures.ts';
 import './tsx.ts';
 import {
   at,
@@ -666,6 +666,24 @@ test("the result: until the graph's final steps have given, where the run stands
   assert.match(html, /<section aria-label="The ask" data-run-ask="true"[\s\S]*<strong>floor<\/strong>/, 'the ask is the brief');
   assert.match(html, /<section aria-label="The result" data-run-result="stands"/);
   assert.match(html, /<p data-result-stands="yours"[\s\S]*?<a [^>]*href="\/runs\/r-1#step-review"/, 'waiting on you, at review');
+});
+
+test('the result of a run called off, or ended, before its final steps gave says its end, never what is to come', async () => {
+  const { RunResult } = await import('../src/components/run/RunResult.tsx');
+  const toCome = {
+    graph: { roots: ['review'], edges: [] },
+    holding: null,
+    steps: [step({ name: 'review', ...coded('waiting'), closeout: null })],
+  };
+  const off = await routedWith(createElement(RunResult, { run: detailOf({ ...toCome, cancelledAt: '2026-09-30T06:00:00.000Z' }) }));
+  assert.match(off, /<p data-result-ended="calledOff"/);
+  assert.doesNotMatch(off, /data-result-stands/, 'not to come');
+  assert.ok(
+    textsOf(off).some((t) => t.includes('called off')),
+    'in the words a person reads',
+  );
+  const ended = await routedWith(createElement(RunResult, { run: detailOf({ ...toCome, status: 'succeeded' }) }));
+  assert.match(ended, /<p data-result-ended="ended"/);
 });
 
 test("the header: the brief's first line for a title, where the run stands, its id to copy, and three tiles — took, cost, rounds", async () => {

@@ -4,9 +4,8 @@
  * thumbnails, the rest as chips, each opening the viewer's sheet — its values, and one fold counting the files it left unnamed. On the
  * graph's node, the first of them on one line.
  */
-import type { StepArtifact } from '@/lib/api/tries';
 import type { StepView } from '@/lib/runView';
-import type { PartSize, StepPartModel } from '@/lib/stepPart';
+import { stepFilesOf, type PartSize, type StepPartModel } from '@/lib/stepPart';
 import { Artifacts, Values } from '../../run/Artifacts';
 import { FieldWidgetView } from '../../field/widgets/FieldWidgetView';
 import { Replies } from '../Outcome';
@@ -14,13 +13,6 @@ import { Fold } from './Fold';
 
 /** What the step gave, as its part's model has it. */
 type Gave = Exclude<StepPartModel['gave'], 'none'>;
-
-/** The files the step's folders hold that its closeout did not name, each path once. */
-function unnamedOf(step: StepView): StepArtifact[] {
-  const named = new Set((step.closeout?.artifacts ?? []).map((a) => a.path));
-  const held = [...(step.artifactsFolder?.files ?? []), ...step.files];
-  return held.filter((file, i) => !named.has(file.path) && held.findIndex((other) => other.path === file.path) === i);
-}
 
 /** A value on one line: a string as it is, anything else as its JSON. */
 const lineOf = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value));
@@ -51,7 +43,7 @@ function First({ gave }: { gave: Gave }) {
 export function PartGave({ step, gave, size }: { step: StepView; gave: Gave; size: PartSize }) {
   if (size === 'S') return <First gave={gave} />;
   const closeout = step.closeout;
-  const unnamed = unnamedOf(step);
+  const unnamed = stepFilesOf(step).unnamed;
   return (
     <section data-part-gave={size} aria-label="What it gave" className="min-w-0 space-y-3 text-body-medium">
       <h3 className="text-label-medium text-on-surface-variant uppercase">

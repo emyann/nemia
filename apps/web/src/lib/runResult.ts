@@ -33,10 +33,16 @@ export function standsOf(state: StepState): Stands {
   return movingInto(state) || isLive(state) ? 'working' : 'toCome';
 }
 
-/** Whether the step's shown try gave anything: a declared field, a file or a value. */
+/** Whether the step's shown try gave anything: the summary it signed off with, a declared field, a file or a value. */
 const gaveOf = (step: StepView): boolean => {
   const closeout = step.closeout;
-  return closeout !== null && (Object.keys(closeout.output).length > 0 || closeout.artifacts.length > 0 || closeout.values.length > 0);
+  return (
+    closeout !== null &&
+    (closeout.summary.trim() !== '' ||
+      Object.keys(closeout.output).length > 0 ||
+      closeout.artifacts.length > 0 ||
+      closeout.values.length > 0)
+  );
 };
 
 /**
@@ -51,4 +57,17 @@ export function resultStepsOf(view: RunDetail): ResultStep[] {
     stands: standsOf(stepState(step, view.cancelledAt !== null, view.holding != null)),
     gave: gaveOf(step),
   }));
+}
+
+/** How a run ended before its final steps gave: called off by a person, or ended on its own. */
+type RunEnd = 'calledOff' | 'ended';
+
+/**
+ * How the run ended, where it has: called off (its status, or the moment it was), else ended once its status is one a run ends in
+ * (succeeded or failed); null for a run still going. What none of its steps says once it stopped: a step a called-off run never ran
+ * reads as still to come.
+ */
+export function runEndOf(view: Pick<RunDetail, 'status' | 'cancelledAt'>): RunEnd | null {
+  if (view.cancelledAt !== null || view.status === 'cancelled') return 'calledOff';
+  return view.status === 'succeeded' || view.status === 'failed' ? 'ended' : null;
 }

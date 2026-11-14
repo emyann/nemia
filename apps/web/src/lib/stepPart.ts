@@ -477,12 +477,34 @@ function fieldsOf(step: StepView, spec: StepSpecView | null): GaveField[] {
   }));
 }
 
-/** How many files the step's artifacts folder and its folder hold that its closeout did not name, each path counted once. */
-function unnamedOf(step: StepView): number {
-  const named = new Set((step.closeout?.artifacts ?? []).map((a) => a.path));
-  const held = new Set([...(step.artifactsFolder?.files ?? []), ...step.files].map((f) => f.path));
-  return [...held].filter((path) => !named.has(path)).length;
+/**
+ * Whether a file a step's folders list is one its closeout named: the same path, or the name the folder serves it by, for a path
+ * relative to the step's workspace — the run copies such a file into the step's artifacts folder, which lists it by its own path there.
+ */
+const namedAs = (named: StepArtifact, listed: StepArtifact): boolean =>
+  named.path === listed.path || (!named.path.startsWith('/') && 'name' in listed && listed.name === named.path);
+
+/** A listed file's one key across the step's two folders: the name it is served by, else its path. */
+const heldKey = (listed: StepArtifact): string => ('name' in listed ? listed.name : listed.path);
+
+/**
+ * Every file of a step, each once: those its closeout named, by the path it named — served where a folder lists its copy — then those
+ * its artifacts folder and its folder hold that it did not name, each name once across the two.
+ */
+export function stepFilesOf(step: StepView): { named: StepArtifact[]; unnamed: StepArtifact[] } {
+  const listed = [...(step.artifactsFolder?.files ?? []), ...step.files];
+  const closeout = step.closeout?.artifacts ?? [];
+  const named = [...new Map(closeout.map((n) => [n.path, n])).values()].map((n) => {
+    const copy = 'url' in n ? undefined : listed.find((l) => 'url' in l && namedAs(n, l));
+    return copy ? { ...copy, path: n.path } : n;
+  });
+  const unnamed = new Map<string, StepArtifact>();
+  for (const l of listed) if (!closeout.some((n) => namedAs(n, l)) && !unnamed.has(heldKey(l))) unnamed.set(heldKey(l), l);
+  return { named, unnamed: [...unnamed.values()] };
 }
+
+/** How many files the step's artifacts folder and its folder hold that its closeout did not name, each counted once. */
+const unnamedOf = (step: StepView): number => stepFilesOf(step).unnamed.length;
 
 /**
  * What the step gave, of the try shown; none where it declares nothing and gave nothing — its loop's replies to findings counting as
@@ -493,7 +515,7 @@ function gaveOf(step: StepView, packets: readonly Packet[], answered: ReadonlySe
   const gave: PartGave = {
     packet: packets.find((p) => p.from === step.name)?.label ?? null,
     fields: fieldsOf(step, step.spec).filter((field) => !answered.has(field.name)),
-    files: step.closeout?.artifacts ?? [],
+    files: stepFilesOf(step).named,
     values: step.closeout?.values ?? [],
     unnamed: unnamedOf(step),
   };

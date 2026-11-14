@@ -74,10 +74,16 @@ const DAY = 86_400_000;
 /** The start of the span of `size` ms that `ms` falls in, as ISO. */
 const floorTo = (ms: number, size: number): string => new Date(Math.floor(ms / size) * size).toISOString();
 
-/** The UTC day of an ISO time or a day: its file's name. */
+/**
+ * The UTC day of an ISO time or a day: its file's name.
+ * @param t An ISO time, or a UTC day.
+ */
 export const dayOf = (t: string): string => t.slice(0, 10);
 
-/** The label keys of `l` that are not `SERIES_LABEL_KEYS`, in their order: none for a label set a line may carry. */
+/**
+ * The label keys of `l` that are not `SERIES_LABEL_KEYS`, in their order: none for a label set a line may carry.
+ * @param l A line's label set.
+ */
 export const strangeLabels = (l: Record<string, unknown>): string[] =>
   Object.keys(l).filter((k) => !(SERIES_LABEL_KEYS as readonly string[]).includes(k));
 
@@ -111,7 +117,10 @@ const diskSamples = (disk: DiskReading): Sample[] => [
 const checkLoads = (load: number | undefined, checks: RecentPass['checks']): Sample[] =>
   load === undefined ? [] : (checks ?? []).map((l): Sample => ({ s: 'check.load', l, v: load }));
 
-/** What one kept pass is sampled into: every series it carries a figure of, none for a figure an older tick did not keep. */
+/**
+ * What one kept pass is sampled into: every series it carries a figure of, none for a figure an older tick did not keep.
+ * @param p The kept pass.
+ */
 export const samplesOf = (p: RecentPass): Sample[] => [
   { s: 'pass.ms', l: {}, v: p.ms },
   ...PHASES.map((phase): Sample => ({ s: 'pass.phase.ms', l: { phase }, v: p.phases[phase] })),
@@ -146,7 +155,11 @@ const lastOf = <T>(items: NonEmpty<T>): T => items.at(-1) ?? items[0];
 /** The value at `q` of sorted `values`, by nearest rank: the last for a `q` above 1. */
 const rank = (sorted: NonEmpty<number>, q: number): number => sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] ?? lastOf(sorted);
 
-/** The counts of `values` in the buckets of `bounds`, each in the first whose bound it does not pass, one past the last for the rest. */
+/**
+ * The counts of `values` in the buckets of `bounds`, each in the first whose bound it does not pass, one past the last for the rest.
+ * @param values The values counted.
+ * @param bounds The buckets' upper bounds, in ascending order, each taken in its bucket.
+ */
 export const bucketsOf = (values: readonly number[], bounds: readonly number[]): number[] => {
   const b = Array.from({ length: bounds.length + 1 }, () => 0);
   for (const v of values) {
@@ -187,7 +200,11 @@ const grouped = <T>(items: readonly T[], key: (item: T) => string): Array<NonEmp
   return [...groups.values()];
 };
 
-/** The passes of `ring` in the minutes `due`, rolled into a line per minute, series and label set, oldest minute first. */
+/**
+ * The passes of `ring` in the minutes `due`, rolled into a line per minute, series and label set, oldest minute first.
+ * @param ring The passes the ring holds.
+ * @param due The minutes to roll, each as an ISO time at its start.
+ */
 export const rollMinutes = (ring: readonly RecentPass[], due: readonly string[]): RollupLine[] =>
   due.flatMap((minute) =>
     grouped(ring.filter((p) => floorTo(Date.parse(p.at), MINUTE) === minute).flatMap(samplesOf), (x) => keyOf(x.s, x.l)).map(
@@ -199,6 +216,10 @@ export const rollMinutes = (ring: readonly RecentPass[], due: readonly string[])
  * The minutes of `ring` due to roll at `now`, oldest first: each a pass of the ring is in, after `last` (the last minute rolled, none
  * before any) and before the minute `now` is in, which is not done. With the ring full (`kept`), its first minute is left out, since the
  * passes before it that were in it are gone.
+ * @param ring The passes the ring holds.
+ * @param last The last minute rolled, as an ISO time, or undefined before any is.
+ * @param now The pass's instant, in epoch ms.
+ * @param kept How many passes the ring holds when full.
  */
 export const minutesDue = (ring: readonly RecentPass[], last: string | undefined, now: number, kept: number): string[] => {
   const current = floorTo(now, MINUTE);
@@ -211,6 +232,9 @@ export const minutesDue = (ring: readonly RecentPass[], last: string | undefined
  * The hours due to roll at `now`, given the last minute line kept before this pass rolled (`lastMinute`) and the last hour line
  * (`lastHour`): every whole hour after `lastHour` and before the hour `now` is in, once the hour of `lastMinute` is done and has no line.
  * Null while nothing is due, so a pass reads no minute file to learn there is none.
+ * @param lastMinute The last minute line kept before this pass rolled, as an ISO time, or undefined where none is.
+ * @param lastHour The last hour line kept, as an ISO time, or undefined where none is.
+ * @param now The pass's instant, in epoch ms.
  */
 export const hoursDue = (
   lastMinute: string | undefined,
@@ -223,7 +247,14 @@ export const hoursDue = (
   return hour < current && (lastHour === undefined || hour > lastHour) ? { after: lastHour, before: current } : null;
 };
 
-/** The value at `q` of a merged line, from its buckets: interpolated inside the bucket it falls in, within its `min` and `max`. */
+/**
+ * The value at `q` of a merged line, from its buckets: interpolated inside the bucket it falls in, within its `min` and `max`.
+ * @param b The line's counts, a bucket each (`bucketsOf`).
+ * @param bounds The buckets' upper bounds, in ascending order.
+ * @param min The least value of the line.
+ * @param max The most value of the line.
+ * @param q The fraction of the samples at or below the value, from 0 to 1: 0.5 for the median.
+ */
 export const percentileOf = (b: readonly number[], bounds: readonly number[], min: number, max: number, q: number): number => {
   const n = b.reduce((x, y) => x + y, 0);
   const target = q * n;
@@ -264,18 +295,31 @@ const merged = (t: string, lines: NonEmpty<RollupLine>): RollupLine => {
   };
 };
 
-/** `lines` merged into spans of `size` ms (an hour, a day), a line per span, series and label set, in the order they are met. */
+/**
+ * `lines` merged into spans of `size` ms (an hour, a day), a line per span, series and label set, in the order they are met.
+ * @param lines The lines merged.
+ * @param size The span each line is merged into, in ms.
+ */
 export const mergeLines = (lines: readonly RollupLine[], size: number): RollupLine[] =>
   grouped(lines, (x) => `${floorTo(Date.parse(x.t), size)}${keyOf(x.s, x.l)}`).map((xs) => merged(floorTo(Date.parse(xs[0].t), size), xs));
 
-/** The minute lines of the hours `due`: merged into an hour a line, after `due.after` and before `due.before`. */
+/**
+ * The minute lines of the hours `due`: merged into an hour a line, after `due.after` and before `due.before`.
+ * @param minutes The minute lines read.
+ * @param due The hours to roll (`hoursDue`).
+ */
 export const rollHours = (minutes: readonly RollupLine[], due: { after: string | undefined; before: string }): RollupLine[] =>
   mergeLines(
     minutes.filter((x) => x.t < due.before && (due.after === undefined || floorTo(Date.parse(x.t), HOUR) > due.after)),
     HOUR,
   );
 
-/** The days of `days` past a retention of `keep` days at `now`: before the day `keep` days back. None when `keep` is undefined. */
+/**
+ * The days of `days` past a retention of `keep` days at `now`: before the day `keep` days back. None when `keep` is undefined.
+ * @param days The UTC days a tier holds a file of.
+ * @param now The pass's instant, in epoch ms.
+ * @param keep The retention, in days, or undefined to keep every day.
+ */
 export const daysPast = (days: readonly string[], now: number, keep: number | undefined): string[] => {
   if (keep === undefined) return [];
   const oldest = dayOf(new Date(Date.parse(dayOf(new Date(now).toISOString())) - keep * DAY).toISOString());
@@ -291,19 +335,30 @@ export const RANGES = {
 } as const satisfies Record<string, { back: number; tier: Tier; span: number }>;
 export type Range = keyof typeof RANGES;
 
-/** Whether `text` names a range. */
+/**
+ * Whether `text` names a range.
+ * @param text The range's name, as asked.
+ */
 export const isRange = (text: string): text is Range => Object.hasOwn(RANGES, text);
 
 /** The days of `days` a reach of `back` milliseconds at `now` reads, oldest first: every one for an endless reach. */
 const daysBack = (back: number, days: readonly string[], now: number): string[] =>
   Number.isFinite(back) ? days.filter((d) => d >= dayOf(new Date(now - back).toISOString())) : [...days];
 
-/** The days a range reads at `now`, oldest first, of those its tier holds: every one for `all`. */
+/**
+ * The days a range reads at `now`, oldest first, of those its tier holds: every one for `all`.
+ * @param range The range read.
+ * @param days The UTC days its tier holds a file of, oldest first.
+ * @param now The read's instant, in epoch ms.
+ */
 export const daysOfRange = (range: Range, days: readonly string[], now: number): string[] => daysBack(RANGES[range].back, days, now);
 
 /**
  * The days of `tier` a memo may keep at `now`, of those its tier holds (`days`): the ones its widest range reaches (`RANGES`), so a day
  * leaves by age alone. Every hour day, since `all` reaches back without end, as a period's health does; the minute days of the last 24h.
+ * @param tier The tier of the memo's days.
+ * @param days The UTC days the tier holds a file of, oldest first.
+ * @param now The read's instant, in epoch ms.
  */
 export const memoDays = (tier: Tier, days: readonly string[], now: number): string[] =>
   daysBack(Math.max(...Object.values(RANGES).flatMap((r) => (r.tier === tier ? [r.back] : []))), days, now);
@@ -333,7 +388,12 @@ const pointOf = (x: RollupLine): SeriesPoint => ({
   ...(x.p50 === undefined ? {} : { p50: x.p50, p95: x.p95 }),
 });
 
-/** The read of `range` at `now` from the lines of its tier's days: those in the range, merged to its span, a series per label set. */
+/**
+ * The read of `range` at `now` from the lines of its tier's days: those in the range, merged to its span, a series per label set.
+ * @param range The range read.
+ * @param lines The lines of its tier's days.
+ * @param now The read's instant, in epoch ms.
+ */
 export const seriesOf = (range: Range, lines: readonly RollupLine[], now: number): SeriesRead => {
   const { back, span } = RANGES[range];
   const from = Number.isFinite(back) ? new Date(now - back).toISOString() : (lines[0]?.t ?? new Date(now).toISOString());
@@ -373,7 +433,10 @@ const whole = (lines: readonly RollupLine[], s: SeriesName): RollupLine | undefi
   return first ? merged(first.t, [first, ...rest]) : undefined;
 };
 
-/** The period's health (`Health`) from its lines, oldest first. */
+/**
+ * The period's health (`Health`) from its lines, oldest first.
+ * @param lines The period's hour lines, oldest first.
+ */
 export const healthOf = (lines: readonly RollupLine[]): Health => {
   const pass = whole(lines, 'pass.ms');
   const load = whole(lines, 'machine.load');

@@ -32,7 +32,11 @@ export type SendReads = {
   spendOf: SpendOf;
 };
 
-/** Each step's own word on the pass, as the pass read it (`stepStatus`): what a route's producer is read by. `pending` for no such step. */
+/**
+ * Each step's own word on the pass, as the pass read it (`stepStatus`): what a route's producer is read by. `pending` for no such step.
+ * @param run The run the pass read.
+ * @param reads The pass's reads: the steps, the tasks' phases, the closeouts, what each cost and each check's verdict.
+ */
 export const wordReader =
   (run: Run, reads: SendReads) =>
   (name: string): StepStatus => {
@@ -45,12 +49,15 @@ export const wordReader =
 /**
  * The card a workflow node files: `<run>-<node>-routed`. A person's card is named by `runId`, whose last piece is four letters or digits,
  * so a name whose last piece is `routed` is never drawn for one.
+ * @param run The id of the run the node is in.
+ * @param node The workflow node's name.
  */
 export const sentCardName = (run: string, node: string): string => `${run}-${node}-routed`;
 
 /**
  * The step whose closeout a condition's route was read from: a table's producer (`route: { from: <producer>.<field> }`), else the
  * condition itself, a judge or a script whose own closeout said the route.
+ * @param condition The condition whose route was read.
  */
 export const routeProducer = (condition: StepSpec): string =>
   condition.route?.kind === 'table' ? firstPiece(condition.route.from, '.') : condition.name;
@@ -58,6 +65,8 @@ export const routeProducer = (condition: StepSpec): string =>
 /**
  * The title a routed card opens with: the first line of the `title` its condition's producer signed off on, where its `output:` declares
  * one and it says one; else the first line of the run's brief, the run's own title.
+ * @param run The run, whose brief and id title the card where the producer says none.
+ * @param producer How the condition's producer signed off, or undefined where it has not.
  */
 export function sentCardTitle(run: Run, producer: Closeout | undefined): string {
   const said = producer?.output?.title;
@@ -69,6 +78,13 @@ export function sentCardTitle(run: Run, producer: Closeout | undefined): string 
  * The text of a routed card: queued, on the node's workflow, handed the caller as context (`from:`), its repository and factory kept, the
  * run's labels (`labels`, `runs/<id>.labels`) as its own `labels:`, so a card routed out of a labelled run is selected by the same labels,
  * and `title` its first line.
+ * @param run The run the card is routed from: its id, repository and factory.
+ * @param node The workflow node that files the card: its name and its workflow.
+ * @param condition The name of the condition whose route filed the card.
+ * @param route The route the condition took, or undefined where none is said.
+ * @param at When the card is queued, ISO.
+ * @param title The card's first line (`sentCardTitle`).
+ * @param labels The run's labels, which the card takes as its own.
  */
 export function sentCardText(
   run: Run,

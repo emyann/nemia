@@ -9,7 +9,11 @@ import type { FrontmatterValue } from '../frontmatter/frontmatter.ts';
 /** A route's name, a step's `when:` and a condition's `routes:` and `ends:` alike: a lowercase word. */
 const ROUTE_WORD = /^[a-z][a-z0-9-]*$/;
 
-/** The five keys of routing, each read or refused: absent keys stay absent, so a step without them is the step it was. */
+/**
+ * The five keys of routing, each read or refused: absent keys stay absent, so a step without them is the step it was.
+ * @param step The step's name, which a refusal names.
+ * @param meta The step's frontmatter keys, each as the text its line holds.
+ */
 export function routingOf(
   step: string,
   meta: Partial<Record<StepKey, string>>,
@@ -92,7 +96,11 @@ const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 
 const ROUTE_SHAPES = '`route: { from: <step>.<field>, table: { <value>: <route> } }`, `route: { script: <path> }` or `route: judge`';
 
-/** A condition's eval (`route:`), from its line: `judge`, or the JSON text `readKeys` kept of its map. Any other shape is refused. */
+/**
+ * A condition's eval (`route:`), from its line: `judge`, or the JSON text `readKeys` kept of its map. Any other shape is refused.
+ * @param step The condition's name, which a refusal names.
+ * @param text The text of the `route:` line.
+ */
 export function routeOf(step: string, text: string): RouteEval {
   if (text.trim() === 'judge') return { kind: 'judge' };
   let map: unknown;
@@ -134,6 +142,9 @@ function tableOf(step: string, from: unknown, table: unknown): RouteEval {
   return { kind: 'table', from: from.trim(), table: rows };
 }
 
-/** A condition's eval as its line writes it, the map `routeOf` reads back. */
+/**
+ * A condition's eval as its line writes it, the map `routeOf` reads back.
+ * @param route The condition's eval.
+ */
 export const routeWritten = (route: RouteEval): FrontmatterValue =>
   route.kind === 'judge' ? 'judge' : route.kind === 'script' ? { script: route.script } : { from: route.from, table: { ...route.table } };

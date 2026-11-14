@@ -27,6 +27,9 @@ type Summarized = Omit<RunSummary, 'startedAt'>;
  * on a person began (`waitingSinceOf`): the end of the waiting step's last try or the placing of a hold only a person lifts, the earliest
  * where several are open, null where the record does not date it; for a finished run, when its work stopped (`finishedAtOf`) and how it
  * ended (`outcomeOf`). Off `judgement`'s own run, views and steps.
+ * @param summary The run's summary, as the whole list summarizes it.
+ * @param judgement The run's judgement on this read: its record, its tasks' views and its steps.
+ * @param now The instant the list is read at, in epoch ms.
  */
 export function framePartsOf(summary: Summarized, judgement: Judgement, now: number): FrameParts {
   const { run, views, steps } = judgement;
@@ -47,12 +50,17 @@ export function framePartsOf(summary: Summarized, judgement: Judgement, now: num
   };
 }
 
-/** `object` with the frame's `parts` laid on its status: a new object, the one a list keeps never changed. */
+/**
+ * `object` with the frame's `parts` laid on its status: a new object, the one a list keeps never changed.
+ * @param object The run as the list keeps it.
+ * @param parts The frame's parts, measured on this read.
+ */
 export const framed = (object: RunObject, parts: FrameParts): RunObject => ({ ...object, status: { ...object.status, ...parts } });
 
 /**
  * The state of a run left unjudged (a task of it does not read, or its unfrozen folder does not load), as the whole list summarizes it
  * off its record (`unjudgedFields`): `running` and moving, so in flight, but where nothing of it is judged.
+ * @param run The run's record: its id, factory, creation and cancellation.
  */
 export const unjudgedStateOf = (run: Pick<Run, 'id' | 'factory' | 'createdAt' | 'cancelledAt'>): RunState =>
   kindOf({

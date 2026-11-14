@@ -11,6 +11,8 @@ import { judgeRefusal, type JudgeFence } from './judge.ts';
  * spends no budget but a judge's (`conditionRefusal`); a workflow node files a card and nothing else (`workflowNodeRefusal`). The loops'
  * own rule, that no span crosses a condition, is `validate`'s, beside the loops'. A judge's fence writes nothing (`judgeRefusal`, by
  * the fence's own judgement, which `validate` hands in), unless it is left to a hire.
+ * @param steps The workflow's steps.
+ * @param fence How the fence's own judgement tells a judge's fence, handed in by `validate`.
  */
 export function routeRefusal(steps: readonly StepSpec[], fence: JudgeFence): string | undefined {
   const byName = new Map(steps.map((s) => [s.name, s]));

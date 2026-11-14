@@ -13,6 +13,9 @@ import { conditionOf, nodeFate, nodeKind, tableRoute } from '../route.ts';
 /**
  * Whether a condition's route is settled for the run: a node after it has been filed, or sent its card. Until then a table's copy on the
  * record yields to its producer's closeout, read afresh, so a producer tried again proposes its route anew.
+ * @param condition The condition read.
+ * @param run The run whose records say which nodes were filed or sent their card.
+ * @param steps The workflow's steps: the nodes after the condition.
  */
 export const routeSettled = (condition: StepSpec, run: Run, steps: readonly StepSpec[]): boolean =>
   steps.some((s) => s.after.includes(condition.name) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent));
@@ -36,7 +39,11 @@ function tableRead(
  * signed closeout looked up in it (`tableRoute`), and for a judge or a script its own signed closeout's `route` (a script's answer file is
  * read as its closeout, `scriptCloseouts` in route.store.ts). Pure.
  *
+ * @param condition The condition read: its routes and its eval.
+ * @param run The run whose record holds a route kept for the try, a person's included.
+ * @param closeoutOf How each step signed off, or undefined where it has not: a table's producer, or the condition itself.
  * @param wordOf The word each step reads on this pass: a producer is read only once it signed off on its work.
+ * @param steps The workflow's steps: the nodes after the condition, which settle the route kept on the record.
  */
 export function answeredRoute(
   condition: StepSpec,
@@ -72,6 +79,10 @@ export function answeredRoute(
  *   routed is `unverified` (`filedWord`).
  *
  * A workflow with none of the routing keys reads exactly as `standing` read it.
+ * @param steps The workflow's steps, in their order.
+ * @param run The run read.
+ * @param stood Where each step stands on this pass (`standing`), by its name.
+ * @param closeoutOf How each step signed off, or undefined where it has not: a table's producer, or a condition.
  */
 export function routedWords(
   steps: readonly StepSpec[],
@@ -107,7 +118,11 @@ function routedWord(
   return hasGate(step, run) && !approvalOf(run, step.name) ? 'awaiting approval' : 'unverified';
 }
 
-/** Whether a person routed the condition for the try it is on (`nemia route`, laid on its record by `runRecord`) with a route it has. */
+/**
+ * Whether a person routed the condition for the try it is on (`nemia route`, laid on its record by `runRecord`) with a route it has.
+ * @param step The condition read: the routes it declares.
+ * @param run The run whose record holds the person's route and the try the condition is on.
+ */
 export const personRouted = (step: StepSpec, run: Run): boolean => {
   const kept = run.steps[step.name]?.route;
   return kept?.by === 'person' && kept.try === tryOf(run, step.name) && (step.routes ?? []).includes(kept.route);
@@ -131,7 +146,16 @@ function filedWord(
   return answeredRoute(step, run, closeoutOf, wordOf, [])?.kind === 'route' ? undefined : 'unsigned';
 }
 
-/** Every step's word on this pass: where it stands (`standing`), with its routing laid over it (`routedWords`). Pure. */
+/**
+ * Every step's word on this pass: where it stands (`standing`), with its routing laid over it (`routedWords`). Pure.
+ * @param steps The workflow the run is judged by.
+ * @param run The run read.
+ * @param phaseOf The phase of each of the run's tasks, by its id, as the caller read them.
+ * @param closeoutOf How each step signed off, or undefined where it has not. Left out, none has.
+ * @param askedCloseout Whether the engine's record of each task, by its id, asked it for a closeout. Left out, none was.
+ * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its budget. Left out, nothing has cost.
+ * @param verdictOf What each step's current check exited with (`exitVerdicts`), or undefined where none ran. Left out, none has.
+ */
 export function runWords(
   steps: readonly StepSpec[],
   run: Run,

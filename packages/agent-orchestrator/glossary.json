@@ -400,6 +400,11 @@
       ]
     },
     {
+      "term": "Pause mode",
+      "meaning": "what the store's pause gives the sessions at work, read from the pause's file on every pass and by every verb (`pauseModeOf`): `none` where no pause stands, `holding` under a pause with no timeout (each runs on), `draining` under one with a timeout (each stops at its call's end, cut once it passes), `cut` at once. `pauseMove` (`packages/agent-orchestrator/src/pause-machine/pause-machine.ts`) says what each event does in each mode, and the store asks it before it writes.",
+      "type": "PauseMode"
+    },
+    {
       "term": "Paused",
       "meaning": "a step whose session is parked at a tool call's end — held at its hook, or stopped with its call cut — until the pause is lifted or the new daemon resumes it as the same try: `paused`, `paused after its call to <tool>` or `paused, its call to <tool> cut` (`pausedWord`, read through `parkedOf`), reason `Paused`, phase running.",
       "type": "StepReason"

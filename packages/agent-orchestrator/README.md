@@ -3120,6 +3120,29 @@ is stopped. A file that is there pauses the store whatever it holds. `wf pause` 
 paused, naming who paused it, and `wf resume` a store none stands on; the api serves the same as `POST`,
 `DELETE` and `GET /api/pause`, whose read carries what finishes and what is staged.
 
+The pause is a machine of four modes, by what it gives the sessions at work: `none`, `holding` (no timeout: each runs on, a
+take-over's own), `draining` (a timeout: each stops at its call's end, cut once it passes) and `cut` (at once). The mode is read from
+the pause's file on every pass and by every verb (`pauseModeOf`), and `pause.store.ts`, which alone writes that file, asks `pauseMove`
+(`src/pause-machine/pause-machine.ts`, proved by `contracts/pause-machine.contract.ts`) before each write:
+
+<!-- diagram:pause:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/pause-machine/pause-machine.ts').then((m) => console.log(m.pauseDiagram()))" -->
+```mermaid
+stateDiagram-v2
+  [*] --> none
+  none --> holding: paused with no timeout
+  none --> draining: paused with a timeout
+  none --> cut: paused at once
+  holding --> cut: cut at once
+  holding --> none: resumed
+  holding --> none: the process that holds it ended
+  draining --> cut: cut at once
+  draining --> none: resumed
+  draining --> none: the process that holds it ended
+  cut --> none: resumed
+  cut --> none: the process that holds it ended
+```
+<!-- diagram:pause:end -->
+
 ## A plan as a folder of cards: `wf start <folder>`
 
 A person who describes a plan in prose (parse the flag, then store it and document it, then show it) writes it as

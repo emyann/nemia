@@ -2,6 +2,10 @@
  * The store's pause on disk: put once, read back, refused a second time while it stands, lifted once, refused a second lift; and a file
  * that does not read as the pause still pauses; and a cordon `nemia cordon` put before the switch, at the same `WF_ROOT/cordon`, is the
  * pause, honoured by every reader and resumed by `nemia resume`. On a store of its own at `ROOT`, given as `ENV`.
+ *
+ * And the store against its machine (pause-machine.ts): each event brought to a store in each mode leaves the file in the mode `pauseMove`
+ * answers, or is refused as it refuses, so a move the machine does not make is one the store does not write; and no file of `src` but
+ * the store's own names the pause's file.
  */
 import { type Env, settingsOf } from '../config/config.store.ts';
 import { test } from 'node:test';
@@ -10,7 +14,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { names } from '../../test/assessed.ts';
-import { cutPause, pauseFile, resumePause, putPause, readPause } from './pause.store.ts';
+import { PAUSE_EVENTS, PAUSE_MODES, pauseMove, type PauseEvent, type PauseMode } from '../pause-machine/pause-machine.ts';
+import { cutPause, liftLapsedPause, modeAt, pauseFile, resumePause, putPause, readPause } from './pause.store.ts';
 import { storeAdmission } from '../runtime-client.ts';
 
 const ROOT = scratch('wf-pause-store-');
@@ -117,4 +122,66 @@ test("the engine's ceiling is the store's sessions per pool, and none at all whe
   const root = scratch('wf-ceiling-');
   assert.equal(storeAdmission(root, settingsOf({ WF_MAX_CONCURRENT: '3' })).maxConcurrent, 3);
   assert.equal('maxConcurrent' in storeAdmission(root, settingsOf({ WF_MAX_CONCURRENT: 'many' })), false);
+});
+
+/** A process no machine runs: the holder each walked pause names, so a lapse is seen of it. */
+const HOLDER = { pid: 2 ** 22 + 1 };
+
+/** A store brought to each mode, by the store's own verbs. */
+const ARRANGED: Readonly<Record<PauseMode, (home: string) => void>> = {
+  none: () => {},
+  holding: (home) => void putPause(home, {}, new Date(), undefined, HOLDER),
+  draining: (home) => void putPause(home, {}, new Date(), 60_000, HOLDER),
+  cut: (home) => void putPause(home, {}, new Date(), 0, HOLDER),
+};
+
+/** Each event as the store's verbs bring it; a lapse is the pass's lift of a pause whose holder the process table says is gone. */
+const BROUGHT: Readonly<Record<PauseEvent, (home: string) => unknown>> = {
+  put: (home) => putPause(home, {}, new Date()),
+  'put-timeout': (home) => putPause(home, {}, new Date(), 60_000),
+  'put-now': (home) => putPause(home, {}, new Date(), 0),
+  cut: (home) => cutPause(home),
+  resume: (home) => resumePause(home),
+  lapse: (home) => liftLapsedPause(home, () => 'gone'),
+};
+
+test('the store writes the moves its machine makes and no other: each event in each mode leaves the file where pauseMove says, or is refused as it says', async (t) => {
+  for (const from of PAUSE_MODES)
+    for (const event of Object.keys(PAUSE_EVENTS) as PauseEvent[])
+      await t.test(`${event} on a store in ${from}`, () => {
+        const home = scratch('wf-pause-walk-');
+        ARRANGED[from](home);
+        assert.equal(modeAt(home), from, 'the store stands in the mode arranged');
+        const move = pauseMove(from, event);
+        if (move.kind === 'refused') {
+          assert.throws(
+            () => BROUGHT[event](home),
+            (err: Error & { _tag?: string }) => err._tag === move.as,
+          );
+          assert.equal(modeAt(home), from, 'a refused move writes nothing');
+          return;
+        }
+        BROUGHT[event](home);
+        assert.equal(modeAt(home), move.kind === 'edge' ? move.to : from);
+      });
+});
+
+/** The files among `sources`, each a path and its text, that name the pause's file and are not the store's own. */
+const namesTheFile = (sources: ReadonlyMap<string, string>): string[] =>
+  [...sources]
+    .filter(([file, text]) => file !== 'pause/pause.store.ts' && /\bpauseFile\(|\bresumedFile\(/.test(text))
+    .map(([file]) => file);
+
+test("no file of src but the store's own names the pause's file, so nothing else can write it; REFUSED: a verb planted that does", () => {
+  const src = path.join(import.meta.dirname, '..');
+  const sources = new Map(
+    fs
+      .readdirSync(src, { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))
+      .map((file) => [file.split(path.sep).join('/'), fs.readFileSync(path.join(src, file), 'utf8')] as const),
+  );
+  assert.ok(sources.has('pause/pause.store.ts'), 'the store is among the files read');
+  assert.deepEqual(namesTheFile(sources), []);
+  const planted = new Map([...sources, ['pause/eager.verb.ts', 'fs.rmSync(pauseFile(home));'] as const]);
+  assert.deepEqual(namesTheFile(planted), ['pause/eager.verb.ts']);
 });

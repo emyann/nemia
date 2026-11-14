@@ -300,6 +300,9 @@ const shown = (value: unknown): string => quote(JSON.stringify(value) ?? 'undefi
  * The first thing a schema refused in `value`: where, and what is there instead of what it expected, said as what `holder` holds
  * there (`the runtime writes`, the default, for a journal). The value found there is quoted as JSON to at most 60 characters, a cut
  * marked `…`.
+ * @param value The value the schema refused.
+ * @param error The schema's refusal of it.
+ * @param holder What the value's writer is said as, in the words of what it holds there.
  */
 export const firstRefusal = (
   value: unknown,
@@ -321,6 +324,10 @@ export const firstRefusal = (
  * Why one entry a store gave back is no event this runtime reads, as a sentence that says what to do: `where` the entry is, and the
  * first field of it that is wrong. `entry` is a task's event, or a feed entry when `feed` is set; a line the store could not parse is
  * given as its text.
+ * @param where Where the entry is, the first words of the sentence.
+ * @param entry The entry as the store gave it back, or the text of a line it could not parse.
+ * @param error The schema's refusal of the entry.
+ * @param feed Whether the entry is a feed entry rather than a task's event.
  */
 export const entryWords = (where: string, entry: unknown, error: Schema.SchemaError, feed: boolean): string => {
   const { path, words } = firstRefusal(entry, error);

@@ -24,6 +24,10 @@ export type Releasable = Pick<State, 'taskId' | 'settled' | 'config' | 'harness'
   attempts: Array<Pick<Attempt, 'n' | 'startedAt' | 'ended' | 'nativeId' | 'usage' | 'exitCode'>>;
 };
 
+/**
+ * What a memo keeps of a settled task (`Releasable`), taken off its fold.
+ * @param state The settled task's fold.
+ */
 export const releasableOf = (state: State): Releasable => ({
   taskId: state.taskId,
   settled: state.settled,
@@ -53,21 +57,36 @@ export type TickMemoState = { cursor: Cursor | undefined; settled: Map<string, R
 /** The memo a pass skips by, when it has one. None by default: a pass without one folds every task. */
 export const TickMemo = Context.Reference<TickMemoState | undefined>('engine/TickMemo', { defaultValue: () => undefined });
 
-/** One memo, made once here: an engine builds this layer once, so every pass it runs shares the one memo. */
+/**
+ * One memo, made once here: an engine builds this layer once, so every pass it runs shares the one memo.
+ * @param options Whether each skipped task is folded again to prove the skip (`verify`); off where absent.
+ */
 export const tickMemoLayer = (options: { verify?: boolean } = {}) =>
   Layer.succeed(TickMemo)({ cursor: undefined, settled: new Map(), listed: new Set(), verify: options.verify === true });
 
-/** The task `id` as `memo` keeps it settled, with the memo that keeps it; none for a task it does not keep, or without a memo. */
+/**
+ * The task `id` as `memo` keeps it settled, with the memo that keeps it; none for a task it does not keep, or without a memo.
+ * @param memo The engine's memo, or undefined for a pass without one.
+ * @param id The task's id.
+ */
 export const keptIn = (memo: TickMemoState | undefined, id: string): { memo: TickMemoState; kept: Releasable } | undefined => {
   const kept = memo?.settled.get(id);
   return memo && kept ? { memo, kept } : undefined;
 };
 
-/** The settled tasks `memo` keeps looking for, each whose finished session could still move (`listed`); none without a memo. */
+/**
+ * The settled tasks `memo` keeps looking for, each whose finished session could still move (`listed`); none without a memo.
+ * @param memo The engine's memo, or undefined for a pass without one.
+ */
 export const keptLooked = (memo: TickMemoState | undefined): Releasable[] =>
   memo ? [...memo.listed].flatMap((id) => memo.settled.get(id) ?? []) : [];
 
-/** Why a task a pass skipped would have been read otherwise, or `undefined`: the proof `verify` asks of every skip. */
+/**
+ * Why a task a pass skipped would have been read otherwise, or `undefined`: the proof `verify` asks of every skip.
+ * @param kept What the memo kept of the task.
+ * @param fresh The task's fold, read again from its journal.
+ * @param decided What `decide` answers of the fresh fold.
+ */
 export const divergence = (kept: Releasable, fresh: State, decided: { do: string }): string | undefined =>
   !settledQuiet(fresh)
     ? `the memo kept it settled (${kept.settled}), and its journal says it is not`

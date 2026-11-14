@@ -16,6 +16,8 @@ export type Instant = { at: number; mono?: Monotonic };
 /**
  * How many milliseconds passed from `from` to `to`: the monotonic difference when both carry a reading of the same boot, the
  * wall-clock difference otherwise — a reading missing on either side, or the two from different boots.
+ * @param from The earlier moment.
+ * @param to The later moment.
  */
 export const elapsedMs = (from: Instant, to: Instant): number =>
   from.mono && to.mono && from.mono.boot === to.mono.boot ? to.mono.ms - from.mono.ms : to.at - from.at;
@@ -25,6 +27,9 @@ export const elapsedMs = (from: Instant, to: Instant): number =>
  * than granting its length again. What shares one bound across the waits of a sequence that must end within it, instead of giving
  * each wait the whole bound and the sequence their sum.
  * Exported only for the tests that import it.
+ * @param from The moment the budget was taken.
+ * @param ms The whole budget, in milliseconds.
+ * @param now The moment the budget is asked at.
  */
 export const leftOf = (from: Instant, ms: number, now: Instant): number => Math.max(0, ms - elapsedMs(from, now));
 

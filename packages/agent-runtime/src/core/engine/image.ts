@@ -11,6 +11,9 @@ import type { Event, Sighting, State } from '../domain.ts';
  * on any number of passes is written once, and a new holder, a resumed process on another version or a turn in another mode is written
  * again. Nothing for a settled task, an ended attempt, a session the pass did not see, or a sighting that says none of them or says what
  * the attempt holds.
+ * @param state The task's fold.
+ * @param sighting What the pass saw of the attempt's session, or undefined where it saw nothing.
+ * @param at The moment the entry is stamped, an ISO time.
  */
 export function imageFacts(state: State, sighting: Sighting | undefined, at: string): Event[] {
   const last = state.attempts.at(-1);

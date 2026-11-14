@@ -204,6 +204,8 @@ const readSealed = (sealed: Opened, after: number) => {
  * past the last read, or the end of the feed for a cursor past it (a store wiped since), never before what the sealed file holds,
  * though the head was opened before a rotation; and how many lines after `after` were forgotten. No feed at all is nothing, at the
  * cursor given.
+ * @param root The store's folder.
+ * @param after The cursor to read past, as a read before answered it; 0 reads the whole feed.
  */
 export const readFeed = (root: string, after: number): FeedRead => {
   const files = feedFiles(root);
@@ -325,6 +327,9 @@ const releaseLock = (lock: string, token: string): void => {
  *
  * The bound is a parameter so that a test of what a held lock does can shorten it rather than wait the shipped one out, and still
  * measure its floor at the bound it gave (`test/feed-rotation.test.ts`). Its default is the shipped constant, so no caller changes.
+ * @param root The store's folder.
+ * @param fn What to run under the lock.
+ * @param waitMs How long to wait for a live holder, in milliseconds.
  */
 export const withFeedLock = <A>(root: string, fn: () => A, waitMs = FEED_LOCK_WAIT_MS): A => {
   fs.mkdirSync(root, { recursive: true });
@@ -344,6 +349,8 @@ const taskIdOf = (entry: unknown): unknown => (typeof entry === 'object' && entr
  * How many of the feed's lines under `root` name each task of `taskIds`, the feed read once (`readFeed`), each line parsed for its
  * `taskId` alone and no body resolved, so a line no runtime wrote is counted as a rotation forgets it; a line a rotation forgot is
  * not counted, and a task with none counts 0.
+ * @param root The store's folder.
+ * @param taskIds The tasks to count the lines of.
  */
 export const feedLinesOf = (root: string, taskIds: readonly string[]): Record<string, number> => {
   const counts = new Map(taskIds.map((id) => [id, 0]));
@@ -531,6 +538,10 @@ const rotateOnce = (root: string, forget: ReadonlySet<string>, then: () => void,
  * under the same lock. The history is read and the sealed file written outside the lock; under it, only the lines appended
  * since, and two renames: a rotation that met another's work done meanwhile starts again, ten times at most. Nothing is renamed
  * when no line was forgotten.
+ * @param root The store's folder.
+ * @param forget The ids of the tasks whose lines the rotation leaves out.
+ * @param then What to run under the lock once the feed is rotated.
+ * @param waitMs How long to wait for a live holder of the lock, in milliseconds.
  */
 export const rotateFeed = (root: string, forget: ReadonlySet<string>, then: () => void, waitMs = FEED_LOCK_WAIT_MS): ForgottenFeed => {
   for (let round = 0; round < 10; round++) {

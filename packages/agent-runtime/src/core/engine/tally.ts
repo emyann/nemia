@@ -42,7 +42,11 @@ const open = new AsyncLocalStorage<readonly Tally[]>();
 /** The tallies open where this runs, the outermost first: none outside every `tallied`. */
 export const talliesHere = (): readonly Tally[] => open.getStore() ?? [];
 
-/** `f` run with `tally` open, inside every tally already open where it is called: what it and all it starts count goes to each. */
+/**
+ * `f` run with `tally` open, inside every tally already open where it is called: what it and all it starts count goes to each.
+ * @param tally The tally to open.
+ * @param f What to run with it open.
+ */
 export const tallied = <T>(tally: Tally, f: () => T): T => open.run([...talliesHere(), tally], f);
 
 /** The counts as they stand where this runs: the innermost tally's open here, else the process's; the live object, never a copy. */
@@ -57,7 +61,10 @@ const count = (add: (c: IoCounts) => void) => {
 /** The totals as they stand: a copy, so a caller can take a difference. */
 export const ioCounts = (): IoCounts => ({ ...counts });
 
-/** One read of `bytes`, made by a reader of the runtime's that did not go through `readText`. */
+/**
+ * One read of `bytes`, made by a reader of the runtime's that did not go through `readText`.
+ * @param bytes How many bytes were read.
+ */
 export const countRead = (bytes: number): void =>
   count((c) => {
     c.reads++;
@@ -70,7 +77,10 @@ export const countWrite = (): void =>
     c.writes++;
   });
 
-/** The feed's lock taken once, after `waitedMs` milliseconds of waiting for it. */
+/**
+ * The feed's lock taken once, after `waitedMs` milliseconds of waiting for it.
+ * @param waitedMs How long the lock was waited for, in milliseconds.
+ */
 export const countLock = (waitedMs: number): void =>
   count((c) => {
     c.locks++;
@@ -83,7 +93,10 @@ export const countSpawn = (): void =>
     c.spawned++;
   });
 
-/** `fs.readFileSync(file, 'utf8')`, counted: throws as it does. */
+/**
+ * `fs.readFileSync(file, 'utf8')`, counted: throws as it does.
+ * @param file The path of the file to read.
+ */
 export const readText = (file: string): string => {
   const buf = fs.readFileSync(file);
   countRead(buf.length);

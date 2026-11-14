@@ -34,7 +34,10 @@ export const SESSION_STATES = [
   'rejected',
 ] as const;
 export type SessionState = (typeof SESSION_STATES)[number];
-/** Whether a word is one of A2A's names for a session's state. */
+/**
+ * Whether a word is one of A2A's names for a session's state.
+ * @param word The word to judge.
+ */
 export const isSessionState = (word: unknown): word is SessionState => (SESSION_STATES as readonly unknown[]).includes(word);
 
 /** At work, as far as the runtime can act on it. */
@@ -42,11 +45,20 @@ export const RUNNING: ReadonlySet<SessionState> = new Set(['submitted', 'working
 /** Waiting on a person — running, but nobody is coming unless the operator is told. */
 export const NEEDS_HUMAN: ReadonlySet<SessionState> = new Set(['input-required', 'auth-required']);
 
-/** A session its harness still holds and the engine still waits on: at work, or waiting on a person. */
+/**
+ * A session its harness still holds and the engine still waits on: at work, or waiting on a person.
+ * @param s The session's state as its harness gave it, or undefined where it gave none.
+ */
 export const isLive = (s: SessionState | undefined): boolean => s !== undefined && (RUNNING.has(s) || NEEDS_HUMAN.has(s));
-/** A session waiting on a person: for words or to sign in. */
+/**
+ * A session waiting on a person: for words or to sign in.
+ * @param s The session's state as its harness gave it, or undefined where it gave none.
+ */
 export const waitsOnPerson = (s: SessionState | undefined): boolean => s !== undefined && NEEDS_HUMAN.has(s);
-/** A session at work: submitted or working. */
+/**
+ * A session at work: submitted or working.
+ * @param s The session's state as its harness gave it, or undefined where it gave none.
+ */
 export const atWorkState = (s: SessionState | undefined): boolean => s !== undefined && RUNNING.has(s);
 
 /**
@@ -66,13 +78,17 @@ const ENDS: Record<SessionState, Outcome | undefined> = {
   'auth-required': undefined,
 };
 
-/** The end an attempt is recorded with when its harness lets the session go in `state`, or `undefined` for one waiting on a person. */
+/**
+ * The end an attempt is recorded with when its harness lets the session go in `state`, or `undefined` for one waiting on a person.
+ * @param state The session's state when its harness let it go.
+ */
 export const endOf = (state: SessionState): Outcome | undefined => ENDS[state];
 
 /**
  * A2A's name for one of the runtime's own former words for a session's state — `working`, `blocked`, `done`, `failed`,
  * `stopped` — which `Sighting.state` spoke before A2A's: what a remote registry entry an older runtime wrote still says.
  * `blocked` is `input-required`, since those words never said which wait; `undefined` for any other word.
+ * @param word The word a registry entry says for the session's state.
  */
 export const formerStateOf = (word: unknown): SessionState | undefined =>
   typeof word === 'string' && Object.hasOwn(FORMER, word) ? FORMER[word as keyof typeof FORMER] : undefined;

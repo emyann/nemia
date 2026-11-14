@@ -12,7 +12,11 @@ function imageInto(a: Attempt, e: Extract<Event, { kind: 'image' }>): void {
   if (e.ranIn !== undefined) a.ranIn = e.ranIn;
 }
 
-/** An event about one attempt, `e`, written into that attempt's fold `a`: every one but its end (`endAttempt`, `domain.ts`). */
+/**
+ * An event about one attempt, `e`, written into that attempt's fold `a`: every one but its end (`endAttempt`, `domain.ts`).
+ * @param a The attempt's fold, written in place.
+ * @param e The event about the attempt.
+ */
 export function foldInto(
   a: Attempt,
   e: Extract<Event, { kind: 'spawned' | 'measured' | 'exited' | 'counted' | 'denied' | 'image' | 'gap' | 'process' | 'held' | 'released' }>,

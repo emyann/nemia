@@ -11,6 +11,7 @@
  */
 import { Schema } from 'effect';
 import { Actor } from './token.ts';
+import { describedNumber } from './meta.ts';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Invalid, Missing } from './api-errors.ts';
 import {
@@ -335,7 +336,7 @@ export type Resumed = typeof Resumed.Type;
 
 /** The store's pause timeout in force: its milliseconds, whether the store's file set it, and since when where it says. */
 export const PauseTimeout = Schema.Struct({
-  ms: Schema.Number.annotate({ description: 'The timeout in milliseconds.' }),
+  ms: describedNumber('The timeout in milliseconds.'),
   set: Schema.Boolean.annotate({ description: "Whether the store's file set it; false for the default." }),
   at: Schema.optionalKey(Schema.String.annotate({ description: 'When it was set, where the file says.' })),
 });

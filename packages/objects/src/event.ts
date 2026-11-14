@@ -20,7 +20,7 @@
  * Plain Schemas of JSON, as every object of this package is.
  */
 import { Schema } from 'effect';
-import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
+import { API_VERSION, ObjectMeta, listOf, describedNumber } from './meta.ts';
 import { Actor } from './token.ts';
 import { ANSWER_VIA, EVENT_REASONS, EVENT_SOURCES, EVENT_TYPES, EVENT_WAITS, INVOLVED_KINDS, WAIT_ON } from './words.ts';
 
@@ -62,9 +62,7 @@ export const Event = Schema.Struct({
     }),
   ),
   call: Schema.optionalKey(Schema.String.annotate({ description: 'The call denied, on a ToolDenied line; absent on any other.' })),
-  try: Schema.optionalKey(
-    Schema.Number.annotate({ description: "The step's try the call was denied in, on a ToolDenied line; absent on any other." }),
-  ),
+  try: Schema.optionalKey(describedNumber("The step's try the call was denied in, on a ToolDenied line; absent on any other.")),
   actor: Schema.optionalKey(Actor),
 });
 export type Event = typeof Event.Type;

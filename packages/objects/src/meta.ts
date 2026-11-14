@@ -8,6 +8,12 @@ import { Schema } from 'effect';
 /** The version every object of this package is served under: a new key is optional, and no key changes meaning under it. */
 export const API_VERSION = 'nemia/v1';
 
+/**
+ * A number that says what it is: `Schema.Number`'s own description never reaches the document, whose JSON side of it is a union with the
+ * non-finite words, so it is described as a union of that one member, which reads and writes the same.
+ */
+export const describedNumber = (description: string) => Schema.Union([Schema.Number]).annotate({ description });
+
 /** The namespace an object is in when nobody names one. */
 export const DEFAULT_NAMESPACE = 'default';
 
@@ -31,7 +37,7 @@ export const ObjectMeta = Schema.Struct({
     description: 'An opaque word that changes on every write of it, which a writer hands back to say which change it read.',
   }),
   generation: Schema.optionalKey(
-    Schema.Number.annotate({ description: 'How many times its spec was changed, for a kind whose spec a person edits; absent otherwise.' }),
+    describedNumber('How many times its spec was changed, for a kind whose spec a person edits; absent otherwise.'),
   ),
 }).annotate({ description: 'Who the object is and which change of it this is: its name, namespace, labels and versions.' });
 export type ObjectMeta = typeof ObjectMeta.Type;
@@ -47,7 +53,7 @@ export const ListMeta = Schema.Struct({
     Schema.String.annotate({ description: 'The opaque word that asks for the next page (?continue=); absent on the last page.' }),
   ),
   remainingItemCount: Schema.optionalKey(
-    Schema.Number.annotate({ description: 'How many items remain after this page; absent where the server did not count them.' }),
+    describedNumber('How many items remain after this page; absent where the server did not count them.'),
   ),
   resourceVersion: Schema.optionalKey(
     Schema.String.annotate({

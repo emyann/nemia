@@ -35,6 +35,7 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
+import type { WorkStands } from '../../contracts/approval-work.contract.ts';
 import type { OwnStatus, WhereAStepStands } from '../../contracts/standing.contract.ts';
 
 /**
@@ -54,8 +55,17 @@ export const gatesOf = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>): st
 export const approvalOf = (run: Run, step: string): Approval | undefined =>
   run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step) && workStands(run, a));
 
-/** Whether each step an approval's `work` names is still on the try it was on when the approval was given; an approval with none stands. */
-const workStands = (run: Run, a: Approval): boolean => Object.entries(a.work ?? {}).every(([step, n]) => tryOf(run, step) === n);
+/**
+ * Whether each step an approval's `work` names is still on the try it was on when the approval was given (as `tryOf` counts it); an
+ * approval with none stands. Each step's record is found among the record's own entries, never read at a name the approval's file gave.
+ */
+export const workStands: WorkStands = (run, a) => {
+  const records = Object.entries(run.steps);
+  return Object.entries(a.work ?? {}).every(([step, n]) => {
+    const record = records.find(([name]) => name === step)?.[1];
+    return (record?.tries?.length ?? 0) + 1 === n;
+  });
+};
 
 /**
  * The tries of the work an ending would act on, as they stand now — what its approval names (`Approval.work`): each step it waits on.

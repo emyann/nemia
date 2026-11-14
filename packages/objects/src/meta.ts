@@ -17,13 +17,23 @@ export const DEFAULT_NAMESPACE = 'default';
  * and its `generation`, the count of changes to its spec, for a kind whose spec a person edits.
  */
 export const ObjectMeta = Schema.Struct({
-  name: Schema.String,
-  namespace: Schema.optionalKey(Schema.String),
-  labels: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  creationTimestamp: Schema.String,
-  resourceVersion: Schema.String,
-  generation: Schema.optionalKey(Schema.Number),
-});
+  name: Schema.String.annotate({ description: 'Its name, unique in its namespace for its kind.' }),
+  namespace: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The namespace it is in; absent for the default one, or for a kind that has none.' }),
+  ),
+  labels: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.String).annotate({
+      description: 'Its labels, each a key and its value; absent where it has none.',
+    }),
+  ),
+  creationTimestamp: Schema.String.annotate({ description: 'When it was made, as an ISO 8601 time.' }),
+  resourceVersion: Schema.String.annotate({
+    description: 'An opaque word that changes on every write of it, which a writer hands back to say which change it read.',
+  }),
+  generation: Schema.optionalKey(
+    Schema.Number.annotate({ description: 'How many times its spec was changed, for a kind whose spec a person edits; absent otherwise.' }),
+  ),
+}).annotate({ description: 'Who the object is and which change of it this is: its name, namespace, labels and versions.' });
 export type ObjectMeta = typeof ObjectMeta.Type;
 
 /**
@@ -33,17 +43,26 @@ export type ObjectMeta = typeof ObjectMeta.Type;
  * ListMeta says it.
  */
 export const ListMeta = Schema.Struct({
-  continue: Schema.optionalKey(Schema.String),
-  remainingItemCount: Schema.optionalKey(Schema.Number),
-  resourceVersion: Schema.optionalKey(Schema.String),
-});
+  continue: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The opaque word that asks for the next page (?continue=); absent on the last page.' }),
+  ),
+  remainingItemCount: Schema.optionalKey(
+    Schema.Number.annotate({ description: 'How many items remain after this page; absent where the server did not count them.' }),
+  ),
+  resourceVersion: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        "The list's position as it was read, which a watch of a list that keeps its old versions resumes from (?watch=true&resourceVersion=).",
+    }),
+  ),
+}).annotate({ description: 'Where a page of a list stands: the word for the next page, how many items remain, and its position.' });
 export type ListMeta = typeof ListMeta.Type;
 
 /** A page of a list of one kind: `<Kind>List`, its metadata, and its items, each an object of that kind. */
 export const listOf = <const Kind extends string, Item extends Schema.Constraint>(kind: Kind, item: Item) =>
   Schema.Struct({
-    apiVersion: Schema.Literal(API_VERSION),
-    kind: Schema.Literal(`${kind}List`),
+    apiVersion: Schema.Literal(API_VERSION).annotate({ description: `The version the list is served under, ${API_VERSION}.` }),
+    kind: Schema.Literal(`${kind}List`).annotate({ description: `What the object is: ${kind}List, a page of a list of ${kind}.` }),
     metadata: ListMeta,
-    items: Schema.Array(item),
+    items: Schema.Array(item).annotate({ description: `The ${kind} objects of this page, each whole.` }),
   });

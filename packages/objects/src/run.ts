@@ -563,7 +563,7 @@ export const RunStatus = Schema.Struct({
   steps: List(RunStepStatus).annotate({ description: "Each step of the run as it stands now, in the workflow's order." }),
   startedAt: NullString.annotate({ description: "When the run's first task was filed; null while nothing of it was." }),
   cancelledAt: NullString.annotate({ description: 'When a person called the run off (nemia cancel); null where nobody did.' }),
-  cancelledBy: Schema.optionalKey(Actor.annotate({ description: 'Who called the run off, where the caller was known.' })),
+  cancelledBy: Schema.optionalKey(Actor),
   pruned: Schema.NullOr(
     Schema.Struct({
       at: Schema.String,

@@ -386,6 +386,61 @@ test('memory-fit: the sessions at once, each at its request else its limit, agai
   names(refused?.message, 'WF_MEMORY_REQUEST=4Gi');
 });
 
+test('sessions-slice: the slice the sessions run under, read fresh, has a ceiling at or under what the machine allocates, else the command that sets it', async (t) => {
+  const GIB = 2 ** 30;
+  const SHOW = (slice: string) => `systemctl --user show ${slice} -p MemoryMax --value`;
+  const sliceOf = async (env: Record<string, string>, answers: Record<string, CommandRead> = {}, more: Partial<ReadinessFacts> = {}) =>
+    (await read({ ...facts({ PATH: '/usr/bin', ...env }, answers), memoryBytes: 16 * GIB, ...more }, identity('exit 0'))).pieces.find(
+      (p) => p.name === 'sessions-slice',
+    );
+  const fixesOf = (p: { fixes: readonly { command: string; kind?: string }[] } | undefined) => p?.fixes.map((f) => [f.command, f.kind]);
+  const SIZED = [['nemia service install --size auto', 'typed']];
+  const OURS = { WF_CGROUP_PARENT: 'nemia-sessions.slice' };
+
+  await t.test('no slice set: the sessions are in the user manager’s own, which nothing caps', async () => {
+    const p = await sliceOf({});
+    assert.deepEqual([p?.state, p?.area, p?.cost], ['missing', 'machine', 'server']);
+    assert.deepEqual(fixesOf(p), SIZED);
+  });
+  await t.test('Nemia’s slice with no ceiling: missing, sized again', async () => {
+    const p = await sliceOf(OURS, { [SHOW('nemia-sessions.slice')]: { code: 0, out: 'infinity\n' } });
+    assert.equal(p?.state, 'missing');
+    assert.deepEqual(fixesOf(p), SIZED);
+  });
+  await t.test('a ceiling at what the machine allocates, 16 GiB less 2 GiB kept: met', async () => {
+    const p = await sliceOf(OURS, { [SHOW('nemia-sessions.slice')]: { code: 0, out: '15032385536\n' } });
+    assert.equal(p?.state, 'met');
+    assert.deepEqual(p?.fixes, []);
+  });
+  await t.test('a ceiling above it: missing, naming both', async () => {
+    const p = await sliceOf(OURS, { [SHOW('nemia-sessions.slice')]: { code: 0, out: '16106127360\n' } });
+    assert.equal(p?.state, 'missing');
+    names(p?.message, '15360 MiB', '14336 MiB');
+    assert.deepEqual(fixesOf(p), SIZED);
+  });
+  await t.test('a slice the person named: the fix sets its ceiling with systemctl', async () => {
+    const p = await sliceOf({ WF_CGROUP_PARENT: 'sessions.slice' }, { [SHOW('sessions.slice')]: { code: 0, out: 'infinity\n' } });
+    assert.equal(p?.state, 'missing');
+    assert.deepEqual(fixesOf(p), [['systemctl --user set-property sessions.slice MemoryMax=15032385536', 'typed']]);
+  });
+  await t.test('a higher floor leaves less allocated: 12 GiB is over 8 GiB', async () => {
+    const p = await sliceOf({ ...OURS, WF_MEMORY_RESERVED: '8Gi' }, { [SHOW('nemia-sessions.slice')]: { code: 0, out: '12884901888\n' } });
+    assert.equal(p?.state, 'missing');
+    names(p?.message, '8192 MiB');
+  });
+  await t.test('not known: systemctl not run, failing or answering nothing, no cgroup v2, or the memory unread', async () => {
+    for (const answer of [undefined, { code: 1, out: '' }, { code: 0, out: '' }, { code: 0, out: '12G\n' }] as CommandRead[])
+      assert.equal((await sliceOf(OURS, { [SHOW('nemia-sessions.slice')]: answer }))?.state, 'unknown', JSON.stringify(answer));
+    assert.equal((await sliceOf(OURS, {}, { exists: () => false }))?.state, 'unknown', 'no cgroup v2');
+    assert.equal((await sliceOf(OURS, {}, { memoryBytes: undefined }))?.state, 'unknown', 'memory unread');
+  });
+  await t.test('a slice the daemon would refuse: missing, in its words', async () => {
+    const p = await sliceOf({ WF_CGROUP_PARENT: 'bad' });
+    assert.equal(p?.state, 'missing');
+    names(p?.message, 'WF_CGROUP_PARENT=bad');
+  });
+});
+
 test("an archive install's tools piece reads its nemia: missing with no link, naming nemia doctor fix tools; met once linked; a checkout reads none", async () => {
   const PATH = `${toolsBinDir(ROOT)}:/usr/bin:/bin`;
   const link = path.join(toolsBinDir(ROOT), 'nemia');

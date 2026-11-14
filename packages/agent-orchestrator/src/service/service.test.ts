@@ -12,6 +12,9 @@ import {
   nameRefusal,
   plistRead,
   plistText,
+  sessionsSliceOf,
+  slicePathOf,
+  sliceText,
   specRefusal,
   statusLines,
   systemdState,
@@ -22,6 +25,7 @@ import {
   type ServiceRead,
   type ServiceSpec,
 } from './service.ts';
+import { cgroupParent } from '../config/config.store.ts';
 
 const SPEC: ServiceSpec = {
   name: 'nemia',
@@ -198,6 +202,16 @@ test('the service’s file: a user unit under the config folder, an agent under 
   const dirs = { home: '/srv/ann', configHome: '/srv/ann/.config' };
   assert.equal(unitPathOf('systemd', 'nemia-trial', dirs), '/srv/ann/.config/systemd/user/nemia-trial.service');
   assert.equal(unitPathOf('launchd', 'nemia', dirs), '/srv/ann/Library/LaunchAgents/nemia.plist');
+});
+
+test('the sessions’ slice: named for its service, a name the daemon reads as WF_CGROUP_PARENT, beside the unit, its ceiling in bytes', () => {
+  const dirs = { home: '/srv/ann', configHome: '/srv/ann/.config' };
+  assert.equal(sessionsSliceOf('nemia'), 'nemia-sessions.slice');
+  assert.equal(cgroupParent({ WF_CGROUP_PARENT: sessionsSliceOf('nemia-trial') }), 'nemia-trial-sessions.slice');
+  assert.equal(slicePathOf('nemia', dirs), '/srv/ann/.config/systemd/user/nemia-sessions.slice');
+  const text = sliceText({ name: 'nemia', ceilingBytes: 15032385536 });
+  assert.match(text, /^\[Slice\]\nMemoryMax=15032385536$/m);
+  assert.match(sliceText({ name: '50%', ceilingBytes: 1 }), /^Description=.*50%%/m, 'a specifier is escaped');
 });
 
 test('the system’s state is read: systemd’s show, launchd’s print, and a label launchd does not know', () => {

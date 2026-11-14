@@ -4,7 +4,6 @@ import { Background, BackgroundVariant, type Edge, Position, ReactFlow, ReactFlo
 import type { PagePlace, WorkflowListing } from '../../lib/api/workflows.ts';
 import { specStep, stepPage } from '../../lib/bar';
 import { extentOf, layout, stepsOf } from '../../lib/layout';
-import { useBarOver } from '../../lib/useBarOver';
 import { useCanvasPress } from '../../lib/useCanvasPress';
 import { useFrameSize } from '../../lib/useFrameSize';
 import { FLOOR_BOX } from '../../lib/classes';
@@ -108,9 +107,8 @@ export function WorkflowCanvas({ workflow, place = {} }: { workflow: WorkflowLis
 }
 
 /**
- * The canvas of `workflow`'s graph `drawn`, its step the bar shows marked `inspected`, and its frame narrowed by what the bar covers of it
- * (`useBarOver`), so the step inspected stays clear of the bar, fitted again as the frame changes width (`useRefit`). A double click
- * goes to the step's page in `place`.
+ * The canvas of `workflow`'s graph `drawn`, its step the bar shows marked `inspected`, fitted again as the frame changes width, as when
+ * the frame's side sheet opens or closes beside the page (`useRefit`). A double click goes to the step's page in `place`.
  */
 function Graph({ workflow, drawn, place }: { workflow: WorkflowListing; drawn: Drawn; place: PagePlace }) {
   const { from, name } = workflow;
@@ -124,18 +122,15 @@ function Graph({ workflow, drawn, place }: { workflow: WorkflowListing; drawn: D
     () => drawn.nodes.map((node) => ({ ...node, data: { ...node.data, inspected: node.id === inspected } })),
     [drawn, inspected],
   );
-  const whole = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLDivElement>(null);
-  const over = useBarOver(whole);
   useRefit(frame);
   return (
     <div
-      ref={whole}
       aria-label={`The steps of ${name} as a graph`}
       className={FLOOR_BOX}
       style={{ height: Math.min(Math.max(drawn.height + 40, 180), 420) }}
     >
-      <div ref={frame} className="h-full min-w-0" style={{ marginRight: over }}>
+      <div ref={frame} className="h-full min-w-0">
         <ReactFlow
           id={`workflow-${from}-${name}`}
           nodes={nodes}
@@ -165,7 +160,10 @@ function Graph({ workflow, drawn, place }: { workflow: WorkflowListing; drawn: D
   );
 }
 
-/** Fits every step of the canvas in `frame` again (`FIT`) each time the frame changes width, as the bar opens or closes beside it. */
+/**
+ * Fits every step of the canvas in `frame` again (`FIT`) each time the frame changes width, as the frame's side sheet opens or closes
+ * beside the page.
+ */
 function useRefit(frame: RefObject<HTMLDivElement | null>) {
   const { fitView } = useReactFlow();
   const { width } = useFrameSize(frame, true);

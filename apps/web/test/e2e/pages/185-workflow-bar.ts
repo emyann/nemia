@@ -155,7 +155,7 @@ async function opens(page: Page): Promise<void> {
 }
 
 /**
- * Build, pressed from the keyboard under the bar that floats over it, swaps a workflow's canvas for its builder and closes the bar showing
+ * Build, pressed from the keyboard beside the bar in the sheet, swaps a workflow's canvas for its builder and closes the bar showing
  * one of its steps; a click on a step in the builder selects it for its form, and shows no bar.
  */
 async function builds(page: Page): Promise<void> {

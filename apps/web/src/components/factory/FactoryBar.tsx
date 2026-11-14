@@ -1,5 +1,5 @@
 /**
- * The frame's floating bar for a factory: what its block on the Factories canvas says, in a bar beside it — its name, its repositories,
+ * The frame's side sheet for a factory: what its block on the Factories canvas says, in a bar beside it — its name, its repositories,
  * what its runs are doing and what it offers, a place of it that is not trusted, or why its file does not read — read from the factories
  * and the runs, which a read again
  * keeps current. Its floor, which Open visits, has its runs.
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { openRunsQuery } from '@/lib/api/runs';
 import { offerOf, openBlockOf, runsOf, type FactoryBlock } from '@/lib/factories';
-import { FloatingBar } from '../frame/FloatingBar';
+import { BarPanel } from '../frame/BarPanel';
 import { FactoryTrust } from './FactoryTrust';
 
 /**
@@ -25,7 +25,7 @@ export function FactoryBar({ factory: name }: { factory: string }) {
   const block = factory && runs.data ? openBlockOf(factory, runs.data) : undefined;
   const repos = block?.repos.join(', ');
   return (
-    <FloatingBar
+    <BarPanel
       title={
         <span className="flex items-center gap-2">
           <span className="min-w-0 break-all">{name}</span>
@@ -41,7 +41,7 @@ export function FactoryBar({ factory: name }: { factory: string }) {
           <Unread name={name} error={factories.error ?? runs.error} read={factories.data !== undefined && runs.data !== undefined} />
         )}
       </div>
-    </FloatingBar>
+    </BarPanel>
   );
 }
 

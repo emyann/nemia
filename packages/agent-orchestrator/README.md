@@ -524,7 +524,13 @@ quantities read by `config.store.ts` (`memoryRequest`, `memoryReserved`), refuse
 it. `WF_MAX_CONCURRENT` still bounds each pool. A step held back says why in its note in `nemia ls` (`admissionWords`):
 `waits for memory: needs 2.5Gi, 1Gi free`, or `waits for a session slot: claude has 4 at work (WF_MAX_CONCURRENT)`.
 `nemia service install --size auto` writes a request that fits the machine; `nemia doctor` says when the settings a daemon runs under
-cannot fit it (`memory-fit`). An installed server keeps the settings its person wrote.
+cannot fit it (`memory-fit`). Admission bounds what starts, not what grows, so on systemd `--size auto` also writes
+`<name>-sessions.slice` beside the unit, its `MemoryMax=` at what the machine allocates (its memory less the floor), and points
+`WF_CGROUP_PARENT` at it: sessions that grow together toward their limits are killed inside that slice, never the daemon or the
+machine, as the kubelet holds every Pod to a node's allocatable memory. A slice `--env WF_CGROUP_PARENT` names is the person's: no
+file is written, and a line names the `systemctl --user set-property` that caps it. `nemia doctor`'s `sessions-slice` piece reads the
+slice's ceiling on every read and says when it has none or one above what the machine allocates (`ceilingFit`), naming the command
+that sets it. An installed server keeps the settings its person wrote.
 
 **A harness's fence is written under that harness's block**, named by its id, the shape a template writes (`src/template/layout.ts`):
 

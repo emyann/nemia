@@ -65,12 +65,16 @@ export function MenuButton() {
   );
 }
 
-/** Nemia's face at the page at `path` with `search`, which opens and closes her side sheet (`HerSheet`). */
+/**
+ * Nemia's face at the page at `path` with `search`, which shows her chat in the frame's side sheet, in place of what the address's
+ * `?bar=` names, or closes it where the sheet shows her; it says open only while the sheet shows her (`FrameFold.shows`).
+ */
 export function HerFace({ path, search }: { path: string; search: Record<string, unknown> }) {
   const sheet = useHerSheet();
+  const fold = useFrameFold();
   const presence = useNemiaPresence(path, search);
   const ownsChat = useOwnsChat();
-  return <NemiaRailFace presence={presence} open={sheet.open} ownsChat={ownsChat} onToggle={sheet.toggle} />;
+  return <NemiaRailFace presence={presence} open={fold.shows === 'her'} ownsChat={ownsChat} onToggle={sheet.toggle} />;
 }
 
 /**

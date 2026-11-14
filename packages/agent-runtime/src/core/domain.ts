@@ -730,21 +730,11 @@ export type State = {
   settled: Outcome | null;
 };
 
-/** The attempt a `starting` event `e` opens on `s`: not yet spawned, with what it continues, is told and runs under, and its turn. */
-const startedAttempt = (s: State, e: Extract<Event, { kind: 'starting' }>): Attempt => ({
-  n: e.attempt,
-  startedAt: e.at,
+/** The optional parts of the attempt a `starting` event `e` opens on `s`: its monotonic start, what it is told and runs under, its turn. */
+const startedParts = (s: State, e: Extract<Event, { kind: 'starting' }>) => ({
   ...(e.mono ? { startedMono: e.mono } : {}),
-  spawnedAt: null,
-  ended: null,
-  endedAt: null,
-  reason: null,
-  nativeId: null,
-  resumeFrom: e.resumeFrom,
   ...(e.nudge ? { nudge: e.nudge } : {}),
   ...(e.resources ? { resources: e.resources } : {}),
-  usage: null,
-  exitCode: null,
   ...(s.inputs.length ? { turn: s.inputs.length } : {}),
 });
 
@@ -835,7 +825,19 @@ export function fold(taskId: string, events: readonly Event[]): State {
         break;
       case 'starting':
         delete s.waits;
-        s.attempts.push(startedAttempt(s, e));
+        s.attempts.push({
+          n: e.attempt,
+          startedAt: e.at,
+          spawnedAt: null,
+          ended: null,
+          endedAt: null,
+          reason: null,
+          nativeId: null,
+          resumeFrom: e.resumeFrom,
+          usage: null,
+          exitCode: null,
+          ...startedParts(s, e),
+        });
         break;
       case 'stop-requested':
         s.stopRequested = true;

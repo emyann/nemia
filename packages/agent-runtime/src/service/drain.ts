@@ -15,13 +15,19 @@ export class DrainRefused extends Schema.TaggedError<DrainRefused>()('DrainRefus
   message: Schema.String,
 }) {}
 
-/** Why `drain` refuses its holder, or `undefined` for a process id or null. */
+/**
+ * Why `drain` refuses its holder, or `undefined` for a process id or null.
+ * @param holder What `drain` was handed: the process id of the engine that holds the attached sessions, or null to let their calls go.
+ */
 export const drainRefusalOf = (holder: unknown): string | undefined =>
   holder === null || (Number.isInteger(holder) && (holder as number) > 0)
     ? undefined
     : `takes the process id of the engine that holds the attached sessions, a whole number from 1, or null to let their calls go; it was handed ${JSON.stringify(holder) ?? 'nothing'}.`;
 
-/** `drain`'s check of its holder: fails with `DrainRefused` for what `drainRefusalOf` refuses, and does nothing otherwise. */
+/**
+ * `drain`'s check of its holder: fails with `DrainRefused` for what `drainRefusalOf` refuses, and does nothing otherwise.
+ * @param holder What `drain` was handed, as `drainRefusalOf` reads it.
+ */
 export const drainChecked = (holder: unknown): Effect.Effect<void, DrainRefused> => {
   const refused = drainRefusalOf(holder);
   return refused === undefined ? Effect.void : Effect.fail(new DrainRefused({ message: refused }));
@@ -30,6 +36,7 @@ export const drainChecked = (holder: unknown): Effect.Effect<void, DrainRefused>
 /**
  * Why `drainSessions` refuses what it was handed, or `undefined` for one grace of whole milliseconds from 0 and no other key, or null: a
  * grace that is no length of time, or a key it does not read, would put a drain no job judges as asked.
+ * @param args Every argument `drainSessions` was handed: one `{ graceMs }`, or null to lift the drain.
  */
 export const drainSessionsRefusalOf = (args: readonly unknown[]): string | undefined => {
   const [given] = args;
@@ -40,7 +47,10 @@ export const drainSessionsRefusalOf = (args: readonly unknown[]): string | undef
     : `takes \`{ graceMs }\`, how long a call in flight is given to finish in whole milliseconds from 0, or null to lift the sessions' drain; it was handed ${args.map((a) => JSON.stringify(a) ?? 'nothing').join(', ') || 'nothing'}.`;
 };
 
-/** `drainSessions`' check of what it was handed: fails with `DrainRefused` for what `drainSessionsRefusalOf` refuses, and nothing else. */
+/**
+ * `drainSessions`' check of what it was handed: fails with `DrainRefused` for what `drainSessionsRefusalOf` refuses, and nothing else.
+ * @param args Every argument `drainSessions` was handed, as `drainSessionsRefusalOf` reads them.
+ */
 export const drainSessionsChecked = (args: readonly unknown[]): Effect.Effect<void, DrainRefused> => {
   const refused = drainSessionsRefusalOf(args);
   return refused === undefined ? Effect.void : Effect.fail(new DrainRefused({ message: refused }));
@@ -52,6 +62,9 @@ export const drainSessionsChecked = (args: readonly unknown[]): Effect.Effect<vo
  * agent's — is never held by it, its deadline counted on; a runner of the consumer's, which declares nothing, is held, as every
  * harness was before harnesses declared, since the runtime cannot tell its parked end from another.
  * Exported only for the tests that import it.
+ * @param stands Whether the sessions' drain stands, as its file was read.
+ * @param harnesses The engine's harnesses, each by its name.
+ * @param fallback The harness that takes a task that names none.
  */
 export const drainHolds =
   (stands: boolean, harnesses: Record<string, HarnessConfig>, fallback: string) =>
@@ -66,6 +79,8 @@ export const drainHolds =
  * What each pass of an engine over `options` reads beside its store and its harnesses: what it admits under (`admissionOf`), and
  * whether the store's sessions' drain stands, read off its file once per pass, then asked per task by its harness (`drainHolds`,
  * `SessionsDrained`, `Now.drained`).
+ * @param options The engine's options, whose `root` holds the drain's file and whose `defaultHarness` names the fallback.
+ * @param harnesses The engine's harnesses, each by its name.
  */
 export const passReadsOf = (options: EngineOptions, harnesses: Record<string, HarnessConfig>) =>
   Layer.merge(

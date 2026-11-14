@@ -10,7 +10,10 @@ import type { Runner } from '../harness/index.ts';
 import { verbHarnessOf, type Capability } from '../harness/declaration.ts';
 import type { Harnessed } from './harnessed.ts';
 
-/** What failed, in words, off a cause: its error's message, or the value itself. */
+/**
+ * What failed, in words, off a cause: its error's message, or the value itself.
+ * @param e What failed.
+ */
 export const wordsOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /** What a verb written to a session says where no session of a task is there to take it. */
@@ -75,7 +78,11 @@ type Reached<Reach> = {
   readonly sighting: Sighting;
 };
 
-/** `effect`'s failure, of any kind, as `verb`'s unsent in the words `message` gives of what failed. */
+/**
+ * `effect`'s failure, of any kind, as `verb`'s unsent in the words `message` gives of what failed.
+ * @param verb The verb, whose `unsent` makes the failure.
+ * @param message The words of what failed, from the failure.
+ */
 export const unsentOf =
   <Unsent>(verb: Pick<WrittenVerb<unknown, Unsent, unknown>, 'unsent'>, message: (e: unknown) => string) =>
   <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, Unsent, R> =>
@@ -89,6 +96,8 @@ export const unsentOf =
 /**
  * `effect`, the reach of a verb handed to a session, its failure worded as `verb`'s refusal where the harness refused it (`refused`)
  * and as its unsent, in the words `message` gives of what failed, otherwise.
+ * @param verb The verb, whose `refused` and `unsent` make the failure.
+ * @param message The words of what failed, from the failure's own words.
  */
 export const handedOver =
   <Refused, Unsent>(verb: Pick<WrittenVerb<Refused, Unsent, unknown>, 'refused' | 'unsent'>, message: (words: string) => string) =>
@@ -105,6 +114,9 @@ export const handedOver =
  * store has no record of, a harness that does not declare the verb or has not its reach, a task with no attempt open
  * (`openAttemptOf`) and a session its harness does not list; a harness that could not be read is the verb's unsent. What the verb
  * then asks of the session's state is its own.
+ * @param ports The engine's journal and runners (`go`, `read`) and the harness a task runs on (`harnessOf`).
+ * @param verb The verb written to the session.
+ * @param taskId The task's id.
  */
 export const sessionReached = <Refused, Unsent, Reach>(
   ports: WrittenPorts,

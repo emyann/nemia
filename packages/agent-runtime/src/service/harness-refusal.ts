@@ -230,6 +230,8 @@ const ownRefuses = (h: HarnessConfig, name: string): ((task: TaskSpec) => string
  *
  * A `RunnerOps` brought as its own is the consumer's: it declares nothing (`declarationOf`), is handed every key of a task's config, and
  * is asked here only whether it holds a call (it does not); its own `refuses`, if it has one, is asked by `file` through the `Runner`.
+ * @param spec The task as filed.
+ * @param harnesses The engine's harnesses, each by its name.
  */
 export const harnessRefusalOf = (spec: Filed, harnesses: Record<string, HarnessConfig>): string | undefined => {
   const h = own(harnesses, spec.harness);

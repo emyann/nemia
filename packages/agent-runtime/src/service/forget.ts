@@ -132,6 +132,10 @@ const sessionsHeld = (go: Go, held: Held) =>
  * a harness this engine does not have; and a session its harness still lists, or could not be read for. Without `yes` it counts;
  * with it, it removes each session's files through its harness (`RunnerOps.forget`), then the journals and the feed's lines in one
  * call to the store, the journal last, so a forget cut short is finished by the next.
+ * @param go Runs an effect with the engine's store and runners provided.
+ * @param runners The engine's harnesses, each by its name.
+ * @param harnessOf The harness that answers for a task in a given state.
+ * @param bytesOf The size of a task's journal in bytes, from its id and its events (`journalBytesOf`).
  */
 export const forgetVerbOf = (
   go: Go,

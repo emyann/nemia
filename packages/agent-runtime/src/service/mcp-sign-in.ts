@@ -77,6 +77,9 @@ const noneWaiting = (name: string): McpSignInRefused =>
  * Why the address `url`, pasted for `name`, completes no sign-in, or `undefined` where it is handed on: no sign-in to `name` waits
  * (`port` undefined), or `callbackRefusal` refuses it against the redirect of the one waiting on `port`. The address is in no refusal.
  * The real verb and the stand-in's judge by this one function.
+ * @param name The name of the server the address was pasted for.
+ * @param port The callback port of the sign-in waiting for `name`, or undefined where none waits.
+ * @param url The address pasted.
  */
 export const callbackRefused = (name: string, port: number | undefined, url: string): McpSignInRefused | undefined => {
   if (port === undefined) return noneWaiting(name);
@@ -167,7 +170,10 @@ const portsHeld = (states: Map<string, McpSignInState>) => {
   return { byPort, claimed, waitsOn, portOf, settle };
 };
 
-/** Why a sign-in verb is refused by an engine none of whose harnesses, `declared`, declares `mcp`: the harnesses it has. */
+/**
+ * Why a sign-in verb is refused by an engine none of whose harnesses, `declared`, declares `mcp`: the harnesses it has.
+ * @param declared The engine's harnesses, each with what it declares.
+ */
 export const noSignInHarness = (declared: readonly HarnessDeclared[]): string =>
   `a sign-in is made inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${declared.map((h) => h.name).join(', ') || 'none'}.`;
 
@@ -176,6 +182,11 @@ export const noSignInHarness = (declared: readonly HarnessDeclared[]): string =>
  * Each is refused, with nothing spawned, where no harness of the engine declares `mcp`: only Claude Code is measured to sign in
  * (`signsInMcp`), and Codex 0.154 hands GitHub no client secret. The Claude Code each runs is found at each ask (`claudeExecutableOf`):
  * `executable`, else the one in `harnessBin`, else the SDK's bundled one, else the one on PATH.
+ * @param harnesses The engine's harnesses, each by its name.
+ * @param root The engine's store root, under which a sign-in's folder is.
+ * @param executable The harness program a sign-in runs, or undefined to look for one.
+ * @param seams What a test gives in place of the real program: the CLI child, the held session and the sign-in's bound; none by default.
+ * @param harnessBin The folder the harness's program is looked for in first, or undefined for none.
  */
 export const mcpSignInVerbsOf = (
   harnesses: Record<string, HarnessConfig>,

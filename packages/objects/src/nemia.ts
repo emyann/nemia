@@ -46,7 +46,7 @@ export const FactoryLevel = Schema.Struct({
  * factory first, and the command a person runs once to trust her folder (`trust`, null where it is trusted).
  */
 export const NemiaLevel = Schema.Struct({
-  level: LevelWord.annotate({ description: "The store's level (nemia level <level>): manual, or a level that lets Nemia act on her own." }),
+  level: LevelWord.annotate({ description: "The store's level (nemia level <level>): manual, semi-auto or auto." }),
   since: Schema.NullOr(Schema.String).annotate({ description: 'When the store took its level; null where its level was never set.' }),
   task: Schema.NullOr(Schema.String).annotate({ description: "Her task's id; null where none was ever filed." }),
   phase: Schema.NullOr(Schema.Literals(ENGINE_PHASES)).annotate({
@@ -238,7 +238,7 @@ export const PolicyReach = Schema.Struct({
   run: Schema.NullOr(Schema.String).annotate({ description: 'The run read, where one was named (?run=); null where a factory was.' }),
   level: LevelWord.annotate({ description: "The factory's level now." }),
   reach: Schema.Literals(POLICY_REACHES).annotate({
-    description: 'How many of the steps at their gate the rules in force reach, as a word.',
+    description: 'How many of the steps at their gate the rules in force reach: all, some or none.',
   }),
   gates: Schema.Array(GateReach).annotate({
     description: 'Each step at its gate, with the rules that reach it, the proposed ones that would, and why each other rule cannot.',

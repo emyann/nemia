@@ -9,8 +9,10 @@
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BadRequest, Gone, Invalid, Missing, ReadFailed, Unjudged } from './api-errors.ts';
-import { StepLog, StepTries, StepTry, TryCloseout } from './run.ts';
+import { StepLog } from './run.ts';
+import { StepTries, StepTry, TryCloseout } from './run-tries.ts';
 import { StepTold } from './run-told.ts';
+import { describedNumber } from './meta.ts';
 import { LIFECYCLE_STATES, SAID_AFTER, TRANSCRIPT_ORIGINS, TRANSCRIPT_ROLES } from './words.ts';
 
 const List = <S extends Schema.Top>(item: S) => Schema.mutable(Schema.Array(item));
@@ -40,11 +42,22 @@ export type TranscriptEvent = typeof TranscriptEvent.Type;
  * left after this page (`more`), to read on from `cursor` at once; absent from an answer that holds every event after its cursor.
  */
 export const StepTranscript = Schema.Struct({
-  events: List(TranscriptEvent),
-  cursor: Schema.NullOr(Schema.String),
-  live: Schema.Boolean,
-  open: Schema.Boolean,
-  more: Schema.optionalKey(Schema.Boolean),
+  events: List(TranscriptEvent).annotate({
+    description: "A page of the engine's events of the step's conversation, from the cursor asked with.",
+  }),
+  cursor: Schema.NullOr(Schema.String).annotate({
+    description: 'The cursor to pass as after on the next read; null for a step with no task to read.',
+  }),
+  live: Schema.Boolean.annotate({ description: 'Whether something of its task runs, or is to.' }),
+  open: Schema.Boolean.annotate({
+    description: "Whether it may yet say more: a task that has not settled, one held open on a person's word among them.",
+  }),
+  more: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description:
+        'Whether events said already are left after this page, to read on from cursor at once; absent where the answer holds every one.',
+    }),
+  ),
 }).annotate({ identifier: 'StepTranscript' });
 export type StepTranscript = typeof StepTranscript.Type;
 
@@ -91,10 +104,14 @@ export type LifecycleGraph = typeof LifecycleGraph.Type;
  * task's path to the end of that try, and the lifecycle it walks, which the board draws it on.
  */
 export const StepPath = Schema.Struct({
-  taskId: Schema.NullOr(Schema.String),
-  try: Schema.Number,
-  path: List(LifecycleTransition),
-  lifecycle: LifecycleGraph,
+  taskId: Schema.NullOr(Schema.String).annotate({ description: "The try's task; null for a step not filed yet, whose path is empty." }),
+  try: describedNumber("The try's number, from 1."),
+  path: List(LifecycleTransition).annotate({
+    description: "The task's path to the end of that try: each lifecycle state its journal says, the entry's kind and when.",
+  }),
+  lifecycle: LifecycleGraph.annotate({
+    description: 'The lifecycle the path walks, which the board draws it on: its states, edges and verbs.',
+  }),
 }).annotate({ identifier: 'StepPath' });
 export type StepPath = typeof StepPath.Type;
 

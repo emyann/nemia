@@ -7,7 +7,9 @@ import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 
 /** The folder, by its absolute path, and whether steps only read it (`:ro`) or write it too (`:rw`). */
-export const VolumeSpec = Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean });
+export const VolumeSpec = Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }).annotate({
+  description: 'The folder, by its absolute path, and whether steps only read it.',
+});
 export type VolumeSpec = typeof VolumeSpec.Type;
 
 /**
@@ -18,13 +20,15 @@ export const VolumeStatus = Schema.Struct({
   present: Schema.Boolean,
   refused: Schema.optionalKey(Schema.String),
   runs: Schema.Array(Schema.String),
-});
+}).annotate({ description: 'Whether the folder is there now, why a run would refuse it, and the runs not ended that mount it.' });
 export type VolumeStatus = typeof VolumeStatus.Type;
 
 /** A factory's volume, as an object. */
 export const Volume = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Volume'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Volume').annotate({
+    description: "What the object is: a Volume, a folder of the person's machine a factory mounts for every local step.",
+  }),
   metadata: ObjectMeta,
   spec: VolumeSpec,
   status: VolumeStatus,

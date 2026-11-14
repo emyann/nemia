@@ -48,9 +48,15 @@ const TaskPart = Schema.Union([
  * task by part: `GET /api/runs/:runId/steps/:step/told`.
  */
 export const StepTold = Schema.Struct({
-  body: NullString,
-  told: NullString,
-  layers: Schema.NullOr(ToldLayers),
-  taskParts: Schema.NullOr(List(TaskPart)),
+  body: NullString.annotate({ description: "The step's own body in the workflow; null where none shows it." }),
+  told: NullString.annotate({ description: 'What the step was told, whole; null where nothing was told.' }),
+  layers: Schema.NullOr(ToldLayers).annotate({
+    description:
+      "What it was told by layer: its agent's, yours, the factory's, the step's policy and its task; null on a record that froze none.",
+  }),
+  taskParts: Schema.NullOr(List(TaskPart)).annotate({
+    description:
+      "Its task by part: its own text with where each came from, and each run's section it was handed; null where nothing was told.",
+  }),
 }).annotate({ identifier: 'StepTold' });
 export type StepTold = typeof StepTold.Type;

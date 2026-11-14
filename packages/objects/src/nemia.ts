@@ -46,18 +46,30 @@ export const FactoryLevel = Schema.Struct({
  * factory first, and the command a person runs once to trust her folder (`trust`, null where it is trusted).
  */
 export const NemiaLevel = Schema.Struct({
-  level: LevelWord,
-  since: Schema.NullOr(Schema.String),
-  task: Schema.NullOr(Schema.String),
-  phase: Schema.NullOr(Schema.Literals(ENGINE_PHASES)),
-  sessionId: Schema.NullOr(Schema.String),
-  reach: Schema.Array(Schema.String),
-  bridge: Schema.NullOr(Schema.Struct({ url: Schema.NullOr(Schema.String), why: Schema.NullOr(Schema.String) })),
-  stopped: Schema.Boolean,
-  spend: Schema.NullOr(Schema.Struct({ usd: Schema.Number, measured: Schema.Number, unmeasured: Schema.Number })),
-  allows: Schema.Array(Schema.String),
-  factories: Schema.Array(FactoryLevel),
-  trust: Schema.NullOr(Schema.String),
+  level: LevelWord.annotate({ description: "The store's level (`nemia level <level>`): manual, semi-auto or auto." }),
+  since: Schema.NullOr(Schema.String).annotate({ description: 'When the store took its level; null where its level was never set.' }),
+  task: Schema.NullOr(Schema.String).annotate({ description: "Her task's id; null where none was ever filed." }),
+  phase: Schema.NullOr(Schema.Literals(ENGINE_PHASES)).annotate({
+    description: 'The phase of her task as the engine says it; null where it is not filed.',
+  }),
+  sessionId: Schema.NullOr(Schema.String).annotate({ description: "Her session's id; null where her task is not filed." }),
+  reach: Schema.Array(Schema.String).annotate({
+    description:
+      'How a person reaches her open session: the command that attaches to it here, then its web link, or why that link is not up. Empty where no session is open.',
+  }),
+  bridge: Schema.NullOr(Schema.Struct({ url: Schema.NullOr(Schema.String), why: Schema.NullOr(Schema.String) })).annotate({
+    description: "Her open session's web link where one was asked, or why it is not up; null where none was asked.",
+  }),
+  stopped: Schema.Boolean.annotate({ description: 'Whether her task was stopped from outside while a level above manual is in force.' }),
+  spend: Schema.NullOr(Schema.Struct({ usd: Schema.Number, measured: Schema.Number, unmeasured: Schema.Number })).annotate({
+    description:
+      'What her sessions cost, counted as each ends: dollars, and how many sessions were measured and not; null where her task is not filed.',
+  }),
+  allows: Schema.Array(Schema.String).annotate({ description: 'The allow rules a person gave her at a prompt.' }),
+  factories: Schema.Array(FactoryLevel).annotate({ description: "Each factory's level, the default factory first." }),
+  trust: Schema.NullOr(Schema.String).annotate({
+    description: 'The command a person runs once to trust her folder, which her session waits for; null where it is trusted.',
+  }),
 });
 
 /**
@@ -73,9 +85,11 @@ export const NemiaLevelSet = Schema.Struct({
 
 /** The facts Nemia keeps: the folder they are in, their names, and the words of the one asked (`fact`, null where none was). */
 export const NemiaMemory = Schema.Struct({
-  dir: Schema.String,
-  facts: Schema.Array(Schema.String),
-  fact: Schema.NullOr(Schema.Struct({ name: Schema.String, text: Schema.String })),
+  dir: Schema.String.annotate({ description: 'The folder her facts are kept in.' }),
+  facts: Schema.Array(Schema.String).annotate({ description: 'The name of each fact she keeps.' }),
+  fact: Schema.NullOr(Schema.Struct({ name: Schema.String, text: Schema.String })).annotate({
+    description: 'The fact asked (`nemia memory <fact>`), by name with its words; null where none was asked.',
+  }),
 });
 
 /**
@@ -127,11 +141,13 @@ export const ProposalPolicyRule = Schema.Struct(proposalRuleFields);
  * none), and the builtin rule, to be confirmed again.
  */
 export const PolicyList = Schema.Struct({
-  agent: Schema.String,
-  file: Schema.String,
-  isDefault: Schema.Boolean,
-  rules: Schema.Array(PolicyRule),
-  proposalRules: Schema.Array(ProposalPolicyRule),
+  agent: Schema.String.annotate({ description: 'The agent whose rules these are.' }),
+  file: Schema.String.annotate({ description: "The file of the person's list of its rules." }),
+  isDefault: Schema.Boolean.annotate({ description: 'Whether the builtin rule is in force, for want of a list the person confirmed.' }),
+  rules: Schema.Array(PolicyRule).annotate({ description: 'The rules in force at a gate, each with its words.' }),
+  proposalRules: Schema.Array(ProposalPolicyRule).annotate({
+    description: 'The rules in force for approving proposals, each with its words.',
+  }),
   proposed: Schema.NullOr(
     Schema.Struct({
       file: Schema.String,
@@ -141,9 +157,14 @@ export const PolicyList = Schema.Struct({
       guidance: Schema.Array(Schema.String),
       stale: Schema.Boolean,
     }),
-  ),
-  instruction: Schema.NullOr(Schema.String),
-  builtin: PolicyRule,
+  ).annotate({
+    description:
+      'What the agent proposed (nemia policy propose): its file and when, each rule with whether it is in force, the words kept as guidance, and whether its custom instruction changed since; null where it proposed nothing.',
+  }),
+  instruction: Schema.NullOr(Schema.String).annotate({
+    description: "The agent's custom instruction its proposal is read from; null where it has none.",
+  }),
+  builtin: PolicyRule.annotate({ description: 'The builtin rule, in force where no list was confirmed, to be confirmed again.' }),
 });
 
 /** A confirm of a rule: its words as the person read them, so what is confirmed is what they read. */
@@ -212,18 +233,29 @@ export const GateReach = Schema.Struct({
  * attached to the factory that does not load, with why.
  */
 export const PolicyReach = Schema.Struct({
-  agent: Schema.String,
-  factory: Schema.String,
-  run: Schema.NullOr(Schema.String),
-  level: LevelWord,
-  reach: Schema.Literals(POLICY_REACHES),
-  gates: Schema.Array(GateReach),
-  suggested: Schema.Array(Schema.Union([PolicyRule, ProposalPolicyRule])),
+  agent: Schema.String.annotate({ description: 'The agent whose rules were read.' }),
+  factory: Schema.String.annotate({ description: 'The factory whose steps at their gate were read.' }),
+  run: Schema.NullOr(Schema.String).annotate({ description: 'The run read, where one was named (?run=); null where a factory was.' }),
+  level: LevelWord.annotate({ description: "The factory's level now." }),
+  reach: Schema.Literals(POLICY_REACHES).annotate({
+    description: 'How many of the steps at their gate the rules in force reach: all, some or none.',
+  }),
+  gates: Schema.Array(GateReach).annotate({
+    description: 'Each step at its gate, with the rules that reach it, the proposed ones that would, and why each other rule cannot.',
+  }),
+  suggested: Schema.Array(Schema.Union([PolicyRule, ProposalPolicyRule])).annotate({
+    description: 'The rules suggested for the steps no rule reaches, each with its words.',
+  }),
   proposal: Schema.Struct({
     rules: Schema.Array(Schema.Union([Schema.Struct(gateRuleBareFields), Schema.Struct(proposalRuleBareFields)])),
     guidance: Schema.Array(Schema.String),
+  }).annotate({
+    description:
+      'The whole proposal to propose them by: what the agent proposed already with the suggestions added, for `PUT /api/policy/<name>/proposal`.',
   }),
-  unloaded: Schema.Array(Schema.Struct({ workflow: Schema.String, message: Schema.String })),
+  unloaded: Schema.Array(Schema.Struct({ workflow: Schema.String, message: Schema.String })).annotate({
+    description: 'Each workflow attached to the factory that does not load, with why.',
+  }),
 });
 export type PolicyReach = typeof PolicyReach.Type;
 
@@ -316,10 +348,12 @@ export const ChatPresence = Schema.Struct({
  * and where she is.
  */
 export const ChatHistory = Schema.Struct({
-  events: Schema.Array(ChatEvent),
-  before: Schema.NullOr(Schema.String),
-  cursor: Schema.String,
-  presence: ChatPresence,
+  events: Schema.Array(ChatEvent).annotate({ description: 'The events of this page of her chat, oldest first.' }),
+  before: Schema.NullOr(Schema.String).annotate({ description: 'The id to ask for the page older by (?before=); null at the first page.' }),
+  cursor: Schema.String.annotate({ description: 'The cursor a stream of her chat resumes from (?after=).' }),
+  presence: ChatPresence.annotate({
+    description: 'Where her task is: her session up, a turn in progress, what waits on the person, and what is unread.',
+  }),
 });
 
 /** The query of a page: the last `limit` events (50 where none is asked, at most 200) before the event `before`. */
@@ -397,10 +431,12 @@ export const ChatStreamHeaders = { 'last-event-id': Schema.optionalKey(Schema.St
  * not read, null where it reads.
  */
 export const NemiaInstructions = Schema.Struct({
-  name: Schema.String,
-  file: Schema.String,
-  words: Schema.NullOr(Schema.String),
-  error: Schema.NullOr(Schema.String),
+  name: Schema.String.annotate({ description: 'The agent the instructions are for: Nemia herself.' }),
+  file: Schema.String.annotate({ description: 'The file they are kept in.' }),
+  words: Schema.NullOr(Schema.String).annotate({
+    description: 'The words she is told after her own instructions; null where none are written.',
+  }),
+  error: Schema.NullOr(Schema.String).annotate({ description: 'Why the file there does not read, and what to do; null where it reads.' }),
 });
 
 /** Nemia's custom instructions written: the words she is told after her instructions. */

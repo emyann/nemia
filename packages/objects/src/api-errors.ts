@@ -18,12 +18,22 @@ const FLOOR_ONLY = FLOOR_REFUSALS.filter(
   (r): r is Exclude<FloorRefusalWord, ProposalRefusal> => !(PROPOSAL_REFUSALS as readonly string[]).includes(r),
 );
 
+/** The sentence every refusal carries under `error`. */
+const ErrorSentence = Schema.String.annotate({
+  description: 'What was refused and what to do next: the command to type or the field to set.',
+});
+
 /** Nothing by that name, or not in that namespace: a 404. */
-export class Missing extends Schema.Class<Missing>('Missing')({ error: Schema.String }, { httpApiStatus: 404 }) {}
+export class Missing extends Schema.Class<Missing>('Missing')({ error: ErrorSentence }, { httpApiStatus: 404 }) {}
 
 /** The thing is held by something else, named in `users` where the package names them: a 409. */
 export class Conflict extends Schema.Class<Conflict>('Conflict')(
-  { error: Schema.String, users: Schema.optionalKey(Schema.Array(Schema.String)) },
+  {
+    error: ErrorSentence,
+    users: Schema.optionalKey(
+      Schema.Array(Schema.String).annotate({ description: 'What holds the thing, by name; absent where the package does not name them.' }),
+    ),
+  },
   { httpApiStatus: 409 },
 ) {}
 
@@ -33,7 +43,19 @@ export class Conflict extends Schema.Class<Conflict>('Conflict')(
  * (`steps`), for the builder to mark.
  */
 export class Invalid extends Schema.Class<Invalid>('Invalid')(
-  { error: Schema.String, way: Schema.optionalKey(Schema.Literals(WRITE_WAYS)), steps: Schema.optionalKey(Schema.Array(Schema.String)) },
+  {
+    error: ErrorSentence,
+    way: Schema.optionalKey(
+      Schema.Literals(WRITE_WAYS).annotate({
+        description: 'How the definition changes instead, for a write of a definition refused where it was sent; absent otherwise.',
+      }),
+    ),
+    steps: Schema.optionalKey(
+      Schema.Array(Schema.String).annotate({
+        description: "The steps a workflow's write was refused for, by name, for the builder to mark; absent otherwise.",
+      }),
+    ),
+  },
   { httpApiStatus: 422 },
 ) {}
 
@@ -44,31 +66,51 @@ export class Invalid extends Schema.Class<Invalid>('Invalid')(
  * (`FLOOR_REFUSALS`).
  */
 export class Forbidden extends Schema.Class<Forbidden>('Forbidden')(
-  { error: Schema.String, reason: Schema.optionalKey(Schema.Literals([...PROPOSAL_REFUSALS, ...GUARD_REFUSALS, ...FLOOR_ONLY])) },
+  {
+    error: ErrorSentence,
+    reason: Schema.optionalKey(
+      Schema.Literals([...PROPOSAL_REFUSALS, ...GUARD_REFUSALS, ...FLOOR_ONLY]).annotate({
+        description:
+          "Why, as a code: a proposal's refusal, the api's guard refusing a write from another host or site, or a standing token asking past its floor.",
+      }),
+    ),
+  },
   { httpApiStatus: 403 },
 ) {}
 
 /** A session token the api refuses — never minted, or its session's try no longer live: a 401, with its reason (`TOKEN_REFUSALS`). */
 export class Unauthorized extends Schema.Class<Unauthorized>('Unauthorized')(
-  { error: Schema.String, reason: Schema.optionalKey(Schema.Literals(TOKEN_REFUSALS)) },
+  {
+    error: ErrorSentence,
+    reason: Schema.optionalKey(
+      Schema.Literals(TOKEN_REFUSALS).annotate({
+        description: "Why the session token was refused, as a code: never minted, or its session's try no longer live.",
+      }),
+    ),
+  },
   { httpApiStatus: 401 },
 ) {}
 
 /** A write the package let through and the disk then refused (a file that is a folder, one read-only): a 500, saying what failed. */
-export class Failed extends Schema.Class<Failed>('Failed')({ error: Schema.String }, { httpApiStatus: 500 }) {}
+export class Failed extends Schema.Class<Failed>('Failed')({ error: ErrorSentence }, { httpApiStatus: 500 }) {}
 
 /**
  * A request the api reads and refuses before the package is asked — a body that is no JSON, a name no run can have, a key its endpoint's
  * Schema does not decode: a 400, with the key refused (`field`, as `payload.spec.steps` or `query.limit`) where a decode refused one.
  */
 export class BadRequest extends Schema.Class<BadRequest>('BadRequest')(
-  { error: Schema.String, field: Schema.optionalKey(Schema.String) },
+  {
+    error: ErrorSentence,
+    field: Schema.optionalKey(
+      Schema.String.annotate({ description: 'The key a decode refused, as payload.spec.steps or query.limit; absent where none was.' }),
+    ),
+  },
   { httpApiStatus: 400 },
 ) {}
 
 /** A write whose body is not sent as `application/json`, which any page can send without the browser asking first: a 415. */
 export class UnsupportedMediaType extends Schema.Class<UnsupportedMediaType>('UnsupportedMediaType')(
-  { error: Schema.String },
+  { error: ErrorSentence },
   { httpApiStatus: 415 },
 ) {}
 
@@ -76,22 +118,28 @@ export class UnsupportedMediaType extends Schema.Class<UnsupportedMediaType>('Un
  * A run's action the package began and something under it then failed — the engine, git, a harness that did not take the words: a 502,
  * naming the command that asks the same way, since asking again may work.
  */
-export class WriteFailed extends Schema.Class<WriteFailed>('WriteFailed')({ error: Schema.String }, { httpApiStatus: 502 }) {}
+export class WriteFailed extends Schema.Class<WriteFailed>('WriteFailed')({ error: ErrorSentence }, { httpApiStatus: 502 }) {}
 
 /** A run one of whose tasks does not read, so it is not judged: a 502, in the words the list says it with. */
-export class Unjudged extends Schema.Class<Unjudged>('Unjudged')({ error: Schema.String }, { httpApiStatus: 502 }) {}
+export class Unjudged extends Schema.Class<Unjudged>('Unjudged')({ error: ErrorSentence }, { httpApiStatus: 502 }) {}
 
 /**
  * A read of the package's the api made and that failed under it — a step's session output, its task's journal, its conversation, which
  * the engine or a harness could not read: a 502, naming the command that reads the same thing from the command line.
  */
-export class ReadFailed extends Schema.Class<ReadFailed>('ReadFailed')({ error: Schema.String }, { httpApiStatus: 502 }) {}
+export class ReadFailed extends Schema.Class<ReadFailed>('ReadFailed')({ error: ErrorSentence }, { httpApiStatus: 502 }) {}
 
 /**
  * A thing that was there and was removed on purpose, its record kept — a step's file `nemia prune --artifacts` removed: a 410, with when
  * it was removed (`pruned`), so a client tells it from one that never was (a 404).
  */
-export class Gone extends Schema.Class<Gone>('Gone')({ error: Schema.String, pruned: Schema.String }, { httpApiStatus: 410 }) {}
+export class Gone extends Schema.Class<Gone>('Gone')(
+  {
+    error: ErrorSentence,
+    pruned: Schema.String.annotate({ description: 'When it was removed (nemia prune --artifacts), as an ISO 8601 time.' }),
+  },
+  { httpApiStatus: 410 },
+) {}
 
 /** One label query, or several given again, OR'd. */
 const LabelQuery = Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)]));

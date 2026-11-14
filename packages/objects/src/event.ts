@@ -20,7 +20,7 @@
  * Plain Schemas of JSON, as every object of this package is.
  */
 import { Schema } from 'effect';
-import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
+import { API_VERSION, ObjectMeta, listOf, describedNumber } from './meta.ts';
 import { Actor } from './token.ts';
 import { ANSWER_VIA, EVENT_REASONS, EVENT_SOURCES, EVENT_TYPES, EVENT_WAITS, INVOLVED_KINDS, WAIT_ON } from './words.ts';
 
@@ -30,19 +30,39 @@ export type EventInvolved = typeof EventInvolved.Type;
 
 /** A line of the feed, as an object. */
 export const Event = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Event'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Event').annotate({ description: 'What the object is: an Event, one line of the feed.' }),
   metadata: ObjectMeta,
-  involved: EventInvolved,
-  reason: Schema.Literals(EVENT_REASONS),
-  type: Schema.Literals(EVENT_TYPES),
-  message: Schema.String,
-  source: Schema.Literals(EVENT_SOURCES),
-  waits: Schema.optionalKey(Schema.Literals(EVENT_WAITS)),
-  on: Schema.optionalKey(Schema.Literals(WAIT_ON)),
-  via: Schema.optionalKey(Schema.Literals(ANSWER_VIA)),
-  call: Schema.optionalKey(Schema.String),
-  try: Schema.optionalKey(Schema.Number),
+  involved: EventInvolved.annotate({
+    description:
+      "What the line is about: its kind (Run, Step, Daemon, Store, Factory) and name, a run's id, `<run>/<step>`, a daemon's pid, or store.",
+  }),
+  reason: Schema.Literals(EVENT_REASONS).annotate({
+    description: 'What happened, as a code a machine selects on; Unknown for a reason this version does not know.',
+  }),
+  type: Schema.Literals(EVENT_TYPES).annotate({
+    description: 'How serious it is: Normal for routine news, Warning for something gone wrong.',
+  }),
+  message: Schema.String.annotate({ description: 'What happened, in the words a person reads.' }),
+  source: Schema.Literals(EVENT_SOURCES).annotate({
+    description: "Whose deed it is: the tick's judgement, the runtime's journal, a person's verb, or a daemon that took the store.",
+  }),
+  waits: Schema.optionalKey(
+    Schema.Literals(EVENT_WAITS).annotate({ description: 'Who the line waits on, where it waits on someone: a person. Absent otherwise.' }),
+  ),
+  on: Schema.optionalKey(
+    Schema.Literals(WAIT_ON).annotate({
+      description:
+        "What a Waiting line waits on: run (other runs), limit (the limit on runs in flight), base (the base branch, while another run lands there), pause (the store's pause) or hold (a hold only a person lifts). Absent on any other line.",
+    }),
+  ),
+  via: Schema.optionalKey(
+    Schema.Literals(ANSWER_VIA).annotate({
+      description: "Where an AwaitingAnswer line's answer is asked: session or closeout. Absent on any other line.",
+    }),
+  ),
+  call: Schema.optionalKey(Schema.String.annotate({ description: 'The call denied, on a ToolDenied line; absent on any other.' })),
+  try: Schema.optionalKey(describedNumber("The step's try the call was denied in, on a ToolDenied line; absent on any other.")),
   actor: Schema.optionalKey(Actor),
 });
 export type Event = typeof Event.Type;

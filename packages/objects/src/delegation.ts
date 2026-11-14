@@ -23,13 +23,19 @@ export const DelegationRule = Schema.Struct({
 export type DelegationRule = typeof DelegationRule.Type;
 
 /** What the agent named by the object may approve: its grants. */
-export const DelegationSpec = Schema.Struct({ rules: Schema.Array(DelegationRule) });
+export const DelegationSpec = Schema.Struct({
+  rules: Schema.Array(DelegationRule).annotate({
+    description: 'Its grants: each the resources, the names among them (every name where empty) and the verbs the agent may approve.',
+  }),
+}).annotate({ description: 'What the agent named by the delegation may approve unasked: its grants.' });
 export type DelegationSpec = typeof DelegationSpec.Type;
 
 /** A delegation, as an object; its name is the agent's. */
 export const Delegation = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Delegation'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Delegation').annotate({
+    description: 'What the object is: a Delegation, what the person lets one agent approve in a factory unasked, at auto.',
+  }),
   metadata: ObjectMeta,
   spec: DelegationSpec,
 });

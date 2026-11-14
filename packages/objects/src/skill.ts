@@ -33,6 +33,9 @@ export const SkillSpec = Schema.Struct({
   preload: Schema.optionalKey(Schema.Boolean),
   body: Schema.String,
   files: Schema.optionalKey(Schema.Array(SkillFile)),
+}).annotate({
+  description:
+    "The skill as its SKILL.md says it: its title, description, tags, examples, whether it is preloaded, its body, and its folder's other text files.",
 });
 export type SkillSpec = typeof SkillSpec.Type;
 
@@ -50,13 +53,16 @@ export const SkillStatus = Schema.Struct({
   usedBy: Schema.Array(SkillUser),
   found: Schema.NullOr(Schema.Literals(['yours', 'repo'])),
   copyHint: Text,
+}).annotate({
+  description:
+    'What Nemia reads of the skill: where it was found, its card entry, what it costs a turn, the agents that give it, the command that copies it, and its revision.',
 });
 export type SkillStatus = typeof SkillStatus.Type;
 
 /** A skill, as an object. Where its SKILL.md does not read as a draft, `spec` is its body alone and `status.error` says why. */
 export const Skill = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Skill'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Skill').annotate({ description: 'What the object is: a Skill, a folder of instructions a session can load.' }),
   metadata: ObjectMeta,
   spec: SkillSpec,
   status: SkillStatus,

@@ -13,19 +13,21 @@ export {
   StepAttempts,
   StepCost,
   StepCheck,
+  StepRaise,
+  StepUsed,
+  TryShort,
+  RunUnjudged,
+} from './run.ts';
+export {
   StepCloseout,
   type BodyPage,
   closeoutNarrowed,
   fieldsNamed,
-  StepRaise,
   StepTries,
   StepTry,
   StepUnreadable,
-  StepUsed,
   TryCloseout,
-  TryShort,
-  RunUnjudged,
-} from './run.ts';
+} from './run-tries.ts';
 export { StepTold } from './run-told.ts';
 export { LabelEdit, Labelled, Labels } from './labels.ts';
 export { RunClock, RunListMeta } from './run-frame.ts';

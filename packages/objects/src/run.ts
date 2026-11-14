@@ -1,7 +1,8 @@
 /**
  * The run as one object, as Kubernetes spells a resource: `apiVersion`, `kind`, `metadata`, the frozen record a run was started with
- * (`spec`) and what the orchestrator judges of it now (`status`); its sub-resources' answers, each a Schema of its own (`StepTries`,
- * `StepTry`, `TryCloseout`, `StepTold`); and a person's labels on a run or a card, with an edit of them and what it answers (`Labels`,
+ * (`spec`) and what the orchestrator judges of it now (`status`). Its sub-resources' answers are each a Schema of its own beside it: a
+ * step's tries and closeouts in `run-tries.ts` (`StepTries`, `StepTry`, `TryCloseout`), what a step was told in `run-told.ts`
+ * (`StepTold`); and a person's labels on a run or a card, with an edit of them and what it answers, in `labels.ts` (`Labels`,
  * `LabelEdit`, `Labelled`). The orchestrator builds each from a run's records and holds its own types equal to them
  * (`packages/agent-orchestrator/src/object/run.model.ts`); the words each field is one of are `words.ts`'s.
  *
@@ -11,7 +12,6 @@
 import { Schema } from 'effect';
 import { Actor } from './token.ts';
 import { API_VERSION, listOf } from './meta.ts';
-import { BODY_PAGE, SHORT_FIELD } from './reads.ts';
 import { RunClock, RunListMeta } from './run-frame.ts';
 import { ObjectGraph } from './graph.ts';
 import { ChatSpeaker } from './nemia.ts';
@@ -40,7 +40,6 @@ import {
   STEP_PHASES,
   STEP_REASONS,
   STEP_STATUSES,
-  TRY_CAUSES,
   WAIT_ON,
 } from './words.ts';
 import { runCodesLegal, stepCodesLegal, tryCodesLegal, type RunCodes, type StepCodes, type TryCodes } from './codes.ts';
@@ -60,7 +59,7 @@ const codesRefused = (what: string, codes: { phase: string; reason: string; on?:
   `${what} is served with codes nothing makes together — phase ${codes.phase}, reason ${codes.reason}` +
   `${'on' in codes ? `, on ${String(codes.on)}, via ${String(codes.via)}` : ''}: a reason has one phase (STEP_PHASE_OF, RUN_PHASE_OF in ` +
   'objects), Waiting alone says what it waits on, and AwaitingAnswer alone where it is asked. Build the codes from the reason.';
-const STEP_CODES = Schema.makeFilter((step: StepCodes) => stepCodesLegal(step) || codesRefused('a step', step));
+export const STEP_CODES = Schema.makeFilter((step: StepCodes) => stepCodesLegal(step) || codesRefused('a step', step));
 const TRY_CODES = Schema.makeFilter((tried: TryCodes) => tryCodesLegal(tried) || codesRefused('a try', tried));
 const RUN_CODES = Schema.makeFilter((run: RunCodes) => runCodesLegal(run) || codesRefused('a run', run));
 
@@ -100,28 +99,55 @@ export type RunMetadata = typeof RunMetadata.Type;
  * the agent it is given, by name, absent for a step given none.
  */
 export const RunSpecStep = Schema.Struct({
-  name: Schema.String,
-  after: Strings,
-  input: Strings,
-  loop: NullString,
-  rounds: NullNumber,
-  harness: NullString,
-  model: NullString,
-  effort: NullString,
-  context: NullNumber,
-  workspace: NullString,
-  place: NullString,
-  resume: NullString,
-  fence: NullString,
-  sandbox: NullString,
-  tools: Schema.NullOr(Strings),
-  deadlineSeconds: NullNumber,
-  agent: Schema.optionalKey(Schema.String),
+  name: Schema.String.annotate({ description: "The step's name in its workflow." }),
+  after: Strings.annotate({ description: 'The steps that must finish first (after:); empty where it starts at once.' }),
+  input: Strings.annotate({ description: 'The steps whose declared output it is handed in its brief, as data (input:).' }),
+  loop: NullString.annotate({
+    description: 'On a looping step, the step a round runs again when its closeout says again: true (loop:); null on any other.',
+  }),
+  rounds: NullNumber.annotate({ description: 'On a looping step, how many rounds it may run (rounds:); null on any other.' }),
+  harness: NullString.annotate({
+    description: 'What runs its session (harness:), or `a2a:<name>` for a remote A2A agent; null where unset.',
+  }),
+  model: NullString.annotate({
+    description: "The model the harness runs its session on (model:); null where unset, the harness's own default.",
+  }),
+  effort: NullString.annotate({ description: 'How hard the harness thinks, in its own words (effort:); null where unset.' }),
+  context: NullNumber.annotate({
+    description: "Its session's context window in tokens (context:); null where unset, the model's whole window.",
+  }),
+  workspace: NullString.annotate({
+    description:
+      "base for a step that runs in the repository's own checkout rather than a worktree of its own (workspace:); null where unset.",
+  }),
+  place: NullString.annotate({
+    description: 'Where its work is (place:): folder, a folder the run makes, or git, on branches of a repository; null where unset.',
+  }),
+  resume: NullString.annotate({
+    description: 'The step whose session this one continues instead of starting cold (resume:); null where unset.',
+  }),
+  fence: NullString.annotate({
+    description:
+      "The fence the run froze for its session, in this layer's word: whether it asks, denies or allows what no rule decides; null where unset.",
+  }),
+  sandbox: NullString.annotate({ description: 'The sandbox the run froze for a harness that fences by one (sandbox:); null where unset.' }),
+  tools: Schema.NullOr(Strings).annotate({
+    description: "The only tools its session may have, in the harness's names (tools:); null where unset, the harness's own set.",
+  }),
+  deadlineSeconds: NullNumber.annotate({
+    description: 'How many seconds its session may run before it is stopped (deadlineSeconds:); null where unset.',
+  }),
+  agent: Schema.optionalKey(Schema.String.annotate({ description: 'The agent the step is given, by name; absent for a step given none.' })),
   /**
    * The fields of its declared output, in its schema's order, each with the shape its `x-shape` marked (`FIELD_SHAPES`, null where none);
    * absent for a step that declares none, or frozen before the run kept them.
    */
-  fields: Schema.optionalKey(List(Schema.Struct({ name: Schema.String, shape: Schema.NullOr(Schema.Literals(FIELD_SHAPES)) }))),
+  fields: Schema.optionalKey(
+    List(Schema.Struct({ name: Schema.String, shape: Schema.NullOr(Schema.Literals(FIELD_SHAPES)) })).annotate({
+      description:
+        "The fields of its declared output in its schema's order, each with the shape its x-shape marked (null where none); absent for a step that declares none.",
+    }),
+  ),
 }).annotate({ identifier: 'RunSpecStep' });
 export type RunSpecStep = typeof RunSpecStep.Type;
 
@@ -132,19 +158,23 @@ export type RunSpecStep = typeof RunSpecStep.Type;
  * handed as context, and the inbox card it was started from (null for none).
  */
 export const RunSpec = Schema.Struct({
-  steps: List(RunSpecStep),
-  brief: Schema.String,
-  place: Schema.Literals(PLACE_KINDS),
-  repo: NullString,
-  baseRef: NullString,
-  branch: NullString,
-  isolate: NullBoolean,
-  work: NullString,
-  workflowDir: Schema.String,
-  try: Schema.NullOr(Schema.Struct({ agent: Schema.String })),
-  after: Strings,
-  context: Strings,
-  from: Schema.NullOr(Schema.Struct({ inbox: Schema.String })),
+  steps: List(RunSpecStep).annotate({ description: "Each step as the run froze it, in the workflow's order." }),
+  brief: Schema.String.annotate({ description: 'What the run was asked to do, in the words it was started with.' }),
+  place: Schema.Literals(PLACE_KINDS).annotate({ description: 'The kind of place its work is on: a git repository, or a folder.' }),
+  repo: NullString.annotate({ description: 'The repository a repository run works on; null on a folder run.' }),
+  baseRef: NullString.annotate({ description: 'The base commit a repository run started from; null on a folder run.' }),
+  branch: NullString.annotate({ description: "The base branch a repository run's result goes to; null on a folder run." }),
+  isolate: NullBoolean.annotate({ description: 'Whether a repository run cut worktrees of its own for its steps; null on a folder run.' }),
+  work: NullString.annotate({ description: "A folder run's work directory; null on a repository run." }),
+  workflowDir: Schema.String.annotate({ description: 'The workflow folder the run was started from.' }),
+  try: Schema.NullOr(Schema.Struct({ agent: Schema.String })).annotate({
+    description: "The agent a try from an agent's page tried; null for any other run.",
+  }),
+  after: Strings.annotate({ description: 'The runs its first steps wait on to land (nemia start --after).' }),
+  context: Strings.annotate({ description: 'The runs whose conclusions it is handed as context.' }),
+  from: Schema.NullOr(Schema.Struct({ inbox: Schema.String })).annotate({
+    description: 'The inbox card it was started from; null for none.',
+  }),
 }).annotate({
   identifier: 'RunSpec',
   description: 'What the run was asked to do: its brief, its workflow, and where it works. Never changes.',
@@ -159,12 +189,14 @@ const CheckVerdict = Schema.Struct({ result: Schema.Literals(CHECK_RESULTS), exi
  * and how it signed off and its check's verdict where it has them (null where not).
  */
 export const TryShort = Schema.Struct({
-  try: Schema.Finite,
-  round: Schema.Finite,
-  phase: StepPhase,
-  reason: StepReason,
-  outcome: Schema.NullOr(Schema.Literals(OUTCOMES)),
-  verdict: Schema.NullOr(CheckVerdict),
+  try: Schema.Finite.annotate({ description: "The current try's number, from 1." }),
+  round: Schema.Finite.annotate({ description: "The round of the step's loop the try was filed in, from 1." }),
+  phase: StepPhase.annotate({ description: 'Where the try is in its life, as a code: the phase its reason stands in.' }),
+  reason: StepReason.annotate({ description: 'Why the try is in its phase, as a code.' }),
+  outcome: Schema.NullOr(Schema.Literals(OUTCOMES)).annotate({
+    description: 'How the try signed off (done or blocked); null while it has not.',
+  }),
+  verdict: Schema.NullOr(CheckVerdict).annotate({ description: "Its check's verdict, a result and the exit; null while it has none." }),
 })
   .check(TRY_CODES)
   .annotate({ identifier: 'TryShort' });
@@ -172,11 +204,19 @@ export type TryShort = typeof TryShort.Type;
 
 /** A raise of a step's cap the package takes, and how it is asked for (`StepRaise`, retry/raise.ts). */
 export const StepRaise = Schema.Struct({
-  by: Schema.Literals(RAISE_BY),
-  above: Schema.Finite,
-  said: Schema.String,
-  modes: List(Schema.Literals(RETRY_MODES)),
-  own: Schema.NullOr(StepStatusWord),
+  by: Schema.Literals(RAISE_BY).annotate({
+    description: 'How the raise is asked for: retry (nemia retry --budget) or round (nemia retry --round --budget).',
+  }),
+  above: Schema.Finite.annotate({
+    description: 'What a new budget has to be more than: what the tries have cost, or the cap a session was ended at.',
+  }),
+  said: Schema.String.annotate({ description: 'That amount, in dollars.' }),
+  modes: List(Schema.Literals(RETRY_MODES)).annotate({
+    description: 'For a try, the ways the package takes it (continue, fresh, recheck); empty for a round.',
+  }),
+  own: Schema.NullOr(StepStatusWord).annotate({
+    description: 'How the step ended on its own work, its budget aside (blocked, unsigned, failed…); null for a round.',
+  }),
 }).annotate({ identifier: 'StepRaise' });
 export type StepRaise = typeof StepRaise.Type;
 
@@ -217,24 +257,33 @@ const PeakMark = Schema.NullOr(Schema.Literals(PEAK_MARKS));
 
 /** What a step's try consumed, in `nemia decide`'s words, its peak against its `context:` (`StepUsed`, usage.ts). */
 export const StepUsed = Schema.Struct({
-  usage: Schema.NullOr(Consumed),
-  used: Schema.String,
-  cost: Schema.String,
-  costUsd: NullNumber,
-  apiMs: NullNumber,
-  toolMs: NullNumber,
-  read: NullString,
-  peak: PeakMark,
-  rebuilt: Schema.Finite,
-}).annotate({ identifier: 'StepUsed' });
+  usage: Schema.NullOr(Consumed).annotate({
+    description:
+      'Each count its sessions consumed where it was measured: responses, tool calls, tokens, cost and time; null where none was.',
+  }),
+  used: Schema.String.annotate({ description: "What was used, in nemia decide's words." }),
+  cost: Schema.String.annotate({ description: "What it cost, in nemia decide's words." }),
+  costUsd: NullNumber.annotate({ description: 'What it cost in dollars; null where it was not measured.' }),
+  apiMs: NullNumber.annotate({ description: "The milliseconds spent waiting on the model's api; null where not measured." }),
+  toolMs: NullNumber.annotate({ description: 'The milliseconds spent in tool calls; null where not measured.' }),
+  read: NullString.annotate({ description: 'What its sessions read into their context, in words; null where not measured.' }),
+  peak: PeakMark.annotate({
+    description:
+      "Where its largest context stands against the step's cap: cap or large; null where it stands below both or was not measured.",
+  }),
+  rebuilt: Schema.Finite.annotate({ description: 'How many times a context was rebuilt.' }),
+}).annotate({
+  identifier: 'StepUsed',
+  description: "What a step's tries consumed, in nemia decide's words: tokens, cost, time, and its peak context.",
+});
 export type StepUsed = typeof StepUsed.Type;
 
 /** What sessions cost together, each once (`Spent`, judged.verb.ts). */
 export const Spent = Schema.Struct({
-  usd: Schema.Finite,
-  measured: Schema.Finite,
-  unmeasured: Schema.Finite,
-  said: Schema.String,
+  usd: Schema.Finite.annotate({ description: 'The dollars the measured sessions cost, each counted once.' }),
+  measured: Schema.Finite.annotate({ description: 'How many sessions were measured.' }),
+  unmeasured: Schema.Finite.annotate({ description: 'How many sessions were not measured, so their cost is not in usd.' }),
+  said: Schema.String.annotate({ description: "The cost in the package's words." }),
 }).annotate({ identifier: 'Spent' });
 export type Spent = typeof Spent.Type;
 
@@ -276,10 +325,15 @@ export type StepLog = typeof StepLog.Type;
 
 /** A step's check: its command, its task, its verdict and, refused, what it said (`StepCheck`, checks.verb.ts). */
 export const StepCheck = Schema.Struct({
-  command: Schema.String,
-  taskId: NullString,
-  verdict: Schema.NullOr(CheckVerdict),
-  refused: Schema.NullOr(Schema.Struct({ exit: Schema.String, stdout: Schema.NullOr(StepLog), stderr: StepLog, unreadable: NullString })),
+  command: Schema.String.annotate({ description: "The check's command, as the step's check: line says it." }),
+  taskId: NullString.annotate({ description: "The check's task; null while none was filed." }),
+  verdict: Schema.NullOr(CheckVerdict).annotate({ description: 'Its verdict, a result and the exit; null while it has none.' }),
+  refused: Schema.NullOr(
+    Schema.Struct({ exit: Schema.String, stdout: Schema.NullOr(StepLog), stderr: StepLog, unreadable: NullString }),
+  ).annotate({
+    description:
+      'What a refused check said: its exit, the last lines of its output and its errors, and why they could not be read; null where it did not refuse.',
+  }),
 }).annotate({ identifier: 'StepCheck' });
 export type StepCheck = typeof StepCheck.Type;
 
@@ -291,7 +345,7 @@ export const SessionReleaseSchema = Schema.Union([
 
 /** How many attempts a try's task made, and how the latest went (`StepAttempts`, tries.verb.ts). */
 export const StepAttempts = Schema.Struct({
-  count: Schema.Finite,
+  count: Schema.Finite.annotate({ description: "How many attempts the try's task made." }),
   latest: Schema.NullOr(
     Schema.Struct({
       startedAt: Schema.String,
@@ -301,8 +355,11 @@ export const StepAttempts = Schema.Struct({
       release: Schema.NullOr(SessionReleaseSchema),
       harness: Schema.NullOr(Schema.Struct({ name: Schema.String, version: Schema.String })),
     }),
-  ),
-}).annotate({ identifier: 'StepAttempts' });
+  ).annotate({
+    description:
+      'How the latest attempt went: when it started and ended, how and why it ended, the release and the harness it ran on; null before the first.',
+  }),
+}).annotate({ identifier: 'StepAttempts', description: "How many attempts a try's task made, and how the latest went." });
 export type StepAttempts = typeof StepAttempts.Type;
 
 /** What the engine filed a step's current try with (`StepFiled`, told.verb.ts), the fence it was filed with said in this layer's word. */
@@ -320,7 +377,7 @@ const StepFiled = Schema.Struct({
 });
 
 /** A file a closeout named, or a step's folder holds (`StepArtifact`, files.store.ts): served, pruned, or only its path. */
-const StepArtifact = Schema.Union([
+export const StepArtifact = Schema.Union([
   Schema.Struct({
     path: Schema.String,
     name: Schema.String,
@@ -388,33 +445,66 @@ const StepBudget = Schema.Struct({ usd: Schema.Finite, said: Schema.String, of: 
  * the command table's, not the step's: the lines read beside the object builds them (`runLines`, lines.verb.ts).
  */
 export const RunStepStatus = Schema.Struct({
-  name: Schema.String,
-  phase: StepPhase,
-  reason: StepReason,
-  status: StepStatusWord,
-  on: Schema.NullOr(Schema.Literals(WAIT_ON)),
-  via: Schema.NullOr(Schema.Literals(ANSWER_VIA)),
-  message: Schema.String,
-  verdict: Schema.NullOr(CheckVerdict),
-  raise: Schema.NullOr(StepRaise),
-  timeline: List(TimelineTry),
-  current: Schema.NullOr(TryShort),
-  filed: Schema.NullOr(StepFiled),
-  taskId: NullString,
-  workspace: NullString,
-  branch: NullString,
-  files: List(StepArtifact),
-  filesError: NullString,
-  note: NullString,
-  roundDue: Schema.Boolean,
-  needs: NullString,
-  waitingFor: Schema.NullOr(Schema.Struct({ words: Schema.String, advice: Schema.String })),
-  approve: NullString,
-  denied: Schema.NullOr(Schema.Struct({ words: Schema.String, calls: Strings })),
-  sessionUnread: NullString,
-  lastLine: NullString,
-  gate: Schema.NullOr(StepGate),
-  said: List(Said),
+  name: Schema.String.annotate({ description: "The step's name in its workflow." }),
+  phase: StepPhase.annotate({ description: 'Where the step is in its life, as a code: the phase its reason stands in.' }),
+  reason: StepReason.annotate({ description: 'Why the step is in its phase, as a code.' }),
+  status: StepStatusWord.annotate({ description: 'The step in one word, as nemia ls says it.' }),
+  on: Schema.NullOr(Schema.Literals(WAIT_ON)).annotate({
+    description: 'What the step waits on, set exactly when its reason is Waiting; null otherwise.',
+  }),
+  via: Schema.NullOr(Schema.Literals(ANSWER_VIA)).annotate({
+    description: 'Where an awaited answer is asked, set only when its reason is AwaitingAnswer: session or closeout. Null otherwise.',
+  }),
+  message: Schema.String.annotate({ description: 'Where the step stands, in the sentence a person reads.' }),
+  verdict: Schema.NullOr(CheckVerdict).annotate({
+    description: "Its current try's check verdict, a result and the exit; null where it has none.",
+  }),
+  raise: Schema.NullOr(StepRaise).annotate({
+    description: "The raise of the step's cap the package takes, and how it is asked for; null where none.",
+  }),
+  timeline: List(TimelineTry).annotate({
+    description: 'Each try of the step on the clock: its session and check, when each was filed, ran and ended, and what its session used.',
+  }),
+  current: Schema.NullOr(TryShort).annotate({
+    description: 'The short of its current try: its number, round, codes, sign-off and verdict; null while it has none.',
+  }),
+  filed: Schema.NullOr(StepFiled).annotate({
+    description:
+      'What the engine filed its current try with: model, effort, context, fence, tools and deadline; null while none was filed.',
+  }),
+  taskId: NullString.annotate({ description: 'The task of its current try; null while none was filed.' }),
+  workspace: NullString.annotate({ description: 'The folder the step works in; null where it has none yet.' }),
+  branch: NullString.annotate({ description: "The branch the step's work is on; null where it has none." }),
+  files: List(StepArtifact).annotate({
+    description: "Every file a folder run's step folder holds, each served, pruned, or only its path; empty where there is no folder.",
+  }),
+  filesError: NullString.annotate({ description: "Why the step's folder could not be read; null where it was." }),
+  note: NullString.annotate({
+    description:
+      'What nemia ls prints beside the step, for one tried again or in a loop past its first round (try 2, by retries: 1; round 2 of 3); null where it prints nothing.',
+  }),
+  roundDue: Schema.Boolean.annotate({ description: "Whether a looping step's next round is due, which its note words." }),
+  needs: NullString.annotate({
+    description: 'The question of a step whose current try signed off blocked, from its closeout; null for any other step.',
+  }),
+  waitingFor: Schema.NullOr(Schema.Struct({ words: Schema.String, advice: Schema.String })).annotate({
+    description: 'What its harness says the session waits for, and what a person does about it; null where the harness said nothing.',
+  }),
+  approve: NullString.annotate({
+    description: 'What nemia ls asks of a person for a step waiting at its gate (approve plan); null for any other step.',
+  }),
+  denied: Schema.NullOr(Schema.Struct({ words: Schema.String, calls: Strings })).annotate({
+    description:
+      'What the harness denied its current try: each call as a permission rule names it, and the line that says them; null where nothing was denied.',
+  }),
+  sessionUnread: NullString.annotate({
+    description: "Why the runtime could not read the step's session, in its words; null where it was read.",
+  }),
+  lastLine: NullString.annotate({ description: "What the step's session said last, on a run read alone; null where nothing was read." }),
+  gate: Schema.NullOr(StepGate).annotate({
+    description: 'Its gate, awaiting approval or approved, with the budgets it proposes; null for a step that is no gate.',
+  }),
+  said: List(Said).annotate({ description: "Words said to the step's session while it ran (nemia say), as the engine journalled them." }),
   asked: Schema.NullOr(
     Schema.Struct({
       try: Schema.Finite,
@@ -423,19 +513,33 @@ export const RunStepStatus = Schema.Struct({
       message: NullString,
       stopFirst: Schema.Boolean,
     }),
-  ),
-  check: Schema.NullOr(StepCheck),
+  ).annotate({
+    description:
+      'A try asked of the step (nemia retry) and not yet filed: its number, its mode, the model and message it was asked with, and whether its session is stopped first; null where none is asked.',
+  }),
+  check: Schema.NullOr(StepCheck).annotate({ description: "Its current try's check; null for a step with no check: line or none filed." }),
   attempts: StepAttempts,
-  used: Schema.NullOr(StepUsed),
-  spent: Schema.NullOr(Spent),
-  budget: Schema.NullOr(StepBudget),
+  used: Schema.NullOr(StepUsed).annotate({ description: 'What its tries consumed; null where nothing was measured.' }),
+  spent: Schema.NullOr(Spent).annotate({ description: "What its tries' sessions cost together; null until one was measured." }),
+  budget: Schema.NullOr(StepBudget).annotate({
+    description: 'Its cap in dollars and what its tries have cost of it, and whether they are over; null for a step with no budget.',
+  }),
   /** How many questions its closeout asks, on a step waiting on a person whose closeout asks some (`Listing`'s `asks`); left out else. */
-  asks: Schema.optionalKey(Schema.Finite),
+  asks: Schema.optionalKey(
+    Schema.Finite.annotate({
+      description: 'How many questions its closeout asks, on a step waiting on a person whose closeout asks some; left out otherwise.',
+    }),
+  ),
   /**
    * Every file of the step's artifacts folder, named by a closeout or not (`folderFiles`, files.store.ts, linked under `…/artifacts/`),
    * with why the folder did not read (null where it did); absent on a step not filed yet, or from an older api.
    */
-  artifactsFolder: Schema.optionalKey(Schema.Struct({ files: List(StepArtifact), error: NullString })),
+  artifactsFolder: Schema.optionalKey(
+    Schema.Struct({ files: List(StepArtifact), error: NullString }).annotate({
+      description:
+        "Every file of the step's artifacts folder, named by a closeout or not, with why the folder did not read; absent on a step not filed yet.",
+    }),
+  ),
 })
   .check(STEP_CODES)
   .annotate({ identifier: 'RunStepStatus' });
@@ -446,20 +550,30 @@ const waitedRun = { run: Schema.String, missing: Schema.Boolean, cancelledAt: Nu
 
 /** The runs a run's roots wait on that have not landed (`RunWaiting`, judged.verb.ts), in the package's words. */
 export const RunWaiting = Schema.Struct({
-  runs: List(Schema.Struct(waitedRun)),
-  word: Schema.String,
-  advice: Schema.String,
-  waitingOnYou: Schema.Boolean,
+  runs: List(Schema.Struct(waitedRun)).annotate({
+    description:
+      'Each run waited on that has not landed, and why it never will on its own where it will not: missing, called off, or its branches gone.',
+  }),
+  word: Schema.String.annotate({ description: 'What nemia ls prints under the run for its wait.' }),
+  advice: Schema.String.annotate({ description: 'The line nemia decide prints under it: what to do about the wait.' }),
+  waitingOnYou: Schema.Boolean.annotate({ description: 'Whether a run it waits on never lands without a person.' }),
 }).annotate({ identifier: 'RunWaiting' });
 export type RunWaiting = typeof RunWaiting.Type;
 
 /** A person's hold on a run (`RunHolding`, judged.verb.ts), in the package's words. */
 export const RunHolding = Schema.Struct({
-  at: Schema.String,
-  runs: List(Schema.Struct({ ...waitedRun, landed: Schema.Boolean })),
-  word: Schema.String,
-  advice: Schema.String,
-  waitingOnYou: Schema.Boolean,
+  at: Schema.String.annotate({ description: 'When the hold was put (nemia hold).' }),
+  runs: List(Schema.Struct({ ...waitedRun, landed: Schema.Boolean })).annotate({
+    description:
+      'The runs the hold waits for, each with why it never lands on its own where it will not, and whether it landed; empty for a hold that names none.',
+  }),
+  word: Schema.String.annotate({
+    description: "What nemia ls prints under the run for its hold, with the person's why and name where the hold has them.",
+  }),
+  advice: Schema.String.annotate({ description: 'The line nemia decide prints under it.' }),
+  waitingOnYou: Schema.Boolean.annotate({
+    description: 'Whether the hold waits on a person: exactly when a run it names never lands on its own.',
+  }),
   actor: Schema.optionalKey(Actor),
 }).annotate({ identifier: 'RunHolding' });
 export type RunHolding = typeof RunHolding.Type;
@@ -489,7 +603,10 @@ export const RunDrift = Schema.Struct({
 });
 
 /** What one step of a run has cost, every try's session together; `cost` null until one was measured. */
-export const StepCost = Schema.Struct({ step: Schema.String, cost: Schema.NullOr(Spent) }).annotate({ identifier: 'StepCost' });
+export const StepCost = Schema.Struct({
+  step: Schema.String.annotate({ description: 'The step, by name.' }),
+  cost: Schema.NullOr(Spent).annotate({ description: "What every try's session of the step cost together; null until one was measured." }),
+}).annotate({ identifier: 'StepCost' });
 export type StepCost = typeof StepCost.Type;
 
 /**
@@ -510,7 +627,7 @@ export const RunStatus = Schema.Struct({
   }),
   on: Schema.NullOr(Schema.Literals(WAIT_ON)).annotate({
     description:
-      'What the run waits on, set exactly when its reason is Waiting: run (the runs its hold names), hold (a hold only a person lifts). Null otherwise.',
+      "What the run waits on, set exactly when its reason is Waiting: run (other runs), limit (the limit on runs in flight), base (the base branch, while another run lands there), pause (the store's pause) or hold (a hold only a person lifts). Null otherwise.",
   }),
   via: Schema.NullOr(Schema.Literals(ANSWER_VIA)).annotate({
     description:
@@ -563,7 +680,7 @@ export const RunStatus = Schema.Struct({
   steps: List(RunStepStatus).annotate({ description: "Each step of the run as it stands now, in the workflow's order." }),
   startedAt: NullString.annotate({ description: "When the run's first task was filed; null while nothing of it was." }),
   cancelledAt: NullString.annotate({ description: 'When a person called the run off (nemia cancel); null where nobody did.' }),
-  cancelledBy: Schema.optionalKey(Actor.annotate({ description: 'Who called the run off, where the caller was known.' })),
+  cancelledBy: Schema.optionalKey(Actor),
   pruned: Schema.NullOr(
     Schema.Struct({
       at: Schema.String,
@@ -672,16 +789,23 @@ export type Run = typeof Run.Type;
  * in the words the list says it with.
  */
 export const RunUnjudged = Schema.Struct({
-  name: Schema.String,
-  namespace: Schema.optionalKey(Schema.String),
-  error: Schema.String,
+  name: Schema.String.annotate({ description: "The run's id." }),
+  namespace: Schema.optionalKey(Schema.String.annotate({ description: 'The factory the run was started in; default for a run of none.' })),
+  error: Schema.String.annotate({ description: 'Why the run could not be judged, in the words the list says it with.' }),
   /**
    * Each step's word as the engine last read it off the run's record — `unreadable` for one a task of which does not read, `pending` for
    * one with none — and its branch, null where it has none; left out by a list that read none.
    */
-  steps: Schema.optionalKey(List(Schema.Struct({ name: Schema.String, message: Schema.String, branch: NullString }))),
+  steps: Schema.optionalKey(
+    List(Schema.Struct({ name: Schema.String, message: Schema.String, branch: NullString })).annotate({
+      description:
+        "Each step's word as the engine last read it off the run's record (unreadable, pending…) and its branch; left out by a list that read none.",
+    }),
+  ),
   /** Its state in the list (`RUN_STATES`), on a list asked by state alone: what its summary says, which reads without its tasks. */
-  state: Schema.optionalKey(Schema.Literals(RUN_STATES)),
+  state: Schema.optionalKey(
+    Schema.Literals(RUN_STATES).annotate({ description: 'Its state in the list, on a list asked by state alone: what its summary says.' }),
+  ),
 }).annotate({ identifier: 'RunUnjudged' });
 export type RunUnjudged = typeof RunUnjudged.Type;
 
@@ -696,159 +820,11 @@ export type RunUnjudged = typeof RunUnjudged.Type;
 export const RunList = Schema.Struct({
   ...listOf('Run', Run).fields,
   metadata: RunListMeta,
-  unjudged: Schema.optionalKey(Schema.Array(RunUnjudged)),
-}).annotate({ identifier: 'RunList' });
-export type RunList = typeof RunList.Type;
-
-/** A closeout's questions under one field of its output (`Asked`, question.ts). */
-const Asked = Schema.Struct({
-  field: Schema.String,
-  questions: List(
-    Schema.Struct({
-      title: Schema.String,
-      body: Schema.String,
-      options: List(Schema.Struct({ label: Schema.String, meaning: Schema.String })),
-      recommended: Schema.NullOr(Schema.Union([Schema.String, List(Schema.String)])),
-      multiple: Schema.Boolean,
+  unjudged: Schema.optionalKey(
+    Schema.Array(RunUnjudged).annotate({
+      description:
+        'Each run of the page a task of which does not read, left out of items since it cannot be judged; absent where there is none.',
     }),
   ),
-});
-
-/** A JSON object whose keys a step's workflow decides (a closeout's `output`, the schema it was read by). */
-const Fields = Schema.Record(Schema.String, Schema.Unknown);
-
-/**
- * What a try signed off with, as the page reads it (`StepCloseout`, tries.verb.ts): its outcome, summary, body and needs, the files and
- * values it handed on, the fields its workflow asked for (`output`) and the schema they were read by, the replies to findings, its
- * questions, what it left out or was refused, and the closeout as it came (`raw`).
- */
-export const StepCloseout = Schema.Struct({
-  apiVersion: NullString,
-  outcome: Schema.Literals(OUTCOMES),
-  summary: Schema.String,
-  body: NullString,
-  needs: NullString,
-  artifacts: List(StepArtifact),
-  values: List(Schema.Struct({ name: Schema.String, value: Schema.String, link: NullString })),
-  refused: Strings,
-  output: Fields,
-  missing: Strings,
-  replies: Schema.NullOr(List(Schema.Struct({ finding: Schema.String, answer: Schema.String, why: Schema.String }))),
-  schema: Fields,
-  /** The shape (`FIELD_SHAPES`) of each field of `schema` its step's output marked by `x-shape`; absent where it marked none. */
-  shapes: Schema.optionalKey(Schema.Record(Schema.String, Schema.Literals(FIELD_SHAPES))),
-  questions: List(Asked),
-  raw: Schema.Unknown,
-  /**
-   * The names of the fields of `output` a narrowed read left out (`closeoutNarrowed`, asked with `?fields=`), each to be asked for by
-   * name; absent from a whole read.
-   */
-  outputLeftOut: Schema.optionalKey(Strings),
-  /** The character of `body` to read on from (`?bodyFrom=`), where a read answered one page of it and more is left; absent otherwise. */
-  bodyNext: Schema.optionalKey(Schema.Finite),
-}).annotate({ identifier: 'StepCloseout' });
-export type StepCloseout = typeof StepCloseout.Type;
-
-/**
- * The names a narrowing query lists — `?fields=` of a closeout's `output`, `?diffs=` of a decision's paths — as JSON:API spells a sparse
- * fieldset: comma-separated, each name trimmed, an empty one naming none, `*` naming every one. Pure.
- * @param fields The query's value, as given.
- */
-export const fieldsNamed = (fields: string): string[] =>
-  fields
-    .split(',')
-    .map((name) => name.trim())
-    .filter((name) => name !== '');
-
-/**
- * A closeout as it came (`raw`), its `body` cut to the characters `[from, to)` a read answers of the closeout's own, so the page bounds
- * both: a `raw` that is no object, or whose `body` is no string, as it is.
- */
-const rawPaged = (raw: unknown, from: number, to: number): unknown =>
-  typeof raw === 'object' && raw !== null && !Array.isArray(raw) && typeof (raw as { body?: unknown }).body === 'string'
-    ? { ...raw, body: (raw as { body: string }).body.slice(from, to) }
-    : raw;
-
-/** The page of a closeout's `body` a read asks for: the character it starts at, and how many it holds at most. */
-export type BodyPage = { readonly from: number; readonly limit: number };
-
-/**
- * `closeout` read narrowly, as every read of it is: what a person decides on — its outcome, summary, needs, files and values, its
- * questions, replies, what it left out and was refused — whole; its `body` cut to the page `body` asks (`BODY_PAGE` by default, never
- * past its most), `bodyNext` the character to read on from where more is left; of its `output` (and the `schema` it was read by) the
- * fields `fields` names — every one where it names `*`, and where it is not given those whose JSON is at most `SHORT_FIELD` characters —
- * those it left out named in `outputLeftOut`; the closeout as it came (`raw`) kept where `fields` names `*`, its `body` cut to the same
- * page (`rawPaged`), else left out, as null. Pure.
- * @param closeout The step's closeout, as it came.
- * @param fields The fields of its output to answer whole, * naming every one; undefined where the read names none.
- * @param body The page of the body to answer: where it starts and how many characters it holds.
- */
-export const closeoutNarrowed = (
-  closeout: StepCloseout,
-  fields: readonly string[] | undefined,
-  body: BodyPage = { from: 0, limit: BODY_PAGE.byDefault },
-): StepCloseout => {
-  const keeps = (name: string): boolean =>
-    fields === undefined
-      ? (JSON.stringify(closeout.output[name]) ?? '').length <= SHORT_FIELD
-      : fields.includes('*') || fields.includes(name);
-  const kept = <V>(record: Readonly<Record<string, V>>): Record<string, V> =>
-    Object.fromEntries(Object.entries(record).filter(([name]) => keeps(name)));
-  const from = Math.max(0, body.from);
-  const to = from + Math.min(Math.max(1, body.limit), BODY_PAGE.most);
-  const whole = closeout.body;
-  const { bodyNext: _bodyNext, ...rest } = closeout;
-  return {
-    ...rest,
-    body: whole === null ? null : whole.slice(from, to),
-    ...(whole !== null && to < whole.length ? { bodyNext: to } : {}),
-    output: kept(closeout.output),
-    schema: kept(closeout.schema),
-    ...(closeout.shapes === undefined ? {} : { shapes: kept(closeout.shapes) }),
-    raw: fields?.includes('*') === true ? rawPaged(closeout.raw, from, to) : null,
-    outputLeftOut: Object.keys(closeout.output).filter((name) => !keeps(name)),
-  };
-};
-
-/** Why a try's closeout does not read, and what it held (`StepUnreadable`, tries.verb.ts). */
-export const StepUnreadable = Schema.Struct({ error: Schema.String, raw: Schema.Unknown }).annotate({ identifier: 'StepUnreadable' });
-export type StepUnreadable = typeof StepUnreadable.Type;
-
-/**
- * One try of a step whole (`StepTry`, tries.verb.ts): its number, round and why it was moved behind (null for the current), its task, where
- * it stands as codes and in words, its attempts, check, closeout or why that does not read, and a person's answer to it.
- */
-export const StepTry = Schema.Struct({
-  try: Schema.Finite,
-  round: Schema.Finite,
-  cause: Schema.NullOr(Schema.Literals(TRY_CAUSES)),
-  current: Schema.Boolean,
-  taskId: NullString,
-  note: NullString,
-  phase: StepPhase,
-  reason: StepReason,
-  on: Schema.NullOr(Schema.Literals(WAIT_ON)),
-  via: Schema.NullOr(Schema.Literals(ANSWER_VIA)),
-  message: Schema.String,
-  attempts: StepAttempts,
-  check: Schema.NullOr(StepCheck),
-  closeout: Schema.NullOr(StepCloseout),
-  unreadable: Schema.NullOr(StepUnreadable),
-  answer: NullString,
-  answeredBy: Schema.optionalKey(Actor),
-})
-  .check(STEP_CODES)
-  .annotate({ identifier: 'StepTry' });
-export type StepTry = typeof StepTry.Type;
-
-/** A step's tries, earliest first, the current one last: `GET /api/runs/:runId/steps/:step/tries`. */
-export const StepTries = Schema.Struct({ tries: List(StepTry) }).annotate({ identifier: 'StepTries' });
-export type StepTries = typeof StepTries.Type;
-
-/** What a try of a step signed off with, or why it does not read (each null where there is none): `…/tries/:try/closeout`. */
-export const TryCloseout = Schema.Struct({
-  try: Schema.Finite,
-  closeout: Schema.NullOr(StepCloseout),
-  unreadable: Schema.NullOr(StepUnreadable),
-}).annotate({ identifier: 'TryCloseout' });
-export type TryCloseout = typeof TryCloseout.Type;
+}).annotate({ identifier: 'RunList' });
+export type RunList = typeof RunList.Type;

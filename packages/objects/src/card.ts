@@ -122,15 +122,23 @@ export const CardStatus = Schema.Struct({
    * answer of a queue alone, where it has one.
    */
   factoryRepo: Schema.optionalKey(Schema.String),
+}).annotate({
+  description:
+    'What Nemia read of the card: its state, the runs it was started as, the last start that did not happen, its title, its place in the queue, and why it does not read as a card.',
 });
 export type CardStatus = typeof CardStatus.Type;
 
 /** An inbox card, as an object. */
 export const Card = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Card'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Card').annotate({
+    description: 'What the object is: a Card, a piece of work filed in the inbox, which a run is started as.',
+  }),
   metadata: ObjectMeta,
-  spec: CardSpec,
+  spec: CardSpec.annotate({
+    description:
+      'What a person wrote on the card: the workflow that runs it, its gate, its models, the runs whose conclusions it is handed, when it was queued, and its body.',
+  }),
   status: CardStatus,
 });
 export type Card = typeof Card.Type;

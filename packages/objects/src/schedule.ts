@@ -20,7 +20,7 @@ export const ScheduleSpec = Schema.Struct({
   /** Retired: read and ignored; the factory's wiring places a scheduled run. */
   repo: Schema.optionalKey(Schema.String),
   tz: Schema.optionalKey(Schema.String),
-});
+}).annotate({ description: 'What the person set (nemia factory schedule): the cron, the brief each run is asked, and the time zone.' });
 export type ScheduleSpec = typeof ScheduleSpec.Type;
 
 /** A scheduled run: its id, and when it was started. */
@@ -36,13 +36,18 @@ export const ScheduleStatus = Schema.Struct({
   next: Schema.optionalKey(Schema.String),
   last: Schema.optionalKey(ScheduleFired),
   refused: Schema.optionalKey(Schema.String),
+}).annotate({
+  description:
+    'What Nemia read of the schedule: since when it holds, its next fire, its last scheduled run, and why its latest fire was refused.',
 });
 export type ScheduleStatus = typeof ScheduleStatus.Type;
 
 /** A schedule, as an object; a write's answer says what it wrote (`written`). */
 export const Schedule = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Schedule'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Schedule').annotate({
+    description: "What the object is: a Schedule, the cron one of a factory's workflows starts runs at.",
+  }),
   metadata: ObjectMeta,
   spec: ScheduleSpec,
   status: ScheduleStatus,

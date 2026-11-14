@@ -8,7 +8,6 @@
  */
 export const READS_ITS_CODE: readonly string[] = [
   'packages/agent-orchestrator/contracts/gate.contract.ts',
-  'packages/agent-orchestrator/contracts/reach.contract.ts',
   'packages/agent-orchestrator/contracts/standing.contract.ts',
   'packages/agent-runtime/contracts/decide.contract.ts',
   'packages/agent-runtime/contracts/lifecycle.contract.ts',

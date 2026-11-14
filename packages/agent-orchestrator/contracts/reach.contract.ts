@@ -3,56 +3,21 @@
  * declares it, never off a run, so it says whether a rule could ever approve that gate, not whether it does now. A condition admission
  * reads on the gated step itself (`factsOf`, src/auto/facts.ts) never holds at some gates: an ending approved before it is filed
  * (`approvedFirst`) has no closeout and no verdict when it is approved, so the agent cannot recommend it and no check has passed; a step
- * with no `check:` never has a check that passed (`verdict === 0`). `neverHolds` says which and why, `ruleReaches` whether a rule could
- * approve a gate, `suggestedFor` the rule that reaches a gate asking all that can hold there, and `unmetNow` what keeps a rule from a gate
+ * with no `check:` never has a check that passed (`verdict === 0`). `neverHolds` says which and why (its spec `never-holds.contract.ts`'s), `ruleReaches`
+ * whether a rule could approve a gate (`rule-reaches.contract.ts`'s), `suggestedFor` the rule that reaches a gate asking all that can hold there, and `unmetNow` what keeps a rule from a gate
  * in a run's facts at the call. The words a person reads, and the read that gathers a factory's gates, are the code's, held by tests.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { Condition, Facts, GateRule as PolicyRule } from '../src/auto/auto.ts';
-import { type GateSite, type NeverWhy, neverHolds, ruleReaches, type Unmet } from '../src/reach/reach.ts';
+import { neverHolds } from '../src/reach/never-holds.ts';
+import { ruleReaches } from '../src/reach/rule-reaches.ts';
+import type { GateSite } from './never-holds.contract.ts';
+
+/** What keeps a rule from letting an answer through in a run's facts: the conditions it needs that do not hold, and its dollar line. */
+export type Unmet = { conditions: Condition[]; overLine: boolean };
 
 /** The conditions a rule may need, in `CONDITIONS`' order (src/auto/auto.ts): written here, since a law reads none of the code's lists. */
 const ALL: readonly Condition[] = ['recommends', 'checked', 'accepted', 'withinBudget', 'nothingOpen'];
-
-/** The two conditions read off the step's own closeout and check, which an approved-first ending has neither of at its gate. */
-const ownWork = (c: Condition): boolean => c === 'recommends' || c === 'checked';
-
-/** Whether `rule` names `step` among those it covers, every step where it names none. */
-const covers = (rule: PolicyRule, step: string): boolean => rule.steps === undefined || rule.steps.includes(step);
-
-const neverHoldsSpec = spec<(site: GateSite, condition: Condition) => NeverWhy | null>({
-  ensures: {
-    approvedFirstHasNoOwnWork: {
-      description: 'At an ending approved before it runs, the agent recommending it and its check passing never hold: it has not run',
-      condition: ({ input: [site, c], output }) => !(site.approvedFirst && ownWork(c)) || output === 'approved-before-it-runs',
-    },
-    noCheckNeverPassed: {
-      description: 'At a gate on a step with no check, run before it is approved, its check passing never holds: it has none',
-      condition: ({ input: [site, c], output }) => !(!site.approvedFirst && !site.hasCheck && c === 'checked') || output === 'no-check',
-    },
-    theRestCanHold: {
-      description:
-        'Every other condition can hold at a gate: every reviewer accepting, staying within budget, nothing left open, and the agent recommending and the check passing at a step that runs before its gate',
-      condition: ({ input: [site, c], output }) =>
-        (site.approvedFirst && ownWork(c)) || (!site.approvedFirst && !site.hasCheck && c === 'checked') || output === null,
-    },
-  },
-});
-export type NeverHolds = Implementation<typeof neverHoldsSpec>;
-
-/** Whether every condition `rule` needs can hold at `site`. */
-const eachCanHold = (rule: PolicyRule, site: GateSite): boolean => rule.when.every((c) => neverHolds(site, c) === null);
-
-const ruleReachesSpec = spec<(rule: PolicyRule, site: GateSite) => boolean>({
-  ensures: {
-    reachesExactlyWhenItCouldApprove: {
-      description: 'A rule can reach a gate exactly when it approves, covers the gated step, and needs no condition that never holds there',
-      condition: ({ input: [rule, site], output }) =>
-        output === (rule.answer === 'approve' && covers(rule, site.step) && eachCanHold(rule, site)),
-    },
-  },
-});
-export type RuleReaches = Implementation<typeof ruleReachesSpec>;
 
 const suggestedForSpec = spec<(site: GateSite) => PolicyRule>({
   ensures: {

@@ -110,9 +110,13 @@ commit that landed. It runs no suite: CI judged the head the review read, and th
 the factory's `landingWaitsOnCi` is true (the default), the receipt waits on the CI context at the merge commit on the base branch
 (`receipt --run <id> --check <name> --wait-on-ci <true|false>`; up to `START_SECONDS` for it to be reported there, or `WHOLE_SECONDS`
 while another check there still runs, and `WHOLE_SECONDS` in all, the bounds the implement step's wait keeps in `exec.ts`, inside the
-landing check's own deadline). Green passes. Red fails the step though the merge stands — nothing is taken back — naming the jobs that
-did not pass: a person re-runs them where CI failed on its own account, or lands a fix, then types `nemia retry <run> land`; where the
-base's tip holds the merge and the context is green there, the receipt passes and says so. A merge whose own run was cancelled — a CI
+landing check's own deadline). Green passes. A red is first re-run, once, as the implement step's wait re-runs one (`rerun.ts`, which
+both scripts import): the failed jobs of each red workflow run at the merge, only a run GitHub says is on its first attempt, so a retry
+of the land step never re-runs it twice, waited on within the same bound; green the second time passes, naming each job re-run and how
+it ended. Red still fails the step though the merge stands — nothing is taken back — naming the jobs that did not pass and each job
+re-run: red twice is a real break of the base, and the refusal says so and points at the merge commit's checks, where a person lands a
+fix, then types `nemia retry <run> land`; where the base's tip holds the merge and the context is green there, the receipt passes and
+says so. A merge whose own run was cancelled — a CI
 that replaces a pending run of the base with a newer push's — or never reported is read at the base's tip where GitHub's compare says it
 holds the merge: green there passes, naming the commit read and why; red there fails the step naming that commit; anything else waits
 on, to the bounds. Still running at the bound fails with the same retry line. Never reported fails too, naming `landingWaitsOnCi`: a

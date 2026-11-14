@@ -28,7 +28,8 @@ Sign off `done` with that subject and body in `message`, the record of what land
 off `blocked`, quoting it whole and naming the exact `nemia retry` line it printed. The run then executes this step's check, which is
 the receipt that the merge happened — `${{ parameters.ciCheck }}` already judged the repository's suite on the head the review read.
 Does the receipt then wait on `${{ parameters.ciCheck }}` at the merge commit on the base branch? **${{ parameters.landingWaitsOnCi }}**
-(the factory's `landingWaitsOnCi`). Where it does, it waits up to 40 minutes, and a merge that turned the base red fails this step
+(the factory's `landingWaitsOnCi`). Where it does, it waits up to 40 minutes, a red there re-run once first (its failed jobs, only a
+run on its first attempt, so a retry never re-runs it twice), and a merge still red, the base turned red, fails this step
 though the merge stands: nothing is taken back, and the refusal names the jobs that did not pass and what a person does. A base whose
 tip holds the merge and is green there passes, as does one whose own run at the merge was cancelled (replaced by a newer push's) or
 never reported, while a red there fails this step naming that commit.

@@ -939,6 +939,73 @@ test("a receipt whose merge's own ci was cancelled waits for a later commit that
   assert.ok(none.err.includes(RETRY), none.err);
 });
 
+/** A job of the merge commit's workflow run 1, as REST gives it, by name and job id: the run's link is what its re-run is asked by. */
+const ranJob = (name: string, job: number, conclusion: string | null, status = 'completed'): Record<string, unknown> =>
+  checkRun(name, conclusion, status, `https://github.com/o/r/actions/runs/1/job/${job}`);
+
+/** The merge's first attempt of run 1: `test x` red, and the gate `ci` that needs it red with it. */
+const FIRST_AT_MERGE = [ranJob('test x', 3, 'failure'), ranJob('ci', 2, 'failure')];
+
+/** The second attempt's jobs, new job ids, completed with `conclusion`, or `status` where they are not over. */
+const secondAtMerge = (conclusion: string | null, status = 'completed') => [
+  ranJob('test x', 13, conclusion, status),
+  ranJob('ci', 12, conclusion, status),
+];
+
+/**
+ * A receipt at a merge whose `ci` reads `polls` (one per read, the last repeating), its run 1 on attempt `attempt`, `gh run rerun`
+ * answered; its run, and the re-runs it asked.
+ */
+function redAtMerge(polls: Record<string, unknown>[][], attempt = 1): { r: Ran; reruns: Called[]; w: World } {
+  const w = afterMerge();
+  w.gh.answers(
+    landedWith(
+      w,
+      ...ciAt(w.merged, polls),
+      tipIs(w.merged),
+      { when: 'actions/runs/1', out: JSON.stringify({ id: 1, run_attempt: attempt }) },
+      { when: 'run rerun' },
+    ),
+  );
+  const r = land(w, 'receipt', receiptArgs(), { WF_CI_WAIT_SECONDS: '60', WF_CI_START_SECONDS: '60', WF_CI_POLL_SECONDS: '0' });
+  return { r, reruns: asked(r.calls, 'run', 'rerun'), w };
+}
+
+test("a receipt red at the merge re-runs its failed jobs once, as the round's wait does: green the second time passes, naming the jobs", () => {
+  const { r, reruns } = redAtMerge([FIRST_AT_MERGE, FIRST_AT_MERGE, secondAtMerge(null, 'queued'), secondAtMerge('success')]);
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(
+    reruns.map((call) => call.argv),
+    [['run', 'rerun', '1', '--failed']],
+    'run 1 is re-run once, its failed jobs, and the red GitHub still shows after it is waited on, not judged',
+  );
+  const attemptAt = r.calls.findIndex((call) => call.argv.join(' ').includes('actions/runs/1'));
+  assert.ok(attemptAt !== -1 && attemptAt < r.calls.findIndex((call) => call.argv[1] === 'rerun'), 'its attempt is read first');
+  assert.match(r.out, /re-ran .* run 1 /);
+  assert.match(r.out, /test x: success/);
+  assert.ok(r.out.includes('`ci` passed on `main`'), r.out);
+});
+
+test('REFUSED: a receipt red at the merge again after its re-run, naming each job re-run and how it ended; never a second re-run', () => {
+  const { r, reruns, w } = redAtMerge([FIRST_AT_MERGE, secondAtMerge('failure')]);
+  assert.equal(r.code, 1, r.out);
+  assert.equal(reruns.length, 1, 'never a second re-run, the re-run red too');
+  assert.match(r.err, /re-ran .* run 1 /);
+  assert.match(r.err, /test x: failure/);
+  assert.ok(r.err.includes(`/commit/${w.merged}/checks`), `pointing at the merge commit's checks:\n${r.err}`);
+  assert.match(r.err, /merge stands/);
+  assert.ok(r.err.includes(RETRY), r.err);
+});
+
+test("REFUSED with no re-run where the merge's run is past its first attempt: a retried land step never re-runs it twice", () => {
+  const { r, reruns, w } = redAtMerge([FIRST_AT_MERGE], 2);
+  assert.equal(r.code, 1, r.out);
+  assert.equal(reruns.length, 0, 'no re-run');
+  assert.match(r.err, /attempt is 2/);
+  assert.ok(!r.err.includes(`/commit/${w.merged}/checks`), 'a red not re-run here is not called a break twice over');
+  assert.ok(r.err.includes(RETRY), r.err);
+});
+
 test('a receipt told not to wait on ci reads no check, saying so by landingWaitsOnCi; a --wait-on-ci of neither, or none, is refused before gh', () => {
   const w = afterMerge();
   w.gh.answers(landed(w));

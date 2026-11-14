@@ -2934,23 +2934,28 @@ const SECOND_STOP_GRACE_MS = 4000;
  */
 const SECOND_STOP_INTO_MS = SECOND_STOP_GRACE_MS / 2;
 
+/**
+ * The test below's harness: it notes each SIGTERM it hears in `terms` and, once one has come, each tick in `ticks`, and sends the
+ * worker the second stop itself, once, `SECOND_STOP_INTO_MS` past the first, in centiseconds. Every instant is read off
+ * `/proc/uptime`, a clock that only goes forward (the wall clock can be stepped under a test: WSL2 steps it to the host's), with
+ * the shell's builtins alone, so no fork stands between a signal and its line. `$PPID` is the worker, which spawns the harness
+ * itself.
+ */
+const SECOND_STOP_SH = [
+  `trap 'read up _ < /proc/uptime; echo "$up" >> terms' TERM`,
+  ': > started',
+  'sent=',
+  'while :; do sleep 0.1; read now _ < /proc/uptime; if [ -s terms ]; then echo "$now" >> ticks;',
+  'if [ -z "$sent" ]; then read first < terms;',
+  `if [ $(( \${now%.*}\${now#*.} - \${first%.*}\${first#*.} )) -ge ${SECOND_STOP_INTO_MS / 10} ]; then sent=1; kill -TERM $PPID; fi; fi; fi; done`,
+].join('\n');
+
 test('a second stop while one is under way signals the harness again, and leaves the grace counted from the first', WAITED, async (t) => {
   const grace = SECOND_STOP_GRACE_MS;
   const into = SECOND_STOP_INTO_MS;
   const dir = root();
   const cwd = scratch('ae-harness-');
-  // Every instant is read off `/proc/uptime`, a clock that only goes forward (the wall clock can be stepped under a test: WSL2
-  // steps it to the host's), with the shell's builtins alone, so no fork stands between a signal and its line. `$PPID` is the
-  // worker, which spawns the harness itself; the harness sends it the second stop once, `into` past the first, in centiseconds.
-  const script = [
-    `trap 'read up _ < /proc/uptime; echo "$up" >> terms' TERM`,
-    ': > started',
-    'sent=',
-    'while :; do sleep 0.1; read now _ < /proc/uptime; if [ -s terms ]; then echo "$now" >> ticks;',
-    'if [ -z "$sent" ]; then read first < terms;',
-    `if [ $(( \${now%.*}\${now#*.} - \${first%.*}\${first#*.} )) -ge ${into / 10} ]; then sent=1; kill -TERM $PPID; fi; fi; fi; done`,
-  ].join('\n');
-  const ops = detachedOps(sh(script), dir, { stopGraceMs: grace, beatMs: 200 });
+  const ops = detachedOps(sh(SECOND_STOP_SH), dir, { stopGraceMs: grace, beatMs: 200 });
   await Effect.runPromise(ops.spawn(req('ae/g5/1', cwd)));
   await within(t, () => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
   const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
@@ -2969,10 +2974,10 @@ test('a second stop while one is under way signals the harness again, and leaves
   await within(t, () => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and its harness ended');
   const [first, second] = lines('terms');
   assert.equal(lines('terms').length, 2, 'the second stop reached the harness before the grace killed it');
-  assert.ok(second! - first! >= into, `the second stop came ${second! - first!} ms into the first's grace, not ${into}`);
+  assert.ok(second - first >= into, `the second stop came ${second - first} ms into the first's grace, not ${into}`);
   const last = lines('ticks').at(-1)!;
   assert.ok(
-    last - second! < grace - into / 2,
-    `the harness was killed ${last - second!} ms after the second stop: the grace runs from the first, not again from the second`,
+    last - second < grace - into / 2,
+    `the harness was killed ${last - second} ms after the second stop: the grace runs from the first, not again from the second`,
   );
 });

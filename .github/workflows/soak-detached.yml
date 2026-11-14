@@ -1,0 +1,66 @@
+# A soak of agent-runtime's suite: twenty runs of it, ten per node, on every pull request that touches the detached worker or its test.
+#
+# Why: on 2026-11-13 main's ci went red twice in two hours on packages/agent-runtime/test/detached.test.ts, on one node only, and a
+# re-run of the failed job passed both times (da83c96a9, e46b993eb). A test that fails one run in many is not seen by one run, and ci
+# hides it besides: implement's round check re-runs a red ci job once, so a first try that failed reads green. So each leg here is the
+# package's whole suite, as ci runs it (--test-concurrency=2, detached.test.ts beside the rest), and each leg's verdict is its first.
+#
+# It informs and never gates: it is a workflow of its own, not a job of ci.yml, whose gate must need every job there
+# (tools/guards/test/ci-workflow.test.ts); a review reads its legs by `gh pr checks`. A leg re-run by hand hides its first try: read
+# the first attempt.
+#
+# No guard reads this file, so it keeps ci.yml's conventions by hand: a token that only reads, a timeout on the job and on each step
+# that reaches the network, GitHub's own actions by major tag, the node versions quoted, the runner's git identity, and no trigger
+# that would run a fork's code with a writable token.
+name: soak-detached
+
+on:
+  pull_request:
+    paths:
+      - packages/agent-runtime/bin/**
+      - packages/agent-runtime/src/harness/detached/**
+      - packages/agent-runtime/test/detached.test.ts
+      - .github/workflows/soak-detached.yml
+
+permissions:
+  contents: read
+
+# A superseded push's soak is cancelled: only the head's twenty runs say anything about what will land.
+concurrency:
+  group: soak-detached-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  soak:
+    name: soak agent-runtime ${{ matrix.run }} on node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    # ci's agent-runtime leg is bounded at 20 minutes, its slowest of 12 green runs being well under 5.
+    timeout-minutes: 20
+    strategy:
+      # Every leg runs to its own verdict: the count of red legs is the measure.
+      fail-fast: false
+      # Ten at once, so the soak leaves runners to ci's own jobs.
+      max-parallel: 10
+      matrix:
+        # Quoted, as in ci.yml: YAML reads 24.16 as a number. 24.16.0 is the floor engines.node claims; 24 is its line's latest.
+        node: ['24.16.0', '24']
+        run: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 5
+      - uses: actions/setup-node@v7
+        timeout-minutes: 5
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Give the runner a git identity
+        # As ci.yml's test job gives it: much of the suite makes scratch repositories.
+        run: |
+          git config --global user.name 'nemia ci'
+          git config --global user.email 'ci@nemia.invalid'
+          git config --global init.defaultBranch main
+      - run: npm ci
+        timeout-minutes: 10
+      - name: test agent-runtime under TZ=UTC
+        run: npx turbo run test --force --filter=agent-runtime
+        env:
+          TZ: UTC

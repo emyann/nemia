@@ -17,7 +17,10 @@
  *   worker has gone on and started its harness, by which time the stop has read `pid: 0`.
  * - `stop` finds a worker by its run file, so a worker whose run file or store is taken away ends its harness itself. A harness
  *   that dies on SIGTERM can leave a child that ignores it holding its stdout past the worker's two-second drain: the worker
- *   kills it too, on a stop as on a run file taken away, within a heartbeat and five seconds of SIGTERM.
+ *   kills it too, on a stop as on a run file taken away, within a heartbeat and five seconds of SIGTERM. A run file taken away
+ *   while the worker writes its status is not made again: a hook freezes the worker in its temp write to hold the removal there.
+ * - A second stop while one is under way is sent by the harness itself, half its grace into the first, off `/proc/uptime` with
+ *   the shell's builtins alone: sent by the test, it waited on the test process too, which a loaded runner held past the kill.
  * - Half a line, as a writer caught mid-append leaves it, is never written on as a line of its own; a wait longer than the
  *   worker's look at the inbox can only let that test pass wrongly under load, never fail it.
  * - A test that ticks the engine puts a fake `claude` on PATH: the `claude` harness is observed on every tick, and must not
@@ -2918,32 +2921,35 @@ test('a detached look, find and stop read the run files of the sessions they are
   });
 });
 
-/** The grace the test below gives its harness: what it waits out, once. */
-const SECOND_STOP_GRACE_MS = 1600;
+/**
+ * The grace the test below gives its harness: what it waits out, once. Wide enough that the second stop, sent at half of it, has a
+ * second of the worker's event loop to land in, and the kill a second to be late in, on a loaded runner.
+ */
+const SECOND_STOP_GRACE_MS = 4000;
 
 /**
- * How far into the first stop's grace the second comes in the test below, on the harness's own clock: half of it, far over a tick's
- * 0.1 s.
+ * How far into the first stop's grace the harness itself sends the second, on its own clock: half of it, far over a tick's 0.1 s.
+ * The harness sends it, not the test, so the test process's own scheduling is not in the chain: once the 0.8 s it was given lost
+ * to a loaded runner, and the test waited out its timeout for a second stop that came after the kill.
  */
 const SECOND_STOP_INTO_MS = SECOND_STOP_GRACE_MS / 2;
-
-/**
- * A shell command that prints the instant, in seconds, off `/proc/uptime`, a clock that only goes forward: the wall clock `date`
- * reads can be stepped under a test (WSL2 steps it to the host's), and once read a harness killed 2.3 s after a second stop in a test
- * that ran 1.8 s in all.
- */
-const UPTIME_SH = 'cut -d" " -f1 /proc/uptime';
 
 test('a second stop while one is under way signals the harness again, and leaves the grace counted from the first', WAITED, async (t) => {
   const grace = SECOND_STOP_GRACE_MS;
   const into = SECOND_STOP_INTO_MS;
   const dir = root();
   const cwd = scratch('ae-harness-');
+  // Every instant is read off `/proc/uptime`, a clock that only goes forward (the wall clock can be stepped under a test: WSL2
+  // steps it to the host's), with the shell's builtins alone, so no fork stands between a signal and its line. `$PPID` is the
+  // worker, which spawns the harness itself; the harness sends it the second stop once, `into` past the first, in centiseconds.
   const script = [
-    `trap '${UPTIME_SH} >> terms' TERM`,
+    `trap 'read up _ < /proc/uptime; echo "$up" >> terms' TERM`,
     ': > started',
-    `while :; do sleep 0.1; if [ -s terms ]; then ${UPTIME_SH} >> ticks; fi; done`,
-  ].join('; ');
+    'sent=',
+    'while :; do sleep 0.1; read now _ < /proc/uptime; if [ -s terms ]; then echo "$now" >> ticks;',
+    'if [ -z "$sent" ]; then read first < terms;',
+    `if [ $(( \${now%.*}\${now#*.} - \${first%.*}\${first#*.} )) -ge ${into / 10} ]; then sent=1; kill -TERM $PPID; fi; fi; fi; done`,
+  ].join('\n');
   const ops = detachedOps(sh(script), dir, { stopGraceMs: grace, beatMs: 200 });
   await Effect.runPromise(ops.spawn(req('ae/g5/1', cwd)));
   await within(t, () => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
@@ -2960,18 +2966,13 @@ test('a second stop while one is under way signals the harness again, and leaves
       : [];
   };
   process.kill(worker, 'SIGTERM');
-  await within(
-    t,
-    () => (lines('ticks').at(-1) ?? 0) - (lines('terms')[0] ?? Infinity) >= into,
-    'the harness ticks on, half its grace into the first stop’s',
-  );
-  process.kill(worker, 'SIGTERM');
-  await within(t, () => lines('terms').length === 2, 'the second stop reached the harness too');
   await within(t, () => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and its harness ended');
-  const [, second] = lines('terms');
+  const [first, second] = lines('terms');
+  assert.equal(lines('terms').length, 2, 'the second stop reached the harness before the grace killed it');
+  assert.ok(second! - first! >= into, `the second stop came ${second! - first!} ms into the first's grace, not ${into}`);
   const last = lines('ticks').at(-1)!;
   assert.ok(
-    last - second < grace - into / 2,
-    `the harness was killed ${last - second} ms after the second stop: the grace runs from the first, not again from the second`,
+    last - second! < grace - into / 2,
+    `the harness was killed ${last - second!} ms after the second stop: the grace runs from the first, not again from the second`,
   );
 });

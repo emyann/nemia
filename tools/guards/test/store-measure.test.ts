@@ -189,6 +189,7 @@ test('on an empty store the report counts no run and holds every measure, the ma
     'tickPass',
     'tickPassInformed',
     'runList',
+    'runListHundred',
     'runSummaries',
     'stats',
     'runListAfterPass',
@@ -203,6 +204,8 @@ test('on an empty store the report counts no run and holds every measure, the ma
     assert.ok(measured !== null && Number.isFinite(measured.cold.ms) && Number.isFinite(measured.warm.ms), key);
   }
   assert.deepEqual(written.measures.runList?.records, { cold: 0, warm: 0 }, 'no run record to read on an empty store');
+  for (const key of ['runList', 'runListHundred'] as const)
+    assert.ok(Number.isInteger(written.measures[key]?.bytes), `${key}: the answer's bytes are measured`);
   assert.equal(written.asked.factory, null, 'no factory of its own');
   for (const key of ['factoryGet', 'factoryCommands', 'scheduleList', 'hireList', 'volumeList', 'mcpServerList'] as const)
     assert.equal(written.measures[key], null, `${key}: no factory of its own to ask`);

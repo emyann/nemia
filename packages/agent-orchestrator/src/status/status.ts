@@ -74,10 +74,11 @@ export const approvedUnfiled = (step: StepSpec, run: Run): boolean =>
 
 /**
  * The steps a send-back from an ending approved and not filed goes to (`sendBackTo`), as `nemia ls`, `nemia decide` and a second `nemia
- * approve` offer it beside the approval: none for a step that is not such an ending, and none on a run held, whose hold refuses a try until
- * it lifts (`heldRefusal`). Pure.
+ * approve` offer it beside the approval: none for a step that is not such an ending, none on a run held, whose hold refuses a try until
+ * it lifts (`heldRefusal`), and none on a run pruned, which takes no try (`prunedRefusal`). Pure.
  */
-export const unfiledBack = (step: StepSpec, run: Run): string[] => (run.hold || !approvedUnfiled(step, run) ? [] : sendBackTo(step, run));
+export const unfiledBack = (step: StepSpec, run: Run): string[] =>
+  run.hold || run.pruned || !approvedUnfiled(step, run) ? [] : sendBackTo(step, run);
 
 /**
  * Whether a step's sessions are filed held open (the runtime's `holdOpen`): its harness, `DEFAULT_HARNESS` where it names none, declares

@@ -881,7 +881,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
         ship: 'awaiting approval:  nemia approve r-1 ship [--message "<words>"]  — or send it back:  nemia retry r-1 review --message "<objection>"',
       });
       assert.deepEqual(gateLines(ENDS, r, DONE, signedDone, asked), {
-        ship: 'approved 23:10Z — "Merge it, and do not touch the changelog."',
+        ship: 'approved 23:10Z — "Merge it, and do not touch the changelog."  — not filed yet; or send the work back:  nemia retry r-1 review --message "<objection>"',
       });
     },
   );

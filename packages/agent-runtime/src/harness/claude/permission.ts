@@ -5,8 +5,8 @@
  * `canUseTool` returns; both are proved by `contracts/permission.contract.ts`.
  *
  * The person is shown what the SDK handed over (`CanUseTool`'s `title`, `displayName`, `description`, `decisionReason` and
- * `blockedPath`, `sdk.d.ts:228`) and a shell call's command as typed, never words made from the call's input. Always allow returns the
- * SDK's `suggestions` whole as `updatedPermissions`, as its comment on them says (`sdk.d.ts:232-239`).
+ * `blockedPath`, `sdk.d.ts:241`) and a shell call's command as typed, never words made from the call's input. Always allow returns the
+ * SDK's `suggestions` whole as `updatedPermissions`, as its comment on them says (`sdk.d.ts:245-252`).
  */
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import type { PermissionAnswered, PermissionAskOf } from '../../../contracts/permission.contract.ts';

@@ -77,6 +77,7 @@ const PARSERS: Record<string, (name: string) => Bar | undefined> = {
  * an empty name, a run with a `/` in its id, a `from` that is no origin, not a string. A factory keeps its whole name. A run id
  * is a file name in the store and a workflow's name its folder's, so a step's address splits at its first `/`, a workflow's step's at its
  * first two, and the step keeps any `/` or `:` of its own.
+ * @param value The root's search key `bar` as the address gives it, of any type.
  */
 export function barOf(value: unknown): Bar | undefined {
   if (typeof value !== 'string') return undefined;
@@ -89,7 +90,10 @@ export function barOf(value: unknown): Bar | undefined {
   return at > 0 && name && parse ? parse(name) : undefined;
 }
 
-/** How `bar` is written in the address, which `barOf` reads back. */
+/**
+ * How `bar` is written in the address, which `barOf` reads back.
+ * @param bar The bar to write.
+ */
 export function barValue(bar: Bar): string {
   switch (bar.kind) {
     case 'start':
@@ -109,13 +113,20 @@ export function barValue(bar: Bar): string {
   }
 }
 
-/** The root route's search: a `bar` that names a bar, and none of the keys a page's own route reads (`factory`, `step`, the filters). */
+/**
+ * The root route's search: a `bar` that names a bar, and none of the keys a page's own route reads (`factory`, `step`, the filters).
+ * @param search The address's search, every key of it as given.
+ */
 export const barSearch = (search: Record<string, unknown>): { bar?: string } => (barOf(search.bar) ? { bar: search.bar as string } : {});
 
 /** Whether `one` and `other` show the same thing: the same address, so the same kind for the same factory, run or step. */
 const sameBar = (one: Bar, other: Bar): boolean => barValue(one) === barValue(other);
 
-/** What the bar shows once `pressed` is pressed while it shows `open`: nothing, for the same thing again, else what was pressed. */
+/**
+ * What the bar shows once `pressed` is pressed while it shows `open`: nothing, for the same thing again, else what was pressed.
+ * @param open What the bar shows, or undefined while it is closed.
+ * @param pressed What was pressed.
+ */
 export const nextBar = (open: Bar | undefined, pressed: Bar): Bar | undefined => (open && sameBar(open, pressed) ? undefined : pressed);
 
 /**
@@ -131,6 +142,8 @@ type BarPage =
 /**
  * The page of the workflow's step `bar` shows, read in `place`: where the bar's Open and a double click on the step's node both lead, so
  * neither reaches the step of another folder of the same name.
+ * @param bar The workflow's step the bar shows.
+ * @param place The place the page under the bar is read in; empty by default.
  */
 export const stepPage = (bar: Extract<Bar, { kind: 'spec' }>, place: PagePlace = {}): Extract<BarPage, { search: PagePlace }> => ({
   to: '/workflows/$from/$workflow/$step',
@@ -142,6 +155,8 @@ export const stepPage = (bar: Extract<Bar, { kind: 'spec' }>, place: PagePlace =
  * The page the bar's Open visits for `bar`: a factory's floor for a factory, a run's page for a run, the step's session for a step, the
  * step's page for a workflow's step, read in `place`, the place the page under the bar is read in, and none for the start of a run, the
  * gauges or the runs waiting on you, which have no page of their own: each row of those opens its run's.
+ * @param bar What the bar shows.
+ * @param place The place the page under the bar is read in; empty by default.
  */
 export function barOpens(bar: Bar, place: PagePlace = {}): BarPage | null {
   switch (bar.kind) {
@@ -160,7 +175,10 @@ export function barOpens(bar: Bar, place: PagePlace = {}): BarPage | null {
   }
 }
 
-/** Whether `open` shows what is the whole machine's, not a page's: its gauges, or the runs waiting on you across every factory. */
+/**
+ * Whether `open` shows what is the whole machine's, not a page's: its gauges, or the runs waiting on you across every factory.
+ * @param open What the bar shows, or undefined while it is closed.
+ */
 export function wholeMachine(open: Bar | undefined): boolean {
   switch (open?.kind) {
     case 'gauges':
@@ -176,13 +194,19 @@ export function wholeMachine(open: Bar | undefined): boolean {
   }
 }
 
-/** The step of the workflow `workflow` read from `from` that `open` shows, or null for a bar that shows none of its steps. */
+/**
+ * The step of the workflow `workflow` read from `from` that `open` shows, or null for a bar that shows none of its steps.
+ * @param open What the bar shows, or undefined while it is closed.
+ * @param from The origin the workflow is read from.
+ * @param workflow The workflow's name.
+ */
 export const specStep = (open: Bar | undefined, from: string, workflow: string): string | null =>
   open?.kind === 'spec' && open.from === from && open.workflow === workflow ? open.step : null;
 
 /**
  * Whether `open` is something a canvas inspects — everything the bar shows but the start of a run — which a press on the empty canvas
  * closes; never the start of a run, whose half-typed brief a press beside it would lose, and nothing for a bar already closed.
+ * @param open What the bar shows, or undefined while it is closed.
  */
 export const inspects = (open: Bar | undefined): boolean => open !== undefined && open.kind !== 'start';
 
@@ -192,6 +216,7 @@ type EscapeKey = { defaultPrevented: boolean; isComposing: boolean; fieldText: s
 /**
  * What `key` does to the open bar: nothing when something else took it or it ends a composition; `leave` the field it was pressed in when
  * that holds text, so a half-typed brief is not lost to one key; else `close` the bar.
+ * @param key The Escape pressed: whether something took it, whether it ends a composition, and its field's text, null outside a field.
  */
 export function escapeDoes(key: EscapeKey): 'ignore' | 'leave' | 'close' {
   if (key.defaultPrevented || key.isComposing) return 'ignore';

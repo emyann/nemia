@@ -55,7 +55,10 @@ export type AgentForm = {
   mcp: string;
 };
 
-/** A form for a new agent, or for the agent `listing` as it reads. */
+/**
+ * A form for a new agent, or for the agent `listing` as it reads.
+ * @param listing The agent as the api lists it, or null for a new agent.
+ */
 export function formOf(listing: AgentListing | null): AgentForm {
   const keys = Object.fromEntries(ROLE_KEYS.map((key) => [key, listing?.keys[key] ?? ''])) as Record<AgentRoleKey, string>;
   return {
@@ -72,7 +75,10 @@ export function formOf(listing: AgentListing | null): AgentForm {
   };
 }
 
-/** The schema file a new result schema is written to when the form names none: beside the agent, after it. */
+/**
+ * The schema file a new result schema is written to when the form names none: beside the agent, after it.
+ * @param name The agent's name as typed; an empty one gives `agent`.
+ */
 export const schemaFileFor = (name: string): string => `${name.trim() || 'agent'}.schema.json`;
 
 /** The words `harnessPrompt:` takes, as the package's `HARNESS_PROMPTS` has them; `''` on the form is none, which is `keep`. */
@@ -82,6 +88,7 @@ export const HARNESS_PROMPTS = ['keep', 'no-coding', 'replace'] as const;
  * The draft a save sends: each field trimmed, an empty one unset (null). A schema pasted with no `output:` is named after the agent, and
  * its text travels only when it or the file's name changed since it was read — one another agent shares is then left alone. Nothing is
  * judged here that the package judges on save.
+ * @param form The agent's form as it is being edited.
  */
 export function draftOf(form: AgentForm): AgentDraft {
   const keys = Object.fromEntries(ROLE_KEYS.map((key) => [key, form.keys[key].trim() || null])) as Record<AgentRoleKey, string | null>;
@@ -101,7 +108,11 @@ export function draftOf(form: AgentForm): AgentDraft {
   };
 }
 
-/** Whether the form says something other than `listing`, as read: what the Save button waits for. */
+/**
+ * Whether the form says something other than `listing`, as read: what the Save button waits for.
+ * @param form The agent's form as it is being edited.
+ * @param listing The agent as read, or null for a new agent.
+ */
 export function edited(form: AgentForm, listing: AgentListing | null): boolean {
   return JSON.stringify(draftOf(form)) !== JSON.stringify(draftOf(formOf(listing)));
 }
@@ -109,6 +120,9 @@ export function edited(form: AgentForm, listing: AgentListing | null): boolean {
 /**
  * The words a key may take on the harness the agent names, from the step form's keys (`KeyForm`): effort and permission mode depend on the
  * harness, and an agent that names none runs on the default one. Null for a key typed as free text.
+ * @param form The step form's keys as the api gives them, or undefined while they load.
+ * @param key The role key asked about.
+ * @param harness The harness the agent names, as typed; empty for the default one.
  */
 export function choicesOf(form: KeyForm | undefined, key: AgentRoleKey, harness: string): readonly string[] | null {
   const field = form?.keys.find((k) => k.key === key);
@@ -123,6 +137,9 @@ export function choicesOf(form: KeyForm | undefined, key: AgentRoleKey, harness:
  * harness has one fence — Claude Code its `permissionMode`, codex its `sandbox` — and the form draws the other only where it is written, as
  * free text, to be taken off. A remote A2A agent has none of the keys the package refuses on it (`remoteRefuses`). Any other harness the
  * form does not know is not judged here: its keys are typed, and the package judges them on save.
+ * @param form The step form's keys as the api gives them, or undefined while they load.
+ * @param key The role key asked about.
+ * @param harness The harness the agent names, as typed; empty for the default one.
  */
 export function hasKey(form: KeyForm | undefined, key: AgentRoleKey, harness: string): boolean {
   const field = form?.keys.find((k) => k.key === key);
@@ -133,30 +150,49 @@ export function hasKey(form: KeyForm | undefined, key: AgentRoleKey, harness: st
   return Object.hasOwn(field.byHarness, on) || !known.includes(on);
 }
 
-/** A key's line of meaning, as the package says it for a step's key of the same name. */
+/**
+ * A key's line of meaning, as the package says it for a step's key of the same name.
+ * @param form The step form's keys as the api gives them, or undefined while they load.
+ * @param key The role key asked about.
+ */
 export const meaningOf = (form: KeyForm | undefined, key: AgentRoleKey): string | null =>
   form?.keys.find((k) => k.key === key)?.meaning ?? null;
 
-/** The skills line as the names it gives, in its order: split on commas, each trimmed, an empty one dropped. */
+/**
+ * The skills line as the names it gives, in its order: split on commas, each trimmed, an empty one dropped.
+ * @param line A comma-separated line as typed: the skills line, or a tools line read the same way.
+ */
 export const skillList = (line: string): string[] =>
   line
     .split(',')
     .map((name) => name.trim())
     .filter(Boolean);
 
-/** Names as the skills line writes them: `review-a-change, write-a-note`. */
+/**
+ * Names as the skills line writes them: `review-a-change, write-a-note`.
+ * @param names The names, in the order they are written.
+ */
 export const skillLine = (names: readonly string[]): string => names.join(', ');
 
-/** The skills line with `name` given last, once: a name it gives already leaves it as it was. */
+/**
+ * The skills line with `name` given last, once: a name it gives already leaves it as it was.
+ * @param line The skills line as typed.
+ * @param name The skill's name to give.
+ */
 export const withSkill = (line: string, name: string): string =>
   skillList(line).includes(name) ? line : skillLine([...skillList(line), name]);
 
-/** The skills line without `name`. */
+/**
+ * The skills line without `name`.
+ * @param line The skills line as typed.
+ * @param name The skill's name to take off.
+ */
 export const withoutSkill = (line: string, name: string): string => skillLine(skillList(line).filter((given) => given !== name));
 
 /**
  * Why the skills given reach nothing, as the package refuses it on save — `tools:` set without `Skill`, or `Skill` denied — or null. A tool
  * is read as the package reads it, one entry of the comma-separated list, exactly `Skill`.
+ * @param form The form's skills line and its keys, `tools` and `disallowedTools` read.
  */
 export function skillToolGap(form: Pick<AgentForm, 'skills' | 'keys'>): 'tools' | 'disallowedTools' | null {
   if (!skillList(form.skills).length) return null;
@@ -166,10 +202,16 @@ export function skillToolGap(form: Pick<AgentForm, 'skills' | 'keys'>): 'tools' 
   return null;
 }
 
-/** `tools:` with `Skill` added last. */
+/**
+ * `tools:` with `Skill` added last.
+ * @param tools The `tools:` line as typed.
+ */
 export const toolsWithSkill = (tools: string): string => skillLine([...skillList(tools), 'Skill']);
 
-/** `disallowedTools:` with `Skill` taken off. */
+/**
+ * `disallowedTools:` with `Skill` taken off.
+ * @param denied The `disallowedTools:` line as typed.
+ */
 export const deniedWithoutSkill = (denied: string): string => skillLine(skillList(denied).filter((tool) => tool !== 'Skill'));
 
 /**
@@ -203,13 +245,18 @@ export const HARNESS_PROMPT_CHOICES: ReadonlyArray<{
   },
 ];
 
-/** The word a form's harness prompt is drawn as: unset is `keep`, which is what a session runs with. */
+/**
+ * The word a form's harness prompt is drawn as: unset is `keep`, which is what a session runs with.
+ * @param value The form's harness prompt as typed; empty for unset.
+ */
 export const harnessPromptShown = (value: string): string => value.trim() || 'keep';
 
 /**
  * The form's harness prompt once `picked` is chosen, from `was`, what the file said as read. `keep` is written only where it was: an agent
  * whose file said nothing, or `keep`, gets back what it said, and one moved to `keep` from another word is left unset, which is `keep` —
  * so picking a choice and then `keep` again is no edit.
+ * @param picked The word chosen, one of `HARNESS_PROMPTS`.
+ * @param was What the agent's file said of its harness prompt as read; empty for nothing.
  */
 export function pickHarnessPrompt(picked: string, was: string): string {
   if (picked !== 'keep') return picked;
@@ -223,6 +270,8 @@ export type KeptForm = { key: string; version: string };
  * The key an agent's form is drawn under. It is the agent's version, so a save, or a change made elsewhere, draws the file as it now reads,
  * and a save goes back against that version. The one exception is the version the page's own copy of a skill moved it to (`kept`): an agent
  * whose `skills:` names the copied skill is versioned by that skill too, and the form a person is typing in stays, to be saved against it.
+ * @param version The agent's version as it reads now.
+ * @param kept The form the page kept across a copy of a skill, or null when it keeps none.
  */
 export const formKeyOf = (version: string, kept: KeptForm | null): string => (kept && kept.version === version ? kept.key : version);
 
@@ -230,6 +279,9 @@ export const formKeyOf = (version: string, kept: KeptForm | null): string => (ke
  * What the page keeps once its copy of a skill is written: the form under `key`, at the version the agent reads at now (`now`) — but only
  * when its file and its schema read as they did when the form was drawn (`was`). A change to either since is someone else's, and the form
  * is drawn again from it, as for any other change, rather than saved over it.
+ * @param was The agent's file and schema as they read when the form was drawn.
+ * @param now The agent as it reads once the copy is written, its version included.
+ * @param key The key the form is drawn under.
  */
 export function keptAfterCopy(
   was: Pick<AgentListing, 'source' | 'schema'>,
@@ -244,6 +296,8 @@ export function keptAfterCopy(
  * What the page keeps once a save has been read back: the form a copy kept is let go only when the agent reads at another version than the
  * one the copy moved it to (`now`), which the save's own read brings. Let go before that read lands, the form would be drawn again from the
  * file as it was before the save, and would stay so where the read failed.
+ * @param kept The form a copy kept, or null when the page keeps none.
+ * @param now The agent's version as read back, or undefined before that read lands.
  */
 export const keptAfterSave = (kept: KeptForm | null, now: string | undefined): KeptForm | null =>
   kept && now !== undefined && now !== kept.version ? null : kept;
@@ -273,7 +327,11 @@ export const TRY_FENCE = "A rehearsal fenced to its own folder, not the agent's 
 /** How a try runs, beside the fence: the keys its step says, never wider than the agent's own. */
 export const TRY_TERMS = 'dontAsk, allowed Edit(**) in its folder and never more than the agent is, $1 to spend';
 
-/** The latest try of an agent among the runs, by when it was made; undefined when it has none. */
+/**
+ * The latest try of an agent among the runs, by when it was made; undefined when it has none.
+ * @param runs The runs listed, a try's carrying the agent it tries.
+ * @param agent The agent's name.
+ */
 export function latestTryOf<T extends { try: { agent: string } | null; createdAt: string }>(
   runs: readonly T[],
   agent: string,
@@ -283,7 +341,11 @@ export function latestTryOf<T extends { try: { agent: string } | null; createdAt
     .reduce<T | undefined>((latest, run) => (!latest || run.createdAt > latest.createdAt ? run : latest), undefined);
 }
 
-/** Why the Try button is not pressable, or null: an empty brief, or a try of the agent still moving — the api refuses both. */
+/**
+ * Why the Try button is not pressable, or null: an empty brief, or a try of the agent still moving — the api refuses both.
+ * @param brief The brief as typed.
+ * @param latest The agent's latest try, whether it still moves and its id, or undefined when it has none.
+ */
 export function tryHeld(brief: string, latest: { moving: boolean; id: string } | undefined): string | null {
   if (latest?.moving) return `A try is still running (${latest.id}): one at a time.`;
   if (!brief.trim()) return 'Write a brief to try it on.';

@@ -24,7 +24,10 @@ const TRACE_STATUS: Record<ConversationState, TraceStatus | undefined> = {
   waits: 'yours',
 };
 
-/** How a trace line draws a line in the state `state`: alive at work, failure failed, at rest not begun, yours waiting on a person. */
+/**
+ * How a trace line draws a line in the state `state`: alive at work, failure failed, at rest not begun, yours waiting on a person.
+ * @param state The state the line is in.
+ */
 export const traceStatusOf = (state: ConversationState): TraceStatus | undefined => TRACE_STATUS[state];
 
 /**
@@ -72,6 +75,9 @@ export type ConversationItem<Own = never> =
  * The one data attribute a family part writes: `what`, under the prefix its caller named, carrying `value` where there is one. A part
  * writes no `data-chat-` of its own, so each conversation keeps the names its pages read — hers `chat`, a step's session `session`.
  * A mark with no value is the attribute React writes for a bare one, which a page selects on its presence.
+ * @param prefix The prefix the caller names: `chat`, or `session`.
+ * @param what What the attribute marks.
+ * @param value What it carries; undefined for a bare one.
  */
 export const mark = (prefix: string, what: string, value?: string): Record<string, string | true> => ({
   [`data-${prefix}-${what}`]: value ?? true,
@@ -81,6 +87,7 @@ export const mark = (prefix: string, what: string, value?: string): Record<strin
  * How much of `items` is drawn, counting a turn by its lines: the number a talk follows its latest by. A turn's lines are folded into
  * one item, so the count of the items alone stands still while a turn grows — and a talk that watched it would follow the first line
  * of a turn and then stand where it was for every line after, the growing turn pushing its foot off the screen.
+ * @param items The conversation's items, as the family's list holds them.
  */
 export const drawnCount = (items: readonly ConversationItem<unknown>[]): number =>
   items.reduce((drawn, item) => drawn + (item.kind === 'work' ? item.lines.length : 1), 0);
@@ -91,15 +98,24 @@ export const drawnCount = (items: readonly ConversationItem<unknown>[]): number 
  */
 type Counted = 'call' | 'step';
 
-/** The one line a folded turn says: `Worked for 2m 14s · 9 calls`, over `ms` and how many `lines` it holds, counted as `counts`. */
+/**
+ * The one line a folded turn says: `Worked for 2m 14s · 9 calls`, over `ms` and how many `lines` it holds, counted as `counts`.
+ * @param ms How long the turn worked, in ms.
+ * @param lines How many lines the turn holds.
+ * @param counts What its lines are counted as.
+ */
 export const turnWords = (ms: number, lines: number, counts: Counted): string =>
   `Worked for ${durationWords(ms, 'second')} · ${lines === 1 ? `1 ${counts}` : `${lines} ${counts}s`}`;
 
-/** The words the line between what was read and what is new says: `2 new`. */
+/**
+ * The words the line between what was read and what is new says: `2 new`.
+ * @param unread How many lines are new.
+ */
 export const newWords = (unread: number): string => (unread === 1 ? '1 new' : `${unread} new`);
 
 /**
  * The words the pill over the talk says: `2 new · Jump to the latest`, and `Jump to the latest` alone where nothing is unread — a
  * conversation nothing is counted unread in (a step's session, which a person reads by opening it) still offers the way back.
+ * @param unread How many lines are unread; zero where none is, or nothing is counted.
  */
 export const jumpWords = (unread: number): string => (unread === 0 ? 'Jump to the latest' : `${newWords(unread)} · Jump to the latest`);

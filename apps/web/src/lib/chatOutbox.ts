@@ -19,7 +19,10 @@ export const CHAT_OUTBOX_KEY = 'nemia:chat-outbox';
  */
 export type ChatKept = { text: string; at: string; refused?: string };
 
-/** What `raw` names: a kept message, or null for storage that holds none, or words that are not one. */
+/**
+ * What `raw` names: a kept message, or null for storage that holds none, or words that are not one.
+ * @param raw What storage holds under the key, or null where it holds nothing.
+ */
 export function parseKept(raw: string | null): ChatKept | null {
   if (raw === null) return null;
   let value: unknown;
@@ -42,12 +45,18 @@ export function readKept(): ChatKept | null {
 /**
  * Keeps `text`, written at `at`, as the message that did not go, with the api's `refused` words where it refused it: where storage is
  * refused or full, nothing is kept.
+ * @param text The message's words.
+ * @param at When the person wrote them.
+ * @param refused The api's words where it refused the message; undefined where the board lost the daemon.
  */
 export function keepUnsent(text: string, at: string, refused?: string): void {
   store(CHAT_OUTBOX_KEY, JSON.stringify(refused === undefined ? { text, at } : { text, at, refused }));
 }
 
-/** The kept message's words changed to `text`, its moment and what the api last said of it kept: nothing where none is kept. */
+/**
+ * The kept message's words changed to `text`, its moment and what the api last said of it kept: nothing where none is kept.
+ * @param text The message's new words.
+ */
 export function editKept(text: string): void {
   const kept = readKept();
   if (kept !== null) keepUnsent(text, kept.at, kept.refused);
@@ -61,7 +70,12 @@ function refusalOf(failure: unknown): string | null {
   return failure instanceof WriteRefusal && failure.status >= 400 && failure.status < 500 ? failure.message : null;
 }
 
-/** The message `text`, written at `at`, as a send that failed with `failure` leaves it: refused with the api's words, or lost. */
+/**
+ * The message `text`, written at `at`, as a send that failed with `failure` leaves it: refused with the api's words, or lost.
+ * @param text The message's words.
+ * @param at When the person wrote them.
+ * @param failure What the send failed with: a refusal of the api's, or any other error.
+ */
 export function keptAfter(text: string, at: string, failure: unknown): ChatKept {
   const refused = refusalOf(failure);
   return refused === null ? { text, at } : { text, at, refused };
@@ -70,6 +84,9 @@ export function keptAfter(text: string, at: string, failure: unknown): ChatKept 
 /**
  * Tries `send` every `ms` until it resolves or is refused, the first try `ms` from now: a failure that is no refusal (`refusalOf`) is
  * tried again, a refusal is handed to `refused` and never tried again on its own. Returns what stops it.
+ * @param send Sends the kept message once.
+ * @param ms How long to wait before each try, in ms.
+ * @param refused Called with the refusal that stops the tries.
  */
 export function retryKept(send: () => Promise<unknown>, ms: number, refused: (failure: unknown) => void): () => void {
   let timer: ReturnType<typeof setTimeout>;
@@ -99,6 +116,7 @@ let sending: Promise<unknown> | null = null;
 /**
  * Runs `send` unless one is already in flight, in which case that one is answered: the api returning, the stream opening and the pace
  * each try the kept message, and it must reach her once. Resolves and rejects as `send` does, and the next call runs it again.
+ * @param send Sends the message once.
  */
 export function sendingOnce<T>(send: () => Promise<T>): Promise<T> {
   if (sending !== null) return sending as Promise<T>;

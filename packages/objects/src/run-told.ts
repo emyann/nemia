@@ -10,17 +10,28 @@ const NullString = Schema.NullOr(Schema.String);
 
 /** What a step was told by layer (`ToldLayers`, brief.ts). */
 const ToldLayers = Schema.Struct({
-  agent: NullString,
-  instructions: NullString,
-  custom: NullString,
-  factory: NullString,
-  agentSkills: Strings,
-  policy: Schema.String,
-  addedSkills: Strings,
-  fence: List(Schema.Struct({ key: Schema.String, value: Schema.String })),
-  folderFiles: Schema.Boolean,
-  task: NullString,
-  via: Schema.Literals(TOLD_VIA),
+  agent: NullString.annotate({ description: "The agent's own words it was told; null where the step has none." }),
+  instructions: NullString.annotate({ description: "The agent's instructions; null where it has none." }),
+  custom: NullString.annotate({ description: "The person's custom instructions for it; null where there are none." }),
+  factory: NullString.annotate({
+    description: 'The rules of the factory its run was started in, as the run froze them; null where there are none.',
+  }),
+  agentSkills: Strings.annotate({ description: "The agent's own skills." }),
+  policy: Schema.String.annotate({ description: "The step's policy: its own note." }),
+  addedSkills: Strings.annotate({ description: 'The skills its line adds.' }),
+  fence: List(
+    Schema.Struct({
+      key: Schema.String.annotate({ description: 'The fence key it tightens.' }),
+      value: Schema.String.annotate({ description: 'Its value as resolved, a list joined with a comma.' }),
+    }),
+  ).annotate({ description: "The fence lines its own file sets over its agent's." }),
+  folderFiles: Schema.Boolean.annotate({
+    description: 'Whether the session reads the files of the folder it works in; false for a step on a remote agent.',
+  }),
+  task: NullString.annotate({ description: 'The task, what its brief told it after the layers above; null where there is none.' }),
+  via: Schema.Literals(TOLD_VIA).annotate({
+    description: "Where the agent's words, the person's and the factory's went: the session's prompt, or the head of its brief.",
+  }),
 });
 
 /**
@@ -29,17 +40,30 @@ const ToldLayers = Schema.Struct({
  */
 const TaskPart = Schema.Union([
   Schema.Struct({
-    kind: Schema.Literal('text'),
-    text: Schema.String,
-    source: Schema.optionalKey(Schema.Literals(TASK_SOURCES)),
-    step: Schema.optionalKey(Schema.String),
+    kind: Schema.Literal('text').annotate({ description: "A section's own text." }),
+    text: Schema.String.annotate({ description: "The section's text." }),
+    source: Schema.optionalKey(
+      Schema.Literals(TASK_SOURCES).annotate({
+        description: 'Whose words the section carries: a person, a step, a check or a run; absent where the read did not cut it.',
+      }),
+    ),
+    step: Schema.optionalKey(
+      Schema.String.annotate({ description: "The step that gave a step's or a check's section; absent otherwise." }),
+    ),
   }),
   Schema.Struct({
-    kind: Schema.Literal('from'),
-    run: Schema.String,
-    asked: Schema.String,
-    body: Schema.String,
-    how: Schema.optionalKey(Schema.Literals(HANDED_HOW)),
+    kind: Schema.Literal('from').annotate({ description: "A run's section, under a ## From run heading." }),
+    run: Schema.String.annotate({ description: "The run's id." }),
+    asked: Schema.String.annotate({
+      description: 'The first line the run was asked, as the section quotes it; empty where the section says it cannot be read.',
+    }),
+    body: Schema.String.annotate({ description: "The section's body under its heading." }),
+    how: Schema.optionalKey(
+      Schema.Literals(HANDED_HOW).annotate({
+        description:
+          'How the run was handed to the step: waited for a run it waited on, read for one handed as context; absent where the record names it in neither.',
+      }),
+    ),
   }),
 ]);
 

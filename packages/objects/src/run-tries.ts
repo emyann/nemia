@@ -7,7 +7,8 @@ import { Schema } from 'effect';
 import { Actor } from './token.ts';
 import { describedOne } from './meta.ts';
 import { BODY_PAGE, SHORT_FIELD } from './reads.ts';
-import { STEP_CODES, StepArtifact, StepAttempts, StepCheck } from './run.ts';
+import { STEP_CODES } from './run.ts';
+import { StepArtifact, StepAttempts, StepCheck } from './run-step.ts';
 import { ANSWER_VIA, FIELD_SHAPES, OUTCOMES, STEP_PHASES, STEP_REASONS, TRY_CAUSES, WAIT_ON } from './words.ts';
 
 /** An array as the package's types hold one, mutable, so a page built off the object keeps their types. */
@@ -19,16 +20,24 @@ const StepReason = Schema.Literals(STEP_REASONS);
 
 /** A closeout's questions under one field of its output (`Asked`, question.ts). */
 const Asked = Schema.Struct({
-  field: Schema.String,
+  field: Schema.String.annotate({ description: 'The output field the questions were asked under.' }),
   questions: List(
     Schema.Struct({
-      title: Schema.String,
-      body: Schema.String,
-      options: List(Schema.Struct({ label: Schema.String, meaning: Schema.String })),
-      recommended: Schema.NullOr(Schema.Union([Schema.String, List(Schema.String)])),
-      multiple: Schema.Boolean,
+      title: Schema.String.annotate({ description: 'The question, in one line; unique among the questions of the field.' }),
+      body: Schema.String.annotate({ description: 'What a person needs to know to answer it.' }),
+      options: List(
+        Schema.Struct({
+          label: Schema.String.annotate({ description: 'The option, as a person picks it; unique among the options.' }),
+          meaning: Schema.String.annotate({ description: 'What picking it means.' }),
+        }),
+      ).annotate({ description: 'The options it offers.' }),
+      recommended: Schema.NullOr(Schema.Union([Schema.String, List(Schema.String)])).annotate({
+        description:
+          'The option the agent recommends, as it wrote it: one label, or a list of labels on a question that takes multiple; null where none.',
+      }),
+      multiple: Schema.Boolean.annotate({ description: 'Whether several options may be chosen together.' }),
     }),
-  ),
+  ).annotate({ description: 'Its questions, in the order the agent gave them.' }),
 });
 
 /** A JSON object whose keys a step's workflow decides (a closeout's `output`, the schema it was read by). */
@@ -46,13 +55,27 @@ export const StepCloseout = Schema.Struct({
   body: NullString.annotate({ description: 'Its markdown account, one page of it on a narrowed read; null where it wrote none.' }),
   needs: NullString.annotate({ description: 'What a person has to settle, on a blocked closeout; null otherwise.' }),
   artifacts: List(StepArtifact).annotate({ description: 'The files it handed on, each served, pruned, or only its path.' }),
-  values: List(Schema.Struct({ name: Schema.String, value: Schema.String, link: NullString })).annotate({
+  values: List(
+    Schema.Struct({
+      name: Schema.String.annotate({ description: "The value's name." }),
+      value: Schema.String.annotate({ description: 'The value.' }),
+      link: NullString.annotate({ description: 'A link to it where the value is an address; null otherwise.' }),
+    }),
+  ).annotate({
     description: 'The values it handed on, each with its name, and a link where the value is an address.',
   }),
   refused: Strings.annotate({ description: 'The files it named that were refused, not handed on.' }),
   output: Fields.annotate({ description: 'The fields its workflow asked for, by name; a narrowed read leaves the long ones out.' }),
   missing: Strings.annotate({ description: 'The fields its workflow asked for that it left out.' }),
-  replies: Schema.NullOr(List(Schema.Struct({ finding: Schema.String, answer: Schema.String, why: Schema.String }))).annotate({
+  replies: Schema.NullOr(
+    List(
+      Schema.Struct({
+        finding: Schema.String.annotate({ description: 'The finding it answers.' }),
+        answer: Schema.String.annotate({ description: "Its answer: fixed or won't fix." }),
+        why: Schema.String.annotate({ description: 'Why it answered so.' }),
+      }),
+    ),
+  ).annotate({
     description: "Its answer to each finding it was handed: the finding, fixed or won't fix, and why; null where it gave none.",
   }),
   schema: Fields.annotate({ description: 'The JSON Schema its output was read by.' }),

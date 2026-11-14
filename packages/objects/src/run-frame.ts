@@ -28,7 +28,11 @@ export type RunClock = typeof RunClock.Type;
 export const RunListMeta = Schema.Struct({
   ...ListMeta.fields,
   counts: Schema.optionalKey(
-    Schema.Struct({ waiting: Schema.Finite, inFlight: Schema.Finite, finished: Schema.Finite }).annotate({
+    Schema.Struct({
+      waiting: Schema.Finite.annotate({ description: 'How many runs wait on a person.' }),
+      inFlight: Schema.Finite.annotate({ description: 'How many runs are in flight.' }),
+      finished: Schema.Finite.annotate({ description: 'How many runs have finished.' }),
+    }).annotate({
       description:
         'How many runs of its namespace and labels are in each state, counted before its fieldSelector and its page; on a list asked by state alone.',
     }),

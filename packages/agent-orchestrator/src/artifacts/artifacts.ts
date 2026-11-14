@@ -38,6 +38,9 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * Both of the ways that hand files to the steps after say that a file through a folder a harness reads as its own configuration
  * (`CONFIG_FOLDERS`) is refused, and why: a later step reads the files directory as a mounted folder, and its harness would take such a
  * file as its own. The checkout's way hands nothing to a later step, and says nothing of it.
+ * @param dir The step's files directory.
+ * @param inMain Whether the step works in the repository's own checkout; false where absent.
+ * @param inFolder Whether the step is of a folder run; false where absent.
  */
 export const artifactsContract = (dir: string, inMain = false, inFolder = false): string =>
   (inFolder
@@ -134,7 +137,11 @@ export type ArtifactPlace = 'workspace' | 'files' | 'escapes' | 'outside' | 'con
  */
 export const HANDED_CLOSEOUT = 'closeout.json';
 
-/** Where a declared artifact is looked for (`ArtifactPlace`). Pure. The files directory itself is no file in it, and is `outside`. */
+/**
+ * Where a declared artifact is looked for (`ArtifactPlace`). Pure. The files directory itself is no file in it, and is `outside`.
+ * @param file The path the closeout declared, from the workspace root or absolute.
+ * @param dir The step's files directory.
+ */
 export function artifactPlace(file: string, dir: string): ArtifactPlace {
   if (!path.isAbsolute(file)) {
     const rel = path.normalize(file);
@@ -178,6 +185,10 @@ export type MissingArtifact = {
  *
  * With its files removed by `nemia prune --artifacts`, a file the directory does not have, and one named from a workspace also gone, is
  * said `not kept`: a step's files are collected at its hand-off, and the marker cannot tell one the step never wrote from one it did.
+ * @param dir The step's files directory.
+ * @param missing Each declared file the run does not have, with why.
+ * @param files Every file in the step's directory, with its size.
+ * @param pruned What `nemia prune` removed of the run, and when; undefined for a run never pruned.
  */
 export function artifactLines(dir: string, missing: readonly MissingArtifact[], files: readonly ArtifactFile[], pruned?: Pruned): string[] {
   const line = (why: MissingArtifact['why'], say: (names: string) => string): string[] => {
@@ -234,7 +245,11 @@ export const REFUSING: ReadonlySet<MissingArtifact['why']> = new Set([
   'reserved',
 ]);
 
-/** Why the run does not have a file a closeout named, said of that one file to the step that named it: `why` as `REFUSING` holds it. */
+/**
+ * Why the run does not have a file a closeout named, said of that one file to the step that named it: `why` as `REFUSING` holds it.
+ * @param why Why the run does not have the file.
+ * @param dir The step's files directory.
+ */
 export function lackWords(why: string, dir: string): string {
   const words: Record<string, string> = {
     'not there': 'nothing is at that path in the workspace',
@@ -252,6 +267,8 @@ export function lackWords(why: string, dir: string): string {
  * A file that is there under a name near the one a closeout gave: among `there`, the files of the step's directory by absolute path, the
  * first with the same last name, letter case aside — in the folder named, spelled in another case, or in another folder. Undefined where
  * none is, and where the file named is itself there.
+ * @param named The file as the closeout named it.
+ * @param there The files of the step's directory, by absolute path.
  */
 export function nearName(named: string, there: readonly string[]): string | undefined {
   const last = path.basename(named).toLowerCase();
@@ -262,6 +279,9 @@ export function nearName(named: string, there: readonly string[]): string | unde
 /**
  * The lines that name each file a closeout lacked to whoever answers for it: the name as the closeout gave it, why the run does not have
  * it (`lackWords`), and the near name where the step's directory `dir` holds one among `there` (`nearName`).
+ * @param lacked Each file the closeout lacked: its path as given, and why.
+ * @param dir The step's files directory.
+ * @param there The files of the step's directory, by absolute path.
  */
 export const lackLines = (lacked: readonly { path: string; why: string }[], dir: string, there: readonly string[]): string[] =>
   lacked.map((file) => {
@@ -272,7 +292,10 @@ export const lackLines = (lacked: readonly { path: string; why: string }[], dir:
 /** What a step's brief says of the files a step before it named: those that are there now, by absolute path, and how many are gone. */
 export type HandedFiles = { there: string[]; gone: number };
 
-/** Bytes, as a person reads them. */
+/**
+ * Bytes, as a person reads them.
+ * @param bytes The size, in bytes.
+ */
 export const sizeOf = (bytes: number): string =>
   bytes < 1024
     ? `${bytes} B`
@@ -288,6 +311,9 @@ export const sizeOf = (bytes: number): string =>
  * writes none of it, whatever its fence. Its own folder is left out, writable as its workspace's mode makes it, and so is every step it
  * does not come after: a sibling, a step after it. None on a harness fenced by a sandbox, which reads the disk already, nor on a remote
  * agent, filed no local field.
+ * @param step The step filed: its name and its harness.
+ * @param steps The run's steps.
+ * @param runArtifacts The folder of the run's artifacts.
  */
 export const handedMounts = (step: Pick<StepSpec, 'name' | 'harness'>, steps: readonly StepSpec[], runArtifacts: string): Mount[] => {
   if (isRemoteHarness(step.harness) || sandboxed(step.harness ?? DEFAULT_HARNESS)) return [];
@@ -302,6 +328,10 @@ export const handedMounts = (step: Pick<StepSpec, 'name' | 'harness'>, steps: re
  * later step removes after the closeout was accepted unsigns nothing, of a task held open as of one settled. Nor is a task read that
  * signed under a tick that read no files: one whose settle the run has counted (`Run.settlesCounted`), any of a record that counts no
  * settle, and one whose check is filed already. None of a pruned run, whose files may be gone.
+ * @param steps The run's steps.
+ * @param run The run.
+ * @param phaseOf The phase of a task, by its id.
+ * @param closeoutOf A step's closeout, by its name, or undefined where it has none.
  */
 export function filesDue(
   steps: readonly StepSpec[],

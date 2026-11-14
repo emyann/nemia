@@ -14,6 +14,12 @@ const coveredFor = (grants: readonly Grant[], rule: ProposalRule, resource: stri
       (g.resourceNames.length === 0 || (rule.resourceNames.length > 0 && rule.resourceNames.every((n) => g.resourceNames.includes(n)))),
   );
 
+/**
+ * The pairs of resource and verb `rule` reaches past its agent's delegation: each pair it covers that no grant of `grants` covers
+ * for every name it names. Empty: the rule may be confirmed.
+ * @param rule The proposal rule asked to be confirmed: its resources, names and verbs.
+ * @param grants The grants of its agent's delegation.
+ */
 export const proposalRuleReach: ProposalRuleReach = (rule, grants) =>
   rule.resources
     .flatMap((resource) => rule.verbs.map((verb): Past => ({ resource, verb })))

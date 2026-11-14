@@ -28,6 +28,8 @@ import type { BranchesAsked, RunAsked } from '../../contracts/branches-asked.con
  * An ending step has no branch of its own: it works on the base branch, and what it acts on is the work of the steps before it. Read as
  * the result, its `main` would be the run's own branch, and every question about the run's result — has it landed, what did it touch,
  * what is there to decide — would be asked of the base branch and answered yes.
+ * @param steps The run's steps.
+ * @param run The run, read for the workflow nodes that routed it on; absent, none did.
  */
 export function resultSteps(steps: readonly StepSpec[], run?: Run): StepSpec[] {
   const routed = run ? routedResult(steps, run) : [];
@@ -40,6 +42,8 @@ export function resultSteps(steps: readonly StepSpec[], run?: Run): StepSpec[] {
 /**
  * The result of a run that routed on to another workflow: for each workflow node that filed its card (`StepRecord.sent`), what its
  * condition read — its `input:`, or the steps it waits on where it names none. What the routed run is handed. Empty for any other run.
+ * @param steps The run's steps.
+ * @param run The run, whose step records say which workflow node filed its card.
  */
 export function routedResult(steps: readonly StepSpec[], run: Run): StepSpec[] {
   const read = steps.flatMap((s) => {
@@ -54,6 +58,7 @@ export function routedResult(steps: readonly StepSpec[], run: Run): StepSpec[] {
  * The checks the run's work was judged by: each distinct `check:` of a step that is not an ending, in the order the steps run. What an
  * ending step is told to run again on the merge, so a shipper written once reads its folder's check off its brief rather than carrying
  * one in its words. Pure.
+ * @param steps The run's steps.
  */
 export function workChecks(steps: readonly StepSpec[]): string[] {
   return [...new Set(steps.flatMap((s) => (!endsOnBase(s) && s.check ? [s.check] : [])))];
@@ -63,6 +68,9 @@ export function workChecks(steps: readonly StepSpec[]): string[] {
  * The branches whose tips this pass records (`tipsSeen`): a stopped run's result branches — succeeded, failed or waiting on a person, so
  * neither running nor cancelled — when it cut worktrees and did not work on its base branch itself. What `nemia decide` offers to land.
  * None for any other run, so git is not asked about it.
+ * @param run The run.
+ * @param steps Its steps.
+ * @param status Its status, as `assess` judged it.
  */
 export function tipBranches(run: Run, steps: readonly StepSpec[], status: Assessment['status']): string[] {
   if (!run.isolate || status === 'running' || status === 'cancelled') return [];
@@ -75,6 +83,9 @@ export function tipBranches(run: Run, steps: readonly StepSpec[], status: Assess
 /**
  * The run's `tips` once this pass has seen its branches — `seen` is each branch git has, and the commit it is at — or undefined when
  * nothing changed, so an unchanged run is not written. Pure. A branch git no longer has keeps the tip last seen: that is what it is for.
+ * @param run The run, whose `tips` are its last seen.
+ * @param branches Its result branches.
+ * @param seen Each branch git has, and the commit it is at.
  */
 export function tipsSeen(
   run: Run,
@@ -97,6 +108,9 @@ export function tipsSeen(
  * The commit each of a run's result `branches` is at, as `heads` has it — or, for one `heads` does not have, the tip the run last saw
  * (`tipsSeen`): what a merge in the repository's checkout is read as this run's by (`checkoutStatus`). Pure: `heads` is every branch of
  * the repository and its commit as its caller read them, none where it read nothing.
+ * @param run The run, by the tips it last saw.
+ * @param branches Its result branches.
+ * @param heads Every branch of the repository and its commit; undefined where its caller read nothing.
  */
 export function resultTips(
   run: Pick<Run, 'tips'>,
@@ -116,6 +130,7 @@ export function resultTips(
  * Whether a branch has landed on its base, read off where the place's `standing` says it stands: yes when it is on
  * its base — `true` with work past its run's base, `'unchanged'` with none or where git could not tell — and false otherwise, or where
  * nothing was read. Pure.
+ * @param stood Where the place says the branch stands; undefined where nothing was read.
  */
 export const landedOver = (stood: BranchStood | undefined): Landed =>
   stood?.onBase !== 'yes' ? false : stood.pastBase === true ? true : 'unchanged';
@@ -146,7 +161,10 @@ export type Radius = {
 /** A branch the screen read, and what it touched — or the sentence saying it is not known (`notKnown`). */
 export type Touched = { branch: string; radius: Radius | { error: string } };
 
-/** The sentence for a branch whose changes could not be read, with what the place said: never read as a branch that changed nothing. */
+/**
+ * The sentence for a branch whose changes could not be read, with what the place said: never read as a branch that changed nothing.
+ * @param said What the place said instead of the changes.
+ */
 export const notKnown = (said: string): string => `what this run changed is not known: ${said}`;
 
 /** Files an agent reads as instructions before it reads the brief. A change to one changes every step after it. */
@@ -186,6 +204,7 @@ export const LESSON: readonly string[] = ['**/CLAUDE.md', '**/AGENTS.md', 'docs/
 /**
  * A `workspaces` glob as the radius matches it: a leading `./` and a trailing `/` dropped, so `./packages/*` is `packages/*`, with or
  * without a slash after it. npm reads them the same, and a regexp built from `./packages/*` as written matches no path git prints.
+ * @param written The glob as the `package.json` writes it.
  */
 export const workspaceGlob = (written: string): string => written.replace(/^(?:\.\/+)+/, '').replace(/\/+$/, '');
 
@@ -193,6 +212,7 @@ export const workspaceGlob = (written: string): string => written.replace(/^(?:\
  * The globs among a repository's `workspaces` that have `**`, as written. Not refused — the repository's `package.json` is not
  * ours — but named on the screen (`radiusLines`), since such a glob names a package at any depth: each file counts once all the
  * same, in the outermost package on its way (`packageOf`), and as a lesson only in that package's own `docs/` (`isLesson`).
+ * @param workspaces The repository's `workspaces` globs, as written.
  */
 export const deepWorkspaces = (workspaces: readonly string[]): string[] => workspaces.filter((w) => workspaceGlob(w).includes('**'));
 
@@ -200,6 +220,7 @@ export const deepWorkspaces = (workspaces: readonly string[]): string[] => works
  * The lesson list for a repository: `LESSON`, and `<workspace>/docs/` for each of its npm `workspaces` globs without `**`. Made from
  * `packages/**`, that glob would take a `docs/` inside a package's source too — `packages/x/src/docs/`, product code — so a `**` glob's
  * packages are read one file at a time instead (`isLesson`).
+ * @param workspaces The repository's `workspaces` globs, as written.
  */
 export const lessonGlobs = (workspaces: readonly string[]): string[] => [
   ...LESSON,
@@ -212,6 +233,10 @@ export const lessonGlobs = (workspaces: readonly string[]): string[] => [
 /** The group of a file in no directory. */
 export const ROOT_GROUP = '(root)';
 
+/**
+ * A glob as a regexp of a whole path: `*` and `?` within one folder, `**` across folders, and a trailing `/` every path under it.
+ * @param glob The glob.
+ */
 export function globRegExp(glob: string): RegExp {
   const g = glob.endsWith('/') ? `${glob}**` : glob;
   let re = '';
@@ -229,6 +254,11 @@ export function globRegExp(glob: string): RegExp {
   return new RegExp(`^${re}$`);
 }
 
+/**
+ * Whether any of `globs` names `file` (`globRegExp`).
+ * @param file The file's path from the repository's root.
+ * @param globs The globs.
+ */
 export const matches = (file: string, globs: readonly string[]): boolean => globs.some((g) => globRegExp(g).test(file));
 
 /** Both ends of a rename: moving a test out of `test/` changes the check as much as editing it. */
@@ -239,6 +269,8 @@ const linesOf = (c: Change): string => (c.added === null || c.removed === null ?
 /**
  * The workspace package a file is in: the outermost directory on its way that a `workspaces` glob names (`packages/agent-orchestrator`),
  * or undefined when none does. Outermost, so a glob with `**`, which names every directory below `packages/`, puts a file in one package.
+ * @param file The file's path from the repository's root.
+ * @param workspaces The repository's `workspaces` globs, as written.
  */
 export function packageOf(file: string, workspaces: readonly string[]): string | undefined {
   const dirs = file.split('/').slice(0, -1);
@@ -252,6 +284,8 @@ export function packageOf(file: string, workspaces: readonly string[]): string |
 
 /**
  * The group a file counts in: the workspace package it is in (`packageOf`), else its top-level directory, else the root.
+ * @param file The file's path from the repository's root.
+ * @param workspaces The repository's `workspaces` globs, as written; none where absent.
  */
 export function groupOf(file: string, workspaces: readonly string[] = []): string {
   const [top] = file.split('/').slice(0, -1);
@@ -262,6 +296,8 @@ export function groupOf(file: string, workspaces: readonly string[] = []): strin
 /**
  * Whether a file is where the next agent reads: on `lessonGlobs`, or — for a package a `**` glob names — in the `docs/` of the one
  * package `packageOf` puts it in, and no `docs/` deeper in that package.
+ * @param file The file's path from the repository's root.
+ * @param workspaces The repository's `workspaces` globs, as written; none where absent.
  */
 export function isLesson(file: string, workspaces: readonly string[] = []): boolean {
   if (matches(file, lessonGlobs(workspaces))) return true;
@@ -273,6 +309,7 @@ export function isLesson(file: string, workspaces: readonly string[] = []): bool
 /**
  * The npm `workspaces` of a repository's root `package.json` text, as written — its list, or its `packages` — and none when there is no
  * file or it does not read: `radius` reads `./packages/*` as `packages/*`, and names a glob with `**` (`workspaceGlob`, `deepWorkspaces`).
+ * @param packageJson The root `package.json`'s text; null or undefined where there is no file.
  */
 export function workspacesIn(packageJson: string | null | undefined): string[] {
   try {
@@ -287,6 +324,8 @@ export function workspacesIn(packageJson: string | null | undefined): string[] {
 /**
  * What a branch touched, grouped by blast radius, from the files the place's `report` says it changed. A file counts in every group it
  * touched — a move from one package to another is a change to both — and a binary file counts as a file, with no lines.
+ * @param files The files the branch changed, each with its lines added and removed.
+ * @param workspaces The repository's `workspaces` globs, as written; none where absent.
  */
 export function radius(files: readonly Change[], workspaces: readonly string[] = []): Radius {
   const changes = [...files];
@@ -317,6 +356,7 @@ export function radius(files: readonly Change[], workspaces: readonly string[] =
 /**
  * The radius for a person: a line per group, then the agent-facing and check-affecting lines, each only when true — and a line naming
  * a `workspaces` glob with `**`, when the base has one, since the groups above are read through it.
+ * @param r What the branch touched, grouped.
  */
 export function radiusLines(r: Radius): string[] {
   if (!r.changes.length) return ['nothing — the branch changed no file against the base'];
@@ -353,22 +393,35 @@ export function radiusLines(r: Radius): string[] {
  * started. `tipBranches` refuses the same branch for the same reason.
  *
  * A run that worked on its base branch itself (`--no-worktree`) gives none: there that branch is exactly where its work is.
+ * @param result The run's result branches.
+ * @param worked The branch each step worked on, undefined for a step that has none.
+ * @param base The run's base branch, for a run that cut worktrees; absent otherwise.
  */
 export const branchesToRead = (result: readonly string[], worked: ReadonlyArray<string | undefined>, base?: string): string[] =>
   result.length ? [...result] : [...new Set(worked.filter((b): b is string => Boolean(b) && b !== base))];
 
-/** The paths whose whole diff the screen asks for: each change a glob names at either end, by its path; the place diffs a rename as one. */
+/**
+ * The paths whose whole diff the screen asks for: each change a glob names at either end, by its path; the place diffs a rename as one.
+ * @param changes The files a branch changed.
+ * @param globs The globs of the files asked for in full.
+ */
 export const sensitivePaths = (changes: readonly Change[], globs: readonly string[]): string[] =>
   changes.filter((c) => pathsOf(c).some((p) => matches(p, globs))).map((c) => c.path);
 
-/** `--sensitive a,b` read into globs; empty entries dropped. */
+/**
+ * `--sensitive a,b` read into globs; empty entries dropped.
+ * @param arg The words `--sensitive` was given.
+ */
 export const parseGlobs = (arg: string): string[] =>
   arg
     .split(',')
     .map((g) => g.trim())
     .filter(Boolean);
 
-/** The heading over the files printed in full, saying why they are. */
+/**
+ * The heading over the files printed in full, saying why they are.
+ * @param globs The globs `--sensitive` names; undefined where it was not given, and the check-affecting files are printed.
+ */
 export const sensitiveHeading = (globs: readonly string[] | undefined): string =>
   globs
     ? `in full: the files --sensitive names (${globs.join(', ')}), in place of what decides a check`
@@ -377,6 +430,7 @@ export const sensitiveHeading = (globs: readonly string[] | undefined): string =
 /**
  * How much a branch changed, in one line: `3 files: +14 −1`, and `, 1 binary` where a file has no line counts; null for a branch that
  * changed no file, which the screen beside it leaves unsaid.
+ * @param r What the branch touched, grouped.
  */
 export function countsLine(r: Radius): string | null {
   if (!r.changes.length) return null;
@@ -387,7 +441,10 @@ export function countsLine(r: Radius): string | null {
   return `${files}${counted}${binary ? `${counted ? ',' : ''} ${binary} binary` : ''}`;
 }
 
-/** What each branch touched, for a person: the branch, then its radius beneath it — or the sentence saying it is not known. */
+/**
+ * What each branch touched, for a person: the branch, then its radius beneath it — or the sentence saying it is not known.
+ * @param touched Each branch read, and what it touched or why it is not known.
+ */
 export const touchedLines = (touched: readonly Touched[]): string[] =>
   touched.flatMap(({ branch, radius: r }) =>
     'error' in r ? [`touched  ${branch}  —  ${r.error}`] : [`touched  ${branch}`, ...radiusLines(r).map((line) => `  ${line}`)],
@@ -397,6 +454,10 @@ export const touchedLines = (touched: readonly Touched[]): string[] =>
  * The files printed in full on one branch, under a heading that says why: the diff the place gave, `none`
  * when no changed file is on the list — said, so an empty section is not mistaken for one never
  * looked at — or the sentence saying it is not known.
+ * @param t The branch, and what it touched or why it is not known.
+ * @param globs The globs `--sensitive` names; undefined for the check-affecting files.
+ * @param diff The diff the place gave, or what it said instead.
+ * @param many Whether the run has more than one branch, so the heading names this one; false where absent.
  */
 export function inFullLines(t: Touched, globs: readonly string[] | undefined, diff: string | { error: string }, many = false): string[] {
   const heading = `${sensitiveHeading(globs)}${many ? `, on ${t.branch}` : ''}`;
@@ -414,6 +475,7 @@ export function inFullLines(t: Touched, globs: readonly string[] | undefined, di
 /**
  * The lesson, for the whole run: whether its branches changed a file the next agent reads, in words without the screen's label, and which
  * of its three it is. A branch that could not be read is not a branch that wrote nothing, and it says it does not know.
+ * @param touched Each branch read, and what it touched or why it is not known.
  */
 export function lessonOf(touched: readonly Touched[]): { said: string; state: LessonState } {
   const unread = touched.filter((t) => 'error' in t.radius).map((t) => t.branch);
@@ -425,7 +487,10 @@ export function lessonOf(touched: readonly Touched[]): { said: string; state: Le
   return { said: written.join(' · '), state: 'written' };
 }
 
-/** The lesson line `nemia decide` prints (`lessonOf`), under its label. */
+/**
+ * The lesson line `nemia decide` prints (`lessonOf`), under its label.
+ * @param touched Each branch read, and what it touched or why it is not known.
+ */
 export const lessonLine = (touched: readonly Touched[]): string => `lesson  ${lessonOf(touched).said}`;
 
 /**
@@ -437,7 +502,12 @@ export const lessonLine = (touched: readonly Touched[]): string => `lesson  ${le
 export const branchesAsked: BranchesAsked = ({ isolate, cancelled, running, results }) =>
   isolate && !cancelled && !running ? [...new Set(results)] : [];
 
-/** What `branchesAsked` is asked of `run`, off its record and its status (`assess`'s): its result branches, in the order of its steps. */
+/**
+ * What `branchesAsked` is asked of `run`, off its record and its status (`assess`'s): its result branches, in the order of its steps.
+ * @param run The run.
+ * @param steps Its steps.
+ * @param status Its status, as `assess` judged it.
+ */
 export const askedOf = (run: Run, steps: readonly StepSpec[], status: Assessment['status']): RunAsked => ({
   isolate: isRepositoryRun(run) && Boolean(run.isolate),
   cancelled: Boolean(run.cancelledAt) || status === 'cancelled',

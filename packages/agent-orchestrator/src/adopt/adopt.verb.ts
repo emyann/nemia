@@ -36,14 +36,22 @@ const manyOf = (args: Args, key: string): string[] => {
   return Array.isArray(value) ? value.map(String) : [];
 };
 
-/** An argument of a command line, quoted for a shell where it holds anything but plain characters. */
+/**
+ * An argument of a command line, quoted for a shell where it holds anything but plain characters.
+ * @param arg The argument as it is, unquoted.
+ */
 export const shellArg = (arg: string): string => (/^[\w./:=@+-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`);
 
 /** The line that takes `name` over by the template at `source` with `sets`, carrying the plan's `digest`. */
 const adoptLine = (name: string, source: string, sets: readonly string[], digest: string): string =>
   `nemia factory adopt ${[name, '--template', source, ...sets.flatMap((s) => ['--set', s]), '--plan', digest].map(shellArg).join(' ')}`;
 
-/** The line that previews the takeover of `name` by the template at `source` with `sets`. */
+/**
+ * The line that previews the takeover of `name` by the template at `source` with `sets`.
+ * @param name The factory's name.
+ * @param source The template's source as the person named it.
+ * @param sets The `--set` words given, each `name=value`.
+ */
 export const diffLine = (name: string, source: string, sets: readonly string[]): string =>
   `nemia factory diff ${[name, '--template', source, ...sets.flatMap((s) => ['--set', s])].map(shellArg).join(' ')}`;
 

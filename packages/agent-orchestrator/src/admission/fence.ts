@@ -30,6 +30,7 @@ const any = (name: string): string => `Bash(nemia ${name}:*)`;
  *
  * An allow on a name covers the commands that extend it (`agents`, `agents write`), and their ask or deny stands over it: a harness asks
  * before it allows, and refuses before it asks.
+ * @param table The command table, each entry with its name and its class.
  */
 export function nemiaFence(table: readonly Entry[]): Fence {
   const unasked = (name: string) => [bare(name), any(name)];
@@ -61,6 +62,8 @@ export const ASSIGNED = 'Bash(*=* nemia *)';
  * `fence` with each prompt the person allowed by its own rule (`allows`, her folder's local settings) asked no more: an ask outranks an
  * allow wherever each is written, so the ask is taken out and the person's allow reaches the call. Only a prompt is widened: an answer
  * has no ask to take out and its admission asks over every allow, a deny stands over every allow, and a broader allow widens nothing.
+ * @param fence Her fence, as `nemiaFence` derives it.
+ * @param allows The rules the person allowed in her folder's local settings.
  */
 export const widened = (fence: Fence, allows: readonly string[]): Fence => ({
   ...fence,

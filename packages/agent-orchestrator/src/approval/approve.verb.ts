@@ -40,6 +40,7 @@ export const proposalGet = Effect.fn('proposalGet')(function* (factory: string, 
 /**
  * A run's state as its record says it, between passes: `cancelled` once called off, `gone` where the store holds it no more, and unread
  * otherwise — so a run-end proposal approved now waits for the pass that judges its run (`pass.verb.ts`).
+ * @param run The run's id.
  */
 export const recordedRunState: RunStateOf = (run) =>
   Effect.gen(function* () {

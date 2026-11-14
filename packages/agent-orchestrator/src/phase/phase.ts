@@ -16,7 +16,7 @@ import type { Reason } from '../feed/index.ts';
 import type { StepStatus } from '../record/record.ts';
 import type { ListedPhase } from '../list/list.ts';
 import type { Assessment } from '../tick/assess.ts';
-import type { AnswerVia, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from 'objects';
+import type { AnswerVia, RUN_PHASE_OF as RUN_PHASES_OF, RunPhase, RunReason, STEP_PHASE_OF, StepPhase, StepReason, WaitOn } from 'objects';
 
 /**
  * Where a step is in its life: not yet at work (`pending`, a wait on another step, a run, a slot, the base or the pause among it), at
@@ -190,9 +190,10 @@ export const ENGINE_REASON: Record<ListedPhase, QualifiedStep> = {
  * The phase each step reason stands in. `waiting` is a wait on a person, and nothing else: a step not filed — waiting on a step
  * (`Pending`), or on a thing (`Waiting`: a run, the limit, the base or the pause) — is `pending`, to come. `Unknown`, a task the
  * engine has no record of, is `pending` too, as the engine folds it; a step whose record does not read at all is `failed` with `Unknown`,
- * set where it is answered (`unjudged`).
+ * set where it is answered (`unjudged`). Typed as objects' table (`STEP_PHASE_OF`), which the served objects' schemas hold a step's codes
+ * to, so a row that differs from it fails the typecheck: the two are one table, kept here so this file loads nothing of objects.
  */
-export const PHASE_OF: Record<StepReason, StepPhase> = {
+export const PHASE_OF: typeof STEP_PHASE_OF = {
   Pending: 'pending',
   Waiting: 'pending',
   Unknown: 'pending',
@@ -236,7 +237,7 @@ export const RUN_REASON_OF: Record<RunStatus, QualifiedRun> = {
 };
 
 /** The phase each run reason stands in: a run a person stops is `waiting`, and a held one `pending`, as a step waiting on a thing is. */
-export const RUN_PHASE_OF: Record<RunReason, RunPhase> = {
+export const RUN_PHASE_OF: typeof RUN_PHASES_OF = {
   Running: 'running',
   Waiting: 'pending',
   Succeeded: 'succeeded',

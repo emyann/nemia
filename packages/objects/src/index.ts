@@ -793,3 +793,5 @@ export { TOKEN_ADD_WORDS, TOKEN_LS_WORDS, TOKEN_RM_WORDS } from './commands-rest
 export { Actor, actorWords, Token, TokenList, TokenMint, TokenMinted, TokensGroup } from './token.ts';
 export { STATS_KEYS, STATS_MANUAL, STATS_WORDS, statsRefusal } from './commands-rest-stats.ts';
 export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow } from './stats-read.ts';
+export { RUN_PHASE_OF, runCodesLegal, STEP_PHASE_OF, stepCodesLegal, tryCodesLegal } from './codes.ts';
+export type { RunCodes, StepCodes, TryCodes } from './codes.ts';

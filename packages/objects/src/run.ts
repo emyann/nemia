@@ -43,6 +43,7 @@ import {
   TRY_CAUSES,
   WAIT_ON,
 } from './words.ts';
+import { runCodesLegal, stepCodesLegal, tryCodesLegal, type RunCodes, type StepCodes, type TryCodes } from './codes.ts';
 
 /** An array as the package's types hold one, mutable, so a page built off the object keeps their types. */
 const List = <S extends Schema.Top>(item: S) => Schema.mutable(Schema.Array(item));
@@ -50,6 +51,18 @@ const Strings = List(Schema.String);
 const NullString = Schema.NullOr(Schema.String);
 const NullNumber = Schema.NullOr(Schema.Finite);
 const NullBoolean = Schema.NullOr(Schema.Boolean);
+
+/**
+ * The checks that hold a served object to codes the package makes (`codes.ts`): its phase is its reason's, a wait says what it waits
+ * on, an answer awaited where it is asked. An object with any other set is refused as it is encoded, and as a client decodes it.
+ */
+const codesRefused = (what: string, codes: { phase: string; reason: string; on?: unknown; via?: unknown }): string =>
+  `${what} is served with codes nothing makes together — phase ${codes.phase}, reason ${codes.reason}` +
+  `${'on' in codes ? `, on ${String(codes.on)}, via ${String(codes.via)}` : ''}: a reason has one phase (STEP_PHASE_OF, RUN_PHASE_OF in ` +
+  'objects), Waiting alone says what it waits on, and AwaitingAnswer alone where it is asked. Build the codes from the reason.';
+const STEP_CODES = Schema.makeFilter((step: StepCodes) => stepCodesLegal(step) || codesRefused('a step', step));
+const TRY_CODES = Schema.makeFilter((tried: TryCodes) => tryCodesLegal(tried) || codesRefused('a try', tried));
+const RUN_CODES = Schema.makeFilter((run: RunCodes) => runCodesLegal(run) || codesRefused('a run', run));
 
 const StepStatusWord = Schema.Literals(STEP_STATUSES);
 const StepPhase = Schema.Literals(STEP_PHASES);
@@ -139,7 +152,9 @@ export const TryShort = Schema.Struct({
   reason: StepReason,
   outcome: Schema.NullOr(Schema.Literals(OUTCOMES)),
   verdict: Schema.NullOr(CheckVerdict),
-}).annotate({ identifier: 'TryShort' });
+})
+  .check(TRY_CODES)
+  .annotate({ identifier: 'TryShort' });
 export type TryShort = typeof TryShort.Type;
 
 /** A raise of a step's cap the package takes, and how it is asked for (`StepRaise`, retry/raise.ts). */
@@ -408,7 +423,9 @@ export const RunStepStatus = Schema.Struct({
    * with why the folder did not read (null where it did); absent on a step not filed yet, or from an older api.
    */
   artifactsFolder: Schema.optionalKey(Schema.Struct({ files: List(StepArtifact), error: NullString })),
-}).annotate({ identifier: 'RunStepStatus' });
+})
+  .check(STEP_CODES)
+  .annotate({ identifier: 'RunStepStatus' });
 export type RunStepStatus = typeof RunStepStatus.Type;
 
 /** The runs a run waits on or is held until, each that has not landed and why it never will on its own (`RunWaiting`, `RunHolding`). */
@@ -541,7 +558,9 @@ export const RunStatus = Schema.Struct({
   waitingSince: Schema.optionalKey(NullString),
   finishedAt: Schema.optionalKey(NullString),
   outcome: Schema.optionalKey(Schema.NullOr(Schema.Literals(RUN_OUTCOMES))),
-}).annotate({ identifier: 'RunStatus' });
+})
+  .check(RUN_CODES)
+  .annotate({ identifier: 'RunStatus' });
 export type RunStatus = typeof RunStatus.Type;
 
 /** The run as one object: `nemia/v1`'s `Run`. */
@@ -719,7 +738,9 @@ export const StepTry = Schema.Struct({
   unreadable: Schema.NullOr(StepUnreadable),
   answer: NullString,
   answeredBy: Schema.optionalKey(Actor),
-}).annotate({ identifier: 'StepTry' });
+})
+  .check(STEP_CODES)
+  .annotate({ identifier: 'StepTry' });
 export type StepTry = typeof StepTry.Type;
 
 /** A step's tries, earliest first, the current one last: `GET /api/runs/:runId/steps/:step/tries`. */

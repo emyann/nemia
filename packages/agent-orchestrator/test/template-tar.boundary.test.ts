@@ -55,12 +55,14 @@ function exported(): string {
   return dir;
 }
 
+/** tar's flags to extract a gzipped archive with the modes it holds (`p`), whatever this process's umask would take off a file. */
+const EXTRACT_KEEPING_MODES = '-xpzf';
+
 test("the system's tar opens an archive into the same files and modes as unpack writes", () => {
   const dir = exported();
   const { out } = run(packedTemplate(dir, undefined, scratch('wf-template-tar-pack-')));
   const byTar = scratch('wf-template-tar-x-');
-  // -p: the modes the archive holds, whatever this process's umask takes off a file tar makes.
-  execFileSync('tar', ['-xpzf', out, '-C', byTar], { stdio: ['ignore', 'pipe', 'pipe'] });
+  execFileSync('tar', [EXTRACT_KEEPING_MODES, out, '-C', byTar], { stdio: ['ignore', 'pipe', 'pipe'] });
   assert.deepEqual(fs.readdirSync(byTar), ['team']);
   assert.deepEqual(filesOf(path.join(byTar, 'team')), filesOf(dir));
 });

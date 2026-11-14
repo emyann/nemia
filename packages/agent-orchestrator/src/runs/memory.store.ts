@@ -13,7 +13,7 @@ import { Missing } from '../refusal/refusal.ts';
 import { mergeSpent } from '../merge/merge.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
-import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
+import { spentAcceptances, spentApprovals, workStands, type RoundAsk } from '../status/status.ts';
 import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore, Unheld } from '../record/record.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Actor } from 'objects';
@@ -80,11 +80,16 @@ const asksOf = (st: State, id: string): Map<string, Held> => st.asks.get(id) ?? 
 const waiting = (st: State, id: string, of: AskOf) =>
   [...asksOf(st, id).values()].filter((h) => !h.done && h.person.of === of).map((h) => structuredClone(h.person.ask));
 
+/** The approvals of run `id` not set aside, as the gate's ask files hold them: each, whether its work still stands or not. */
+const approvalsHeld = (st: State, id: string) =>
+  [...asksOf(st, id).values()].flatMap((h) => (!h.done && h.person.of === 'gate' ? [structuredClone(h.person.ask)] : []));
+
 /** The run `id`, its person's files composed onto it as `runRecord` composes them. */
 function readOf(st: State, id: string): Run {
   const record = st.records.get(id);
   if (!record) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
-  const [approvals, acceptances] = [waiting(st, id, 'gate'), waiting(st, id, 'loop')];
+  const approvals = approvalsHeld(st, id).filter((a) => workStands(record, a));
+  const acceptances = waiting(st, id, 'loop');
   const [pruned, hold, unheld, labels] = [st.pruned.get(id), st.holds.get(id), st.unheld.get(id), st.labels.get(id)];
   return {
     ...structuredClone(record),
@@ -175,6 +180,16 @@ function runsOf(st: State): RunsLayer['runs'] {
   };
 }
 
+/**
+ * The name an ask set aside is kept under once another is written at its name, as a file in `done/` is never written over (`doneWith`):
+ * its name with `.2`, `.3`, … after it, the first not held.
+ */
+const keptAside = (held: ReadonlyMap<string, Held>, name: string): string => {
+  let n = 2;
+  while (held.has(`${name}.${n}`)) n++;
+  return `${name}.${n}`;
+};
+
 /** Set aside each ask of `of` named by `spent` (its step and number): consumed, never edited, as `doneWith` moves a file. */
 function spend(st: State, id: string, of: AskOf, spent: ReadonlyArray<{ step: string; n: number }>): void {
   for (const { step, n } of spent) {
@@ -216,7 +231,7 @@ function asksGroup(st: State): RunsLayer['asks'] {
         st,
         run.id,
         'gate',
-        spentApprovals(run).map((a) => ({ step: a.step, n: a.try })),
+        spentApprovals({ ...run, approvals: approvalsHeld(st, run.id) }).map((a) => ({ step: a.step, n: a.try })),
       );
       spend(
         st,
@@ -236,7 +251,9 @@ function asksGroup(st: State): RunsLayer['asks'] {
       const name = nameOf(keyOf(person));
       const where = runsAt(`${id}.asks`, name);
       const held = st.asks.get(id) ?? new Map<string, Held>();
-      if (held.has(name)) return { written: false, where, stray: null };
+      const before = held.get(name);
+      if (before && !before.done) return { written: false, where, stray: null };
+      if (before) held.set(keptAside(held, name), before);
       held.set(name, { person: structuredClone(person), done: false });
       st.asks.set(id, held);
       touch(st, id);

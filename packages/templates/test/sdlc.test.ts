@@ -339,6 +339,7 @@ const intakePass = (steps: ReturnType<typeof intakeOf>, handsOver: string, appro
     signedOff: (step) => (step === 'intake' ? { outcome: 'done', summary: 'the intent', artifacts: [], output: intent } : undefined),
     asked: () => false,
     verdictOf: () => undefined,
+    checkKillOf: () => undefined,
     sessionBlocked: () => false,
     spendOf: () => undefined,
     asks: [],

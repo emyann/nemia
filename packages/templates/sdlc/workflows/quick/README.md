@@ -46,7 +46,7 @@ On GitHub, the check is the cheap set, and CI: it runs `change.ts size`, `probe.
 `implementCheck` parameter, `pull-request.ts push` and `pull-request.ts wait --check <name>`, in that order, and nothing else.
 Each script is read from what the run froze when it began, never from the tree it judges: `change.ts`, quick's own, from its frozen
 workflow files (`node "$WF_WORKFLOW_FILES/change.ts"`, the copy of this folder), and the scripts it runs as `build` does — `probe.ts`,
-`parts.ts`, `pull-request.ts` and `landing.ts`, with `ci-log.ts`, `exec.ts` and `refresh.ts`, which they import — from its frozen carried files
+`parts.ts`, `pull-request.ts` and `landing.ts`, with `ci-log.ts`, `exec.ts`, `rerun.ts` and `refresh.ts`, which they import — from its frozen carried files
 (`node "$WF_CARRIED_FILES/<script>.ts"`, the copy of the template's `carried/` folder), kept there once for both workflows. Where
 either variable is not set, the check names it on stderr and fails, running no clause after it. This sdlc needs the Nemia it ships
 with: one that renders and freezes a template's carried folder and reads a `{ path }` item of a list.
@@ -90,8 +90,8 @@ carried `landing.ts`, as `build`'s does, and fast-forwards the checkout, and its
 and the check merges that head once CI is green at it, as `build`'s README says: the landed commit differs from the reviewed head only
 in the files `landingDerives` names. Main has one guard, whatever the workflow: the required CI context on the head the review read, and
 a merge that refuses anything but this run's own green pull request. Where the factory's `landingWaitsOnCi` is true (the default), the
-receipt then waits on the CI context at the merge commit on the base branch, as `build`'s README says: a merge that turned the base red
-fails the land step though the merge stands, unless the base's tip holds it and is green there, which passes a merge whose own run was
+receipt then waits on the CI context at the merge commit on the base branch, as `build`'s README says: a red there is re-run once
+first, as the round's wait re-runs one, and a merge still red, the base turned red, fails the land step though the merge stands, unless the base's tip holds it and is green there, which passes a merge whose own run was
 cancelled or never reported too; set it false (`--set landingWaitsOnCi=false`) where CI does not run on pushes to the base.
 
 ## The review

@@ -27,6 +27,7 @@ import {
   raiseOf,
   raiseWords,
   sendBackTo,
+  takeBackWords,
   spentWord,
   waitsAtGate,
   type Raise,
@@ -35,7 +36,7 @@ import {
 import { budgetWord } from '../money/money.ts';
 import type { Verdict } from '../check/index.ts';
 import { messageRefusal, modeWord, retriesSpent, type RetryAsk, type RetryHow } from './retry-ask.ts';
-import { carries, heard, pauseAskVoid, retriesDue, retryable } from './retry.ts';
+import { carries, heard, pauseAskVoid, retriesDue, retryable, type CheckKillOf } from './retry.ts';
 import { remoteRetryRefusal } from '../harness/harness.ts';
 import { autoDropped } from '../workflow/index.ts';
 import { modeOf } from '../former/former.ts';
@@ -55,6 +56,7 @@ type Asked = {
   asks: readonly RetryAsk[];
   harnessBlocked: (taskId: string) => boolean;
   spendOf: SpendOf;
+  checkKillOf: CheckKillOf;
 };
 
 /**
@@ -118,6 +120,7 @@ export function retryRefusal(
   asks: readonly RetryAsk[] = [],
   harnessBlocked: (taskId: string) => boolean = () => false,
   spendOf: SpendOf = () => undefined,
+  checkKillOf: CheckKillOf = () => undefined,
 ): string | null {
   const asked: Asked = {
     steps,
@@ -132,6 +135,7 @@ export function retryRefusal(
     asks,
     harnessBlocked,
     spendOf,
+    checkKillOf,
   };
   const step = askedStep(asked);
   if (typeof step === 'string') return step;
@@ -262,7 +266,7 @@ function uncarriedRefusal(c: Judged, pending: RetryAsk): string {
 
 /** Why a step with no way to be tried has none: an ending stopped on the base branch, an ending at its gate, or its status. */
 function nothingToTry(c: Judged): string {
-  return stoppedEndingRefusal(c) ?? endingGateRefusal(c) ?? statusRefusal(c);
+  return stoppedEndingRefusal(c) ?? endingGateRefusal(c) ?? unspentRefusal(c) ?? statusRefusal(c);
 }
 
 /** A step whose work an ending stopped on the base branch acted on: sent back through the folder's loop, or landed again. */
@@ -293,6 +297,17 @@ function endingGateRefusal(c: Judged): string | undefined {
     `${name} is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. ` +
     `Approve it: nemia approve ${run.id} ${name}${back ? ` — or send the work back: ${back}` : ''}.`
   );
+}
+
+/**
+ * A send-back of work an ending approved and not filed waits on, where that approval names no work (`takeBackWords`): nothing would spend
+ * it, so it is taken back first.
+ */
+function unspentRefusal(c: Judged): string | undefined {
+  const { steps, run, name, status } = c;
+  if (!satisfiesAfter(status)) return undefined;
+  const ending = steps.find((s) => s.after.includes(name) && sendBackTo(s, run).includes(name) && takeBackWords(s, run));
+  return ending ? takeBackWords(ending, run) : undefined;
 }
 
 /** What a step's status says of a try, when it has none: not filed, running, checking, done, or a loop's round to go. */
@@ -419,8 +434,8 @@ function budgetMisgiven(c: Judged): string | undefined {
 
 /** A step the run is about to try again itself: an ask to sign off, or a try `retries:` still covers. */
 function runTriesItself(c: Judged): string | undefined {
-  const { steps, step, run, name, phaseOf, closeoutOf, askedCloseout, verdictOf, spendOf, next } = c;
-  const itself = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, [], () => false, spendOf).find(
+  const { steps, step, run, name, phaseOf, closeoutOf, askedCloseout, verdictOf, spendOf, checkKillOf, next } = c;
+  const itself = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, [], () => false, spendOf, checkKillOf).find(
     (r) => r.step === name,
   );
   if (itself?.by === 'signoff') {
@@ -428,6 +443,10 @@ function runTriesItself(c: Judged): string | undefined {
       ? 'its closeout named a file the run does not have'
       : 'its session ended without the closeout it was asked for';
     return `the run continues ${name} itself: ${why}, once a round, told to sign off, before it waits on you — the next tick files try ${next}. Wait for it: nemia ls ${run.id}.`;
+  }
+  if (itself?.mode === 'recheck') {
+    const left = (step.retries ?? 0) - retriesSpent(run.steps[name]);
+    return `the run runs ${name}'s check again itself: the machine ran out of memory and killed a process of it, and \`retries: ${step.retries}\` has ${left} left, so the next tick runs it as try ${next}. Wait for it: nemia ls ${run.id}.`;
   }
   if (itself) {
     const left = (step.retries ?? 0) - retriesSpent(run.steps[name]);

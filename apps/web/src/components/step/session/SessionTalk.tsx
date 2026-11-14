@@ -39,7 +39,7 @@ type Props = {
   live: boolean;
   /** The message the session is writing, drawn after the turns until the whole of it takes its place. */
   writing?: string | null;
-  /** `compact` for the run page's Activity tab; the session page's own by default. */
+  /** `compact` for the step bar's tail of it; the session page's own by default. */
   density?: 'page' | 'compact';
 };
 
@@ -55,7 +55,7 @@ export function SessionTalk({ who, turns, live, writing = null, density = 'page'
       unread={0}
       readable={null}
       onRead={() => {}}
-      drawOwn={(own) => <SessionOwn own={own} marks={MARKS} />}
+      drawOwn={(own) => <SessionOwn own={own} step={who} marks={MARKS} />}
       density={density}
       writing={writing}
     />

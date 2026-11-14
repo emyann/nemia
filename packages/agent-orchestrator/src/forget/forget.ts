@@ -7,7 +7,7 @@ import type { StepSpec } from '../step/step.ts';
 import { andList, type CloseoutAsked, type RepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/index.ts';
-import { modeWord, spentAsks, type Retry, type RetryAsk } from '../retry/index.ts';
+import { modeWord, spentAsks, type CheckKillOf, type Retry, type RetryAsk } from '../retry/index.ts';
 import {
   approvedFirst,
   landsOnCheck,
@@ -123,6 +123,7 @@ export function forgetRefusal(
   verb: 'rm' | 'prune' = 'rm',
   merging: MergeState['merging'] = 'none',
   command = `nemia ${verb} ${run.id}`,
+  checkKillOf: CheckKillOf = () => undefined,
 ): string | null {
   const asked: Forgetting = {
     steps,
@@ -133,6 +134,7 @@ export function forgetRefusal(
     closeoutOf,
     askedCloseout,
     verdictOf,
+    checkKillOf,
     asks,
     roundAsks,
     spendOf,
@@ -157,6 +159,7 @@ type Forgetting = {
   closeoutOf: (step: string) => Closeout | undefined;
   askedCloseout: (taskId: string) => CloseoutAsked;
   verdictOf: (step: string) => Verdict | undefined;
+  checkKillOf: CheckKillOf;
   asks: readonly RetryAsk[];
   roundAsks: readonly RoundAsk[];
   spendOf: SpendOf;
@@ -199,6 +202,7 @@ function factsOf(f: Forgetting, others: readonly Run[]): Facts {
             signedOff: f.closeoutOf,
             asked: f.askedCloseout,
             verdictOf: f.verdictOf,
+            checkKillOf: f.checkKillOf,
             sessionBlocked: () => false,
             spendOf: f.spendOf,
             asks: f.asks,

@@ -58,6 +58,11 @@ const KEPT: readonly Kept[] = [
     why: "A sheet portaled over the window, out of the page column: its width is the window's.",
   },
   {
+    file: 'src/components/view/ViewerSheet.tsx',
+    token: 'data-[side=right]:sm:max-w-3xl',
+    why: "A sheet portaled over the window, out of the page column: its width is the window's.",
+  },
+  {
     file: 'src/components/agent/SkillPicker.tsx',
     token: 'data-[side=right]:sm:max-w-xl',
     why: "A sheet portaled over the window, out of the page column: its width is the window's.",

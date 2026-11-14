@@ -3,9 +3,20 @@
  * (`approvalRefusal`), and whether a step's task, held open, waits for a person's word on this pass (`holdsOpen`). Pure.
  */
 import type { StepSpec } from '../step/step.ts';
-import { andList, endedForGood, tryOf, type Run, type StepStatus } from '../record/record.ts';
+import { andList, endedForGood, tryOf, type Approval, type Run, type StepStatus } from '../record/record.ts';
 import { heard, modeWord, retryable } from '../retry/index.ts';
-import { approvalOf, approvedFirst, branchWord, gatesOf, hasGate, notHandedOn, resultOnBase, standing } from '../status/status.ts';
+import {
+  approvalOf,
+  approvedFirst,
+  takeBackOf,
+  branchWord,
+  gatesOf,
+  hasGate,
+  notHandedOn,
+  resultOnBase,
+  standing,
+  sendBackTo,
+} from '../status/status.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { routeLine, runWords } from '../route/routed/index.ts';
 import { firstPiece } from '../piece/piece.ts';
@@ -34,6 +45,37 @@ export const approvalWordsRefusal = (message: string | undefined, command = 'nem
   message !== undefined && !message.trim()
     ? `--message is empty, and an approval's words are handed to every step after the gate: empty, they tell them nothing. Say what you approve, or on what terms — ${command} --message "<words>" — or leave --message out.`
     : null;
+
+/**
+ * A second approval of the try a step is on: while it may still be sent back, the send-back (`sendsBack`, or `unfiledRefusal` for an
+ * ending approved and not filed); else that it has handed on.
+ */
+function approvedRefusal(steps: readonly StepSpec[], step: StepSpec, run: Run, given: Approval, sendsBack: true | undefined): string {
+  const { name } = step;
+  const approved = `try ${tryOf(run, name)} of ${name} is already approved, at ${given.at}${given.message !== undefined ? ', with words' : ''}`;
+  if (sendsBack)
+    return `${approved}: what waits on it is filed on the next tick, once. To send it back instead, before that tick: nemia retry ${run.id} ${name} --message "<objection>".`;
+  if (approvedFirst(step, run) && !run.steps[name]?.taskId) return unfiledRefusal(step, run, approved, given);
+  const after = steps.some((s) => s.after.includes(name));
+  return `${approved}, and it has handed on: ${after ? 'what waits on it has been filed' : 'nothing waits on it, and its run goes on without it'}, so there is nothing to approve, nor to send back. See where the run stands: nemia ls ${run.id}.`;
+}
+
+/**
+ * A second approval of an ending approved and not filed: it waits for the checkout, or the pass that files it, and its work may still
+ * be sent back, which spends the approval (`approvedUnfiled`) — the run is neither held nor pruned here, which `approvalRefusal` refused
+ * first. An approval an older nemia wrote names no work, and no send-back spends it: taken back first (`takeBackOf`), the work may be
+ * sent back.
+ */
+function unfiledRefusal(step: StepSpec, run: Run, approved: string, given: Approval): string {
+  const back = sendBackTo(step, run).map((s) => `nemia retry ${run.id} ${s} --message "<objection>"`);
+  const after =
+    given.work === undefined
+      ? ` ${takeBackOf(step, run, given)}`
+      : back.length
+        ? ` To send the work back instead, before it is filed: ${back.join(' or ')}.`
+        : '';
+  return `${approved}, and nothing of it has run: the run files it once it may — nemia ls ${run.id} says what it waits for.${after}`;
+}
 
 /**
  * Why `nemia approve` will not approve this step, in words that name the fix — or null, when it may: the step waits at its gate. Pure.
@@ -94,13 +136,7 @@ export const approvalRefusal: ApprovalRefusal = (
   const n = tryOf(run, name);
   const given = approvalOf(run, name);
   const { sendsBack } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf);
-  if (given) {
-    const approved = `try ${n} of ${name} is already approved, at ${given.at}${given.message !== undefined ? ', with words' : ''}`;
-    if (sendsBack)
-      return `${approved}: what waits on it is filed on the next tick, once. To send it back instead, before that tick: nemia retry ${run.id} ${name} --message "<objection>".`;
-    const after = steps.some((s) => s.after.includes(name));
-    return `${approved}, and it has handed on: ${after ? 'what waits on it has been filed' : 'nothing waits on it, and its run goes on without it'}, so there is nothing to approve, nor to send back. See where the run stands: nemia ls ${run.id}.`;
-  }
+  if (given) return approvedRefusal(steps, step, run, given, sendsBack);
   const pending = asks.find((a) => a.step === name && a.try === n + 1);
   if (pending && !heard(pending, sendsBack)) {
     return `try ${n + 1} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} is at its gate, so no tick honours it: a send-back says what to change. Delete that ask — retry-${name}-${n + 1}, in the run's .asks directory — then approve it, or send it back with words: nemia retry ${run.id} ${name} --message "<objection>".`;

@@ -13,12 +13,13 @@ import path from 'node:path';
 export const PER_WORKER_BYTES = 2_560 * 1024 * 1024;
 
 /** The pages of a run, handed to its workers one at a time (`queueOf`). */
-export type PageQueue<P> = { next(): P | null; stop(): void };
+export type PageQueue<P> = { next(): P | null; stop(): void; left(): number };
 
 /**
  * The pages a run hands its workers, one at a time, in the order given, which is the order of the pages: each worker asks for its next as
  * it finishes its last, so a worker that drew the slow pages keeps no other waiting at the end. `next` answers null once every page is
- * handed out, and from `stop` on: after a worker fails, no worker starts another page.
+ * handed out, and from `stop` on: once a run names no more failures (`startsAgain`), no worker starts another page. `left` is how many
+ * pages are still to hand out, none from `stop` on.
  */
 export function queueOf<P>(pages: readonly P[]): PageQueue<P> {
   let at = 0;
@@ -28,8 +29,21 @@ export function queueOf<P>(pages: readonly P[]): PageQueue<P> {
     stop: () => {
       stopped = true;
     },
+    left: () => (stopped ? 0 : pages.length - at),
   };
 }
+
+/** How many failures a run names before it hands out no more pages: a build that breaks every page is not visited to its end. */
+export const FAILURES_NAMED = 5;
+
+/**
+ * Whether a seat whose worker failed starts another, on a fresh store, for the pages left: a session then reads every failing page of
+ * its batch in one run, where a run that stopped at its first cost a run a failure. Not when the worker was `handed` no page — it failed
+ * before visiting one, so its seat would fail again the same way — nor once the run has `failed` `FAILURES_NAMED` times, nor with no page
+ * `left`. The store is a fresh one because the failing page's writes are still in the old: the next page in its place would read them.
+ */
+export const startsAgain = ({ handed, failed, left }: { handed: number; failed: number; left: number }): boolean =>
+  handed > 0 && failed < FAILURES_NAMED && left > 0;
 
 /**
  * How many workers a run takes: half the machine's `cores`, or `asked` when the command line gives it, then no more than its `freeBytes`
@@ -103,9 +117,12 @@ export function apart(seats: readonly Seat[]): void {
   }
 }
 
+/** The page a failure names, if it names one. */
+export const pageNamed = (failure: string): string | undefined => /^(?:worker \d+: )?(?:before )?the (\S+) page \(/.exec(failure)?.[1];
+
 /** The page a failure names, by its place in `order`: a failure that names none goes last. */
 function placeOf(failure: string, order: readonly string[]): number {
-  const name = /^(?:worker \d+: )?(?:before )?the (\S+) page \(/.exec(failure)?.[1];
+  const name = pageNamed(failure);
   const at = name === undefined ? -1 : order.indexOf(name);
   return at < 0 ? order.length : at;
 }

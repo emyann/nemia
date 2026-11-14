@@ -319,6 +319,27 @@ test("a send-back at an ending's gate goes to the work, and a try of the ending 
   );
 
   await t.test(
+    'an ending approved and not filed: its work is sent back where its approval names the work, which a try of it spends — and REFUSED where an older nemia wrote it with none, naming how to take it back',
+    () => {
+      const review = ENDS[1];
+      const named = atEnd({ approvals: [{ ...approval('ship', 1), work: { review: 1 } }] });
+      assert.deepEqual(retryable(review, named, DONE, signedDone, asked, ENDS).sendsBack, true);
+      assert.equal(retryRefusal(ENDS, named, 'review', { mode: 'continue', message: 'not this way' }, DONE, signedDone, asked), null);
+      const older = atEnd({ approvals: [approval('ship', 1)] });
+      assert.equal(retryable(review, older, DONE, signedDone, asked, ENDS).sendsBack, undefined);
+      names(
+        retryRefusal(ENDS, older, 'review', { mode: 'continue', message: 'not this way' }, DONE, signedDone, asked),
+        'approve-ship-1',
+        'done/',
+        'nemia retry r-1 review --message "<objection>"',
+      );
+      names(approvalRefusal(ENDS, older, 'ship', undefined, DONE, signedDone, asked), 'approve-ship-1', 'done/');
+      const takenBack = atEnd();
+      assert.equal(retryRefusal(ENDS, takenBack, 'review', { mode: 'continue', message: 'not this way' }, DONE, signedDone, asked), null);
+    },
+  );
+
+  await t.test(
     'REFUSED: a try of the ending step itself, which has not run — it names the approval that files it and the send-back to the work, not "there is nothing to try again"',
     () => {
       assert.equal(

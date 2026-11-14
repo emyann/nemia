@@ -16,6 +16,49 @@ import { scratch } from 'test-kit/scratch';
 import { builtEngine } from './engine.ts';
 import { story } from 'test-kit/checkpoints';
 import { until, WAITED } from '../src/waits/index.ts';
+import type { Event } from '../src/index.ts';
+import { asyncStore, type AsyncJournal } from './promise-runner.ts';
+
+/**
+ * A journal an older runtime wrote and died in the window between `starting` and `spawned`: its task filed with a limit of its own,
+ * its attempt's `starting` entry carrying no `resources`, as no runtime before the defaults moved to `start` journalled them.
+ */
+const olderJournal = (taskId: string, cwd: string): AsyncJournal => {
+  const at = new Date().toISOString();
+  const tasks = new Map<string, Event[]>([
+    [
+      taskId,
+      [
+        {
+          kind: 'filed',
+          at,
+          brief: 'run it',
+          cwd,
+          harness: 'command',
+          config: { command: ['true'] },
+          resources: { limits: { memory: '64Mi' } },
+        },
+        { kind: 'starting', at, attempt: 1 },
+      ],
+    ],
+  ]);
+  const feed: Array<{ taskId: string; event: Event }> = [];
+  return {
+    async append(id, event) {
+      tasks.set(id, [...(tasks.get(id) ?? []), event]);
+      feed.push({ taskId: id, event });
+    },
+    async read(id) {
+      return [...(tasks.get(id) ?? [])];
+    },
+    async list() {
+      return [...tasks.keys()].sort();
+    },
+    async feed(after) {
+      return { entries: feed.slice(after), cursor: feed.length };
+    },
+  };
+};
 
 test(
   'a host that makes no scope: a limited task, its own limit or the default, ends unstartable with no run file; an unlimited one runs',
@@ -35,6 +78,14 @@ test(
       );
     const ids = { limited: await file(engine, { limits: { memory: '64Mi' } }), plain: await file(engine) };
     const fromDefault = await file(defaulted);
+    const olderRoot = scratch('ae-memory-older-');
+    const older = builtEngine(
+      EngineService.layer({
+        root: olderRoot,
+        journal: asyncStore(olderJournal('t-older', cwd)),
+        harnesses: { command: detachedOps(commandHarness, olderRoot, { scopeProgram: 'false' }) },
+      }),
+    );
     const state = async (on: typeof engine, id: string) => (await Effect.runPromise(on.view(id))).state;
 
     await s.test('every task settles', async (sub) => {
@@ -43,7 +94,9 @@ test(
         async () => {
           await Effect.runPromise(engine.tick());
           await Effect.runPromise(defaulted.tick());
+          await Effect.runPromise(older.tick());
           return (
+            (await state(older, 't-older')).settled !== null &&
             (await state(engine, ids.limited)).settled !== null &&
             (await state(engine, ids.plain)).settled !== null &&
             (await state(defaulted, fromDefault)).settled !== null
@@ -72,6 +125,21 @@ test(
       assert.deepEqual(limited.attempts[0]?.resources, { limits: { memory: '64Mi' } }, 'the default its attempt started under');
       assert.deepEqual([limited.settled, limited.attempts[0]?.reason], ['failed', 'unstartable']);
     });
+
+    await s.test(
+      'an attempt an older runtime started, its `starting` entry with no resources, spawns under the limit it was filed with',
+      async () => {
+        const upgraded = await state(older, 't-older');
+        assert.deepEqual(upgraded.resources, { limits: { memory: '64Mi' } }, 'the limit its filing carries');
+        assert.equal(upgraded.attempts[0]?.resources, undefined, 'none on its `starting` entry');
+        assert.deepEqual(
+          [upgraded.settled, upgraded.attempts[0]?.reason],
+          ['failed', 'unstartable'],
+          'its spawn asked for a limit, which only a scope holds, and was refused',
+        );
+        assert.ok(upgraded.attempts[0]?.error, 'the refusal is on the attempt');
+      },
+    );
 
     await s.test('a task with no limit spawns plainly and succeeds, carrying no memory', async () => {
       const plain = await state(engine, ids.plain);

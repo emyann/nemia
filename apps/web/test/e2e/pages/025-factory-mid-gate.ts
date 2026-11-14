@@ -12,9 +12,9 @@ export default {
   /**
    * A run held at a gate in its middle, on the default floor: nothing of it moves, the api reads it failed with nothing to decide about its
    * result, and it waits on a person all the same — so its card stays, says what it asks, and takes the answer. The card links to what is
-   * being approved, in its answer row, which grows it no taller: pressed, the run's page opens on plan's inspector, on Output, with the
-   * plan's approach in it, and the page goes back to the floor. The card is approved where it is, a press a person can make clear of the
-   * legend, then the popover's. The approval is written, then taken back, so every page after reads the store as seeded.
+   * being approved, in its answer row, which grows it no taller: pressed, the run's page opens on plan's inspector, its part whole, with
+   * the plan's approach in what it gave, and the page goes back to the floor. The card is approved where it is, a press a person can make
+   * clear of the legend, then the popover's. The approval is written, then taken back, so every page after reads the store as seeded.
    */
   name: 'factory-mid-gate',
   route: '/factories/default',
@@ -54,11 +54,9 @@ export default {
       timeout: WAIT_MS,
     });
     const inspector = stepBar(page, id, gated);
-    await expectVisible(
-      inspector.getByRole('tab', { name: 'Output', selected: true }),
-      `Read what it handed on lands on ${gated}'s bar, open on Output`,
-    );
-    await expectVisible(inspector.locator('[data-field="approach"]', { hasText: GATED.output.approach }), "with the plan's approach in it");
+    const gave = inspector.locator('[data-part-gave="L"]');
+    await expectVisible(gave, `Read what it handed on lands on ${gated}'s bar, its part whole with what it gave`);
+    await expectVisible(gave.locator('[data-field="approach"]', { hasText: GATED.output.approach }), "with the plan's approach in it");
     await settled(page);
     await expectOnScreen(inspector, `${gated}'s bar floats in view over the run's page, whatever is above the canvas`);
     await photograph(page, path.join(OUT, `factory-mid-gate-read-${await themeOf(page)}.png`));

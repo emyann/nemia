@@ -121,6 +121,11 @@ export type EarlierTry = {
   model?: string;
   /** The pause filed the try after this one (`nemia pause --now` stopped it, and the resume tried it again): `cause` stays its mode. */
   paused?: true;
+  /**
+   * The run's `retries:` filed the try after this one, a recheck: the machine ran out of memory and killed a process of its check, so the
+   * check was run again (`retriesDue`). `cause` stays `recheck`, which replaces only the check; `retriesSpent` counts it.
+   */
+  retried?: true;
   /** The cap a person raised the step's `budget:` to for the try after this one (`--budget`): in force from it on (`budgetOf`). */
   budget?: number;
 };
@@ -199,12 +204,13 @@ export function messageRefusal(how: RetryHow, command = 'nemia retry <runId> <st
 const anew = (t: EarlierTry): boolean => t.cause === 'round' || t.cause === 'merge' || t.cause === 'back';
 
 /**
- * The tries `retries:` has filed for a step in the round it is on. A person's do not count: `retries` is what the run may spend on its
- * own word. Nor do an earlier round's: a round is new work for the step, and its check may refuse it afresh — and so is a merge.
+ * The tries `retries:` has filed for a step in the round it is on, a recheck it filed (`retried`) among them. A person's do not
+ * count: `retries` is what the run may spend on its own word. Nor do an earlier round's: a round is new work for the step, and its
+ * check may refuse it afresh — and so is a merge.
  */
 export const retriesSpent = (record: StepRecord | undefined): number => {
   let spent = 0;
-  for (const t of record?.tries ?? []) spent = anew(t) ? 0 : spent + (t.cause === 'retries' ? 1 : 0);
+  for (const t of record?.tries ?? []) spent = anew(t) ? 0 : spent + (t.cause === 'retries' || t.retried ? 1 : 0);
   return spent;
 };
 
@@ -234,7 +240,7 @@ export const modeWord = (how: { mode: RetryMode; model?: string }): string => (h
 
 /** The note that says a try, and on whose word: `retries:`, an ask to sign off, or `nemia retry` and what it was typed with. */
 export const tryWord = (r: Retry, step: StepSpec): string =>
-  `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'an ask to sign off, once a round' : askedWord(r)}`;
+  `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}${r.mode === 'recheck' ? ', its check run again: the machine ran out of memory' : ''}` : r.by === 'signoff' ? 'an ask to sign off, once a round' : askedWord(r)}`;
 
 /**
  * A try asked for, as `tryWord` says it: by `nemia pause --now`, which stopped its session or check, or by `nemia retry` as it was typed.
@@ -260,8 +266,9 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
   const over: EarlierTry = {
     taskId: record.taskId,
     ...(check ? { check } : {}),
-    cause: retry.by === 'ask' || retry.by === 'pause' ? retry.mode : retry.by,
+    cause: retry.by === 'ask' || retry.by === 'pause' || retry.mode === 'recheck' ? retry.mode : retry.by,
     ...(retry.by === 'pause' ? { paused: true as const } : {}),
+    ...(retry.by === 'retries' && retry.mode === 'recheck' ? { retried: true as const } : {}),
     ...(retry.model ? { model: retry.model } : {}),
     ...(retry.budget !== undefined ? { budget: retry.budget } : {}),
   };
@@ -303,6 +310,8 @@ export const dueNote = (step: StepSpec, run: Run, r: Retry): string => {
   if (r.by === 'signoff')
     return `try ${r.try} due — an ask to sign off, once a round: ${lackedOf(run.steps[step.name]).length ? 'its closeout named a file the run does not have' : 'its session ended without its closeout'}`;
   if (r.by === 'pause') return pausedNote(r);
+  if (r.mode === 'recheck')
+    return `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent: the machine ran out of memory and killed a process of its check, and the next tick runs it again`;
   return `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`;
 };
 

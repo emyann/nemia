@@ -1,7 +1,7 @@
 /**
- * A run's canvas (src/lib/canvas.ts), as tables: an attempt's time, a run's edges and how each is drawn, a saved layout read back, the
- * layout store per run and per Factory, and where a canvas is fitted beside the bar; the edge colours read from the theme, and the
- * double click, each a test of its own.
+ * A run's canvas (src/lib/canvas.ts), as tables: an attempt's time, a run's edges and how each is drawn, the packets they carry, a saved
+ * layout read back, the layout store per run and per Factory, and where a canvas is fitted beside the bar; the edge colours read from
+ * the theme, and the double click, each a test of its own.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,6 +19,8 @@ import {
   LOOP_DEPTH,
   loopLabel,
   loopPath,
+  packetLabel,
+  packetsOf,
   parseLayout,
   parseOpen,
   place,
@@ -489,4 +491,27 @@ test("a double click's second click opens the step its first click showed, where
   assert.equal(secondClick('review', 0), null, 'a click the keyboard made');
   assert.equal(secondClick('review', 3), null, "a triple click's third");
   assert.equal(secondClick(null, 2), null, 'its first click showed no step');
+});
+
+test('packetsOf and edgesOf: an edge whose taker is handed its giver carries the packet, labelled by the giver; an after edge with none carries none', () => {
+  const packets = packetsOf([
+    { name: 'design', input: [], fields: 3, files: 2 },
+    { name: 'implement', input: ['design', 'gone'], fields: 0, files: 0 },
+    { name: 'review', input: [], fields: 0, files: 0 },
+  ]);
+  assert.deepEqual(
+    packets,
+    [{ from: 'design', to: 'implement', label: 'design', fields: 3, files: 2 }],
+    'a giver the run lacks hands none',
+  );
+  assert.equal(packetLabel('design'), 'design');
+  const edges = edgesOf(
+    graphOf(after('design', 'implement'), after('implement', 'review'), loop('review', 'implement')),
+    [step('design', 'verified'), step('implement', 'working'), step('review', 'waiting')],
+    new Map(),
+    packets,
+  );
+  assert.equal(edges.find((e) => e.id === 'design->implement')?.packet?.label, 'design');
+  assert.equal(edges.find((e) => e.id === 'implement->review')?.packet, undefined);
+  assert.equal(edges.find((e) => e.kind === 'loop')?.packet, undefined);
 });

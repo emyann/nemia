@@ -1,4 +1,4 @@
-import { sidebar, stepBar } from '../board.ts';
+import { openFold, partOf, sidebar, stepBar } from '../board.ts';
 import { expectBeneath, expectCount, expectInside, expectVisible, settled } from '../checks.ts';
 import { LOOPING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -8,9 +8,9 @@ export default {
    * A run whose review loop is out of rounds, waiting on you. Its record names a repository that is not on this machine, so the Decide
    * section says what its branch changed is not known, and the page renders. The graph the run froze: implement → review, the edge back
    * beneath the row, and review drawn as a human gate. Each step's note is on hover on the canvas and under its chip on the run's page,
-   * read before a click opens the inspector, which has a heading of its own. The timeline has a row a try and a total a round;
-   * implement's Details list its three rounds, each a task of its own, and round 2 selected shows its closeout with the other two
-   * folded beneath.
+   * read before a click opens the inspector, which has a heading of its own. The timeline (a receipt) has a row a try and a total a round;
+   * implement's try picker lists its three tries by round, the current one picked, and try 2 picked shows round 2's closeout in its
+   * Said and Gave and names its own task in its Detail, the address keeping the choice.
    */
   name: 'loop',
   route: `/runs/${LOOPING.id}`,
@@ -22,10 +22,10 @@ export default {
       'no warning about the workflow folder: it reads as the loop the run froze, with nothing drifted and nothing unread',
     );
     await expectVisible(
-      page.getByText(`Waiting on you: ${LOOPING.exhausted}`),
-      `the run's page says ${LOOPING.exhausted} is waiting on you`,
+      page.locator(`section[aria-label="Asks of you"] li[data-step="${LOOPING.exhausted}"]`),
+      `the run's page says ${LOOPING.exhausted} is waiting on you, in the asks at its top`,
     );
-    const decide = page.locator('section[aria-label="Decide"]');
+    const decide = (await openFold(page.locator('[data-asks]'), 'decide')).locator('section[aria-label="Decide"]');
     await expectVisible(
       decide.getByText(/^what this run changed is not known: /).first(),
       `the Decide section says what ${LOOPING.id}'s branch changed is not known: its record names a repository not on this machine`,
@@ -86,13 +86,13 @@ export default {
       `implement's chip on the graph ends its title with the round it is on (${LOOPING.notes.implement})`,
     );
     for (const name of LOOPING.steps) {
-      const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name, exact: true }) });
+      const detail = await openFold(partOf(page, name), 'detail');
       await expectVisible(
-        section.locator('[data-note]', { hasText: LOOPING.notes[name] }),
-        `the run's page shows ${name}'s note under its chip, where there is room (${LOOPING.notes[name]})`,
+        detail.locator('[data-note]', { hasText: LOOPING.notes[name] }),
+        `the run's page shows ${name}'s note in its part's Detail, where there is room (${LOOPING.notes[name]})`,
       );
     }
-    const timeline = page.locator('section[aria-label="Timeline"]');
+    const timeline = (await openFold(page.locator('section[aria-label="Receipts"]'), 'timeline')).locator('section[aria-label="Timeline"]');
     for (const name of LOOPING.steps) {
       await expectCount(
         timeline.locator(`tr[data-step="${name}"][data-task="session"]`),
@@ -107,44 +107,46 @@ export default {
     await expectCount(timeline.locator('tfoot tr[data-total]'), 4, "a total for each of the loop's three rounds, and the run's");
     await node(LOOPING.exhausted).click();
     const inspector = stepBar(page, LOOPING.id, LOOPING.exhausted);
+    await expectVisible(inspector.locator('[data-part-said]'), `${LOOPING.exhausted}'s inspector draws what it said: it has signed off`);
     await expectVisible(
-      inspector.getByRole('tab', { name: 'Output', selected: true }),
-      `${LOOPING.exhausted}'s inspector opens on Output: it has signed off`,
+      inspector.locator('[data-step-tag]', { hasText: /^waits on you$/i }),
+      `the step inspector opens on a click on ${LOOPING.exhausted}, its tag saying it waits on you`,
     );
-    await inspector.getByRole('tab', { name: 'Details' }).click();
-    await expectVisible(inspector.locator('[data-state="exhausted"]'), `the step inspector opens on a click on ${LOOPING.exhausted}`);
     await expectVisible(
-      inspector.locator('[data-note]', { hasText: LOOPING.notes.review }),
-      `the inspector's Details show ${LOOPING.exhausted}'s note under its chip`,
+      (await openFold(partOf(inspector, LOOPING.exhausted), 'detail')).locator('[data-note]', { hasText: LOOPING.notes.review }),
+      `the inspector's Detail shows ${LOOPING.exhausted}'s note`,
     );
     await settled(page);
     await expectInside(graph.locator('.react-flow__node'), graph.locator('.react-flow'), 'every step is on the canvas under the open bar');
 
     await node(LOOPING.target).click();
     const target = stepBar(page, LOOPING.id, LOOPING.target);
-    const rows = target.locator('section[aria-label="Rounds"] li[data-try]');
-    await expectCount(
-      rows,
-      3,
-      `${LOOPING.target}'s Details, the tab kept from ${LOOPING.exhausted}'s inspector, list its three rounds, a row each`,
-    );
-    for (const [i, label] of ['round 1 · try 1', 'round 2 · try 2 (round)', 'round 3 · try 3 (round)'].entries()) {
-      await expectVisible(rows.nth(i).getByText(label), `row ${i + 1} is ${label}`);
-      await expectVisible(rows.nth(i).getByText(`${LOOPING.id}-implement-${i + 1}`, { exact: true }), `row ${i + 1} names its own task`);
+    const picker = target.locator(`[data-try-picker="${LOOPING.target}"]`);
+    const rows = picker.locator('[data-try]');
+    await expectCount(rows, 3, `${LOOPING.target}'s try picker, in its part in the bar, lists its three tries`);
+    for (const [i, label] of ['try 1', 'try 2', 'try 3 (current)'].entries()) {
+      await expectVisible(
+        picker.locator(`[data-round="${i + 1}"] [data-try="${i + 1}"]`, { hasText: label }),
+        `round ${i + 1} holds ${label}`,
+      );
     }
-    await expectVisible(target.locator('li[data-try="3"][aria-current="true"]'), 'the current round is the one selected');
-    await target.getByRole('button', { name: 'Show the closeout of round 2 · try 2 (round)' }).click();
-    await expectVisible(target.locator('[data-shown-try="2"]'), 'selecting round 2 opens its closeout in the Output tab');
+    await expectVisible(picker.locator('[data-try="3"][data-selected]'), 'the current try is the one picked');
+    await picker.locator('[data-try="2"]').click();
+    await target.page().waitForURL((url) => url.searchParams.get('try') === `${LOOPING.target}:2`);
+    await expectVisible(picker.locator('[data-try="2"][data-selected]'), 'try 2 picked, the address keeping it (?try=)');
+    const said = target.locator('[data-part-said]');
     await expectVisible(
-      target.getByText(LOOPING.earlier[1].implement, { exact: true }),
-      `round 2's summary (${LOOPING.earlier[1].implement})`,
+      said.getByText(LOOPING.earlier[1].implement, { exact: true }),
+      `its Said is round 2's summary (${LOOPING.earlier[1].implement})`,
     );
-    await expectVisible(target.locator('li[data-answer]', { hasText: LOOPING.replied }), `round 2's reply, as finding → answer · why`);
-    await expectCount(
-      target.locator('section[aria-label="Other tries"] details:not([open])'),
-      2,
-      'the other two rounds are folded beneath it',
+    await expectVisible(
+      target.locator('[data-part-gave] li[data-answer]', { hasText: LOOPING.replied }),
+      `and its Gave round 2's reply, as finding → answer · why`,
     );
+    const detail = await openFold(partOf(target, LOOPING.target), 'detail');
+    const shown = detail.locator('[data-shown-try="2"]');
+    await expectVisible(shown.getByText('round 2 · try 2 (round)'), "its Detail's try shown is round 2's");
+    await expectVisible(shown.getByText(`${LOOPING.id}-implement-2`, { exact: true }), 'which names its own task');
     await settled(page);
   },
 } satisfies PageSpec;

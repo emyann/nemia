@@ -3193,6 +3193,189 @@ export function writeAsking(root: string, now = Date.now()): string[] {
 }
 
 /**
+ * A run of the git place whose last step gave every kind of thing a part draws, written by a page for its visit and taken back before it
+ * ends (`writeShaped`): `plan` gave a list its taker is handed (`input`), and `build`, after it, gave a link, a commit, a table and a list,
+ * named a picture and a markdown note in its artifacts folder and left a JSON and a log there unnamed, and was told by a person, by `plan`,
+ * by `plan`'s check and by another run, each under the heading the run writes for it.
+ */
+export const SHAPED = {
+  id: 'shaped-output-e2e',
+  title: 'Give the board its widgets',
+  giver: 'plan',
+  step: 'build',
+  pr: 'https://github.com/example/board/pull/42',
+  head: '4f1c2a9e8b7d6c5f4e3d2c1b0a9f8e7d6c5b4a39',
+  findings: [
+    { file: 'src/run.tsx', line: 12, note: 'The header wraps at 390.' },
+    { file: 'src/step.tsx', line: 40, note: 'A dash where no value is given.' },
+  ],
+  touched: ['apps/web/src/run.tsx', 'apps/web/src/step.tsx', 'apps/web/src/view.tsx'],
+  scope: ['the run page', 'the step bar'],
+  summary: 'Built the widgets, each drawn by its field.',
+  account: 'Every field is drawn by its **widget**:\n\n- a link\n- a commit\n- a table and a list',
+  /** The files `build` named, then those it left unnamed, as the sheet steps through them. */
+  named: { picture: 'shot.png', markdown: 'notes.md' },
+  unnamed: { json: 'data.json', log: 'run.log' },
+  notes: '# Notes\n\nThe widgets read their **schema**, never their value.',
+  /** What each source told `build`, as its task's sections carry it. */
+  asked: 'Give every field of a step its widget.',
+  handed: 'The plan: a widget a field.',
+  checked: 'The check passed: `npm test` exited 0.',
+  /** The run `build` was handed as context (`read`), by its first line. */
+  other: { id: 'lay-the-diamond-top-e2e4', asked: 'Lay the diamond top' },
+} as const;
+
+/**
+ * Writes SHAPED into the store at `root` — its record, its folder, its two tasks each ended once with its closeout, flat as a harness
+ * writes it, and `build`'s artifacts folder — and answers every path written, to take back. Given `tried`, an agent's name, its folder is
+ * that agent's try's (`tries/<agent>`), so the run is a try of the agent, as `nemia agent try` starts one.
+ */
+export function writeShaped(root: string, { now = Date.now(), tried }: { now?: number; tried?: string } = {}): string[] {
+  const { id, giver, step } = SHAPED;
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const dir = tried ? path.join(root, 'tries', tried) : path.join(root, 'workflow-shaped-output');
+  const task = (name: string) => path.join(root, 'engine', 'tasks', `${id}-${name}.jsonl`);
+  const files = path.join(root, 'runs', id, 'artifacts', step);
+  const ran = (name: string, began: number, brief: string, closeout: object) =>
+    write(
+      task(name),
+      lines([
+        { kind: 'filed', at: ago(began), brief, cwd: '/code/hkb-v2', maxAttempts: 1, harness: 'claude' },
+        { kind: 'starting', at: ago(began - 0.1), attempt: 1 },
+        { kind: 'spawned', at: ago(began - 0.1), attempt: 1 },
+        {
+          kind: 'ended',
+          at: ago(began - 2),
+          attempt: 1,
+          sessionId: `ae/${id}-${name}/1`,
+          observed: 'done',
+          reason: 'harness',
+          closeout,
+          usage: { responses: 4, toolCalls: 9, inputTokens: 120_000, outputTokens: 3_400, costUsd: 0.42 },
+        },
+        { kind: 'settled', at: ago(began - 2), outcome: 'succeeded' },
+      ]),
+    );
+  write(path.join(files, SHAPED.named.picture), palette());
+  write(path.join(files, SHAPED.named.markdown), `${SHAPED.notes}\n`);
+  write(path.join(files, SHAPED.unnamed.json), `${JSON.stringify({ widgets: 11, drawn: true }, null, 2)}\n`);
+  write(path.join(files, SHAPED.unnamed.log), 'started\nbuilt the widgets\nsigned off\n');
+  const brief = [
+    `Do ${step}.`,
+    '',
+    '## What was asked for',
+    '',
+    SHAPED.asked,
+    '',
+    `## From ${giver}`,
+    '',
+    SHAPED.handed,
+    '',
+    `## What ${giver}'s check said`,
+    '',
+    SHAPED.checked,
+    '',
+    `## From run ${SHAPED.other.id}`,
+    '',
+    'What it was asked, the first line:',
+    '',
+    '```text',
+    SHAPED.other.asked,
+    '```',
+    '',
+    'It concluded with its top laid.',
+  ].join('\n');
+  ran(giver, 12, `Do ${giver}.\n\n## What was asked for\n\n${SHAPED.asked}`, {
+    outcome: 'done',
+    summary: 'Planned a widget a field.',
+    needs: null,
+    artifacts: [],
+    scope: SHAPED.scope,
+  });
+  ran(step, 8, brief, {
+    outcome: 'done',
+    summary: SHAPED.summary,
+    body: SHAPED.account,
+    needs: null,
+    artifacts: [path.join(files, SHAPED.named.picture), path.join(files, SHAPED.named.markdown)],
+    pr: SHAPED.pr,
+    head: SHAPED.head,
+    findings: SHAPED.findings,
+    touched: SHAPED.touched,
+  });
+  const strings = { type: 'array', items: { type: 'string' } };
+  const planSchema = { type: 'object', properties: { scope: strings }, required: ['scope'], additionalProperties: false };
+  const buildSchema = {
+    type: 'object',
+    properties: {
+      pr: { type: 'string', description: 'The pull request.' },
+      head: { type: 'string', description: 'The commit it ended on.' },
+      findings: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { file: { type: 'string' }, line: { type: 'integer' }, note: { type: 'string' } },
+          required: ['file', 'line', 'note'],
+          additionalProperties: false,
+        },
+      },
+      touched: strings,
+    },
+    required: ['pr', 'head', 'findings', 'touched'],
+    additionalProperties: false,
+  };
+  const shapes = { pr: 'link', head: 'commit' } as const;
+  write(path.join(dir, `${giver}.md`), `---\nplace: git\nharness: claude\noutput: ${giver}.schema.json\n---\nDo ${giver}.\n`);
+  write(
+    path.join(dir, `${step}.md`),
+    `---\nplace: git\nharness: claude\nafter: [${giver}]\ninput: [${giver}]\noutput: ${step}.schema.json\n---\nDo ${step}.\n`,
+  );
+  write(path.join(dir, `${giver}.schema.json`), `${JSON.stringify(planSchema, null, 2)}\n`);
+  const marked = {
+    ...buildSchema,
+    properties: {
+      ...buildSchema.properties,
+      pr: { 'x-shape': 'link', description: buildSchema.properties.pr.description },
+      head: { 'x-shape': 'commit', description: buildSchema.properties.head.description },
+    },
+  };
+  write(path.join(dir, `${step}.schema.json`), `${JSON.stringify(marked, null, 2)}\n`);
+  const record = path.join(root, 'runs', `${id}.json`);
+  write(
+    record,
+    JSON.stringify(
+      {
+        id,
+        repo: '/code/hkb-v2',
+        workspace: '/code/hkb-v2',
+        baseRef: '19c9365',
+        branch: 'main',
+        isolate: true,
+        brief: `${SHAPED.title}\n\nA run written by the run page's pages of npm run e2e, and taken back when they leave.`,
+        workflowDir: dir,
+        workflow: [
+          { name: giver, after: [], body: `Do ${giver}.`, harness: 'claude', output: { file: `${giver}.schema.json`, schema: planSchema } },
+          {
+            name: step,
+            after: [giver],
+            input: [giver],
+            body: `Do ${step}.`,
+            harness: 'claude',
+            output: { file: `${step}.schema.json`, schema: buildSchema, shapes },
+          },
+        ],
+        context: [SHAPED.other.id],
+        createdAt: ago(14),
+        steps: { [giver]: { taskId: `${id}-${giver}` }, [step]: { taskId: `${id}-${step}` } },
+      },
+      null,
+      2,
+    ),
+  );
+  return [record, dir, path.join(root, 'runs', id), task(giver), task(step)];
+}
+
+/**
  * The output field of budgets a step's closeout gives, as the loader expands `{"x-shape": "budgets"}` and the record freezes it: a list of
  * strict rows, each a later step, its amount in dollars and why. Equal to the orchestrator's `BUDGETS_SCHEMA`, which the run's record
  * must hold whole for the gate to read the field as budgets.

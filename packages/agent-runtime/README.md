@@ -1071,8 +1071,9 @@ by the kernel inside that cgroup alone; nothing outside it, a neighbour's sessio
 | a detached job (`command`, `codex`, a `HarnessSpec`, a Claude Code job) | the worker (`bin/ae-worker.ts`) and its harness: systemd-run runs the worker itself, so its pid, group and stop path are unchanged | the worker, on each beat and at the harness's exit, off its own cgroup (`cgroupMemoryOf('self')`); it gives its harness `oom_score_adj` 500, which every child inherits, so the kernel kills a runaway child, never the worker that writes the end; `OOMPolicy=continue` keeps systemd from stopping the rest of the scope |
 | a held session (attached, a long-lived one among them) | Claude Code, its children with it | its holder, off Claude Code's cgroup where it rewrites the run file and once before it ends the session: best-effort, since a scope that emptied with Claude Code killed in it reads nothing more, and the last read stands |
 
-The attempt keeps what the cgroup said as it ended, `memory: { limitBytes, peakBytes?, oomKills }` — `oomKills` the processes the
-kernel's OOM killer ended in it, `peakBytes` its `memory.peak` where the kernel keeps one (5.19 on) — carried from the sighting
+The attempt keeps what the cgroup said as it ended, `memory: { limitBytes, peakBytes?, oomKills, oom? }` — `oomKills` the processes
+any OOM killer of the kernel ended in it, the machine's own included (`memory.events`' `oom_kill`), `oom` the times its own limit was
+reached (`memory.events`' `oom`, absent on a record written before it was carried), so a kill with `oom` at 0 is the machine's, `peakBytes` its `memory.peak` where the kernel keeps one (5.19 on) — carried from the sighting
 onto the `ended` entry and the attempt as `terminationMessage` is, absent with no limit and on a journal written before; `decide`
 reads none of it. The peak counts the worker's own Node process beside its harness.
 

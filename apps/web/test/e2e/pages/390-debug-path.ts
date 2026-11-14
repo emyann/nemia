@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { photograph, sidebar, themeOf } from '../board.ts';
+import { LEDGER, openFold, partOf, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -13,17 +13,18 @@ const TAKEN = ['submitted->starting', 'starting->working', 'working->ending', 'e
 
 export default {
   /**
-   * A settled step's Debug panel: closed as the page opens, with nothing of the lifecycle drawn; opened, its task's path, each state its
-   * journal says with the entry that put it there, drawn over the lifecycle's graph — the state it stands in lit and the routes it took
-   * to get there drawn over the graph's. A person scrubs back, by an entry of the timeline or the slider's keys, and the lit state and
-   * the routes taken move back with them. Its lifecycle is a drawing: a click on a state inspects nothing. Reads the store as seeded and
-   * writes nothing.
+   * A settled step's Debug panel, in the Detail fold of its row of the run page's ledger: closed as the page opens, with nothing of the
+   * lifecycle drawn; opened, its task's path, each state its journal says with the entry that put it there, drawn over the lifecycle's
+   * graph — the state it stands in lit and the routes it took to get there drawn over the graph's. A person scrubs back, by an entry of the
+   * timeline or the slider's keys, and the lit state and the routes taken move back with them. Its lifecycle is a drawing: a click on a
+   * state inspects nothing. Reads the store as seeded and writes nothing.
    */
   name: 'debug-path',
-  route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
+  route: `/runs/${FAKE.id}`,
   expect: async (page) => {
     await sidebar(page);
-    const panel = page.getByRole('region', { name: 'Debug' });
+    const detail = await openFold(partOf(page.locator(LEDGER), SESSION.step), 'detail');
+    const panel = detail.getByRole('region', { name: 'Debug' });
     const trigger = panel.getByRole('button', { name: /Debug$/ });
     await expectVisible(trigger, 'the step has a Debug panel');
     if ((await trigger.getAttribute('aria-expanded')) !== 'false')

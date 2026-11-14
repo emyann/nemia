@@ -11,12 +11,12 @@ import { costWords, SOURCE_BADGES } from '../../lib/skills';
 import { cn } from '../../lib/utils';
 import { routeLink } from '../nav/routeLink';
 import { container, hairline } from '../../lib/meaning';
+import { focusRing } from '../ui/ds/utils';
 
 /** A link to a route, as React Aria draws one (`routeLink`): what the Agents pages link a node and an agent with. */
 export const RouteLink = routeLink(AriaLink);
 
-const LINK =
-  'rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
+const LINK = cn('rounded-sm underline decoration-outline underline-offset-2 hover:decoration-foreground', focusRing());
 
 /** The word for each origin an agent is read from. */
 const AGENT_FROM: Readonly<Record<AgentListing['from'], string>> = {

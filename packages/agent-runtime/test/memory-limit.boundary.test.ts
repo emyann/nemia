@@ -71,6 +71,7 @@ test(
       assert.equal(a?.exitCode, 137, `the harness said its child was killed, not itself (-1): ${a?.exitCode} ${JSON.stringify(a?.memory)}`);
       assert.equal(a?.memory?.limitBytes, 268_435_456);
       assert.ok((a?.memory?.oomKills ?? 0) >= 1, `the kernel killed in the scope: ${JSON.stringify(a?.memory)}`);
+      assert.ok((a?.memory?.oom ?? 0) >= 1, `at the scope's own limit, which memory.events counts as oom: ${JSON.stringify(a?.memory)}`);
       assert.equal(typeof a?.memory?.peakBytes, 'number');
     });
 

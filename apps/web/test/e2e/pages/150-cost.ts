@@ -1,30 +1,35 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
+import { openFold, partOf, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
 import { expectCount, expectInside, expectUncut, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { COSTLY } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 /**
- * The run's header says what the run took beside what it cost: its clock — at work, since it waits on you — with its start and the wall
- * time on hover, and its tokens with their split, in full; photographed, and at the phone's width, where the header wraps and cuts nothing.
+ * The run's header says what the run took beside what it cost, each a tile: its clock — at work, since it waits on you — with its start
+ * and the wall time on hover; its tokens with their split, in full, are in the Tokens receipt; photographed, and at the phone's width,
+ * where the header wraps and cuts nothing.
  */
 async function tookInTheHeader(page: Page): Promise<void> {
-  const header = page.locator('article header').first();
+  const header = page.locator('header[data-run-header]');
   await expectVisible(
-    header.locator('[data-run-took] time[title^="At work "][title*="from start to now"]', { hasText: new RegExp(`^${COSTLY.took}$`) }),
+    header.locator('[data-run-took][title^="At work "][title*="from start to now"] [data-stat-tile="took"]', { hasText: COSTLY.took }),
     "the run's header says how long it has been at work, not what it took: it waits on you; its start and the wall time on hover",
   );
+  const tokens = await openFold(page.locator('section[aria-label="Receipts"]'), 'tokens');
   await expectVisible(
-    header.locator('[data-run-tokens]', { hasText: `${COSTLY.tokens.said} (${COSTLY.tokens.split})` }),
-    `and the tokens its sessions used, with their split (${COSTLY.tokens.said} (${COSTLY.tokens.split}))`,
+    tokens.locator('[data-run-tokens]', { hasText: `${COSTLY.tokens.said} (${COSTLY.tokens.split})` }),
+    `and the Tokens receipt says the tokens its sessions used, with their split (${COSTLY.tokens.said} (${COSTLY.tokens.split}))`,
   );
   const size = page.viewportSize();
   for (const width of [size?.width ?? 1280, 390]) {
     await page.setViewportSize({ width, height: size?.height ?? 844 });
-    await expectUncut(header.locator('[data-run-took], [data-run-cost], [data-run-tokens]'), `each figure read whole, ${width} wide`);
+    await expectUncut(
+      page.locator('header[data-run-header] [data-run-took], header[data-run-header] [data-run-cost], [data-run-tokens]'),
+      `each figure read whole, ${width} wide`,
+    );
     await photograph(header, path.join(OUT, `cost-header-took${width === 390 ? '-phone' : ''}-${await themeOf(page)}.png`));
   }
   if (size) await page.setViewportSize(size);
@@ -32,10 +37,10 @@ async function tookInTheHeader(page: Page): Promise<void> {
 
 export default {
   /**
-   * What a run cost, and steps held on their budget: the run's cost and what its sessions read in its header, a cost column on the
-   * timeline, a step's cost of its cap on its node and in the inspector, red past it, and the raises the Decide section offers. In a page
-   * of its own, a raise not above what was spent is refused in the package's words, and nothing is written. The page ends with tokens'
-   * Details open for the photograph, and each page after it reads the store as seeded.
+   * What a run cost, and steps held on their budget: the run's cost in its header and what its sessions read in its Tokens receipt, a cost
+   * column on the timeline, a step's cost of its cap on its node and in the inspector, red past it, and the raises each step's part offers.
+   * In a page of its own, a raise not above what was spent is refused in the package's words, and nothing is written. The page ends with
+   * tokens' Detail open for the photograph, and each page after it reads the store as seeded.
    */
   name: 'cost',
   route: `/runs/${COSTLY.id}`,
@@ -48,11 +53,11 @@ export default {
       'no warning about the workflow folder: it reads as the budgets the run froze',
     );
     await expectVisible(
-      page.locator('article header [data-run-cost]', { hasText: `cost ${COSTLY.cost}` }),
+      page.locator('header[data-run-header] [data-run-cost] [data-stat-tile="cost"]', { hasText: COSTLY.cost }),
       `the run's header says what it cost (${COSTLY.cost})`,
     );
     await tookInTheHeader(page);
-    const runRead = page.locator('article header [data-run-read]');
+    const runRead = page.locator('section[aria-label="Receipts"] [data-fold="tokens"] [data-run-read]');
     await expectVisible(
       runRead.locator('.font-mono', { hasText: COSTLY.read.run }),
       `and what its sessions read, by price, in the classes every one of them measured (${COSTLY.read.run})`,
@@ -62,25 +67,26 @@ export default {
       'and that a resumed session rebuilt its cache, in words that say so',
     );
     await expectCount(runRead.locator('[data-peak]'), 0, "no peak on the run's: review's Codex sessions measured none");
-    const palette = page.locator(`section#step-${COSTLY.asks.step}`);
+    const palette = await openFold(partOf(page, COSTLY.asks.step), 'detail');
     await expectVisible(
       palette.locator('dd [data-read]', { hasText: COSTLY.read.palette.counts }),
-      `${COSTLY.asks.step}'s section says what its session read (${COSTLY.read.palette.counts})`,
+      `${COSTLY.asks.step}'s part's Detail says what its session read (${COSTLY.read.palette.counts})`,
     );
     await expectVisible(
       palette.locator('[data-peak="large"]', { hasText: COSTLY.read.palette.peak }),
       `and marks its peak, past 200k with no cap`,
     );
-    const reasons = `Waiting on you: ${COSTLY.steps.join(', ')} — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget — nemia decide ${COSTLY.id}`;
+    const asksOfYou = page.locator('section[aria-label="Asks of you"]');
+    for (const name of COSTLY.steps)
+      await expectVisible(
+        asksOfYou.locator(`li[data-step="${name}"] a[data-ask-link="${name}"]`).first(),
+        `the asks of you say ${name}, past a budget or held on one, waits on you, linked to its part`,
+      );
     await expectVisible(
-      page.locator('section[aria-label="Waiting on you"] > p', { hasText: reasons }),
-      `the banner says every step past its budget waits on you, implement and review held on implement's budget alone, and why: ${reasons}`,
-    );
-    await expectVisible(
-      page.locator(`section[aria-label="Waiting on you"] [data-need="asks"][data-step="${askingStep.step}"]`, {
+      asksOfYou.locator(`[data-ask="needs"][data-step="${askingStep.step}"]`, {
         hasText: `${askingStep.step} asks: ${askingStep.needs}`,
       }),
-      `the banner says what ${askingStep.step}, signed off blocked past its budget, asks`,
+      `the asks say what ${askingStep.step}, signed off blocked past its budget, asks`,
     );
 
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
@@ -120,7 +126,7 @@ export default {
       `${held.step}, with no cap and no session priced, has no cost row: not $0`,
     );
 
-    const timeline = page.locator('section[aria-label="Timeline"]');
+    const timeline = (await openFold(page.locator('section[aria-label="Receipts"]'), 'timeline')).locator('section[aria-label="Timeline"]');
     const cellsSay = async (cells: Locator, want: readonly string[], assertion: string) => {
       await expectCount(cells, want.length, assertion);
       const said = await cells.allTextContents();
@@ -149,7 +155,7 @@ export default {
       `the run's total says what it cost (${COSTLY.cost})`,
     );
 
-    const decide = page.locator('section[aria-label="Decide"]');
+    const decide = (await openFold(page.locator('[data-asks]'), 'decide')).locator('section[aria-label="Decide"]');
     await expectVisible(
       decide.locator('[data-over-budget]', {
         hasText:
@@ -161,9 +167,7 @@ export default {
       decide.locator('section[aria-label="Used"] dd', { hasText: 'run $7.85 measured · 2 sessions not measured' }),
       "and what every try of the run cost, in wf decide's words",
     );
-    const answers = decide.locator('section[aria-label="Answer"]');
-    const raiseRow = (p: Page | Locator, name: string) =>
-      p.locator(`section[aria-label="Answer"] [data-offer="raise"][data-step="${name}"]`);
+    const raiseRow = (p: Page, name: string) => partOf(p, name).locator(`[data-part-asks] [data-offer="raise"][data-step="${name}"]`);
     const amountOf = (row: Locator, name: string) =>
       row.getByRole('spinbutton', { name: new RegExp(`^The cap to raise ${name} to, in dollars`) });
     for (const [name, startsAt, button] of [
@@ -171,7 +175,7 @@ export default {
       [held.step, held.startsAt, 'Raise the budget and go round again'],
       [askingStep.step, askingStep.startsAt, 'Raise the budget and answer'],
     ] as const) {
-      const row = raiseRow(decide, name);
+      const row = raiseRow(page, name);
       await expectVisible(amountOf(row, name), `a box for the cap to raise ${name} to`);
       const value = await amountOf(row, name).inputValue();
       if (value !== startsAt)
@@ -181,18 +185,18 @@ export default {
       await expectVisible(row.getByRole('button', { name: button }), `${name}'s row offers ${button}`);
     }
     await expectVisible(
-      raiseRow(decide, over.step).getByRole('radio', { name: /^a new session/ }),
+      raiseRow(page, over.step).getByRole('radio', { name: /^a new session/ }),
       `a new session as an option to continuing ${over.step}'s`,
     );
     await expectVisible(
-      raiseRow(decide, over.step).getByRole('radio', { name: /^its check again/ }),
+      raiseRow(page, over.step).getByRole('radio', { name: /^its check again/ }),
       `its check again as an option for ${over.step}, whose check refused, which needs no raise`,
     );
     await expectVisible(
-      raiseRow(decide, over.step).getByRole('textbox', { name: `What to tell ${over.step}, if anything` }),
+      raiseRow(page, over.step).getByRole('textbox', { name: `What to tell ${over.step}, if anything` }),
       `a box for anything to tell ${over.step}`,
     );
-    const answering = raiseRow(decide, askingStep.step);
+    const answering = raiseRow(page, askingStep.step);
     await expectVisible(
       answering.locator('[data-asks]', { hasText: `asks: ${askingStep.needs}` }),
       `${askingStep.step}'s row says what it asks`,
@@ -206,9 +210,9 @@ export default {
     if (!(await raiseAndAnswer.isEnabled()))
       throw new Refused('Raise the budget and answer is enabled once an answer is written — it stayed disabled');
     await answerBox.fill('');
-    await expectCount(raiseRow(decide, held.step).getByRole('radio'), 0, 'a round has no mode to choose');
+    await expectCount(raiseRow(page, held.step).getByRole('radio'), 0, 'a round has no mode to choose');
     await expectCount(
-      answers.locator(`[data-step="${held.target}"]`),
+      partOf(page, held.target).locator('[data-part-asks] [data-offer]'),
       0,
       `${held.target} has no row of its own: it goes again with ${held.step}'s round`,
     );
@@ -279,13 +283,13 @@ export default {
 
     await node(over.step).click();
     const inspector = stepBar(page, COSTLY.id, over.step);
-    await inspector.getByRole('tab', { name: 'Details' }).click();
+    await openFold(partOf(inspector, over.step), 'detail');
     await expectVisible(
       inspector.locator('[data-spent="over"]', { hasText: over.of }),
-      `the inspector's Details say what ${over.step}'s tries cost of its cap (${over.of}), red past it`,
+      `the inspector's Detail says what ${over.step}'s tries cost of its cap (${over.of}), red past it`,
     );
     await expectVisible(
-      inspector.locator('[data-state="over-budget"]', { hasText: 'waits on you' }),
+      inspector.locator('[data-step-tag]', { hasText: /^waits on you$/i }),
       `and its word, waits on you, for ${over.status}`,
     );
     await expectVisible(

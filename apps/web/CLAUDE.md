@@ -54,6 +54,12 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - `npm run e2e` hands its pages to workers one at a time (`queueOf`, `e2e/workers.ts`), each a process with its own seeded store, api,
   `vite preview` and Chromium (`e2e/worker.ts`); `--workers <n>` sets how many, else the machine does (`workersFor`), and either way free memory caps it: `--workers` can lower the
   count, never raise it past what free memory holds, and a run given fewer than it asked says so before it starts them.
+- A run of the e2e builds the app once, and not at all where `dist/` is already the build of the sources as they stand (`current`,
+  `e2e/built.ts`: the board's files but its tests, `objects`' and the lockfile, by size and time of change; never in CI); `rm -rf dist`
+  makes it build. A worker stops at its first failing page, and its seat starts another on a fresh store for the pages left
+  (`startsAgain`, `e2e/workers.ts`), so one run names every failing page of its batch, five at most, and their names together at its end:
+  read them all before running again. After a change to a part most pages draw, run the pages that draw it most and sign off: the
+  round's `ci` shards visit every page in five minutes and name the ones it broke, where walking them all here takes an hour.
 - Once per machine, install each Playwright's browser through the checkout's own `node_modules`, never from an `npx` download (an install
   deletes the builds of every Playwright it does not see): `npx playwright install chromium` for the e2e, and
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.
@@ -168,7 +174,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A person's word for a step's state has one writer, `PERSON` in `lib/words.ts`, a total `Record<StepState, PersonWords>`: its rail word
   (on the chip, the rail and the card's tag), what it means on hover, and the words of its wait for a state that waits on a person. The
   run's own waits (`RUN_WAITS`) and how a run ended (`ENDED`, `called off` for `cancelled`) sit beside it. Where the board's word differs
-  from the code's, it is translated there alone: `status.ts` reads the codes, `runWords.ts` and `stepCard.ts` compose.
+  from the code's, it is translated there alone: `status.ts` reads the codes, `runWords.ts` and `stepPart.ts` compose.
   `test/structure.test.ts` refuses a rail word spelled elsewhere, a retired phrasing (`waits for you`, `check refused`, `not signed`,
   `cancelled` said to a person) and a runtime word (`journal`, `engine`, `WF_MAX_RUNS`) on hover.
 - A value two files under `lib/api/` need sits in a sibling that imports no sibling: the word a route kept on Hono reads for a workflow's

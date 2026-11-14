@@ -186,6 +186,30 @@
           "card": "run-core, one read of a run (D): the board's default factory is objects' `DEFAULT_NAMESPACE`, through two converters"
         }
       ]
+    },
+    {
+      "term": "Step part",
+      "meaning": "one step as every size of it is drawn — the graph's node, the preview card, and whole in the ledger, the bar and the step's page — from one model, `stepPartOf` (`apps/web/src/lib/stepPart.ts`): six slots in an order a size never changes, only leaves some out (head, asks of you, got, said, gave, detail), each `none` where it does not apply, of the try the address shows (`?try=<step>:<n>`, `tryShown`, `apps/web/src/lib/tryAddress.ts`, proved by `apps/web/contracts/try-shown.contract.ts`). Its head is the one writer of the words the step's card says (`headOf`).",
+      "type": "StepPartModel"
+    },
+    {
+      "term": "Packet",
+      "meaning": "what a step hands the step whose `input` names it: drawn on the graph's edge between them, labelled by the giver's name, with the fields and files the giver's shown try gave; the giver's Gave and the taker's Got say the same label (`packetsOf`, `apps/web/src/lib/canvas.ts`).",
+      "type": "Packet"
+    },
+    {
+      "term": "Receipt",
+      "meaning": "a folded record at the foot of a run's page, read when a person wants to check rather than act: its timeline, its checks, its specs, its tokens, and where it ran."
+    },
+    {
+      "term": "Field widget",
+      "meaning": "what draws a declared field of a step's output, chosen once per field from its schema and the shape its `x-shape` marks, never from its value, so the field looks the same before its step runs (a dash) and on every run: `widgetOf` (`apps/web/src/lib/fieldWidget.ts`, proved by `apps/web/contracts/field-widget.contract.ts`).",
+      "type": "FieldWidget"
+    },
+    {
+      "term": "Viewer",
+      "meaning": "what draws a step's file in a sheet with an address of its own (`?view=<step>/<path>`, `apps/web/src/lib/viewAddress.ts`), which Back closes: a picture, markdown, JSON or text, by the kind the api serves it as and its extension, never its bytes, and none for a file it cannot draw, offered by its link (`viewerOf`, `apps/web/src/lib/viewers.ts`, proved by `apps/web/contracts/artifact-viewer.contract.ts`).",
+      "type": "Viewer"
     }
   ]
 }

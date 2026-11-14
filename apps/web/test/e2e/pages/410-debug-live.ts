@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PATH_POLL_MS } from '../../../src/lib/lifecyclePath.ts';
-import { fed, openDebug, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
+import { fed, LEDGER, openDebug, partOf, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -18,12 +18,12 @@ export default {
    * The Debug panel reads what the feed says of its step. implement's task is settled, so its path is not polled; the step filed again
    * behind the page's back, as a retry files it — a new task, the first kept as try 1 — and that task stopped before it started, is not
    * read while nothing says so. Once the feed says implement moved, the panel draws the new task's path within `LIVE_MS`, lit where it
-   * stands, and offers the try before it, which a person picks to see where that one ended. Taken back the same way. The new task is
-   * settled, so no conversation of it is followed: a live one's stream, closed by the board as the take-back moves the step back, would be
-   * a failed request.
+   * stands, and the part offers the try before it, which a person picks in its try picker to see where that one ended. Taken back the same
+   * way. The new task is settled, so no conversation of it is followed: a live one's stream, closed by the board as the take-back moves the
+   * step back, would be a failed request.
    */
   name: 'debug-live',
-  route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
+  route: `/runs/${FAKE.id}`,
   expect: async (page) => {
     await sidebar(page);
     const { id } = FAKE;
@@ -33,7 +33,8 @@ export default {
     const record = path.join(store!, 'runs', `${id}.json`);
     const journal = path.join(store!, 'engine', 'tasks', `${second}.jsonl`);
     const seeded = fs.readFileSync(record, 'utf8');
-    const { panel, lifecycle } = await openDebug(page, first);
+    const part = partOf(page.locator(LEDGER), SESSION.step);
+    const { panel, lifecycle } = await openDebug(part, first);
     const completed = lifecycle.locator('[data-state="completed"][data-lit]');
     await expectVisible(completed, `${step}'s task settled: completed lit`);
     await idle(page);
@@ -71,14 +72,19 @@ export default {
       await expectCount(lifecycle.locator('[data-route][data-taken]'), 2, 'two routes taken: the person’s stop, and a pass’s settling');
       await expectVisible(lifecycle.locator('[data-route="submitted->stopping"][data-taken]'), 'submitted->stopping taken, by the stop');
       await expectVisible(lifecycle.locator('[data-route="stopping->canceled"][data-taken]'), 'stopping->canceled taken');
-      const picker = panel.getByRole('radiogroup', { name: 'Which try' });
-      await expectVisible(picker.getByRole('radio', { name: 'try 2 (current)', checked: true }), 'the current try is picked');
+      const picker = part.getByRole('radiogroup', { name: `Which try of ${step}` });
+      await expectVisible(
+        picker.getByRole('radio', { name: 'try 2 (current)', checked: true }),
+        "the current try is picked, in the part's own picker, which the Debug panel follows",
+      );
+      await expectVisible(panel.locator('[data-path-try="2"]'), 'and the panel says the try it draws');
       await idle(page);
       await settled(page);
       await photograph(panel, path.join(OUT, `debug-live-retried-${await themeOf(page)}.png`));
 
       await picker.getByRole('radio', { name: 'try 1', exact: true }).click();
-      await expectVisible(panel.locator(`[data-path="${first}"]`), 'try 1 picked: its own task');
+      await page.waitForURL((url) => url.searchParams.get('try') === `${step}:1`);
+      await expectVisible(panel.locator(`[data-path="${first}"]`), 'try 1 picked, the address keeping it: its own task');
       await expectVisible(completed, 'where it ended: completed lit');
     } finally {
       fs.writeFileSync(record, seeded);
@@ -86,7 +92,7 @@ export default {
       fed(id, step, 'succeeded');
     }
     await expectCount(
-      panel.getByRole('radiogroup', { name: 'Which try' }),
+      part.getByRole('radiogroup', { name: `Which try of ${step}` }),
       0,
       'with the retry taken back, one try, and no picker',
       LIVE_MS,

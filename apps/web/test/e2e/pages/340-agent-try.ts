@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, themeOf, isRunAction } from '../board.ts';
+import { fed, openFold, openRunMenu, photograph, runMenuActions, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS, checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -234,14 +234,17 @@ export default {
 
       await shown.locator(`a[data-try-run="${id}"]`).click();
       await page.waitForURL((url) => url.pathname === `/runs/${id}`, { timeout: WAIT_MS });
-      const header = page.locator('article header').first();
-      await expectVisible(header.locator(`[data-try-tag="${seeded.name}"]`), "the try's page tags it try");
-      await expectVisible(header.locator(`a[data-agent-link="${seeded.name}"]`), 'and links the agent it tried');
+      const where = await openFold(page.locator('section[aria-label="Receipts"]'), 'where');
+      await expectVisible(where.locator(`[data-try-tag="${seeded.name}"]`), "the try's page tags it try, in its receipt of where it ran");
+      await expectVisible(where.locator(`a[data-agent-link="${seeded.name}"]`), 'and links the agent it tried');
+      const actions = await runMenuActions(page);
+      if (!actions.includes('remove')) throw new Refused(`a try's menu offers Remove — it offers ${actions.join(', ')}`);
       await idle(page);
       await settled(page);
       await photograph(page, path.join(OUT, `agent-try-run-${await themeOf(page)}.png`), { fullPage: true });
-      await header.getByRole('button', { name: 'Remove…' }).click();
-      const [removed] = await Promise.all([removal(page, id), header.getByRole('button', { name: 'Remove', exact: true }).click()]);
+      const menu = await openRunMenu(page);
+      await menu.getByRole('button', { name: 'Remove…' }).click();
+      const [removed] = await Promise.all([removal(page, id), menu.getByRole('button', { name: 'Remove', exact: true }).click()]);
       if (removed.status() !== 200) throw new Refused(`the api removes the try — it answered ${removed.status()}: ${await removed.text()}`);
       await page.waitForURL((url) => url.pathname === '/runs', { timeout: WAIT_MS });
       await expectCount(page.locator(`a[href="/runs/${id}"]`), 0, 'removed, the try is off Runs');

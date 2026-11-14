@@ -2,7 +2,7 @@
  * The one output of a step that hires an agent: the fields the agent's `output:` declares, then those the step's own adds, each with
  * one owner. Pure: it reads the two declarations `outputOf` already read, and refuses a field both declare.
  */
-import { AGENTS_FOLDER, type OutputOwner, refuse, type StepOutput } from '../step/step.ts';
+import { AGENTS_FOLDER, type OutputOwner, refuse, shapesKept, type StepOutput } from '../step/step.ts';
 
 /** Who declares a field: `agent` with its name and schema file, or `step` with its own. */
 const ownerOf = (by: OutputOwner['by'], name: string, output: StepOutput): OutputOwner => ({ by, name, file: output.file });
@@ -15,8 +15,9 @@ const declarer = (o: OutputOwner): string =>
 
 /**
  * Step `step`'s output, merged from its agent `agent`'s declaration `fromAgent` and its own `own`: the agent's fields first, then the
- * step's, each recorded in `owners`. `file` is the step's own `output:` line where it has one, else the agent's, as the step's file is
- * written back. Undefined when neither declares one. Refuses a field both declare, naming it and both declarers: a field has one owner.
+ * step's, each recorded in `owners`, and the shape of each field either marked (`shapes`). `file` is the step's own `output:` line
+ * where it has one, else the agent's, as the step's file is written back. Undefined when neither declares one. Refuses a field both
+ * declare, naming it and both declarers: a field has one owner.
  */
 export function mergedOutput(
   step: string,
@@ -49,5 +50,5 @@ export function mergedOutput(
     required: [...(fromAgent?.schema.required ?? []), ...(own?.schema.required ?? [])],
     additionalProperties: false as const,
   };
-  return { file: declaring.file, schema, owners };
+  return { file: declaring.file, schema, owners, ...shapesKept({ ...fromAgent?.shapes, ...own?.shapes }) };
 }

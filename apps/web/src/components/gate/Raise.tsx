@@ -13,9 +13,9 @@ import { MODES, Refusal, useAsk, useRound } from './Ask';
 import { answersFrom, Asks, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import type { Frozen } from '../../lib/frozen';
 import { BUTTON, TEXTAREA } from '../../lib/classes';
+import { focusRing } from '../ui/ds/utils';
 
-const AMOUNT =
-  'w-24 rounded border border-outline bg-background px-2 py-1 font-mono text-body-medium focus:border-on-surface-variant focus:outline-none';
+const AMOUNT = `w-24 rounded border border-outline bg-background px-2 py-1 font-mono text-body-medium focus:border-on-surface-variant ${focusRing()}`;
 
 /**
  * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes

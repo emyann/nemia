@@ -135,6 +135,7 @@ export function runWith(note: string | null): RunDetail {
             },
           },
         ],
+        shown: 1,
         timeline: [],
       },
     ],
@@ -352,6 +353,8 @@ export const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Part
   const base = runOf('awaiting approval', { waitingOnYou: ['review'] });
   return {
     ...base,
+    status: 'awaiting approval',
+    phase: 'waiting',
     waitingOnYouWords: ['approve review'],
     gates: ['review'],
     ...run,

@@ -12,8 +12,11 @@ import { HerSheetProvider } from '@/components/frame/HerSheet';
 import { LinkRefusal } from '@/components/frame/LinkRefusal';
 import { NewerRelease } from '@/components/frame/NewerRelease';
 import { SetupBanner } from '@/components/frame/SetupBanner';
+import { ViewerSheet } from '@/components/view/ViewerSheet';
 import { SidebarProvider, sidebarOpenOf } from '@/components/ui/sidebar';
 import { barSearch } from '@/lib/bar';
+import { trySearch } from '@/lib/tryAddress';
+import { viewSearch } from '@/lib/viewAddress';
 import { useFeed } from '@/lib/useFeed';
 import { NemiaChatProvider } from '@/lib/useNemiaChat';
 import { useFrameSize } from '@/lib/useFrameSize';
@@ -22,8 +25,12 @@ import { useScrollMark } from '@/lib/useScrollMark';
 /** Where the router's devtools button stands in a dev build: at the rail's foot beside the query's, over neither her face nor her sheet. */
 const ROUTER_TOOLS_AT: CSSProperties = { left: '4.5rem' };
 
+/**
+ * The search every page reads: what the bar shows (`bar`), the try each step shows (`try`), and the file the viewer's sheet shows
+ * (`view`).
+ */
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  validateSearch: barSearch,
+  validateSearch: (search: Record<string, unknown>) => ({ ...barSearch(search), ...trySearch(search), ...viewSearch(search) }),
   component: Root,
 });
 
@@ -44,9 +51,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
  * `staticData` says it `ownsChat`, the chat page, her chat is never drawn in the sheet, the page being the panel itself. The frame follows
  * the workflow feed once for the whole page: what moves on it is read again at once, the polls slow while its stream is open, and the
  * gauges say which. Her chat is held over the whole frame too (`NemiaChatProvider`), one stream of hers for the visit, which the sheet and
- * the chat page both read, so neither a navigation nor a bar taking the sheet closes it or opens another. The devtools of a dev build sit
- * at the rail's foot, over neither her face nor her sheet. React Aria's `RouterProvider` sends every React Aria link, pressed with Enter or
- * clicked, through the router, so no link loads the whole page again.
+ * the chat page both read, so neither a navigation nor a bar taking the sheet closes it or opens another. Over the page, the viewer's
+ * sheet shows the step's file the address's `?view=` names (`ViewerSheet`), its own place, which Back closes. The devtools of a dev
+ * build sit at the rail's foot, over neither her face nor her sheet. React Aria's `RouterProvider` sends every React Aria link, pressed
+ * with Enter or clicked, through the router, so no link loads the whole page again.
  */
 function Root() {
   const path = useRouterState({ select: (state) => state.location.pathname });
@@ -86,6 +94,7 @@ function Root() {
               </main>
             </div>
             <FrameSheet path={path} search={search} feed={feed} />
+            <ViewerSheet />
           </SidebarProvider>
         </HerSheetProvider>
       </NemiaChatProvider>

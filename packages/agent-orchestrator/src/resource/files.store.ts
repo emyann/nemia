@@ -108,8 +108,9 @@ const isDirectory = (at: string): boolean => {
 };
 
 /**
- * Everything a folder step's own folder holds, for a person who never opens a terminal: each regular file directly in `dir`, by
- * name, as the files route serves it — its size and what the board does with it. Newest-looking first is not worth guessing at:
+ * Everything a step's folder holds, for a person who never opens a terminal: each regular file directly in `dir`, by name, as the
+ * `route` it is linked under serves it — `files` for a folder step's own folder, `artifacts` for any step's artifacts folder
+ * (`artifactsDir`) — its size and what the board does with it. Newest-looking first is not worth guessing at:
  * they are listed in name order, as a directory listing reads.
  *
  * What the route cannot serve is listed all the same, by its path alone, drawn as any path a closeout named that the api does not
@@ -131,7 +132,12 @@ const isDirectory = (at: string): boolean => {
  * that made nothing. The name comes from the package, not spelled a second time here. A `given` that is not a directory is a step's
  * own file and is listed: what the run makes is a directory.
  */
-export function folderFiles(run: Pick<Run, 'id'>, step: string, dir: string): { files: StepArtifact[]; error: string | null } {
+export function folderFiles(
+  run: Pick<Run, 'id'>,
+  step: string,
+  dir: string,
+  route: 'files' | 'artifacts',
+): { files: StepArtifact[]; error: string | null } {
   let names: string[];
   try {
     names = fs.readdirSync(dir).sort();
@@ -146,7 +152,7 @@ export function folderFiles(run: Pick<Run, 'id'>, step: string, dir: string): { 
       const here = path.join(dir, name);
       const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;
       if (!stat) return { path: here };
-      const url = `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/files/${encodeURIComponent(name)}`;
+      const url = `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/${route}/${encodeURIComponent(name)}`;
       return { path: here, name, url, kind: typeOf(name).kind, size: stat.size };
     });
   return { files, error: null };

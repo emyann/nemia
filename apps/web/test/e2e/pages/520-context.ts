@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { openFold, partOf, photograph, themeOf } from '../board.ts';
 import { cardOf, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { CARDS, DIAMOND, FACTORIES, FAKE, hiringStarts, WORKFLOWS } from '../seed.ts';
@@ -213,9 +213,12 @@ async function onTheCard(page: Page, what: string): Promise<void> {
   await from.getByRole('button', { name: 'Done' }).click();
 }
 
-/** READER's run page: its task in its parts, the run it waited on and each it read a block headed by how, linked to its run. */
+/**
+ * READER's run page: its task in its parts, in implement's Detail fold, the run it waited on and each it read a block headed by how, linked
+ * to its run.
+ */
 async function onTheRunPage(page: Page, what: string): Promise<void> {
-  const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: 'implement', exact: true }) });
+  const section = await openFold(partOf(page, 'implement').locator('[data-part-detail]'), 'detail');
   const fold = section.locator('details[data-told]');
   if (!(await fold.evaluate((el) => (el as HTMLDetailsElement).open))) await fold.locator('summary').click();
   const blocks = fold.locator('[data-layer="task"] section[data-from-run]');

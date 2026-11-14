@@ -58,6 +58,7 @@ export const Try = Schema.Struct({
   cause: TryCause,
   model: Schema.optional(Schema.String),
   paused: Schema.optional(Schema.Literal(true)),
+  retried: Schema.optional(Schema.Literal(true)),
   budget: Schema.optional(Schema.Number),
 }).annotate({ identifier: 'Try' });
 export type Try = typeof Try.Type;
@@ -179,6 +180,7 @@ const Approval = Schema.Struct({
   at: Schema.String,
   message: Schema.optional(Schema.String),
   budgets: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
+  work: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
   actor: Schema.optional(Actor),
 });
 

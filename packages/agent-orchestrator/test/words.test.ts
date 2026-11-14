@@ -262,7 +262,6 @@ const HARNESS_WORDS: Baseline = {
   'apps/web/src/components/agent/AgentForm.tsx': { count: 7, ...MOVES.web },
   'apps/web/src/components/gate/Decide.tsx': { count: 1, ...MOVES.checkout },
   'apps/web/src/components/step/Facts.tsx': { count: 16, card: 'u42s' },
-  'apps/web/src/components/gate/Needs.tsx': { count: 1, ...MOVES.wait },
   'apps/web/src/components/frame/QuotaLine.tsx': { count: 1, ...MOVES.quota },
   'apps/web/src/components/step/Reach.tsx': { count: 10, ...MOVES.reach },
   'apps/web/src/components/agent/SkillPicker.tsx': { count: 2, ...MOVES.checkout },

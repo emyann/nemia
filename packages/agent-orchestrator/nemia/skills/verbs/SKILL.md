@@ -640,7 +640,8 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                daemon's sessions are given up to the timeout to end their tool calls
                                (--timeout <d>, else nemia pause-timeout), park, and resume as the same try on
                                the new release; then say each piece the new release reads missing
-                               that a run waits on, with its fix. A tag built already is switched
+                               that a run waits on, and each of the machine and its service, with
+                               its fix, or that none of those is. A tag built already is switched
                                to without a rebuild, so an older tag rolls back. --repo:
                                the repository the tag is in (the running release's source);
                                --name: the service (nemia). Then it removes each release that is

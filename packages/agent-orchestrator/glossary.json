@@ -364,8 +364,14 @@
     },
     {
       "term": "Out of memory",
-      "meaning": "a step whose current try's session or check the kernel killed a process of at its memory limit, read off the attempt's `memory` record on every pass and said in the step's note on the feed, `nemia ls` and the run page: the limit, the peak where the kernel kept one, and the knob to raise, the step's own `memory:` where it names one, else `WF_MEMORY_LIMIT`, the daemon's default (`packages/agent-orchestrator/src/out-of-memory/out-of-memory.ts`).",
-      "type": "KilledAtLimit"
+      "meaning": "a step whose current try's session or check the kernel's OOM killer ended a process of, read off the attempt's `memory` record on every pass and said in the step's note on the feed, `nemia ls` and the run page, with whose memory ran out (`by`): its own limit's where the cgroup's limit was reached (`oom`), or a record written before it was counted, said with the limit, the peak where the kernel kept one, and the knob to raise, the step's own `memory:` where it names one, else `WF_MEMORY_LIMIT`, the daemon's default; else the machine's, said with the peak under its own limit and fewer sessions at once (`WF_MAX_CONCURRENT`) or more memory for the machine, never a limit knob, its check run again by the step's `retries:` (`packages/agent-orchestrator/src/out-of-memory/out-of-memory.ts`).",
+      "type": "OutOfMemoryKill",
+      "retired": [
+        {
+          "spelling": "KilledAtLimit",
+          "card": "runtime: a process the machine's OOM killer ended is told apart from one its own limit ended"
+        }
+      ]
     },
     {
       "term": "Pass phase",

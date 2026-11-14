@@ -506,9 +506,14 @@ so a runaway test is killed there alone. The step's check is filed without it, a
 is set. A daemon started with `WF_MEMORY_LIMIT` on a host where the runtime cannot make such a scope refuses to start, naming the
 variable to unset (`limitRefusal`). A session or a check the kernel killed a process of at its limit says so in its step's note — on the
 feed, `nemia ls` and the run page — with the limit, the peak, and the knob to raise: the step's `memory:` where it names one, else
-`WF_MEMORY_LIMIT` (`outOfMemoryWords`). A raised `memory:` reaches a new run, since a run freezes its workflow; a raised
-`WF_MEMORY_LIMIT` or `WF_MEMORY_REQUEST` reaches every task not yet started once the daemon is restarted with it, a queued one among
-them; a session already running keeps the size it started under.
+`WF_MEMORY_LIMIT` (`outOfMemoryWords`). The runtime's record tells that kill apart from the machine's: `oomKills` counts the processes
+any OOM killer ended in the cgroup, `oom` the times its own limit was reached. A kill with no `oom` is the machine's: the whole machine
+ran out of memory, under the task's own limit. Its note says so, with the peak and the limit, and names fewer sessions at once
+(`WF_MAX_CONCURRENT`) or the machine's memory, never a limit knob, since a higher limit squeezes the machine further. A check the
+machine killed is no verdict on the work: the step's `retries:` runs it again as its check, never a session told to look at it. A
+record written before `oom` was carried reads as a kill at the limit. A raised `memory:` reaches a new run, since a run freezes its
+workflow; a raised `WF_MEMORY_LIMIT` or `WF_MEMORY_REQUEST` reaches every task not yet started once the daemon is restarted with it, a
+queued one among them; a session already running keeps the size it started under.
 
 **A session is admitted only while the memory it asks fits the machine.** What each asks is its request, a container's
 `resources.requests.memory`: the daemon's `WF_MEMORY_REQUEST` for every task filed with none of its own (`defaultRequests`), and,
@@ -1769,6 +1774,10 @@ retries: 1
   `wf retry`. A `--continue` of one whose harness never named its session — it could not start, or was lost — continues the
   session it was started to continue (`continuesFrom`). A held-open step's answered turn is no different: one that fails,
   is lost or cannot start settles its task `failed`, and the next try is a `-tryN` task of its own, never another answer.
+  A check the machine's OOM killer ended a process of, under its own limit (its memory record's `oom` at 0, *out of memory*), is no
+  verdict on the work: the next tick runs the check again, and nothing else, as `--recheck` does, whatever it exited with and whatever
+  `checkFailurePolicy:` says of the code. Its record keeps the try as a `recheck` marked `retried`, and it counts against `n` like any
+  try of `retries:`. Past them, the step waits on you, offered `--recheck` first.
 - **`checkFailurePolicy:` — which refusals are a person's.** A step's check can say which of its exit codes mean a refusal only a
   person can answer — no tool signed in, a remote not there — read against Kubernetes' Job `podFailurePolicy`:
 
@@ -2778,6 +2787,17 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   a round on the run's branch, where merging the base in is the work's to do. The ending's try moves behind (`cause: 'back'`) in the same
   write; once the loop settles it waits at its gate, nothing of it run, for a new approval. Refused, naming the fix: no words, a step
   that is not the loop's, `nemia retry --round` of the loop, one way while the other is asked for, and a folder with no loop before its ending.
+- **An ending approved and not yet filed can still have its work sent back.** Nothing of a `workspace: base` ending runs before its
+  approval, and it may wait after it: for the checkout another run's ending holds, or for the pass that files it. Its approval names
+  the tries of the work it approved, each step it waits on (`work` in its file), and is in force only while those tries stand. So until
+  the ending is filed, `wf retry <run> review --message "<objection>"` (the steps `sendBackTo` names) is taken: the try it files is
+  past what the approval approved, which spends it: the record's read composes no such approval onto the run (`workStands`), and the
+  tick moves it into `done/`, beside any spent there before, never over one, and
+  once the work signs off again the ending waits at its gate for a new approval. A restart reads the same, since the record's tries are
+  what spend it. `wf ls`, `wf decide` and a second `wf approve` offer that send-back beside what the ending waits for; a held or pruned
+  run offers none. An approval an older nemia wrote names no work, and counts as current; no try of the work would spend it, so nothing
+  offers its send-back, and `wf retry` and a second `wf approve` say to take it back first, moving `approve-<ending>-<try>` into the
+  run's `.asks/done/`. Once the ending is filed, the send-back is refused as it was.
 - **The tick hands a step's leftovers off once for each try.** What a person leaves in a step's worktree after its hand-off is theirs,
   not committed under the step's name, until the step's next try.
 - **What the steps after it are told.** Every step after an approved gate — the one after it and each after that one, the

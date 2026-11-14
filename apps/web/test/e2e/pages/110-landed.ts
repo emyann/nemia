@@ -1,4 +1,4 @@
-import { sidebar } from '../board.ts';
+import { openFold, partOf, sidebar } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, settled } from '../checks.ts';
 import { LANDED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -13,27 +13,23 @@ export default {
   expect: async (page) => {
     await sidebar(page);
     const { ending } = LANDED;
-    const section = page.locator(`article > section#step-${ending}`);
+    const section = partOf(page, ending);
 
     await expectCount(
-      page.locator('section[aria-label="To decide"]'),
+      page.locator('[data-asks]'),
       0,
-      'a run whose ending merged it has nothing to decide: its ending answered for its own branch',
-    );
-    await expectCount(page.locator('section[aria-label="Waiting on you"]'), 0, 'and waits on nobody');
-    await expectCount(
-      page.locator('section[aria-label="Decide"]'),
-      0,
-      'and the Decide section says nothing: the branch is already on the base',
+      'a run whose ending merged it has nothing to decide, its ending having answered for its own branch, and waits on nobody: no asks, and no Decide fold under them',
     );
 
     await expectVisible(section.getByText(LANDED.merged), `${ending} says what it did (${LANDED.merged})`);
+    const detail = await openFold(section, 'detail');
+    await openFold(detail, 'spec');
     await expectVisible(
-      section.locator('dd', { hasText: /^base$/ }),
+      detail.locator('dd', { hasText: /^base$/ }),
       `and its facts say it ran in the repository's own checkout (workspace base)`,
     );
-    await expectVisible(section.locator('dd', { hasText: /^approved, try 1$/ }), 'and that its gate is approved');
-    const approval = section.locator(`section[aria-label="The approval of ${ending}"]`);
+    await expectVisible(detail.locator('dd', { hasText: /^approved, try 1$/ }), 'and that its gate is approved');
+    const approval = detail.locator(`section[aria-label="The approval of ${ending}"]`);
     await expectVisible(
       approval.getByText('your approval filed it, and the step is handed it as the terms it acts on'),
       `the approval under ${ending} says it filed the step, not that a step after the gate was handed anything`,
@@ -42,19 +38,20 @@ export default {
     await expectCount(page.getByText('every step after the gate'), 0, 'nothing on the page says a step follows the gate: none does');
     await expectCount(section.locator(`section[aria-label="The gate of ${ending}"]`), 0, 'and there is no gate to act at: it is approved');
 
+    const where = await openFold(page.locator('section[aria-label="Receipts"]'), 'where');
     const said = /— removed 1 worktree, 1\.50 GB freed, and its files, 48\.0 MB freed; its branches and record are kept$/;
     await expectVisible(
-      page.locator('article [data-fact="pruned"] [data-pruned]', { hasText: said }),
-      'the run says it was pruned: when, what it removed and freed, and what it kept',
+      where.locator('[data-fact="pruned"] [data-pruned]', { hasText: said }),
+      'the run says it was pruned, in its receipt of where it ran: when, what it removed and freed, and what it kept',
     );
     await expectVisible(section.getByText(LANDED.merged), 'and a pruned run still reads its steps as they ended');
-    const shot = page.locator('article > section#step-review [data-artifact="pruned"]', { hasText: LANDED.shot });
+    const shot = partOf(page, 'review').locator('[data-part-gave] [data-artifact="pruned"]', { hasText: LANDED.shot });
     await expectVisible(
       shot,
       `review's ${LANDED.shot} reads as removed by a prune of its files, not drawn as a path as if it had never been made`,
     );
     await expectVisible(shot.getByText(/ — its files were removed at .+, by a prune of its files$/), 'with when, and by what');
-    const moment = (await page.locator('article [data-fact="pruned"] [data-pruned] time').first().textContent())!.trim();
+    const moment = (await where.locator('[data-fact="pruned"] [data-pruned] time').first().textContent())!.trim();
     await expectTexts(
       shot.locator('time'),
       [moment],

@@ -9,7 +9,8 @@ export default {
   /**
    * A routed run's page, the run written by the page and taken back (`seedRouted`): its condition drawn as one, its routes listed with the
    * one it took marked and the one it ends on said; the route edges it did not take thin and faint, the one it took drawn whole; the node
-   * it passed by reading `skipped`, sunk into the floor; and its workflow node reading `sent`, linked to the card it filed. Then its
+   * it passed by reading `skipped`, sunk into the floor; its workflow node reading `sent`, linked to the card it filed, and that card
+   * the run's result, as its final node gave it. Then its
    * workflow, a folder of yours written beside it: the condition and the workflow node drawn as such, its route edges labelled. It ends
    * back on the Workflows page, the run and the folder taken back, which the runner's own picture shows.
    */
@@ -58,7 +59,14 @@ export default {
         1,
         `the one route edge not taken, into ${ROUTED.skipped}, is drawn faint`,
       );
+      const result = page.locator('section[data-run-result]');
+      await expectVisible(
+        result.locator(`[data-result-gave="${ROUTED.workflowNode}"] [data-result-sent] a[href="/inbox/${ROUTED.card}"]`),
+        `the run's result is what its final ${ROUTED.workflowNode} gave: the card it sent, linked`,
+      );
+      await expectCount(result.locator('[data-result-ended], [data-result-stands]'), 0, 'and never that the run ended before it gave');
       await settled(page);
+      await photograph(result, path.join(OUT, `run-routed-result-${await themeOf(page)}.png`));
       await photograph(graph, path.join(OUT, `run-routed-graph-${await themeOf(page)}.png`));
       await photograph(page, path.join(OUT, `run-routed-page-${await themeOf(page)}.png`), { fullPage: true });
 

@@ -36,7 +36,7 @@ export default {
     try {
       const run = await openOn(page, `/runs/${id}`, opened);
       const step = await openOn(page, `/runs/${id}/steps/${ending}`, opened);
-      await expectVisible(run.other.locator(`article > section#step-${ending}`), 'the run page draws the run while it is in the store');
+      await expectVisible(run.other.locator(`article#step-${ending}`), 'the run page draws the run while it is in the store');
       await expectVisible(step.other.getByRole('heading', { level: 1, name: ending, exact: true }), 'and the step page its step');
       for (const { problems } of [run, step]) {
         if (problems().length)

@@ -1830,6 +1830,7 @@ test('a check the machine killed under its own limit is run again by `retries:`,
     run = await throughCheck(['check: npm test', 'retries: 1'], 'failed', squeezed);
   });
   await s.test('one pass runs its check again, and files no session', async () => {
+    const before = fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
     const pass = await tick(run.id);
     assert.deepEqual([pass.tried, pass.checked], [['implement'], ['implement']]);
     assert.deepEqual(b.filings, [`${run.id}-implement`, check1(), check2()], 'a check, and no session');
@@ -1838,6 +1839,17 @@ test('a check the machine killed under its own limit is run again by `retries:`,
       { taskId: `${run.id}-implement`, check: { taskId: check1() }, cause: 'recheck', retried: true },
     ]);
     assert.deepEqual(retryAsks(run.id), [], 'nobody asked for it');
+    fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), before);
+  });
+  await s.test('the pass that filed it died before writing the run down: the recheck is adopted, never filed twice', async () => {
+    const again = await tick(run.id);
+    assert.deepEqual(again.tried, [], 'adopted before the pass assessed anything, nothing left to file');
+    assert.equal(b.filings.filter((f) => f === check2()).length, 1);
+    assert.equal(b.tasks.has(`${run.id}-implement-try2`), false, 'and no session looked for, or filed');
+    assert.deepEqual(filedAs(runRecord(ROOT, run.id).steps.implement).tries, [
+      { taskId: `${run.id}-implement`, check: { taskId: check1() }, cause: 'recheck', retried: true },
+    ]);
+    assert.deepEqual(runRecord(ROOT, run.id).steps.implement?.check, { taskId: check2() });
   });
   await s.test('the machine kills it again: its retries spent, it waits on you, and `nemia decide` offers --recheck first', async () => {
     ended(check2(), 'failed', squeezed);

@@ -11,7 +11,9 @@
  * `omega`, whose `step` names none. `repoS` is a second repository with no workflow.
  *
  * Factories: `hired` (repoR) attaches alpha and hires ada into `alpha/implement`; `empty` (repoR) attaches delta and hires no one;
- * `shadow` (repoR) attaches delta and hires max into `delta/ship`; `other` (repoS) attaches omega and hires zed into `omega/step`.
+ * `shadow` (repoR) attaches delta and hires max into `delta/ship`; `other` (repoS) attaches omega and hires zed into `omega/step`;
+ * `treed` (repoS), made from a template, has in its tree the workflow `press`, whose `review` names no agent, and the agent `proof`, and
+ * its wiring hires proof into `press/review`.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -62,6 +64,11 @@ for (const [name, repo, workflow] of [
 hireAgent({ factory: 'hired', agent: 'ada', step: 'alpha/implement' });
 hireAgent({ factory: 'shadow', agent: 'max', step: 'delta/ship' });
 hireAgent({ factory: 'other', agent: 'zed', step: 'omega/step' });
+addFactory({ name: 'treed', repos: [repoS], template: { source: '/t/team', version: '0.1.0', params: {} } });
+const TREE = path.join(root, 'factories', 'treed', 'tree');
+write(path.join(TREE, 'factory.json'), JSON.stringify({ workflows: ['press'], hires: { 'press/review': 'proof' } }));
+write(path.join(TREE, 'workflows', 'press', 'review.md'), '---\nplace: git\n---\nReview it.\n');
+write(path.join(TREE, 'workflows', 'agents', 'proof.md'), agentText('You review, as the tree says.'));
 
 /** The agents of the namespace `ns`, every origin's, as the Agents page reads them: in the default factory, on `repoR`. */
 const agents = (ns = 'default'): Promise<LibraryAgent[]> => everyOrigin<LibraryAgent>(app, 'agents', ns, ns === 'default' ? ON_REPO : '');
@@ -164,4 +171,18 @@ test('REFUSED: a step whose `agent:` holds a path separator credits no agent, no
     [{ from: 'repo', workflow: 'gamma', step: 'plan', hired: false }],
     'broken/stray names ../agents/cleo, which the package refuses as a name: gamma/plan is all cleo fills',
   );
+});
+
+test("a factory's own agent, read in that factory, fills each step the factory hires it into, and names that factory", async () => {
+  type Status = { origin: string; fills: unknown[]; factories: string[] };
+  const read = async (url: string): Promise<Status> => {
+    const res = await app.request(url);
+    assert.equal(res.status, 200, url);
+    return ((await res.json()) as { status: Status }).status;
+  };
+  const filled = [{ from: 'factory', workflow: 'press', step: 'review', hired: true }];
+  for (const url of ['/api/namespaces/treed/agents/proof', '/api/namespaces/treed/agents/proof?factory=treed']) {
+    const status = await read(url);
+    assert.deepEqual([status.origin, status.fills, status.factories], ['factory', filled, ['treed']], url);
+  }
 });

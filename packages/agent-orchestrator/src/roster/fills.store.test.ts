@@ -4,7 +4,7 @@
  *
  * The repository `repo` has the workflow `alpha`, whose `implement` names no agent and whose `review` names `iris`, and `gamma`, whose
  * `plan` names `ada` and whose `stray` names `../agents/ada`; its `agents/` has `iris` and `ada`. The store `home` has `ada` and `zed`, and
- * the workflow `omega`, whose `step` names `zed`.
+ * the workflow `omega`, whose `step` names `zed`. A factory made from a template has a tree of its own, with `alpha` and `proof`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -73,4 +73,18 @@ test('each agent file the factories fill a step with, their names sorted; a fact
       [theirs('iris'), ['alpha']],
     ]),
   );
+});
+
+test("a factory made from a template fills the steps of its tree's workflows with its tree's agents, a workflow read once, as a start reads it", () => {
+  const tree = scratch('wf-fills-tree-');
+  write(path.join(tree, 'workflows', 'alpha', 'review.md'), 'Review it.\n');
+  write(path.join(tree, 'workflows', 'agents', 'proof.md'), 'You are proof.\n');
+  const treed: Factory = { ...factory('treed', ['alpha', 'omega'], { 'alpha/review': 'proof', 'omega/step': 'proof' }), tree };
+  const own = path.resolve(tree, 'workflows', 'agents', 'proof.md');
+  assert.deepEqual(stepsFilled(repo, home, treed), [
+    { from: 'factory', workflow: 'alpha', step: 'review', hired: true, file: own },
+    { from: 'yours', workflow: 'omega', step: 'step', hired: false, file: yours('zed') },
+  ]);
+  assert.deepEqual(factoriesFilling([{ ...treed, file: 'treed.json' }], home).get(own), ['treed']);
+  assert.deepEqual(factoriesFilling([{ ...treed, repos: [], file: 'treed.json' }], home).get(own), ['treed'], 'on its tree alone');
 });

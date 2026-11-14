@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { useRouterState } from '@tanstack/react-router';
 import { Link as AriaLink } from 'react-aria-components';
 import { sourceOf, type AgentSkill, type GivenSkill, type SkillSource } from '../../lib/api/library.ts';
-import { type AgentListing, type AgentUser } from '../../lib/api/agents.ts';
+import { type AgentFill, type AgentListing, type AgentUser } from '../../lib/api/agents.ts';
 import { type PagePlace } from '../../lib/api/workflows.ts';
 import { costWords, SOURCE_BADGES } from '../../lib/skills';
 import { cn } from '../../lib/utils';
@@ -42,16 +42,16 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
 }
 
 /**
- * A node that names an agent, linked to its step's page: `workflow › step`; a repository's, in the factory and repository the page is
- * in, the default factory reading no repository.
+ * A node that names an agent, or a step it fills, linked to its step's page: `workflow › step`; a repository's or a factory's own, in the
+ * factory and repository the page is in, the default factory reading no repository.
  */
-function NodeLink({ user }: { user: AgentUser }) {
+function NodeLink({ user }: { user: AgentUser | AgentFill }) {
   const here = usePlaceHere();
   return (
     <RouteLink
       to="/workflows/$from/$workflow/$step"
       params={{ from: user.from, workflow: user.workflow, step: user.step }}
-      search={user.from === 'repo' ? here : {}}
+      search={user.from === 'yours' ? {} : here}
       data-node={`${user.workflow}/${user.step}`}
       className={cn('font-mono text-body-small text-foreground', LINK)}
     >
@@ -60,17 +60,26 @@ function NodeLink({ user }: { user: AgentUser }) {
   );
 }
 
-/** The nodes that name an agent, each linked — or that none does. */
-export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'usedBy'>; className?: string }) {
+/** Each node that names an agent, then each step it fills in the factory read that none of those is, hired there or named elsewhere. */
+const nodesOf = ({ usedBy, fills }: Pick<AgentListing, 'usedBy' | 'fills'>): Array<AgentUser | AgentFill> => {
+  const keyOf = (node: AgentUser | AgentFill) => `${node.from}/${node.workflow}/${node.step}`;
+  const named = new Set(usedBy.map(keyOf));
+  const filled = fills.filter((fill, i) => !named.has(keyOf(fill)) && fills.findIndex((other) => keyOf(other) === keyOf(fill)) === i);
+  return [...usedBy, ...filled];
+};
+
+/** The nodes that name an agent and the steps it fills in the factory read, each linked — or that none does. */
+export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'usedBy' | 'fills'>; className?: string }) {
+  const nodes = nodesOf(listing);
   return (
     <p data-used-by className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body-small text-muted-foreground', className)}>
-      {listing.usedBy.length ? (
+      {nodes.length ? (
         <>
           <span>Attached to</span>
-          {listing.usedBy.map((user, i) => (
-            <span key={`${user.workflow}/${user.step}`}>
+          {nodes.map((user, i) => (
+            <span key={`${user.from}/${user.workflow}/${user.step}`}>
               <NodeLink user={user} />
-              {i < listing.usedBy.length - 1 && ','}
+              {i < nodes.length - 1 && ','}
             </span>
           ))}
         </>

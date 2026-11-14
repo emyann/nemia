@@ -68,6 +68,7 @@ export const agent = (extra: Partial<AgentListing> = {}): AgentListing => ({
   source: '---\nrole: Code reviewer\n---\nReview the change.\n',
   version: 'v-1',
   usedBy: [{ from: 'yours', workflow: 'build', step: 'review' }],
+  fills: [],
   error: null,
   untried: { why: 'a try runs Claude Code', copy: null },
   ...extra,

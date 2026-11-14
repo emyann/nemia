@@ -18,8 +18,11 @@ export type AgentPlace = 'repo' | 'yours';
 /** A node that names an agent: the step `step` of the workflow `workflow`, read from `from` — the agent's own place. */
 export type AgentUser = { from: AgentPlace; workflow: string; step: string };
 
+/** Where a step an agent fills is read from: either place an agent is, or the tree of a factory made from a template (`factory`). */
+export type FillPlace = AgentPlace | 'factory';
+
 /** A step an agent fills: the step `step` of the workflow `workflow`, read from `from`, and whether a factory hired it there. */
-export type AgentFill = { from: AgentPlace; workflow: string; step: string; hired: boolean };
+export type AgentFill = { from: FillPlace; workflow: string; step: string; hired: boolean };
 
 /** A step filled, and the agent file that fills it, as `path.resolve` spells it. */
 export type FilledStep = AgentFill & { file: string };

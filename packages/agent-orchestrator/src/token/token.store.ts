@@ -41,10 +41,16 @@ const TokenFiledSchema = Schema.Struct({
   task: Schema.String,
 });
 
-/** The folder the store keeps its token records in, under the store `home`. */
+/**
+ * The folder the store keeps its token records in, under the store `home`.
+ * @param home The store's root folder.
+ */
 export const tokensDir = (home: string): string => path.join(home, 'tokens');
 
-/** The digest a token is kept and found by: its sha-256, in hex. */
+/**
+ * The digest a token is kept and found by: its sha-256, in hex.
+ * @param token The token itself, as a session or a request presents it.
+ */
 export const tokenDigest = (token: string): string => crypto.createHash('sha256').update(token).digest('hex');
 
 /** The file of the token whose digest is `digest`, under the store `home`. */
@@ -68,6 +74,8 @@ function minted(dir: string, record: object): string {
 /**
  * Mints a session's token, its record written under its digest (`tokenFile`), readable by its owner alone (`minted`). Answers the token
  * itself, which is written nowhere: the caller hands it to the session.
+ * @param home The store's root folder.
+ * @param record What the token vouches for: the session's agent, factory, run, step, attempt and task.
  */
 export function mintToken(home: string, record: TokenFiled): string {
   return minted(tokensDir(home), record);
@@ -76,6 +84,8 @@ export function mintToken(home: string, record: TokenFiled): string {
 /**
  * The record the store keeps of `token`, or null where it minted none: no file under its digest, or one that does not read as a record,
  * which vouches for no session.
+ * @param home The store's root folder.
+ * @param token The token presented.
  */
 export function readToken(home: string, token: string): TokenFiled | null {
   let text: string;
@@ -118,13 +128,22 @@ const PersonTokenFiledSchema = Schema.Struct({
 /** The person, as a token's holder. */
 const PERSON_HOLDER: TokenHolder = { kind: 'person' };
 
-/** Who holds the token `record` is of: its holder, or the person where it names none. */
+/**
+ * Who holds the token `record` is of: its holder, or the person where it names none.
+ * @param record The standing token's record.
+ */
 export const holderOf = (record: PersonTokenFiled): TokenHolder => record.holder ?? PERSON_HOLDER;
 
-/** The standing record `record` is, as `callerOf` reads it: its name and its holder. */
+/**
+ * The standing record `record` is, as `callerOf` reads it: its name and its holder.
+ * @param record The standing token's record.
+ */
 export const standingOf = (record: PersonTokenFiled): StandingRecord => ({ name: record.name, holder: holderOf(record) });
 
-/** The folder the store keeps a person's token records in, under the store `home`. */
+/**
+ * The folder the store keeps a person's token records in, under the store `home`.
+ * @param home The store's root folder.
+ */
 export const personTokensDir = (home: string): string => path.join(home, 'person-tokens');
 
 /** A name a person's token takes: a letter or a digit, then letters, digits, `.`, `_` or `-`, 63 at most. */
@@ -163,6 +182,10 @@ function personFiles(home: string): Array<{ file: string; record: PersonTokenFil
  * digest, readable by its owner alone (`minted`). Answers the token itself, once: the store keeps only its digest. Refused, writing
  * nothing: a name that is no name (`Invalid`), an agent's name that is none (`Invalid`), and a name a token is already kept under
  * (`Conflict`, naming the removal that frees it).
+ * @param home The store's root folder.
+ * @param name The name the token is kept and removed under.
+ * @param now When it is minted, written as its `createdAt`.
+ * @param holder Who holds it: the person, or an agent and what bounds it.
  */
 export function mintPersonToken(home: string, name: string, now: Date = new Date(), holder: TokenHolder = PERSON_HOLDER): string {
   if (!PERSON_TOKEN_NAME.test(name))
@@ -187,6 +210,9 @@ export function mintPersonToken(home: string, name: string, now: Date = new Date
  * whose name the person did not type: a pairing's, after its client, and a first-visit link's. Answers the token, once, and the name it
  * was minted under. Refused as `mintPersonToken` refuses: a name that is no name (`Invalid`); a name taken between the read and the write
  * is tried again under the next.
+ * @param home The store's root folder.
+ * @param name The name to mint under, or to count on from where it is taken.
+ * @param now When it is minted, written as its `createdAt`.
  */
 export function mintPersonTokenFree(home: string, name: string, now: Date = new Date()): { token: string; name: string } {
   const taken = new Set(personFiles(home).map((f) => f.record.name));
@@ -202,7 +228,11 @@ export function mintPersonTokenFree(home: string, name: string, now: Date = new 
   }
 }
 
-/** The record of the person's token whose digest is `digest`, or null where the store keeps none: it was never minted, or was removed. */
+/**
+ * The record of the person's token whose digest is `digest`, or null where the store keeps none: it was never minted, or was removed.
+ * @param home The store's root folder.
+ * @param digest The token's digest (`tokenDigest`).
+ */
 export function personTokenOf(home: string, digest: string): PersonTokenFiled | null {
   let text: string;
   try {
@@ -214,7 +244,10 @@ export function personTokenOf(home: string, digest: string): PersonTokenFiled | 
   return personRecordOf(text);
 }
 
-/** The person's tokens the store keeps, by name: each its name and when it was minted, never its digest. */
+/**
+ * The person's tokens the store keeps, by name: each its name and when it was minted, never its digest.
+ * @param home The store's root folder.
+ */
 export function personTokens(home: string): PersonTokenFiled[] {
   return personFiles(home)
     .map((f) => f.record)
@@ -224,6 +257,8 @@ export function personTokens(home: string): PersonTokenFiled[] {
 /**
  * Removes the person's token named `name`: a request presenting it is refused as unknown from then on. Answers its record. Refused
  * (`Missing`) where the store keeps no token under that name, naming the list.
+ * @param home The store's root folder.
+ * @param name The name the token is kept under.
  */
 export function revokePersonToken(home: string, name: string): PersonTokenFiled {
   const found = personFiles(home).find((f) => f.record.name === name);
@@ -272,13 +307,21 @@ export const TokenDoor = Context.Reference<TokenDoorShape>('agent-orchestrator/T
   defaultValue: () => rootedDoor((root) => doorOf<TokensLayer, string>(tokenFiles(root)), 'token door'),
 });
 
-/** The token door over the records of the store `root`, as a layer: for a program that names its root by the door. */
+/**
+ * The token door over the records of the store `root`, as a layer: for a program that names its root by the door.
+ * @param root The store's root folder, whose token records the door reads and writes.
+ */
 export const tokenDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(TokenDoor)(doorOf<TokensLayer, string>(tokenFiles(root)));
 
 /**
  * A step's session token, minted under the store `home` as its try `attempt` is filed as the engine's task `task`: its agent (the step's
  * name where it has none), the run's factory (the default one where it names none: null is Nemia's alone) and the run and step.
  * Answered as the field `filedConfig` takes.
+ * @param home The store's root folder.
+ * @param run The run the try is of: its id and its factory.
+ * @param step The step the try is of: its name and its agent.
+ * @param task The id of the engine's task the try is filed as.
+ * @param attempt The try's number, written on the record.
  */
 export const stepToken = (
   home: string,
@@ -311,7 +354,10 @@ export const CREDENTIAL_FILE = 'credential';
 /** The name the store's credential is minted under, or the first free one after it. */
 export const CREDENTIAL_NAME = 'local';
 
-/** The credential's file under the store `home`. */
+/**
+ * The credential's file under the store `home`.
+ * @param home The store's root folder.
+ */
 export const credentialFile = (home: string): string => path.join(home, CREDENTIAL_FILE);
 
 /** The token `<home>/credential` holds, trimmed, or none: no file, or an empty one. */
@@ -331,6 +377,8 @@ function heldCredential(home: string): string | undefined {
  * Puts the person's credential in place under the store `home`: where `<home>/credential` holds a token the store keeps as a standing
  * token held by the person, leaves it and answers `kept`; else mints a person-held token named `local`, or the first free name after it,
  * and writes it to the file with mode 0600 through a hidden file renamed over it, answering `minted` and the name.
+ * @param home The store's root folder.
+ * @param now When a token it mints is minted.
  */
 export function credentialKept(
   home: string,

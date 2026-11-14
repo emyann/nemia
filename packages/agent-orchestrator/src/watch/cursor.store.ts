@@ -19,6 +19,7 @@ const cursorText = (cursor: number): string => `${cursor}\n`;
  * The cursor `file` holds — or undefined where there is no such file, which is a watch's first: it starts where it was told to, and
  * writes the file as it reads. A file that holds anything but a whole number of bytes is refused by name (exit 2), never read as 0: a
  * watch that read it as 0 would say every line of the feed again.
+ * @param file The cursor file.
  */
 export function cursorFileStart(file: string): number | undefined {
   if (fs.statSync(file, { throwIfNoEntry: false }) === undefined) return undefined;
@@ -35,6 +36,8 @@ export function cursorFileStart(file: string): number | undefined {
 /**
  * Writes `cursor` to `file`, whole: to a temp name beside it, then renamed over it, so a reader never sees half a number and a write
  * that dies leaves the cursor it had. A path whose directory is not there is refused by name (exit 2), before a watch reads a line.
+ * @param file The cursor file.
+ * @param cursor The feed position to keep, in bytes.
  */
 export function keepCursor(file: string, cursor: number): void {
   const dir = path.dirname(file);
@@ -43,5 +46,8 @@ export function keepCursor(file: string, cursor: number): void {
   writeWhole(file, cursorText(cursor));
 }
 
-/** Rewrites `file` to 0: what a watch keeps when the feed was cut under it, and it reads on from the start of the feed there is now. */
+/**
+ * Rewrites `file` to 0: what a watch keeps when the feed was cut under it, and it reads on from the start of the feed there is now.
+ * @param file The cursor file.
+ */
 export const cutCursorFile = (file: string): void => keepCursor(file, 0);

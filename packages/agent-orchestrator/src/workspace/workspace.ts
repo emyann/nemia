@@ -82,6 +82,8 @@ export type Provisioned =
 /**
  * Whether a repository's own checkout is installed before its worktrees are given their `node_modules`, and why: a clone Nemia keeps,
  * with a lockfile, and no `node_modules` or one its lockfile parts from. A person's checkout, and one that is not npm's, never.
+ * @param seen What the runner saw of the checkout: whether Nemia cloned it, its lockfile, its `node_modules` and where the lockfile parts
+ * from it.
  */
 export const checkoutInstall: CheckoutInstallOf = (seen) => {
   if (!seen.cloned || !seen.lockfile) return { due: false };
@@ -93,6 +95,8 @@ export const checkoutInstall: CheckoutInstallOf = (seen) => {
  * What the run does with one of its worktrees' `node_modules` before it files a step, a try, a round or a check there: provisioned as a
  * cut provisions it where it has none, cleared and provisioned again where its lockfile parts from it, and left as it is otherwise — and
  * always where it is not the run's own worktree, not npm's, or one link to a whole tree.
+ * @param seen What the runner saw of the worktree: whether it is the run's own, its lockfile, its `node_modules` and where the lockfile
+ * parts from it.
  */
 export const worktreeDeps: WorktreeDepsOf = (seen) => {
   if (!seen.ours || !seen.lockfile || seen.tree === 'shared') return { act: 'keep' };
@@ -100,7 +104,11 @@ export const worktreeDeps: WorktreeDepsOf = (seen) => {
   return seen.parting === null ? { act: 'keep' } : { act: 'reprovision', because: seen.parting };
 };
 
-/** `p` relative to `root` when it lies strictly inside it, else null. */
+/**
+ * `p` relative to `root` when it lies strictly inside it, else null.
+ * @param root The folder.
+ * @param p The path asked about.
+ */
 export const inside = (root: string, p: string): string | null => {
   const rel = path.relative(root, p);
   return rel && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel) ? rel : null;
@@ -124,6 +132,10 @@ export const inside = (root: string, p: string): string | null => {
  * - **Every other dot entry is left out** — `.package-lock.json`, `.vite-temp`, `.cache` — because it
  *   belongs to the tree it is in, and a tool writing it through a link would write main's. That is also
  *   how the runner tells a tree npm installed (it has `.package-lock.json`) from one this plan made.
+ * @param mainRoot The main checkout's root folder.
+ * @param worktree The worktree's root folder.
+ * @param main The listing of the main checkout's root `node_modules`.
+ * @param nested The listing of each workspace's own `node_modules`, by the workspace's folder; none by default.
  */
 export function depsPlan(
   mainRoot: string,
@@ -197,7 +209,10 @@ type LockEntry = { version?: string; resolved?: string; link?: boolean; optional
 /** What the main checkout has on disk at a lockfile's package path: a link and where it leads, or a package and its version. */
 export type Installed = { link: true; resolved: string } | { link: false; version?: string };
 
-/** Whether a lockfile key names an installed package — `node_modules/a`, `node_modules/a/node_modules/b`, `apps/web/node_modules/c`. */
+/**
+ * Whether a lockfile key names an installed package — `node_modules/a`, `node_modules/a/node_modules/b`, `apps/web/node_modules/c`.
+ * @param key The lockfile's package path.
+ */
 export const isModuleKey = (key: string): boolean => key.startsWith('node_modules/') || key.includes('/node_modules/');
 
 /**
@@ -210,7 +225,10 @@ const moduleFolder = (key: string): string | null => {
   return folder.split('/').every((s) => s && s !== '.' && s !== '..' && s !== 'node_modules') ? folder : null;
 };
 
-/** The workspace folders whose own `node_modules` a lockfile installs into, sorted: `['apps/web']`. None for what is not a lockfile. */
+/**
+ * The workspace folders whose own `node_modules` a lockfile installs into, sorted: `['apps/web']`. None for what is not a lockfile.
+ * @param lock The lockfile, as parsed.
+ */
 export function workspaceModules(lock: unknown): string[] {
   const folders = Object.keys(lockfilePackages(lock) ?? {})
     .filter(isModuleKey)
@@ -219,7 +237,10 @@ export function workspaceModules(lock: unknown): string[] {
   return [...new Set(folders)].sort();
 }
 
-/** A lockfile's `packages`, or null when it has none — which is to say, it is not a lockfile. */
+/**
+ * A lockfile's `packages`, or null when it has none — which is to say, it is not a lockfile.
+ * @param lock The lockfile, as parsed.
+ */
 export const lockfilePackages = (lock: unknown): Record<string, LockEntry> | null => {
   const packages = (lock as { packages?: unknown } | null)?.packages;
   return packages && typeof packages === 'object' ? (packages as Record<string, LockEntry>) : null;
@@ -242,6 +263,8 @@ export const lockfilePackages = (lock: unknown): Record<string, LockEntry> | nul
  * (`workspaceModules`): outside the repository, though main has it. An optional package main does not have is not a
  * difference: it is a platform build this machine did not take. A package main has and the lockfile does not name is not looked for. A
  * lockfile that did not parse parts at `package-lock.json`.
+ * @param wanted The worktree's lockfile, as parsed.
+ * @param installed What is on disk in the main checkout at each of the lockfile's package paths; null or undefined where nothing is.
  */
 export function lockfileParting(wanted: unknown, installed: Readonly<Record<string, Installed | null | undefined>>): string | null {
   const want = lockfilePackages(wanted);
@@ -262,6 +285,7 @@ export function lockfileParting(wanted: unknown, installed: Readonly<Record<stri
 /**
  * What a step is told of its `node_modules`, under `## Where to look` — only when the run did more than
  * link it: a tree of its own that `npm ci` installed, or one it could not make.
+ * @param deps What the run made of the step's `node_modules`; undefined where it made nothing.
  */
 export function depsLines(deps: Provisioned | undefined): string[] {
   if (deps?.tree === 'own') {
@@ -305,6 +329,9 @@ export function depsLines(deps: Provisioned | undefined): string[] {
  * checkout is not the run's to commit under a step's name, and such a step commits its own work there.
  * And once for each try (`handedOff`): what is in the workspace after the hand-off is a person's, or
  * the next step's, and not this step's to sign.
+ * @param steps The run's workflow.
+ * @param run The run whose steps are read.
+ * @param phaseOf The phase of a task, by its id.
  */
 export function handOffDue(steps: readonly StepSpec[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
   const finished = ['succeeded', 'failed', 'stopped'];
@@ -322,7 +349,11 @@ export function handOffDue(steps: readonly StepSpec[], run: Run, phaseOf: (taskI
     .map(([name]) => name);
 }
 
-/** Every step that waits on `name`, directly or through another. */
+/**
+ * Every step that waits on `name`, directly or through another.
+ * @param steps The workflow's steps.
+ * @param name The step whose downstream is read.
+ */
 export function downstreamOf(steps: readonly StepSpec[], name: string): Set<string> {
   const found = new Set<string>();
   const queue = [name];
@@ -390,6 +421,8 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * `composeBrief`'s "every step filed so far" fallback, which no `make` copies. Every folder of a folder run holds the run's inputs, so a
  * step that continues another's folder (`inherit`) is given nothing more: it is standing in the folder that was given it, and an
  * `inherit` chain ends at a step that made one. Pure.
+ * @param run The run: its place, its inputs and cards, and its steps.
+ * @param plan The step's workspace plan (`workspacePlan`).
  */
 export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'cards' | 'steps'>, plan: WorkspacePlan): Given {
   if (placeOf(run) !== 'folder' || plan.kind === 'base') return { inputs: null, from: [] };
@@ -408,6 +441,8 @@ export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'cards' | 'steps'>
 /**
  * Which workspace a step needs (`WorkspacePlan`). Pure. `main` is said by the step (`workspace: base`), never read off the shape; a fan-in
  * merges onto the first of its parents by name.
+ * @param steps The workflow's steps.
+ * @param step The step asked about.
  */
 export function workspacePlan(steps: readonly StepSpec[], step: StepSpec): WorkspacePlan {
   if (endsOnBase(step)) return { kind: 'base' };
@@ -435,6 +470,8 @@ export const LINE_NAME = 'run';
  *
  * Every other cut keeps its step's name — a fork with a parent, a fan-in merge, and a second root of a run that starts wide — because
  * those are lines of work beside the run's own, and each needs a worktree and a branch of its own.
+ * @param steps The run's frozen steps, in the workflow's order.
+ * @param step The step whose cut is named.
  */
 export function cutName(steps: readonly StepSpec[], step: StepSpec): string {
   const line = steps.find((s) => {

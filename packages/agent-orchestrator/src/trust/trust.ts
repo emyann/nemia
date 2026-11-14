@@ -34,7 +34,10 @@ export type Untrusted = {
   readonly never: string | null;
 };
 
-/** The command that asks the trust of a factory's places again. */
+/**
+ * The command that asks the trust of a factory's places again.
+ * @param factory The factory's name.
+ */
 export const trustCommandOf = (factory: string): string => `nemia factory trust ${factory}`;
 
 /** `folder` said after `place` where the trust is kept under another folder than the place itself. */
@@ -44,6 +47,8 @@ const keptUnder = (place: string, folder: string): string => (folder === place ?
  * The lines `nemia factory add`, `apply` and `trust` print of the trust asked for `factory`'s places: for each one written, the
  * place, the harness, what it grants and how to take it back; for each one not given, why and what repairs it. None for a place
  * already trusted, nor for a harness that keeps no trust.
+ * @param factory The factory whose places the trust was asked for.
+ * @param asked What each place's trust came to.
  */
 export const trustedLines = (factory: string, asked: readonly PlaceTrust[]): string[] =>
   asked.flatMap((one) => {
@@ -60,6 +65,9 @@ export const trustedLines = (factory: string, asked: readonly PlaceTrust[]): str
 /**
  * The lines the listing prints under `factory` for each of its places in `untrusted`, indented by `width`: the place, the harness,
  * what is withheld, and the command that repairs it, or why nothing can.
+ * @param factory The factory the lines are printed under; places of other factories are left out.
+ * @param untrusted The places whose harness withholds its grants.
+ * @param width How many spaces the lines are indented by, before their own two.
  */
 export const untrustedLines = (factory: string, untrusted: readonly Untrusted[], width: number): string[] =>
   untrusted
@@ -77,6 +85,8 @@ type TrustRead = { readonly harness: string; readonly folder: string; readonly g
  * folder the rules are in, and withholds them until it does. `undefined` where the trust is given, and where the harness keeps none
  * (`trust` undefined), so a refusal says it only where it is true. `factory` names the factory whose verb asks the trust again, left
  * out for a run started in none, whose person trusts the folder by running the harness there.
+ * @param trust The harness's trust of the rules' folder; undefined where the harness keeps none.
+ * @param factory The factory whose verb asks the trust again; undefined for a run started in none.
  */
 export const untrustedNote = (trust: TrustRead | undefined, factory?: string): string | undefined =>
   trust === undefined || trust.trusted

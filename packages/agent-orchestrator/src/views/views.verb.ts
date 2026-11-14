@@ -48,6 +48,7 @@ import { RunId } from '../record/record.model.ts';
 /**
  * How many answers a task held open has been given (`answer`): the turns after its first. Zero for any other task, and for one nobody read.
  * What tells a turn a pass started and died before writing down (`adoptTries`) from one the record already holds.
+ * @param view The engine's view of the task; undefined for one nobody read.
  */
 export const answersIn = (view: TaskView | undefined): number => (view?.state.holdOpen ? (view.state.inputs?.length ?? 0) : 0);
 
@@ -68,6 +69,8 @@ export const answersIn = (view: TaskView | undefined): number => (view?.state.ho
  * of the tasks they name, when the verb runs, so what `advance` reads after its own act is the engine's, never a report or a read from
  * before it. A verb this does not know drops every view, for the same reason, and so does any verb while a read is in flight: what that
  * read answers is not kept, and a `list` whose kept view such a verb dropped reads again, so no task it was handed is left out unnamed.
+ * @param e The engine the pass reads through.
+ * @param views The views the runtime's pass reported (`TickReport.views`).
  */
 export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
   const kept = new Map<unknown, TaskView>(views.map((v) => [v.id, v]));
@@ -135,6 +138,7 @@ type TaskList = Effect.Success<ReturnType<Engine['list']>>;
  * it, as `reportedEngine` does, and a pass — a `tick` or an `up` — drops all of it, so a command that acts reads the engine's
  * word after its act. A view that failed is not kept: the next read asks the engine again. Two reads of one task at once share the one
  * read.
+ * @param e The engine the command reads through.
  */
 export function viewedOnce(e: Engine): Engine {
   type Read = Deferred.Deferred<TaskView, Effect.Error<ReturnType<Engine['view']>>>;
@@ -245,6 +249,7 @@ export const everyTryOf = Effect.fn('everyTryOf')(function* (e: Engine, run: Run
  * attempt ended without it (`unsignedEnd`), which the runtime reports and the orchestrator judges. What tells a step that ended
  * without one — `unsigned` — from a task that was never asked, and from one that failed. Exported, log-free, for a consumer that
  * words a step as `nemia ls` does.
+ * @param views The engine's views of tasks, already read, by task id.
  */
 export const closeoutAsked =
   (views: ReadonlyMap<string, TaskView>) =>
@@ -258,6 +263,7 @@ export const closeoutAsked =
  * Whether the harness marked a task's session blocked while its attempt runs — the engine's `needs-human` — off views already read. What
  * tells a step waiting on a person with nothing signed, as on a login refresh the harness lost, from one still working (`retryable`).
  * Exported, log-free, for a consumer that asks `retry` for such a step as `nemia retry` does.
+ * @param views The engine's views of tasks, already read, by task id.
  */
 export const harnessBlocked =
   (views: ReadonlyMap<string, TaskView>) =>
@@ -271,6 +277,7 @@ export const harnessBlocked =
  *
  * Exported, log-free, for a consumer that words a step as `nemia ls` does. The words themselves are `waitingWords` and `harnessWaitLine` in
  * list/list.ts, which is the only place this repository turns the harness's word into a sentence.
+ * @param views The engine's views of tasks, already read, by task id.
  */
 export const waitingOf =
   (views: ReadonlyMap<string, TaskView>) =>
@@ -283,6 +290,7 @@ export const waitingOf =
  * that is not queued, and for one not read: the runtime says it only while the task waits. Costs no observation of its own.
  *
  * Exported, log-free, for a consumer that words a step as `nemia ls` does. The words themselves are `admissionWords` in list/list.ts.
+ * @param views The engine's views of tasks, already read, by task id.
  */
 export const admissionWaitOf =
   (views: ReadonlyMap<string, TaskView>) =>
@@ -293,6 +301,7 @@ export const admissionWaitOf =
  * Why the runtime could not read a task's session alone, in its own words (`TaskView.unreadWhy`), off its view already read: what one
  * line of its output said that did not decode. Null for no view, and for a task whose session was read, settled or never started, and
  * on the first look that reads it: the runtime says it afresh on every look, and nothing here keeps it.
+ * @param view The engine's view of the task; undefined for none.
  */
 export const unreadOf = (view: TaskView | undefined): string | null => view?.unreadWhy ?? null;
 
@@ -307,6 +316,7 @@ export type Bridge = { url: string | null; why: string | null };
  * where it was asked and is not, and null where the task was not filed bridged, or is not viewed. Costs no observation of its own.
  *
  * Exported, log-free, for a consumer that shows a person where to reach a session, as `nemia level` and a run's step detail do.
+ * @param views The engine's views of tasks, already read, by task id.
  */
 export const bridgeOf =
   (views: ReadonlyMap<string, TaskView>) =>
@@ -329,6 +339,7 @@ export const bridgeOf =
  * (`currentTurn`), and says the denials of its own attempts: what the turn it answered was denied was that try's.
  *
  * Exported, log-free, for a consumer that words a step as `nemia ls` does. The words themselves are `deniedWords` in list/list.ts.
+ * @param views The engine's views of tasks, already read, by task id.
  */
 export const deniedOf =
   (views: ReadonlyMap<string, TaskView>) =>
@@ -342,6 +353,8 @@ export const deniedOf =
  * recorded,
  * its image placed under `releases`, the store's real releases folder (`sessionRanOn`). Nothing for a task settled, one whose last
  * attempt has ended, or one whose attempt recorded neither. Exported, log-free, for a consumer that words a step as `nemia ls` does.
+ * @param views The engine's views of tasks, already read, by task id.
+ * @param releases The store's real releases folder, which the image is placed under.
  */
 export const ranOnOf =
   (views: ReadonlyMap<string, TaskView>, releases: string) =>
@@ -357,6 +370,7 @@ export const ranOnOf =
  * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `nemia ls` and
  * `nemia decide` print beside it — and what they were denied (`deniedOf`), which stops a step that says `denials: fail`. Exported,
  * log-free, for a consumer that words a step as `nemia ls` does. A task with no view read has no spend known.
+ * @param views The engine's views of tasks, already read, by task id.
  */
 export const spendReader =
   (views: ReadonlyMap<string, TaskView>): SpendOf =>
@@ -372,6 +386,8 @@ export const spendReader =
  * (`refusedCheck`), and what `nemia ls` words, without reading a stream: a run waiting on a person costs no more each pass.
  *
  * Exported for a consumer that words a check as `nemia ls` does.
+ * @param views The engine's views of tasks, already read, by task id.
+ * @param run The run whose steps name their checks' tasks.
  */
 export const exitVerdicts =
   (views: ReadonlyMap<string, TaskView>, run: Run) =>
@@ -384,6 +400,8 @@ export const exitVerdicts =
  * What the kernel's OOM killer did to each step's current check, and whose memory ran out (`outOfMemory` over `killedMemoryOf`), off the
  * check's view on every pass: undefined where it killed nothing of it, or the step has no check. Read by `retriesDue`, which runs a check
  * the machine killed again (`CheckKillOf`).
+ * @param views The engine's views of tasks, already read, by task id.
+ * @param run The run whose steps name their checks' tasks.
  */
 export const checkKills =
   (views: ReadonlyMap<string, TaskView>, run: Run): CheckKillOf =>
@@ -395,6 +413,8 @@ export const checkKills =
 /**
  * The harness's own id for the session a try after the task continues — what `--resume` takes: its last session's, or, where the harness
  * never named that one, the session it was started to continue (`continuesFrom`).
+ * @param views The engine's views of tasks, already read, by task id.
+ * @param taskId The task the next try continues.
  */
 export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string): string | undefined =>
   continuesFrom(views.get(taskId)?.state.attempts);
@@ -409,6 +429,8 @@ export type UnjudgedWord = typeof UNREADABLE | EnginePhase | 'unknown';
  * A step's word on a run left unjudged because a task it reads does not (`unjudgedWords`): `unreadable` when any task the step has filed —
  * its own, its check's, an earlier try's or its check's (`stepTasks`) — is among `unreadable`; else `pending` with no task of its own
  * filed, and the engine's word for that task (`wordOfView`). What `nemia ls` prints beside such a step, and the board's chip.
+ * @param views The engine's views of tasks, already read, by task id.
+ * @param unreadable The tasks that do not read, each by its id with why.
  */
 export const unjudgedWord =
   (views: ReadonlyMap<string, TaskView>, unreadable: ReadonlyMap<string, string>) =>
@@ -418,6 +440,8 @@ export const unjudgedWord =
 /**
  * How many times a person said something to each step's current try while it ran (`nemia say`): the engine's `said` on the try's task, off
  * views already read. Exported, log-free, for a consumer that words a step as `nemia ls` does.
+ * @param views The engine's views of tasks, already read, by task id.
+ * @param run The run whose steps name the tasks.
  */
 export const saidCount =
   (views: ReadonlyMap<string, TaskView>, run: Run) =>
@@ -428,6 +452,7 @@ export const saidCount =
 
 /**
  * What was said to a task's sessions while they ran (`nemia say`), off its view: none for a task with no view, or a view with no `said`.
+ * @param view The engine's view of the task; undefined for none.
  */
 export const saidIn = (view: TaskView | undefined): readonly Said[] => view?.state.said ?? [];
 
@@ -555,6 +580,9 @@ const checkStreams = Effect.fnUntraced(function* (e: Engine, taskId: string, std
  * made the statement to its harness, and it lives on the engine's record of the attempt that made
  * it, which is also what keeps a resumed step from being credited with its parent's. It is the current turn's (`currentTurn`): a task
  * held open and answered has none until its next turn signs.
+ * @param views The engine's views of tasks, already read, by task id.
+ * @param run The run whose steps name the tasks.
+ * @param stepName The step asked about.
  */
 export function closeoutOf(views: ReadonlyMap<string, TaskView>, run: Run, stepName: string): Closeout | { error: string } | undefined {
   const taskId = run.steps[stepName]?.taskId;
@@ -582,6 +610,9 @@ function closeoutGiven(
 /**
  * The closing statement the current turn of a step's task made, as it came back and as the run read it (`closeoutGiven`); undefined for a
  * step with no task, and for a turn that made none. What a pass words a step's `closed out` one-shot from (`closeoutsOf`).
+ * @param views The engine's views of tasks, already read, by task id.
+ * @param run The run whose steps name the tasks.
+ * @param stepName The step asked about.
  */
 export function closeoutTold(
   views: ReadonlyMap<string, TaskView>,
@@ -592,7 +623,11 @@ export function closeoutTold(
   return taskId ? closeoutGiven(views, taskId) : undefined;
 }
 
-/** A task's closing statement (`closeoutSaid`), well-formed only: what `nemia stats` reads a try's tallies off. */
+/**
+ * A task's closing statement (`closeoutSaid`), well-formed only: what `nemia stats` reads a try's tallies off.
+ * @param views The engine's views of tasks, already read, by task id.
+ * @param taskId The task asked about.
+ */
 export function taskCloseout(views: ReadonlyMap<string, TaskView>, taskId: string): Closeout | undefined {
   const c = closeoutSaid(views, taskId);
   return c && !('error' in c) ? c : undefined;
@@ -601,6 +636,9 @@ export function taskCloseout(views: ReadonlyMap<string, TaskView>, taskId: strin
 /**
  * Only the well-formed ones, for the pure functions that just want the outcome. Given the run's steps, a script condition's answer is
  * read as its closeout (`scriptCloseouts`, route.store.ts).
+ * @param views The engine's views of tasks, already read, by task id.
+ * @param run The run whose steps name the tasks.
+ * @param steps The run's workflow, whose script conditions are read as closeouts; left out, none is.
  */
 export const closeoutReader = (
   views: ReadonlyMap<string, TaskView>,
@@ -688,7 +726,10 @@ export const keptParent = Effect.fn('keptParent')(function* (id: string, git: Br
  */
 export type Parents = { git: BranchReader; read: Map<string, ParentRun> };
 
-/** The runs a pass reads as runs others wait on (`Parents`), none read yet, through `git`. */
+/**
+ * The runs a pass reads as runs others wait on (`Parents`), none read yet, through `git`.
+ * @param git What reads the runs' branches.
+ */
 export const passParents = (git: BranchReader): Parents => ({ git, read: new Map() });
 
 /**
@@ -710,6 +751,8 @@ export const parentsRead = Effect.fnUntraced(function* (run: Run, git: BranchRea
  *
  * Off views already read, not a view of its own: each `e.view` is a harness observe, so `decide` reads
  * each task once and hands its views here.
+ * @param views The engine's views of tasks, already read, by task id.
+ * @param run The run whose steps name the tasks.
  */
 export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Record<string, Consumed | undefined> {
   const used: Record<string, Consumed | undefined> = {};

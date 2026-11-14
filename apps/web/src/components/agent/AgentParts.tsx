@@ -149,6 +149,8 @@ function CompactSkill({ skill }: { skill: AgentSkill }) {
 /**
  * An agent's name as a person's: its file's name, first letter up and dashes as spaces — `reviewer` is Reviewer, `note-writer` Note
  * writer.
+ *
+ * @param name the agent's file name, its words joined by dashes
  */
 export const personOf = (name: string): string => {
   const spaced = name.replaceAll('-', ' ');

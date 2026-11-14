@@ -32,6 +32,12 @@ const highlighterOf = () =>
       }),
   ));
 
+/**
+ * The code as shiki draws it twice, once in a light theme and once in a dark one: the two HTML strings, in that order.
+ *
+ * @param code the source text to highlight
+ * @param language the language the code is written in, any but plain text
+ */
 export async function highlightCode(code: string, language: Exclude<CodeLanguage, 'text'>) {
   const shiki = await highlighterOf();
   return [

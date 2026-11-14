@@ -17,13 +17,20 @@ type CheckVerdict = NonNullable<StepCheck['verdict']>;
 /**
  * A try as its picker and its detail name it: its round, its number, and in brackets how it was reached — what replaced the try before
  * it: `round 2 · try 3 (round)`, `round 1 · try 2 (retries)`.
+ *
+ * @param t the try to name
+ * @param tries every try of the step, to find the one before it
  */
 export function tryLabel(t: Frozen<StepTry>, tries: readonly Frozen<StepTry>[]): string {
   const before = tries.find((other) => other.try === t.try - 1);
   return `round ${t.round} · try ${t.try}${before?.cause ? ` (${before.cause})` : ''}`;
 }
 
-/** A step's tries grouped by their round, rounds in order, each round's tries earliest first: what the try picker lists. */
+/**
+ * A step's tries grouped by their round, rounds in order, each round's tries earliest first: what the try picker lists.
+ *
+ * @param tries a step's tries, in any order
+ */
 export const triesByRound = <T extends Frozen<Pick<StepTry, 'try' | 'round'>>>(tries: readonly T[]): Array<{ round: number; tries: T[] }> =>
   [...new Set(tries.map((t) => t.round))].sort((a, b) => a - b).map((round) => ({ round, tries: tries.filter((t) => t.round === round) }));
 

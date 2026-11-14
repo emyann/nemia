@@ -49,6 +49,10 @@ visits no other: a page reads only the seed and what it writes itself. A page is
 without its number (`pages/NAMES` lists them); `--photos` alone pictures every page. Its last lines list
 the pictures.
 
+`--pages` runs none of the look's browser tests (`apps/web/test/e2e/*.test.ts`: the parts on their stories
+page, the bars, the checks). A change to a part of the look (`src/components/look`) or a story runs them too:
+`npm run e2e -- --look`, or `npm run e2e -- --look --pages <name,…>` when pages are due as well.
+
 - **When a step before you named pictures** in its artifacts or `screenshots`, those absolute paths are
   the pictures: read them.
 - **Otherwise,** take them: `WF_ARTIFACTS=<your files directory> npm run e2e -- --photos --pages <name,…>`

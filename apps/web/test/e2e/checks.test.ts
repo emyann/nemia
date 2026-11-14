@@ -1,6 +1,6 @@
 /**
- * The e2e's refusals, made to refuse. `npm run e2e` runs this before it looks at the real pages, so a
- * check that cannot fail never gets to pass them. It needs Chromium (`npx playwright install chromium`),
+ * The e2e's refusals, made to refuse. `npm run e2e -- --look` runs this, and a whole `npm run e2e` before it
+ * looks at the real pages, so a check that cannot fail never gets to pass them. It needs Chromium (`npx playwright install chromium`),
  * which is why it is not part of `npm test`.
  */
 import { after, before, test } from 'node:test';

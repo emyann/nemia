@@ -36,12 +36,9 @@ const timeoutBreaks = (name: string, script: string): string[] =>
     ? []
     : [`the ${name} script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
 
-test("the package's test and e2e scripts bound every test at `WAITED`'s timeout, so a wait in a test given none still ends", () => {
-  const { scripts } = JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as {
-    scripts: { test: string; e2e: string };
-  };
-  assert.deepEqual(timeoutBreaks('test', scripts.test), [], 'npm test');
-  assert.deepEqual(timeoutBreaks('e2e', scripts.e2e), [], 'npm run e2e');
+test("the package's test script bounds every test at `WAITED`'s timeout, so a wait in a test given none still ends", () => {
+  const { scripts } = JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { scripts: { test: string } };
+  assert.deepEqual(timeoutBreaks('test', scripts.test), [], "npm test; the look's browser tests are bounded in e2e-look.test.ts");
 });
 
 test("REFUSED: a script with no default timeout, or another than `WAITED`'s, leaves a test's wait unbounded", () => {

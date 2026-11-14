@@ -8,7 +8,10 @@ import type { RunRemoved } from 'objects';
 /** What the engine forgot of a removed run's tasks. */
 type Engine = NonNullable<RunRemoved['engine']>;
 
-/** Bytes, as a person reads them. */
+/**
+ * Bytes, as a person reads them.
+ * @param bytes The size, in bytes.
+ */
 export const sizeOf = (bytes: number): string =>
   bytes < 1024
     ? `${bytes} B`
@@ -46,7 +49,11 @@ const refusalWords = (f: Engine, marker: string): string => {
   return `${said} ${marker} keeps their ids and the daemon asks again each pass; only a person removes it, once nothing of them is wanted: rm ${marker}`;
 };
 
-/** What the engine did with the run `id`'s tasks: forgot, left, waits and refused; empty where it keeps none. */
+/**
+ * What the engine did with the run `id`'s tasks: forgot, left, waits and refused; empty where it keeps none.
+ * @param f What the engine answers of the run's tasks: those forgotten, left, waited on and refused, and its marker.
+ * @param id The run's id, said for the marker where the engine names none.
+ */
 export const engineWords = (f: Engine, id: string): string => {
   const marker = f.marker ?? `the marker of ${id}`;
   const left = f.left.length ? `it left ${f.left.join('; ')}` : '';
@@ -109,7 +116,10 @@ function storeLine(r: RunRemoved): string {
     .join('; ');
 }
 
-/** The one line `nemia rm` prints of a run it forgot: what it did with the run, then what the engine did with its tasks. */
+/**
+ * The one line `nemia rm` prints of a run it forgot: what it did with the run, then what the engine did with its tasks.
+ * @param r What the api answers of the run removed.
+ */
 export function forgottenLine(r: RunRemoved): string {
   const engine = r.engine ? engineWords(r.engine, r.id) : '';
   return engine ? `${storeLine(r)}; ${engine}` : storeLine(r);

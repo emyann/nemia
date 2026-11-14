@@ -9,10 +9,18 @@ import type { FactoryAdoptPlan, FactoryUpgradePlan } from 'objects';
 /** The version a base holds where no status names it, as the plan and the upgrade print it. */
 export const UNKNOWN = 'a version no status names';
 
-/** The line that resolves the conflict `at` of the factory `name`, as a person types it. */
+/**
+ * The line that resolves the conflict `at` of the factory `name`, as a person types it.
+ * @param name The factory's name.
+ * @param at Where the conflict is, as the plan says it.
+ */
 export const resolveLine = (name: string, at: string): string => `nemia factory resolve ${name} '${at}' --ours|--theirs|--file <path>`;
 
-/** The line that approves the proposal `proposal` resolving conflicts of the factory `name`, as a person types it. */
+/**
+ * The line that approves the proposal `proposal` resolving conflicts of the factory `name`, as a person types it.
+ * @param name The factory's name.
+ * @param proposal The name of the proposal to approve.
+ */
 export const approveLine = (name: string, proposal: string): string => `nemia proposals approve ${proposal} -n ${name}`;
 
 /** Where a clean change came from, as the plan says it. */
@@ -41,6 +49,7 @@ function headLines({ name, from, to, switched }: FactoryUpgradePlan): string[] {
  * What `nemia factory diff` prints of a templated factory's upgrade: where it is a switch, both templates; what merges cleanly, then
  * each conflict, its base side where it has one, the parameters the upgrade drops where any, the plan's digest, and the line that files
  * it; then, where there are conflicts, the line that resolves each, after the upgrade's, since a resolve is taken for a filed upgrade.
+ * @param plan The upgrade's plan as the api answers it: the factory, the merge and what the upgrade files.
  */
 export function planLines(plan: FactoryUpgradePlan): string[] {
   const { name, merge, next } = plan;

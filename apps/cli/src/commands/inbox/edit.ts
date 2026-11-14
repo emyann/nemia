@@ -10,7 +10,11 @@ import { fileOf, textOrFile } from './card-lines.ts';
 
 const { name: COMMAND } = INBOX_EDIT_WORDS;
 
-/** What `nemia inbox edit` prints of the card written, beside the card as it was read (`before`): its name kept and its title now. */
+/**
+ * What `nemia inbox edit` prints of the card written, beside the card as it was read (`before`): its name kept and its title now.
+ * @param card The card as the api answers it after the write.
+ * @param before The card as it was read before the write.
+ */
 export const editedLines = (card: Card, before: Card): string[] => {
   const { name } = card.metadata;
   const title = headline(card.spec.body ?? '');
@@ -21,7 +25,10 @@ export const editedLines = (card: Card, before: Card): string[] => {
   ];
 };
 
-/** `nemia inbox edit`'s runner, on the words parsed against its words. */
+/**
+ * `nemia inbox edit`'s runner, on the words parsed against its words.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function inboxEdit(args: Args): Promise<number> {
   const name = textArg(args, 'name') ?? '';
   const source = textOrFile(textArg(args, 'source') ?? '', COMMAND, `nemia inbox edit ${name} ./card.md`);

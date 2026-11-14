@@ -14,7 +14,10 @@ import { namespaceOf, pathArg, placeOf, textArg, writtenLine } from './written.t
 
 const { name: COMMAND, usage: USAGE } = SKILLS_WRITE_WORDS;
 
-/** `nemia skills write`'s runner, on the words parsed against its words. */
+/**
+ * `nemia skills write`'s runner, on the words parsed against its words.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function skillsWrite(args: Args): Promise<number> {
   const place = placeOf(args, COMMAND, USAGE);
   const file = pathArg(args, 'file', COMMAND, USAGE, "the skill's SKILL.md to write");

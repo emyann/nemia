@@ -21,7 +21,10 @@ const removalOf = (args: Args) => {
 const removedLine = (dir: string, removed: readonly string[] | undefined): string =>
   removed === undefined ? dir : `${dir}: ${removed.join(', ')}`;
 
-/** `nemia agents rm yours <name> --version <v>`'s runner: the agent removed, and the files it took. */
+/**
+ * `nemia agents rm yours <name> --version <v>`'s runner: the agent removed, and the files it took.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function agentsRm(args: Args): Promise<number> {
   const asking = removalOf(args);
   const { status } = await asked(AGENTS_RM_WORDS.name, (c) => c.agents.delete(asking));
@@ -29,7 +32,10 @@ export async function agentsRm(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia workflows rm yours <name> --version <v>`'s runner: the folder removed whole, and the files it held. */
+/**
+ * `nemia workflows rm yours <name> --version <v>`'s runner: the folder removed whole, and the files it held.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function workflowsRm(args: Args): Promise<number> {
   const asking = removalOf(args);
   const { status } = await asked(WORKFLOWS_RM_WORDS.name, (c) => c.workflows.delete(asking));
@@ -37,7 +43,10 @@ export async function workflowsRm(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia agents run yours <name> --brief <words>`'s runner: the try started, and where to follow it. */
+/**
+ * `nemia agents run yours <name> --brief <words>`'s runner: the try started, and where to follow it.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function agentsRun(args: Args): Promise<number> {
   const name = textArg(args, 'name') ?? '';
   const namespace = namespaceOfPlace(textArg(args, 'from'), undefined);

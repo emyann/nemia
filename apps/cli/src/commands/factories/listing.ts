@@ -120,6 +120,9 @@ const unread = (o: Factory): o is Factory & { status: { error: string } } => o.s
 /**
  * What `nemia factory ls` prints of `factories` (the default's object left out) with what was read beside each (`beside`, by name) at
  * `now`: the default factory first, then each by name, and how to file one or remove one.
+ * @param factories Every factory the api lists, the default's object among them.
+ * @param beside What was read beside each factory, its schedules and its instruction, by the factory's name.
+ * @param now The time the schedules' fires are measured from, in ms since the epoch.
  */
 export function listingLines(factories: readonly Factory[], beside: ReadonlyMap<string, Beside>, now: number): string[] {
   const sorted = factories
@@ -157,7 +160,10 @@ async function besideOf(command: string, name: string): Promise<Beside> {
   return { schedules: schedules?.items ?? [], instruction };
 }
 
-/** `nemia factory` and `nemia factory ls`' runner: every factory read of the api, and what is read beside each, printed. */
+/**
+ * `nemia factory` and `nemia factory ls`' runner: every factory read of the api, and what is read beside each, printed.
+ * @param command The command typed, `factory` or `factory ls`, said in the api's refusals.
+ */
 export async function factoryListed(command: string): Promise<number> {
   const listed = await factoriesListed(command);
   const reading = listed.items.filter((o) => o.metadata.name !== DEFAULT_NAMESPACE && !unread(o));

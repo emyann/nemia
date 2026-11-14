@@ -42,7 +42,13 @@ function pairsOf(args: Args, key: string, sent: (value: string) => string): Reco
   );
 }
 
-/** What `nemia factory move` says of a move from `from` to `to`: what was filed, cloned, mounted and moved, then what to type next. */
+/**
+ * What `nemia factory move` says of a move from `from` to `to`: what was filed, cloned, mounted and moved, then what to type next.
+ * @param from The context of the store the factory was moved from.
+ * @param to The context of the store it was moved to.
+ * @param exp The export read of `from`'s store: the cards left there and what stays.
+ * @param filed What the import into `to`'s store answers: the file, the repositories, volumes and cards, and the places left untrusted.
+ */
 export function movedLines(from: string, to: string, exp: FactoryExport, filed: FactoryImported): string[] {
   const cloned = new Set(filed.cloned);
   return [
@@ -62,7 +68,11 @@ export function movedLines(from: string, to: string, exp: FactoryExport, filed: 
   ];
 }
 
-/** `nemia factory move`: the factory exported from `--from`'s store and imported into `--to`'s, never trusted there. */
+/**
+ * `nemia factory move`: the factory exported from `--from`'s store and imported into `--to`'s, never trusted there.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ * @param env The environment whose contexts name both stores; this process's by default.
+ */
 export async function factoryMove(args: Args, env: NodeJS.ProcessEnv = process.env): Promise<number> {
   const name = textOf(args, 'name');
   const to = textOf(args, 'to');

@@ -102,7 +102,11 @@ and forgetting to wire it in:
 - **Twelve test legs**: one per workspace, on node 24.16.0 — the floor `engines.node` claims — and 24, the orchestrator in two shards
   on each node, so four legs of its own. Each leg runs its package's suite once, under `TZ=UTC`; the web's leg alone runs it a second
   time under `TZ=America/New_York`, conditioned with `if: matrix.workspace == 'web'`. Both runs pass `--force`: `turbo.json` hashes no
-  environment, so without it the second run replays the first from the cache and the second timezone is never tested.
+  environment, so without it the second run replays the first from the cache and the second timezone is never tested. The floor's legs
+  run their suites on a push to main and not on a pull request, where each says so and runs nothing: a pull request is judged on 24,
+  and main's `ci`, which the landing waits on, is where a failure of the floor alone is read. Measured over 400 `ci` runs (2026-11-12 to
+  11-14): the two versions disagreed twice, 24 failing both times and never the floor alone, the floor's legs were a third of a push's
+  runner time, and under load a run's wall time was its wait for a runner (13 to 42 minutes on the four slowest).
 
   The second zone was every leg's until the card of 2026-10-21 measured what it bought. Local time is read in `apps/web/src/lib` (8
   files) and nowhere else: the orchestrator, the runtime and the api read none, and the runtime's one hit formats a number. In 54 `ci`

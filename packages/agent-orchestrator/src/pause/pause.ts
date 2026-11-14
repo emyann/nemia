@@ -14,12 +14,14 @@ import type { RecordMemo } from '../rest/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { landsOnCheck } from '../status/status.ts';
+import { pausedModeOf, SESSIONS_UNDER, type PausedMode } from '../pause-machine/pause-machine.ts';
 import { blockedWord, parkedOf, phaseOfView, type WordView } from '../views/views-words.ts';
 import type { Actor } from 'objects';
 
 /**
  * A person's pause on the store, as its file says it: when it was put, who put it, and the person's words for why (`why`, absent when none
- * were given), each one line; and the timeout a call in flight is given before it is cut (`timeoutMs`), absent on a pause that parks no
+ * were given), each one line; and the timeout a call in flight is given before it is cut (`timeoutMs`, which says the pause's mode,
+ * `pausedModeOf` in pause-machine.ts), absent on a pause that parks no
  * session — the take-over's own, or one put before the timeout was written; and the caller who put it (`actor`, objects' `Actor`), beside
  * `by`, absent on a pause put in-process, by a take-over, or before actors were said. A file that does not read gives each field empty,
  * and still pauses.
@@ -293,12 +295,10 @@ const sinceWords = ({ at, by, why }: Pause): string =>
  * is cut at once and parks; under another timeout each stops when its current tool call ends, cut once the timeout passes; under none (a
  * restart's take-over) each runs on to its end. The client's printers copy it word for word.
  */
-const pauseDoes = ({ timeoutMs }: Pause): string =>
-  timeoutMs === 0
-    ? 'nothing new starts, and each working session is cut at once and parks'
-    : timeoutMs !== undefined
-      ? 'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes'
-      : 'nothing new starts, and each working session runs on to its end';
+const pauseDoes = (pause: Pause): string => `nothing new starts, and ${SESSIONS_UNDER[pausedModeOf(pause)]}`;
+
+/** Whether a pause in each mode counts its sessions down to a cut, as "Pausing" then says how long is left. */
+const COUNTS_DOWN: Readonly<Record<PausedMode, boolean>> = { holding: false, draining: true, cut: true };
 
 /** The pause as it was put, in one line: since when, by whom and why, what it stops, and the verb that resumes. */
 export const pauseWords = (pause: Pause): string =>
@@ -320,7 +320,7 @@ export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged
   if (!pause) return null;
   const sessions = finishing.filter((f) => f.kind === 'session').length;
   const head =
-    pause.timeoutMs !== undefined && sessions
+    COUNTS_DOWN[pausedModeOf(pause)] && pause.timeoutMs !== undefined && sessions
       ? pausingWords(sessions, Math.min(pause.timeoutMs, Date.parse(pause.at) + pause.timeoutMs - now.getTime()))
       : `Pausing: ${finishing.length} finishing`;
   return finishing.length

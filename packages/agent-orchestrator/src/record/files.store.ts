@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
-import { pauseFile, readPause } from '../pause/pause.store.ts';
+import { pauseStands, readPause } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
 import type { AskKey, AskOf, AsksRead, AskWritten, PersonRequest, Pruned, Run, RunStore } from './record.ts';
 import type { Labels } from '../labels/labels.ts';
@@ -516,7 +516,7 @@ export const filesStoreAt = (home: string): RunStore => ({
     stamps: () => restStamps(home),
     exists: (id) => fs.existsSync(runFile(home, id)),
     taken: (id) => runIdTaken(home, id),
-    calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(home, id))) || fs.existsSync(pauseFile(home)),
+    calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(home, id))) || pauseStands(home),
     cancel: (id, actor) => markCancelled(home, id, actor),
     forget: (id) => removeRunFiles(home, id),
     ids: () => runIds(home),

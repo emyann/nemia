@@ -23,6 +23,7 @@ import { tipsSeen } from '../branches/index.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { passRevisions } from '../revisions/pin.verb.ts';
+import { DRAIN_OF, pauseModeOf } from '../pause-machine/pause-machine.ts';
 import { liftLapsedPause, readPause, readResumed } from '../pause/pause.store.ts';
 import { finishingAmong, parkedAmong, type Finishing, type Parked, type Pause, type PauseStanding } from '../pause/pause.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
@@ -350,8 +351,10 @@ const drainFromPause = Effect.fnUntraced(function* (engine: Engine) {
   const home = yield* StoreRoot;
   if (typeof engine.drainSessions !== 'function') return;
   const pause = yield* tried(() => readPause(home));
-  if (pause === null) yield* asked('drainSessions', engine.drainSessions(null));
-  else if (pause.timeoutMs !== undefined) yield* asked('drainSessions', engine.drainSessions({ graceMs: pause.timeoutMs }));
+  const drain = DRAIN_OF[pauseModeOf(pause)];
+  if (drain === 'lift') yield* asked('drainSessions', engine.drainSessions(null));
+  else if (drain === 'put' && pause?.timeoutMs !== undefined)
+    yield* asked('drainSessions', engine.drainSessions({ graceMs: pause.timeoutMs }));
 });
 
 /** Each session of `runs` the pause has parked (`parkedAmong`), read off the views the runtime reported on the pass. */

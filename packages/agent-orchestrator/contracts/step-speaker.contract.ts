@@ -15,7 +15,8 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { Caller } from './proposal-approval.contract.ts';
-import { AGENT_OPENS, AGENT_WRITES, framedFor, type Speaker } from '../src/chat/chat.ts';
+import { AGENT_OPENS, AGENT_WRITES, framedFor } from '../src/chat/framed.ts';
+import type { Speaker } from './speaker.contract.ts';
 
 const stepSpeakerSpec = spec<(caller: Caller) => Speaker>({
   ensures: {

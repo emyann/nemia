@@ -8,6 +8,9 @@ import { fenced, prunedWords, tryOf, type Run, type TaskPhase } from '../record/
 import { holdWord } from '../wait/wait.ts';
 import type { SaidAfter } from 'objects';
 import type { SaidBy, SaidFrom } from '../../contracts/step-speaker.contract.ts';
+import { AGENT_OPENS, AGENT_WRITES } from '../chat/index.ts';
+
+export { AGENT_OPENS, AGENT_WRITES } from '../chat/index.ts';
 
 export type { SaidFrom } from '../../contracts/step-speaker.contract.ts';
 
@@ -95,12 +98,6 @@ export function saidLines(said: readonly SaidTo[]): string[] {
     ...fenced(s.text, 'text'),
   ]);
 }
-
-/** The words an agent's frame opens with, before its name: `framedFor`'s (chat.ts), read back by `saidBy`. */
-export const AGENT_OPENS = 'The agent ';
-
-/** The words between an agent's name and its own in its frame: `framedFor`'s (chat.ts), read back by `saidBy`. */
-export const AGENT_WRITES = ' writes, not the person: ';
 
 /**
  * Who the words `text` a step's journal holds are from, and the words without their frame: an agent's where they stand in the frame

@@ -29,7 +29,7 @@ import { AgentName } from '../agents/agents.model.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { EngineService, asked, over, trustedFolder, type Engine } from '../runtime-client.ts';
 import { answersDue, answersOwed, closesOwed, sayOutbox, outboxOwed, recordAsks } from '../chat/say.verb.ts';
-import { upOf } from '../chat/chat.ts';
+import { upOf } from '../chat/index.ts';
 import {
   composePrompt,
   filedPrompt,

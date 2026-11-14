@@ -548,7 +548,7 @@ export type { Pin } from './revisions/revisions.ts';
 export { definitionRevision, ledgerOf } from './revisions/revisions.store.ts';
 export { chatAnswer, chatHistory, chatRead, chatSay, chatStop, FILES_CHECK_MS, followChat, RECORD_BEAT_MS } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatFollow, ChatFollowed, ChatHistory, ChatReads, ChatSent } from './chat/chat.verb.ts';
-export type { Ask, AskEvent, AskOption, AskPick, AskQuestion, ChatEvent, Presence } from './chat/chat.ts';
+export type { Ask, AskEvent, AskOption, AskPick, AskQuestion, ChatEvent, Presence } from './chat/index.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';
 
 import * as RunModel from './record/record.model.ts';

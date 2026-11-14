@@ -1,7 +1,7 @@
 /** `nemia say`, an entry of the command table: words to a step's session, journalled on its task, or kept for its first try (`sayRun`). */
 import { Effect, Schema } from 'effect';
 import { RunSay, type SaidAfter, SAY_WORDS } from 'objects';
-import { fromRefusal, type Speaker } from '../chat/chat.ts';
+import { fromRefusal, type Speaker } from '../chat/index.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { type Said } from './say.ts';
 import { sayRun } from './say.verb.ts';

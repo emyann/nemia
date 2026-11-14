@@ -18,10 +18,14 @@ export type SkillSource = DefinitionOrigin;
 /**
  * The word the api reads — on a step's page, a start, a card's `from:` — for where a workflow is from: `yours`, or `repo` for any
  * other origin, the factory's own tree among them, which those routes read under `repo`.
+ * @param from The origin a page's address names.
  */
 export const sourceOf = (from: string): Extract<DefinitionOrigin, 'repo' | 'yours'> => (from === 'yours' ? 'yours' : 'repo');
 
-/** A card entry as an object says it, its lists copied into the board's plain type. */
+/**
+ * A card entry as an object says it, its lists copied into the board's plain type.
+ * @param entry The card entry, as the object says it.
+ */
 export const cardEntryOf = (entry: {
   readonly id: string;
   readonly name: string;
@@ -40,7 +44,10 @@ export const cardEntryOf = (entry: {
   ...(entry.outputModes ? { outputModes: [...entry.outputModes] } : {}),
 });
 
-/** The origin a page's address names (its `$from`), as the api reads `?origin=`: one of its words, else none, the one it serves. */
+/**
+ * The origin a page's address names (its `$from`), as the api reads `?origin=`: one of its words, else none, the one it serves.
+ * @param from The origin a page's address names (its `$from`).
+ */
 export const originWord = (from: string): DefinitionOrigin | undefined => DEFINITION_ORIGINS.find((origin) => origin === from);
 
 /**

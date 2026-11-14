@@ -16,11 +16,20 @@ export const CLOSED_LABEL_KEYS: readonly string[] = ['factory', 'workflow'];
 /**
  * Edits `id`'s labels by `edits` (`key=value`, `key-`), as the CLI's label verb for a run does: the Run's `labels` action, in the run's
  * namespace (`namespaceOf`). A changed value needs `overwrite`.
+ * @param namespace The run's namespace: its factory's, `default` for a run of none.
+ * @param id The run's id.
+ * @param edits Each edit: `key=value` sets a label, `key-` takes one off.
+ * @param overwrite Whether a label the run has may take another value; false refuses it.
  */
 export const labelRun = (namespace: string, id: string, edits: readonly string[], overwrite = false): Promise<Labelled> =>
   runs.labels(namespace, id, { labels: edits, overwrite }, 'The labels may be set: read the run again before sending it again.');
 
-/** Edits `card`'s labels by `edits`, as the CLI's label verb for a card does: the Card's `labels` verb, in the card's namespace. */
+/**
+ * Edits `card`'s labels by `edits`, as the CLI's label verb for a card does: the Card's `labels` verb, in the card's namespace.
+ * @param card The card: its name and its factory, null for the default factory.
+ * @param edits Each edit: `key=value` sets a label, `key-` takes one off.
+ * @param overwrite Whether a label the card has may take another value; false refuses it.
+ */
 export const labelCard = (card: { name: string; factory: string | null }, edits: readonly string[], overwrite = false): Promise<Labelled> =>
   cards.labels(namespaceOf(card.factory), card.name, { labels: edits, overwrite });
 
@@ -46,13 +55,19 @@ const LabelStatsSchema = Schema.Struct({
   }),
 });
 
-/** What the runs `stats` covers have spent, every try's cost summed, or null where no try's cost was measured. */
+/**
+ * What the runs `stats` covers have spent, every try's cost summed, or null where no try's cost was measured.
+ * @param stats The stats the label page read.
+ */
 export const spentOf = (stats: LabelStats): number | null => {
   const known = stats.all.steps.flatMap((step) => (step.costUsd === null ? [] : [step.costUsd]));
   return known.length === 0 ? null : known.reduce((sum, cost) => sum + cost, 0);
 };
 
-/** The stats of the runs `selector` takes. */
+/**
+ * The stats of the runs `selector` takes.
+ * @param selector A label selector; blank for every run.
+ */
 export const labelStatsQuery = (selector: string) =>
   queryOptions({
     queryKey: ['stats', ...selectorKey(selector)],
@@ -62,6 +77,9 @@ export const labelStatsQuery = (selector: string) =>
       ),
   });
 
-/** The address' label filter, `?l=<selector>`, kept where it says something. */
+/**
+ * The address' label filter, `?l=<selector>`, kept where it says something.
+ * @param search The address' search, as the router parsed it.
+ */
 export const labelSearch = (search: Record<string, unknown>): { l?: string } =>
   typeof search.l === 'string' && search.l.trim() !== '' ? { l: search.l } : {};

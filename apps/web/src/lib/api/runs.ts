@@ -23,7 +23,10 @@ const unjudgedOf = (run: RunUnjudged): UnjudgedRun => ({ id: run.name, factory: 
 /** In name order, as the list's. */
 const byName = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
-/** Every run of a list: each run judged (`runViewOf`) and each it could not judge (`UnjudgedRun`), in name order as the list's. */
+/**
+ * Every run of a list: each run judged (`runViewOf`) and each it could not judge (`UnjudgedRun`), in name order as the list's.
+ * @param list The RunList as the api serves it.
+ */
 export const rowsOf = (list: RunList): RunRow[] => [...list.items.map(runViewOf), ...(list.unjudged ?? []).map(unjudgedOf)].sort(byName);
 
 /** Every run of `query`, the RunList whole: a plain list, no page and no state, so no run's frame is measured. */
@@ -33,6 +36,7 @@ const everyRun = (query: RunListQuery = {}): Promise<RunRow[]> => runs.listAll(q
  * The runs `selector` takes by their labels (`GET /api/runs?labelSelector=`), every page of them, under `['runs']`: the labels page's,
  * which counts a label's runs by how each ended. Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed
  * is not followed — every minute while it is.
+ * @param selector A label selector; blank for every run.
  */
 export const runsSelectedQuery = (selector: string) =>
   queryOptions({
@@ -97,7 +101,10 @@ const frameOf =
   (run: Run | RunUnjudged): R | UnjudgedRun =>
     'error' in run ? unjudgedOf(run) : read(run);
 
-/** The frame (`OpenRuns`) off the list of the runs not finished: each run in its state's part, the counts and `asOf` the list's. */
+/**
+ * The frame (`OpenRuns`) off the list of the runs not finished: each run in its state's part, the counts and `asOf` the list's.
+ * @param list The list of the runs not finished, as the api serves it asked by state.
+ */
 export function openOf(list: RunList): OpenRuns {
   const stated = statedOf(list);
   return {
@@ -129,6 +136,8 @@ const labelled = (query: RunListQuery, selector: string | undefined): RunListQue
  * The frame (`GET /api/runs?fieldSelector=status.state!=finished`, or `/api/namespaces/<factory>/runs` for one factory, `default` naming
  * the runs of none): the runs that wait and move with the counts, what the board's frame reads on every page. Keyed `['runs-open']`, and
  * `['runs-open', factory]` for one factory; read again on each event of the workflow feed (`useFeed`), and paced as `runsSelectedQuery` is.
+ * @param factory The factory whose runs are read, by its namespace (`default` the runs of none); undefined for every factory.
+ * @param selector A label selector the runs are taken by; undefined or blank for every run.
  */
 export const openRunsQuery = (factory?: string, selector?: string) =>
   queryOptions({
@@ -152,6 +161,7 @@ export type FinishedPage = { asOf: string; total: number; runs: FinishedRun[]; c
 /**
  * A page of the finished runs off the list asked `status.state=finished`: each run judged with its finish, in the list's order. A run the
  * list could not judge has no finish to say and is no row of it; the count holds it.
+ * @param list The list of the finished runs, as the api serves it asked by state.
  */
 export function finishedOf(list: RunList): FinishedPage {
   return {
@@ -173,6 +183,7 @@ export function finishedOf(list: RunList): FinishedPage {
  * `factory` alone, newest finished first: a run that waits on a person though it is finished, which the floor shows whether Show finished
  * is on or not. Keyed `['runs-finished', factory, 'undecided']`, so the feed and a write read it again as they read every page of the
  * finished runs, a decision or a merge taking it off; paced as `runsSelectedQuery` is.
+ * @param factory The factory whose runs are read, by its namespace (`default` the runs of none); undefined for every factory.
  */
 export const undecidedRunsQuery = (factory?: string) =>
   queryOptions({
@@ -189,6 +200,9 @@ export const FINISHED_SIZE = 9;
  * the token the page before it answered, the last of `older` (`continue`), the first page for none. Keyed `['runs-finished', factory,
  * token]`, the factory and the token null for every factory's and the first page; read again on each event of the workflow feed
  * (`useFeed`), and paced as `runsSelectedQuery` is.
+ * @param factory The factory whose runs are read, by its namespace (`default` the runs of none); undefined for every factory.
+ * @param older The tokens of the pages before this one, oldest first; none for the first page.
+ * @param selector A label selector the runs are taken by; undefined or blank for every run.
  */
 export const finishedRunsQuery = (factory: string | undefined, older: readonly string[], selector?: string) => {
   const from = older.at(-1);
@@ -207,6 +221,8 @@ export const finishedRunsQuery = (factory: string | undefined, older: readonly s
  * Whether the strip reads the page after `page` to have every run finished today, the day beginning at `dayStart` (epoch ms): the list
  * answers the newest finished first, so a page that holds a run finished before the day began is the last that holds one of today's.
  * Proved by `contracts/finished-today.contract.ts`.
+ * @param page The page read: when each of its runs finished, in epoch ms, and whether a page follows it.
+ * @param dayStart When the day began, in epoch ms.
  */
 export const readsOnToday: ReadsOnToday = (page: FinishedPageRead, dayStart: number): boolean =>
   page.next && page.finishedMs.length > 0 && page.finishedMs.every((ms) => ms >= dayStart);
@@ -242,6 +258,8 @@ async function finishedSince(factory: string | undefined, dayStart: number): Pro
  * strip's. Read off `GET /api/runs?fieldSelector=status.state=finished&limit=50` page by page until a page reaches into the day before
  * (`readsOnToday`). Keyed `['runs-finished', factory, 'today', dayStart]`, so the feed and a write read it again as they read every page
  * of the finished runs; paced as `runsSelectedQuery` is.
+ * @param factory The factory whose runs are read, by its namespace (`default` the runs of none); undefined for every factory.
+ * @param dayStart When the day began, in epoch ms.
  */
 export const finishedTodayQuery = (factory: string | undefined, dayStart: number) =>
   queryOptions({
@@ -264,7 +282,10 @@ export const finishedPagesQuery = () =>
     refetchInterval: false,
   });
 
-/** What a run would hand as context now (`GET /api/runs/:runId/concluded`): read again with the runs, since a source in flight moves on. */
+/**
+ * What a run would hand as context now (`GET /api/runs/:runId/concluded`): read again with the runs, since a source in flight moves on.
+ * @param id The run's id.
+ */
 export const concludedQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id, 'concluded'],
@@ -275,6 +296,8 @@ export const concludedQuery = (id: string) =>
  * Remove a try's run, as the CLI's `rm` removes it: its record, and the folders it worked in, in the run's namespace (`namespaceOf`). The
  * api removes only a try, and not one still in flight; rejects with its refusal in full — the package's words, which say to cancel it
  * first — or the api's own about the request.
+ * @param namespace The run's namespace: its factory's, `default` for a run of none.
+ * @param id The run's id.
  */
 export const removeRun = (namespace: string, id: string): Promise<RunRemoved> =>
   runs.delete(namespace, id, 'The run may be removed: look on the Runs page before removing it again.');
@@ -282,6 +305,8 @@ export const removeRun = (namespace: string, id: string): Promise<RunRemoved> =>
 /**
  * Lift a person's hold on a run, as the CLI's `hold <run> --off` lifts it: the hold's file removed, and the run goes on at the next tick.
  * Rejects with the api's refusal in full — the package's words for a run nobody holds — or its own about the request.
+ * @param namespace The run's namespace: its factory's, `default` for a run of none.
+ * @param id The run's id.
  */
 export const liftHold = (namespace: string, id: string): Promise<RunHeld> =>
   runs.unhold(namespace, id, "The hold may be lifted: look at the run's page before lifting it again.");
@@ -290,6 +315,10 @@ export const liftHold = (namespace: string, id: string): Promise<RunHeld> =>
  * Hold a run until the runs `until` names land, as the CLI's `hold <run> --until <run>… --why <words>` holds it, `why` sent only where it
  * says something; who put it is the user the api runs as. Rejects with the api's refusal in full — the package's words for a run it will
  * not hold, or a run to wait on it will not take — or its own about the request.
+ * @param namespace The run's namespace: its factory's, `default` for a run of none.
+ * @param id The run's id.
+ * @param until The ids of the runs whose landing lifts the hold.
+ * @param why Why the run is held, as the person said it; blank for no words.
  */
 export const putHold = (namespace: string, id: string, until: readonly string[], why: string): Promise<RunHeld> =>
   runs.hold(namespace, id, { until, ...(why.trim() ? { why } : {}) }, 'The run may be held: look at its page before holding it again.');
@@ -307,6 +336,9 @@ type Pruned = { id: string; pruned: true; lines: string[]; left: number };
  * Prune a finished run, as the CLI's `prune <run> --yes` does: its worktrees removed, and its files with `artifacts`; a run nobody merged
  * only with `unmerged`. No branch is deleted. Rejects with the api's refusal in full — the package's words for a run not over, one already
  * pruned, or one nobody merged — or its own about the request.
+ * @param namespace The run's namespace: its factory's, `default` for a run of none.
+ * @param id The run's id.
+ * @param how What the prune gives back beyond the worktrees: the run's files, and a run nobody merged.
  */
 export async function pruneRun(namespace: string, id: string, how: PruneHow): Promise<Pruned> {
   const answer = await runs.prune(namespace, id, how, 'The run may be pruned: look at its page before pruning it again.');

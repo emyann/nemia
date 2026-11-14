@@ -26,7 +26,10 @@ export const upgradesQuery = queryOptions({
   retry: retryUnlessGone,
 });
 
-/** The server upgraded (or taken back) to the release `tag`, as the upgrade typed at its machine does: the upgrade as filed. */
+/**
+ * The server upgraded (or taken back) to the release `tag`, as the upgrade typed at its machine does: the upgrade as filed.
+ * @param tag The tag of the release to upgrade to, or go back to.
+ */
 export const startUpgrade = (tag: string): Promise<Upgrade> =>
   call(
     (c) => c.upgrades.start({ payload: { tag } }),
@@ -36,6 +39,7 @@ export const startUpgrade = (tag: string): Promise<Upgrade> =>
 /**
  * Where an upgrade's output is followed, as server-sent events: `output`, a chunk of what it printed; `ended`, its end, its data the
  * `Upgrade`.
+ * @param id The upgrade's id, as its start answered.
  */
 export const upgradeOutputPath = (id: string): string => `/api/upgrades/${encodeURIComponent(id)}/output`;
 

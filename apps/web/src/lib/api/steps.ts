@@ -71,7 +71,11 @@ export const STEP_STREAM_SCHEMAS: { readonly [K in keyof StreamData]: Schema.Dec
   unreadable: UNREADABLE.fields.data.to,
 };
 
-/** Where a step's conversation is read, and — with `/stream` after it — followed as server-sent events. */
+/**
+ * Where a step's conversation is read, and — with `/stream` after it — followed as server-sent events.
+ * @param runId The run's id.
+ * @param step The step's name.
+ */
 export const transcriptPath = (runId: string, step: string) =>
   `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/transcript`;
 
@@ -92,6 +96,9 @@ const transcriptPage = (runId: string, step: string, after: string | undefined, 
  * left after it, so the read goes on at once from each page's `cursor` while it says so, before the page follows the stream from the last
  * cursor. Every page's events in order, and the last page's cursor, `live` and `open`. A page that says `more` and answers back the cursor
  * it was asked from is an api that would be asked forever, refused naming the restart.
+ * @param runId The run's id.
+ * @param step The step's name.
+ * @param signal Aborts the read; none for a read that runs to its end.
  */
 export async function readTranscript(runId: string, step: string, signal?: AbortSignal): Promise<StepTranscript> {
   let page = await transcriptPage(runId, step, undefined, signal);
@@ -110,6 +117,11 @@ export async function readTranscript(runId: string, step: string, signal?: Abort
  * The path of a step's try: the current one for a `tryNumber` of null, keyed by `stamp` (`stepStamp`), so the feed's `step` event, which
  * reads the run's record again, reads it again once the step moved; an earlier one by its number, which never moves. The current try's
  * is read again as `poll` answers for the path last read (`pathPoll`), and while another is read the path last read stays on the page.
+ * @param runId The run's id.
+ * @param step The step's name.
+ * @param stamp The stamp of the step's state: a new one reads the current try's path again.
+ * @param tryNumber The number of the try whose path is read; null for the current one.
+ * @param poll How long to wait before reading the path again, in ms, given the path last read; false reads it no more.
  */
 export const stepPathQuery = (
   runId: string,
@@ -136,6 +148,7 @@ const SERVED = /^\/api\/runs\/([^/]+)\/steps\/([^/]+)\/(artifacts|files)\/([^/]+
 /**
  * The text of a file a step's closeout named or its folder holds, read by the address the api served it under (`url`), for the viewer's
  * sheet: its bytes as UTF-8. Read once a sheet shows it, and again each time one does, since a step that runs again writes it again.
+ * @param url The address the api served the file under.
  */
 export const stepFileQuery = (url: string) =>
   queryOptions({

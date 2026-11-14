@@ -79,6 +79,7 @@ export type InboxEntry = {
  * as every card listed is; its factory its namespace, none for `default`; `null` where the card says nothing. `factoryRepo` is null:
  * the Card does not say which repository its factory picks for it, so the page reads that off the factories (`factoryRepoOf`,
  * lib/inbox.ts).
+ * @param card The Card as the api serves it.
  */
 export const entryOf = (card: Card): InboxEntry => {
   const { metadata, spec, status } = card;
@@ -103,7 +104,10 @@ export const entryOf = (card: Card): InboxEntry => {
   };
 };
 
-/** The entries of a page of cards (`entryOf`). */
+/**
+ * The entries of a page of cards (`entryOf`).
+ * @param list A page of Cards as the api serves it.
+ */
 export const entriesOf = (list: CardList): InboxEntry[] => list.items.map(entryOf);
 
 /** Every card that `selector` takes by its labels (`?labelSelector=`), or every card for none. */
@@ -130,7 +134,10 @@ export const inboxQuery = queryOptions({
   queryFn: () => inPlaySelected(undefined),
 });
 
-/** The inbox's cards in play that `selector` takes by their labels, or every one for none; under `['inbox']`, read again with it. */
+/**
+ * The inbox's cards in play that `selector` takes by their labels, or every one for none; under `['inbox']`, read again with it.
+ * @param selector A label selector, `?labelSelector=`; undefined or blank for every card.
+ */
 export const inboxSelectedQuery = (selector: string | undefined) =>
   queryOptions({
     queryKey: ['inbox', ...selectorKey(selector)],
@@ -141,6 +148,7 @@ export const inboxSelectedQuery = (selector: string | undefined) =>
  * Every card of the inbox, its run ended or not, that `selector` takes by its labels, or every card for none: the Inbox page's read, which
  * splits them into in play and ended itself (`CARD_KIND`). Under `['inbox']`, read again with it; keyed by an object, which no card's name
  * can be, so a card named `all` keeps its page's key (`cardQuery`, `['inbox', name]`).
+ * @param selector A label selector, `?labelSelector=`; undefined or blank for every card.
  */
 export const inboxAllQuery = (selector: string | undefined) =>
   queryOptions({
@@ -151,6 +159,7 @@ export const inboxAllQuery = (selector: string | undefined) =>
 /**
  * Reads the inbox with `selector`: resolves where the api reads it, rejects with the api's words where it refuses it (a 422 naming the
  * clause). The label filter's check before it writes the address.
+ * @param selector The label selector to check, as a person typed it.
  */
 export const checkSelector = (selector: string): Promise<unknown> => cards.listAll(selector.trim());
 
@@ -189,6 +198,7 @@ const keyValue = (card: Card, key: CardKey): string | null => {
 /**
  * Each key a card may set, a row each in `CARD_KEYS`' order, with its value (`keyValue`) and what it means (`CARD_KEY_MEANINGS`): the
  * rows a card's page draws. Null for an entry that does not read as a card: its `error` says why.
+ * @param card The Card as the api serves it, its own error said in its status where it does not read.
  */
 export const cardKeysOf = (card: Card): KeyRow[] | null =>
   card.status.error === undefined ? CARD_KEYS.map((key) => ({ key, value: keyValue(card, key), meaning: CARD_KEY_MEANINGS[key] })) : null;
@@ -196,6 +206,7 @@ export const cardKeysOf = (card: Card): KeyRow[] | null =>
 /**
  * A card, for its page: the Card read by its name, whichever factory holds it (`cards.getAll`). Read again on each visit, as the inbox
  * is.
+ * @param name The card's name.
  */
 export const cardQuery = (name: string) =>
   queryOptions({
@@ -231,6 +242,7 @@ export const fileCard = async ({
 /**
  * Drop a card without starting it, as the CLI's `inbox rm <name>` does (the Card's `delete`). Rejects with the api's refusal in full: the
  * package's words for a card that is not there, or for a name that is not a card's.
+ * @param card The card to drop: its name and its factory.
  */
 export async function dropCard(card: CardRef): Promise<void> {
   await cards.delete(namespaceOf(card.factory), card.name);
@@ -241,6 +253,7 @@ export async function dropCard(card: CardRef): Promise<void> {
  * `queue` and `unqueue`). The tick starts the next card in the queue when a run slot frees, on the workflow the card names. Resolves with
  * the card as it now reads; rejects with the api's refusal in full — the package's words for a card that is not there, names no workflow,
  * is queued already or was started — or the api's own about the request.
+ * @param card The card to queue or take off the queue: its name and its factory.
  */
 export const queueCard = (card: CardRef, { off = false }: { off?: boolean } = {}): Promise<Card> =>
   off ? cards.unqueue(namespaceOf(card.factory), card.name) : cards.queue(namespaceOf(card.factory), card.name);
@@ -251,6 +264,9 @@ export const queueCard = (card: CardRef, { off = false }: { off?: boolean } = {}
  * factory, for a card that names none: none for the default factory. Never a repository nor an origin: the factory places the run by its
  * wiring for the workflow and finds the workflow by its name. Resolves with the new run; rejects with the api's refusal in full — a card
  * not there, one started already, a workflow its factory does not offer, one its factory wires to no repository.
+ * @param card The card to start: its name and its factory.
+ * @param start Its run's workflow by name and its brief, the runs it waits on (`after`) and the runs it reads as context, each when given.
+ * @param factory The factory to start it in, for a card that names none; null, undefined or the default namespace for the default factory.
  */
 export const startCard = (
   card: CardRef,
@@ -277,6 +293,8 @@ export const startCard = (
  * and the `resourceVersion` it was read at, so a card changed in between is refused, not overwritten. Resolves with the card as it now
  * reads; rejects with the api's refusal in full: a card that is not there or was started, a run the store does not have, a card changed
  * since it was read — or the api's own about the request.
+ * @param card The card whose `from:` is set: its name and its factory.
+ * @param runs The ids of the runs its run is handed; none takes the line off.
  */
 export async function setCardFrom(card: CardRef, runs: readonly string[]): Promise<Card> {
   const namespace = namespaceOf(card.factory);

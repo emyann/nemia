@@ -319,6 +319,7 @@ type CapabilitiesPlace = { factory?: string; repo?: string };
 /**
  * What the repository of `place` offers a step, read in the factory it names, else in the one the store's factories leave. Not polled: it
  * changes when a person edits the checkout, and the api asks each server for its tools once while it runs. Read again on each visit.
+ * @param place The factory and repository the page reads; either left out where the address names none.
  */
 export const capabilitiesQuery = (place: CapabilitiesPlace) =>
   queryOptions({

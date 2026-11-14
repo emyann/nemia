@@ -21,7 +21,16 @@ import { deniedWords, harnessWaitLine } from '../list/list.ts';
 import { choicesOf, costLine, runCostLines, runCostWords, type DecideCommand, type Decision } from './decide.ts';
 import { acceptedLines, gateLines } from '../brief/index.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
-import { answerLines, answerOf, overBudgetLine, retryOffers, type Retry, type RetryAsk } from '../retry/index.ts';
+import {
+  answerLines,
+  answerOf,
+  overBudgetLine,
+  retriesNamed,
+  retryOffers,
+  retryRefusal,
+  type Retry,
+  type RetryAsk,
+} from '../retry/index.ts';
 import { timeline, type Timeline } from '../timeline/index.ts';
 import {
   checkReportsRead,
@@ -280,7 +289,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const { run, views, judged, git } = at;
   const config = yield* StoreConfig;
   const e = viewedOnce(seenBy(at.e, views));
-  const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, asks, roundAsks: rounds, checkout } = judged.read;
+  const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, asks, roundAsks: rounds, checkout, tipOf } = judged.read;
   const steps = [...at.steps];
   const { decision: d, assessed, spendOf } = judged;
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
@@ -299,8 +308,16 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
     ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf, verdictOf),
-    ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, () => landingDenies(run, place), checkKillOf),
+    ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, () => landingDenies(run, place), checkKillOf, tipOf),
   ];
+  const needsRefused = (name: string): string | undefined => {
+    const needs = reader(name)?.needs;
+    for (const { step, how } of needs ? retriesNamed(needs, run.id) : []) {
+      const refused = retryRefusal(steps, run, step, how, phaseOf, reader, asked, verdictOf, asks, () => false, spendOf, checkKillOf, tipOf);
+      if (refused) return `the nemia retry its needs names is refused: ${refused}`;
+    }
+    return undefined;
+  };
   const answer: Decided = {
     run,
     steps,
@@ -317,7 +334,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
     runCost: runCostLines(run, spendOf),
     runCostSaid: runCostWords(run, spendOf),
     answers,
-    answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
+    answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf, needsRefused),
     gates: saidBy(
       gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds, checkKillOf),
       (name) => approvalOf(run, name)?.actor,

@@ -202,7 +202,7 @@ export const advancePass = Effect.fn('advancePass')(
       ? { read: pass, slot }
       : { standing: standingNow(runsAtOnce(home).runs.list()).pipe(Effect.provideService(PlaceService, place)) };
     const lift = yield* liftHold(e, run, parents);
-    const { checkout, assessed } = yield* passAssessment(e, run, reads, from, memo, yield* standingOf(pass));
+    const { checkout, assessed } = yield* passAssessment(e, run, reads, from, memo, yield* standingOf(pass), heads);
     const { ran, settled, marked, timed } = yield* marksOf(e, run, reads, assessed.status);
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(ran, reads, closer);
@@ -306,7 +306,7 @@ const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, 
 /**
  * The pass's assessment of a run, the truth every other reader of it agrees with (`test/one-read.test.ts` reads it by this name): its one
  * read (`reads`), the checkout another run's ending holds (`checkoutHold`, over `from` and `memo`), and where its branches stand
- * (`withStandings`), judged by `assess`. Read after a hold the pass lifts, which `assess` reads off the run.
+ * (`withStandings`), and where its branches are now (`heads`, the pass's: what a person's recheck of a blocked step is judged on), judged by `assess`. Read after a hold the pass lifts, which `assess` reads off the run.
  */
 export const passAssessment = Effect.fnUntraced(function* (
   e: Engine,
@@ -315,10 +315,12 @@ export const passAssessment = Effect.fnUntraced(function* (
   from: Parameters<typeof checkoutHold>[4],
   memo: StatusMemo,
   standing: PassStanding,
+  heads?: Heads,
 ) {
   const home = yield* StoreRoot;
   const checkout = yield* checkoutHold(home, e, run, reads.steps, from, yield* StoreConfig, memo, reads.phaseOf);
-  const read = withStandings({ ...reads, checkout }, standing);
+  const tipOf = heads ? { tipOf: (branch: string) => heads()?.[branch] } : {};
+  const read = withStandings({ ...reads, checkout, ...tipOf }, standing);
   return { checkout, read, assessed: assess(read) };
 });
 

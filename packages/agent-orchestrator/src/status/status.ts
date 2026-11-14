@@ -456,7 +456,9 @@ const blockedAccepted = (step: StepSpec, said: Closeout | undefined, steps: read
  * how the try ended.
  *
  * `blocked` for a closeout signed `blocked`, unless the run refuses it (`closeoutRefusals`: questions that do not read), which reads as any
- * refused closeout does, `unsigned` once its session ended, so the run asks it to mend them.
+ * refused closeout does, `unsigned` once its session ended, so the run asks it to mend them — and unless a person had the check of the
+ * try before it run again on that very task (`rechecked`, `blockedRecheck`): then it stands on its check as a signed step does,
+ * `checking`, `verified` or `failed (check)`, and `unsigned` where it is short of a field the step owes.
  *
  * `budget exhausted` for a task its harness cut off at its cap, settled `failed` or `succeeded`: cut off, not concluded, and no attempt
  * follows (agent-runtime's README) — until a recheck files the step's check on that task (`retryable`), after which it stands on its
@@ -469,7 +471,7 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   const st = run.steps[step.name];
   if (!st?.taskId) return 'pending';
   const said = closeoutOf(step.name);
-  if (blockedAccepted(step, said, steps)) return 'blocked';
+  if (blockedAccepted(step, said, steps) && !(step.check && rechecked(st))) return 'blocked';
 
   const signed = (s: StepStatus): StepStatus =>
     s === 'verified' && askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s;
@@ -485,6 +487,12 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   if (step.denials === 'fail' && spendOf(st.taskId)?.denied?.length) return 'denied';
   if (!step.check) return askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : 'unverified';
   return signed(onItsCheck(step, st, phaseOf));
+};
+
+/** Whether the try just behind a step's current one is a recheck of that very task: its current task's check was run again. */
+const rechecked = (st: StepRecord): boolean => {
+  const last = st.tries?.at(-1);
+  return last !== undefined && last.taskId === st.taskId && last.cause === 'recheck';
 };
 
 /**

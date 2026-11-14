@@ -207,6 +207,8 @@ const changesNone = (key: string): boolean => {
  * them only while a cap is in force, because each is a read off the task's journal — no harness asked, but a read per try per pass — and
  * a step answered without limit — the supervisor, which is answered for as long as a person keeps answering — would otherwise add one
  * journal read per answer to every pass, for ever, buying nothing.
+ * The check of the try just behind each step's current one is read always, one view a step that never grows: whether a blocked step
+ * may have it run again turns on its phase (`blockedRecheck`).
  *
  * Reads the tasks one at a time, in the order of the run's steps. Never fails: a view's refusal it dies of in the runtime's words
  * (`asked`), and of anything else as it was thrown.
@@ -217,6 +219,8 @@ export const taskPhasesRead = Effect.fn('taskPhases')(function* (run: Run, { ear
   for (const { taskId, check, tries } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, yield* asked('view', e.view(taskId)));
     if (check) views.set(check.taskId, yield* asked('view', e.view(check.taskId)));
+    const behind = tries?.at(-1)?.check;
+    if (behind && !views.has(behind.taskId)) views.set(behind.taskId, yield* asked('view', e.view(behind.taskId)));
     if (earlierTries) for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, yield* asked('view', e.view(t.taskId)));
   }
   return {

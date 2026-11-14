@@ -36,9 +36,11 @@ import { budgetWord } from '../money/money.ts';
 import type { Verdict } from '../check/index.ts';
 import { messageRefusal, modeWord, retriesSpent, type RetryAsk, type RetryHow } from './retry-ask.ts';
 import { carries, heard, pauseAskVoid, retriesDue, retryable, type CheckKillOf } from './retry.ts';
+import { blockedRecheck, blockedRecheckRead, type TipOf } from './blocked-recheck.ts';
 import { remoteRetryRefusal } from '../harness/harness.ts';
 import { autoDropped } from '../workflow/index.ts';
 import { modeOf } from '../former/former.ts';
+import { answersOr } from '../question/index.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 
 /** What `retryRefusal` was asked: its arguments, and the command its refusals name. */
@@ -56,6 +58,7 @@ type Asked = {
   harnessBlocked: (taskId: string) => boolean;
   spendOf: SpendOf;
   checkKillOf: CheckKillOf;
+  tipOf: TipOf;
 };
 
 /**
@@ -106,6 +109,7 @@ type Judged = Asked &
  * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`). Left out, a step whose session is blocked is
  *   running, and refused.
  * @param spendOf What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and `--budget` is refused on every one.
+ * @param tipOf Where each branch of the run is now (`blockedRecheck`): left out, no blocked step may be rechecked, each told why.
  */
 export function retryRefusal(
   steps: readonly StepSpec[],
@@ -120,6 +124,7 @@ export function retryRefusal(
   harnessBlocked: (taskId: string) => boolean = () => false,
   spendOf: SpendOf = () => undefined,
   checkKillOf: CheckKillOf = () => undefined,
+  tipOf: TipOf = () => undefined,
 ): string | null {
   const asked: Asked = {
     steps,
@@ -135,6 +140,7 @@ export function retryRefusal(
     harnessBlocked,
     spendOf,
     checkKillOf,
+    tipOf,
   };
   const step = askedStep(asked);
   if (typeof step === 'string') return step;
@@ -190,7 +196,7 @@ function judged(asked: Asked, step: StepSpec): Judged {
   const again = stoppedAt ? `nemia retry ${run.id} ${stoppedAt.name}` : '';
   return {
     ...asked,
-    ...retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, asked.harnessBlocked, spendOf, asked.verdictOf),
+    ...retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, asked.harnessBlocked, spendOf, asked.verdictOf, asked.tipOf),
     step,
     next,
     pending: asks.find((a) => a.step === name && a.try === next),
@@ -328,6 +334,7 @@ function modeRefusal(c: Judged): string | undefined {
     return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;
   }
   if (status === 'budget exhausted') return budgetStopRefusal(c);
+  if (status === 'blocked') return blockedRecheckRefusal(c);
   const is =
     via === 'session'
       ? 'is running, its session blocked by its harness with nothing signed off'
@@ -339,6 +346,33 @@ function modeRefusal(c: Judged): string | undefined {
       ? `To send it back from its gate, say what to change: nemia retry ${run.id} ${name} --message "<objection>".`
       : `Ask for another session instead: nemia retry ${run.id} ${name} (or --fresh).`
   }`;
+}
+
+/**
+ * `--recheck` of a step that signed off blocked, refused where its failed check may not run again (`blockedRecheck`): each why says what to
+ * do instead, and names only a command taken on the same state — a wait, or the session's answer.
+ */
+function blockedRecheckRefusal(c: Judged): string {
+  const { run, name, command, phaseOf, tipOf, closeoutOf } = c;
+  const said = blockedRecheck(blockedRecheckRead(run.steps[name], true, phaseOf, tipOf));
+  const answer = `${command} ${answersOr(c.step, closeoutOf(name), '--message "<answer>"')}`;
+  const head = `--recheck runs again the check that failed before ${name} signed off blocked`;
+  if (said.recheck) return `${head}, and may run again now: ${command} --recheck.`;
+  switch (said.why) {
+    case 'unsettled':
+    case 'not blocked':
+      return `${head}, and its session has not settled: wait for it, then ask again — nemia ls ${run.id}.`;
+    case 'not handed off':
+      return `${head}, and the run has not yet committed what its session left on its branch: the next pass does. Ask again after it — nemia ls ${run.id}.`;
+    case 'unread':
+      return `${head}, and where its branch stands now was not read: ask again with the store's daemon up (nemia up), which reads it.`;
+    case 'moved':
+      return `${head}, and its branch moved since that check was filed, from ${said.was} to ${said.now}: the check never judged what is there now. Answer it with a session, whose check judges it: ${answer}`;
+    case 'unrecorded':
+      return `${head}, and the commit that check judged was never recorded (a run filed before checks kept it): what it judged is unknown. Answer it with a session: ${answer}`;
+    case 'no failed check':
+      return `${head}, and no check of it failed before it did: there is nothing to run again. Answer it with a session: ${answer}`;
+  }
 }
 
 /** `--recheck` of a step ended at its budget that has no check to run, or whose staged merge the run took back: its session, raised. */
@@ -423,7 +457,7 @@ function budgetMisgiven(c: Judged): string | undefined {
 /** A step the run is about to try again itself: an ask to sign off, or a try `retries:` still covers. */
 function runTriesItself(c: Judged): string | undefined {
   const { steps, step, run, name, phaseOf, closeoutOf, askedCloseout, verdictOf, spendOf, checkKillOf, next } = c;
-  const itself = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, [], () => false, spendOf, checkKillOf).find(
+  const itself = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, [], () => false, spendOf, checkKillOf, c.tipOf).find(
     (r) => r.step === name,
   );
   if (itself?.by === 'signoff') {

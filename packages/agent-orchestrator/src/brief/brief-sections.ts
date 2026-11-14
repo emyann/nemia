@@ -281,9 +281,17 @@ const whyEnded = (r: RetryBriefing): string =>
   (r.status === 'unsigned' ? notAccepted(r) : undefined) ?? WHY_ENDED[r.status] ?? `The last try ended \`${r.status}\`.`;
 
 /**
+ * What a try after a check that did not pass is told of the way to have it run again, where what failed is not the work's: signing off
+ * again with nothing changed files the check again, as `retries:` allows (`retriesDue`), and past them a person may (`blockedRecheck`).
+ */
+const CHECK_AGAIN =
+  "Where what failed is not your work's — the machine, a test that varies run to run — change nothing and sign off as before, saying why: signing off again files the check again, as far as this step's `retries:` allow, and after them a person can run it again.";
+
+/**
  * `## Try <n>`: why the step is being tried again, and on whose word — then `## Your answer`, what the person who
  * asked for the try said with it, as they wrote it, in a fence longer than any run of backticks in it (`fenced`) —
- * then, for a check that did not pass, what the check said, as data (`refusalSection`). The fence is what keeps the
+ * then, for a check that did not pass, what the check said, as data (`refusalSection`), and that signing off again unchanged runs it again
+ * (`CHECK_AGAIN`). The fence is what keeps the
  * brief's structure the run's: a pasted snippet that leaves a fence open, or a line that reads as a heading, would
  * otherwise swallow or split the sections after it, and on a continue those are the only instructions left. The answer is
  * beside why the step is back, and before the evidence: a step that signed off blocked reads the answer to its `needs`
@@ -331,6 +339,7 @@ export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false)
     who,
     '',
     where,
+    ...(r.status === 'failed (check)' ? [CHECK_AGAIN] : []),
     ...told,
     ...answer,
     ...denied,

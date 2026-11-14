@@ -103,6 +103,7 @@ export const RunStart = Schema.Struct({
   label: Schema.optionalKey(Schema.Array(NotBlank).annotate({ description: 'The labels it is started with, each key=value.' })),
   card: Schema.optionalKey(
     Schema.Never.annotate({
+      description: 'Refused: an inbox card is started at its own path, POST /api/namespaces/<namespace>/cards/<name>/start.',
       message: 'a card is started at its own path, POST /api/namespaces/:namespace/cards/:name/start, with the workflow and the brief',
     }),
   ),
@@ -173,7 +174,10 @@ export const RunStartedFacts = Schema.Struct({
       Schema.Struct({ key: Schema.String, values: Schema.Array(Schema.Struct({ run: Schema.String, value: Schema.String })) }),
     ).annotate({ description: "Each label key it did not inherit, since the runs it names disagree on it, with each run's value." }),
   ),
-}).annotate({ identifier: 'RunStartedFacts' });
+}).annotate({
+  identifier: 'RunStartedFacts',
+  description: 'The run as it was started, what nemia start prints of it: its steps, place, mounts, files copied, waits, gates and labels.',
+});
 export type RunStartedFacts = typeof RunStartedFacts.Type;
 
 /**

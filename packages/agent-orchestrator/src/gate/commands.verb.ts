@@ -14,7 +14,7 @@ import { checked, type Served } from '../command/entry.verb.ts';
 import { givenAnswers, typedAnswers } from '../question/asked.verb.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { approveRun } from './gate.verb.ts';
+import { approveRun, takeBackRun } from './gate.verb.ts';
 import { dollarsOf } from '../keys/index.ts';
 import { budgetArgs, type StepBudget } from '../budget/budget.ts';
 
@@ -95,8 +95,43 @@ const loopAccepted = Effect.fnUntraced(function* (input: ApproveInput, home: str
 });
 
 /**
+ * `nemia approve --off`: the approval of a step that stands approved while nothing it approved has been filed, taken back (`takeBackRun`),
+ * with who took it back (`actor`) where the caller was handed. It takes the step, and no words, answers or caps (`approveRefusal` refuses
+ * them as typed; sent to the api, they are refused here). It answers no `next`: the step waits at its gate again.
+ */
+const takenBack = Effect.fnUntraced(function* (input: ApproveInput) {
+  const { runId, step, actor } = input;
+  if (input.answers?.length || input.budgets?.length || input.message !== undefined)
+    return yield* Effect.fail(
+      new Invalid({
+        message: `--off takes back an approval and gives none, so it takes no message, answers or budgets: nemia approve ${runId} ${step ?? '<step>'} --off.`,
+      }),
+    );
+  if (step === undefined)
+    return yield* Effect.fail(
+      new Invalid({
+        message: `--off takes back the approval of a step, named: nemia approve ${runId} <step> --off, the step as nemia ls ${runId} lists it.`,
+      }),
+    );
+  const { approval, file, takenBack: back } = yield* takeBackRun(runId, step, actor);
+  return {
+    step,
+    try: approval.try,
+    at: approval.at,
+    message: approval.message ?? null,
+    file,
+    ...(approval.actor ? { actor: approval.actor } : {}),
+    loop: false,
+    caps: [],
+    takenBack: back,
+  };
+});
+
+/**
  * `nemia approve`: a step's try approved at its gate, or a loop out of rounds ended as it stands; what the next tick files because of it,
- * and the file the approval is written to, and who gave it (`actor`) where the caller was handed. `loop` says which.
+ * and the file the approval is written to, and who gave it (`actor`) where the caller was handed. `loop` says which. With `off`, the
+ * approval taken back instead, as it was given, its file where it was set aside, and when and by whom (`takenBack`), and no `next`: the
+ * step waits at its gate again.
  */
 export const APPROVE: Served<
   {
@@ -106,9 +141,10 @@ export const APPROVE: Served<
     message: string | null;
     file: string;
     actor?: Actor;
-    next: Next;
+    next?: Next;
     loop: boolean;
     caps: Array<{ step: string; usd: number; above: boolean; workflow: number | null }>;
+    takenBack?: { at: string; actor?: Actor };
   },
   ApproveInput
 > = {
@@ -119,6 +155,7 @@ export const APPROVE: Served<
     const { answers: _answers, budgets: _budgets, actor, ...flags } = input;
     yield* checked(approveRefusal(flags));
     const { runId, step } = input;
+    if (input.off === true) return yield* takenBack(input);
     const words = input.message;
     if ((yield* approveForm(runId, step)) === 'loop') return yield* loopAccepted(input, home);
     const gated = step ?? '';

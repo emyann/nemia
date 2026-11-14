@@ -2805,8 +2805,15 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   once the work signs off again the ending waits at its gate for a new approval. A restart reads the same, since the record's tries are
   what spend it. `wf ls`, `wf decide` and a second `wf approve` offer that send-back beside what the ending waits for; a held or pruned
   run offers none. An approval an older nemia wrote names no work, and counts as current; no try of the work would spend it, so nothing
-  offers its send-back, and `wf retry` and a second `wf approve` say to take it back first, moving `approve-<ending>-<try>` into the
-  run's `.asks/done/`. Once the ending is filed, the send-back is refused as it was.
+  offers its send-back, and `wf retry` and a second `wf approve` say to take it back first, `wf approve <run> <ending> --off`. Once the
+  ending is filed, the send-back is refused as it was.
+- **A person takes back an approval while nothing it approved has been filed.** `wf approve <run> <step> --off` (over the api and the
+  MCP port, `off: true` on the approval) takes back the approval of a step that stands approved while neither its session nor its check
+  has a task — an ending waiting on the checkout, held, or not yet ticked — the same whether the approval names the work it approved or
+  an older nemia wrote it with none; the step waits at its gate again. The approval is not deleted: its file is set aside in the run's
+  `.asks/done/` as a spent one is, beside any there, with `takenBack` written on it — when, and who (`actor`). Refused, naming the fix,
+  for a gate not approved and once anything of the step is filed, in the words a second approval gives a step that has handed on
+  (`takeBackJudged`, its stop proved by `contracts/take-back.contract.ts`).
 - **The tick hands a step's leftovers off once for each try.** What a person leaves in a step's worktree after its hand-off is theirs,
   not committed under the step's name, until the step's next try.
 - **What the steps after it are told.** Every step after an approved gate — the one after it and each after that one, the

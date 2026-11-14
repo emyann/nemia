@@ -92,8 +92,8 @@ export const approvedUnfiled = (step: StepSpec, run: Run): boolean => unfiledApp
 
 /**
  * What an ending approved and not filed whose approval names no work (`unfiledApproval`, not `approvedUnfiled`) says of a send-back of its
- * work: no try of the work would spend that approval, so it is taken back first — its file moved into the run's `.asks/done/` — and then
- * the work is sent back (`sendBackTo`). Empty for any other step. Pure.
+ * work: no try of the work would spend that approval, so it is taken back first — `nemia approve <run> <step> --off`, which sets its file
+ * aside in the run's `.asks/done/` — and then the work is sent back (`sendBackTo`). Empty for any other step. Pure.
  */
 export const takeBackWords = (step: StepSpec, run: Run): string => {
   const given = unfiledApproval(step, run);
@@ -107,7 +107,7 @@ export const takeBackOf = (step: StepSpec, run: Run, given: Approval): string =>
     .join(' or ');
   return (
     `${step.name}'s approval of try ${given.try} (at ${given.at}) names no work: an older nemia wrote it, so no try of the work would spend it, and ${step.name} would be filed on it once the work signed off again. ` +
-    `To send the work back, take that approval back first — move approve-${step.name}-${given.try}, in the run's .asks directory, into its done/ folder${back ? ` — then: ${back}` : ''}.`
+    `To send the work back, take that approval back first — nemia approve ${run.id} ${step.name} --off${back ? ` — then: ${back}` : ''}.`
   );
 };
 

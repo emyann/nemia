@@ -144,6 +144,10 @@ export const RETRY_WORDS = {
 /** The refusal of an approval's words before anything is read: `--message` given only blanks. */
 export const approveRefusal = (args: Args): string | null => {
   const message = textOf(args, 'message');
+  if (args.off === true)
+    return message !== undefined || args.answer !== undefined || args.budget !== undefined
+      ? `--off takes back an approval and gives none, so it takes no --message, --answer or --budget: ${commandLine(APPROVE_WORDS, args, { off: true })}.`
+      : null;
   return message !== undefined && !message.trim()
     ? `--message is empty, and an approval's words are handed to every step after the gate: empty, they tell them nothing. Say what you approve, or on what terms — ${commandLine(APPROVE_WORDS, args)} --message "<words>" — or leave --message out.`
     : null;
@@ -153,7 +157,7 @@ export const approveRefusal = (args: Args): string | null => {
 export const APPROVE_WORDS = {
   name: 'approve',
   served: [{ endpoint: 'runs.approve' }],
-  usage: '<runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"]',
+  usage: '<runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"] | <runId> <step> --off',
   help: [
     'let a step waiting at its gate hand on: what waits on it is filed on',
     'the next tick, and every step after the gate is handed your words',
@@ -172,6 +176,9 @@ export const APPROVE_WORDS = {
     'Your approval makes the budgets the step proposed the caps of the',
     'steps after the gate, and auto never approves unasked a cap above',
     "a step's own budget",
+    '--off: take back the approval of a step that stands approved while',
+    'nothing it approved has been filed — an ending waiting on the',
+    'checkout, held, or not yet ticked. The step waits at its gate again',
   ],
   spec: {
     positionals: [
@@ -196,9 +203,10 @@ export const APPROVE_WORDS = {
         takes: '--message takes the words that go with your approval, quoted: nemia approve <runId> [<step>] --message "<words>".',
         twice: 'nemia approve takes --message once: put all your words in it, quoted — nemia approve <runId> [<step>] --message "<words>".',
       },
+      { flag: '--off', kind: 'switch', key: 'off' },
     ],
     unknown: (arg) =>
-      `nemia approve does not take ${arg}. It takes the run, the step, --answer <n>=<letter>, --budget <step>=<amount> and --message "<words>": nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"].`,
+      `nemia approve does not take ${arg}. It takes the run, the step, --answer <n>=<letter>, --budget <step>=<amount> and --message "<words>", or --off: nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"], or nemia approve <runId> <step> --off.`,
   },
   check: approveRefusal,
   writes: true,

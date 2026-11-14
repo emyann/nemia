@@ -6,9 +6,9 @@
 import { Effect } from 'effect';
 import type { Actor } from 'objects';
 import { tried } from '../runtime-client.ts';
-import { tryOf, type Approval, type Run } from '../record/record.ts';
+import { tryOf, type Approval, type Run, type TakenBack } from '../record/record.ts';
 import { approvedFirst, approvedWork } from '../status/status.ts';
-import { approvalRefusal } from './gate.ts';
+import { approvalRefusal, takeBackJudged } from './gate.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
 import { standingsOf } from '../branches/branches.store.ts';
@@ -121,4 +121,46 @@ export const approveRun = Effect.fn('approve')(function* (
     return yield* Effect.fail(new Conflict({ message: why }));
   }
   return { run, approval, file, caps, above: aboveTheWorkflow(caps, ceilingsOf(steps)) } satisfies Approved;
+});
+
+/** What `nemia approve --off` did: the run, the approval as given, where it was set aside, and when and by whom it was taken back. */
+export type TakenBackApproval = { run: Run; approval: Approval; file: string; takenBack: TakenBack };
+
+/**
+ * Take back the approval of a step that stands approved while nothing it approved has been filed — `nemia approve <run> <step> --off` —
+ * by setting its file aside in the run's `.asks/done/` as the pass sets a spent approval aside, with when and by whom (`actor`) written on
+ * it (`asks.takeBack`): never deleted. The step then waits at its gate again. The same for an approval that names the work it approved
+ * and one an older nemia wrote with none.
+ *
+ * Refused before anything is moved, exit 2, with what to do instead: a run not there (`Missing`); and what `takeBackJudged` refuses
+ * (`Conflict`) — a step the run does not have, one not approved, and one anything of which is filed, its session or its check. An approval
+ * set aside between the look and the move (a pass found it spent) is refused as the look then refuses it.
+ */
+export const takeBackRun = Effect.fn('approve-off')(function* (id: string, stepName: string, actor?: Actor) {
+  const door = yield* RunDoor;
+  if (!(yield* door.runs.exists(RunId.read(id))))
+    return yield* Effect.fail(
+      new Missing({
+        message: `no such run: ${id}. nemia approve --off takes a run by its id, as nemia ls lists it: nemia approve <runId> <step> --off.`,
+      }),
+    );
+  const run = yield* door.runs.read(RunId.read(id));
+  const steps = yield* stepsOf(run);
+  const judged = takeBackJudged(steps, run, stepName);
+  if ('refused' in judged) return yield* Effect.fail(new Conflict({ message: judged.refused }));
+  const { approval } = judged;
+  const takenBack: TakenBack = { at: new Date().toISOString(), ...(actor ? { actor } : {}) };
+  const file = yield* door.asks.takeBack(RunId.read(id), stepName, approval.try, takenBack);
+  if (file === null) {
+    const now = takeBackJudged(steps, yield* door.runs.read(RunId.read(id)), stepName);
+    return yield* Effect.fail(
+      new Conflict({
+        message:
+          'refused' in now
+            ? now.refused
+            : `try ${approval.try} of ${stepName}'s approval was set aside while it was being taken back. See where the run stands: nemia ls ${id}.`,
+      }),
+    );
+  }
+  return { run, approval, file, takenBack } satisfies TakenBackApproval;
 });

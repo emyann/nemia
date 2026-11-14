@@ -142,6 +142,14 @@ test('nemia approve prints the try approved and what the next tick files, each c
   assert.match(approveLines({ ...approved, loop: true, next: 'nothing' }, 'r-1', false)[0] ?? '', /accepted: try 1 of ship as it stands/);
 });
 
+test('nemia approve --off prints the approval taken back, that the step waits at its gate again with the command to approve it, and where it was set aside', () => {
+  const given = { step: 'ship', try: 1, at: 't', message: null, file: 'done/approve-ship-1', loop: false, caps: [] };
+  const lines = approveLines({ ...given, takenBack: { at: 'u' } }, 'r-1', false);
+  assert.ok(lines[0]?.includes('nemia approve r-1 ship'), lines[0]);
+  assert.ok(lines[0]?.includes('taken back'), lines[0]);
+  assert.equal(lines.at(-1), '   done/approve-ship-1');
+});
+
 test('nemia say prints where the words went, then the words fenced longer than any run of backticks in them', () => {
   const lines = sayLines({ at: 't', attempt: 2, text: 'use ``` here', after: null, try: 1, taskId: 'task-1' }, 'r-1', 'implement');
   assert.match(lines[0] ?? '', /said to implement, try 1, attempt 2, at t — journalled on task-1/);

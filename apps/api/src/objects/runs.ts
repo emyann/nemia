@@ -241,12 +241,26 @@ const retried = (at: At & { readonly step: string }, payload: RunRetry) =>
     };
   });
 
-/** The step `at.step` approved at its gate (`nemia approve`): the approval written, with who gave it (the caller's actor). */
+/**
+ * The step `at.step` approved at its gate (`nemia approve`): the approval written, with who gave it (the caller's actor); or, with `off`,
+ * its approval taken back, with who took it back.
+ */
 const approved = (at: At & { readonly step: string }, payload: RunApprove) =>
   acted(at, async (s) => {
     const done = await s.inRequest(APPROVE.handler({ runId: at.name, step: at.step, ...payload, actor: actorOf(s.caller) }));
-    const { step, try: tried, at: when, message, file, actor, loop, next, caps } = done;
-    return { step, try: tried, at: when, message, file, ...(actor ? { actor } : {}), loop, next, caps };
+    const { step, try: tried, at: when, message, file, actor, loop, next, caps, takenBack } = done;
+    return {
+      step,
+      try: tried,
+      at: when,
+      message,
+      file,
+      ...(actor ? { actor } : {}),
+      loop,
+      ...given('next', next),
+      caps,
+      ...given('takenBack', takenBack),
+    };
   });
 
 /**

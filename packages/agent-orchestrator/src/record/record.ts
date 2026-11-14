@@ -126,6 +126,13 @@ export type Approval = {
 };
 
 /**
+ * That a person took an approval back (`nemia approve <run> <step> --off`) while nothing it approved had been filed: when, and
+ * who (objects' `Actor`, absent where the caller is not known). Written on the approval's file as the take-back sets it aside in
+ * the run's `done/`, as a spent approval is set aside, beside what the approval said; never on an approval in force.
+ */
+export type TakenBack = { at: string; actor?: Actor };
+
+/**
  * A person's word at a loop out of rounds, as its file says it (`nemia approve`): the looping step, the try it accepts, when, and what they
  * said — the words every step after the loop is handed under `## Accepted`, beside the findings the loop left open (`acceptedSection`).
  *
@@ -586,6 +593,12 @@ export type RunStore = {
     readonly write: (id: string, ask: PersonRequest) => AskWritten;
     /** Where a person finds the ask `key` of the run: the path a message names for them to read or remove. */
     readonly where: (id: string, key: AskKey) => string;
+    /**
+     * Set aside the approval of try `n` of `step`, taken back by a person: its file moved into the run's `done/` as a spent one is, at the
+     * first name there no file holds, with `takenBack` written beside what it said — never deleted, never over a file in `done/`. Answers
+     * where it was set aside, or null where no approval was at its name, taken back or spent since it was read.
+     */
+    readonly takeBack: (id: string, step: string, n: number, takenBack: TakenBack) => string | null;
   };
   readonly holds: {
     /**

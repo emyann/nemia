@@ -450,6 +450,30 @@ const ASK_WALKS: Record<string, Walk[]> = {
       says: [true, true],
     },
   ],
+  'asks.takeBack': [
+    {
+      name: "an approval taken back is set aside in its run's done/, no longer composed onto the run, and a second take-back finds none",
+      walk: ({ door, root }) => {
+        made(door, 'w-take');
+        const ask = { step: 'implement', try: 1, at, work: { implement: 1 } };
+        act(door.asks.write(idOf('w-take'), { kind: 'approve', of: 'gate', ask }));
+        const where = done(door.asks.takeBack(idOf('w-take'), 'implement', 1, { at, actor: ON_LAPTOP }));
+        const again = done(door.asks.takeBack(idOf('w-take'), 'implement', 1, { at }));
+        const run = act(door.runs.read(idOf('w-take'))) as Run;
+        const given = done(door.asks.write(idOf('w-take'), { kind: 'approve', of: 'gate', ask }));
+        return [where?.startsWith(`${root}/runs/w-take.asks/done/`), again, run.approvals, given.written];
+      },
+      says: [true, null, undefined, true],
+    },
+    {
+      name: 'a take-back of an approval never written finds none',
+      walk: ({ door }) => {
+        made(door, 'w-take-none');
+        return done(door.asks.takeBack(idOf('w-take-none'), 'implement', 1, { at }));
+      },
+      says: null,
+    },
+  ],
   'asks.read': [
     {
       name: 'the asks waiting are read: a retry among the asks, a round and a merge among the rounds, and approvals onto the run',

@@ -19,6 +19,7 @@ import {
   acceptFile,
   acceptanceIn,
   approvalFile,
+  takeBackApproval,
   approvalIn,
   askFile,
   askIn,
@@ -530,6 +531,7 @@ export const filesStoreAt = (home: string): RunStore => ({
     consume: (run, asks, rounds, voided) => consumeAllAsks(home, run, asks, rounds, voided),
     write: (id, person) => writePersonAsk(home, id, person),
     where: (id, key) => askWhere(home, id, key),
+    takeBack: (id, step, n, takenBack) => takeBackApproval(home, id, step, n, takenBack),
   },
   holds: {
     lift: (id, at, actor) => removeHold(home, id, at, actor),

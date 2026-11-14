@@ -329,11 +329,10 @@ test("a send-back at an ending's gate goes to the work, and a try of the ending 
       assert.equal(retryable(review, older, DONE, signedDone, asked, ENDS).sendsBack, undefined);
       names(
         retryRefusal(ENDS, older, 'review', { mode: 'continue', message: 'not this way' }, DONE, signedDone, asked),
-        'approve-ship-1',
-        'done/',
+        'nemia approve r-1 ship --off',
         'nemia retry r-1 review --message "<objection>"',
       );
-      names(approvalRefusal(ENDS, older, 'ship', undefined, DONE, signedDone, asked), 'approve-ship-1', 'done/');
+      names(approvalRefusal(ENDS, older, 'ship', undefined, DONE, signedDone, asked), 'nemia approve r-1 ship --off');
       const takenBack = atEnd();
       assert.equal(retryRefusal(ENDS, takenBack, 'review', { mode: 'continue', message: 'not this way' }, DONE, signedDone, asked), null);
     },

@@ -188,8 +188,13 @@ export const RunAsked = Schema.Struct({
 }).annotate({ identifier: 'RunAsked' });
 export type RunAsked = typeof RunAsked.Type;
 
-/** An approval of a step at its gate, as `nemia approve` makes one: the words with it, the answers to its questions, the caps it sets. */
+/**
+ * An approval of a step at its gate, as `nemia approve` makes one: the words with it, the answers to its questions, the caps it sets. Or,
+ * with `off: true` and none of those, the approval of a step that stands approved while nothing it approved has been filed, taken back
+ * (`nemia approve <run> <step> --off`).
+ */
 export const RunApprove = Schema.Struct({
+  off: Schema.optionalKey(Schema.Boolean),
   message: Schema.optionalKey(Schema.String),
   answers: Schema.optionalKey(Answers),
   budgets: Schema.optionalKey(Schema.Array(Schema.Struct({ step: Schema.String, usd: Schema.Finite }))),
@@ -199,7 +204,8 @@ export type RunApprove = typeof RunApprove.Type;
 /**
  * What an approval answers: the step, the try approved, when, the words, and the approval's file; and, as `nemia approve` prints it,
  * whether it ended a loop out of rounds (`loop`), what the next tick files because of it (`next`), and each cap it set (`caps`), above
- * the step's own budget in the workflow or not.
+ * the step's own budget in the workflow or not. Of an approval taken back (`off`), the approval as it was given, its file where it was
+ * set aside in the run's `done/`, and when and by whom it was taken back (`takenBack`).
  */
 export const RunApproved = Schema.Struct({
   step: Schema.String,
@@ -213,6 +219,7 @@ export const RunApproved = Schema.Struct({
   caps: Schema.optionalKey(
     Schema.Array(Schema.Struct({ step: Schema.String, usd: Schema.Finite, above: Schema.Boolean, workflow: Schema.NullOr(Schema.Finite) })),
   ),
+  takenBack: Schema.optionalKey(Schema.Struct({ at: Schema.String, actor: Schema.optionalKey(Actor) })),
 }).annotate({ identifier: 'RunApproved' });
 export type RunApproved = typeof RunApproved.Type;
 

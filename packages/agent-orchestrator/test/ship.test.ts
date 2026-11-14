@@ -1902,6 +1902,38 @@ test('an ending approved and waiting on the checkout, in a round after the first
   );
 });
 
+test('an ending approved by an older nemia and waiting on the checkout: its approval names no work, so a send-back is offered nowhere, is refused naming how to take it back, and is taken once it is', async (t) => {
+  const s = story(t);
+  let first = '';
+  let asksDir = '';
+
+  await s.test('REFUSED: no try of the work would spend the approval, so the send-back names the file to take back', async () => {
+    const two = await at.twoApproved();
+    first = two.first.id;
+    asksDir = path.join(ROOT, 'runs', `${first}.asks`);
+    assert.deepEqual([(await at.pass(first)).filed, (await at.pass(two.second.id)).filed], [[], ['ship']]);
+    fs.writeFileSync(path.join(asksDir, 'approve-ship-1'), JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
+    assert.equal(await statusOf(first, 'ship'), `waiting on the checkout (${two.second.id}'s ship has it)`);
+    assert.ok(!(await shipOf(first)).note?.includes('nemia retry'), 'nemia ls offers no send-back');
+    await assert.rejects(
+      stage.runWith(e(), retryRun(first, 'implement', { mode: 'continue', message: 'sub subtracts the wrong way round' })),
+      refusedAs('Conflict', 'approve-ship-1', 'done/', `nemia retry ${first} implement --message "<objection>"`),
+    );
+    await assert.rejects(stage.runWith(e(), approveRun(first, 'ship')), refusedNaming('approve-ship-1', 'done/'));
+  });
+
+  await s.test('taken back as the refusal says, the gate holds again and the send-back is taken', async () => {
+    fs.mkdirSync(path.join(asksDir, 'done'), { recursive: true });
+    fs.renameSync(path.join(asksDir, 'approve-ship-1'), path.join(asksDir, 'done', 'approve-ship-1'));
+    assert.equal(await statusOf(first, 'ship'), 'awaiting approval');
+    const { ask } = await stage.runWith(
+      e(),
+      retryRun(first, 'implement', { mode: 'continue', message: 'sub subtracts the wrong way round' }),
+    );
+    assert.deepEqual([ask.step, ask.try], ['implement', 2]);
+  });
+});
+
 test('an ending that stopped on the base branch sends the work back through the loop: review hears the objection and what ship needs, implement gets a round, and ship waits at its gate for a new approval', async (t) => {
   const s = story(t);
   const { tasks, filings, settle } = stage.board();

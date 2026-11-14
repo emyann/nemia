@@ -9,6 +9,8 @@ import {
   approvalOf,
   approvedFirst,
   approvedUnfiled,
+  takeBackWords,
+  unfiledApproval,
   branchWord,
   gatesOf,
   hasGate,
@@ -55,20 +57,24 @@ function approvedRefusal(steps: readonly StepSpec[], step: StepSpec, run: Run, g
   const approved = `try ${tryOf(run, name)} of ${name} is already approved, at ${given.at}${given.message !== undefined ? ', with words' : ''}`;
   if (sendsBack)
     return `${approved}: what waits on it is filed on the next tick, once. To send it back instead, before that tick: nemia retry ${run.id} ${name} --message "<objection>".`;
-  if (approvedUnfiled(step, run)) return unfiledRefusal(step, run, approved);
+  if (unfiledApproval(step, run)) return unfiledRefusal(step, run, approved);
   const after = steps.some((s) => s.after.includes(name));
   return `${approved}, and it has handed on: ${after ? 'what waits on it has been filed' : 'nothing waits on it, and its run goes on without it'}, so there is nothing to approve, nor to send back. See where the run stands: nemia ls ${run.id}.`;
 }
 
 /**
- * A second approval of an ending approved and not filed (`approvedUnfiled`): it waits for the checkout, or the pass that files it, and its
- * work may still be sent back, which spends the approval (`unfiledBack`) — none on a held run, whose hold refuses a try.
+ * A second approval of an ending approved and not filed (`unfiledApproval`): it waits for the checkout, or the pass that files it, and its
+ * work may still be sent back, which spends the approval (`unfiledBack`) — none on a held run, whose hold refuses a try. An approval an
+ * older nemia wrote names no work, and no send-back spends it: taken back first (`takeBackWords`), the work may be sent back.
  */
 function unfiledRefusal(step: StepSpec, run: Run, approved: string): string {
   const back = unfiledBack(step, run).map((s) => `nemia retry ${run.id} ${s} --message "<objection>"`);
-  return `${approved}, and nothing of it has run: the run files it once it may — nemia ls ${run.id} says what it waits for.${
-    back.length ? ` To send the work back instead, before it is filed: ${back.join(' or ')}.` : ''
-  }`;
+  const after = back.length
+    ? ` To send the work back instead, before it is filed: ${back.join(' or ')}.`
+    : approvedUnfiled(step, run)
+      ? ''
+      : ` ${takeBackWords(step, run)}`;
+  return `${approved}, and nothing of it has run: the run files it once it may — nemia ls ${run.id} says what it waits for.${after}`;
 }
 
 /**

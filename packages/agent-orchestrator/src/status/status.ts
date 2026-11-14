@@ -76,12 +76,36 @@ export const approvedWork = (step: StepSpec, run: Run): Record<string, number> |
   approvedFirst(step, run) ? Object.fromEntries(step.after.map((a) => [a, tryOf(run, a)])) : undefined;
 
 /**
- * Whether an ending approved first (`approvedFirst`) has its approval of the work as it stands (`approvalOf`) and nothing of it filed: it
- * waits for the checkout, or for the pass that files it. Its work may still be sent back (`sendsBack` in `retryable`), which spends the
- * approval, as the try after a gated step's own does. False on a run called off, which files nothing. Pure.
+ * The approval of an ending approved first (`approvedFirst`) that is in force (`approvalOf`) while nothing of the ending is filed: it waits
+ * for the checkout, or for the pass that files it. None on a run called off, which files nothing. Pure.
  */
-export const approvedUnfiled = (step: StepSpec, run: Run): boolean =>
-  !run.cancelledAt && approvedFirst(step, run) && !run.steps[step.name]?.taskId && Boolean(approvalOf(run, step.name));
+export const unfiledApproval = (step: StepSpec, run: Run): Approval | undefined =>
+  !run.cancelledAt && approvedFirst(step, run) && !run.steps[step.name]?.taskId ? approvalOf(run, step.name) : undefined;
+
+/**
+ * Whether an ending approved and not filed (`unfiledApproval`) may still have its work sent back (`sendsBack` in `retryable`): its approval
+ * names the work it approved (`Approval.work`), so the try the send-back files spends it (`workStands`), as the try after a gated step's
+ * own does. Not one an older nemia wrote, which names none: nothing in the record would spend it, and the ending would be filed on it once
+ * the work signed off again — its send-back is refused, naming how to take it back (`retryRefusal`). Pure.
+ */
+export const approvedUnfiled = (step: StepSpec, run: Run): boolean => unfiledApproval(step, run)?.work !== undefined;
+
+/**
+ * What an ending approved and not filed whose approval names no work (`unfiledApproval`, not `approvedUnfiled`) says of a send-back of its
+ * work: no try of the work would spend that approval, so it is taken back first — its file moved into the run's `.asks/done/` — and then
+ * the work is sent back (`sendBackTo`). Empty for any other step. Pure.
+ */
+export const takeBackWords = (step: StepSpec, run: Run): string => {
+  const given = unfiledApproval(step, run);
+  if (!given || given.work !== undefined) return '';
+  const back = sendBackTo(step, run)
+    .map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`)
+    .join(' or ');
+  return (
+    `${step.name}'s approval of try ${given.try} (at ${given.at}) names no work: an older nemia wrote it, so no try of the work would spend it, and ${step.name} would be filed on it once the work signed off again. ` +
+    `To send the work back, take that approval back first — move approve-${step.name}-${given.try}, in the run's .asks directory, into its done/ folder${back ? ` — then: ${back}` : ''}.`
+  );
+};
 
 /**
  * The steps a send-back from an ending approved and not filed goes to (`sendBackTo`), as `nemia ls`, `nemia decide` and a second `nemia

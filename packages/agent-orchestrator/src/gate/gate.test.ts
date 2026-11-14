@@ -220,10 +220,10 @@ test('gateLines at an ending approved and not filed: the send-back of the work b
       { ship: 'approved 23:10Z  — not filed yet; or send the work back:  nemia retry r-1 implement --message "<objection>"' },
     ],
     [
-      'an approval a file older code wrote, with no work named, counts as current',
+      'an approval a file older code wrote, with no work named, counts as current, and offers no send-back: no try of the work would spend it',
       atShip({ approvals: [approval('ship', 1)] }),
       PLAN_DONE,
-      { ship: 'approved 23:10Z  — not filed yet; or send the work back:  nemia retry r-1 implement --message "<objection>"' },
+      { ship: 'approved 23:10Z' },
     ],
     [
       'on a held run, no send-back: the hold refuses a try until it lifts',

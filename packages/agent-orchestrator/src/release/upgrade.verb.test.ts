@@ -292,7 +292,8 @@ test('two tags: v1 built on its trial store, v2 switched in with the service on 
       assert.equal(events.at(-1), 'resume');
       assert.equal(done.restart, 'service');
       assert.equal(done.pid, NEW);
-      assert.match(done.lines.at(-1) ?? '', new RegExp(`onto v2: the service ticks the store as pid ${NEW}`));
+      assert.match(done.lines.at(-2) ?? '', new RegExp(`onto v2: the service ticks the store as pid ${NEW}`));
+      assert.match(done.lines.at(-1) ?? '', /nemia doctor/, "the new release's doctor is said after the restart");
       assert.equal(fs.readlinkSync(pointer), 'v2');
       assert.equal(currentRelease(ROOT)?.commit, V2);
       const names = fs.readdirSync(releasesDir(ROOT)).filter((f) => !f.startsWith('.'));
@@ -575,14 +576,20 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
         const done = await run({ tag: 'v12', repo: REPO }, onPointer());
         assert.equal(done.restart, 'service');
         assert.ok(fs.readFileSync(CARRIED, 'utf8').includes(`doctor --json ${ROOT}`), 'the new release read the store');
-        const after = done.lines.slice(done.lines.findIndex((l) => l.includes(`ticks the store as pid ${NEW}`)) + 1);
+        const after = done.lines
+          .slice(done.lines.findIndex((l) => l.includes(`ticks the store as pid ${NEW}`)) + 1)
+          .filter((l) => !l.startsWith('removed '));
         assert.match(after[0] ?? '', /not ready/, after.join('\n'));
         for (const name of ['mise', 'repository-toolchain'])
           assert.ok(
             after.some((l) => l.includes(`nemia doctor fix ${name} --factory nemia --workflow quick`)),
             `${name}'s fix: ${after.join('\n')}`,
           );
-        assert.ok(!after.some((l) => l.includes('linger')), 'a piece no run waits on is left to nemia doctor');
+        const lingered = after.findIndex((l) => l.includes('linger'));
+        assert.ok(
+          lingered > after.findIndex((l) => l.includes('repository-toolchain')),
+          `the service's piece no run waits on is said too, after those a run waits on: ${after.join('\n')}`,
+        );
       } finally {
         readAs({ ready: true, pieces: [] });
         fs.rmSync(UNIT, { force: true });
@@ -605,15 +612,43 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
     },
   );
 
-  await s.test('restarted onto a release that reads ready: nothing more is said than the restart', async () => {
+  await s.test(
+    'restarted onto a release whose doctor finds memory-fit missing: the piece and its fix are said last, and it succeeds',
+    async () => {
+      const fit: ReadinessPiece = {
+        name: 'memory-fit',
+        area: 'machine',
+        state: 'missing',
+        message: '6 sessions at once (WF_MAX_CONCURRENT=6), each asking 7804 MiB, are more than this machine holds: 1 session fits',
+        fixes: [{ message: 'size the sessions to this machine', command: 'nemia service install --size auto', startable: false }],
+        cost: 'server',
+      };
+      readAs({ ready: true, pieces: [fit] });
+      try {
+        const done = await run({ tag: 'v13', repo: REPO }, onPointer());
+        const restart = done.lines.findIndex((l) => l.includes(`onto v13: the service ticks the store as pid ${NEW}`));
+        assert.ok(restart > 0, done.lines.join('\n'));
+        const said = done.lines.slice(done.lines.findIndex((l) => l.includes('memory-fit')));
+        assert.ok(said.length > 0 && said[0]?.includes(fit.message), done.lines.join('\n'));
+        assert.ok(said[1]?.includes('nemia service install --size auto'), `its fix follows it: ${done.lines.join('\n')}`);
+        assert.equal(said.length, 2, `the piece and its fix are the upgrade's last lines: ${done.lines.join('\n')}`);
+        assert.ok(!done.lines.some((l) => /not ready|held/.test(l)), 'no run waits on it');
+      } finally {
+        readAs({ ready: true, pieces: [] });
+        fs.rmSync(UNIT, { force: true });
+      }
+    },
+  );
+
+  await s.test('restarted onto a release that reads ready: one line, last, says the machine and its service miss nothing', async () => {
     try {
       const done = await run({ tag: 'v13', repo: REPO }, onPointer());
       const restart = done.lines.findIndex((l) => l.includes(`onto v13: the service ticks the store as pid ${NEW}`));
       assert.ok(restart > 0, done.lines.join('\n'));
-      assert.ok(
-        done.lines.slice(restart + 1).every((l) => l.startsWith('removed ')),
-        `only the retention's removals follow the restart: ${done.lines.join('\n')}`,
-      );
+      const after = done.lines.slice(restart + 1).filter((l) => !l.startsWith('removed '));
+      assert.equal(after.length, 1, `beside the retention's removals, one line follows the restart: ${done.lines.join('\n')}`);
+      assert.equal(done.lines.at(-1), after[0], 'said after every line of the upgrade');
+      assert.ok(!after[0]?.includes('✗'), after[0]);
     } finally {
       fs.rmSync(UNIT, { force: true });
     }
@@ -656,7 +691,9 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
     try {
       const done = await run({ tag: 'v12', repo: REPO }, onPointer());
       const restart = done.lines.findIndex((l) => l.includes(`onto v12: the service ticks the store as pid ${NEW}`));
-      assert.match(done.lines[restart + 1] ?? '', /nemia doctor\b/, done.lines.join('\n'));
+      const after = done.lines.slice(restart + 1).filter((l) => !l.startsWith('removed '));
+      assert.equal(after.length, 1, done.lines.join('\n'));
+      assert.match(after[0] ?? '', /nemia doctor\b/, done.lines.join('\n'));
     } finally {
       readAs({ ready: true, pieces: [] });
       fs.rmSync(UNIT, { force: true });

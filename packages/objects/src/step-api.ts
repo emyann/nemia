@@ -9,7 +9,8 @@
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BadRequest, Gone, Invalid, Missing, ReadFailed, Unjudged } from './api-errors.ts';
-import { StepLog, StepTries, StepTry, TryCloseout } from './run.ts';
+import { StepLog } from './run.ts';
+import { StepTries, StepTry, TryCloseout } from './run-tries.ts';
 import { StepTold } from './run-told.ts';
 import { describedNumber } from './meta.ts';
 import { LIFECYCLE_STATES, SAID_AFTER, TRANSCRIPT_ORIGINS, TRANSCRIPT_ROLES } from './words.ts';

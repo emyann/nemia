@@ -37,7 +37,6 @@
   "apps/api/src/objects/runs.ts": 1,
   "apps/api/src/objects/serve.ts": 4,
   "apps/api/src/objects/table.ts": 1,
-  "apps/api/src/openapi/reference.ts": 1,
   "apps/api/src/port.ts": 7,
   "apps/api/src/proposals/proposals.ts": 1,
   "apps/api/src/request/request.ts": 4,

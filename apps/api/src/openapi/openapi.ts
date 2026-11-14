@@ -40,7 +40,7 @@ const saidByEndpoint = (): Map<string, Said> =>
           description: [
             `**Command** \`${`${line} ${words.usage}`.trim()}\``,
             `**MCP tool** \`${tool.tool}\` · **When an agent calls it** ${answers}`,
-            words.help.join('\n'),
+            ['```text', ...words.help, '```'].join('\n'),
           ].join('\n\n'),
         };
         return [tool.endpoint, said] as const;
@@ -52,7 +52,8 @@ const saidByEndpoint = (): Map<string, Said> =>
  * The document: every group of the `Api`, its paths, and the Schemas of its objects and refusals under `components.schemas`, as Effect
  * writes it (`OpenApi.fromApi`), each operation then said in the surface's own words: one a command of the table links
  * (`COMMAND_WORDS`) takes that command's line as its summary and, under it, its tool on the MCP port, who answers for it when an agent
- * calls it, and the command's help; one no command links keeps its id as its summary. The words are the table's, so a command's help
+ * calls it, and the command's help as it is printed, in a block that keeps its `<words>`; one no command links keeps its id as its
+ * summary. The words are the table's, so a command's help
  * changed there is changed here.
  */
 export const openapiDocument = () => {

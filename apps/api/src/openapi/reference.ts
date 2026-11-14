@@ -23,8 +23,13 @@ export const REFERENCE_SCRIPT_PATH = '/openapi/scalar.js';
  */
 export const REFERENCE_BUNDLE = new URL('./browser/standalone.js', import.meta.resolve('@scalar/api-reference'));
 
-/** The page and the viewer's script, the script's text given by `script`. */
-export const referenceOf = (script: () => Promise<string>) =>
+/**
+ * The page and the viewer's script.
+ * @param script Gives the text of the viewer's script.
+ * @param client Whether the viewer's request client is on: off on the api's own page, where a request would act on the store behind
+ * it unasked; on for the page a person starts to try an api they name (`browseApp`).
+ */
+export const referenceOf = (script: () => Promise<string>, client = false) =>
   new Hono<ApiEnv>()
     .get(REFERENCE_SCRIPT_PATH, async (c) => c.body(await script(), 200, { 'content-type': 'text/javascript; charset=utf-8' }))
     .get(
@@ -36,8 +41,9 @@ export const referenceOf = (script: () => Promise<string>) =>
         darkMode: true,
         withDefaultFonts: false,
         telemetry: false,
-        hideClientButton: true,
-        hideTestRequestButton: true,
+        hideClientButton: !client,
+        hideTestRequestButton: !client,
+        persistAuth: false,
         agent: { disabled: true },
         mcp: { disabled: true },
         showDeveloperTools: 'never',

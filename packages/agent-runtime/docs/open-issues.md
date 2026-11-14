@@ -472,9 +472,14 @@ same path now: the worker gives what it signalled five seconds, then kills what 
 the group is empty (review, round 2). What that leaves (`bin/ae-worker.ts`, `test/detached.test.ts`):
 
 - **It is noticed at the worker's next write**: the heartbeat, within five seconds, or sooner at a word written on or an id.
-- **A removal in the instant between the worker's look and its rename is undone.** The worker looks for the file, then
-  renames its new copy into place, so a file removed in between is written again and the worker runs on as before. The
-  window is a few microseconds on each write. Nothing in the runtime removes a run file; a person or a test does.
+- **A removal in the instant between the worker's look and its rename is undone.** The worker writes its new copy to a temp
+  file, looks for the run file, then renames the copy into place, so a file removed between the look and the rename, one
+  syscall apart, is written again and the worker runs on as before. The window is a few microseconds on each write; closing
+  it would take a rename that replaces only a file that is there (`renameat2`'s `RENAME_EXCHANGE`), which Node lacks, and
+  renaming the old file aside first would show a live session's run file absent for an instant. Until 2026-11-13 the look came
+  before the temp write, so the window was the whole write, and main's `ci` went red at `da83c96a9` on a run file removed in
+  it and made again (`test/detached.test.ts`, *taken away while it writes its status*, which freezes the worker there).
+  Nothing in the runtime removes a run file; a person or a test does.
 - **The parent going is not a stop.** The worker is detached to outlive the engine that started it, and an engine restarted
   adopts it by its run file. A test that starts a worker stops it itself: every test root comes from `test-kit/scratch`,
   whose hooks stop what runs in a root and remove it, and `test/leaks.test.ts` runs a failing test file to prove that

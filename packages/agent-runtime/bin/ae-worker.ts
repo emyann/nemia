@@ -200,18 +200,26 @@ let stoppedAt: number | undefined;
 /**
  * Writes `patch` on the run file, with a fresh heartbeat; nothing once the run file has gone. In this order:
  *
- * 1. The run file is looked for first: renamed into place, a write would make again the file that was taken away.
- * 2. The status is written to a temp file and renamed over the run file, so a reader never sees half a JSON object.
+ * 1. The status is written to a temp file, so a reader never sees half a JSON object.
+ * 2. The run file is looked for, just before the rename and after the write: renamed into place, a write would make again the
+ *    file that was taken away, and a look made before the write would leave the whole write's time for a removal to be undone.
+ *    Found gone, the temp file is removed too.
+ * 3. The temp file is renamed over the run file. A removal between the look and the rename, one syscall apart, is still undone:
+ *    Node has no rename that replaces only a file that is there (`docs/open-issues.md` #32).
  *
  * A run file found gone, or a directory gone with it (the store removed, `ENOENT`), is `vanished`.
  */
 const write = (patch: Partial<typeof status> = {}) => {
   if (gone) return;
   status = { ...status, ...patch, heartbeatAt: new Date().toISOString(), beat: monoNow() };
-  if (!fs.existsSync(runFile)) return vanished();
+  const tmp = `${runFile}.tmp`;
   try {
-    fs.writeFileSync(`${runFile}.tmp`, JSON.stringify(status));
-    fs.renameSync(`${runFile}.tmp`, runFile);
+    fs.writeFileSync(tmp, JSON.stringify(status));
+    if (!fs.existsSync(runFile)) {
+      fs.rmSync(tmp, { force: true });
+      return vanished();
+    }
+    fs.renameSync(tmp, runFile);
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return vanished();
     throw e;

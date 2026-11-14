@@ -57,9 +57,20 @@ export const FLUSH_MS = 1_000;
  *
  * A factory's line — its upgrade's conflicts pending or settled — reads the factories again, whose conditions say it, and the daemon's
  * standing: it names no run.
+ * @param event The event the line arrived as: a daemon's, the store's or a factory's, which names no run.
  */
 export function keysOf(event: StandingEvent): QueryKey[];
+/**
+ * The queries a run's event of the feed can change: the run's own keys among them.
+ * @param event The event the line arrived as: a run's word, a step's or a run removed.
+ * @param run The id of the run the line names.
+ */
 export function keysOf(event: RunEvent, run: string): QueryKey[];
+/**
+ * The queries an event of the feed can change, either kind.
+ * @param event The event the line arrived as.
+ * @param run The id of the run the line names, for a run's event; undefined for a daemon's, the store's and a factory's.
+ */
 export function keysOf(event: FeedEvent, run?: string): QueryKey[] {
   switch (event) {
     case 'daemon':
@@ -100,6 +111,7 @@ const INBOX = 'inbox';
  * run's steps' (`['runs', id, 'steps']`), each of which stands for every key under it — a factory's own answer and each page move with
  * every run's, every read of the inbox with its started cards' runs, and every stamp of each step's tries and told with a run's event,
  * and the feed names no factory, no page, no selector, no card and no stamp.
+ * @param queryKey The key to invalidate.
  */
 export const filterOf = (queryKey: QueryKey): { queryKey: QueryKey; exact: boolean } => ({
   queryKey,
@@ -113,6 +125,7 @@ export const filterOf = (queryKey: QueryKey): { queryKey: QueryKey; exact: boole
  * Whether a query is one the board polls at `pace`, and reads again when the stream goes down: what the feed says — the runs, the light
  * answer and a factory's, every page of the finished runs, a run's record, and the cap — and whether a daemon ticks the store
  * (`daemonQuery`), which every event reads again but none can say is gone.
+ * @param key The query's key.
  */
 export const polled = (key: QueryKey): boolean =>
   (key.length === 1 && (key[0] === 'runs' || key[0] === OPEN || key[0] === 'ceilings' || key[0] === 'daemon')) ||
@@ -122,7 +135,10 @@ export const polled = (key: QueryKey): boolean =>
 /** Whether the feed's stream is open now: one stream a page, so one flag, set by `followFeed` alone. */
 let live = false;
 
-/** How often a polled query is read: `fast` while the feed is not followed, and `FALLBACK_MS` while it is. A query's `refetchInterval`. */
+/**
+ * How often a polled query is read: `fast` while the feed is not followed, and `FALLBACK_MS` while it is. A query's `refetchInterval`.
+ * @param fast How often the query is read while the feed is not followed, in ms.
+ */
 export const pace = (fast: number): number => (live ? FALLBACK_MS : fast);
 
 /**
@@ -215,6 +231,10 @@ const gathered = (sink: FeedSink, frames: Frames, timers: Timers) => {
  * A listener of a stream closed and replaced does nothing with what that stream still dispatches.
  *
  * Returns what stops following.
+ * @param open Opens a stream of the feed from where it starts: after an event it was sent, or at the feed's end.
+ * @param sink What the page is told: the queries to read again, and whether the feed is followed.
+ * @param frames The frames a read of the gathered keys waits for.
+ * @param timers The timers the reopening, the grace and the gathering are kept by: the browser's by default, or a test's own.
  */
 export function followFeed(
   open: (start: FeedStart) => StreamLike,

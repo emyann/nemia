@@ -26,7 +26,10 @@ export type Following = Followed & {
   loading: boolean;
 };
 
-/** What a page holds of a conversation before it is read: nothing, being read when there is one (`loading`). */
+/**
+ * What a page holds of a conversation before it is read: nothing, being read when there is one (`loading`).
+ * @param loading Whether there is a conversation to read, its first read in flight.
+ */
 export const unread = (loading: boolean): Following => ({
   events: [],
   partial: null,
@@ -79,6 +82,8 @@ function changed(s: Following, c: Change, closed: Set<string>): Following {
  * A task that has settled is never followed, whatever the step waits on: it says nothing ever again, so the api would answer `settled`
  * and end the stream, and a page that stops reading before that answer arrives aborts a request nobody was served by — which the e2e's
  * watch counts as a failed request, since only the frame's own streams are let go (`watch` in `test/e2e/checks.ts`).
+ * @param first The first read: whether its task is live, the cursor it gave (null for none), and whether its task is open.
+ * @param waiting Whether the step waits on a person.
  */
 export const followedFrom = (first: { live: boolean; cursor: string | null; open: boolean }, waiting: boolean): string | null =>
   first.live || (waiting && first.open) ? first.cursor : null;
@@ -124,6 +129,11 @@ const stepFollower = (): Follower<Following, Change> => {
   };
 };
 
-/** A step's conversation followed on `stream`, each change written through `update` (`follow`, `stepFollower`). */
+/**
+ * A step's conversation followed on `stream`, each change written through `update` (`follow`, `stepFollower`).
+ * @param stream The step's stream: an EventSource, or anything that dispatches the same events.
+ * @param update Writes a change to the conversation the page holds.
+ * @param frames The frames the arrivals that come together are folded on.
+ */
 export const followStep = (stream: StreamLike, update: (change: (s: Following) => Following) => void, frames: Frames): (() => void) =>
   follow(stream, stepFollower(), update, frames);

@@ -94,6 +94,10 @@ export const END_GRACE_MS = 2_000;
  * reconnect — or after `END_GRACE_MS`, and not the moment its last event arrives. Closed then, while the rest of the response is still on
  * its way, the browser aborts a request that was answered in full (`net::ERR_ABORTED`), which the e2e's watch counts as a failed request.
  * The page stops following at once all the same.
+ * @param stream The stream the conversation is followed on: an EventSource, or anything that dispatches the same events.
+ * @param follower What the conversation means by its stream.
+ * @param update Writes a change to the state the conversation holds.
+ * @param frames The frames the arrivals that come together are folded on.
  */
 export function follow<S extends Followed, C>(
   stream: StreamLike,

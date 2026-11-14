@@ -343,6 +343,69 @@ test('a worker ends all of its harness however its session ends: stopped, or its
       },
     );
 
+  await t.test(
+    'a worker whose run file is taken away while it writes its status ends its harness, and makes no run file again',
+    async (sub) => {
+      const dir = root();
+      const cwd = scratch('ae-harness-');
+      const hook = path.join(dir, 'freeze-in-write.mjs');
+      fs.writeFileSync(
+        hook,
+        [
+          "import fs from 'node:fs';",
+          "if (process.argv[1]?.endsWith('ae-worker.ts')) {",
+          '  const write = fs.writeFileSync;',
+          '  fs.writeFileSync = (...a) => {',
+          "    if (String(a[0]).endsWith('.json.tmp') && String(a[1]).includes('\"harness\"')) {",
+          "      fs.writeFileSync = write; process.kill(process.pid, 'SIGSTOP');",
+          '    }',
+          '    return write(...a);',
+          '  };',
+          '}',
+        ].join('\n'),
+      );
+      const ops = detachedOps(sh('echo $$ > pid; exec sleep 30'), dir, QUICK);
+      const was = process.env.NODE_OPTIONS;
+      process.env.NODE_OPTIONS = `${was ?? ''} --import=${pathToFileURL(hook).href}`.trim();
+      try {
+        await Effect.runPromise(ops.spawn(req('ae/g1/2', cwd)));
+      } finally {
+        if (was === undefined) delete process.env.NODE_OPTIONS;
+        else process.env.NODE_OPTIONS = was;
+      }
+      const file = runFileOf(dir, 'sh', 'ae/g1/2');
+      let worker = 0;
+      let harness = 0;
+      try {
+        await within(
+          sub,
+          () => (worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))?.pid ?? 0) > 0 && isFrozen(worker),
+          'the worker freezes in its write of the harness it started',
+        );
+        await within(
+          sub,
+          () => {
+            try {
+              harness = Number(fs.readFileSync(path.join(cwd, 'pid'), 'utf8'));
+            } catch {}
+            return harness > 0;
+          },
+          'the harness started',
+        );
+        fs.rmSync(file);
+        process.kill(worker, 'SIGCONT');
+        await within(sub, () => !alive(worker) && !alive(harness), 'the worker and its harness ended');
+        assert.equal(fs.existsSync(file), false, 'the run file is not made again');
+      } finally {
+        for (const pid of [worker, harness].filter((p) => p > 0))
+          for (const sig of ['SIGCONT', 'SIGKILL'] as const)
+            try {
+              process.kill(pid, sig);
+            } catch {}
+      }
+    },
+  );
+
   await t.test('a worker whose run file is taken away kills what of its harness ignored SIGTERM before it exits', async (sub) => {
     const { dir, cwd, worker } = await stubborn(sub, 'ae/g3/1');
     fs.rmSync(path.join(dir, 'runs', 'sh', 'ae_g3_1.json'));

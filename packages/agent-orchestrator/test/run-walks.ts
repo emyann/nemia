@@ -15,11 +15,16 @@ import { act, done } from './door-walks.ts';
 import type { RunDoorShape } from '../src/runs/runs.store.ts';
 import { RunId } from '../src/record/record.model.ts';
 import type { PersonRequest, Run } from '../src/record/record.ts';
+import type { Actor } from 'objects';
 
 type Walk = DoorWalk<RunDoorShape>;
 type Door = RunDoorShape;
 
 const at = '2026-09-30T09:00:00.000Z';
+
+/** Who acted, as the api hands each write its caller's actor: the person on a token, and an agent's session. */
+const ON_LAPTOP: Actor = { kind: 'person', token: 'laptop' };
+const REVIEWER: Actor = { kind: 'agent', agent: 'reviewer', run: 'r-1', step: 'review' };
 const idOf = (id: string): RunId => RunId.read(id);
 
 /** A repository run's record as the tick writes one today, frozen steps and all. */
@@ -306,6 +311,20 @@ const RUNS: Record<string, Walk[]> = {
       },
       says: [true, true],
     },
+    {
+      name: "a run cancelled by an actor keeps the first cancellation's actor with its time, and one cancelled with none reads with none",
+      walk: ({ door }) => {
+        made(door, 'w-cancel-by');
+        made(door, 'w-cancel-none');
+        const first = act(door.runs.cancel(idOf('w-cancel-by'), ON_LAPTOP));
+        const again = act(door.runs.cancel(idOf('w-cancel-by'), REVIEWER));
+        act(door.runs.cancel(idOf('w-cancel-none')));
+        const read = act(door.runs.read(idOf('w-cancel-by'))) as Run;
+        const none = act(door.runs.read(idOf('w-cancel-none'))) as Run;
+        return [again === first, read.cancelledAt === first, read.cancelledBy, 'cancelledBy' in none, Boolean(none.cancelledAt)];
+      },
+      says: [true, true, ON_LAPTOP, false, true],
+    },
   ],
   'runs.forget': [
     {
@@ -465,6 +484,30 @@ const ASK_WALKS: Record<string, Walk[]> = {
   ],
   'asks.consume': [
     {
+      name: 'each ask written with its actor is read back with it: a retry, a round, an approval at a gate and a loop accepted',
+      walk: ({ door }) => {
+        made(door, 'w-asks-by');
+        const asked: PersonRequest[] = [
+          { kind: 'retry', of: 'try', ask: { step: 'implement', try: 2, mode: 'continue', message: 'again', at, actor: REVIEWER } },
+          { kind: 'retry', of: 'round', ask: { step: 'review', round: 3, at, actor: ON_LAPTOP } },
+          { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at, actor: ON_LAPTOP } },
+          { kind: 'approve', of: 'loop', ask: { step: 'review', try: 1, at, message: 'good enough', actor: REVIEWER } },
+        ];
+        for (const ask of asked) act(door.asks.write(idOf('w-asks-by'), ask));
+        const read = act(door.asks.read(idOf('w-asks-by'))) as { asks: Array<{ actor?: Actor }>; rounds: Array<{ actor?: Actor }> };
+        const run = act(door.runs.read(idOf('w-asks-by'))) as Run;
+        const answered = act(door.asks.answers(idOf('w-asks-by'))) as Array<{ actor?: Actor }>;
+        return [
+          read.asks.map((a) => a.actor),
+          read.rounds.map((r) => r.actor),
+          run.approvals?.map((a) => a.actor),
+          run.acceptances?.map((a) => a.actor),
+          answered.map((a) => a.actor),
+        ];
+      },
+      says: [[REVIEWER], [ON_LAPTOP], [ON_LAPTOP], [REVIEWER], [REVIEWER]],
+    },
+    {
       name: 'an ask stays until the record holds its try, is consumed once it does, and is still answered from',
       walk: ({ door }) => {
         const run = made(door, 'w-consume');
@@ -520,6 +563,16 @@ const HOLDS: Record<string, Walk[]> = {
         return [hold.until, hold.why, hold.by, again, read?.at === hold.at];
       },
       says: [['other-run'], 'wait for it', 'ann', null, true],
+    },
+    {
+      name: 'a hold put by an actor keeps it beside `by`, and is read back with both',
+      walk: ({ door }) => {
+        made(door, 'w-put-by');
+        const hold = act(door.holds.put(idOf('w-put-by'), [], { by: 'ann', actor: ON_LAPTOP })) as { actor?: Actor };
+        const read = (act(door.runs.read(idOf('w-put-by'))) as Run).hold;
+        return [hold.actor, read?.by, read?.actor];
+      },
+      says: [ON_LAPTOP, 'ann', ON_LAPTOP],
     },
   ],
   'holds.lift': [

@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { apart, failedInOrder, PER_WORKER_BYTES, queueOf, workersFor, type PageQueue, type Seat } from './e2e/workers.ts';
+import { apart, failedInOrder, fewerThanAsked, PER_WORKER_BYTES, queueOf, workersFor, type PageQueue, type Seat } from './e2e/workers.ts';
 
 const SEVEN = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 
@@ -65,9 +65,29 @@ test('at least one worker, on a machine with one core or no free memory', () => 
   assert.equal(workersFor({ ...ROOMY, freeBytes: 0 }), 1);
 });
 
-test('a number asked for wins over the machine, cut to the pages', () => {
-  assert.equal(workersFor({ ...ROOMY, cores: 2, freeBytes: 0, asked: 5 }), 5);
+test('a number asked for wins over the cores, cut to the pages', () => {
+  assert.equal(workersFor({ ...ROOMY, cores: 2, asked: 5 }), 5);
   assert.equal(workersFor({ ...ROOMY, pages: 3, asked: 5 }), 3);
+});
+
+test('a number asked for is capped by free memory: lowered by it, never raised past it, and at least one', () => {
+  const rows: Array<[string, { asked: number; freeBytes: number }, number]> = [
+    ['asked above the memory bound gives the bound', { asked: 4, freeBytes: 2 * PER_WORKER_BYTES + 1 }, 2],
+    ['asked below the memory bound gives what was asked', { asked: 2, freeBytes: 6 * PER_WORKER_BYTES }, 2],
+    ['no room at all still gives one worker', { asked: 4, freeBytes: 0 }, 1],
+  ];
+  for (const [row, given, workers] of rows) assert.equal(workersFor({ ...ROOMY, ...given }), workers, row);
+});
+
+test('a run given fewer workers than it asked says so, and one cut by its pages alone or asking nothing says nothing', () => {
+  const said = (given: { asked?: number; freeBytes: number; pages: number }) =>
+    fewerThanAsked({ ...given, workers: workersFor({ ...ROOMY, ...given }) });
+  const cut = said({ asked: 4, freeBytes: 2 * PER_WORKER_BYTES, pages: 10 });
+  assert.notEqual(cut, null, 'free memory gave two of the four asked');
+  assert.match(cut!, /\b4\b[^]*\b2\b/, 'the line names the four asked before the two started');
+  assert.equal(said({ asked: 2, freeBytes: 6 * PER_WORKER_BYTES, pages: 10 }), null, 'given what it asked');
+  assert.equal(said({ asked: 4, freeBytes: 6 * PER_WORKER_BYTES, pages: 3 }), null, 'the pages alone cut it');
+  assert.equal(said({ freeBytes: 0, pages: 10 }), null, 'nothing asked');
 });
 
 /** Two workers apart in everything. */

@@ -299,6 +299,7 @@ const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
   return {
     startedAt: runStartedAt(run, views),
     cancelledAt: run.cancelledAt ?? null,
+    ...(run.cancelledBy ? { cancelledBy: run.cancelledBy } : {}),
     pruned: prunedOf(run),
     onDisk: { worktrees: false, files: false },
     holdUntil: judged.holding && run.hold ? [...run.hold.until] : [],

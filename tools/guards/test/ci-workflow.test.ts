@@ -39,6 +39,8 @@ import {
   GENERATED,
   gateSteps,
   LEGS,
+  LOOK,
+  LOOK_FLAG,
   OWN_JOB,
   readWorkflow,
   runSteps,
@@ -581,6 +583,102 @@ function cancelDrift(workflow: Workflow): string[] {
       ];
 }
 
+/**
+ * The value of an Actions expression body under `github`, read as Actions reads it: string literals, `github.<name>` contexts, `==` and
+ * `!=` (case-insensitive, as Actions compares strings), `&&` and `||` (each giving back one of its operands) and parentheses.
+ * `undefined` where the body holds anything else, so a group the clause cannot evaluate is drift rather than a pass.
+ */
+export function evaluate(body: string, github: Record<string, string>): string | boolean | undefined {
+  const tokens = [...body.matchAll(/\s*('(?:[^']|'')*'|[A-Za-z_][\w.-]*|==|!=|&&|\|\||\(|\)|\S)/g)].map(([, token]) => token);
+  let at = 0;
+  const truthy = (value: string | boolean): boolean => value !== '' && value !== false;
+  const primary = (): string | boolean | undefined => {
+    const token = tokens[at++];
+    if (token === undefined) return undefined;
+    if (token === '(') {
+      const inner = or();
+      return tokens[at++] === ')' ? inner : undefined;
+    }
+    if (token.startsWith("'")) return token.slice(1, -1).replaceAll("''", "'");
+    if (token === 'true' || token === 'false') return token === 'true';
+    const name = /^github\.([\w-]+)$/.exec(token)?.[1];
+    return name !== undefined && name in github ? github[name] : undefined;
+  };
+  const equality = (): string | boolean | undefined => {
+    const left = primary();
+    if (tokens[at] !== '==' && tokens[at] !== '!=') return left;
+    const operator = tokens[at++];
+    const right = primary();
+    if (left === undefined || right === undefined) return undefined;
+    const same = String(left).toLowerCase() === String(right).toLowerCase();
+    return operator === '==' ? same : !same;
+  };
+  const and = (): string | boolean | undefined => {
+    let left = equality();
+    while (tokens[at] === '&&') {
+      at++;
+      const right = equality();
+      if (left === undefined || right === undefined) return undefined;
+      left = truthy(left) ? right : left;
+    }
+    return left;
+  };
+  const or = (): string | boolean | undefined => {
+    let left = and();
+    while (tokens[at] === '||') {
+      at++;
+      const right = and();
+      if (left === undefined || right === undefined) return undefined;
+      left = truthy(left) ? left : right;
+    }
+    return left;
+  };
+  const value = or();
+  return at === tokens.length ? value : undefined;
+}
+
+/** The concurrency group `group` names for a run of `ref` at `sha`, or `undefined` where an expression in it cannot be evaluated. */
+export function groupOf(group: string, ref: string, sha: string): string | undefined {
+  let unreadable = false;
+  const named = group.replace(/\$\{\{([^}]*)\}\}/g, (_, body: string) => {
+    const value = evaluate(body, { ref, sha });
+    if (value === undefined) unreadable = true;
+    return String(value);
+  });
+  return unreadable ? undefined : named;
+}
+
+/** Two commits and the refs the clause runs the group for: main's push, and a branch's pull request. */
+const MAIN_REF = 'refs/heads/main';
+const BRANCH_REF = 'refs/pull/1/merge';
+const SHAS = ['1ae76136c0000000000000000000000000000000', '4d2da905e0000000000000000000000000000000'] as const;
+
+/**
+ * A concurrency group that does not give each push to main a group of its own while a branch's runs share one. GitHub keeps one run
+ * pending per group and cancels the older pending one whatever `cancel-in-progress` says, so a group main's pushes share cancels a
+ * landing's run before it starts; a branch's group that names the commit would never cancel a superseded run.
+ */
+export function groupDrift(workflow: Workflow): string[] {
+  const group = workflow.concurrency?.group ?? '';
+  const [first, second] = SHAS;
+  const main = SHAS.map((sha) => groupOf(group, MAIN_REF, sha));
+  const branch = SHAS.map((sha) => groupOf(group, BRANCH_REF, sha));
+  if ([...main, ...branch].includes(undefined))
+    return [
+      `concurrency.group in ${FILE} reads ${group}, which this guard cannot evaluate: write it from github.ref and github.sha alone, with ==, !=, && and ||, such as ci-\${{ github.ref == '${MAIN_REF}' && github.sha || github.ref }}`,
+    ];
+  const drift: string[] = [];
+  if (main[0] === main[1] || !main[0]?.includes(first) || !main[1]?.includes(second))
+    drift.push(
+      `concurrency.group in ${FILE} gives two pushes to main the group ${main[0]} and ${main[1]}: name the commit (github.sha) in main's group, since GitHub cancels a group's older pending run whatever cancel-in-progress says and the ${GATE} gate would read a landing that was never tested as red`,
+    );
+  if (branch[0] !== branch[1] || branch.some((name) => name?.includes(first) || name?.includes(second)))
+    drift.push(
+      `concurrency.group in ${FILE} gives two pushes to one branch the group ${branch[0]} and ${branch[1]}: leave the commit out of a branch's group, so its superseded run is cancelled`,
+    );
+  return drift;
+}
+
 /** The expression the shard's run must be given its shard by: the leg's own, never a literal, or every leg would run shard 1. */
 const SHARD_FLAG = '--shard ${{ matrix.shard }}';
 
@@ -665,6 +763,34 @@ function boundDrift(workflow: Workflow): string[] {
   ];
 }
 
+/** The look job's step that runs the e2e. */
+const lookRunStep = (workflow: Workflow): Step | undefined =>
+  runSteps(workflow, LOOK).find((step) => step.run?.includes(E2E_COMMAND) === true);
+
+/**
+ * A look job that is not there or runs other than the look's tests alone, and a shard that runs them too. The look's tests run once per
+ * push: in every shard they ran four times, each file with its own Chromium and stories page, and nowhere they would run not at all.
+ */
+function lookDrift(workflow: Workflow): string[] {
+  const command = `${E2E_COMMAND} -- ${LOOK_FLAG}`;
+  if (workflow.jobs[LOOK] === undefined)
+    return [
+      `${FILE} has no ${LOOK} job: add one that runs \`${command}\`, or nothing in CI runs the look's browser tests, which the shards do not`,
+    ];
+  const sentences: string[] = [];
+  const run = lookRunStep(workflow)?.run ?? '';
+  const words = run.split(/\s+/);
+  if (!run.includes(command) || words.includes('--shard') || words.includes('--pages'))
+    sentences.push(
+      `the ${LOOK} job in ${FILE} does not run \`${command}\` alone: write its step \`${command}\`, with no --shard or --pages, so it runs every look test and no page`,
+    );
+  if ((shardRunStep(workflow)?.run ?? '').split(/\s+/).includes(LOOK_FLAG))
+    sentences.push(
+      `the ${E2E} job's run of \`${E2E_COMMAND}\` in ${FILE} passes ${LOOK_FLAG}: take it off, since the ${LOOK} job runs the look's tests once and every shard would run them again`,
+    );
+  return sentences;
+}
+
 /** Where Playwright keeps the browsers it downloads, the one path the e2e job may cache. */
 const BROWSERS = '~/.cache/ms-playwright';
 
@@ -679,13 +805,13 @@ const installStep = (steps: Step[]): Step | undefined => steps.find((step) => st
  * The install's `--with-deps` runs apt, which stalled shards for ten minutes on cache hits of a key the lockfile's hash made. And the
  * cache holds the browsers alone: a build or a page's result restored from one would be a verdict nothing in the run decided.
  */
-function browserDrift(workflow: Workflow): string[] {
-  const steps = workflow.jobs[E2E]?.steps ?? [];
+function browserDrift(workflow: Workflow, job: string): string[] {
+  const steps = workflow.jobs[job]?.steps ?? [];
   const caches = steps.filter((step) => step.uses?.startsWith('actions/cache') === true);
   const cache = caches[0];
   if (caches.length !== 1 || cache === undefined || cache.with?.path !== BROWSERS)
     return [
-      `the ${E2E} job in ${FILE} does not cache ${BROWSERS} alone: give it one actions/cache step whose path is ${BROWSERS}, so Chromium is restored rather than installed, and cache nothing else, so no verdict is read from a cache`,
+      `the ${job} job in ${FILE} does not cache ${BROWSERS} alone: give it one actions/cache step whose path is ${BROWSERS}, so Chromium is restored rather than installed, and cache nothing else, so no verdict is read from a cache`,
     ];
   const sentences: string[] = [];
   const keyed = /^\$\{\{ steps\.([\w-]+)\.outputs\.key \}\}$/.exec(String(cache.with.key ?? ''));
@@ -693,17 +819,17 @@ function browserDrift(workflow: Workflow): string[] {
   const read = steps[reader]?.run ?? '';
   if (reader === -1 || reader > steps.indexOf(cache) || !read.includes('package-lock.json') || !read.includes(PLAYWRIGHT_PIN))
     sentences.push(
-      `the browsers' cache of the ${E2E} job in ${FILE} is not keyed on the version of ${PLAYWRIGHT_PIN} in package-lock.json: key it on \${{ steps.<id>.outputs.key }} of a step before it that reads that version, so a lockfile change that moves no Playwright keeps the browsers`,
+      `the browsers' cache of the ${job} job in ${FILE} is not keyed on the version of ${PLAYWRIGHT_PIN} in package-lock.json: key it on \${{ steps.<id>.outputs.key }} of a step before it that reads that version, so a lockfile change that moves no Playwright keeps the browsers`,
     );
   if (cache.with['restore-keys'] !== undefined)
     sentences.push(
-      `the browsers' cache of the ${E2E} job in ${FILE} has restore-keys: take them off, since a near miss holds another Playwright's builds, which the install downloads past and the save then carries too`,
+      `the browsers' cache of the ${job} job in ${FILE} has restore-keys: take them off, since a near miss holds another Playwright's builds, which the install downloads past and the save then carries too`,
     );
   const install = installStep(steps);
   const hit = `steps.${cache.id ?? '<id>'}.outputs.cache-hit != 'true'`;
   if (install === undefined || cache.id === undefined || install.if !== hit || steps.indexOf(install) < steps.indexOf(cache))
     sentences.push(
-      `the ${E2E} job in ${FILE} does not install Chromium on a cache miss alone: give the cache step an id and the install, after it, if: ${hit}, or every shard runs apt on a hit`,
+      `the ${job} job in ${FILE} does not install Chromium on a cache miss alone: give the cache step an id and the install, after it, if: ${hit}, or every shard runs apt on a hit`,
     );
   return sentences;
 }
@@ -992,10 +1118,13 @@ const drift = (
   ...verdictDrift(workflow),
   ...statusDrift(workflow, GATE, GATE, VERDICT),
   ...cancelDrift(workflow),
+  ...groupDrift(workflow),
   ...targetDrift(text),
   ...shardDrift(workflow, pages),
   ...boundDrift(workflow),
-  ...browserDrift(workflow),
+  ...lookDrift(workflow),
+  ...browserDrift(workflow, E2E),
+  ...browserDrift(workflow, LOOK),
   ...buildDrift(workflow),
   ...scanDrift(workflow, config),
   ...allowDrift(config, stubs),
@@ -1045,7 +1174,7 @@ test('the shipped CI workflow runs on the three events, reads alone, and caches 
   assert.deepEqual(cached, [], 'setup-node caches no install here: the lockfile install is part of what is tested');
 });
 
-test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor adrift, an unquoted node, a job pinned off the floor and one unpinned, a hidden path uploaded as if it were not, a job outside the gate, a third party, a timezone untested, a run unforced, a landing cancelled, a fork with a writable token', () => {
+test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor adrift, an unquoted node, a job pinned off the floor and one unpinned, a hidden path uploaded as if it were not, a job outside the gate, a third party, a timezone untested, a run unforced, a landing cancelled, a landing superseded while pending, a fork with a writable token', () => {
   const workspaces = readWorkspaces();
   const engine = readEngine();
   const text = workflowText();
@@ -1260,6 +1389,21 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
     assert.deepEqual(cancelDrift(cancelled), [
       `concurrency.cancel-in-progress in .github/workflows/ci.yml reads ${String(value)}: write it ${SPARED} so a branch's superseded run is cancelled and every push to main keeps its own run, since the ci gate reads a cancelled job as a failure and a landing that was never tested would report red`,
     ]);
+  }
+
+  assert.deepEqual(groupDrift(shipped), [], "the shipped group gives each push to main its own and a branch's pushes one");
+  for (const [group, refused] of [
+    ['ci-${{ github.ref }}', 'main'],
+    ['ci-${{ github.ref }}-${{ github.sha }}', 'branch'],
+    ['ci-${{ github.ref }}-${{ github.run_id }}', 'unreadable'],
+  ] as const) {
+    const regrouped = structuredClone(shipped);
+    assert.ok(regrouped.concurrency !== undefined, 'the workflow sets concurrency today');
+    regrouped.concurrency.group = group;
+    assert.equal(groupDrift(regrouped).length, 1, `${group} is refused for one reason: ${refused}`);
+    const [a, b] = [groupOf(group, 'refs/heads/main', 'a'), groupOf(group, 'refs/heads/main', 'b')];
+    if (refused === 'unreadable') assert.equal(a, undefined, `${group} reads a context the clause does not evaluate`);
+    else assert.equal(a === b, refused === 'main', `${group}: main's two pushes share a group exactly where that is the refusal`);
   }
 
   const target = ['pull', 'request', 'target'].join('_');
@@ -1513,7 +1657,7 @@ test('REFUSED: no job that sums the shards, one that does not wait for them, and
 
 test("REFUSED: the e2e caching more than the browsers, keyed off the lockfile's hash, with restore-keys, and installing on a hit", () => {
   const shipped = readWorkflow();
-  assert.deepEqual(browserDrift(shipped), [], 'the e2e restores its browsers from a cache keyed on the pinned Playwright today');
+  assert.deepEqual(browserDrift(shipped, E2E), [], 'the e2e restores its browsers from a cache keyed on the pinned Playwright today');
   const cacheOf = (workflow: Workflow): Step => {
     const step = (workflow.jobs[E2E].steps ?? []).find((each) => each.uses?.startsWith('actions/cache') === true);
     assert.ok(step?.with !== undefined, 'the e2e job caches its browsers today');
@@ -1526,21 +1670,54 @@ test("REFUSED: the e2e caching more than the browsers, keyed off the lockfile's 
 
   const widened = structuredClone(shipped);
   cacheOf(widened).with = { ...cacheOf(widened).with, path: `${BROWSERS}\n.e2e` };
-  refused(browserDrift(widened), 'alone', "the pages' results cached beside the browsers");
+  refused(browserDrift(widened, E2E), 'alone', "the pages' results cached beside the browsers");
 
   const hashed = structuredClone(shipped);
   cacheOf(hashed).with = { ...cacheOf(hashed).with, key: "playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}" };
-  refused(browserDrift(hashed), PLAYWRIGHT_PIN, "the key the lockfile's whole hash");
+  refused(browserDrift(hashed, E2E), PLAYWRIGHT_PIN, "the key the lockfile's whole hash");
 
   const near = structuredClone(shipped);
   cacheOf(near).with = { ...cacheOf(near).with, 'restore-keys': 'playwright-' };
-  refused(browserDrift(near), 'restore-keys', 'a near miss restored');
+  refused(browserDrift(near, E2E), 'restore-keys', 'a near miss restored');
 
   const always = structuredClone(shipped);
   const install = installStep(always.jobs[E2E].steps ?? []);
   assert.ok(install?.if !== undefined, 'the install is conditioned on a miss today');
   delete install.if;
-  refused(browserDrift(always), 'cache miss alone', 'the install run on a hit');
+  refused(browserDrift(always, E2E), 'cache miss alone', 'the install run on a hit');
+});
+
+test('REFUSED: no look job, one that runs other than the look alone, a shard that runs the look too, and a look job with no browsers cached', () => {
+  const shipped = readWorkflow();
+  assert.deepEqual(lookDrift(shipped), [], 'the look runs once, in its own job, and no shard runs it today');
+  assert.deepEqual(browserDrift(shipped, LOOK), [], 'and restores its browsers as the shards do');
+  const refused = (drift: string[], token: string, why: string): void => {
+    assert.equal(drift.length, 1, `${why}: ${drift.join(' | ')}`);
+    assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
+  };
+
+  const gone = structuredClone(shipped);
+  delete gone.jobs[LOOK];
+  refused(lookDrift(gone), `no ${LOOK} job`, 'the job deleted');
+  const unneeded = structuredClone(shipped);
+  unneeded.jobs[GATE].needs = (unneeded.jobs[GATE].needs ?? []).filter((job) => job !== LOOK);
+  refused(gateDrift(unneeded), LOOK, 'the look job dropped from the gate');
+
+  const pages = structuredClone(shipped);
+  const step = lookRunStep(pages);
+  assert.ok(step?.run !== undefined, 'the look job runs the e2e today');
+  step.run = `${step.run} --pages runs`;
+  refused(lookDrift(pages), 'alone', 'the look job visiting pages beside the look');
+
+  const shard = structuredClone(shipped);
+  const run = shardRunStep(shard);
+  assert.ok(run?.run !== undefined, 'the e2e job runs the e2e today');
+  run.run = `${run.run} ${LOOK_FLAG}`;
+  refused(lookDrift(shard), `passes ${LOOK_FLAG}`, 'every shard running the look again');
+
+  const uncached = structuredClone(shipped);
+  uncached.jobs[LOOK].steps = (uncached.jobs[LOOK].steps ?? []).filter((each) => each.uses?.startsWith('actions/cache') !== true);
+  refused(browserDrift(uncached, LOOK), 'alone', 'the look job installing Chromium on every push');
 });
 
 test('REFUSED: no build job, a generator not run, a staleness step that names one generated path, and a path this repository has not', () => {

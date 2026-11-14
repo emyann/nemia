@@ -8,7 +8,7 @@
  * answers the file it names, else, but under `assets/`, the board's `index.html`, which routes it in the browser. A path that climbs
  * out of the folder, `..` encoded or not, is refused 400; with no board built, a 404 naming the build.
  *
- * A page carries no data of the store, so it needs no token, on a store marked exposed too (`needOf`, caller/caller.ts): the page that
+ * A page carries no data of the store, so it needs no token, on any store (`needOf`, caller/caller.ts): the page that
  * asks for one must load. The disk is read through what app.ts hands it (`BoardFiles`), as the OpenAPI page's script is: a reader here
  * touches nothing of the machine.
  */
@@ -16,7 +16,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import type { Handler } from 'hono';
 import { runningRelease } from 'agent-orchestrator';
-import { answered, onPort } from '../caller/caller.ts';
+import { answered, onPort } from '../caller/index.ts';
 import { ApiConfig, type ApiEnv } from '../layer.ts';
 
 /** The route the board is served on: every path, after the mount, before the api's 404. */

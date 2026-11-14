@@ -14,8 +14,9 @@ import { mergeSpent } from '../merge/merge.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
-import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore } from '../record/record.ts';
+import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore, Unheld } from '../record/record.ts';
 import type { Labels } from '../labels/labels.ts';
+import type { Actor } from 'objects';
 import { RunDoor, cardStartedTwice, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
 
 /** Where the stand-in says a run's files are: the root its paths are named under, as the files' are under `WF_ROOT`. */
@@ -32,7 +33,7 @@ const nameOf = ({ of, step, n }: AskKey): string => `${of}-${step}-${n}`;
 const runsAt = (...parts: string[]): string => path.posix.join(MEMORY_ROOT, 'runs', ...parts);
 
 /** The keys a record holds that are a person's, composed on read and never written into it (`rewriteRun`). */
-const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'saidBefore', 'pause'] as const;
+const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause'] as const;
 const recordOf = (run: Run): Run => {
   const kept: Record<string, unknown> = { ...run };
   for (const key of COMPOSED) delete kept[key];
@@ -46,8 +47,10 @@ type Held = { person: PersonRequest; done: boolean };
 type State = {
   records: Map<string, Run>;
   cancelled: Map<string, string>;
+  cancellers: Map<string, Actor>;
   pruned: Map<string, Pruned>;
   holds: Map<string, Hold>;
+  unheld: Map<string, Unheld>;
   labels: Map<string, Labels>;
   said: Map<string, Array<SaidBefore & { step: string }>>;
   refresh: Map<string, { at: string }>;
@@ -59,8 +62,10 @@ type State = {
 const stateOf = (): State => ({
   records: new Map(),
   cancelled: new Map(),
+  cancellers: new Map(),
   pruned: new Map(),
   holds: new Map(),
+  unheld: new Map(),
   labels: new Map(),
   said: new Map(),
   refresh: new Map(),
@@ -80,12 +85,14 @@ function readOf(st: State, id: string): Run {
   const record = st.records.get(id);
   if (!record) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
   const [approvals, acceptances] = [waiting(st, id, 'gate'), waiting(st, id, 'loop')];
-  const [pruned, hold, labels] = [st.pruned.get(id), st.holds.get(id), st.labels.get(id)];
+  const [pruned, hold, unheld, labels] = [st.pruned.get(id), st.holds.get(id), st.unheld.get(id), st.labels.get(id)];
   return {
     ...structuredClone(record),
     ...(st.cancelled.has(id) ? { cancelledAt: st.cancelled.get(id) } : {}),
+    ...(st.cancellers.has(id) ? { cancelledBy: structuredClone(st.cancellers.get(id)) } : {}),
     ...(pruned !== undefined ? { pruned: structuredClone(pruned) } : {}),
     ...(hold !== undefined ? { hold: structuredClone(hold) } : {}),
+    ...(unheld !== undefined ? { unheld: structuredClone(unheld) } : {}),
     ...(labels !== undefined ? { labels: { ...labels } } : {}),
     ...saidBeforeOf(st, id),
     ...(approvals.length ? { approvals } : {}),
@@ -105,12 +112,14 @@ function forgetOf(st: State, id: string): string[] {
     [st.cancelled, `${id}.cancelled`],
     [st.pruned, `${id}.pruned`],
     [st.holds, `${id}.hold`],
+    [st.unheld, `${id}.unheld`],
     [st.refresh, `${id}.refresh`],
     [st.labels, `${id}.labels`],
     [st.asks, `${id}.asks/`],
     [st.said, `${id}.said/`],
   ];
   for (const [held, name] of named) if (held.delete(id)) removed.push(`runs/${name}`);
+  st.cancellers.delete(id);
   if (card !== undefined) removed.push(`started/${card}.json`);
   st.versions.delete(id);
   return removed;
@@ -141,11 +150,12 @@ function runsOf(st: State): RunsLayer['runs'] {
     exists: (id) => st.records.has(id),
     taken: (id) => [st.records, st.cancelled, st.pruned, st.holds, st.labels, st.refresh, st.asks, st.said].some((m) => m.has(id)),
     calledOff: (id) => st.cancelled.has(id) || st.pruned.has(id) || st.holds.has(id),
-    cancel: (id) => {
+    cancel: (id, actor) => {
       const at = st.cancelled.get(id);
       if (at !== undefined) return at;
       const now = new Date().toISOString();
       st.cancelled.set(id, now);
+      if (actor) st.cancellers.set(id, structuredClone(actor));
       touch(st, id);
       return now;
     },
@@ -238,15 +248,22 @@ function asksGroup(st: State): RunsLayer['asks'] {
 
 function holdsOf(st: State): RunsLayer['holds'] {
   return {
-    lift: (id, at) => {
+    lift: (id, at, actor) => {
       if (st.holds.get(id)?.at !== at) return false;
+      if (actor) st.unheld.set(id, { since: at, actor: structuredClone(actor) });
       st.holds.delete(id);
       touch(st, id);
       return true;
     },
-    put: (id, until, { why, by }) => {
+    put: (id, until, { why, by, actor }) => {
       if (st.holds.has(id)) return null;
-      const hold: Hold = { at: new Date().toISOString(), until: [...until], ...(why ? { why } : {}), ...(by ? { by } : {}) };
+      const hold: Hold = {
+        at: new Date().toISOString(),
+        until: [...until],
+        ...(why ? { why } : {}),
+        ...(by ? { by } : {}),
+        ...(actor ? { actor: structuredClone(actor) } : {}),
+      };
       st.holds.set(id, hold);
       touch(st, id);
       return structuredClone(hold);

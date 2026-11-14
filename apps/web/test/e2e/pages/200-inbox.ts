@@ -15,6 +15,7 @@ import {
   unfactoredWhy,
   WORKFLOWS,
 } from '../seed.ts';
+import { bearer } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store, takeBackRuns } from '../world.ts';
 
@@ -852,7 +853,7 @@ async function visit(page: Page): Promise<void> {
       const listedBefore = await order(requeued);
       const elsewhere = await fetch(new URL(`/api/namespaces/${FACTORY}/cards/${planned.name}/queue`, requeued.url()), {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...bearer() },
       });
       const behind = ((await elsewhere.json()) as { spec?: { queued?: string } }).spec?.queued;
       if (elsewhere.status !== 200 || !behind)

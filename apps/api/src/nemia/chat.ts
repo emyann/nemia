@@ -1,6 +1,6 @@
 /**
  * Nemia's chat on the board, the chat endpoints of the nemia group (`objects`' `NemiaGroup`, handled in nemia.ts): her history a page at
- * a time with where she is, the same followed as server-sent events, the person's words sent, or an allowed agent's, a question of hers
+ * a time with where she is, the same followed as server-sent events, the person's words sent, or an agent's, a question of hers
  * answered, their read mark moved, and the turn she is answering stopped. Each is a program of the package's chat (`chatHistory`,
  * `followChat`, `chatSay`, `chatAnswer`, `chatRead`, `chatStop`) over her place (`nemiaChatPlace`), and no command of the table: a write
  * of the person's files kept out of her own fence. Her stream follows her task's session on the app's registry (`Followings`), one
@@ -22,12 +22,12 @@
  *   record read again on a beat (`Beats.chat`) where her session cannot be followed. A read that fails once the stream is open is an
  *   `unreadable` event with `retrying: true` — the next look reads again, and gives up on nothing — and the first that works after one
  *   says `readable`, which takes the notice off the page.
- * - `POST /api/nemia/chat/send` — `{ text, from? }` put in her outbox, which the keeper says to her once she is up, framed by who wrote
- *   it: 201 with the entry `{ id, at, text, from? }`. `from` is who wrote it: none, or `{ kind: 'person' }`, is the person, taken from
- *   the board alone (`Sec-Fetch-Site: same-origin`, which a browser on the board sends and a shell, a script or an MCP host does not);
- *   `{ kind: 'agent', name }` is an agent speaking as itself, taken from anywhere under a name the person allowed (`nemia chat allow
- *   <name>`) and drawn as a `peer`'s, never as the person's. 422 for text that is empty or too long, for words from anywhere but the
- *   board that name no agent, and for a name no agent speaks under, 409 for a name the person has not allowed.
+ * - `POST /api/nemia/chat/send` — `{ text }` put in her outbox, which the keeper says to her once she is up, framed by who wrote it:
+ *   201 with the entry `{ id, at, text, from? }`. Who wrote it is the caller the request's token says: the person, under any token of
+ *   theirs (the board's cookie, a shell's), and an agent, by its session's token or a standing one minted for it (`nemia token add
+ *   <name> --agent <agent>`), under its agent's name, drawn as a `peer`'s, never as the person's. `from`, retired, is refused naming an
+ *   agent and read no further naming the person. 422 for text that is empty or too long, for a `from` naming an agent, and for an
+ *   agent under a name no agent speaks under.
  * - `POST /api/nemia/chat/answer` — `{ id, picks }`, the person's answer to a question, a proposal or a permission: each pick names
  *   the question by its own words and carries the `labels` chosen or `words` of the person's own. 200 with the answer
  *   `{ id, at, answers }`, keyed by each question's words, which the keeper carries to her held call or says to her as words. 404 for
@@ -40,7 +40,6 @@
  *   cannot end a turn without ending its session.
  */
 import { Effect, Stream } from 'effect';
-import { HttpServerRequest } from 'effect/http';
 import {
   chatAnswer as answerAsk,
   chatHistory,
@@ -147,14 +146,13 @@ export const chatStream = (after: string | undefined) =>
     return Stream.concat(Stream.fromIterable(opening.frames), relayed);
   });
 
-/** Words put in her outbox (`POST /api/nemia/chat/send`), the person's from the board alone (`Sec-Fetch-Site: same-origin`). */
+/**
+ * Words put in her outbox (`POST /api/nemia/chat/send`), as the caller's the request's token says (`Served.caller`): the person's under
+ * any token of theirs, the board's cookie as a shell's, over plain http as over https; an agent's under its name. A `from` naming an
+ * agent is the package's 422.
+ */
 export const chatSend = ({ text, from }: typeof ChatSend.Type) =>
-  Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) =>
-    answeredWrite((s) => {
-      const via = request.headers['sec-fetch-site'] === 'same-origin' ? 'board' : 'elsewhere';
-      return s.inRequest(chatSay(nemiaChatPlace(s.home), text, from ?? { kind: 'person' }, via));
-    }),
-  );
+  answeredWrite((s) => s.inRequest(chatSay(nemiaChatPlace(s.home), text, s.caller, from)));
 
 /** The turn she is answering stopped (`POST /api/nemia/chat/stop`). */
 export const chatStop = () => answeredWrite((s) => s.inRequest(stopTurn(nemiaChatPlace(s.home))));

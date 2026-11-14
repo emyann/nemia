@@ -10,7 +10,8 @@ import path from 'node:path';
 import type { MetricRead } from '../src/gauges/ceilings.ts';
 import { argsOf, DEFAULT_PORT, portOf, SERVER_TIMEOUTS, ticksOf, VIEWER_PORT } from '../src/port.ts';
 import { scratch } from 'test-kit/scratch';
-import { DEFAULT_EVERY_MS } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { DEFAULT_EVERY_MS, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 
 const API = path.join(import.meta.dirname, '..');
 
@@ -53,6 +54,26 @@ test('the api ticks with no argument, and not with --no-tick; any other is refus
       argv.join(' '),
     );
 });
+
+/** The person's token kept in each store an api of these tests serves, by the store's root: minted once, as the person mints one. */
+const minted = new Map<string, string>();
+
+/**
+ * The headers a request to the api serving the store at `root` presents: a token the person holds, minted into that store through the
+ * package's token door, since no route the api answers takes a request with none.
+ */
+function asPerson(root: string): { authorization: string } {
+  let token = minted.get(root);
+  if (token === undefined) {
+    token = Effect.runSync(
+      Effect.gen(function* () {
+        return yield* (yield* TokenDoor).persons.mint('main-test');
+      }).pipe(Effect.provide(tokenDoorFiles(root))),
+    );
+    minted.set(root, token);
+  }
+  return { authorization: `Bearer ${token}` };
+}
 
 /**
  * `node src/main.ts` with `PORT` and `args`, in the store `root` (one of its own unless given), exporting no telemetry unless `otel`
@@ -101,7 +122,7 @@ test('PORT=0 starts the api on a free port, and it prints the port it got', asyn
   const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);
   assert.notEqual(Number(got), 0);
   assert.notEqual(Number(got), DEFAULT_PORT);
-  const res = await fetch(`http://127.0.0.1:${got}/api/health`);
+  const res = await fetch(`http://127.0.0.1:${got}/api/health`, { headers: asPerson(api.root) });
   assert.deepEqual(await res.json(), { ok: true }, 'and it is listening there');
 });
 
@@ -112,7 +133,11 @@ test("REFUSED: the api listens on 127.0.0.1 alone — nothing answers on this ma
   const api = startApi('0');
   t.after(() => api.child.kill());
   const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);
-  assert.deepEqual(await (await fetch(`http://127.0.0.1:${got}/api/health`)).json(), { ok: true }, 'it answers on loopback');
+  assert.deepEqual(
+    await (await fetch(`http://127.0.0.1:${got}/api/health`, { headers: asPerson(api.root) })).json(),
+    { ok: true },
+    'it answers on loopback',
+  );
   if (!outward) return t.skip('this machine has no address but loopback to try');
   await assert.rejects(
     fetch(`http://${outward}:${got}/api/health`),
@@ -200,7 +225,7 @@ test("(a) the api is the store's daemon: it holds the lease as the api, at its u
   const lease = await leaseSays(api.root, (l) => l.url === url);
   assert.deepEqual([lease.pid, lease.by], [api.child.pid, 'api']);
   assert.deepEqual(lease.release, { kind: 'checkout', root: path.resolve(API, '..', '..') }, 'the lease says the api runs this checkout');
-  const daemon = (await (await fetch(`${url}/api/daemon`)).json()) as Record<string, unknown>;
+  const daemon = (await (await fetch(`${url}/api/daemon`, { headers: asPerson(api.root) })).json()) as Record<string, unknown>;
   assert.deepEqual([daemon.by, daemon.url, daemon.pid], ['api', url, api.child.pid]);
 });
 
@@ -276,7 +301,7 @@ test('(f) --no-tick serves the board and writes no lease', async (t) => {
   const viewer = startApi('0', ['--no-tick']);
   t.after(() => viewer.child.kill());
   const [url] = await viewer.said(/http:\/\/127\.0\.0\.1:\d+/);
-  assert.deepEqual(await (await fetch(`${url}/api/health`)).json(), { ok: true });
+  assert.deepEqual(await (await fetch(`${url}/api/health`, { headers: asPerson(viewer.root) })).json(), { ok: true });
   assert.equal(fs.existsSync(path.join(viewer.root, 'daemon.json')), false);
 });
 
@@ -285,11 +310,12 @@ test('(f) --no-tick serves the board and writes no lease', async (t) => {
  * answered: `answered` with a status line, `closed` where the server had let the connection go before the call was written, and `reset`
  * where it let it go as the call reached it — what an MCP host's pool met (`ECONNRESET`).
  */
-async function callAfterPause(port: number, pauseMs: number): Promise<'answered' | 'reset' | 'closed'> {
+async function callAfterPause(port: number, pauseMs: number, authorization = ''): Promise<'answered' | 'reset' | 'closed'> {
   const socket = net.connect({ port, host: '127.0.0.1' });
   let heard = '';
   socket.on('data', (chunk: Buffer) => (heard += chunk.toString('latin1')));
-  const ask = `GET /api/health HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n\r\n`;
+  const presented = authorization === '' ? '' : `Authorization: ${authorization}\r\n`;
+  const ask = `GET /api/health HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n${presented}\r\n`;
   const answers = () => heard.split('HTTP/1.1 200').length - 1;
   const answered = (count: number) =>
     new Promise<'answered' | 'reset' | 'closed'>((resolve) => {
@@ -326,7 +352,7 @@ test("a client that reuses its connection after a pause past Node's keep-alive i
   const [, port] = await api.said(/http:\/\/127\.0\.0\.1:(\d+)/);
   const [control, served] = await Promise.all([
     callAfterPause((node.address() as net.AddressInfo).port, pastNodesKeepAlive),
-    callAfterPause(Number(port), pastNodesKeepAlive),
+    callAfterPause(Number(port), pastNodesKeepAlive, asPerson(api.root).authorization),
   ]);
   assert.notEqual(control, 'answered', "a server of Node's defaults has let the connection go: the planted client is not answered");
   assert.equal(served, 'answered', 'the api answers the call on the connection the client kept');
@@ -371,7 +397,7 @@ test('an api started --no-tick exports a server span per request, with the HTTP 
   const api = startApi('0', ['--no-tick'], undefined, c.url, { OTEL_BSP_SCHEDULE_DELAY: EXPORT_MS });
   t.after(() => api.child.kill());
   const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);
-  assert.equal((await fetch(`http://127.0.0.1:${got}/api/version`)).status, 200);
+  assert.equal((await fetch(`http://127.0.0.1:${got}/api/version`, { headers: asPerson(api.root) })).status, 200);
   await api.said(/\d\d:\d\d:\d\d {2}GET \/api\/version 200 \d+ms/);
   const spans = await Promise.race([posted, api.ended.then((code) => assert.fail(`the api exited ${code}:\n${api.output()}`))]);
   assert.match(spans, /"nemia"/, 'under the nemia service');
@@ -425,9 +451,9 @@ test("the api's daemon posts its own series and the pass's at zero before any re
   );
 });
 
-/** A metric of the api at `url`, as `GET /api/metrics` answers it, by its name. */
-const metricOf = async (url: string, name: string) =>
-  ((await (await fetch(`${url}/api/metrics`)).json()) as MetricRead[]).find((m) => m.name === name);
+/** A metric of the api at `url` serving the store at `root`, as `GET /api/metrics` answers it, by its name. */
+const metricOf = async (url: string, root: string, name: string) =>
+  ((await (await fetch(`${url}/api/metrics`, { headers: asPerson(root) })).json()) as MetricRead[]).find((m) => m.name === name);
 
 /**
  * A folder run whose one step signed off, written into the store at `root` as `nemia start` and the engine would leave it: the run's
@@ -481,10 +507,10 @@ test("REFUSED: a line the api's daemon writes reaches the api's stream from the 
   await leaseSays(api.root, (l) => l.url === url);
   const stream = new AbortController();
   t.after(() => stream.abort());
-  const res = await fetch(`${url}/api/feed/stream`, { signal: stream.signal });
+  const res = await fetch(`${url}/api/feed/stream`, { signal: stream.signal, headers: asPerson(api.root) });
   const reader = res.body!.getReader();
-  while ((await metricOf(url, 'feed.followers'))?.value !== 1) await new Promise((r) => setTimeout(r, 20));
-  const reads = (await metricOf(url, 'feed.follow.reads'))?.count;
+  while ((await metricOf(url, api.root, 'feed.followers'))?.value !== 1) await new Promise((r) => setTimeout(r, 20));
+  const reads = (await metricOf(url, api.root, 'feed.follow.reads'))?.count;
 
   signedOffRun(api.root);
   let said = '';
@@ -499,7 +525,7 @@ test("REFUSED: a line the api's daemon writes reaches the api's stream from the 
     `the stream opens, after its \`opened\` event, on the daemon's started line, written before the api listened:\n${said}`,
   );
   assert.equal(
-    (await metricOf(url, 'feed.follow.reads'))?.count,
+    (await metricOf(url, api.root, 'feed.follow.reads'))?.count,
     reads,
     'the line came as an item of the hub the daemon published to, which the reader took without reading the file: the beat found the file where the reader was',
   );

@@ -1,34 +1,15 @@
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { BrowserContext, Page } from 'playwright';
 import { photograph, themeOf, topBarOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { serveExposed } from '../served.ts';
+import { mintPersonToken, serveExposed } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
-import { apiEnv, OUT, REPO, store } from '../world.ts';
+import { TOKEN_COOKIE as COOKIE } from 'objects';
+import { OUT, store } from '../world.ts';
 
 /** The name the page mints its token under, taken back at its end. */
 const NAME = 'board-e2e';
-
-/** The cookie the api keeps the token in (`objects`' `TOKEN_COOKIE`). */
-const COOKIE = 'nemia-token';
-
-/** A token of the person's minted on the worker's store by `nemia token add`, as its owner mints one at the store's machine. */
-function minted(): string {
-  const printed = execFileSync(
-    process.execPath,
-    [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'nemia.ts'), 'token', 'add', NAME],
-    {
-      encoding: 'utf8',
-      env: apiEnv,
-      stdio: 'pipe',
-    },
-  );
-  const token = /^Authorization: Bearer (\S+)$/m.exec(printed)?.[1];
-  if (!token) throw new Refused(`nemia token add prints the token it mints — it printed:\n${printed}`);
-  return token;
-}
 
 /** The token field's press, sending what the field holds, and the answer of `POST /api/session` it is sent as. */
 async function sent(other: Page, token: string): Promise<number> {
@@ -52,12 +33,13 @@ const keptIn = async (context: BrowserContext) => (await context.cookies()).find
 
 export default {
   /**
-   * On a store marked exposed (`WF_EXPOSED=1`), every read asks for a token, and the board shows the token page in place of every page:
-   * a field that hides what is pasted, and the press that sends it. A token the store does not keep is refused there and the page stays;
-   * one minted by `nemia token add` is kept by the api as an HttpOnly cookie, and the page loads again to the runs. Settings' Forget has
-   * the api clear it, and the token page is back. A second seat serves the worker's store marked exposed, in a browser context of its
-   * own, so its cookie reaches neither the worker's seat nor another page; the token is removed and the seat stopped at the end. Its
-   * 401s are the point, so its page counts exactly those.
+   * On a store marked exposed (`WF_EXPOSED=1`), as on every store, a browser with no token is shown the token page in place of every
+   * page: the way in it names (`nemia board link`), a field that hides what is pasted, and the press that sends it. A token the store
+   * does not keep is refused there and the page stays; one of the person's minted on the store (`mintPersonToken`, as `nemia token add`
+   * mints one) is kept by the api as an HttpOnly cookie, and the page loads again to the runs. Settings' Forget has the api clear it,
+   * and the token page is back. A second seat serves the worker's store marked exposed, in a browser context of its own with no cookie,
+   * so its cookie reaches neither the worker's seat nor another page; the token is removed and the seat stopped at the end. Its 401s
+   * are the point, so its page counts exactly those.
    */
   name: 'token',
   route: '/runs',
@@ -70,7 +52,7 @@ export default {
       .browser()!
       .newContext({ colorScheme: (await themeOf(page)) as 'light' | 'dark', viewport: { width: 1280, height: 800 } });
     try {
-      const token = minted();
+      const token = mintPersonToken(store!, NAME);
       const other = await context.newPage();
       const { problems } = watch(other);
       await other.goto(new URL('/runs', seat.base).href, { waitUntil: 'load' });
@@ -78,6 +60,10 @@ export default {
       await expectVisible(asked, 'a store marked exposed asks this browser for a token');
       await expectCount(topBarOf(other), 0, 'in place of every page: no frame is drawn');
       await expectVisible(other.locator('[data-token-said]'), "the api's own words, which say where a token is minted");
+      await expectVisible(
+        other.locator('[data-token-way] code').getByText('nemia board link', { exact: true }),
+        "the page names the way in typed on the store's machine, nemia board link",
+      );
       if ((await other.locator('input[data-token-field]').getAttribute('type')) !== 'password')
         throw new Refused('the field hides what is pasted into it (type=password)');
       await settled(other);

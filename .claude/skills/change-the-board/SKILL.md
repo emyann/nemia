@@ -170,6 +170,8 @@ is written, the commands, and what its own code promises — and this section ho
   (`340-agent-try.ts`).
 - A package program the e2e runs from a string (`PASS` in `apps/web/test/e2e/world.ts`) is read by no typecheck: after changing what a
   package's program requires, run `npm run e2e -- --pages runs`, which seeds through it.
+- `npm run e2e -- --pages` runs none of `test/e2e/*.test.ts`: a change to a part of the look, its stories, `test/e2e/parts/`, or the
+  runner's `visit.ts`, `checks.ts` or `contrast.ts` runs `npm run e2e -- --look` (with `--pages` when pages are due too).
 - A story of a part lays out with inline styles, never a class of its own, and a node test imports a part by its own file: the look's door
   loads the kit's folder, which Node refuses. A component of the board that needs a state proven in a browser has its stories beside it
   too (`apps/web/src/components/<noun>/<Name>.stories.tsx`, `run/WaitingCard`'s): both hosts read every folder under `components/` but `ui/` and `ai-elements/`.

@@ -1,12 +1,15 @@
 /**
  * A store served for the tests of the client's own verbs (`get`, `apply`, `explain`), as the moved reads' test serves one
  * (`reads.test.ts`): a scratch store (`test-kit/scratch`, which reaps what runs in it), the api on it started with `--no-tick` on a
- * free port, and the lease the client reads, its `url` alone. `nemia` runs the bin on it, waited on for its end, never for a length of
- * time.
+ * free port, and the lease the client reads, its `url` alone. The person's credential is put in the store as a daemon's start puts it
+ * (`credentialKept`), which `--no-tick` does not run, so `nemia` on it presents the person's token with nothing typed, as on the
+ * person's own machine; a test that means a client with none removes `<root>/credential`. `nemia` runs the bin on it, waited on for its
+ * end, never for a length of time.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { credentialKept } from 'agent-orchestrator';
 import { ambient } from './ambient.ts';
 import { scratch } from 'test-kit/scratch';
 
@@ -42,6 +45,7 @@ export async function servedStore(prefix: string, seed: (root: string) => void, 
     };
   })();
   seed(root);
+  credentialKept(root);
   const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env: { ...env, PORT: '0' } });
   let said = '';
   const ended = new Promise<void>((resolve) => child.on('close', () => resolve()));

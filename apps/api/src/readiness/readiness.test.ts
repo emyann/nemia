@@ -123,6 +123,7 @@ test("a session's token starts no fix: 403, and nothing is filed", async () => {
   assert.ok(before > 0, 'the session task is listed, so the count is read');
   const res = await send('POST', '/api/readiness/fixes', { need: 'identity', answers: { name: 'x', email: 'y@example.com' } }, token);
   assert.equal(res.status, 403);
+  assert.equal(((await res.json()) as { reason?: string }).reason, 'person-only');
   assert.equal(Effect.runSync(engineFor(engine()).list()).views.length, before, 'no fix filed');
 });
 

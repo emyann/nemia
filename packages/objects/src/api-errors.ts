@@ -3,7 +3,20 @@
  * the query every list of the `Api` takes. Shared by every group (`api.ts`, `run-api.ts`).
  */
 import { Schema } from 'effect';
-import { GUARD_REFUSALS, PROPOSAL_REFUSALS, TOKEN_REFUSALS, WRITE_WAYS } from './words.ts';
+import {
+  FLOOR_REFUSALS,
+  GUARD_REFUSALS,
+  PROPOSAL_REFUSALS,
+  TOKEN_REFUSALS,
+  WRITE_WAYS,
+  type FloorRefusalWord,
+  type ProposalRefusal,
+} from './words.ts';
+
+/** The floor's refusals a proposal's do not already say (`other-factory` is both's, said once). */
+const FLOOR_ONLY = FLOOR_REFUSALS.filter(
+  (r): r is Exclude<FloorRefusalWord, ProposalRefusal> => !(PROPOSAL_REFUSALS as readonly string[]).includes(r),
+);
 
 /** Nothing by that name, or not in that namespace: a 404. */
 export class Missing extends Schema.Class<Missing>('Missing')({ error: Schema.String }, { httpApiStatus: 404 }) {}
@@ -27,10 +40,11 @@ export class Invalid extends Schema.Class<Invalid>('Invalid')(
 /**
  * A caller the api knows, refused what it asks: an approval its standing does not reach, a proposal in another factory, a write only the
  * person makes — a 403, with its reason (`PROPOSAL_REFUSALS`); or a write the api's guard refuses before its body is read, addressed to
- * another host or made by a page on another site (`GUARD_REFUSALS`).
+ * another host or made by a page on another site (`GUARD_REFUSALS`); or what an agent's standing token asks past its floor
+ * (`FLOOR_REFUSALS`).
  */
 export class Forbidden extends Schema.Class<Forbidden>('Forbidden')(
-  { error: Schema.String, reason: Schema.optionalKey(Schema.Literals([...PROPOSAL_REFUSALS, ...GUARD_REFUSALS])) },
+  { error: Schema.String, reason: Schema.optionalKey(Schema.Literals([...PROPOSAL_REFUSALS, ...GUARD_REFUSALS, ...FLOOR_ONLY])) },
   { httpApiStatus: 403 },
 ) {}
 

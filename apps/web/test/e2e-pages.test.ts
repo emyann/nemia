@@ -289,6 +289,37 @@ test('only a run of every page in the dark theme is whole, the run a check makes
   assert.equal(planOf(['--pages', 'a,b,c'], ABC).whole, false, 'a run of pages named, even all of them');
 });
 
+test("--look runs the look's browser tests; a whole run runs them too, and a run of pages or of a shard runs none", () => {
+  const whole = planOf([], ABC);
+  assert.equal(whole.look, true, 'a run with no selector is every look test and every page');
+  assert.deepEqual(namesOf(whole.visit), ['a', 'b', 'c']);
+  assert.equal(whole.whole, true);
+  assert.equal(planOf(['--pages', 'b'], ABC).look, false, '--pages runs the pages it names, and no look test');
+  assert.equal(planOf(['--shard', '1', '--of', '2'], ABC).look, false, 'a shard runs its pages: the look runs once per push, in e2e-look');
+  const look = planOf(['--look'], ABC);
+  assert.equal(look.look, true);
+  assert.deepEqual(namesOf(look.visit), [], '--look alone visits no page');
+  assert.equal(look.whole, false, 'and is no whole run');
+  const both = planOf(['--look', '--pages', 'b'], ABC);
+  assert.equal(both.look, true);
+  assert.deepEqual(namesOf(both.visit), ['b']);
+});
+
+test('REFUSED: --look with a shard, and --look alone with a flag about pages', () => {
+  for (const argv of [
+    ['--look', '--shard', '1', '--of', '2'],
+    ['--look', '--photos'],
+    ['--look', '--workers', '2'],
+    ['--look', '--photos', '--contrast'],
+  ]) {
+    assert.throws(
+      () => planOf(argv, ABC),
+      (e: Error) => e instanceof Error && e.message.includes('npm run e2e -- --look'),
+      argv.join(' '),
+    );
+  }
+});
+
 test('--workers says how many workers visit the pages; without it the machine says', () => {
   assert.equal(planOf(['--workers', '3'], ABC).workers, 3);
   assert.equal(planOf(['--pages', 'b', '--workers', '1'], ABC).workers, 1);
@@ -326,11 +357,14 @@ test('REFUSED: a flag the e2e does not know', () => {
   assert.throws(
     () => planOf(['--colour'], ABC),
     (e: Error) =>
-      /^the e2e takes --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not --colour\b/.test(e.message),
+      /^the e2e takes --look, --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not --colour\b/.test(
+        e.message,
+      ),
   );
   assert.throws(
     () => planOf(['b'], ABC),
-    (e: Error) => /^the e2e takes --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not b\b/.test(e.message),
+    (e: Error) =>
+      /^the e2e takes --look, --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not b\b/.test(e.message),
   );
 });
 

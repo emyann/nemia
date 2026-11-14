@@ -2,16 +2,12 @@
  * Nemia, the store's own agent, on the api: the nemia group of `objects`' Api (`NemiaGroup`), each endpoint's handler calling the
  * orchestrator by type — her level read and set (`LEVEL`), the facts she keeps (`MEMORY`), an agent's rules for auto (`POLICY`,
  * `POLICY_PROPOSE`, `POLICY_CONFIRM`, `POLICY_DROP`) and what they reach (`POLICY_REACH`), her custom instructions (`AGENTS_CUSTOM` for
- * her name), her chat (chat.ts) and the names an agent may speak under in it (`CHAT_SPEAKERS`, `CHAT_ALLOW`, `CHAT_DISALLOW`). What
- * each takes, answers and refuses is the group's to say (packages/objects/src/nemia-api.ts); a refusal of the orchestrator's is answered
- * by its kind (`answered`, objects/refused.ts).
+ * her name) and her chat (chat.ts). What each takes, answers and refuses is the group's to say (packages/objects/src/nemia-api.ts); a
+ * refusal of the orchestrator's is answered by its kind (`answered`, objects/refused.ts).
  */
 import type { Effect } from 'effect';
 import {
   AGENTS_CUSTOM,
-  CHAT_ALLOW,
-  CHAT_DISALLOW,
-  CHAT_SPEAKERS,
   customInstructionsFile,
   LEVEL,
   MEMORY,
@@ -82,9 +78,6 @@ export const nemiaHandlers = readsBounded(Api, 'nemia', (handlers) =>
     .handle('chatStop', () => chatStop())
     .handle('chatAnswer', ({ payload }) => chatAnswer(payload))
     .handle('chatRead', ({ payload: { through } }) => chatRead(through))
-    .handle('speakers', () => answered((s) => s.inRequest(CHAT_SPEAKERS.handler({}))))
-    .handle('allowSpeaker', ({ params: { speaker } }) => answeredWrite((s) => s.inRequest(CHAT_ALLOW.handler({ name: speaker }))))
-    .handle('disallowSpeaker', ({ params: { speaker } }) => answeredWrite((s) => s.inRequest(CHAT_DISALLOW.handler({ name: speaker }))))
     .handle('instructions', () =>
       answered(async (s) => {
         try {

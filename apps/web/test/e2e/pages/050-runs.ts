@@ -42,6 +42,7 @@ import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idl
 import { agosRefused } from '../runs-times.ts';
 import { contrastHolds } from '../runs-contrast.ts';
 import { COSTLY, ENDING, GATED, REGATED, regatedFiles, writeRegated } from '../seed.ts';
+import { seated } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, photographing, store } from '../world.ts';
 
@@ -1017,7 +1018,10 @@ const CLOSE_UPS = {
 async function closeUps(page: Page): Promise<void> {
   if (!photographing) return;
   const theme = (await themeOf(page)) as 'light' | 'dark';
-  const context = await page.context().browser()!.newContext({ colorScheme: theme, viewport: page.viewportSize(), deviceScaleFactor: 3 });
+  const context = await seated(
+    await page.context().browser()!.newContext({ colorScheme: theme, viewport: page.viewportSize(), deviceScaleFactor: 3 }),
+    page.url(),
+  );
   try {
     const near = await context.newPage();
     await near.goto(page.url(), { waitUntil: 'load' });

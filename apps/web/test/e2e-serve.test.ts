@@ -1,6 +1,6 @@
 /**
  * The served board's command (`test/e2e/serve.ts`), as far as it needs no build: the folder it serves a workspace from, a holder that is
- * gone read as no board, the ports a step given the browser could not open, the three lines it prints, a tree that changed over the one a
+ * gone read as no board, the ports a step given the browser could not open, the four lines it prints, a tree that changed over the one a
  * board was built from, a build that changed the workspace named line by line, and a file the build rewrote put back.
  */
 import { test } from 'node:test';
@@ -32,7 +32,7 @@ test('REFUSED: a folder whose holder is gone, or whose file does not read, serve
   const gone = ended.pid;
   assert.equal(alive(gone), false);
   const write = (said: unknown) => fs.writeFileSync(path.join(dir, 'served.json'), JSON.stringify(said));
-  const at = { board: 'http://127.0.0.1:41234', api: 'http://127.0.0.1:41235', stories: 'http://127.0.0.1:41236', tree: 'a1' };
+  const at = { board: 'http://127.0.0.1:41234', api: 'http://127.0.0.1:41235', stories: 'http://127.0.0.1:41236', tree: 'a1', token: 't' };
   write({ pid: gone, ...at });
   assert.equal(servedIn(dir), undefined, 'a holder that is gone');
   write({ pid: process.pid, board: at.board });
@@ -41,18 +41,19 @@ test('REFUSED: a folder whose holder is gone, or whose file does not read, serve
   assert.equal(servedIn(dir), undefined, 'no tree said: a board built from nobody knows what');
   write({ pid: process.pid, board: at.board, api: at.api, tree: at.tree });
   assert.equal(servedIn(dir), undefined, "no stories said: a holder from before the look's stories, to be replaced");
+  write({ pid: process.pid, board: at.board, api: at.api, stories: at.stories, tree: at.tree });
+  assert.equal(servedIn(dir), undefined, 'no token said: a holder from before every route asked one, whose board shows its token page');
   fs.writeFileSync(path.join(dir, 'served.json'), '{');
   assert.equal(servedIn(dir), undefined, 'a file half written');
   write({ pid: process.pid, ...at });
   assert.deepEqual(servedIn(dir), { pid: process.pid, ...at });
 });
 
-test('serve prints the board first, its api second and the stories third, each on a line a step reads an address from', () => {
-  assert.deepEqual(linesOf({ board: 'http://127.0.0.1:41234', api: 'http://127.0.0.1:41235', stories: 'http://127.0.0.1:41236' }), [
-    'board on http://127.0.0.1:41234',
-    'api on http://127.0.0.1:41235',
-    'stories on http://127.0.0.1:41236',
-  ]);
+test('serve prints the board first, its api second, the stories third and the token last, each on a line a step reads it from', () => {
+  assert.deepEqual(
+    linesOf({ board: 'http://127.0.0.1:41234', api: 'http://127.0.0.1:41235', stories: 'http://127.0.0.1:41236', token: 'tok-1' }),
+    ['board on http://127.0.0.1:41234', 'api on http://127.0.0.1:41235', 'stories on http://127.0.0.1:41236', 'token tok-1'],
+  );
 });
 
 test('REFUSED: a board built from another tree is not the one to open: a commit, a change to a tracked file and a new file each make another', () => {
@@ -91,6 +92,7 @@ test('REFUSED: a board built from another tree is not the one to open: a commit,
     api: 'http://127.0.0.1:41235',
     stories: 'http://127.0.0.1:41236',
     tree: seen[0],
+    token: 't',
   };
   assert.equal(standsFor(served, seen[0]), true);
   assert.equal(standsFor(served, seen.at(-1)!), false, 'a board of the first tree is not one of the last');

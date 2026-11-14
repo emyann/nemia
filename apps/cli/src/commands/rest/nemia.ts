@@ -1,21 +1,8 @@
 /**
- * Nemia's switch and who may speak in her chat: `nemia level` (`nemia.level` bare, `nemia.setLevel` given a level, a raise or its end),
- * where she is and each factory's level; `nemia chat speakers` (`nemia.speakers`), and `nemia chat allow|disallow <name>`
- * (`nemia.allowSpeaker`, `nemia.disallowSpeaker`), the names an agent may speak under, each write answering the list after.
+ * Nemia's switch: `nemia level` (`nemia.level` bare, `nemia.setLevel` given a level, a raise or its end), where she is and each factory's
+ * level. Who may speak in her chat is no list of names any more: an agent speaks with a token of its own (`RETIRED_COMMANDS`).
  */
-import {
-  type Args,
-  CHAT_ALLOW_WORDS,
-  CHAT_DISALLOW_WORDS,
-  CHAT_SPEAKERS_WORDS,
-  type ChatSpeakers,
-  DEFAULT_NAMESPACE,
-  LEVEL_WORDS,
-  LEVELS,
-  levelWritten,
-  NemiaLevel,
-  NemiaLevelSet,
-} from 'objects';
+import { type Args, DEFAULT_NAMESPACE, LEVEL_WORDS, LEVELS, levelWritten, NemiaLevel, NemiaLevelSet } from 'objects';
 import { asked } from '../../objects.ts';
 import { said, switchArg, textArg } from '../requests.ts';
 
@@ -92,31 +79,5 @@ const levelSet = (args: Args): typeof NemiaLevelSet.Type => {
 export async function level(args: Args): Promise<number> {
   const data = await asked(LEVEL_WORDS.name, (c) => (levelWritten(args) ? c.nemia.setLevel({ payload: levelSet(args) }) : c.nemia.level()));
   said(levelLines(data));
-  return 0;
-}
-
-/** The lines of the names allowed. */
-const speakerLines = ({ allowed }: ChatSpeakers): string[] =>
-  allowed.length === 0 ? ['no agent may speak in her chat — nemia chat allow <name>'] : [...allowed];
-
-/** `nemia chat speakers`' runner: the names an agent may speak under in her chat. */
-export async function chatSpeakers(): Promise<number> {
-  said(speakerLines(await asked(CHAT_SPEAKERS_WORDS.name, (c) => c.nemia.speakers())));
-  return 0;
-}
-
-/** `nemia chat allow <name>`'s runner: the name allowed, and the list after. */
-export async function chatAllow(args: Args): Promise<number> {
-  const speaker = textArg(args, 'name') ?? '';
-  const list = await asked(CHAT_ALLOW_WORDS.name, (c) => c.nemia.allowSpeaker({ params: { speaker } }));
-  said([`${speaker} may speak in her chat and to a step's session, as itself.`, ...speakerLines(list)]);
-  return 0;
-}
-
-/** `nemia chat disallow <name>`'s runner: the name taken back, and the list after. */
-export async function chatDisallow(args: Args): Promise<number> {
-  const speaker = textArg(args, 'name') ?? '';
-  const list = await asked(CHAT_DISALLOW_WORDS.name, (c) => c.nemia.disallowSpeaker({ params: { speaker } }));
-  said([`${speaker} may no longer speak in her chat nor to a step's session.`, ...speakerLines(list)]);
   return 0;
 }

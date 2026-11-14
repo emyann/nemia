@@ -66,7 +66,10 @@ const labelsOf = (line: FeedLine): Record<string, string> | undefined => {
  */
 export const feedPosition = (end: number): string => String(end);
 
-/** The line `line`, which starts at byte `start` of the feed and ends just before `end`, as an Event. */
+/**
+ * The line `line`, which starts at byte `start` of the feed and ends just before `end`, as an Event: who acted (`actor`) carried where the
+ * line says, a person's act's.
+ */
 export const eventOf = (line: FeedLine, start: number, end: number): Event => {
   const labels = labelsOf(line);
   const kind = kindOf(line);
@@ -93,5 +96,6 @@ export const eventOf = (line: FeedLine, start: number, end: number): Event => {
     ...(oneOf(ANSWER_VIA, line.via) ? { via: line.via } : {}),
     ...(line.call !== undefined ? { call: line.call } : {}),
     ...(line.try !== undefined ? { try: line.try } : {}),
+    ...('actor' in line && line.actor !== undefined ? { actor: line.actor } : {}),
   };
 };

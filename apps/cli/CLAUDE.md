@@ -41,14 +41,18 @@ this machine's daemon, reached through its api. It sits beside the board, above 
   0600) written by `nemia config`, and `NEMIA_CONTEXT` for one command, judged by `contextOf` (`contracts/context.contract.ts`). Under a
   remote context every command asks its server with its token and nothing reads this machine's store or starts a daemon; a word the
   client does not answer and that is no verb of this machine is refused (`routeOf`'s `refused`, `stranded` in `src/main.ts`). A machine
-  verb (`MACHINE_VERBS`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`, and `template`, `frontmatter`,
+  verb (`MACHINE_VERBS`: `service`, `upgrade`, `up`, `tick`, `version`, `claude-token`, and `template`, `frontmatter`,
   `admit`, which touch this machine's files and no store) runs here whatever the context. `template export --factory`, the one of them
   that holds a store's part, reads the factory, its rules and its instruction through the api of the context in use and hands them to
   the spawned export on stdin, `--factory-parts -` (`src/template-export.ts`).
   `nemia upgrade` upgrades this machine's install under a remote context too, then names `nemia server upgrade` on stderr
   (`serverHint`): the server a context names is upgraded by that verb of the client's own, through its api.
-  On a store marked exposed, its own machine's reads present the token kept for `local` (`nemia config set-context local --token-file
-  <file>`, `local-token` in the file, `chosenToken`).
+  The api asks a token of every caller, its own machine's included. Under `local` the client presents the token kept for it (`nemia
+  config set-context local --token-file <file>`, `local-token` in the file, `chosenToken`), else the person's credential the daemon
+  keeps in the store (`<WF_ROOT>/credential`, 0600, a person-held token named `local` that `up` re-mints where it is no kept token:
+  `credentialKept` in the orchestrator), read by `storeCredential` (`src/where.ts`), so the person's `nemia` on the store's machine types
+  nothing; none where neither is. A test's api started `--no-tick` runs no `up`: `servedStore` (`test/served.ts`) puts the credential
+  in place first, and a test that means a client with none removes the file.
   `ambient()` drops `NEMIA_CONTEXT` and `XDG_CONFIG_HOME`, so no test asks the daemon a person's config names.
 - **A command whose words the client holds is run under `src/commands/`** (`commanded.ts`, a runner per verb under its group's folder,
   `<group>/runners.ts`): parsed by `objects`' `parseArgv` against
@@ -94,8 +98,8 @@ this machine's daemon, reached through its api. It sits beside the board, above 
   `resourceNamed`), and `explain` reads the fields off `OpenApi.fromApi(Api)`, the document the api serves, computed here. YAML is read
   and written with `yaml`.
 - **Every request carries the session's token** where `WF_SESSION_TOKEN` is set and not empty, as `Authorization: Bearer <token>`
-  (`callerToken` and `sessionHeaders`, `src/client.ts`), on the typed client, the readiness probe and the feed's stream alike; none is
-  the person.
+  (`callerToken` and `sessionHeaders`, `src/client.ts`), on the typed client, the readiness probe and the feed's stream alike; else the
+  person's token of the context in use, as *Which daemon* says.
   A 403 `Forbidden` or a 401 `Unauthorized` of the api is its refusal in its words, exit 2, as `Invalid` is; a `Conflict` (a stale
   version) exits 1.
 - **A refusal is a `Refused` (`src/refused.ts`)**: its words name the command to type next and its `code` is the exit code, 2 for a

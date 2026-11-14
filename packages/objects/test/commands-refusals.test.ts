@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { type Args, COMMAND_WORDS, CommandRefused, commandLine, parseArgv, type Spec } from 'objects';
+import { type Args, COMMAND_WORDS, CommandRefused, commandLine, parseArgv, RETIRED_COMMANDS, retiredIn, type Spec } from 'objects';
 
 /** The words of the command the client holds named `name`. */
 const words = (name: string) => COMMAND_WORDS.find((w) => w.name === name) ?? assert.fail(`${name} is a command the client holds`);
@@ -265,4 +265,18 @@ test('REFUSED: what each command the client holds refuses of its command line, b
       names(refused, ...said);
       for (const word of not) assert.ok(!refused?.includes(word), `${refused} names ${word}`);
     });
+});
+
+test('REFUSED: the retired `say --as` and `chat speakers|allow|disallow`, each naming the token an agent speaks with instead', () => {
+  names(refusedBy('say', ['r-1', 'impl', '--as', 'operator', 'cut', 'it']), '--as', 'nemia token add', '--agent');
+  assert.equal(refusedBy('say', ['r-1', 'impl', 'cut', '--as', 'operator']), null, 'an --as among the words is words');
+  for (const line of [
+    ['chat', 'speakers'],
+    ['chat', 'allow', 'operator'],
+    ['chat', 'disallow', 'operator'],
+  ])
+    names(retiredIn(line), `nemia ${line.slice(0, 2).join(' ')}`, 'nemia token add', '--agent');
+  assert.equal(retiredIn(['chat']), undefined, 'a line that opens with no retired command');
+  assert.equal(retiredIn(['say', 'r-1', 'impl', 'hi']), undefined);
+  assert.ok(![...RETIRED_COMMANDS.keys()].some((name) => COMMAND_WORDS.some((w) => w.name === name)), 'no retired name is a command');
 });

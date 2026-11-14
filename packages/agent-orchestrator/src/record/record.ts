@@ -11,7 +11,7 @@ import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { MergeOf, RoundAsk } from '../status/status.ts';
 import type { Pin } from '../revisions/revisions.ts';
 import type { Labels } from '../labels/labels.ts';
-import type { PlaceKind, StepStatusWord } from 'objects';
+import type { Actor, PlaceKind, StepStatusWord } from 'objects';
 import type { EndedForGood, HonoursAsks } from '../../contracts/honours-asks.contract.ts';
 import type { FolderRun as FolderRunModel, RepositoryRun as RepositoryRunModel } from './record.model.ts';
 
@@ -67,9 +67,17 @@ export const isRepositoryRun = (run: Run): run is RepositoryRun => placeOf(run) 
 
 /**
  * A person's hold on a run, as its file says it: when it was put, the runs it waits on to land, in the order they were named, the
- * person's words for why (`why`, absent when none were given) and who put it (`by`, absent on a file older code wrote), each one line.
+ * person's words for why (`why`, absent when none were given) and who put it (`by`, absent on a file older code wrote), each one line; and
+ * the caller who put it (`actor`, objects' `Actor`): absent on a hold put in-process, and on a file older code wrote.
  */
-export type Hold = { at: string; until: readonly string[]; why?: string; by?: string };
+export type Hold = { at: string; until: readonly string[]; why?: string; by?: string; actor?: Actor };
+
+/**
+ * Who lifted a person's hold by hand (`nemia hold <run> --off`, the api's `DELETE …/hold`), as its file says it: the moment of the hold
+ * lifted (`since`, the hold's `at`), which pairs it with that hold's lift on the feed, and the caller who lifted it (`actor`). The last
+ * lift's alone: a lift by a caller the api did not resolve leaves none.
+ */
+export type Unheld = { since: string; actor: Actor };
 
 /**
  * Words said to a step before it was filed (`nemia say` to a step with no task and no try behind it): when, and the words as said — an
@@ -101,9 +109,10 @@ export type PrunedFiles = { at: string; bytes: number };
  * A person's word at a gate, as its file says it (`nemia approve`): the step, the try it approves, when, and what they said with it — the
  * words every step after the gate is handed under `## Approved` (`approvedSection`). `message` is absent on an approval given without any.
  * `budgets`: the caps it sets for the steps after the gate, by step, in dollars — the budgets the gated step proposed, with the amounts the
- * person gave over them (`approvedCaps`) — read on every pass as those steps' caps (`budgetOf`); absent where it sets none.
+ * person gave over them (`approvedCaps`) — read on every pass as those steps' caps (`budgetOf`); absent where it sets none. `actor`: who
+ * approved (objects' `Actor`), absent on an approval given in-process and on a file older code wrote.
  */
-export type Approval = { step: string; try: number; at: string; message?: string; budgets?: Record<string, number> };
+export type Approval = { step: string; try: number; at: string; message?: string; budgets?: Record<string, number>; actor?: Actor };
 
 /**
  * A person's word at a loop out of rounds, as its file says it (`nemia approve`): the looping step, the try it accepts, when, and what they
@@ -111,9 +120,9 @@ export type Approval = { step: string; try: number; at: string; message?: string
  *
  * `message` is required, where an approval's is not: an approval says yes to work a step handed on, and an acceptance says yes to work a
  * reviewer has just said is not done. What makes that a decision rather than a shrug is the reason, and it is the one thing the shipper and
- * whoever reads the merge have.
+ * whoever reads the merge have. `actor`: who accepted, as an approval's.
  */
-export type Acceptance = { step: string; try: number; at: string; message: string };
+export type Acceptance = { step: string; try: number; at: string; message: string; actor?: Actor };
 
 /**
  * Where one step stands. ONE vocabulary, shared by `assess`, `listing` and `decision`, so the DAG,
@@ -525,9 +534,10 @@ export type RunStore = {
     /** Whether a person called the run off: cancelled it, pruned it, or holds it — or paused the whole store. */
     readonly calledOff: (id: string) => boolean;
     /**
-     * Write down that a person cancelled the run (`nemia cancel`), and answer with the time that stands: the first cancellation is kept.
+     * Write down that a person cancelled the run (`nemia cancel`), and who did (`actor`, where the caller is known), and answer with the
+     * time that stands: the first cancellation is kept, its actor with it.
      */
-    readonly cancel: (id: string) => string;
+    readonly cancel: (id: string, actor?: Actor) => string;
     /**
      * Remove what the store keeps under the run's id, whether or not its record is there — the record, the cancellation, the prune marker,
      * the hold, the refresh ask, the labels, the asks, what was said before a step was filed and the run's own directory, in that
@@ -567,13 +577,16 @@ export type RunStore = {
     readonly where: (id: string, key: AskKey) => string;
   };
   readonly holds: {
-    /** Lift the hold put at `at`, and only while it still stands: false when it is gone or a hold was put since. */
-    readonly lift: (id: string, at: string) => boolean;
+    /**
+     * Lift the hold put at `at`, and only while it still stands: false when it is gone or a hold was put since. Given who lifts it
+     * (`actor`), kept beside the run as its `unheld` first, so the pass that reads the hold gone reads who took it.
+     */
+    readonly lift: (id: string, at: string, actor?: Actor) => boolean;
     /**
      * Hold the run until the runs `until` land, with a person's `why` and who they are (`by`) when given: the hold written, or null when
      * one already stands, which is kept.
      */
-    readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by'>) => Hold | null;
+    readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by' | 'actor'>) => Hold | null;
     /** Whether a hold's file is there, read as a hold or not: one that does not read still holds the run. */
     readonly stands: (id: string) => boolean;
   };

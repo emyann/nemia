@@ -2,7 +2,8 @@
  * The readiness read (`readinessOf`): every piece a person's server needs to run its factories, each in place, missing, not known or not
  * activated, with the command or the fix that puts it there and what it costs while missing (`cost`: a run waits on it, or it keeps the
  * server up or open) — each declared harness's two needs (installed, signed in), the service and its linger, the bind, the machine
- * (cgroup v2, the user's service manager, the tools folder, whether the sessions' memory fits it), the places' needs, every factory's
+ * (cgroup v2, the user's service manager, the tools folder, whether the sessions' memory fits it, whether their slice holds them to
+ * what it allocates), the places' needs, every factory's
  * workflows' needs, the places' repository needs in each factory's repository, a factory at all, and a newer release — and whether a
  * run was ever started here (`ran`). Composed
  * from facts the package already holds; the machine's are read through `ReadinessFacts`, which a test hands its own. A controller: it
@@ -16,7 +17,7 @@ import { Effect, Exit } from 'effect';
 import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, memoryBytesOf } from 'agent-runtime/vocabulary';
 import type { Need, NeedState, Readiness, ReadinessCost, ReadinessFix, ReadinessPiece, ReadinessState } from 'objects';
 import { pathLedByTools, StoreRoot, toolsBinDir, toolsDir } from '../config/root.store.ts';
-import { maxConcurrent, memoryLimit, memoryRequest, memoryReserved, type Env } from '../config/config.store.ts';
+import { cgroupParent, maxConcurrent, memoryLimit, memoryRequest, memoryReserved, type Env } from '../config/config.store.ts';
 import { isRefusal } from '../refusal/refusal.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
 import type { Factory, FactoryListing } from '../factory/factory.ts';
@@ -31,7 +32,17 @@ import { tried } from '../runtime-client.ts';
 import { archiveInstall, type Running } from '../release/index.ts';
 import { toolsNeed, toolsNemia } from '../release/nemia-link.store.ts';
 import { latestRelease, runningRelease } from '../release/version.verb.ts';
-import { BIND_PUBLIC_VARIABLE, bindExposure, DEFAULT_NAME, kindOfBind, memoryFit, reservedFor, type MemoryFit } from '../service/index.ts';
+import {
+  BIND_PUBLIC_VARIABLE,
+  bindExposure,
+  ceilingFit,
+  DEFAULT_NAME,
+  kindOfBind,
+  memoryFit,
+  reservedFor,
+  sessionsSliceOf,
+  type MemoryFit,
+} from '../service/index.ts';
 import { claudeTokenStatus, tokenAgeWords, tokenWarningLine, TOKEN_MAKER, TOKEN_NAME, TOKEN_RENEWAL } from '../sign-in/sign-in.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { fixCommandOf, type FixAt } from './needs.ts';
@@ -120,6 +131,9 @@ const TOOLS: Of = { name: 'tools', area: 'machine', cost: 'run' };
 /** Whether the sessions' memory fits the machine keeps the server up: a run waits on none, and an admitted one may take the machine. */
 const MEMORY_FIT: Of = { name: 'memory-fit', area: 'machine', cost: 'server' };
 
+/** Whether the sessions' slice holds them to what the machine allocates keeps the server up: a run waits on none. */
+const SESSIONS_SLICE: Of = { name: 'sessions-slice', area: 'machine', cost: 'server' };
+
 /** A factory: a run starts in one. */
 const FACTORY: Of = { name: 'factory', area: 'factory', cost: 'run' };
 
@@ -196,7 +210,7 @@ function machinePieces(home: string, facts: ReadinessFacts): ReadinessPiece[] {
         : piece(manager, 'missing', "the user's service manager (systemd --user) does not answer", [
             typed('log in as the user once, so their manager starts, and keep it with linger', `sudo loginctl enable-linger ${facts.user}`),
           ]);
-  return [cgroup, user, toolsPiece(home, facts), memoryFitPiece(facts)];
+  return [cgroup, user, toolsPiece(home, facts), memoryFitPiece(facts), sessionsSlicePiece(facts)];
 }
 
 /** `bytes` in whole MiB, as a person reads them. */
@@ -267,6 +281,83 @@ function fitPiece(fit: MemoryFit, set: MemorySet, floor: string): ReadinessPiece
 /** A quantity a reader answered, in bytes, or null where unset. */
 const bytesOrNull = (quantity: string | undefined): number | null => (quantity === undefined ? null : (memoryBytesOf(quantity) ?? null));
 
+/** The floor kept for the daemon and the machine, in bytes: `WF_MEMORY_RESERVED` as its reader answered it, else its default. */
+const floorOf = (totalBytes: number, reserved: string | undefined): number =>
+  bytesOrNull(reserved) ?? reservedFor(Math.floor(totalBytes / 2 ** 20)) * 2 ** 20;
+
+/** The memory a machine of `totalBytes` read was not read: no whole number of bytes above nothing. */
+const unread = (totalBytes: number | undefined): totalBytes is undefined =>
+  totalBytes === undefined || !Number.isInteger(totalBytes) || totalBytes < 1;
+
+/**
+ * Whether the slice the sessions run under (`WF_CGROUP_PARENT`) holds them together to what this machine allocates (`ceilingFit`): its
+ * memory less the floor kept, as `memory-fit` reads it. Its ceiling is asked of systemd on every read (`systemctl --user show <slice>
+ * -p MemoryMax --value`): `infinity` is none, digits are bytes. Missing where no slice is set (the user manager's own, which nothing
+ * caps), where it has no ceiling or one above what is allocated — naming `--size auto` for Nemia's own slice, `systemctl --user
+ * set-property` for one the person named — or where a setting is one the daemon refuses, in its words; not known where the memory, the
+ * cgroup v2 or systemd's answer could not be read.
+ */
+function sessionsSlicePiece(facts: ReadinessFacts): ReadinessPiece {
+  const totalBytes = facts.memoryBytes;
+  if (unread(totalBytes))
+    return piece(
+      SESSIONS_SLICE,
+      'unknown',
+      "this machine's memory could not be read, so whether the sessions' slice holds them to it is not known",
+    );
+  if (!facts.exists('/sys/fs/cgroup/cgroup.controllers'))
+    return piece(SESSIONS_SLICE, 'unknown', 'the kernel holds no cgroup v2, so no slice holds the sessions together');
+  let parent: string | undefined;
+  let reserved: string | undefined;
+  try {
+    parent = cgroupParent(facts.env);
+    reserved = memoryReserved(facts.env);
+  } catch (refused) {
+    if (!isRefusal(refused)) throw refused;
+    return piece(SESSIONS_SLICE, 'missing', refused.message);
+  }
+  const allocatableBytes = totalBytes - floorOf(totalBytes, reserved);
+  if (allocatableBytes < 1)
+    return piece(
+      SESSIONS_SLICE,
+      'missing',
+      `the floor kept leaves nothing of this machine's ${mib(totalBytes)} to the sessions: set WF_MEMORY_RESERVED under it`,
+    );
+  const allocated = `the ${mib(allocatableBytes)} this machine allocates to sessions (its ${mib(totalBytes)} less the floor kept, WF_MEMORY_RESERVED)`;
+  if (parent === undefined)
+    return piece(
+      SESSIONS_SLICE,
+      'missing',
+      `no WF_CGROUP_PARENT is set, so the sessions run in the user manager's own slice, which nothing caps: sessions that grow together may take the machine. Size them with nemia service install --size auto, which writes a slice held to ${allocated}`,
+      [SIZED],
+    );
+  const shown = facts.run('systemctl', ['--user', 'show', parent, '-p', 'MemoryMax', '--value']);
+  const memoryMax = shown?.code === 0 ? shown.out.trim() : '';
+  if (memoryMax !== 'infinity' && !/^\d+$/.test(memoryMax))
+    return piece(
+      SESSIONS_SLICE,
+      'unknown',
+      `the ceiling of the sessions' slice ${parent} could not be read: systemctl --user show ${parent} -p MemoryMax --value did not answer it`,
+    );
+  const ceilingBytes = memoryMax === 'infinity' ? null : Math.max(1, Math.min(Number(memoryMax), 2 ** 50));
+  const fit = ceilingFit({ ceilingBytes, allocatableBytes });
+  if (fit.verdict === 'held')
+    return piece(
+      SESSIONS_SLICE,
+      'met',
+      `the sessions run under ${parent}, held together under ${mib(fit.ceilingBytes)}, within ${allocated}`,
+    );
+  const fix =
+    parent === sessionsSliceOf(DEFAULT_NAME)
+      ? SIZED
+      : typed('give the slice its ceiling', `systemctl --user set-property ${parent} MemoryMax=${allocatableBytes}`);
+  const said =
+    fit.verdict === 'none'
+      ? `the sessions' slice ${parent} has no memory ceiling (MemoryMax=infinity)`
+      : `the sessions' slice ${parent} is held under ${mib(fit.ceilingBytes)}, more than ${allocated}`;
+  return piece(SESSIONS_SLICE, 'missing', `${said}, so sessions that grow together may take the machine: hold it to ${allocated}`, [fix]);
+}
+
 /**
  * Whether the settings the daemon runs under fit this machine (`memoryFit`): the sessions at once (`WF_MAX_CONCURRENT`), each counted
  * at its default request (`WF_MEMORY_REQUEST`), else its default limit (`WF_MEMORY_LIMIT`), against the machine's memory less the floor
@@ -280,7 +371,7 @@ function memoryFitPiece(facts: ReadinessFacts): ReadinessPiece {
     return piece(MEMORY_FIT, 'unknown', "this machine's memory could not be read, so whether its sessions fit it is not known");
   const set = memorySetOf(facts.env);
   if ('refused' in set) return piece(MEMORY_FIT, 'missing', set.refused);
-  const reservedBytes = bytesOrNull(set.reserved) ?? reservedFor(Math.floor(totalBytes / 2 ** 20)) * 2 ** 20;
+  const reservedBytes = floorOf(totalBytes, set.reserved);
   if (reservedBytes > totalBytes)
     return piece(
       MEMORY_FIT,

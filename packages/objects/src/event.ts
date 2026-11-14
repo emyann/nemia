@@ -21,6 +21,7 @@
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
+import { Actor } from './token.ts';
 import { ANSWER_VIA, EVENT_REASONS, EVENT_SOURCES, EVENT_TYPES, EVENT_WAITS, INVOLVED_KINDS, WAIT_ON } from './words.ts';
 
 /** What an Event is about: its kind, and its name — a run's id, `<run>/<step>`, a daemon's pid, or `store`. */
@@ -42,6 +43,7 @@ export const Event = Schema.Struct({
   via: Schema.optionalKey(Schema.Literals(ANSWER_VIA)),
   call: Schema.optionalKey(Schema.String),
   try: Schema.optionalKey(Schema.Number),
+  actor: Schema.optionalKey(Actor),
 });
 export type Event = typeof Event.Type;
 

@@ -511,8 +511,9 @@ any OOM killer ended in the cgroup, `oom` the times its own limit was reached. A
 ran out of memory, under the task's own limit. Its note says so, with the peak and the limit, and names fewer sessions at once
 (`WF_MAX_CONCURRENT`) or the machine's memory, never a limit knob, since a higher limit squeezes the machine further. A check the
 machine killed is no verdict on the work: the step's `retries:` runs it again as its check, never a session told to look at it. A
-record written before `oom` was carried reads as a kill at the limit. A raised `memory:` reaches a new run, since a run freezes its workflow; a raised
-`WF_MEMORY_LIMIT` reaches what the daemon files once it is restarted with it.
+record written before `oom` was carried reads as a kill at the limit. A raised `memory:` reaches a new run, since a run freezes its
+workflow; a raised `WF_MEMORY_LIMIT` or `WF_MEMORY_REQUEST` reaches every task not yet started once the daemon is restarted with it, a
+queued one among them; a session already running keeps the size it started under.
 
 **A session is admitted only while the memory it asks fits the machine.** What each asks is its request, a container's
 `resources.requests.memory`: the daemon's `WF_MEMORY_REQUEST` for every task filed with none of its own (`defaultRequests`), and,

@@ -68,7 +68,8 @@ test(
 
     await s.test('a task filed with none on an engine with a default takes the default, and ends unstartable the same', async () => {
       const limited = await state(defaulted, fromDefault);
-      assert.deepEqual(limited.resources, { limits: { memory: '64Mi' } });
+      assert.equal(limited.resources, undefined, 'none written on its filing');
+      assert.deepEqual(limited.attempts[0]?.resources, { limits: { memory: '64Mi' } }, 'the default its attempt started under');
       assert.deepEqual([limited.settled, limited.attempts[0]?.reason], ['failed', 'unstartable']);
     });
 

@@ -239,6 +239,7 @@ export const StoredEventSchema = Schema.Union([
     nudge: Schema.optional(Schema.String),
     nudgeBody: Schema.optional(BodyRefSchema),
     mono: Schema.optional(MonotonicSchema),
+    resources: Schema.optional(ResourcesSchema),
   }),
   event('spawned', { attempt: Schema.Finite, error: Schema.optional(Schema.String), mono: Schema.optional(MonotonicSchema) }),
   Ended,

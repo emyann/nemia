@@ -249,10 +249,12 @@ function readinessOfJson(out: string): Readiness | string {
  * store at `root`, under the context `local` whatever context the person uses (`NEMIA_CONTEXT`), so it asks this machine's daemon, and the
  * pieces it reads are the new release's — this process's code is the older one's and cannot know them. Where a run waits on a missing
  * piece (`runsWait`), one line saying the store is not ready (`readinessSaid`), then each missing piece a run waits on with the fixes that
- * put it there; nothing where it reads ready. The client's own pieces (area `client`: the server reached, the token taken, `nemia` on
+ * put it there, and nothing of them where none is. The client's own pieces (area `client`: the server reached, the token taken, `nemia` on
  * PATH) hold no run of the store's and are never among them: one of them missing that a run waits on means the server's read did not reach
- * this command, which says so, with the piece's fix. A read that does not answer is one line naming the command to type. Never a refusal:
- * the upgrade itself succeeded.
+ * this command, which says so, with the piece's fix. Else, read off the same answer, each piece of the machine and of its service
+ * (`CHEAP_AREAS`) missing that no run waits on, with its fixes — memory that admits one session at a time keeps the server slow while
+ * every run moves — or, where none of those is missing, one line saying so. A read that does not answer is one line naming the command
+ * to type. Never a refusal, and nothing is rolled back: the upgrade itself succeeded, and the lines say what to do next.
  */
 function readinessAfter(tag: string, root: string, archive: boolean, env: NodeJS.ProcessEnv): string[] {
   const ran = spawnSync(installedNemia(root, archive), ['doctor', '--json'], {
@@ -271,16 +273,35 @@ function readinessAfter(tag: string, root: string, archive: boolean, env: NodeJS
       `what ${tag} needs before a run could not be read: ${unreached.message}${unreached.fixes[0] ? ` (${unreached.fixes[0].command})` : ''}, then read it with nemia doctor`,
     ];
   const server = { ...read, pieces: read.pieces.filter((p) => p.area !== 'client') };
-  if (!runsWait(server)) return [];
-  const missing = server.pieces.filter(held);
+  const waited = runsWait(server) ? server.pieces.filter(held) : [];
+  const cheap = server.pieces.filter((p) => CHEAP_AREAS.includes(p.area) && p.state === 'missing');
+  const advised = cheap.filter((p) => !waited.includes(p));
   return [
-    `on ${tag} the store is ${readinessSaid(server)}; every new run is held until each is in place:`,
-    ...missing.flatMap((p) => [
-      `  ✗ ${p.name}${p.factory === undefined ? '' : ` (${[p.factory, p.workflow].filter((w) => w !== undefined).join('/')})`}: ${p.message}`,
-      ...p.fixes.map((f) => `      ${f.command}  — ${f.message}`),
-    ]),
+    ...(waited.length === 0
+      ? []
+      : [`on ${tag} the store is ${readinessSaid(server)}; every new run is held until each is in place:`, ...waited.flatMap(pieceLines)]),
+    ...(cheap.length === 0
+      ? [`on ${tag} nemia doctor finds nothing missing on the machine or its service`]
+      : advised.length === 0
+        ? []
+        : [
+            `on ${tag} nemia doctor finds missing on the machine or its service, though no run waits on it:`,
+            ...advised.flatMap(pieceLines),
+          ]),
   ];
 }
+
+/**
+ * The areas of the doctor whose missing pieces an upgrade says though no run waits on them: the machine and the service, cheap to read
+ * and read off what the daemon runs under, which a release that reads it otherwise (memory admitted by a session's ask) can leave short.
+ */
+const CHEAP_AREAS: readonly ReadinessPiece['area'][] = ['machine', 'service'];
+
+/** A missing piece as the upgrade says it: its name, where it is, what is missing, then each fix with its command. */
+const pieceLines = (p: ReadinessPiece): string[] => [
+  `  ✗ ${p.name}${p.factory === undefined ? '' : ` (${[p.factory, p.workflow].filter((w) => w !== undefined).join('/')})`}: ${p.message}`,
+  ...p.fixes.map((f) => `      ${f.command}  — ${f.message}`),
+];
 
 /**
  * The daemon after the switch: restarted through the take-over where the service holds the lease and its file runs `releases/current`;
@@ -360,10 +381,10 @@ const tagOf = (args: Args, running: Running) => {
 
 /**
  * Upgrades the store to `tag` (`archived` on an archive install, else `prepared`, each of which switches the pointer), restarts the daemon
- * (`restarted`), says what the new release reads missing where the daemon now runs it (`readinessAfter`), then removes what no one needs
- * (`removedAfter`); refused before the switch, and before anything is fetched or built where
- * the tag is no release's name or goes back past the store's floor (`floorRefusal`). `running` is the code this command runs, which says
- * whether the store is an archive install.
+ * (`restarted`), reads what the new release finds missing where the daemon now runs it (`readinessAfter`), removes what no one needs
+ * (`removedAfter`), and says the missing pieces last, after its own lines; refused before the switch, and before anything is fetched
+ * or built where the tag is no release's name or goes back past the store's floor (`floorRefusal`). `running` is the code this command
+ * runs, which says whether the store is an archive install.
  */
 export const upgrade = Effect.fn('upgrade')(function* (
   args: Args,
@@ -399,7 +420,7 @@ export const upgrade = Effect.fn('upgrade')(function* (
     built,
     ...daemon,
     removed: retained.removed,
-    lines: [said, `releases/${CURRENT} now names ${tag}`, ...daemon.lines, ...readiness, ...retained.lines],
+    lines: [said, `releases/${CURRENT} now names ${tag}`, ...daemon.lines, ...retained.lines, ...readiness],
   } satisfies Upgraded;
 });
 
@@ -421,7 +442,8 @@ const UPGRADE: Command<Upgraded> = {
     "daemon's sessions are given up to the timeout to end their tool calls",
     '(--timeout <d>, else nemia pause-timeout), park, and resume as the same try on',
     'the new release; then say each piece the new release reads missing',
-    'that a run waits on, with its fix. A tag built already is switched',
+    'that a run waits on, and each of the machine and its service, with',
+    'its fix, or that none of those is. A tag built already is switched',
     'to without a rebuild, so an older tag rolls back. --repo:',
     "the repository the tag is in (the running release's source);",
     '--name: the service (nemia). Then it removes each release that is',

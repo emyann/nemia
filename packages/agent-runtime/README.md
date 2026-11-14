@@ -1051,10 +1051,13 @@ quantity, is what the engine's admission counts the task at against the machine 
 with a limit and no request is counted at its limit, as Kubernetes gives such a container a request equal to its limit. A fraction
 (`1.5Gi`), an exponent, `m`, a request above the limit, a limit or a request other than `memory` (`cpu`) and anything else under
 `resources` are refused at `file()` (`resourcesRefusalOf`), nothing journalled; so is a limit on a remote agent, whose process is the
-other party's. An engine given `defaultLimits: { memory: '6Gi' }` and `defaultRequests: { memory: '2560Mi' }` writes them onto every
-task filed with no `resources` of its own, as a LimitRange's `default` and `defaultRequest` are written into a Pod at admission: the
-`filed` entry says what each task ran under, and a new default never changes a task already filed. A remote agent's task is never
-given the defaults, so a default makes no remote task unfileable. `Engine.layer` refuses a `defaultLimits.memory` or a
+other party's. An engine given `defaultLimits: { memory: '6Gi' }` and `defaultRequests: { memory: '2560Mi' }` gives them to every
+task filed with no `resources` of its own as each of its attempts starts, as a LimitRange's `default` and `defaultRequest` land on a
+Pod only when it is created: nothing is written onto the `filed` entry, a queued task is admitted by the defaults the engine holds when
+it judges it (`runsUnder`, `src/core/admission.ts`), and each attempt's `starting` entry records what it ran under, which its cgroup
+holds until it ends. So a resize of the defaults reaches every task not yet started, and a later turn or restart of one already
+running; an attempt already started keeps its own. A journal an older runtime wrote, with the defaults of its day on `filed`, runs at
+that size. A remote agent's task is never given the defaults, so a default makes no remote task unfileable. `Engine.layer` refuses a `defaultLimits.memory` or a
 `defaultRequests.memory` it cannot read, a default request above the default limit, and a `cgroupParent` that is not a slice's unit
 name (`sessions.slice`).
 

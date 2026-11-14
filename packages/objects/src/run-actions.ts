@@ -21,7 +21,11 @@ import { RETRY_MODES, SAID_AFTER } from './words.ts';
 const Strings = Schema.Array(Schema.String);
 
 /** A text that is not blank: a name, an id, a label's edit. */
-const NotBlank = Schema.String.check(Schema.makeFilter((text: string) => text.trim() !== ''));
+const NOT_BLANK = Schema.makeFilter((text: string) => text.trim() !== '');
+const NotBlank = Schema.String.check(NOT_BLANK);
+
+/** A text that is not blank, saying what it is: its description before its check, which drops one set after it. */
+const notBlank = (description: string) => Schema.String.annotate({ description }).check(NOT_BLANK);
 
 /**
  * A person's answers to the questions a step's closeout asks: the question, the options chosen, and their own words. Its description says
@@ -40,9 +44,13 @@ const Answers = Schema.Array(Schema.Struct({ question: Schema.String, chose: Str
  * `text` where its bytes are UTF-8 text, else its bytes in `base64` (a picture); one of the two. Its name is a file's own, no folder in it.
  */
 export const RunInput = Schema.Struct({
-  name: NotBlank,
-  text: Schema.optionalKey(Schema.String),
-  base64: Schema.optionalKey(Schema.String),
+  name: notBlank("The file's own name, no folder in it: what the run's steps find it by."),
+  text: Schema.optionalKey(
+    Schema.String.annotate({ description: 'Its text, where its bytes are UTF-8 text; else left out, and base64 given.' }),
+  ),
+  base64: Schema.optionalKey(
+    Schema.String.annotate({ description: 'Its bytes in base64, where they are no text (a picture); else left out, and text given.' }),
+  ),
 }).annotate({ identifier: 'RunInput' });
 export type RunInput = typeof RunInput.Type;
 
@@ -52,10 +60,22 @@ export type RunInput = typeof RunInput.Type;
  * files handed to its steps (`inputs`).
  */
 export const startExtras = {
-  models: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  gates: Schema.optionalKey(Schema.Array(NotBlank)),
-  noWorktree: Schema.optionalKey(Schema.Boolean),
-  inputs: Schema.optionalKey(Schema.Array(RunInput)),
+  models: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.String).annotate({
+      description: "Each step's model for this run alone, step to model, as `--model <step>=<model>` gives it.",
+    }),
+  ),
+  gates: Schema.optionalKey(
+    Schema.Array(NotBlank).annotate({
+      description: "The steps gated in this run (--gate): each one's closeout waits for an approval before anything after it is filed.",
+    }),
+  ),
+  noWorktree: Schema.optionalKey(
+    Schema.Boolean.annotate({ description: 'Whether the run works with no worktree of its own (--no-worktree).' }),
+  ),
+  inputs: Schema.optionalKey(
+    Schema.Array(RunInput).annotate({ description: 'The files handed to its steps (`--input <file>`), each by its name.' }),
+  ),
 };
 
 /**
@@ -66,15 +86,24 @@ export const startExtras = {
  */
 export const RunStart = Schema.Struct({
   ...startExtras,
-  workflow: NotBlank,
-  from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
-  after: Schema.optionalKey(Schema.Array(NotBlank)),
-  context: Schema.optionalKey(Schema.Array(NotBlank)),
-  cards: Schema.optionalKey(Schema.Array(NotBlank)),
-  brief: Schema.optionalKey(Schema.String),
-  label: Schema.optionalKey(Schema.Array(NotBlank)),
+  workflow: notBlank('The workflow to run, by name.'),
+  from: Schema.optionalKey(
+    Schema.Literals(['repo', 'yours']).annotate({
+      description: 'Where the workflow is read from when both the repository and your library have it: repo or yours.',
+    }),
+  ),
+  after: Schema.optionalKey(Schema.Array(NotBlank).annotate({ description: 'The runs its first steps wait on to land (--after), by id.' })),
+  context: Schema.optionalKey(
+    Schema.Array(NotBlank).annotate({
+      description: 'The runs whose conclusions it is handed as context (--context), by id; it does not wait on them.',
+    }),
+  ),
+  cards: Schema.optionalKey(Schema.Array(NotBlank).annotate({ description: 'The inbox cards it is handed, by name.' })),
+  brief: Schema.optionalKey(Schema.String.annotate({ description: 'What the run is asked to do.' })),
+  label: Schema.optionalKey(Schema.Array(NotBlank).annotate({ description: 'The labels it is started with, each key=value.' })),
   card: Schema.optionalKey(
     Schema.Never.annotate({
+      description: 'Refused: an inbox card is started at its own path, `POST /api/namespaces/<namespace>/cards/<name>/start`.',
       message: 'a card is started at its own path, POST /api/namespaces/:namespace/cards/:name/start, with the workflow and the brief',
     }),
   ),
@@ -97,33 +126,58 @@ const CopiedInto = Schema.Struct({ names: Strings, dir: Schema.String });
  * alone (`models`); its labels, and each key it did not inherit since the runs it names disagree on it (`labelsLeftOut`).
  */
 export const RunStartedFacts = Schema.Struct({
-  steps: Schema.Array(Schema.Struct({ name: Schema.String, agent: Schema.optionalKey(Schema.String) })),
-  from: Schema.optionalKey(Schema.String),
-  factory: Schema.optionalKey(Schema.String),
-  repo: Schema.String,
-  repository: Schema.Boolean,
-  workflow: Schema.String,
-  mounts: Schema.optionalKey(Strings),
-  writable: Schema.optionalKey(Schema.Array(WrittenBy)),
-  volumes: Schema.optionalKey(Strings),
-  writableVolumes: Schema.optionalKey(Schema.Array(WrittenBy)),
-  settings: Schema.optionalKey(Strings),
-  workspace: Schema.String,
-  inputs: Schema.optionalKey(CopiedInto),
-  cards: Schema.optionalKey(CopiedInto),
-  workflowFiles: Schema.optionalKey(Schema.String),
-  carriedFiles: Schema.optionalKey(Schema.String),
-  after: Schema.optionalKey(Strings),
-  branch: Schema.String,
-  context: Schema.optionalKey(Strings),
-  gated: Schema.optionalKey(Strings),
-  ends: Schema.optionalKey(Strings),
-  models: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  labels: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  labelsLeftOut: Schema.optionalKey(
-    Schema.Array(Schema.Struct({ key: Schema.String, values: Schema.Array(Schema.Struct({ run: Schema.String, value: Schema.String })) })),
+  steps: Schema.Array(Schema.Struct({ name: Schema.String, agent: Schema.optionalKey(Schema.String) })).annotate({
+    description: 'Its steps, each with the agent it is filed with, absent where none.',
+  }),
+  from: Schema.optionalKey(Schema.String.annotate({ description: 'The inbox card it came from; absent for a run from no card.' })),
+  factory: Schema.optionalKey(Schema.String.annotate({ description: 'The factory it was started in; absent for the default one.' })),
+  repo: Schema.String.annotate({ description: 'Its repository.' }),
+  repository: Schema.Boolean.annotate({
+    description: 'Whether it works in its repository; false for a folder run, whose steps work in a folder each.',
+  }),
+  workflow: Schema.String.annotate({ description: "Its workflow's name." }),
+  mounts: Schema.optionalKey(Strings.annotate({ description: "The factory's folders it mounts read-only." })),
+  writable: Schema.optionalKey(
+    Schema.Array(WrittenBy).annotate({
+      description: "The factory's folders some of its steps write, each with those steps; each other local step reads it alone.",
+    }),
   ),
-}).annotate({ identifier: 'RunStartedFacts' });
+  volumes: Schema.optionalKey(Strings.annotate({ description: "The factory's volumes it mounts read-only." })),
+  writableVolumes: Schema.optionalKey(
+    Schema.Array(WrittenBy).annotate({ description: 'The volumes some of its steps write, each with those steps.' }),
+  ),
+  settings: Schema.optionalKey(Strings.annotate({ description: 'The harness settings it froze from its factory.' })),
+  workspace: Schema.String.annotate({ description: 'Where it works.' }),
+  inputs: Schema.optionalKey(
+    CopiedInto.annotate({ description: 'The input files it copied, by name, and the folder they were copied into.' }),
+  ),
+  cards: Schema.optionalKey(
+    CopiedInto.annotate({ description: 'The inbox cards it copied, by name, and the folder they were copied into.' }),
+  ),
+  workflowFiles: Schema.optionalKey(
+    Schema.String.annotate({ description: "Where its workflow's files were copied, which its steps read them from." }),
+  ),
+  carriedFiles: Schema.optionalKey(
+    Schema.String.annotate({ description: 'Where the files its workflow shares with the others beside it were copied.' }),
+  ),
+  after: Schema.optionalKey(Strings.annotate({ description: 'The runs it waits on to land on its branch.' })),
+  branch: Schema.String.annotate({ description: 'The base branch its result goes to, which the runs it waits on land on.' }),
+  context: Schema.optionalKey(Strings.annotate({ description: 'The runs it is handed as context.' })),
+  gated: Schema.optionalKey(Strings.annotate({ description: 'The steps gated in it.' })),
+  ends: Schema.optionalKey(Strings.annotate({ description: 'Its endings a person approves first.' })),
+  models: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.String).annotate({ description: "Each step's model for this run alone, step to model." }),
+  ),
+  labels: Schema.optionalKey(Schema.Record(Schema.String, Schema.String).annotate({ description: 'The labels it was started with.' })),
+  labelsLeftOut: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({ key: Schema.String, values: Schema.Array(Schema.Struct({ run: Schema.String, value: Schema.String })) }),
+    ).annotate({ description: "Each label key it did not inherit, since the runs it names disagree on it, with each run's value." }),
+  ),
+}).annotate({
+  identifier: 'RunStartedFacts',
+  description: 'The run as it was started, what nemia start prints of it: its steps, place, mounts, files copied, waits, gates and labels.',
+});
 export type RunStartedFacts = typeof RunStartedFacts.Type;
 
 /**
@@ -135,22 +189,37 @@ export type RunStartedFacts = typeof RunStartedFacts.Type;
  * did not take (`ignoredRepo`).
  */
 export const RunStarted = Schema.Struct({
-  id: Schema.String,
-  card: Schema.optionalKey(Schema.String),
-  queueLeft: Schema.optionalKey(Schema.String),
-  ignoredRepo: Schema.optionalKey(Schema.String),
-  paused: Schema.optionalKey(Paused),
-  landed: Schema.optionalKey(Strings),
-  hints: Schema.optionalKey(Strings),
-  notMounted: Schema.optionalKey(Strings),
-  notVolumes: Schema.optionalKey(Strings),
-  repoFoundFactory: Schema.optionalKey(Schema.String),
+  id: Schema.String.annotate({ description: "The new run's id." }),
+  card: Schema.optionalKey(Schema.String.annotate({ description: "The inbox card started, on a card's start." })),
+  queueLeft: Schema.optionalKey(
+    Schema.String.annotate({ description: "Why the card's queued: line is still on it, on a card's start where it is." }),
+  ),
+  ignoredRepo: Schema.optionalKey(
+    Schema.String.annotate({ description: 'A repo: line of the card the start did not take, since the factory places the run.' }),
+  ),
+  paused: Schema.optionalKey(
+    Paused.annotate({ description: "The store's pause as it stood once the run was written; absent where it is not paused." }),
+  ),
+  landed: Schema.optionalKey(Strings.annotate({ description: 'The runs handed as context that had landed.' })),
+  hints: Schema.optionalKey(
+    Strings.annotate({ description: 'A line for each file of its workflow folder that still writes a former spelling.' }),
+  ),
+  notMounted: Schema.optionalKey(
+    Strings.annotate({ description: "The factory's repositories left out of its mounts, being no directory." }),
+  ),
+  notVolumes: Schema.optionalKey(Strings.annotate({ description: "The factory's volumes left out of its mounts, being no directory." })),
+  repoFoundFactory: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The ?repo= that only found the factory, its wiring placing the run on another repository.' }),
+  ),
   run: Schema.optionalKey(RunStartedFacts),
 }).annotate({ identifier: 'RunStarted' });
 export type RunStarted = typeof RunStarted.Type;
 
 /** What an inbox card's start answers (the Card's `start`): what a start answers (`RunStarted`), the card's name always among it. */
-export const CardStarted = Schema.Struct({ ...RunStarted.fields, card: Schema.String }).annotate({ identifier: 'CardStarted' });
+export const CardStarted = Schema.Struct({
+  ...RunStarted.fields,
+  card: Schema.String.annotate({ description: 'The inbox card started, by name.' }),
+}).annotate({ identifier: 'CardStarted' });
 export type CardStarted = typeof CardStarted.Type;
 
 /**
@@ -164,11 +233,20 @@ export const RETRY_ASKED_MODES = [...RETRY_MODES, 'nudge'] as const;
  * its cap (`budget`), a person's `answers` to its questions; or, with `round`, another round of the loop it closes.
  */
 export const RunRetry = Schema.Struct({
-  mode: Schema.Literals(RETRY_ASKED_MODES),
-  model: Schema.optionalKey(Schema.String),
-  round: Schema.optionalKey(Schema.Boolean),
-  message: Schema.optionalKey(Schema.String),
-  budget: Schema.optionalKey(Schema.Finite),
+  mode: Schema.Literals(RETRY_ASKED_MODES).annotate({
+    description:
+      "How the step is tried again: continue its session, start it fresh, or recheck its work; nudge is continue's former spelling.",
+  }),
+  model: Schema.optionalKey(Schema.String.annotate({ description: "The model a fresh try runs on; left out, the step's own." })),
+  round: Schema.optionalKey(
+    Schema.Boolean.annotate({ description: 'Whether this asks another round of the loop the step closes (--round), not another try.' }),
+  ),
+  message: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The words the try is told: an answer to its needs, or what to do differently.' }),
+  ),
+  budget: Schema.optionalKey(
+    Schema.Finite.annotate({ description: "A raise of the step's cap in dollars (--budget), above what its tries have cost." }),
+  ),
   answers: Schema.optionalKey(Answers),
 }).annotate({ identifier: 'RunRetry' });
 export type RunRetry = typeof RunRetry.Type;
@@ -178,13 +256,13 @@ export type RunRetry = typeof RunRetry.Type;
  * first; or, of a round, the looping step and the round. `hint` names the spelling to send where the body said a former one.
  */
 export const RunAsked = Schema.Struct({
-  try: Schema.optionalKey(Schema.Finite),
-  file: Schema.String,
-  stopFirst: Schema.optionalKey(Schema.Boolean),
-  step: Schema.optionalKey(Schema.String),
-  round: Schema.optionalKey(Schema.Finite),
-  budget: Schema.optionalKey(Schema.Finite),
-  hint: Schema.optionalKey(Schema.String),
+  try: Schema.optionalKey(Schema.Finite.annotate({ description: 'The try asked for; absent for a round.' })),
+  file: Schema.String.annotate({ description: "The ask's file, which the next pass acts on." }),
+  stopFirst: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Whether the tick stops a blocked session first.' })),
+  step: Schema.optionalKey(Schema.String.annotate({ description: 'The looping step, for a round.' })),
+  round: Schema.optionalKey(Schema.Finite.annotate({ description: 'The round asked for, for a round.' })),
+  budget: Schema.optionalKey(Schema.Finite.annotate({ description: 'The raise of the cap the ask carries, in dollars; absent for none.' })),
+  hint: Schema.optionalKey(Schema.String.annotate({ description: 'The spelling to send, where the body said a former one (nudge).' })),
 }).annotate({ identifier: 'RunAsked' });
 export type RunAsked = typeof RunAsked.Type;
 
@@ -194,10 +272,21 @@ export type RunAsked = typeof RunAsked.Type;
  * (`nemia approve <run> <step> --off`).
  */
 export const RunApprove = Schema.Struct({
-  off: Schema.optionalKey(Schema.Boolean),
-  message: Schema.optionalKey(Schema.String),
+  off: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description:
+        'Takes back the approval of a step that stands approved while nothing it approved has been filed (--off), with none of the keys below.',
+    }),
+  ),
+  message: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The words given with the approval, which the steps after it are told.' }),
+  ),
   answers: Schema.optionalKey(Answers),
-  budgets: Schema.optionalKey(Schema.Array(Schema.Struct({ step: Schema.String, usd: Schema.Finite }))),
+  budgets: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ step: Schema.String, usd: Schema.Finite })).annotate({
+      description: 'The caps the approval sets on the steps after it, each a step and its dollars.',
+    }),
+  ),
 }).annotate({ identifier: 'RunApprove' });
 export type RunApprove = typeof RunApprove.Type;
 
@@ -208,18 +297,31 @@ export type RunApprove = typeof RunApprove.Type;
  * set aside in the run's `done/`, and when and by whom it was taken back (`takenBack`).
  */
 export const RunApproved = Schema.Struct({
-  step: Schema.String,
-  try: Schema.Finite,
-  at: Schema.String,
-  message: Schema.NullOr(Schema.String),
-  file: Schema.String,
+  step: Schema.String.annotate({ description: 'The step approved.' }),
+  try: Schema.Finite.annotate({ description: 'The try approved.' }),
+  at: Schema.String.annotate({ description: 'When it was approved.' }),
+  message: Schema.NullOr(Schema.String).annotate({ description: 'The words given with it; null for none.' }),
+  file: Schema.String.annotate({ description: "The approval's file; of one taken back, where it was set aside in the run's done/." }),
   actor: Schema.optionalKey(Actor),
-  loop: Schema.optionalKey(Schema.Boolean),
-  next: Schema.optionalKey(Schema.Literals(['step', 'waiting', 'nothing'])),
-  caps: Schema.optionalKey(
-    Schema.Array(Schema.Struct({ step: Schema.String, usd: Schema.Finite, above: Schema.Boolean, workflow: Schema.NullOr(Schema.Finite) })),
+  loop: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Whether it ended a loop out of rounds.' })),
+  next: Schema.optionalKey(
+    Schema.Literals(['step', 'waiting', 'nothing']).annotate({
+      description: 'What the next tick files because of it: a step, nothing yet while it waits, or nothing.',
+    }),
   ),
-  takenBack: Schema.optionalKey(Schema.Struct({ at: Schema.String, actor: Schema.optionalKey(Actor) })),
+  caps: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({ step: Schema.String, usd: Schema.Finite, above: Schema.Boolean, workflow: Schema.NullOr(Schema.Finite) }),
+    ).annotate({
+      description:
+        "Each cap it set: the step, its dollars, and whether that is above the step's own budget in the workflow (null where it has none).",
+    }),
+  ),
+  takenBack: Schema.optionalKey(
+    Schema.Struct({ at: Schema.String, actor: Schema.optionalKey(Actor) }).annotate({
+      description: 'When and by whom the approval was taken back (--off); absent for one given.',
+    }),
+  ),
 }).annotate({ identifier: 'RunApproved' });
 export type RunApproved = typeof RunApproved.Type;
 
@@ -228,7 +330,15 @@ export type RunApproved = typeof RunApproved.Type;
  * token says — the person under any token of theirs, an agent by a standing token minted for it or by its session's. A `from` naming an
  * agent is refused (422), naming `nemia token add <name> --agent <agent>`; one naming the person is read no further.
  */
-export const RunSay = Schema.Struct({ text: Schema.String, from: Schema.optionalKey(ChatSpeaker) }).annotate({
+export const RunSay = Schema.Struct({
+  text: Schema.String.annotate({ description: "The words said to the step's running session." }),
+  from: Schema.optionalKey(
+    ChatSpeaker.annotate({
+      description:
+        'Retired: who wrote the words is the caller the token says. One naming an agent is refused; one naming the person is read no further.',
+    }),
+  ),
+}).annotate({
   identifier: 'RunSay',
 });
 export type RunSay = typeof RunSay.Type;
@@ -240,22 +350,30 @@ export type RunSay = typeof RunSay.Type;
  * they came after.
  */
 export const RunSaid = Schema.Struct({
-  at: Schema.String,
-  attempt: Schema.Finite,
-  text: Schema.String,
-  after: Schema.NullOr(Schema.Struct({ kind: Schema.Literals(SAID_AFTER), id: Schema.String })),
-  kept: Schema.optionalKey(Schema.Literal(true)),
-  from: Schema.optionalKey(ChatSpeaker),
-  words: Schema.optionalKey(Schema.String),
-  try: Schema.optionalKey(Schema.Finite),
-  taskId: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  at: Schema.String.annotate({ description: "When the session's harness took the words, or when they were kept." }),
+  attempt: Schema.Finite.annotate({ description: 'The attempt of the session that took them; its first, for words kept.' }),
+  text: Schema.String.annotate({ description: "The words as said, an agent's in its frame." }),
+  after: Schema.NullOr(Schema.Struct({ kind: Schema.Literals(SAID_AFTER), id: Schema.String })).annotate({
+    description: 'What the words came after in the conversation; null for none, and for words kept.',
+  }),
+  kept: Schema.optionalKey(
+    Schema.Literal(true).annotate({ description: 'True for a step not filed yet: the words are kept for its first try, not delivered.' }),
+  ),
+  from: Schema.optionalKey(ChatSpeaker.annotate({ description: 'The agent that wrote the words, where one did.' })),
+  words: Schema.optionalKey(Schema.String.annotate({ description: "That agent's words without the frame they were said in." })),
+  try: Schema.optionalKey(Schema.Finite.annotate({ description: "The step's try the words were said to." })),
+  taskId: Schema.optionalKey(Schema.NullOr(Schema.String).annotate({ description: "That try's task; null for a step not filed yet." })),
 }).annotate({ identifier: 'RunSaid' });
 export type RunSaid = typeof RunSaid.Type;
 
 /** The run pinned to the new revisions, as `nemia refresh` pins it; with `base`, its loop's work sent to merge its base (`step`). */
 export const RunRefresh = Schema.Struct({
-  step: Schema.optionalKey(Schema.String),
-  base: Schema.optionalKey(Schema.Boolean),
+  step: Schema.optionalKey(Schema.String.annotate({ description: "With base, the looping step whose loop's work merges its base." })),
+  base: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description: "Whether the loop's work is sent to merge its base (--base), rather than the run pinned to the new revisions.",
+    }),
+  ),
 }).annotate({ identifier: 'RunRefresh' });
 export type RunRefresh = typeof RunRefresh.Type;
 
@@ -264,37 +382,50 @@ export type RunRefresh = typeof RunRefresh.Type;
  * what, the commit, the round and the ask's file.
  */
 export const RunRefreshed = Schema.Struct({
-  drift: Schema.optionalKey(Schema.Array(RunDrift)),
-  step: Schema.optionalKey(Schema.String),
-  target: Schema.optionalKey(Schema.String),
-  onto: Schema.optionalKey(Schema.String),
-  sha: Schema.optionalKey(Schema.String),
-  round: Schema.optionalKey(Schema.Finite),
-  file: Schema.optionalKey(Schema.String),
-  said: Schema.optionalKey(Schema.String),
+  drift: Schema.optionalKey(
+    Schema.Array(RunDrift).annotate({
+      description: 'The kinds the run was behind and is now pinned to anew, each with the revision pinned and the one now.',
+    }),
+  ),
+  step: Schema.optionalKey(Schema.String.annotate({ description: 'The looping step, of a merge of the base.' })),
+  target: Schema.optionalKey(Schema.String.annotate({ description: "The step that merges, the loop's target, of a merge of the base." })),
+  onto: Schema.optionalKey(Schema.String.annotate({ description: 'The base branch merged, of a merge of the base.' })),
+  sha: Schema.optionalKey(Schema.String.annotate({ description: "The base branch's commit merged, of a merge of the base." })),
+  round: Schema.optionalKey(Schema.Finite.annotate({ description: 'The round the merge is asked in, of a merge of the base.' })),
+  file: Schema.optionalKey(Schema.String.annotate({ description: "The ask's file, of a merge of the base." })),
+  said: Schema.optionalKey(Schema.String.annotate({ description: 'What the refresh did, in words.' })),
 }).annotate({ identifier: 'RunRefreshed' });
 export type RunRefreshed = typeof RunRefreshed.Type;
 
 /** A run held until other runs land, as `nemia hold <run> --until <run>…` holds it: the runs, why, and who holds it. */
 export const RunHold = Schema.Struct({
-  until: Schema.optionalKey(Strings),
-  why: Schema.optionalKey(Schema.String),
-  by: Schema.optionalKey(Schema.String),
+  until: Schema.optionalKey(
+    Strings.annotate({ description: 'The runs the hold waits on to land (--until); left out, a hold only a person lifts.' }),
+  ),
+  why: Schema.optionalKey(Schema.String.annotate({ description: "The person's words for why, one line." })),
+  by: Schema.optionalKey(Schema.String.annotate({ description: 'Who puts the hold, one line.' })),
 }).annotate({ identifier: 'RunHold' });
 export type RunHold = typeof RunHold.Type;
 
 /** A person's hold on a run, as written: when, the runs it waits on to land, why and by whom. */
 export const RunHoldWritten = Schema.Struct({
-  at: Schema.String,
-  until: Strings,
-  why: Schema.optionalKey(Schema.String),
-  by: Schema.optionalKey(Schema.String),
+  at: Schema.String.annotate({ description: 'When the hold was put.' }),
+  until: Strings.annotate({ description: 'The runs it waits on to land, in the order they were named.' }),
+  why: Schema.optionalKey(Schema.String.annotate({ description: "The person's words for why; absent where none were given." })),
+  by: Schema.optionalKey(Schema.String.annotate({ description: 'Who put it; absent on a file older code wrote.' })),
   actor: Schema.optionalKey(Actor),
-}).annotate({ identifier: 'RunHoldWritten' });
+}).annotate({
+  identifier: 'RunHoldWritten',
+  description: 'A hold on a run, as written: when, the runs it waits on to land, why and by whom.',
+});
 export type RunHoldWritten = typeof RunHoldWritten.Type;
 
 /** What a hold put or lifted answers: the run, whether it was lifted, and the hold. */
-export const RunHeld = Schema.Struct({ id: Schema.String, lifted: Schema.Boolean, hold: RunHoldWritten }).annotate({
+export const RunHeld = Schema.Struct({
+  id: Schema.String.annotate({ description: "The run's id." }),
+  lifted: Schema.Boolean.annotate({ description: 'Whether the hold was lifted, rather than put.' }),
+  hold: RunHoldWritten,
+}).annotate({
   identifier: 'RunHeld',
 });
 export type RunHeld = typeof RunHeld.Type;
@@ -314,13 +445,22 @@ export const RunCancelPlan = Schema.Union([
 export type RunCancelPlan = typeof RunCancelPlan.Type;
 
 /** What a cancel answers: the run and the plan it followed (`nemia cancel`). */
-export const RunCancelled = Schema.Struct({ id: Schema.String, plan: RunCancelPlan, actor: Schema.optionalKey(Actor) }).annotate({
+export const RunCancelled = Schema.Struct({
+  id: Schema.String.annotate({ description: "The run's id." }),
+  plan: RunCancelPlan.annotate({
+    description:
+      'What the cancel did: cancel, with the tasks asked to stop; already-cancelled, with when; or finished, a run already over, with its status.',
+  }),
+  actor: Schema.optionalKey(Actor),
+}).annotate({
   identifier: 'RunCancelled',
 });
 export type RunCancelled = typeof RunCancelled.Type;
 
 /** A condition routed by hand, as `nemia route` routes one: the route, one of the condition's `routes:`. */
-export const RunRoute = Schema.Struct({ route: Schema.String }).annotate({ identifier: 'RunRoute' });
+export const RunRoute = Schema.Struct({
+  route: Schema.String.annotate({ description: 'The route the condition takes, one of its routes:.' }),
+}).annotate({ identifier: 'RunRoute' });
 export type RunRoute = typeof RunRoute.Type;
 
 /**
@@ -328,11 +468,11 @@ export type RunRoute = typeof RunRoute.Type;
  * pass files the steps whose `when:` names it.
  */
 export const RunRouted = Schema.Struct({
-  step: Schema.String,
-  try: Schema.Finite,
-  route: Schema.String,
-  at: Schema.String,
-  file: Schema.String,
+  step: Schema.String.annotate({ description: 'The condition routed.' }),
+  try: Schema.Finite.annotate({ description: 'The try of it the route is for.' }),
+  route: Schema.String.annotate({ description: 'The route; the next pass files the steps whose when: names it.' }),
+  at: Schema.String.annotate({ description: 'When it was written.' }),
+  file: Schema.String.annotate({ description: 'The file it is in.' }),
 }).annotate({ identifier: 'RunRouted' });
 export type RunRouted = typeof RunRouted.Type;
 
@@ -368,21 +508,29 @@ export type BranchWhy = typeof BranchWhy.Type;
  * cut worktrees (`isolate`), whether it was a folder run (`folder`), and why its unfrozen workflow did not read (`unfrozen`).
  */
 export const RunRemoved = Schema.Struct({
-  id: Schema.String,
-  removed: Schema.Boolean,
-  engine: Schema.NullOr(EngineForgetting),
-  worktrees: Schema.optionalKey(Strings),
+  id: Schema.String.annotate({ description: "The run's id." }),
+  removed: Schema.Boolean.annotate({ description: 'Whether it was removed.' }),
+  engine: Schema.NullOr(EngineForgetting).annotate({
+    description: 'What the engine forgot of its tasks, and what waits to be forgotten until it settles; null where it had none.',
+  }),
+  worktrees: Schema.optionalKey(Strings.annotate({ description: 'The worktrees removed.' })),
   handedOff: Schema.optionalKey(
-    Schema.Array(Schema.Struct({ step: Schema.String, branch: Schema.optionalKey(Schema.String), commit: Schema.String })),
+    Schema.Array(Schema.Struct({ step: Schema.String, branch: Schema.optionalKey(Schema.String), commit: Schema.String })).annotate({
+      description: 'What each worktree held uncommitted, committed first: the step, its branch and the commit.',
+    }),
   ),
-  gone: Schema.optionalKey(Strings),
-  files: Schema.optionalKey(Strings),
-  branches: Schema.optionalKey(Schema.Array(Schema.Struct({ branch: Schema.String, deleted: Schema.Boolean, why: BranchWhy }))),
-  base: Schema.optionalKey(Schema.String),
-  repo: Schema.optionalKey(Schema.String),
-  isolate: Schema.optionalKey(Schema.Boolean),
-  folder: Schema.optionalKey(Schema.Literal(true)),
-  unfrozen: Schema.optionalKey(Schema.String),
+  gone: Schema.optionalKey(Strings.annotate({ description: 'The worktrees already gone.' })),
+  files: Schema.optionalKey(Strings.annotate({ description: 'The files removed, the record first.' })),
+  branches: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ branch: Schema.String, deleted: Schema.Boolean, why: BranchWhy })).annotate({
+      description: 'What became of each branch, deleted or kept, and why.',
+    }),
+  ),
+  base: Schema.optionalKey(Schema.String.annotate({ description: 'Its base branch.' })),
+  repo: Schema.optionalKey(Schema.String.annotate({ description: 'Its repository.' })),
+  isolate: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Whether it cut worktrees of its own.' })),
+  folder: Schema.optionalKey(Schema.Literal(true).annotate({ description: 'True for a folder run.' })),
+  unfrozen: Schema.optionalKey(Schema.String.annotate({ description: 'Why its unfrozen workflow did not read.' })),
 }).annotate({ identifier: 'RunRemoved' });
 export type RunRemoved = typeof RunRemoved.Type;
 
@@ -391,9 +539,13 @@ export type RunRemoved = typeof RunRemoved.Type;
  * `preview`, judged and listed with what it would free, and nothing removed, as `nemia prune` lists it before it asks.
  */
 export const RunPrune = Schema.Struct({
-  unmerged: Schema.optionalKey(Schema.Boolean),
-  artifacts: Schema.optionalKey(Schema.Boolean),
-  preview: Schema.optionalKey(Schema.Boolean),
+  unmerged: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Prunes a run nobody merged (--unmerged).' })),
+  artifacts: Schema.optionalKey(Schema.Boolean.annotate({ description: "Prunes its steps' files too (--artifacts)." })),
+  preview: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description: 'Judges and lists it with what it would free, removing nothing, as nemia prune does before it asks.',
+    }),
+  ),
 }).annotate({ identifier: 'RunPrune' });
 export type RunPrune = typeof RunPrune.Type;
 
@@ -406,18 +558,22 @@ const Sized = Schema.Struct({ path: Schema.String, bytes: Schema.Finite });
  * preview, the bytes a prune would free (`bytes`).
  */
 export const RunPruned = Schema.Struct({
-  id: Schema.String,
-  pruned: Schema.Boolean,
-  lines: Strings,
-  worktrees: Schema.Array(Sized),
-  artifacts: Schema.NullOr(Sized),
+  id: Schema.String.annotate({ description: "The run's id." }),
+  pruned: Schema.Boolean.annotate({ description: 'Whether it was pruned.' }),
+  lines: Strings.annotate({ description: "nemia prune's lines about it." }),
+  worktrees: Schema.Array(Sized).annotate({ description: 'The worktrees removed, each with the bytes it held.' }),
+  artifacts: Schema.NullOr(Sized).annotate({
+    description: "Its steps' files directory where it was removed, with the bytes it held; null where it was not.",
+  }),
   left: Schema.Array(
     Schema.Union([
       Schema.Struct({ path: Schema.String, git: Schema.String, fix: Schema.optionalKey(Schema.String) }),
       Schema.Struct({ path: Schema.String, unread: Schema.String }),
       Schema.Struct({ path: Schema.String, files: Schema.String }),
     ]),
-  ),
-  bytes: Schema.optionalKey(Schema.Finite),
+  ).annotate({
+    description: "What was left, each with why: git's word and its fix, a folder that did not read, or the files a worktree holds.",
+  }),
+  bytes: Schema.optionalKey(Schema.Finite.annotate({ description: 'The bytes a prune would free, of a preview.' })),
 }).annotate({ identifier: 'RunPruned' });
 export type RunPruned = typeof RunPruned.Type;

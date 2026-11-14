@@ -7,7 +7,11 @@
 import { Schema } from 'effect';
 
 /** A step's lines beside its controls: its approval at its gate, a try in its session, and words said to it. */
-export const StepCommands = Schema.Struct({ approve: Schema.String, retry: Schema.String, say: Schema.String }).annotate({
+export const StepCommands = Schema.Struct({
+  approve: Schema.String.annotate({ description: 'The line that approves the step at its gate (nemia approve).' }),
+  retry: Schema.String.annotate({ description: 'The line that tries the step again in its session (nemia retry).' }),
+  say: Schema.String.annotate({ description: 'The line that says words to its session (nemia say).' }),
+}).annotate({
   identifier: 'StepCommands',
 });
 export type StepCommands = typeof StepCommands.Type;
@@ -17,10 +21,12 @@ export type StepCommands = typeof StepCommands.Type;
  * for none) and the repository (null for yours outside a factory).
  */
 export const WorkflowPageAddress = Schema.Struct({
-  from: Schema.Literals(['repo', 'yours']),
-  workflow: Schema.String,
-  factory: Schema.NullOr(Schema.String),
-  repo: Schema.NullOr(Schema.String),
+  from: Schema.Literals(['repo', 'yours']).annotate({
+    description: "Where the workflow is read from: the repository's workflows folder, or yours.",
+  }),
+  workflow: Schema.String.annotate({ description: "The workflow's name." }),
+  factory: Schema.NullOr(Schema.String).annotate({ description: 'The factory it is attached to; null for none.' }),
+  repo: Schema.NullOr(Schema.String).annotate({ description: 'The repository it is read from; null for yours outside a factory.' }),
 }).annotate({ identifier: 'WorkflowPageAddress' });
 export type WorkflowPageAddress = typeof WorkflowPageAddress.Type;
 
@@ -29,16 +35,26 @@ export type WorkflowPageAddress = typeof WorkflowPageAddress.Type;
  * started from no card), and the address of its workflow's page (null where the board pages none). Constant for a run, off its record.
  */
 export const RunLines = Schema.Struct({
-  decide: Schema.String,
-  refresh: Schema.String,
-  fromNote: Schema.NullOr(Schema.String),
-  steps: Schema.Record(Schema.String, StepCommands),
-  workflowPage: Schema.NullOr(WorkflowPageAddress),
+  decide: Schema.String.annotate({ description: 'The line that shows what to decide about the run (nemia decide).' }),
+  refresh: Schema.String.annotate({
+    description: 'The line that pins the run to the new revisions of its workflow, agents and skills (nemia refresh).',
+  }),
+  fromNote: Schema.NullOr(Schema.String).annotate({
+    description: 'Where the run came from, in words; null for a run started from no card.',
+  }),
+  steps: Schema.Record(Schema.String, StepCommands).annotate({ description: "Each step's lines, by its name: approve, retry and say." }),
+  workflowPage: Schema.NullOr(WorkflowPageAddress).annotate({
+    description: "Where the board pages the run's workflow; null where it pages none.",
+  }),
 }).annotate({ identifier: 'RunLines' });
 export type RunLines = typeof RunLines.Type;
 
 /** What a run started now with it as context would be handed: the run, whether it has landed, and its `## From run` section. */
-export const Concluded = Schema.Struct({ run: Schema.String, landed: Schema.Boolean, section: Schema.String }).annotate({
+export const Concluded = Schema.Struct({
+  run: Schema.String.annotate({ description: "The run's id." }),
+  landed: Schema.Boolean.annotate({ description: 'Whether it has landed.' }),
+  section: Schema.String.annotate({ description: 'Its ## From run section, as a run started now with it as context would be handed it.' }),
+}).annotate({
   identifier: 'Concluded',
 });
 export type Concluded = typeof Concluded.Type;

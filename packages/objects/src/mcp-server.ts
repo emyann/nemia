@@ -24,7 +24,7 @@ export const McpServerSpec = Schema.Struct({
   url: Schema.String,
   headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
   oauth: Schema.optionalKey(McpServerOAuth),
-});
+}).annotate({ description: 'The server as the factory records it: its transport, url, headers (each value masked) and OAuth client.' });
 export type McpServerSpec = typeof McpServerSpec.Type;
 
 /** The state the server's harness reports now, its tools counted, and why it failed; `state` absent where it could not be read. */
@@ -37,11 +37,17 @@ export type McpServerStatus = typeof McpServerStatus.Type;
 
 /** An MCP server, as an object: a builtin one carries its spec alone; a write's answer says what it wrote (`written`). */
 export const McpServer = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('McpServer'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('McpServer').annotate({
+    description: 'What the object is: an McpServer, a remote MCP server a factory records for its agents.',
+  }),
   metadata: ObjectMeta,
   spec: McpServerSpec,
-  status: Schema.optionalKey(McpServerStatus),
+  status: Schema.optionalKey(
+    McpServerStatus.annotate({
+      description: "The state the server's harness reports now, its tools counted, and why it failed; absent on a builtin server.",
+    }),
+  ),
   written: Schema.optionalKey(FactoryWritten),
 });
 export type McpServer = typeof McpServer.Type;

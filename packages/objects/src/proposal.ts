@@ -34,6 +34,9 @@ export const ProposalSpec = Schema.Struct({
   objects: Schema.Array(ProposedObject),
   applyAt: Schema.optionalKey(Schema.Literals(APPLY_AT)),
   why: Schema.optionalKey(Schema.String),
+}).annotate({
+  description:
+    "What the proposal asks: the objects it applies, each as apply takes it, when it applies (at approval where absent), and why, in the proposer's words.",
 });
 export type ProposalSpec = typeof ProposalSpec.Type;
 
@@ -78,13 +81,18 @@ export const ProposalStatus = Schema.Struct({
   revisions: Schema.optionalKey(Schema.Array(Schema.String)),
   written: Schema.optionalKey(Schema.Array(Schema.String)),
   message: Schema.optionalKey(Schema.String),
+}).annotate({
+  description:
+    "The machinery's account of the proposal: its phase, who proposed and approved it, its changes and whether it widens access, the objects as they stood before it applied, the revisions it made, and why it stands where it does.",
 });
 export type ProposalStatus = typeof ProposalStatus.Type;
 
 /** A proposal, as an object. */
 export const Proposal = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Proposal'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Proposal').annotate({
+    description: "What the object is: a Proposal, a change of a factory's definitions and wiring waiting on an approval.",
+  }),
   metadata: ObjectMeta,
   spec: ProposalSpec,
   status: ProposalStatus,

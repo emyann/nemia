@@ -42,42 +42,71 @@ const Radius = Schema.Struct({
 
 /** What a branch touched, or the sentence saying what it changed is not known. */
 export const DecisionTouched = Schema.Struct({
-  branch: Schema.String,
-  radius: Schema.Union([Radius, Schema.Struct({ error: Schema.String })]),
+  branch: Schema.String.annotate({ description: 'The branch read.' }),
+  radius: Schema.Union([Radius, Schema.Struct({ error: Schema.String })]).annotate({
+    description:
+      'What the branch touched: its files and their counts, its groups, what an agent reads and what decides a check; or the sentence saying it is not known.',
+  }),
 }).annotate({ identifier: 'DecisionTouched' });
 export type DecisionTouched = typeof DecisionTouched.Type;
 
 /** One file of a branch's check-affecting diff: its unified diff, cut at the read model's cap, and how many lines were cut. */
 export const DiffFile = Schema.Struct({
-  path: Schema.String,
-  lines: Strings,
-  cut: Schema.Finite,
+  path: Schema.String.annotate({ description: 'The file, by its path in the repository.' }),
+  lines: Strings.annotate({ description: "Its unified diff, a line each, cut at the read's cap; empty where its lines were left out." }),
+  cut: Schema.Finite.annotate({ description: 'How many lines of its diff were cut.' }),
   /** The lines its hunks add and remove, counted over the whole diff before it is cut; absent from a decision read before them. */
-  added: Schema.optionalKey(Schema.Finite),
-  removed: Schema.optionalKey(Schema.Finite),
+  added: Schema.optionalKey(
+    Schema.Finite.annotate({
+      description: 'The lines its hunks add, counted over the whole diff before it is cut; absent from a decision read before them.',
+    }),
+  ),
+  removed: Schema.optionalKey(
+    Schema.Finite.annotate({
+      description: 'The lines its hunks remove, counted over the whole diff before it is cut; absent from a decision read before them.',
+    }),
+  ),
   /** Whether a narrowed decision (`decisionNarrowed`, `?diffs=`) left its `lines` out, to be asked for by its path. */
-  linesLeftOut: Schema.optionalKey(Schema.Boolean),
+  linesLeftOut: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description: 'Whether the read left its lines out, to be asked for by its path (`?diffs=<path>`); absent where it did not.',
+    }),
+  ),
 }).annotate({ identifier: 'DiffFile' });
 export type DiffFile = typeof DiffFile.Type;
 
 /** A branch's check-affecting diff, a file each; `error`, the sentence saying it is not known, when the place did not say. */
 export const SensitiveDiff = Schema.Struct({
-  branch: Schema.String,
-  files: List(DiffFile),
-  error: Schema.NullOr(Schema.String),
+  branch: Schema.String.annotate({ description: 'The branch whose diff this is.' }),
+  files: List(DiffFile).annotate({ description: 'Each file of its check-affecting diff.' }),
+  error: Schema.NullOr(Schema.String).annotate({
+    description: 'The sentence saying its diff is not known, where the place did not say; null where it is.',
+  }),
 }).annotate({ identifier: 'SensitiveDiff' });
 export type SensitiveDiff = typeof SensitiveDiff.Type;
 
 /** The lesson line in the package's words, without its label, and which of its three it is (`LESSON_STATES`). */
-export const Lesson = Schema.Struct({ said: Schema.String, state: Schema.Literals(LESSON_STATES) }).annotate({ identifier: 'Lesson' });
+export const Lesson = Schema.Struct({
+  said: Schema.String.annotate({ description: "The lesson line in the package's words, without its label." }),
+  state: Schema.Literals(LESSON_STATES).annotate({
+    description: 'Which of its three the line is: written where the next agent reads, nothing, or unknown.',
+  }),
+}).annotate({
+  identifier: 'Lesson',
+  description:
+    'The lesson line of the decision: whether the run wrote a lesson where the next agent reads, in words, and which of its three states it is.',
+});
 export type Lesson = typeof Lesson.Type;
 
 /** A command `nemia decide` offers, which the board only copies: its label, the bare line, the sentence it ends, and its step. */
 export const DecideCommand = Schema.Struct({
-  label: Schema.Literals(DECIDE_LABELS),
-  command: Schema.String,
-  said: Schema.NullOr(Schema.String),
-  step: Schema.NullOr(Schema.String),
+  label: Schema.Literals(DECIDE_LABELS).annotate({
+    description:
+      'What the command does, as nemia decide labels it: land it, drop it, read it, once more, refresh, approve, send back, forget it.',
+  }),
+  command: Schema.String.annotate({ description: 'The bare line to type.' }),
+  said: Schema.NullOr(Schema.String).annotate({ description: 'The sentence the line ends, where it has one; null otherwise.' }),
+  step: Schema.NullOr(Schema.String).annotate({ description: 'The step the command acts on; null for one about the whole run.' }),
 }).annotate({ identifier: 'DecideCommand' });
 export type DecideCommand = typeof DecideCommand.Type;
 
@@ -126,38 +155,58 @@ const Collision = Schema.Struct({
  * one line (`Collisions`, collide.ts).
  */
 export const Collisions = Schema.Struct({
-  onto: Schema.String,
+  onto: Schema.String.annotate({ description: 'The base branch the run lands onto.' }),
   base: List(
     Schema.Union([
       Schema.Struct({ branch: Schema.String, clean: Schema.Literal(true), said: Schema.String }),
       Schema.Struct({ branch: Schema.String, clean: Schema.Literal(false), conflicts: Strings, said: Schema.String }),
       Schema.Struct({ branch: Schema.String, error: Schema.String, said: Schema.String }),
     ]),
-  ),
-  inFlight: Strings,
-  colliding: List(Collision),
-  semantic: Schema.NullOr(Schema.Struct({ step: Schema.String, check: Schema.String, sha: Schema.String, said: Schema.String })),
-  said: Schema.String,
-}).annotate({ identifier: 'Collisions' });
+  ).annotate({
+    description: 'Whether each branch ahead merges onto the base: clean, with its conflicts, or not known, and that in words.',
+  }),
+  inFlight: Strings.annotate({ description: 'The other runs in flight on the same base.' }),
+  colliding: List(Collision).annotate({
+    description: 'Each branch of another run that a branch of this run does not merge onto cleanly, and that in words.',
+  }),
+  semantic: Schema.NullOr(Schema.Struct({ step: Schema.String, check: Schema.String, sha: Schema.String, said: Schema.String })).annotate({
+    description:
+      'The landing check that refused the merged tree though it merges: its step, the check, the commit and the words; null where none did.',
+  }),
+  said: Schema.String.annotate({ description: 'The whole of it in one line.' }),
+}).annotate({
+  identifier: 'Collisions',
+  description: "At an ending's decision: whether its branches merge onto the base, and the other runs in flight its branches collide with.",
+});
 export type Collisions = typeof Collisions.Type;
 
 /**
  * The run whose ending step works on the base branch in the repository's own working tree now, and that step (`CheckoutHold`, cap.ts):
  * what an ending of this run waits on, the base (`WAIT_ON`'s `base`).
  */
-export const BaseHold = Schema.Struct({ run: Schema.String, step: Schema.String }).annotate({ identifier: 'BaseHold' });
+export const BaseHold = Schema.Struct({
+  run: Schema.String.annotate({ description: "The run whose ending holds the base branch in the repository's own working tree." }),
+  step: Schema.String.annotate({ description: 'Its ending step that works there now.' }),
+}).annotate({
+  identifier: 'BaseHold',
+  description:
+    "The run whose ending step works on the base branch in the repository's own working tree now, which this run's ending waits on.",
+});
 export type BaseHold = typeof BaseHold.Type;
 
 /** The runs in flight a run is held at by the cap on them, and the cap (`RunSlot`, cap.ts). */
-export const RunSlot = Schema.Struct({ inFlight: Schema.Finite, cap: Schema.Finite }).annotate({ identifier: 'RunSlot' });
+export const RunSlot = Schema.Struct({
+  inFlight: Schema.Finite.annotate({ description: 'How many runs are in flight now.' }),
+  cap: Schema.Finite.annotate({ description: 'The cap on runs in flight that holds this run.' }),
+}).annotate({ identifier: 'RunSlot', description: 'The runs in flight a run is held at by the cap on them, and the cap.' });
 export type RunSlot = typeof RunSlot.Type;
 
 /** One option of a question a step asks: the letter `nemia decide` prints it by, its label, which an answer chooses, and what it means. */
 export const DecisionOption = Schema.Struct({
-  letter: Schema.String,
-  label: Schema.String,
-  meaning: Schema.String,
-  recommended: Schema.Boolean,
+  letter: Schema.String.annotate({ description: 'The letter nemia decide prints the option by.' }),
+  label: Schema.String.annotate({ description: 'Its label, which an answer chooses word for word.' }),
+  meaning: Schema.String.annotate({ description: 'What choosing it means.' }),
+  recommended: Schema.Boolean.annotate({ description: 'Whether the step recommends it.' }),
 }).annotate({ identifier: 'DecisionOption' });
 export type DecisionOption = typeof DecisionOption.Type;
 
@@ -167,17 +216,25 @@ export type DecisionOption = typeof DecisionOption.Type;
  * body, its options, and whether several may be chosen together (`multiple`).
  */
 export const DecisionQuestion = Schema.Struct({
-  number: Schema.Finite,
-  field: Schema.String,
-  title: Schema.String,
-  body: Schema.String,
-  options: List(DecisionOption),
-  multiple: Schema.Boolean,
+  number: Schema.Finite.annotate({
+    description:
+      "Its number among the step's questions as nemia decide prints them, from 1, across the question fields of its output in their order.",
+  }),
+  field: Schema.String.annotate({ description: 'The output field it was asked under.' }),
+  title: Schema.String.annotate({ description: 'Its title, which an answer names word for word.' }),
+  body: Schema.String.annotate({ description: 'What it asks, at length.' }),
+  options: List(DecisionOption).annotate({ description: 'Its options, each with its letter, label and meaning.' }),
+  multiple: Schema.Boolean.annotate({ description: 'Whether several options may be chosen together.' }),
 }).annotate({ identifier: 'DecisionQuestion' });
 export type DecisionQuestion = typeof DecisionQuestion.Type;
 
 /** The questions a step waiting on a person asks now, in its current closeout: what its approval or its next try answers. */
-export const StepQuestions = Schema.Struct({ step: Schema.String, questions: List(DecisionQuestion) }).annotate({
+export const StepQuestions = Schema.Struct({
+  step: Schema.String.annotate({ description: 'The step waiting on a person.' }),
+  questions: List(DecisionQuestion).annotate({
+    description: 'The questions its current closeout asks, which its approval or its next try answers.',
+  }),
+}).annotate({
   identifier: 'StepQuestions',
 });
 export type StepQuestions = typeof StepQuestions.Type;
@@ -191,19 +248,30 @@ export type StepQuestions = typeof StepQuestions.Type;
  * absent where none asks or from a decision read before them), which `answers` names back by title and label.
  */
 export const Decidable = Schema.Struct({
-  standings: List(Standing),
-  touched: List(DecisionTouched),
+  standings: List(Standing).annotate({
+    description:
+      'Where each result branch stands against the base now: on it, ahead, gone or unread, with what it changed and whether it still merges.',
+  }),
+  touched: List(DecisionTouched).annotate({ description: 'What each branch read touched.' }),
   lesson: Lesson,
-  sensitive: List(SensitiveDiff),
-  used: Schema.Record(Schema.String, StepUsed),
+  sensitive: List(SensitiveDiff).annotate({ description: "Each branch's check-affecting diff." }),
+  used: Schema.Record(Schema.String, StepUsed).annotate({ description: 'What each filed step consumed, by its name.' }),
   total: StepUsed,
-  cost: Schema.NullOr(Schema.String),
-  overBudget: Schema.NullOr(Schema.String),
-  commands: List(DecideCommand),
+  cost: Schema.NullOr(Schema.String).annotate({ description: "The run's cost, in the package's words; null where none was measured." }),
+  overBudget: Schema.NullOr(Schema.String).annotate({ description: 'The line saying the run is over its budget; null where it is not.' }),
+  commands: List(DecideCommand).annotate({ description: 'The commands nemia decide offers for the run.' }),
   baseHeldBy: Schema.optionalKey(BaseHold),
-  awaiting: Schema.NullOr(Schema.Struct({ branches: Strings, direct: Schema.Boolean })),
-  collisions: Schema.NullOr(Collisions),
-  questions: Schema.optionalKey(List(StepQuestions)),
+  awaiting: Schema.NullOr(Schema.Struct({ branches: Strings, direct: Schema.Boolean })).annotate({
+    description:
+      'What the finished run awaits: its branches, and direct for one that worked on its base branch itself; null for a run still running with a step waiting on a person.',
+  }),
+  collisions: Schema.NullOr(Collisions).annotate({ description: "The collisions read at an ending's decision; null elsewhere." }),
+  questions: Schema.optionalKey(
+    List(StepQuestions).annotate({
+      description:
+        'The questions each step waiting on a person asks now, which an answer names back by title and label; absent where none asks.',
+    }),
+  ),
 }).annotate({ identifier: 'Decidable' });
 export type Decidable = typeof Decidable.Type;
 

@@ -33,6 +33,8 @@ export const AgentSpec = Schema.Struct({
   mcp: Schema.optionalKey(Text),
   output: Schema.optionalKey(Schema.NullOr(Schema.Struct({ file: Schema.String, text: Schema.String }))),
   instructions: Schema.optionalKey(Schema.String),
+}).annotate({
+  description: 'The agent as its file says it: its role, description, harness keys, skills, MCP servers, output schema and instructions.',
 });
 export type AgentSpec = typeof AgentSpec.Type;
 
@@ -76,13 +78,16 @@ export const AgentStatus = Schema.Struct({
   custom: Schema.optionalKey(Text),
   /** The files a removal took (`DELETE …/agents/<name>`), on that answer alone: the agent's file and a schema no other agent names. */
   removed: Schema.optionalKey(Schema.Array(Schema.String)),
+}).annotate({
+  description:
+    'What Nemia reads of the agent: where it was found, the steps that name it and those it fills, the skills it gives, where it was copied from, why it does not read, and its revision.',
 });
 export type AgentStatus = typeof AgentStatus.Type;
 
 /** An agent, as an object. */
 export const Agent = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Agent'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Agent').annotate({ description: 'What the object is: an Agent, a definition a step is filled by.' }),
   metadata: ObjectMeta,
   spec: AgentSpec,
   status: AgentStatus,
@@ -150,7 +155,12 @@ export const AgentSource = Schema.Struct({
 export type AgentSource = typeof AgentSource.Type;
 
 /** Every agent file the store knows of, each a file `POST …/agents/copy` takes. */
-export const AgentSources = Schema.Struct({ sources: Schema.Array(AgentSource) }).annotate({ identifier: 'AgentSources' });
+export const AgentSources = Schema.Struct({
+  sources: Schema.Array(AgentSource).annotate({
+    description:
+      'Every agent file the store knows of, each with where it was found, its folder, file, name, description and version, or why it does not read.',
+  }),
+}).annotate({ identifier: 'AgentSources' });
 export type AgentSources = typeof AgentSources.Type;
 
 /**
@@ -158,18 +168,20 @@ export type AgentSources = typeof AgentSources.Type;
  * name it takes there (`as`, its own where left out), and each skill or schema of the copy whose library's version stays (`keep`).
  */
 export const AgentCopy = Schema.Struct({
-  file: Schema.String,
-  as: Schema.optionalKey(Schema.String),
-  keep: Schema.optionalKey(Schema.Array(Schema.String)),
+  file: Schema.String.annotate({ description: 'The agent file to copy into your library, by its path as the sources list it.' }),
+  as: Schema.optionalKey(Schema.String.annotate({ description: 'The name it takes in your library; left out, its own.' })),
+  keep: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({ description: "Each skill or schema of the copy whose library's version stays, by name." }),
+  ),
 }).annotate({ identifier: 'AgentCopy' });
 export type AgentCopy = typeof AgentCopy.Type;
 
 /** What a copy did: the agent's name in your library, the parts it wrote and those it reused, by name, and the record's file. */
 export const AgentCopied = Schema.Struct({
-  name: Schema.String,
-  copied: Schema.Array(Schema.String),
-  reused: Schema.Array(Schema.String),
-  record: Schema.String,
+  name: Schema.String.annotate({ description: "The agent's name in your library." }),
+  copied: Schema.Array(Schema.String).annotate({ description: 'The parts the copy wrote, by name.' }),
+  reused: Schema.Array(Schema.String).annotate({ description: 'The parts already in your library that the copy reused, by name.' }),
+  record: Schema.String.annotate({ description: "The file of the copy's record: where it came from and its version." }),
 }).annotate({ identifier: 'AgentCopied' });
 export type AgentCopied = typeof AgentCopied.Type;
 
@@ -179,21 +191,28 @@ export type AgentCopied = typeof AgentCopied.Type;
  * naming the agent until it is cleared or written again.
  */
 export const AgentInstructions = Schema.Struct({
-  name: Schema.String,
-  file: Schema.String,
-  words: Text,
-  error: Text,
+  name: Schema.String.annotate({ description: 'The agent the instructions are for.' }),
+  file: Schema.String.annotate({ description: 'The file they are kept in.' }),
+  words: Text.annotate({
+    description: 'What the agent is told after its own instructions (nemia agents custom); null where none are written.',
+  }),
+  error: Text.annotate({
+    description:
+      'Why a file there does not read, which stops every run naming the agent until it is cleared or written again; null where it reads.',
+  }),
 }).annotate({ identifier: 'AgentInstructions' });
 export type AgentInstructions = typeof AgentInstructions.Type;
 
 /** Custom instructions written (`PUT …/instructions`): what the agent is told after its instructions. The last write wins. */
-export const AgentInstructionsWrite = Schema.Struct({ words: Schema.String }).annotate({ identifier: 'AgentInstructionsWrite' });
+export const AgentInstructionsWrite = Schema.Struct({
+  words: Schema.String.annotate({ description: 'What the agent is told after its own instructions; the last write wins.' }),
+}).annotate({ identifier: 'AgentInstructionsWrite' });
 export type AgentInstructionsWrite = typeof AgentInstructionsWrite.Type;
 
 /** Custom instructions cleared (`DELETE …/instructions`): the file looked at, and whether there were words to remove. */
 export const AgentInstructionsCleared = Schema.Struct({
-  name: Schema.String,
-  file: Schema.String,
-  removed: Schema.Boolean,
+  name: Schema.String.annotate({ description: 'The agent whose instructions were cleared.' }),
+  file: Schema.String.annotate({ description: 'The file looked at.' }),
+  removed: Schema.Boolean.annotate({ description: 'Whether there were words to remove.' }),
 }).annotate({ identifier: 'AgentInstructionsCleared' });
 export type AgentInstructionsCleared = typeof AgentInstructionsCleared.Type;

@@ -63,16 +63,25 @@ export const RUN_PHASE_OF = {
 const stepPhaseFits = (phase: StepPhase, reason: StepReason): boolean =>
   phase === STEP_PHASE_OF[reason] || (reason === 'Unknown' && phase === 'failed');
 
-/** Whether a step's codes are a set the package makes. */
+/**
+ * Whether a step's codes are a set the package makes.
+ * @param codes The step's phase, its reason, what it waits on and where its answer is asked, as served.
+ */
 export const stepCodesLegal: StepCodesLegal = (codes) =>
   stepPhaseFits(codes.phase, codes.reason) &&
   (codes.on !== null) === (codes.reason === 'Waiting') &&
   (codes.via !== null) === (codes.reason === 'AwaitingAnswer');
 
-/** Whether a try's codes are a set the package makes. */
+/**
+ * Whether a try's codes are a set the package makes.
+ * @param codes The try's phase and its reason, as served.
+ */
 export const tryCodesLegal: TryCodesLegal = (codes) => stepPhaseFits(codes.phase, codes.reason);
 
-/** Whether a run's codes are a set the package makes: a run may await an answer and say no `via`, where no step of it does. */
+/**
+ * Whether a run's codes are a set the package makes: a run may await an answer and say no `via`, where no step of it does.
+ * @param codes The run's phase, its reason, what it waits on and where its answer is asked, as served.
+ */
 export const runCodesLegal: RunCodesLegal = (codes) =>
   codes.phase === RUN_PHASE_OF[codes.reason] &&
   (codes.on !== null) === (codes.reason === 'Waiting') &&

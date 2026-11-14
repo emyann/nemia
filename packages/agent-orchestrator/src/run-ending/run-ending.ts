@@ -19,11 +19,20 @@ export const RUN_ENDING: Readonly<Record<RunStatusWord, RunEnding>> = {
   cancelled: 'over',
 };
 
-/** How a run in `status` stands to its end (`RUN_ENDING`). */
+/**
+ * How a run stands to its end, by its status (`RUN_ENDING`).
+ * @param status The run in one word, as a pass worked it out from its steps.
+ */
 export const runEndingOf: RunEndingOf = (status) => RUN_ENDING[status];
 
-/** Whether a run in `status` has ended: it is broken or over, and files nothing until a person tries a step of it again. */
+/**
+ * Whether a run has ended: it is broken or over, and files nothing until a person tries a step of it again.
+ * @param status The run in one word, as a pass worked it out from its steps.
+ */
 export const runEnded = (status: RunStatusWord): boolean => runEndingOf(status) !== 'going';
 
-/** Whether a run in `status` is over for good: it succeeded or was called off, and nothing of it is tried again. */
+/**
+ * Whether a run is over for good: it succeeded or was called off, and nothing of it is tried again.
+ * @param status The run in one word, as a pass worked it out from its steps.
+ */
 export const runOver = (status: RunStatusWord): boolean => runEndingOf(status) === 'over';

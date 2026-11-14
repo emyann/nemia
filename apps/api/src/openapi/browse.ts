@@ -24,8 +24,9 @@ function titled(): unknown {
 }
 
 /**
- * The page's app: the worded document at the document's path, the reference page and its script beside it (`script` gives the
- * viewer's text), and the root sent to the page. It holds no store and guards nothing: there is nothing behind it but the document.
+ * The page's app: the worded document at the document's path, the reference page and its script beside it, and the root sent to the
+ * page. It holds no store and guards nothing: there is nothing behind it but the document.
+ * @param script Gives the text of the viewer's script, read where the machine is touched.
  */
 export const browseApp = (script: () => Promise<string>) => {
   const document = titled();

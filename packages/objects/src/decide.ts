@@ -88,13 +88,22 @@ export type SensitiveDiff = typeof SensitiveDiff.Type;
 /** The lesson line in the package's words, without its label, and which of its three it is (`LESSON_STATES`). */
 export const Lesson = Schema.Struct({
   said: Schema.String.annotate({ description: "The lesson line in the package's words, without its label." }),
-  state: Schema.Literals(LESSON_STATES).annotate({ description: 'Which of its three states the lesson is in.' }),
-}).annotate({ identifier: 'Lesson', description: 'What the run left as a lesson, in words, and its state.' });
+  state: Schema.Literals(LESSON_STATES).annotate({
+    description: 'Which of its three the line is: written where the next agent reads, nothing, or unknown.',
+  }),
+}).annotate({
+  identifier: 'Lesson',
+  description:
+    'The lesson line of the decision: whether the run wrote a lesson where the next agent reads, in words, and which of its three states it is.',
+});
 export type Lesson = typeof Lesson.Type;
 
 /** A command `nemia decide` offers, which the board only copies: its label, the bare line, the sentence it ends, and its step. */
 export const DecideCommand = Schema.Struct({
-  label: Schema.Literals(DECIDE_LABELS).annotate({ description: 'What the command does, as the label nemia decide prints it under.' }),
+  label: Schema.Literals(DECIDE_LABELS).annotate({
+    description:
+      'What the command does, as nemia decide labels it: land it, drop it, read it, once more, refresh, approve, send back, forget it.',
+  }),
   command: Schema.String.annotate({ description: 'The bare line to type.' }),
   said: Schema.NullOr(Schema.String).annotate({ description: 'The sentence the line ends, where it has one; null otherwise.' }),
   step: Schema.NullOr(Schema.String).annotate({ description: 'The step the command acts on; null for one about the whole run.' }),

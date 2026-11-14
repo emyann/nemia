@@ -664,3 +664,37 @@ test('--template names a builtin template by its name: an upgrade records the na
     assert.equal(programsAt(ROOT, builtins).reconciled(templated('from-folder')).conditions[0].reason, 'Upgraded');
   });
 });
+
+test("a conflict's resolution is checked against the tree the upgrade composes: a tally reading a field the same upgrade adds to an agent's schema", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir } = await applied('tallied');
+  const [given, schema] = ['agents/reviewer/output.schema.json', 'workflows/agents/reviewer.schema.json'];
+  const doc = JSON.parse(textIn(dir, given));
+  doc.properties.findings.items.properties.missed = { type: 'boolean', description: 'Whether an earlier round missed it.' };
+  doc.properties.findings.items.required.push('missed');
+  fs.writeFileSync(path.join(dir, given), `${JSON.stringify(doc, null, 2)}\n`);
+  edit(dir, 'nemia.yaml', (spec) => {
+    spec.version = '0.2.0';
+  });
+  edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+    spec.steps[1].tally = ['findings.missed'];
+  });
+  rewrite(treeDir(ROOT, 'tallied'), REVIEW, 'budget: 7', 'budget: 8');
+  const sets = ['--to', '0.2.0', '--set', 'budget=9'];
+  const { plan } = planIn(await previewOf('tallied', ...sets));
+  await main(['factory', 'upgrade', 'tallied', ...sets, '--plan', plan], noEngine());
+  const waiting = reconciled(templated('tallied'));
+  assert.deepEqual(
+    waiting.upgrade?.conflicts.map((c) => c.at),
+    [`${REVIEW}#budget`],
+    'the tally and the schema merge cleanly',
+  );
+  assert.doesNotMatch(textIn(treeDir(ROOT, 'tallied'), schema), /missed/, "the tree holds the schema before the upgrade's");
+  await main(['factory', 'resolve', 'tallied', `${REVIEW}#budget`, '--theirs'], noEngine());
+  const proposal: string = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'tallied'), 'utf8')).proposals?.['Workflow/dev'] ?? '';
+  const approved = await runWith(noEngine(), approveProgram(PERSON, 'tallied', proposal, { home: ROOT }));
+  assert.equal(approved?.status.phase, 'applied', approved?.status.message);
+  assert.equal(reconciled(templated('tallied')).conditions[0].reason, 'Upgraded');
+  assert.match(textIn(treeDir(ROOT, 'tallied'), REVIEW), /^tally: findings\.missed$/m);
+  assert.match(textIn(treeDir(ROOT, 'tallied'), schema), /"missed"/, "the clean merge's schema is the tree's once merged");
+});

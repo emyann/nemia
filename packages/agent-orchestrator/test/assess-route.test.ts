@@ -201,6 +201,26 @@ test('a gated condition holds its answered route for a person, and files on the 
   assert.deepEqual(approved.ready, ['build-web', 'log']);
 });
 
+test('a gated condition on a route in ends: holds the run awaiting approval, and it succeeds on the approval, filing nothing', () => {
+  const gated = TRIAGE.map((s) => (s.name === 'triage' ? { ...s, gate: true as const } : s));
+  const held = passOf({ filed: { plan: 'succeeded' }, surface: 'docs', steps: gated });
+  assert.deepEqual([held.a.ready, held.a.send], [[], []]);
+  assert.deepEqual(
+    ['build-web', 'build-backend', 'log', 'notes'].map((n) => held.words[n]),
+    ['skipped', 'skipped', 'skipped', 'skipped'],
+  );
+  assert.equal(held.a.status, 'awaiting approval');
+  held.run.approvals = [{ step: 'triage', try: 1, at: '2026-01-01T00:00:00Z' }];
+  const approved = assess(
+    aRead(gated, held.run, {
+      phaseOf: phases({ 't-plan': 'succeeded' }),
+      signedOff: (n) => (n === 'plan' ? { outcome: 'done', summary: 's', artifacts: [], output: { surface: 'docs' } } : undefined),
+    }),
+  );
+  assert.deepEqual([approved.ready, approved.send], [[], []]);
+  assert.equal(approved.status, 'succeeded');
+});
+
 test('a workflow node on the route taken is due its card, then reads sent and satisfies what follows', () => {
   const routed = TRIAGE.map((s) => (s.name === 'build-backend' ? { ...s, workflow: 'build' } : s));
   const due = passOf({ filed: { plan: 'succeeded', log: 'succeeded' }, surface: 'backend', steps: routed });

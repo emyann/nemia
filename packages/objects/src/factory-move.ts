@@ -9,11 +9,17 @@ import { Schema } from 'effect';
 import { TemplateGiven } from './factory.ts';
 
 /** A card that follows its factory: its name on the source and its file's text as the source holds it. */
-export const FactoryExportCard = Schema.Struct({ name: Schema.String, source: Schema.String });
+export const FactoryExportCard = Schema.Struct({
+  name: Schema.String.annotate({ description: 'Its name on the source.' }),
+  source: Schema.String.annotate({ description: "Its file's text as the source holds it." }),
+});
 export type FactoryExportCard = typeof FactoryExportCard.Type;
 
 /** A card of the factory that stays on the source, and why: a run started from it, which does not move. */
-export const FactoryExportLeft = Schema.Struct({ name: Schema.String, why: Schema.String });
+export const FactoryExportLeft = Schema.Struct({
+  name: Schema.String.annotate({ description: "The card's name." }),
+  why: Schema.String.annotate({ description: 'Why it stays: a run started from it, which does not move.' }),
+});
 export type FactoryExportLeft = typeof FactoryExportLeft.Type;
 
 /**
@@ -23,14 +29,25 @@ export type FactoryExportLeft = typeof FactoryExportLeft.Type;
  * follow it and those left behind. Nothing of the source is written by it.
  */
 export const FactoryExport = Schema.Struct({
-  name: Schema.String,
-  file: Schema.String,
-  folder: Schema.Struct({ archive: Schema.String }),
-  template: Schema.optionalKey(TemplateGiven),
-  instruction: Schema.optionalKey(Schema.Struct({ path: Schema.String, words: Schema.String })),
-  cards: Schema.Array(FactoryExportCard),
-  left: Schema.Array(FactoryExportLeft),
-  stays: Schema.Array(Schema.String),
+  name: Schema.String.annotate({ description: 'The factory.' }),
+  file: Schema.String.annotate({ description: "The factory's file, as text." }),
+  folder: Schema.Struct({
+    archive: Schema.String.annotate({ description: "The factory's folder packed as the store packs an archive, in base64." }),
+  }).annotate({ description: "The factory's folder, packed but for the folders named in stays." }),
+  template: Schema.optionalKey(
+    TemplateGiven.annotate({ description: 'The template it was made from, as a request gives one; absent for a hand-made factory.' }),
+  ),
+  instruction: Schema.optionalKey(
+    Schema.Struct({
+      path: Schema.String.annotate({ description: 'The path the instruction is kept at, outside its repositories.' }),
+      words: Schema.String.annotate({ description: "The instruction's words." }),
+    }).annotate({ description: "The instruction's words where they are kept at a path outside its repositories; absent otherwise." }),
+  ),
+  cards: Schema.Array(FactoryExportCard).annotate({ description: 'The cards in play that no run has started, which follow it.' }),
+  left: Schema.Array(FactoryExportLeft).annotate({ description: 'The cards that stay on the source, each with why.' }),
+  stays: Schema.Array(Schema.String).annotate({
+    description: "The folders of the factory left out of the packed folder, which belong to the source's store.",
+  }),
 });
 export type FactoryExport = typeof FactoryExport.Type;
 
@@ -46,19 +63,34 @@ export type MoveCards = (typeof MOVE_CARDS)[number];
  * fails.
  */
 export const FactoryImportWrite = Schema.Struct({
-  export: FactoryExport,
-  repos: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  volumes: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  from: Schema.String,
+  export: FactoryExport.annotate({ description: 'The export as the source answered it.' }),
+  repos: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.String).annotate({
+      description:
+        'The value for each repository by its path on the source: a git URL to clone, or a folder of this machine by its whole path.',
+    }),
+  ),
+  volumes: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.String).annotate({
+      description: 'The path for each volume by its name, or by its path on the source where it has no name.',
+    }),
+  ),
+  from: Schema.String.annotate({ description: "The store the factory came from, as the moved cards' line names it." }),
 });
 export type FactoryImportWrite = typeof FactoryImportWrite.Type;
 
 /** A volume as the target mounts it: its name (its path on the source where it has none) and its path on this machine. */
-export const FactoryImportedVolume = Schema.Struct({ name: Schema.String, path: Schema.String });
+export const FactoryImportedVolume = Schema.Struct({
+  name: Schema.String.annotate({ description: 'Its name, or its path on the source where it has none.' }),
+  path: Schema.String.annotate({ description: 'Its path on this machine.' }),
+});
 export type FactoryImportedVolume = typeof FactoryImportedVolume.Type;
 
 /** A card filed on the target: its name here, and the name it had on the source. */
-export const FactoryImportedCard = Schema.Struct({ name: Schema.String, was: Schema.String });
+export const FactoryImportedCard = Schema.Struct({
+  name: Schema.String.annotate({ description: 'Its name here.' }),
+  was: Schema.String.annotate({ description: 'The name it had on the source.' }),
+});
 export type FactoryImportedCard = typeof FactoryImportedCard.Type;
 
 /**
@@ -67,12 +99,14 @@ export type FactoryImportedCard = typeof FactoryImportedCard.Type;
  * (`nemia factory trust <name>`).
  */
 export const FactoryImported = Schema.Struct({
-  name: Schema.String,
-  file: Schema.String,
-  repos: Schema.Array(Schema.String),
-  cloned: Schema.Array(Schema.String),
-  volumes: Schema.Array(FactoryImportedVolume),
-  cards: Schema.Array(FactoryImportedCard),
-  untrusted: Schema.Array(Schema.String),
+  name: Schema.String.annotate({ description: 'The factory filed.' }),
+  file: Schema.String.annotate({ description: "Its file's path." }),
+  repos: Schema.Array(Schema.String).annotate({ description: 'Its repositories on this machine.' }),
+  cloned: Schema.Array(Schema.String).annotate({ description: 'The URLs cloned for it.' }),
+  volumes: Schema.Array(FactoryImportedVolume).annotate({ description: 'Its volumes.' }),
+  cards: Schema.Array(FactoryImportedCard).annotate({ description: 'Its cards, each with the name it had.' }),
+  untrusted: Schema.Array(Schema.String).annotate({
+    description: "Its places a harness does not trust: every one, since trusting them is the person's.",
+  }),
 });
 export type FactoryImported = typeof FactoryImported.Type;

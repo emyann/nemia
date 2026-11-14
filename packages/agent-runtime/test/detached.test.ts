@@ -269,8 +269,8 @@ const within = (t: Waiter, ok: () => boolean, what: string | (() => string)) => 
 /**
  * The worker of run `name` of spec `spec` in store `dir`, by the pid its run file says it published: what `stop` signals. Never by a
  * scan of the processes in `dir`: where the host makes scopes, the process the spawn launched starts the worker behind `--scope-by`
- * and lingers until it has read that pid, so a scan can find it first, and a signal sent to it never reaches the worker. Under load
- * that left the second-stop test's harness running to its timeout on CI (2026-11-13, `e46b993eb`).
+ * and lingers until it has read that pid, so a scan can find it first, and a signal sent to it never reaches the worker: a test that
+ * stops it waits on a harness that runs on to its timeout.
  */
 const workerOf = async (t: Waiter, dir: string, name: string, spec = 'sh') => {
   let pid = 0;

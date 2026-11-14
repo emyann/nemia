@@ -97,6 +97,7 @@ export type ListedTask = Pick<TaskView, 'id' | 'calling'> & {
  * The calls in flight of the sessions living in the daemon (`restartPolicy: 'Always'`), each read off `list`: the whole store once, for
  * the live sessions among it, then those sessions alone on each read after. A job is never among them: it runs on through a restart.
  * Each call is named by its task's run and step labels, or its id where it carries none.
+ * @param list The runtime's list of tasks: the whole store where given no ids, else the tasks of those ids alone.
  */
 export const attachedCalls = <E, R>(list: (ids?: readonly string[]) => Effect.Effect<{ views: readonly ListedTask[] }, E, R>) => {
   let ids: readonly string[] | undefined;
@@ -121,6 +122,9 @@ const engineList = (ids?: readonly string[]) => Effect.flatMap(EngineService, (e
 /**
  * The timeout a take-over gives the calls in flight: `--timeout` where given (`timeoutOf`), else the store's at `home` (`timeoutAt`).
  * Refused (`Invalid`): a `--timeout` that does not read, naming `by`'s flag, or a timeout file that does not read.
+ * @param args The command's parsed arguments, whose `timeout` is read where given.
+ * @param home The store's root, whose timeout file is read where no `--timeout` is given.
+ * @param by The command asking, which a refusal opens on (`nemia upgrade`, `nemia service restart`).
  */
 export const timeoutGiven = (args: Args, home: string, by: string): Effect.Effect<number, Refusal> =>
   tried(() => {
@@ -130,7 +134,12 @@ export const timeoutGiven = (args: Args, home: string, by: string): Effect.Effec
     return ms;
   });
 
-/** The live host of `nemia <verb>`, its take-over given the timeout `timeoutGiven` reads off `args` and the store at `home`. */
+/**
+ * The live host of `nemia <verb>`, its take-over given the timeout `timeoutGiven` reads off `args` and the store at `home`.
+ * @param args The command's parsed arguments, whose `--timeout` is read.
+ * @param home The store's root.
+ * @param verb The verb after `nemia`, which a refusal names.
+ */
 export const timedHost = (args: Args, home: string, verb: string): Effect.Effect<ServiceHost, Refusal> =>
   Effect.map(timeoutGiven(args, home, `nemia ${verb}`), (ms) => liveHost(home, ms));
 
@@ -139,6 +148,8 @@ export const timedHost = (args: Args, home: string, verb: string): Effect.Effect
  * runs is under `releases/current` (`pointedEntry`), so the service follows the pointer. A take-over gives the daemon's calls in
  * flight `timeoutMs` (`timeoutGiven`), ten minutes where none is given, and its pause names this process as its holder (`thisProcess`),
  * so the daemon's next pass lifts it once the command has ended.
+ * @param root The store's root.
+ * @param timeoutMs How long a take-over gives the daemon's calls in flight, in ms; ten minutes where not given.
  */
 export const liveHost = (root: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): ServiceHost => ({
   machine: machineOf,
@@ -542,7 +553,11 @@ const installedRead = (at: Placed): ServiceRead['unit'] => {
 /** What an upgrade asks of the store's service: the system's word on it, the entry its file runs, its start and its log. */
 export type ServiceForUpgrade = Started & { readonly state: UnitState | null; readonly entry: string | undefined };
 
-/** The service `--name` names on this machine, as installed, or null where the machine, the store or the name has none to ask. */
+/**
+ * The service `--name` names on this machine, as installed, or null where the machine, the store or the name has none to ask.
+ * @param args The command's parsed arguments, whose `--name` names the service.
+ * @param host The machine as the service sees it (`liveHost`).
+ */
 export function serviceForUpgrade(args: Args, host: ServiceHost): ServiceForUpgrade | null {
   let at: Placed;
   try {
@@ -567,7 +582,11 @@ export type ServiceAt = Started & {
   readonly state: UnitState | null;
 };
 
-/** The service `--name` names on this machine; refused (`Invalid`) where there is no system to run one, or a name the store forbids. */
+/**
+ * The service `--name` names on this machine; refused (`Invalid`) where there is no system to run one, or a name the store forbids.
+ * @param args The command's parsed arguments, whose `--name` names the service.
+ * @param host The machine as the service sees it (`liveHost`).
+ */
 export function serviceAt(args: Args, host: ServiceHost): ServiceAt {
   const at = placed(args, host);
   const installed = readUnit(at.file) !== null;

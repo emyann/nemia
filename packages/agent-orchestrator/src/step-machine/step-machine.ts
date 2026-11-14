@@ -103,7 +103,11 @@ export const STEP_EDGES: readonly StepEdge[] = [
   { from: 'over budget', to: 'pending', event: 'a round on your word, with a budget' },
 ];
 
-/** What a step reading `from` on one pass and `to` on the next did: stayed, moved along an edge, or a move the machine does not draw. */
+/**
+ * What a step reading `from` on one pass and `to` on the next did: stayed, moved along an edge, or a move the machine does not draw.
+ * @param from The step's status on one pass.
+ * @param to Its status on the next.
+ */
 export const stepMove: StepMove = (from, to) => {
   if (from === to) return { kind: 'stays' };
   const edge = STEP_EDGES.find((e) => e.from === from && e.to === to);
@@ -121,6 +125,7 @@ export const stepMachineGraph = (): StepMachineGraph => ({
 /**
  * A step's lifecycle as a Mermaid state diagram: each word named once, then the edges. Held in the package's README between `diagram:step`
  * markers.
+ * @param graph The machine drawn; the step's own where not given.
  */
 export const stepDiagram = (graph: StepMachineGraph = stepMachineGraph()): string => {
   const id = (s: StepStatus): string => STEP_STATES[s].id;

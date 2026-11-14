@@ -134,7 +134,10 @@ export type RunRead = {
   deadlineOf: (taskId: string) => number | null;
 };
 
-/** The UTC day of a time, `YYYY-MM-DD`. */
+/**
+ * The UTC day of a time, `YYYY-MM-DD`.
+ * @param at A time, as `Date` reads it.
+ */
 export const dayOf = (at: string): string => new Date(at).toISOString().slice(0, 10);
 
 /** A sum of what is known, null where nothing is. */
@@ -143,7 +146,10 @@ const knownSum = (values: ReadonlyArray<number | null | undefined>): number | nu
   return known.length ? known.reduce((n, v) => n + v, 0) : null;
 };
 
-/** The keys a run's facts carry. */
+/**
+ * The keys a run's facts carry.
+ * @param run The run's record.
+ */
 export const keysOf = (run: Run): RunKeys => ({
   run: run.id,
   factory: runNamespace(run.factory),
@@ -271,7 +277,10 @@ function runFactOf(r: RunRead): RunFact[] {
   ];
 }
 
-/** What one run's timeline gives: a fact per try that ended, and the run's own once it finished. */
+/**
+ * What one run's timeline gives: a fact per try that ended, and the run's own once it finished.
+ * @param r The run's record and its timeline, as read.
+ */
 export const factsOf = (r: RunRead): Pick<Facts, 'tries' | 'runs'> => ({ tries: tryFactsOf(r), runs: runFactOf(r) });
 
 /**
@@ -330,7 +339,10 @@ export type StepRow = {
  */
 export type SlowLanding = RunKeys & { day: string; step: string; try: number; checkMs: number; deadlineMs: number; share: number };
 
-/** Each try whose landing check passed in more than half its filed deadline (`SlowLanding`), in the order of the tries. */
+/**
+ * Each try whose landing check passed in more than half its filed deadline (`SlowLanding`), in the order of the tries.
+ * @param tries The facts of the tries, in their order.
+ */
 export const slowLandingsOf = (tries: readonly TryFact[]): SlowLanding[] =>
   tries.flatMap(({ run, factory, workflow, repo, day, step, try: n, check, checkMs, landingDeadlineMs: deadlineMs }) =>
     check === 'passed' && checkMs !== null && deadlineMs !== null && checkMs > deadlineMs / 2
@@ -378,7 +390,10 @@ const mean = (values: ReadonlyArray<number | null>): number | null => {
   return known.length ? known.reduce((n, v) => n + v, 0) / known.length : null;
 };
 
-/** The headline numbers of a set of facts (`Headline`). */
+/**
+ * The headline numbers of a set of facts (`Headline`).
+ * @param f The facts of the tries and of the runs.
+ */
 export function headlineOf(f: Pick<Facts, 'tries' | 'runs'>): Headline {
   const landed = f.runs.filter((r) => r.landed === true);
   return {
@@ -439,7 +454,11 @@ function stepRowsOf(tries: readonly TryFact[]): StepRow[] {
 
 const DAY_MS = 86_400_000;
 
-/** The day `n` days after `day` (before it, for a negative `n`). */
+/**
+ * The day `n` days after `day` (before it, for a negative `n`).
+ * @param day A day, `YYYY-MM-DD`.
+ * @param n How many days after it, negative for before.
+ */
 export const dayPlus = (day: string, n: number): string => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
 
 /** Every day from `from` to `to`, both included. */
@@ -499,6 +518,13 @@ const byKey = (a: string | null, b: string | null): number => (a === b ? 0 : a =
  * are always the last 14 days to `now`'s day and the 14 before. `healthOver` reads the system's health over the days answered: none
  * kept, unless handed. `taken` says the runs whose facts and marks are kept, of the query's selectors (`statsRun` reads them off the
  * runs' labels): every run's, unless handed — and a run left out is still compared with, as one another key leaves out.
+ * @param facts The store's facts and marks.
+ * @param query The keys filtered on, the key to go by, and the days kept.
+ * @param now The time the stats are as of.
+ * @param unreadable The runs left out because a journal of them does not read; none where not given.
+ * @param healthOver The system's health over the days answered, from the first, null where there is none, to the last; none kept where not
+ *   given.
+ * @param taken Whether the run of that id is kept, of the query's selectors; every run where not given.
  */
 export function statsOf(
   facts: Facts,
@@ -542,6 +568,8 @@ export type QueryKey = 'from' | 'to' | 'by' | ByKey;
  * A query off what a person gave, each value under the name its key has where they gave it (`nameOf`: `--by` on the command line, `by` on
  * the api). Refused with `Invalid`: a key to go by that is not one of `BY_KEYS`, a day that is not a real `YYYY-MM-DD`, a `from` after the
  * `to`, and an empty filter.
+ * @param given What the person gave, by the query's key.
+ * @param nameOf What the person calls a key, as a refusal names it.
  */
 export function statsQueryOf(given: Partial<Record<QueryKey, string>>, nameOf: (key: QueryKey) => string): StatsQuery {
   const by = given.by;

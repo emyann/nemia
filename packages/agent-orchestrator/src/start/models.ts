@@ -14,6 +14,7 @@ export type RunModels = Readonly<Record<string, string>>;
 /**
  * The models `pairs` name, each `<step>=<model>`, in the order written — or why they do not read, as the words after what named them:
  * a pair with no `=`, a blank step or model, one with a space in it, and a step named twice.
+ * @param pairs Each `<step>=<model>` as written.
  */
 export function modelsOf(pairs: readonly string[]): { models: Record<string, string> } | { why: string } {
   const models: Record<string, string> = {};
@@ -29,7 +30,10 @@ export function modelsOf(pairs: readonly string[]): { models: Record<string, str
   return { models };
 }
 
-/** The models as a card's `model:` line and `nemia start` say them: `implement=fable, review=opus`. */
+/**
+ * The models as a card's `model:` line and `nemia start` say them: `implement=fable, review=opus`.
+ * @param models The model of each step, by the step's name.
+ */
 export const modelsText = (models: RunModels): string =>
   Object.entries(models)
     .map(([step, model]) => `${step}=${model}`)
@@ -41,6 +45,9 @@ export const modelsText = (models: RunModels): string =>
  * operator configured it; and a step whose mode the model drops (`autoDropped`), naming the
  * models that keep it, as `nemia retry --model` is refused. What the harness refuses of the config the step is then filed with is the
  * start's next question (`configRefused`), asked of the steps with the models set (`withModels`).
+ * @param steps The workflow's steps.
+ * @param models The model of each step named, by the step's name.
+ * @param said What named a step's model, as a refusal opens on.
  */
 export function modelsRefusal(steps: readonly StepSpec[], models: RunModels, said: (step: string) => string): string | undefined {
   for (const [name, model] of Object.entries(models)) {
@@ -57,7 +64,11 @@ export function modelsRefusal(steps: readonly StepSpec[], models: RunModels, sai
   return undefined;
 }
 
-/** `steps` with each step `models` names on its model, every other as it is: what the run freezes, and what a revision it takes keeps. */
+/**
+ * `steps` with each step `models` names on its model, every other as it is: what the run freezes, and what a revision it takes keeps.
+ * @param steps The workflow's steps.
+ * @param models The model of each step named, by the step's name; undefined where none is named.
+ */
 export const withModels = <S extends Pick<StepSpec, 'name' | 'model'>>(steps: readonly S[], models: RunModels | undefined): S[] =>
   steps.map((s) => {
     const model = models?.[s.name];

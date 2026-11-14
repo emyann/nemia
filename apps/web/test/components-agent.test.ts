@@ -676,6 +676,7 @@ test("a link to a repository's agent, or to a node of a repository's workflow, k
       { from: 'factory' as const, workflow: 'dev', step: 'implement', hired: false },
       { from: 'factory' as const, workflow: 'build', step: 'review', hired: true },
       { from: 'factory' as const, workflow: 'build', step: 'review', hired: false },
+      { from: 'yours' as const, workflow: 'mine', step: 'ship', hired: true },
     ],
   };
   const html = renderToStaticMarkup(
@@ -684,6 +685,7 @@ test("a link to a repository's agent, or to a node of a repository's workflow, k
   );
   assert.match(html, /href="\/workflows\/repo\/dev\/implement\?factory=treed"/, "a repository's node, in the page's factory");
   assert.match(html, /href="\/workflows\/yours\/mine\/plan"/, 'a node of yours, with none');
+  assert.match(html, /href="\/workflows\/yours\/mine\/ship\?factory=treed"/, 'a step of yours the factory hires it into, in that factory');
   assert.equal(
     html.match(/href="\/workflows\/factory\/build\/review\?factory=treed"/g)?.length,
     1,

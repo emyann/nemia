@@ -19,6 +19,10 @@ import type { FillPlace, FilledStep } from './roster.ts';
 /**
  * The file a start of the workflow in `workflowDir` runs for the agent `name`: `agents/<name>.md` in the first of its `lookupRoots` that
  * has one, resolved. None for a name no root has, and for a name holding a path separator, which names no file of `agents/`.
+ *
+ * @param workflowDir the workflow's folder, whose own `agents/` is looked in first
+ * @param name the agent's name, as a step's `agent:` line or a hire writes it
+ * @param places the repository and the store whose folders are looked in after it
  */
 export function agentFileOf(workflowDir: string, name: string, places: Places): string | undefined {
   if (/[\\/]/.test(name)) return undefined;
@@ -66,6 +70,10 @@ function filledIn(from: FillPlace, dir: string, workflow: string, hires: Readonl
  * names. A factory made from a template reads each workflow from the first of those that holds it, as a start in it reads one by its
  * name; any other, from each. In the order they are listed: by place, then workflow, then step; the store's alone where there is no
  * repository. Throws where a place's folder cannot be listed (`foldersIn`).
+ *
+ * @param repo the repository whose `workflows/` is read, or none to read the store's alone
+ * @param home the store, whose `workflows/` is read and whose agents a start finds
+ * @param factory the factory read in, whose attached workflows, hires and tree are read; none for the default factory, every workflow
  */
 export function stepsFilled(repo: string | undefined, home: string, factory?: Factory): FilledStep[] {
   const places: Places = repo === undefined ? { home } : { repo, home };
@@ -104,6 +112,9 @@ const filesFilledBy = (factory: Factory, home: string): string[] =>
 /**
  * Each agent file one of `factories` (`readFactories`) fills a step with, and the names of those factories, sorted and named once. A
  * factory whose file does not read fills nothing, and hides no other.
+ *
+ * @param factories the factories as their files list them, each read on each of its repositories
+ * @param home the store each factory's steps are read with
  */
 export function factoriesFilling(factories: readonly FactoryListing[], home: string): Map<string, string[]> {
   const byFile = new Map<string, Set<string>>();

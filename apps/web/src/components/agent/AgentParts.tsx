@@ -42,8 +42,8 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
 }
 
 /**
- * A node that names an agent, or a step it fills, linked to its step's page: `workflow › step`; a repository's or a factory's own, in the
- * factory and repository the page is in, the default factory reading no repository.
+ * A node that names an agent, or a step it fills, linked to its step's page: `workflow › step`; a repository's, a factory's own, and a
+ * step of yours a factory hires it into, in the factory and repository the page is in, the default factory reading no repository.
  */
 function NodeLink({ user }: { user: AgentUser | AgentFill }) {
   const here = usePlaceHere();
@@ -51,7 +51,7 @@ function NodeLink({ user }: { user: AgentUser | AgentFill }) {
     <RouteLink
       to="/workflows/$from/$workflow/$step"
       params={{ from: user.from, workflow: user.workflow, step: user.step }}
-      search={user.from === 'yours' ? {} : here}
+      search={user.from === 'yours' && !('hired' in user && user.hired) ? {} : here}
       data-node={`${user.workflow}/${user.step}`}
       className={cn('font-mono text-body-small text-foreground', LINK)}
     >

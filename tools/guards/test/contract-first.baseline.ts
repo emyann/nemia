@@ -45,5 +45,4 @@ export const READS_ITS_CODE: readonly string[] = [
   'packages/agent-runtime/contracts/permission.contract.ts',
   'packages/agent-runtime/contracts/stop.contract.ts',
   'packages/agent-runtime/contracts/transport.contract.ts',
-  'packages/objects/contracts/discovery.contract.ts',
 ];

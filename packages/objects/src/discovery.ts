@@ -7,9 +7,11 @@
  * Kubernetes' words. The parser is pure.
  */
 import { Schema } from 'effect';
-import type { ResourcesOf } from '../contracts/discovery.contract.ts';
+import type { ApiRoute, KindPlural, Resource, ResourcesOf, RouteMethod } from '../contracts/discovery.contract.ts';
 import { API_VERSION } from './meta.ts';
 import { KINDS, RESOURCE_VERBS, type ResourceVerb } from './words.ts';
+
+export type { ApiRoute, KindPlural, Resource, RouteMethod } from '../contracts/discovery.contract.ts';
 
 /** One resource the api serves: its name (a plural, or `<plural>/<sub>`), its singular, its scope, its kind and its verbs. */
 export const APIResource = Schema.Struct({
@@ -29,27 +31,6 @@ export const APIResourceList = Schema.Struct({
   resources: Schema.Array(APIResource),
 });
 export type APIResourceList = typeof APIResourceList.Type;
-
-/** A method a route of the `Api` answers, as discovery reads it. */
-export type RouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-
-/**
- * A route as its path reads: the plural after `/api/` or `/api/namespaces/:namespace/`, whether it is under a namespace, whether a name
- * follows the plural (`item`), and the words after it with the names left out (`sub`, `steps/retry`), null where none follow.
- */
-export type ApiRoute = {
-  readonly method: RouteMethod;
-  readonly plural: string;
-  readonly namespaced: boolean;
-  readonly item: boolean;
-  readonly sub: string | null;
-};
-
-/** A kind the api serves, and the plural its paths name it by. */
-export type KindPlural = { readonly kind: string; readonly plural: string };
-
-/** A resource discovery lists: its name (a plural, or `<plural>/<sub>`), its kind, whether a namespace holds it, and its verbs. */
-export type Resource = { readonly name: string; readonly kind: string; readonly namespaced: boolean; readonly verbs: ResourceVerb[] };
 
 /** The methods discovery reads a route of, each a verb of Kubernetes'. */
 const ROUTE_METHODS: readonly RouteMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];

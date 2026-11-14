@@ -210,6 +210,31 @@ export const plistText = (spec: ServiceSpec): string =>
 export const unitPathOf = (system: ServiceSystem, name: string, dirs: { home: string; configHome: string }): string =>
   system === 'systemd' ? `${dirs.configHome}/systemd/user/${name}.service` : `${dirs.home}/Library/LaunchAgents/${name}.plist`;
 
+/**
+ * The slice the sessions of the service `name` run under, which `nemia service install --size auto` writes on systemd and points
+ * `WF_CGROUP_PARENT` at: `<name>-sessions.slice`, a name `cgroupParent` reads. Its dash places it under systemd's `<name>.slice`.
+ */
+export const sessionsSliceOf = (name: string): string => `${name}-sessions.slice`;
+
+/** The sessions' slice's file, beside the service's user unit under `configHome` (`~/.config`). */
+export const slicePathOf = (name: string, dirs: { configHome: string }): string =>
+  `${dirs.configHome}/systemd/user/${sessionsSliceOf(name)}`;
+
+/**
+ * The sessions' slice of the service `name`: its ceiling (`MemoryMax=`) at `ceilingBytes`, what the machine allocates to sessions, so a
+ * burst of sessions that grow together is killed inside the slice, never the daemon, sshd or the machine. Written in bytes, so that no
+ * suffix's base is in question.
+ */
+export const sliceText = ({ name, ceilingBytes }: { name: string; ceilingBytes: number }): string =>
+  [
+    '[Unit]',
+    `Description=${percent(`Sessions of the Nemia daemon ${name}, held together to what the machine allocates`)}`,
+    '',
+    '[Slice]',
+    `MemoryMax=${ceilingBytes}`,
+    '',
+  ].join('\n');
+
 /** The unit's file name as systemd knows it, or the agent's label. */
 export const unitName = (system: ServiceSystem, name: string): string => (system === 'systemd' ? `${name}.service` : name);
 

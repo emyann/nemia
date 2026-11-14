@@ -136,6 +136,11 @@ export async function loadPages(dir = PAGES_DIR): Promise<PageSpec[]> {
  * name that is no page (listing the pages there are), `--pages` with no name after it, `--workers` with no whole number of one or more,
  * one of `--shard` and `--of` without the other, `--shard` with `--pages`, a shard past the shards there are, and an `--of` past the
  * pages there are.
+ *
+ * Whether it runs the `look`'s browser tests (`test/e2e/*.test.ts`, `LOOK_TESTS` in look.ts), before it builds anything: with `--look`, or
+ * with no selector at all (`--pages`, `--shard`, `--look`), the whole e2e. `--look` alone visits no page and is no whole run; `--look
+ * --pages <name,…>` runs both. Refuses `--look` with `--shard`, since the look runs once per push (CI's `e2e-look` job) and not once per
+ * shard, and `--look` with no `--pages` beside `--photos`, `--contrast` or `--workers`, which are about pages it would not visit.
  */
 export function planOf<P extends { name: string }>(
   argv: readonly string[],
@@ -148,7 +153,9 @@ export function planOf<P extends { name: string }>(
   workers?: number;
   shard?: { i: number; of: number };
   whole: boolean;
+  look: boolean;
 } {
+  let look = false;
   let photos = false;
   let measured = false;
   let named: string[] | undefined;
@@ -156,7 +163,8 @@ export function planOf<P extends { name: string }>(
   let shard: number | undefined;
   let of: number | undefined;
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--photos') photos = true;
+    if (argv[i] === '--look') look = true;
+    else if (argv[i] === '--photos') photos = true;
     else if (argv[i] === '--contrast') measured = true;
     else if (argv[i] === '--pages') named = namesAfter(argv[++i]);
     else if (argv[i] === '--workers') workers = workersAfter(argv[++i]);
@@ -164,7 +172,7 @@ export function planOf<P extends { name: string }>(
     else if (argv[i] === '--of') of = wholeAfter('--of', 'the whole number of shards', argv[++i]);
     else
       throw new Error(
-        `the e2e takes --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not ${argv[i]}: ` +
+        `the e2e takes --look, --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not ${argv[i]}: ` +
           'npm run e2e -- --photos --pages <name,…>',
       );
   }
@@ -182,6 +190,16 @@ export function planOf<P extends { name: string }>(
           `give --of ${pages.length} at most`,
       );
   }
+  if (look && shard !== undefined)
+    throw new Error(
+      "--look runs the look's tests once, and a shard is one of several runs of the pages: run them apart " +
+        '(npm run e2e -- --look, and npm run e2e -- --shard 1 --of 4)',
+    );
+  if (look && !named && (photos || measured || workers !== undefined))
+    throw new Error(
+      '--photos, --contrast and --workers are about the pages a run visits, and --look alone visits none: name them ' +
+        '(npm run e2e -- --look --pages <name,…> --photos)',
+    );
   if (measured && !photos)
     throw new Error('--contrast measures what is pictured, and nothing is without --photos: npm run e2e -- --photos --contrast');
   const themes: Theme[] = photos ? ['light', 'dark'] : ['dark'];
@@ -195,9 +213,11 @@ export function planOf<P extends { name: string }>(
       workers,
       shard: { i: shard, of },
       whole: false,
+      look: false,
     };
   }
-  if (!named) return { visit: [...pages], themes, pictured: () => photos, measured, workers, whole: !photos };
+  if (look && !named) return { visit: [], themes, pictured: () => false, measured, workers, whole: false, look };
+  if (!named) return { visit: [...pages], themes, pictured: () => photos, measured, workers, whole: !photos, look: true };
   const all = pages.map((p) => p.name);
   const unknown = named.filter((name) => !all.includes(name));
   if (unknown.length)
@@ -210,6 +230,7 @@ export function planOf<P extends { name: string }>(
     measured,
     workers,
     whole: false,
+    look,
   };
 }
 

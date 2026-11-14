@@ -327,8 +327,11 @@ MemoryHigh=11G
 MemoryMax=13G
 ```
 
-then `systemctl --user daemon-reload` and `systemctl --user restart nemia.service`. Without the variable each scope is made in the user
-manager's root slice, bounded by its own limit alone. Sessions already at work when the limit is set keep running where they started:
+then `systemctl --user daemon-reload` and `systemctl --user restart nemia.service`. `nemia service install --size auto` writes such a
+slice itself, `nemia-sessions.slice`, its `MemoryMax=` at the machine's memory less the floor (`WF_MEMORY_RESERVED`), and points the
+unit's `WF_CGROUP_PARENT` at it; the hand-written slice above is the operator's alternative. A drop-in's `WF_CGROUP_PARENT` is read
+after the unit and overrides it: the daemon then keeps the drop-in's slice, and `nemia doctor` judges that one. Without the variable
+each scope is made in the user manager's root slice, bounded by its own limit alone. Sessions already at work when the limit is set keep running where they started:
 only tasks filed afterwards are scoped. `nemia up` says the limit, and the slice, on its start lines.
 
 ### Admission by memory, and sizing an existing install
@@ -343,8 +346,13 @@ session asks its whole limit, so a machine sized for its sessions' limits may ad
 2. **Size it**, either by `nemia service install --size auto`, which writes `WF_MAX_CONCURRENT`, `WF_MEMORY_LIMIT` and
    `WF_MEMORY_REQUEST` for this machine (`--env` keeps what you give it), or by setting `WF_MEMORY_REQUEST` yourself, in the unit's
    `--env` or the drop-in beside `WF_MEMORY_LIMIT`: `Environment=WF_MEMORY_REQUEST=2560Mi`, at or under the limit.
-3. **Restart the daemon** (`systemctl --user daemon-reload`, then `systemctl --user restart nemia.service`), and read `nemia doctor`
-   again: its `memory-fit` piece is met.
+3. **Cap the sessions together.** Admission bounds what starts, not what grows: sessions admitted by their requests can still grow
+   together toward their limits and take the machine. `nemia doctor`'s `sessions-slice` piece reads the ceiling of the slice the
+   daemon's sessions run under (`WF_CGROUP_PARENT`) and says when there is no slice, it has no ceiling, or its ceiling is above what
+   the machine allocates. `nemia service install --size auto` writes `nemia-sessions.slice` at that ceiling; for a slice of your own,
+   `systemctl --user set-property <slice> MemoryMax=<bytes>`, the command the piece names, applies it at once and keeps it.
+4. **Restart the daemon** (`systemctl --user daemon-reload`, then `systemctl --user restart nemia.service`), and read `nemia doctor`
+   again: its `memory-fit` and `sessions-slice` pieces are met.
 
 ## Moving the factory onto a release
 

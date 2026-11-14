@@ -3,9 +3,9 @@
  * GitHub, and the receipt that it happened. A Bash prefix rule cannot tell `gh pr merge 7` from `gh pr merge 9`, and `gh` is denied whole
  * to the agents that land, so the act is this script, read from the run's frozen carried files (`$WF_CARRIED_FILES`) and run with `node`,
  * as `pull-request.ts` carries the push and the pull request. It imports `ci-log.ts`, beside it, for how a check of a commit reads,
- * `exec.ts`, for how a command is run and CI waited on, as `pull-request.ts` does, and `refresh.ts`, for the landing refresh: the run
- * freezes the carried folder whole, so a script may import a sibling it holds. It is told the name of
- * the CI context it reads (`--check <name>`), since that name is the repository's, never the script's.
+ * `exec.ts`, for how a command is run and CI waited on, and `rerun.ts`, for the one re-run of a red, as `pull-request.ts` does, and
+ * `refresh.ts`, for the landing refresh: the run freezes the carried folder whole, so a script may import a sibling it holds. It is
+ * told the name of the CI context it reads (`--check <name>`), since that name is the repository's, never the script's.
  *
  * - `merge --run <id> --subject <line> --body-file <f> --check <name>`, which the landing session types once its step has been filed — on a
  *   person's approval in `build`, or by the workflow in `quick`, where the review's pass files it: it refuses anything but this run's own
@@ -40,7 +40,11 @@
  *   (`WF_CI_START_SECONDS`), 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval, inside the landing check's own
  *   deadline, the whole of it while another check at the merge still runs (a context that sums up other jobs comes once they end).
  *   Green passes. Red refuses, naming the jobs that did not pass — unless the base's tip holds the merge and the context is green there,
- *   which passes and says so. A merge whose own run was cancelled (a CI's pending run replaced by a newer push's) or never reported is
+ *   which passes and says so — but only once the failed jobs of each red Actions run at the merge were re-run, once, by the rule
+ *   `pull-request.ts`'s wait keeps (`rerun.ts`, which both import: only while GitHub says the run's `run_attempt` is 1, so a retry of the
+ *   land step never re-runs it twice), and waited on within the same bound: a green second time passes, naming the jobs re-run and how
+ *   each ended; red again refuses, naming them too and saying the base is broken, not flaky, with the merge commit's checks to read.
+ *   A merge whose own run was cancelled (a CI's pending run replaced by a newer push's) or never reported is
  *   read at the base's tip where it holds the merge, by GitHub's compare (`ahead` or `identical`): green there passes, saying which
  *   commit was read and why, red there refuses naming that commit, and anything else waits on. A read of GitHub that fails — `gh` timing
  *   out, exiting non-zero, or answering no JSON — is no verdict: the wait reads again within the whole bound, and a read still failing
@@ -65,6 +69,7 @@ import {
   PASSED,
   type Seen,
   greenLater,
+  latest,
   listing,
   named,
   noVerdict,
@@ -78,6 +83,7 @@ import {
 } from './ci-log.ts';
 import { POLL_SECONDS, Refusal, START_SECONDS, WHOLE_SECONDS, authed, base, git, noGh, run, seconds, sleep } from './exec.ts';
 import { type Refreshed, bodyFileOf, lacksBase, recorded, refresh } from './refresh.ts';
+import { type Rerun, redTwice, rerunOnce, rerunSaid, seenAfter } from './rerun.ts';
 
 /** The one `mergeable` GitHub gives a pull request that can be merged now; `CONFLICTING` and `UNKNOWN` are both refusals. */
 const MERGEABLE = 'MERGEABLE';
@@ -87,7 +93,7 @@ const STEP = 'land';
 
 /**
  * An entry of a commit's checks: a check run, or a status context, as `gh pr view --json statusCheckRollup` gives one, or as `entriesAt`
- * maps one read over REST. Apart from `pull-request.ts`'s on purpose: a landing re-runs no workflow, so it reads no `workflowName`.
+ * maps one read over REST. Apart from `pull-request.ts`'s on purpose: REST's check runs name no workflow, so it reads no `workflowName`.
  */
 type Entry = Partial<Record<'name' | 'context' | 'status' | 'state' | 'conclusion' | 'detailsUrl' | 'targetUrl' | 'startedAt', string>>;
 
@@ -525,7 +531,7 @@ function receipt(args: string[]): string[] {
       `\`${check}\` at ${oid.slice(0, 12)} was not waited on again: it has the same tree as ${fresh.headRefOid.slice(0, 12)}, ` +
         'the refreshed head it passed at',
     ];
-  return [...before, ...proven, ciAt(pr, oid, onto, check, id, began)];
+  return [...before, ...proven, ...ciAt(pr, oid, onto, check, id, began)];
 }
 
 /**
@@ -703,40 +709,57 @@ function readAt(sha: string): { entries: Entry[]; unread?: string } {
 }
 
 /**
- * The CI context `check` at `oid`, the merge of `pr` on `onto`, waited out within the bounds: a line where it passed, a refusal where it
- * did not, never came, or never finished (`judgedAt`). A context that sums up other jobs is reported only once they end, so while any
- * check at the merge runs it has the whole bound, not the start's.
+ * The CI context `check` at `oid`, the merge of `pr` on `onto`, waited out within the bounds: the lines where it passed, a refusal where
+ * it did not, never came, or never finished (`judgedAt`). A context that sums up other jobs is reported only once they end, so while any
+ * check at the merge runs it has the whole bound, not the start's. A red is re-run once first (`rerun.ts`), within the same bound, and
+ * every line after says what was re-run and how it ended.
  */
-function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string, began = Date.now()): string {
+function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string, began = Date.now()): string[] {
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);
   const l: Landing = { number: pr.number, url: pr.url, oid, onto, check };
+  const again: Again = { asked: false };
   for (;;) {
-    const { entries, unread } = readAt(oid);
+    const { entries: all, unread } = readAt(oid);
+    const entries = latest(all);
     const ours = named(entries, check);
-    const said = unread === undefined ? judgedAt(l, entries, ours, id) : undefined;
-    if (said) return said;
+    const said = unread === undefined ? judgedAt(l, entries, ours, id, again) : undefined;
+    if (said) return [...rerunSaid(again.rerun, entries).map((line) => line.trim()), said];
     const bound = unread === undefined && ours.length === 0 && !entries.some(pending) ? start : whole;
-    if (Date.now() - began >= bound * 1000) throw new Refusal([unfinished(l, entries, bound, unread), stands(l), retryLine(id)].join('\n'));
+    if (Date.now() - began >= bound * 1000)
+      throw new Refusal([unfinished(l, entries, bound, unread), ...rerunSaid(again.rerun, entries), stands(l), retryLine(id)].join('\n'));
     sleep(poll);
   }
 }
 
+/** The receipt's one re-run of a red at the merge, carried across the polls of one wait: whether it was asked, and what it re-ran. */
+type Again = { asked: boolean; rerun?: Rerun<Entry> };
+
 /**
- * The merge's checks read once: a line where `ours` passed, or where they are red or carry no verdict of their own (`superseded`: never
- * reported, or every run cancelled, as a CI does whose pending run a newer push replaced) and the base's tip that holds the merge
- * (`later`) passed; a refusal where the merge is red and the tip did not pass, or the merge has no verdict and the tip is red; none, to
- * wait on, where neither has a verdict yet.
+ * The merge's checks read once: a line where `ours` passed — the second time, where a red was re-run — or where they are red or carry no
+ * verdict of their own (`superseded`: never reported, or every run cancelled, as a CI does whose pending run a newer push replaced) and
+ * the base's tip that holds the merge (`later`) passed; none, to wait on, where a red at the merge was just re-run (`again`, once a
+ * wait, and only a run on its first attempt) or a job re-run still shows its first time; a refusal where the merge is red and was not
+ * re-run, or red again after it, and the tip did not pass, or the merge has no verdict and the tip is red; none, to wait on, where neither
+ * has a verdict yet.
  */
-function judgedAt(l: Landing, entries: readonly Entry[], ours: readonly Entry[], id: string): string | undefined {
-  const seen = seenOf(ours);
+function judgedAt(l: Landing, entries: readonly Entry[], ours: readonly Entry[], id: string, again: Again): string | undefined {
+  const seen = seenAfter(again.rerun, entries, ours);
   if (seen === 'passed') return `\`${l.check}\` passed on \`${l.onto}\` at ${l.oid.slice(0, 12)}, the merge commit`;
   const none = superseded(ours) ? noVerdict(ours) : undefined;
   if (seen !== 'failed' && none === undefined) return undefined;
   const tip = later(l.oid, l.onto, l.check);
   if (tip?.seen === 'passed') return greenLater(l, tip.sha, none);
-  if (none === undefined) throw new Refusal([...reddened(l, l.oid, entries), retryLine(id)].join('\n'));
+  if (none === undefined) {
+    if (!again.asked) {
+      again.asked = true;
+      again.rerun = rerunOnce(ours, entries);
+      if (again.rerun?.runs.length) return undefined;
+    }
+    const twice = redTwice(again.rerun, entries);
+    throw new Refusal([...reddened(l, l.oid, entries, undefined, rerunSaid(again.rerun, entries), twice), retryLine(id)].join('\n'));
+  }
   if (tip?.seen === 'failed') throw new Refusal([...reddened(l, tip.sha, tip.entries, none), retryLine(id)].join('\n'));
   return undefined;
 }

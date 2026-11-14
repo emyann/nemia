@@ -133,7 +133,7 @@ export function failures(log: string): { lines: string[]; tests: boolean } {
  * A check of a commit, a check run or a status context, as either script reads one: each field absent where GitHub gives none.
  * `startedAt` is when a check run started; Go's zero time (`0001-01-01T00:00:00Z`) for one still queued.
  */
-type Check = Partial<Record<CheckField, string>>;
+export type Check = Partial<Record<CheckField, string>>;
 type CheckField = 'name' | 'context' | 'status' | 'state' | 'conclusion' | 'detailsUrl' | 'targetUrl' | 'workflowName' | 'startedAt';
 
 /** The one conclusion that is a pass: a skipped, cancelled or neutral CI context is no verdict to land on. */
@@ -276,19 +276,24 @@ function unreported(l: Landing, entries: readonly Check[], secs: number): string
 /**
  * The refusal of a red context at `sha` on the base, its retry line left to the caller: where — the merge, which turned the base red,
  * or the base's tip, which holds the merge that had `none` of its own — the jobs that did not pass with their URLs, and what a person
- * does.
+ * does. `rerun`, the lines that say what the receipt re-ran and how it ended, or why it re-ran nothing, follow the first line; where
+ * `twice`, a job re-ran red again, so the base is broken, not flaky, and the refusal says so and points at the commit's checks.
  */
-export function reddened(l: Landing, sha: string, entries: readonly Check[], none?: string): string[] {
+export function reddened(l: Landing, sha: string, entries: readonly Check[], none?: string, rerun: string[] = [], twice = false): string[] {
   const [at, merge] = [sha.slice(0, 12), `the merge of #${l.number}`];
   return [
     none === undefined
       ? `\`${l.check}\` is red on \`${l.onto}\` at ${at}, ${merge}: this landing turned the base branch red.`
       : `\`${l.check}\` is red on \`${l.onto}\` at ${at}, the base's tip, which holds ${l.oid.slice(0, 12)}, ${merge}: ${none}. ` +
         'The base branch is red there.',
+    ...rerun,
     stands(l),
     `  The jobs that did not pass (${commitUrl(l, sha)}):`,
     ...listing(entries.filter((entry) => !pending(entry) && !NOT_FAILED.has(verdict(entry)))),
-    '  Where CI failed on its own account, a person re-runs the failed jobs; where the change broke it, a fix is landed. Then the ' +
-      'step is retried, which reads the merge and the base again.',
+    twice
+      ? `  Red twice, the second time after a re-run: this is a real break of \`${l.onto}\`, not a flake. Read its checks at ` +
+        `${commitUrl(l, sha)}/checks, land a fix, then retry the step, which reads the merge and the base again.`
+      : '  Where CI failed on its own account, a person re-runs the failed jobs; where the change broke it, a fix is landed. Then the ' +
+        'step is retried, which reads the merge and the base again.',
   ];
 }

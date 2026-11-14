@@ -111,6 +111,15 @@ test('each kind of line decodes as the feed’s writers write it, and as a line 
     assert.deepEqual(read.labels, { run: 'r-1', workflow: 'build', team: 'core' });
     assert.equal(Schema.is(RunLine)({ ...line, labels: { run: 'r-1', team: 3 } }), false);
   });
+  await t.test("a person's act keeps who acted, a run's line and the store's alike; a line written before actors reads with none", () => {
+    const actor = { kind: 'person', token: 'laptop' } as const;
+    const approved = { ...upgraded({ at: AT, run: 'r-1', step: 'plan', word: 'approved', note: `try 1 · at ${AT}` }), actor };
+    const paused = { ...upgraded({ at: AT, store: STORE, word: 'store paused', note: `since ${AT}`, by: 'ann' }), actor };
+    assert.deepEqual(Schema.decodeUnknownSync(RunLine)(approved).actor, actor);
+    assert.deepEqual(Schema.decodeUnknownSync(StoreLine)(paused).actor, actor);
+    assert.equal('actor' in Schema.decodeUnknownSync(RunLine)(upgraded({ at: AT, run: 'r-1', word: 'cancel asked' })), false);
+    assert.equal(Schema.is(RunLine)({ ...approved, actor: { kind: 'robot' } }), false, 'an actor of no kind is refused');
+  });
   await t.test('REFUSED: a daemon line of another word', () =>
     assert.equal(Schema.is(DaemonLine)({ at: AT, daemon: 1, word: `not ${DAEMON_STARTED}` }), false),
   );

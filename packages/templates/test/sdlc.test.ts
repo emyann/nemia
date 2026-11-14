@@ -17,6 +17,7 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { FACTORY_APPLY, loadWorkflows } from 'agent-orchestrator';
 import { parseAgent, parseFolder, parseWorkflow, splitFrontmatter } from 'agent-orchestrator/workflow';
+import { assess } from 'agent-orchestrator/run';
 import { PERSONS_EXIT } from '../sdlc/carried/exec.ts';
 import { scratch } from 'test-kit/scratch';
 import { copyOf, filesUnder, handled, nemia, rendered, SDLC, storeEnv } from './template.ts';
@@ -261,24 +262,30 @@ test("each step that writes its own output has its schema beside it, the templat
     );
 });
 
+/** The intake of the factory `name`, parsed with Iris as a run reads it. */
+const intakeOf = (name: string) => {
+  const folder = path.join(treeOf(name), 'workflows', 'intake');
+  const files = fs
+    .readdirSync(folder)
+    .filter((leaf) => leaf.endsWith('.md') && leaf !== 'README.md')
+    .map((leaf) => [leaf.slice(0, -'.md'.length), fs.readFileSync(path.join(folder, leaf), 'utf8')] as const);
+  const readIn = (dir: string) => (file: string) => {
+    const at = path.join(dir, file);
+    return fs.existsSync(at) ? fs.readFileSync(at, 'utf8') : undefined;
+  };
+  const agents = path.join(treeOf(name), 'workflows', 'agents');
+  const iris = parseAgent('iris', fs.readFileSync(path.join(agents, 'iris.md'), 'utf8'), readIn(agents));
+  const steps = parseFolder(files, readIn(folder), new Map([['iris', iris]]), undefined, {
+    factory: name,
+    workflow: 'intake',
+    agents: { intake: 'iris' },
+  });
+  return steps;
+};
+
 for (const name of ['set', 'plain'])
-  test(`rendered ${name === 'set' ? 'on GitHub' : 'in the checkout'}, intake loads, ending in the condition next that routes to build or quick`, () => {
-    const folder = path.join(treeOf(name), 'workflows', 'intake');
-    const files = fs
-      .readdirSync(folder)
-      .filter((leaf) => leaf.endsWith('.md') && leaf !== 'README.md')
-      .map((leaf) => [leaf.slice(0, -'.md'.length), fs.readFileSync(path.join(folder, leaf), 'utf8')] as const);
-    const readIn = (dir: string) => (file: string) => {
-      const at = path.join(dir, file);
-      return fs.existsSync(at) ? fs.readFileSync(at, 'utf8') : undefined;
-    };
-    const agents = path.join(treeOf(name), 'workflows', 'agents');
-    const iris = parseAgent('iris', fs.readFileSync(path.join(agents, 'iris.md'), 'utf8'), readIn(agents));
-    const steps = parseFolder(files, readIn(folder), new Map([['iris', iris]]), undefined, {
-      factory: name,
-      workflow: 'intake',
-      agents: { intake: 'iris' },
-    });
+  test(`rendered ${name === 'set' ? 'on GitHub' : 'in the checkout'}, intake loads, ending in the condition next that routes to build or quick, or ends the run`, () => {
+    const steps = intakeOf(name);
     const of = (step: string) => steps.find((s) => s.name === step);
     assert.deepEqual(
       steps.map((s) => s.name),
@@ -286,10 +293,70 @@ for (const name of ['set', 'plain'])
     );
     assert.equal(of('intake')?.gate ?? false, false, 'the gate is on the condition, so the intent is approved with its route');
     assert.equal(of('next')?.gate, true);
-    assert.deepEqual(of('next')?.routes, ['build', 'quick']);
-    assert.deepEqual(of('next')?.route, { kind: 'table', from: 'intake.needsDesign', table: { yes: 'build', no: 'quick' } });
+    assert.deepEqual(of('next')?.routes, ['build', 'quick', 'end']);
+    assert.deepEqual(of('next')?.route, {
+      kind: 'table',
+      from: 'intake.handsOver',
+      table: { design: 'build', change: 'quick', nothing: 'end' },
+    });
+    assert.deepEqual(of('next')?.ends, ['end']);
     assert.deepEqual([of('to-build')?.when, of('to-build')?.workflow], [['build'], 'build']);
     assert.deepEqual([of('to-quick')?.when, of('to-quick')?.workflow], [['quick'], 'quick']);
+  });
+
+/** One pass of a rendered intake whose Iris signed off with `handsOver`, `next` approved or not: what `assess` files and sends. */
+/** The one read `assess` takes, by the type of its parameter: the entry exports `assess` alone. */
+type AssessRead = Parameters<typeof assess>[0];
+
+const intakePass = (steps: ReturnType<typeof intakeOf>, handsOver: string, approved: boolean) => {
+  const run: AssessRead['run'] = {
+    id: 'r-1',
+    repo: '/repo',
+    workspace: '/wt',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'an idea',
+    workflowDir: '/wf',
+    createdAt: '2026-01-01T00:00:00Z',
+    steps: { intake: { taskId: 't-intake' }, next: { taskId: null }, 'to-build': { taskId: null }, 'to-quick': { taskId: null } },
+    ...(approved ? { approvals: [{ step: 'next', try: 1, at: '2026-01-01T00:00:00Z' }] } : {}),
+  };
+  const intent = {
+    title: 'an idea',
+    problem: 'what hurts',
+    proposedOutcome: 'what becomes true',
+    affected: [],
+    constraints: [],
+    decisions: [],
+    open: [],
+    handsOver,
+  };
+  const read: AssessRead = {
+    steps,
+    run,
+    phaseOf: (id) => (id === 't-intake' ? 'succeeded' : 'unknown'),
+    signedOff: (step) => (step === 'intake' ? { outcome: 'done', summary: 'the intent', artifacts: [], output: intent } : undefined),
+    asked: () => false,
+    verdictOf: () => undefined,
+    sessionBlocked: () => false,
+    spendOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    standings: [],
+    checkout: undefined,
+  };
+  const a = assess(read);
+  return { ready: a.ready, send: a.send, status: a.status };
+};
+
+for (const name of ['set', 'plain'])
+  test(`rendered ${name === 'set' ? 'on GitHub' : 'in the checkout'}, an intake whose intent hands over nothing files neither to-build nor to-quick, and the run succeeds once next is approved`, () => {
+    const steps = intakeOf(name);
+    assert.deepEqual(intakePass(steps, 'nothing', false), { ready: [], send: [], status: 'awaiting approval' });
+    assert.deepEqual(intakePass(steps, 'nothing', true), { ready: [], send: [], status: 'succeeded' });
+    assert.deepEqual(intakePass(steps, 'design', true).send, ['to-build'], 'the same pass sends build for an intent that needs a design');
+    assert.deepEqual(intakePass(steps, 'change', true).send, ['to-quick'], 'and quick for one that settles its change');
   });
 
 test('the team is six agents, and Ada is none of them', () => {

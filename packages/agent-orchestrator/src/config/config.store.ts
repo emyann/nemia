@@ -295,8 +295,8 @@ export const defaultFactoryStarts = (env: Env): boolean => env.WF_DEFAULT_FACTOR
 
 /**
  * `WF_EXPOSED`, whether the store is marked exposed — reached from beyond this machine, through a bind, a proxy or a tunnel — so that the
- * api refuses every request that presents no token (`callerGate`): only with `1`, which whoever exposes the store sets. Unset, by
- * default, a request with no token is the person.
+ * api may listen on an address beyond the loopback (`bindOf`): only with `1`, which whoever exposes the store sets. Every store, exposed
+ * or not, refuses a request to the api that presents no token (`callerGate`).
  */
 export const exposedStore = (env: Env): boolean => env.WF_EXPOSED === '1';
 

@@ -5,6 +5,7 @@
  * wrote down as the tick does (`readAndAdopt`).
  */
 import { Effect } from 'effect';
+import type { Actor } from 'objects';
 import { EngineService } from '../runtime-client.ts';
 import { type Run } from '../record/record.ts';
 import { cancelPlan, type CancelPlan } from './cancel.ts';
@@ -34,8 +35,11 @@ export type Cancelled = { run: Run; plan: CancelPlan };
  * taken. A task the engine's record says was asked to stop is not asked again, and a stop it refuses — the task settled, or was asked to
  * stop, since the read — is nothing left to do (`stopAsked`). Fails with a refusal a read threw; dies of anything else, any other failure
  * of the engine included (`tried`, `awaited`).
+ *
+ * Who calls it off (`actor`, the caller where it is known) is written with the time, and the first cancellation's is kept as its time is:
+ * the run answered is read again after the mark, so its `cancelledAt` and `cancelledBy` are the ones that stand.
  */
-export const cancelRun = Effect.fn('cancel')(function* (id: string) {
+export const cancelRun = Effect.fn('cancel')(function* (id: string, actor?: Actor) {
   const e = yield* EngineService;
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const { read } = yield* readAndAdopt(e, run);
@@ -49,5 +53,7 @@ export const cancelRun = Effect.fn('cancel')(function* (id: string) {
   yield* closeWaitingTasks(e, run, views);
   if (plan.kind === 'already-cancelled') return { run, plan } satisfies Cancelled;
 
-  return { run: { ...run, cancelledAt: yield* (yield* RunDoor).runs.cancel(RunId.read(id)) }, plan } satisfies Cancelled;
+  const at = yield* (yield* RunDoor).runs.cancel(RunId.read(id), actor);
+  const { cancelledBy } = yield* (yield* RunDoor).runs.read(RunId.read(id));
+  return { run: { ...run, cancelledAt: at, ...(cancelledBy ? { cancelledBy } : {}) }, plan } satisfies Cancelled;
 });

@@ -32,8 +32,10 @@ export function queueOf<P>(pages: readonly P[]): PageQueue<P> {
 }
 
 /**
- * How many workers a run takes: `asked`, when the command line gives it; else half the machine's `cores`, as many as its `freeBytes` hold
- * at `PER_WORKER_BYTES` each, and no more than there are `pages` — the least of the three, and at least one.
+ * How many workers a run takes: half the machine's `cores`, or `asked` when the command line gives it, then no more than its `freeBytes`
+ * hold at `PER_WORKER_BYTES` each and no more than there are `pages` — the least of the three, and at least one. `asked` can lower the
+ * count, never raise it past what free memory holds: two runs that each ask for four workers on a machine with room for three ran it out
+ * of memory.
  */
 export function workersFor({
   cores,
@@ -46,8 +48,29 @@ export function workersFor({
   pages: number;
   asked?: number;
 }): number {
-  if (asked !== undefined) return Math.max(1, Math.min(asked, pages));
-  return Math.max(1, Math.min(Math.floor(cores / 2), Math.floor(freeBytes / PER_WORKER_BYTES), pages));
+  return Math.max(1, Math.min(asked ?? Math.floor(cores / 2), Math.floor(freeBytes / PER_WORKER_BYTES), pages));
+}
+
+/**
+ * The line a run says before it starts its workers when free memory gave it fewer than `asked` (`workersFor`): how many were asked, how
+ * many it starts, and the free memory that set it. Null when nothing was asked, or when the pages alone cut it.
+ */
+export function fewerThanAsked({
+  asked,
+  workers,
+  freeBytes,
+  pages,
+}: {
+  asked?: number;
+  workers: number;
+  freeBytes: number;
+  pages: number;
+}): string | null {
+  if (asked === undefined || workers >= Math.min(asked, pages)) return null;
+  return (
+    `e2e: ${asked} workers asked, ${workers} started: ${Math.round(freeBytes / 2 ** 20)} MB free holds ` +
+    `${Math.floor(freeBytes / PER_WORKER_BYTES)} at ${PER_WORKER_BYTES / 2 ** 20} MB each`
+  );
 }
 
 /** A worker as a run knows it: its number, its store, and once it reports them, the port of its api and the address of its app. */

@@ -1,9 +1,9 @@
 /**
- * The words of Nemia's switch and of the feed's subscriptions: `level`, the chat's `speakers`, `allow` and `disallow`, `subscribe` and
- * `unsubscribe`. A check here is the pure part of what the handler refuses; what needs the orchestrator's rules or the feed's grammar (a
- * name an agent speaks under, a subscription's name, a label query) the api refuses, `Invalid`. Pure.
+ * The words of Nemia's switch and of the feed's subscriptions: `level`, `subscribe` and `unsubscribe`. A check here is the pure part of
+ * what the handler refuses; what needs the orchestrator's rules or the feed's grammar (a subscription's name, a label query) the api
+ * refuses, `Invalid`. The chat's `speakers`, `allow` and `disallow` are retired (`RETIRED_COMMANDS`, commands-renamed.ts). Pure.
  */
-import type { Args, CommandWords, Spec } from './command.ts';
+import type { Args, CommandWords } from './command.ts';
 import { SELECTOR_FLAG_FORM } from './commands-flags.ts';
 import { DEFAULT_NAMESPACE } from './meta.ts';
 import { LEVELS } from './words.ts';
@@ -93,53 +93,6 @@ export const LEVEL_WORDS = {
   only: { side: 'cli', why: "the api serves it as the nemia group's `level` and `setLevel` of `objects`' Api, calling this handler" },
 } as const satisfies CommandWords;
 
-/** The spec of a command of one name: `nemia chat <verb> <name>`. */
-const nameSpec = (verb: string): Spec => ({
-  positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
-  flags: [],
-  unknown: (arg) => `nemia chat ${verb} takes one agent's name, and ${arg} is a second: nemia chat ${verb} <name>, once per name.`,
-  missing: `nemia chat ${verb} takes the name the agent speaks under, such as operator: nemia chat ${verb} <name>.`,
-});
-
-/** `nemia chat speakers`: the names the person allowed an agent to speak under in her chat. */
-export const CHAT_SPEAKERS_WORDS = {
-  name: 'chat speakers',
-  served: [{ endpoint: 'nemia.speakers' }],
-  usage: '',
-  help: ['the names an agent may speak under in her chat, each one you allowed'],
-  spec: { positionals: [], flags: [], unknown: (arg) => `nemia chat speakers takes nothing, not ${arg}: nemia chat speakers.` },
-  writes: false,
-  class: 'read',
-} as const satisfies CommandWords;
-
-/** `nemia chat allow <name>`: an agent may speak in her chat under `name`. Asked of the person every time. */
-export const CHAT_ALLOW_WORDS = {
-  name: 'chat allow',
-  served: [{ endpoint: 'nemia.allowSpeaker' }],
-  usage: '<name>',
-  help: [
-    "let an agent speak in her chat under a name, and to a step's session",
-    '(nemia say --as <name>): its words reach her, the step and the board as',
-    'its own, never as yours. Asked of you every time',
-  ],
-  spec: nameSpec('allow'),
-  writes: true,
-  class: 'ask',
-  asksAlways: true,
-} as const satisfies CommandWords;
-
-/** `nemia chat disallow <name>`: no agent speaks in her chat under `name` any more. Asked of the person every time. */
-export const CHAT_DISALLOW_WORDS = {
-  name: 'chat disallow',
-  served: [{ endpoint: 'nemia.disallowSpeaker' }],
-  usage: '<name>',
-  help: ['take a name back: words under it are refused. Asked of you every time'],
-  spec: nameSpec('disallow'),
-  writes: true,
-  class: 'ask',
-  asksAlways: true,
-} as const satisfies CommandWords;
-
 /** How `nemia subscribe` is typed, as its refusals end on it. */
 export const SUBSCRIBE_FORM = 'nemia subscribe <name> <task> [-l <key>=<value>]... [--digest-every <minutes>] [--at-least <level>]';
 
@@ -216,11 +169,4 @@ export const UNSUBSCRIBE_WORDS = {
 } as const satisfies CommandWords;
 
 /** Nemia's and the subscriptions' words, in the order the help lists them. */
-export const REST_NEMIA_WORDS = [
-  SUBSCRIBE_WORDS,
-  UNSUBSCRIBE_WORDS,
-  LEVEL_WORDS,
-  CHAT_SPEAKERS_WORDS,
-  CHAT_ALLOW_WORDS,
-  CHAT_DISALLOW_WORDS,
-] as const satisfies readonly CommandWords[];
+export const REST_NEMIA_WORDS = [SUBSCRIBE_WORDS, UNSUBSCRIBE_WORDS, LEVEL_WORDS] as const satisfies readonly CommandWords[];

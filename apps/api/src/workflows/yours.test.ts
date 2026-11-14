@@ -1,6 +1,6 @@
 /** `GET /api/store` (yours.ts): your store's folders under the root of the app asked, and the line that files a factory, off the table. */
 import '../../test/harness.ts';
-import { root } from '../../test/harness.ts';
+import { root, seatPerson } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -34,6 +34,7 @@ test("GET /api/store answers your folders under the app's store root, each absol
     turnOnNemia,
   });
   const home = scratch('nemia-api-yours-home-');
+  seatPerson(home);
   const { app: own } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
   assert.deepEqual(
     await storeOn(own),

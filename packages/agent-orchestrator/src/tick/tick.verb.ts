@@ -23,7 +23,7 @@ import { tipsSeen } from '../branches/index.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { passRevisions } from '../revisions/pin.verb.ts';
-import { liftLapsedPause, readPause } from '../pause/pause.store.ts';
+import { liftLapsedPause, readPause, readResumed } from '../pause/pause.store.ts';
 import { finishingAmong, parkedAmong, type Finishing, type Parked, type Pause, type PauseStanding } from '../pause/pause.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { unloadedFolder } from '../steps/steps.ts';
@@ -33,7 +33,7 @@ import { hasStarted } from '../wait/wait.ts';
 import { ceilings, identify, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { type Settings, setting, StoreConfig } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
-import type { FeedConflicts, FeedReadiness } from '../feed/index.ts';
+import type { FeedConflicts, FeedReadiness, FeedResumed } from '../feed/index.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
 import { levelsNow } from '../level/levels.verb.ts';
 import { conflictsNow } from '../factory/applied/applied.verb.ts';
@@ -483,6 +483,7 @@ const feedErrorOf = (
     emitFeed(new Map(runs.flatMap((run) => feedOf(run.id, done.get(run.id)))), {
       unjudged: new Set(unjudged.keys()),
       pause,
+      ...resumedOf(home),
       ...(levels === undefined ? {} : { levels }),
       ...(conflicts === undefined ? {} : { conflicts }),
       ...readOf(readiness?.()),
@@ -494,6 +495,12 @@ const feedErrorOf = (
         : `the feed (${feedFile(home)}) was not written on this pass: ${(Cause.squash(written.cause) as Error).message}`,
     ),
   );
+
+/** Who last lifted the store's pause by hand, as `emitFeed` takes it (`readResumed`): none where nobody the api resolved has. */
+const resumedOf = (home: string): { resumed?: FeedResumed } => {
+  const resumed = readResumed(home);
+  return resumed === undefined ? {} : { resumed };
+};
 
 /** The store's readiness as `emitFeed` takes it: none where the daemon has read none. */
 const readOf = (readiness: FeedReadiness | undefined): { readiness?: FeedReadiness } => (readiness === undefined ? {} : { readiness });

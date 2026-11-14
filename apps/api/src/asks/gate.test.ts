@@ -14,8 +14,8 @@
  * the run records this file seeds. Each 409 is asserted equal to what the package's verb says itself. The table runs first: the
  * stories write beside the runs, and what they write stays.
  */
-import { root } from '../../test/harness.ts';
-import type { DecideCommand, Decidable } from 'objects';
+import { root, SEATED } from '../../test/harness.ts';
+import { actorWords, type DecideCommand, type Decidable } from 'objects';
 import { closeoutOf, listedOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -426,6 +426,7 @@ test('a person approves a gate on the board: the need on the list and the detail
           at: undefined,
           message: 'Ship the second reading.',
           file: approvalFile(root, R, 'plan', 1),
+          actor: SEATED,
           loop: false,
           next: 'waiting',
           caps: [],
@@ -437,6 +438,7 @@ test('a person approves a gate on the board: the need on the list and the detail
         try: 1,
         at: took.at,
         message: 'Ship the second reading.',
+        actor: SEATED,
       });
       assert.deepEqual(asked(), ['approve-plan-1']);
       assert.equal(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'), record, "the api wrote nothing of the run's record");
@@ -444,17 +446,27 @@ test('a person approves a gate on the board: the need on the list and the detail
     },
   );
 
-  await s.test('the detail reads the approval under the step, which waits on nobody, as `nemia ls` has it', async () => {
-    assert.ok(took);
-    const run = await object();
-    const plan = stepOf(run, 'plan');
-    assert.deepEqual(plan.gate, { awaiting: false, approval: { try: 1, at: took.at, message: 'Ship the second reading.' } });
-    assert.equal(plan.approve, null);
-    assert.deepEqual([run.status.waitingOnYou, run.status.waitingOnYouWords], [[], []]);
-    const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
-    assert.equal(plan.message, words.steps.find((s) => s.name === 'plan')?.message, 'as `nemia ls` has it until the tick files what waits');
-    assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou, 'and nobody waited on, as `nemia ls` has it');
-  });
+  await s.test(
+    'the detail reads the approval under the step, with who gave it (the person, on the token the request presented), which waits on nobody, as `nemia ls` has it',
+    async () => {
+      assert.ok(took);
+      const run = await object();
+      const plan = stepOf(run, 'plan');
+      assert.deepEqual(plan.gate, {
+        awaiting: false,
+        approval: { try: 1, at: took.at, message: 'Ship the second reading.', actor: SEATED },
+      });
+      assert.equal(plan.approve, null);
+      assert.deepEqual([run.status.waitingOnYou, run.status.waitingOnYouWords], [[], []]);
+      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
+      assert.equal(
+        plan.message,
+        words.steps.find((s) => s.name === 'plan')?.message,
+        'as `nemia ls` has it until the tick files what waits',
+      );
+      assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou, 'and nobody waited on, as `nemia ls` has it');
+    },
+  );
 
   await s.test('a second approval is refused (409), naming the try approved and when, and nothing more is written', async () => {
     assert.ok(took);
@@ -472,8 +484,11 @@ test('a person approves a gate on the board: the need on the list and the detail
     const wordless = (await res.json()) as Approved;
     assert.equal(wordless.message, null);
     const { at: when, ...written } = JSON.parse(fs.readFileSync(approvalFile(root, id, 'plan', 1), 'utf8'));
-    assert.deepEqual([written, when], [{ step: 'plan', try: 1 }, wordless.at]);
-    assert.deepEqual((await object(id)).status.steps[0].gate, { awaiting: false, approval: { try: 1, at: wordless.at, message: null } });
+    assert.deepEqual([written, when], [{ step: 'plan', try: 1, actor: SEATED }, wordless.at]);
+    assert.deepEqual((await object(id)).status.steps[0].gate, {
+      awaiting: false,
+      approval: { try: 1, at: wordless.at, message: null, actor: SEATED },
+    });
   });
 
   await s.test(
@@ -488,13 +503,16 @@ test('a person approves a gate on the board: the need on the list and the detail
       const res = await approveOver('design', { message: 'Go.', answers }, BOARD, id);
       assert.equal(res.status, 202, await res.clone().text());
       const answered = (await res.json()) as Approved;
-      const words = approvedAnswerText('design', [cut, where], answers, 'Go.');
+      const words = approvedAnswerText('design', [cut, where], answers, 'Go.', actorWords(SEATED));
       assert.equal(answered.message, words);
       const written = JSON.parse(fs.readFileSync(approvalFile(root, id, 'design', 1), 'utf8')) as { message: string };
       assert.equal(written.message, words);
       assert.ok(words.startsWith("The person's answers to design's questions:"), words);
-      assert.ok(words.endsWith('Note: Go.\n\nAnswered by: person, on the board'), words);
-      assert.deepEqual((await object(id)).status.steps[0].gate, { awaiting: false, approval: { try: 1, at: answered.at, message: words } });
+      assert.ok(words.endsWith('Note: Go.\n\nAnswered by: the person, on harness'), words);
+      assert.deepEqual((await object(id)).status.steps[0].gate, {
+        awaiting: false,
+        approval: { try: 1, at: answered.at, message: words, actor: SEATED },
+      });
     },
   );
 });
@@ -571,7 +589,7 @@ test('a person sends a step back from its gate: refused without words, asked wit
       const back = await ask('design', { mode: 'continue', message: 'Cut it smaller.', answers }, asks);
       assert.equal(back.status, 202, await back.clone().text());
       const written = JSON.parse(fs.readFileSync(askFile(root, asks, 'design', 2), 'utf8')) as { message: string };
-      assert.equal(written.message, answerText([cut, where], answers, 'Cut it smaller.'));
+      assert.equal(written.message, answerText([cut, where], answers, 'Cut it smaller.', actorWords(SEATED)));
       assert.deepEqual(asked(asks), ['retry-design-2']);
     },
   );

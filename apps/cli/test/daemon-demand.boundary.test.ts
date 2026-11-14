@@ -118,6 +118,8 @@ test('nemia ls on a store no daemon serves starts one through nemia daemon, read
   assert.notEqual(held?.pid, process.pid);
   assert.ok(ofThisStore(held?.pid as number), `pid ${String(held?.pid)} is not a process of ${ROOT}`);
   assert.ok(stderr.includes(`kill ${String(held?.pid)}`), stderr);
+  const credential = path.join(ROOT, 'credential');
+  assert.equal(fs.statSync(credential).mode & 0o777, 0o600, "the daemon's start put the person's credential in place, read by ls");
   await stopStarted();
   assert.equal(alive(held?.pid as number), false);
 });

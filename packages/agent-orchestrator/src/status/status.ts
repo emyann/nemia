@@ -16,6 +16,7 @@ import { filedOwed } from '../pinned/pinned.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { budgetOf } from '../budget/budget.ts';
 import { declarationOf } from '../harness/harness.ts';
+import type { Actor } from 'objects';
 export { approvedCapsOf, budgetOf } from '../budget/budget.ts';
 import type { Retry, RetryHow } from '../retry/index.ts';
 import {
@@ -688,9 +689,9 @@ export type MergeLanding = { step: string; check: string };
 /**
  * A person's `nemia retry --round`, as its ask file says it: the looping step, the round it asks for, the cap `--budget` raises, and when.
  * A person's `nemia refresh --base` is one too, with `merge`: the looping step, the round it is on, which the merge leaves as it is
- * (`mergeAskIn`).
+ * (`mergeAskIn`). `actor`: who asked, as a retry ask's.
  */
-export type RoundAsk = { step: string; round: number; budget?: number; at: string; merge?: MergeOf };
+export type RoundAsk = { step: string; round: number; budget?: number; at: string; merge?: MergeOf; actor?: Actor };
 
 /** The rounds a looping step's loop runs on its own word: its `rounds:`, which the parser always sets. */
 export const capOf = (looping: StepSpec): number => looping.rounds ?? DEFAULT_ROUNDS;

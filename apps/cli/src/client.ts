@@ -7,12 +7,13 @@
 export { Refused } from './refused.ts';
 import { chosenToken } from './context.ts';
 import { Refused } from './refused.ts';
+import { storeCredential } from './where.ts';
 
 /**
  * The header that says who calls: `Authorization: Bearer <token>` where `WF_SESSION_TOKEN` holds the token the orchestrator handed a
- * session; else the person's token of the context in use (`chosenToken`, context.ts): a remote one's, or the one kept for this machine's
- * own daemon where its store is exposed; none where neither is, which the api of a store not exposed reads as the person. Every request
- * of this client carries it.
+ * session; else the person's token of the context in use (`callerToken`): a remote one's, the one the config keeps for this machine's
+ * own daemon, or the store's credential; none where none is, which the api refuses naming how to present one. Every request of this
+ * client carries it.
  */
 export const sessionHeaders = (env: NodeJS.ProcessEnv = process.env): Readonly<Record<string, string>> => {
   const token = callerToken(env);
@@ -20,12 +21,13 @@ export const sessionHeaders = (env: NodeJS.ProcessEnv = process.env): Readonly<R
 };
 
 /**
- * The token this client calls with, as `sessionHeaders` presents it: the session's where `WF_SESSION_TOKEN` holds one, else the
- * person's.
+ * The token this client calls with, as `sessionHeaders` presents it: the session's where `WF_SESSION_TOKEN` holds one; else the
+ * person's of the context in use (`chosenToken`, context.ts); else, under this machine's context, the credential the daemon keeps in
+ * the store for the person (`storeCredential`, where.ts), so the person's `nemia` on the store's machine needs nothing typed.
  */
 export const callerToken = (env: NodeJS.ProcessEnv = process.env): string | undefined => {
   const session = env.WF_SESSION_TOKEN;
-  return session !== undefined && session !== '' ? session : chosenToken(env);
+  return session !== undefined && session !== '' ? session : (chosenToken(env) ?? storeCredential(env));
 };
 
 /** A query's words: each key once, or several times for a list (`selector`). */

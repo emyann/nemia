@@ -24,6 +24,9 @@ type Entry = {
   readonly spec?: Spec;
 };
 
+/** An entry of the table as admission reads it, named for the reads beside it (`floor.verb.ts`). */
+export type { Entry as AdmissionEntry };
+
 /** A command of the table typed on a shell line: its name, its class, and the words after its name. */
 export type Typed = { name: string; class: CommandClass; args: string[] };
 
@@ -164,7 +167,7 @@ const rounds = (args: readonly string[]): boolean => args.includes('--round');
  * for another round (`--round`), names no run and step, or tries a step `waitOf` says waits on the person; any other answer always asks,
  * since it only answers what waits.
  */
-function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) => string | undefined): string | undefined {
+export function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) => string | undefined): string | undefined {
   const line = ['nemia', name, ...args].join(' ');
   if (name !== 'retry') return `${line} answers what waits on you: it is yours to give.`;
   if (raises(args)) return `${line} raises a step's cap: a budget is yours to raise.`;
@@ -210,7 +213,7 @@ export function answerOf(typed: Typed, table: readonly Entry[]): { runId: string
  * accept` and is the person's every time — the run's factory at `auto`, and a rule that allows it in the run's facts at the call
  * (`allowedBy`).
  */
-function policyAllows(typed: Typed, table: readonly Entry[], auto: PolicyReads | undefined): boolean {
+export function policyAllows(typed: Typed, table: readonly Entry[], auto: PolicyReads | undefined): boolean {
   if (auto === undefined || !(RULE_ANSWERS as readonly string[]).includes(typed.name) || raises(typed.args) || rounds(typed.args))
     return false;
   const answer = answerOf(typed, table);

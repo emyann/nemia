@@ -90,6 +90,7 @@ export default {
 async function takeBack(page: Page, hold: string, id: string, gated: string): Promise<void> {
   const left = fs.existsSync(hold);
   fs.rmSync(hold, { force: true });
+  fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });
   fed(id, gated, 'awaiting approval');
   if (left) await idle(page);
 }

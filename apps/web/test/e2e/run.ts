@@ -1,20 +1,23 @@
 /**
  * `npm run e2e`: the web app, built, served against seeded stores, and looked at in a browser, by workers in parallel.
  *
- *     npm run e2e [-- [--photos [--contrast]] [--pages <name,…>] [--shard <i> --of <n>] [--workers <n>]]
+ *     npm run e2e [-- [--look] [--photos [--contrast]] [--pages <name,…>] [--shard <i> --of <n>] [--workers <n>]]
  *
  *  0. Reads its plan from its command line (`planOf`, pages.ts), refusing a flag or a page it does not know before anything else.
- *  1. Builds the web app, once.
- *  2. Hands the pages it visits to workers, one at a time as each asks (`queueOf`, workers.ts): as many workers as `--workers` asks, else
- *     as many as the machine has room for (`workersFor`) — half its cores, as many as its free memory holds, no more than the pages.
- *  3. Makes an empty store for each, refusing two that are one (`apart`), and starts each worker (worker.ts), which seeds its store,
+ *  1. With `--look`, or with no `--pages`, `--shard` or `--look` (the whole e2e), runs the look's browser tests first, two files at a
+ *     time (`lookTests`, look.ts), and stops there when it visits no page (`--look` alone). `--pages` and a shard run none of them.
+ *  2. Builds the web app, once.
+ *  3. Hands the pages it visits to workers, one at a time as each asks (`queueOf`, workers.ts): half the machine's cores, or as many as
+ *     `--workers` asks, capped by as many as its free memory holds and by the pages (`workersFor`); `--workers` can lower the count,
+ *     never raise it past free memory, and a run given fewer than it asked says so on one line before it starts them.
+ *  4. Makes an empty store for each, refusing two that are one (`apart`), and starts each worker (worker.ts), which seeds its store,
  *     serves it with an api and `vite preview` of its own, and visits the pages it is handed in its own Chromium, in the dark theme: no
  *     console error, no failed request, the page in the theme asked for, and the elements the page must have. With `--pages`, only the
  *     pages named; with `--photos`, each in a light and then a dark theme. Each worker's lines are said as it says them, after `[w<i>]`.
- *  4. Takes no picture but a failing page's. With `--photos`, screenshots each page visited in each theme, with the pictures the page
+ *  5. Takes no picture but a failing page's. With `--photos`, screenshots each page visited in each theme, with the pictures the page
  *     takes of itself, into $WF_ARTIFACTS when a run gives one — the step's files directory — and into `.e2e/` at the repository root
  *     otherwise.
- *  5. Reads what each worker wrote, refusing two that served one store, api or app (`apart`); and says last the ten slowest pages, what
+ *  6. Reads what each worker wrote, refusing two that served one store, api or app (`apart`); and says last the ten slowest pages, what
  *     each worker took, and how many pages passed, in which themes, in how many seconds. A whole run — every page, in the dark theme —
  *     says what its pages cost summed, and fails when that passes their bound, naming its slowest pages (`overBound`, timing.ts); its
  *     own time refuses nothing, and is said when it passed a step's tool (`pastTool`). A run of one shard (`--shard <i> --of <n>`) is
@@ -24,16 +27,17 @@
  * Exits non-zero when a worker fails, saying each failure, and last the first by the pages' order, naming the page, the theme and the
  * assertion, with a screenshot of what the page looked like. On a signal, every worker is stopped and every store removed. The assertions
  * are made to refuse in checks.test.ts, the visiting and the exit (visit.ts) in visit.test.ts, and a full-page picture of a tall page with
- * its frame where the window was in photograph.test.ts, all of which `npm run e2e` runs first.
+ * its frame where the window was in photograph.test.ts, all of which `--look` runs, and a whole `npm run e2e` first.
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { lookTests } from './look.ts';
 import { loadPages, planOf } from './pages.ts';
 import { overBound, pagesLine, pastTool, rankLines, type PageTiming, type ShardPages } from './timing.ts';
 import { exitOn } from './visit.ts';
-import { apart, failedInOrder, queueOf, workersFor, type PageQueue, type Seat } from './workers.ts';
+import { apart, failedInOrder, fewerThanAsked, queueOf, workersFor, type PageQueue, type Seat } from './workers.ts';
 import type { WorkerResult } from './worker.ts';
 import { fromNodeModules, OUT, plain, WEB } from './world.ts';
 
@@ -157,8 +161,16 @@ async function main(): Promise<void> {
   const started = performance.now();
   const pages = await loadPages();
   const plan = planOf(process.argv.slice(2), pages);
+  if (plan.look) await lookTests(children);
+  if (!plan.visit.length) {
+    console.log(`\ne2e: the look's tests passed in ${Math.round((performance.now() - started) / 1000)} s, and no page was asked for`);
+    return;
+  }
   build();
-  const n = workersFor({ cores: os.availableParallelism(), freeBytes: os.freemem(), pages: plan.visit.length, asked: plan.workers });
+  const freeBytes = os.freemem();
+  const n = workersFor({ cores: os.availableParallelism(), freeBytes, pages: plan.visit.length, asked: plan.workers });
+  const fewer = fewerThanAsked({ asked: plan.workers, workers: n, freeBytes, pages: plan.visit.length });
+  if (fewer) console.log(fewer);
   const queue = queueOf(plan.visit.map((p) => p.name));
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-e2e-run-'));
   stores.push(dir);

@@ -4,6 +4,7 @@
  * (`retryRun`, over `EngineService`), run by a caller with `runWith`.
  */
 import { Effect } from 'effect';
+import type { Actor } from 'objects';
 import { configRefusal, tried } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { tryOf, type Run } from '../record/record.ts';
@@ -38,6 +39,18 @@ import { RunId } from '../record/record.model.ts';
  */
 export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean };
 
+/** The ask `nemia retry` writes for the next try of `stepName`: its way, model, words and cap as asked, now, and who asked (`actor`). */
+const askOf = (run: Run, stepName: string, how: RetryHow, actor: Actor | undefined): RetryAsk => ({
+  step: stepName,
+  try: tryOf(run, stepName) + 1,
+  mode: how.mode,
+  ...(how.model ? { model: how.model } : {}),
+  ...(how.message !== undefined ? { message: how.message } : {}),
+  ...(how.budget !== undefined ? { budget: how.budget } : {}),
+  at: new Date().toISOString(),
+  ...(actor ? { actor } : {}),
+});
+
 /**
  * Ask for another try of a step — `nemia retry` — by writing the ask, and nothing else. The next tick honours it once.
  *
@@ -51,14 +64,14 @@ export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean 
  *
  * `stopBlocked` takes a step whose session its harness blocked, with nothing signed (`retryable`): the ask is written as any other, and
  * the tick stops that session before it files the try. `nemia retry` passes it, and so does the board's `POST …/retry`. Left out, such a
- * step is running and refused as one: a caller takes the harness's word on purpose, never by default. Fails with a refusal, the verb's or
- * one a read threw; dies of anything else (`tried`).
+ * step is running and refused as one: a caller takes the harness's word on purpose, never by default. Who asks (`actor`, the caller
+ * where it is known) is kept on the ask. Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`).
  */
 export const retryRun = Effect.fn('retry')(function* (
   id: string,
   stepName: string,
   how: RetryHow,
-  { stopBlocked = false }: { stopBlocked?: boolean } = {},
+  { stopBlocked = false, actor }: { stopBlocked?: boolean; actor?: Actor | undefined } = {},
 ) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* stepsOf(run);
@@ -93,15 +106,7 @@ export const retryRun = Effect.fn('retry')(function* (
   const { own } = yield* toldOf(run, step);
   const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, denied, home, own));
   if (refusedConfig) return yield* Effect.fail(new Invalid({ message: refusedConfig }));
-  const ask: RetryAsk = {
-    step: stepName,
-    try: tryOf(run, stepName) + 1,
-    mode: how.mode,
-    ...(how.model ? { model: how.model } : {}),
-    ...(how.message !== undefined ? { message: how.message } : {}),
-    ...(how.budget !== undefined ? { budget: how.budget } : {}),
-    at: new Date().toISOString(),
-  };
+  const ask = askOf(run, stepName, how, actor);
   const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'retry', of: 'try', ask });
   const file = written.where;
   if (!written.written) {

@@ -301,7 +301,7 @@ test('a planner blocked on two questions is answered at the terminal', async (t)
         { question: where.title, chose: ['retry', 'gate'], own: 'both' },
       ],
       undefined,
-      'at the terminal',
+      'the person, at the terminal',
     );
     assert.equal(askRead(id, ask).message, expected);
     assert.equal(asked.try, 2, 'the answers ask for try 2 of plan');
@@ -310,7 +310,7 @@ test('a planner blocked on two questions is answered at the terminal', async (t)
     const noted = await asking();
     await stage.main(['retry', noted, 'plan', '--answer', '1: neither', '--answer', '2=a', '--message', 'thanks']);
     const message = askRead(noted, asksOf(noted)[0]).message as string;
-    assert.ok(message.endsWith('\n\nNote: thanks\n\nAnswered by: person, at the terminal'), message);
+    assert.ok(message.endsWith('\n\nNote: thanks\n\nAnswered by: the person, at the terminal'), message);
     assert.ok(message.includes('1. How is the card cut?\n   In my own words: neither'), message);
   });
 });
@@ -343,7 +343,7 @@ test("a gated planner's questions are answered with its approval", async (t) => 
         { question: where.title, chose: ['gate'] },
       ],
       'go',
-      'at the terminal',
+      'the person, at the terminal',
     );
     assert.equal(askRead(id, 'approve-plan-1').message, expected);
     assert.deepEqual([approved.step, approved.try], ['plan', 1]);

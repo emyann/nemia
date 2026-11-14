@@ -6,7 +6,7 @@
  */
 import { lackedOf, tryOf, type CloseoutAsked, type Run, type StepRecord } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
-import type { RetryMode, TryCause } from 'objects';
+import type { Actor, RetryMode, TryCause } from 'objects';
 
 /**
  * How a person asks for another try of a step, with `nemia retry`.
@@ -135,7 +135,8 @@ export type EarlierTry = {
  * with it (`--message`): the answer to the `needs` of a step that signed off blocked, or anything else they have to say to the
  * step. The try's brief carries it as `## Your answer` (`retrySection`). Absent on an ask without one. And `interrupted`, on the ask
  * `nemia pause --now` writes for each task it stops: that task's id, the step's session or its check, which the ask is due on only once
- * that very task settled `stopped` (`pauseAskVoid`).
+ * that very task settled `stopped` (`pauseAskVoid`). `actor`: who asked (objects' `Actor`), absent on an ask written in-process, by
+ * `nemia pause --now`, or by code older than actors.
  */
 export type RetryAsk = {
   step: string;
@@ -146,6 +147,7 @@ export type RetryAsk = {
   budget?: number;
   interrupted?: string;
   at: string;
+  actor?: Actor;
 };
 
 /**

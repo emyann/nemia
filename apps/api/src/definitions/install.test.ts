@@ -5,7 +5,7 @@
  * route answers on it: a step's page of a workflow of yours, a template's workflows, the factories' list, a factory's proposals, listed
  * and made, and its resolve.
  */
-import '../../test/harness.ts';
+import { seatPerson } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -66,6 +66,7 @@ function installed(home: string) {
     builtAt: '2026-11-12T00:00:00.000Z',
     from: 'archive',
   };
+  seatPerson(home);
   const { HKB_REPO: _noRepoOfItsOwn, ...env } = process.env;
   return appOf(
     Layer.mergeAll(

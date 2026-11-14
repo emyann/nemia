@@ -14,6 +14,7 @@ import { Artifacts, Values } from '../run/Artifacts';
 import { Markdown } from '../markdown/Markdown';
 import { FieldView, Json, OutcomeHead } from './Outcome';
 import { Questions } from '../gate/Questions';
+import { Actor } from '../actor/Actor';
 import type { Frozen } from '../../lib/frozen';
 
 export { Artifacts, bytesWord } from '../run/Artifacts';
@@ -134,7 +135,7 @@ export function TryCloseouts({ tries, selected, none }: { tries: readonly Frozen
           {selected.current && ' · current'}
         </p>
       )}
-      {selected.answer && <YourAnswer answer={selected.answer} />}
+      {selected.answer && <YourAnswer answer={selected.answer} by={selected.answeredBy} />}
       <TryOutcome t={selected} none={none} />
       {others.length > 0 && (
         <section aria-label="Other tries" className="space-y-1">
@@ -145,7 +146,7 @@ export function TryCloseouts({ tries, selected, none }: { tries: readonly Frozen
                 {t.current && ' · current'} — {outcomeWord(outcomeOf(t, EARLIER_NONE))}
               </summary>
               <div className="space-y-3 border-t border-outline-variant p-2">
-                {t.answer && <YourAnswer answer={t.answer} />}
+                {t.answer && <YourAnswer answer={t.answer} by={t.answeredBy} />}
                 <TryOutcome t={t} none={EARLIER_NONE} />
               </div>
             </details>
@@ -168,12 +169,18 @@ function AsItCame({ raw }: { raw: unknown }) {
   );
 }
 
-/** What a person said to a try when they asked for it, as the CLI's `decide` prints it under the try before's question: `your answer`. */
-function YourAnswer({ answer }: { answer: string }) {
+/**
+ * What a person said to a try when they asked for it, as the CLI's `decide` prints it under the try before's question: `your answer`;
+ * under it who answered (`Actor`), where the try says.
+ */
+function YourAnswer({ answer, by }: { answer: string; by: StepTry['answeredBy'] }) {
   return (
-    <p data-your-answer className="whitespace-pre-wrap break-words">
-      <span className="font-medium text-muted-foreground">your answer:</span> {answer}
-    </p>
+    <div className="space-y-0.5">
+      <p data-your-answer className="whitespace-pre-wrap break-words">
+        <span className="font-medium text-muted-foreground">your answer:</span> {answer}
+      </p>
+      <Actor actor={by} />
+    </div>
   );
 }
 

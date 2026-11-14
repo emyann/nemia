@@ -21,7 +21,7 @@ import { followUpgrade, startUpgrade, upgradeOf, upgradesRead, type UpgradeFollo
 import { Api, type UpgradeStreamEvent } from 'objects';
 import { readsBounded } from '../objects/answer-bound.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
-import { personOnly } from '../caller/caller.ts';
+import { personOnly } from '../caller/index.ts';
 import { UpgradeStarts } from './starts.ts';
 
 /**

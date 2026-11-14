@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
+import { actorWords, type Actor } from 'objects';
 import { fed, photograph, sidebar, stepBar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
@@ -14,7 +15,7 @@ const chosenOn = (where: Locator, title: string): Promise<string[]> =>
     .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
 
 /** The JSON of the ask `file`, or nothing where it is not there. */
-const askIn = (file: string): { message?: string; mode?: string; step?: string; try?: number } =>
+const askIn = (file: string): { message?: string; mode?: string; step?: string; try?: number; actor?: Actor } =>
   fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
 
 /** Whether `r` is the POST of `verb` on the gated step. */
@@ -107,14 +108,10 @@ export default {
         `1. ${cut.title}\n   Chose: ${cut.recommended} — ${cut.options[0].meaning}`,
         `2. ${where.title}\n   Chose: ${where.options[1].label} — ${where.options[1].meaning}`,
       ];
-      const words = [
-        `The person's answers to ${gated}'s questions:`,
-        ...blocks,
-        `Note: ${ASKING.note}`,
-        'Answered by: person, on the board',
-      ];
       const approval = askIn(path.join(asks, `approve-${gated}-1`));
-      if (approval.message !== words.join('\n\n'))
+      const answeredBy = (actor: Actor | undefined) => `Answered by: ${actor ? actorWords(actor) : 'nobody'}`;
+      const words = [`The person's answers to ${gated}'s questions:`, ...blocks, `Note: ${ASKING.note}`, answeredBy(approval.actor)];
+      if (!approval.actor || approval.message !== words.join('\n\n'))
         throw new Refused(`the approval's words are the answers, in the package's words — it holds ${JSON.stringify(approval)}`);
       await expectVisible(
         page.locator(`section[aria-label="The approval of ${gated}"] [data-words]`, {
@@ -132,8 +129,8 @@ export default {
       if (sent.status() !== 202)
         throw new Refused(`the api takes the send-back with its answers — it answered ${sent.status()}: ${await sent.text()}`);
       const back = askIn(path.join(asks, `retry-${gated}-2`));
-      const told = ['Answers to your questions:', ...blocks, `Note: ${ASKING.objection}`, 'Answered by: person, on the board'];
-      if (back.mode !== 'continue' || back.message !== told.join('\n\n'))
+      const told = ['Answers to your questions:', ...blocks, `Note: ${ASKING.objection}`, answeredBy(back.actor)];
+      if (back.mode !== 'continue' || !back.actor || back.message !== told.join('\n\n'))
         throw new Refused(`the send-back carries the answers, the objection their note — it holds ${JSON.stringify(back)}`);
       await expectCount(gate, 0, 'and the gate is offered no more: it is sent back');
     } finally {

@@ -1,6 +1,8 @@
 /**
  * The former names of commands and of their flags, and the read of a command line that still says one (`renamedIn`): the client runs the
- * line as the name it became, and admission reads it as that name too, so an old spelling reaches no rule the new one would not. Pure.
+ * line as the name it became, and admission reads it as that name too, so an old spelling reaches no rule the new one would not. And the
+ * commands retired with nothing to run in their place (`RETIRED_COMMANDS`), which the client refuses naming what to type instead
+ * (`retiredIn`). Pure.
  */
 import { CLI } from './command.ts';
 
@@ -29,6 +31,31 @@ export const RENAMED: ReadonlyMap<string, Renamed> = new Map([
   ['template check', { to: 'template lint' }],
   ['factory plan', { to: 'factory diff' }],
 ]);
+
+/** What an agent types in place of a list of names it may speak under: a token of its own, which says who it is. */
+const AGENT_TOKEN = `an agent speaks with a token of its own, which says who it is: the person mints one with \`${CLI} token add <name> --agent <agent>\` and hands it to the agent`;
+
+/**
+ * Each command retired with no command in its place, by its name of one word or two, and the words that say what to type instead: the
+ * chat's list of the names an agent may speak under (`chat speakers`, `chat allow`, `chat disallow`), retired for an agent's own token.
+ */
+export const RETIRED_COMMANDS: ReadonlyMap<string, string> = new Map([
+  ['chat speakers', `${CLI} chat speakers is retired: no list of names is kept, ${AGENT_TOKEN}; \`${CLI} token ls\` lists the tokens.`],
+  ['chat allow', `${CLI} chat allow is retired: ${AGENT_TOKEN}.`],
+  ['chat disallow', `${CLI} chat disallow is retired: ${AGENT_TOKEN}, and \`${CLI} token rm <name>\` retires it.`],
+]);
+
+/**
+ * The refusal of a command line, its words after the program, that opens with a retired command (`RETIRED_COMMANDS`, the longest that
+ * matches): the words that say what to type instead, or undefined where it opens with none.
+ */
+export function retiredIn(words: readonly string[]): string | undefined {
+  for (const size of [2, 1]) {
+    const said = words.length >= size ? RETIRED_COMMANDS.get(words.slice(0, size).join(' ')) : undefined;
+    if (said !== undefined) return said;
+  }
+  return undefined;
+}
 
 /** Each flag renamed, by the command that takes it and its former spelling: `nemia retry --nudge` is `nemia retry --continue`. */
 export const RENAMED_FLAGS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map([['retry', new Map([['--nudge', '--continue']])]]);

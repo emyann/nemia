@@ -2,13 +2,13 @@
  * The session token, as a run meets it: a step's session is filed a token of its try's own in its environment (`SESSION_TOKEN`), the
  * store keeps only its digest's record, and the api's question — who a request is from (`sessionCaller`) — answers the step's agent while
  * the try is the live one, `session-ended` once it settled or a later try replaced it, `unknown-token` for one the store never minted,
- * and the person for none. Nemia's session is filed one too, in no factory. A person's token is the person whatever the route needs, until
- * it is removed by name; none, where the route needs one, is refused. `nemia token add`, `ls` and `rm` as a person types them. Kinds are
- * asserted, never sentences.
+ * and the person for none. Nemia's session is filed one too, in no factory. A standing token is its holder — the person, or an agent —
+ * whatever the route needs, until it is retired by name; none, where the route needs one, is refused. `nemia token add`, `ls` and `rm` as
+ * the api calls them. Kinds are asserted, never sentences.
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,11 +21,11 @@ import { SESSION_TOKEN } from '../src/filed/filed.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { sessionCaller } from '../src/token/caller.verb.ts';
 import type { TokenNeed } from '../src/token/token.ts';
-import { tokenDigest, tokensDir, mintToken, mintPersonToken, revokePersonToken } from '../src/token/token.store.ts';
+import { tokenDigest, tokensDir, mintToken, mintPersonToken, personTokensDir, revokePersonToken } from '../src/token/token.store.ts';
+import { TOKEN_ADD, TOKEN_LS, TOKEN_RM } from '../src/token/commands.verb.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { writeSpeakers } from '../src/chat/chat.store.ts';
-import { typed } from './typed.ts';
+import { handled, typed } from './typed.ts';
 import { SAY } from '../src/say/commands.verb.ts';
 import { Conflict } from '../src/runner.ts';
 import { COMMAND_WORDS } from 'objects';
@@ -106,11 +106,19 @@ test('a step is filed a session token, which names its agent while its try is li
   });
 
   await s.test('a request presenting it is the agent of its step, in its factory and run', async () => {
-    assert.deepEqual(await callerBy(token), { kind: 'agent', agent: 'implement', factory: 'default', run: id, step: 'implement' });
+    assert.deepEqual(await callerBy(token), {
+      kind: 'agent',
+      agent: 'implement',
+      factory: 'default',
+      run: id,
+      step: 'implement',
+      token: null,
+      narrowed: null,
+    });
   });
 
-  await s.test('a request presenting none is the person', async () => {
-    assert.deepEqual(await callerBy(undefined), { kind: 'person' });
+  await s.test('a program presenting none, to what needs none, is the person under no token', async () => {
+    assert.deepEqual(await callerBy(undefined), { kind: 'person', token: null });
   });
 
   await s.test('once its try settled, the token is refused session-ended', async () => {
@@ -140,90 +148,107 @@ test("a session that is no run's is live while its task has not settled, in no f
     const token = mintToken(ROOT, { agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task });
     assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'session-ended' });
     await Effect.runPromise(stage.board().e.file({ id: task, brief: 'be on', cwd: ROOT, restartPolicy: 'Always' }));
-    assert.deepEqual(await callerBy(token), { kind: 'agent', agent: 'nemia', factory: null, run: null, step: null });
+    assert.deepEqual(await callerBy(token), {
+      kind: 'agent',
+      agent: 'nemia',
+      factory: null,
+      run: null,
+      step: null,
+      token: null,
+      narrowed: null,
+    });
     stage.board().settle(task, 'succeeded', undefined);
     assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'session-ended' });
   });
 });
 
-test("a person's token is the person whatever the route needs, until removed by name; none is refused where a route needs one", async (t) => {
+test('a standing token is its holder whatever the route needs, until retired by name; none is refused where a route needs one', async (t) => {
   await t.test('no token: the person where the route needs none, refused token-required where it needs any', async () => {
-    assert.deepEqual(await callerBy(undefined, 'none'), { kind: 'person' });
-    for (const need of ['token', 'person'] as const)
+    assert.deepEqual(await callerBy(undefined, 'none'), { kind: 'person', token: null });
+    for (const need of ['token', 'standing'] as const)
       assert.deepEqual(await callerBy(undefined, need), { kind: 'refused', reason: 'token-required' }, need);
   });
 
-  await t.test("a person's token is the person, on a route that needs none, any token, or the person's", async () => {
+  await t.test("a person's token is the person under its name, on a route that needs none, any token, or a standing one", async () => {
     const token = mintPersonToken(ROOT, 'laptop');
-    for (const need of ['none', 'token', 'person'] as const) assert.deepEqual(await callerBy(token, need), { kind: 'person' }, need);
+    for (const need of ['none', 'token', 'standing'] as const)
+      assert.deepEqual(await callerBy(token, need), { kind: 'person', token: 'laptop' }, need);
     revokePersonToken(ROOT, 'laptop');
-    for (const need of ['none', 'token', 'person'] as const)
+    for (const need of ['none', 'token', 'standing'] as const)
       assert.deepEqual(await callerBy(token, need), { kind: 'refused', reason: 'unknown-token' }, `${need}, once removed`);
   });
 
-  await t.test("a live session's token is refused person-token-required where the route needs the person's", async () => {
+  await t.test('a token minted before holders were said, a record with no holder, is the person under its name', async () => {
+    const token = mintPersonToken(ROOT, 'old-laptop');
+    const file = path.join(personTokensDir(ROOT), `${tokenDigest(token)}.json`);
+    assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(file, 'utf8')) as object).sort(), ['createdAt', 'name']);
+    fs.writeFileSync(file, `${JSON.stringify({ name: 'old-laptop', createdAt: '2026-01-01T00:00:00.000Z' })}\n`);
+    assert.deepEqual(await callerBy(token, 'standing'), { kind: 'person', token: 'old-laptop' });
+  });
+
+  await t.test(
+    "an agent's token is its agent under the token's name, in the factory it is bound to, with its narrowing, in no run",
+    async () => {
+      const token = mintPersonToken(ROOT, 'ops', new Date(), { kind: 'agent', agent: 'operator', factory: 'a', narrowed: 'act' });
+      for (const need of ['token', 'standing'] as const)
+        assert.deepEqual(
+          await callerBy(token, need),
+          { kind: 'agent', agent: 'operator', factory: 'a', run: null, step: null, token: 'ops', narrowed: 'act' },
+          need,
+        );
+    },
+  );
+
+  await t.test("a live session's token is refused person-token-required where the route needs a standing one", async () => {
     const task = 'nemia-person-need';
     const token = mintToken(ROOT, { agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task });
     await Effect.runPromise(stage.board().e.file({ id: task, brief: 'be on', cwd: ROOT, restartPolicy: 'Always' }));
     assert.equal((await callerBy(token, 'token')).kind, 'agent');
-    assert.deepEqual(await callerBy(token, 'person'), { kind: 'refused', reason: 'person-token-required' });
+    assert.deepEqual(await callerBy(token, 'standing'), { kind: 'refused', reason: 'person-token-required' });
   });
 });
 
-/** What `argv` printed on stdout through the stage's CLI, line by line. */
-const printedBy = async (t: TestContext, argv: string[]): Promise<string[]> => {
-  const lines: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    lines.push(args.join(' '));
-  });
-  try {
-    await stage.main(argv);
-  } finally {
-    log.mock.restore();
-  }
-  return lines.join('\n').split('\n');
-};
-
-test('nemia token add prints the token once with its header, ls lists it by name alone, and rm revokes it', async (t) => {
-  const added = await printedBy(t, ['token', 'add', 'cli-laptop']);
-  const token = added.find((line) => /^[A-Za-z0-9_-]{43}$/.test(line)) ?? '';
-  assert.ok(token, 'the token is printed on a line of its own');
-  assert.ok(
-    added.some((line) => line === `Authorization: Bearer ${token}`),
-    'the header a client sends it in',
+test('nemia token add mints a token for a holder, answered once; ls lists it by name and holder alone; rm retires it', async () => {
+  const over = { env: ENV };
+  const added = await handled(TOKEN_ADD, { name: 'cli-ops', agent: 'operator', narrowed: 'read' }, over);
+  assert.match(added.token, /^[A-Za-z0-9_-]{43}$/);
+  assert.deepEqual(
+    { ...added, token: '', createdAt: '' },
+    { name: 'cli-ops', holder: 'agent', agent: 'operator', narrowed: 'read', token: '', createdAt: '' },
   );
-  assert.deepEqual(await callerBy(token, 'person'), { kind: 'person' });
+  assert.equal((await callerBy(added.token, 'standing')).kind, 'agent');
 
-  const listed = (await printedBy(t, ['token', 'ls'])).join('\n');
-  assert.match(listed, /cli-laptop/);
-  assert.ok(!listed.includes(token) && !listed.includes(tokenDigest(token)), 'neither the token nor its digest is listed');
+  const listed = await handled(TOKEN_LS, {}, over);
+  const mine = listed.tokens.find((t) => t.name === 'cli-ops');
+  assert.deepEqual(mine && { ...mine, createdAt: '' }, {
+    name: 'cli-ops',
+    holder: 'agent',
+    agent: 'operator',
+    narrowed: 'read',
+    createdAt: '',
+  });
+  const text = JSON.stringify(listed);
+  assert.ok(!text.includes(added.token) && !text.includes(tokenDigest(added.token)), 'neither the token nor its digest is listed');
 
-  await assert.rejects(stage.main(['token', 'add', 'cli-laptop']), (err: unknown) => (err as { _tag?: string })._tag === 'Conflict');
-  await printedBy(t, ['token', 'rm', 'cli-laptop']);
-  assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'unknown-token' });
-  await assert.rejects(stage.main(['token', 'rm', 'cli-laptop']), (err: unknown) => (err as { _tag?: string })._tag === 'Missing');
+  await assert.rejects(handled(TOKEN_ADD, { name: 'cli-ops' }, over), (err: unknown) => (err as { _tag?: string })._tag === 'Conflict');
+  await assert.rejects(
+    handled(TOKEN_ADD, { name: 'cli-x', factory: 'a' }, over),
+    (err: unknown) => (err as { _tag?: string })._tag === 'Invalid',
+  );
+  await handled(TOKEN_RM, { name: 'cli-ops' }, over);
+  assert.deepEqual(await callerBy(added.token), { kind: 'refused', reason: 'unknown-token' });
+  await assert.rejects(handled(TOKEN_RM, { name: 'cli-ops' }, over), (err: unknown) => (err as { _tag?: string })._tag === 'Missing');
 });
 
 /**
- * `nemia say` to `runId`'s `implement` as the api takes it from a client in `env`: who calls read off the session token it presents
- * (`sessionCaller`), refused (`Conflict`) where it names no live try, and `--as` the name the words say they are from.
+ * `nemia say` to `runId`'s `implement` as the api takes it from a client presenting `token`: who calls read off the token
+ * (`sessionCaller`, the need the api's routes ask: a token), refused (`Conflict`) where it names no live try, the caller as the api hands
+ * it on.
  */
-const sayAs = async (runId: string, env: Env, ...words: string[]) => {
-  const token = env[SESSION_TOKEN];
-  const caller = await callerBy(token === undefined || token === '' ? undefined : token);
-  if (caller.kind === 'refused') throw new Conflict({ message: `the session's token is refused: ${caller.reason}` });
-  const as = words[0] === '--as' ? words[1] : undefined;
-  const text = (as === undefined ? words : words.slice(2)).join(' ');
-  return stage.runWith(
-    stage.board().e,
-    SAY.handler({
-      runId,
-      step: 'implement',
-      text,
-      caller: caller.kind === 'agent' ? { kind: 'agent', agent: caller.agent, factory: caller.factory } : { kind: 'person' },
-      ...(as === undefined ? {} : { from: { kind: 'agent', name: as } }),
-    }),
-  );
+const sayAs = async (runId: string, token: string, ...words: string[]) => {
+  const caller = await callerBy(token, 'token');
+  if (caller.kind === 'refused') throw new Conflict({ message: `the token is refused: ${caller.reason}` });
+  return stage.runWith(stage.board().e, SAY.handler({ runId, step: 'implement', text: words.join(' '), caller }));
 };
 
 test("`nemia say` from a step's session says its words as its agent's, by the token in its environment; an ended one is refused", async (t) => {
@@ -242,20 +267,21 @@ test("`nemia say` from a step's session says its words as its agent's, by the to
     await pass(id);
     stage.board().settle(`${id}-implement`, 'working');
     token = tokenOf(`${id}-implement`) ?? '';
-    await sayAs(id, { ...ENV, [SESSION_TOKEN]: token }, 'Start', 'with', 'the', 'parser.');
+    await sayAs(id, token, 'Start', 'with', 'the', 'parser.');
     assert.deepEqual(heard(), ['The agent implement writes, not the person: Start with the parser.']);
   });
 
-  await s.test('with no token, `--as` an allowed name frames them under it; the person says them as ever', async () => {
-    writeSpeakers(path.join(ROOT, 'nemia'), ['operator']);
-    await sayAs(id, ENV, '--as', 'operator', 'Cut', 'it.');
-    await sayAs(id, { ...ENV, [SESSION_TOKEN]: '' }, 'Widen', 'it.');
+  await s.test("an agent's standing token frames them under its agent; the person's token says them as ever", async () => {
+    const ops = mintPersonToken(ROOT, 'say-ops', new Date(), { kind: 'agent', agent: 'operator', factory: null, narrowed: null });
+    const laptop = mintPersonToken(ROOT, 'say-laptop');
+    await sayAs(id, ops, 'Cut', 'it.');
+    await sayAs(id, laptop, 'Widen', 'it.');
     assert.deepEqual(heard().slice(1), ['The agent operator writes, not the person: Cut it.', 'Widen it.']);
   });
 
   await s.test('REFUSED: a token whose try ended is a Conflict, never taken as the person, and nothing is said', async () => {
     stage.board().settle(`${id}-implement`, 'failed', { outcome: 'blocked', summary: 'stuck', artifacts: [], needs: null });
-    await assert.rejects(sayAs(id, { ...ENV, [SESSION_TOKEN]: token }, 'hello'), (err: Error & { exitCode?: number }) => {
+    await assert.rejects(sayAs(id, token, 'hello'), (err: Error & { exitCode?: number }) => {
       assert.equal(err.name, 'Conflict');
       assert.equal(err.exitCode, 2);
       return true;

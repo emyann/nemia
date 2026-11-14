@@ -110,3 +110,28 @@ test('a landing is one of a commit, an abort or nothing touched', async (t) => {
   ];
   for (const [value, ok] of rows) await t.test(JSON.stringify(value), () => assert.equal(Schema.is(Landing)(value), ok));
 });
+
+test("a run's composed facts decode with the actor who acted and without one, as a store written before actors holds them", async (t) => {
+  const at = '2026-09-01T00:00:00.000Z';
+  const person = { kind: 'person', token: 'laptop' };
+  const session = { kind: 'agent', agent: 'review', run: 'r-1', step: 'review' };
+  const base = run({ implement: null });
+  const rows: Array<[string, unknown, boolean]> = [
+    ['a run of the old store: no actor anywhere', { ...base, approvals: [{ step: 'implement', try: 1, at }], cancelledAt: at }, true],
+    [
+      'each fact with its actor',
+      {
+        ...base,
+        approvals: [{ step: 'implement', try: 1, at, actor: person }],
+        acceptances: [{ step: 'implement', try: 1, at, message: 'fine', actor: session }],
+        hold: { at, until: [], by: 'ann', actor: person },
+        pause: { at, by: 'ann', actor: person },
+        cancelledAt: at,
+        cancelledBy: session,
+      },
+      true,
+    ],
+    ['REFUSED: an actor of no kind', { ...base, cancelledAt: at, cancelledBy: { kind: 'robot' } }, false],
+  ];
+  for (const [what, value, ok] of rows) await t.test(what, () => assert.equal(decodes(value), ok));
+});

@@ -18,7 +18,7 @@ import path from 'node:path';
 import { Client, type JSONRPCMessage, ReadBuffer, serializeMessage, type Transport } from '@modelcontextprotocol/client';
 import { scratch } from 'test-kit/scratch';
 import { Effect, Layer, Logger } from 'effect';
-import { emitFeed, type FeedWords, freshFeedMemo, StoreRoot } from 'agent-orchestrator';
+import { credentialKept, emitFeed, type FeedWords, freshFeedMemo, StoreRoot } from 'agent-orchestrator';
 import { ambient } from './ambient.ts';
 import { skippedRead } from '../src/watch/channel.ts';
 
@@ -105,8 +105,12 @@ function child(t: TestContext, proc: ChildProcess) {
   return { proc, ended, said, out: () => out, err: () => err };
 }
 
-/** The api over `root`, `--no-tick` on a free port, its url written into the store's lease once it listens. */
+/**
+ * The api over `root`, `--no-tick` on a free port, its url written into the store's lease once it listens, and the person's credential
+ * put in the store as a daemon's start puts it (`credentialKept`), which `--no-tick` does not run.
+ */
 async function apiOver(t: TestContext, root: string) {
+  credentialKept(root);
   const env = { ...ambient('NEMIA_ON_INSTALLED'), PORT: '0', WF_ROOT: root, HKB_REPO: root };
   const api = child(t, spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env, timeout: 120_000 }));
   const url = await api.said((out) => /api listening on (http:\/\/127\.0\.0\.1:\d+)/.exec(out)?.[1]);
@@ -206,7 +210,9 @@ test('started with no cursor file, a line written after the start arrives as one
   await followingFrom(c, before);
   await store.pass({ 'r-1': stepAt('awaiting approval', 'approve it: nemia approve r-1 plan') });
   const [first] = await c.got((all) => (events(all).length > 0 ? events(all) : undefined));
-  const event = (await (await fetch(`${api.url}/api/events/${before}`)).json()) as {
+  const credential = fs.readFileSync(path.join(store.root, 'credential'), 'utf8').trim();
+  const asked = await fetch(`${api.url}/api/events/${before}`, { headers: { authorization: `Bearer ${credential}` } });
+  const event = (await asked.json()) as {
     message: string;
     reason: string;
     involved: { name: string };

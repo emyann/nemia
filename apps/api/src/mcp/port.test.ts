@@ -1,7 +1,8 @@
 /**
  * The MCP port at `/mcp` (`mcpPort`), spoken to by the SDK's own `Client` over a transport whose fetch goes into the app: with a person's
  * token it lists the generated tools and serves a call by the endpoint the tool is linked to, a refusal of that endpoint answered as a
- * tool's error; the gate in front of it refuses no token, a session's token and a token never minted, each 401 by its word; and a call
+ * tool's error; an agent's standing token, one the person minted for it, reaches it too; the gate in front of it refuses no token, a
+ * session's token and a token never minted, each 401 by its word; and a call
  * still pending is told to its caller as progress, every interval, where the caller gave a progress token; and the feed's resources on
  * the modern era: declared subscribable, a listen of a view acknowledged and told of each new line, a read answering it, a URI no view
  * refused -32602 holding nothing, and a closed listen letting its view go. Statuses, refusal words and
@@ -10,7 +11,7 @@
  * On the stand-ins: the runtime's test engine and the test place; a run planted as its record alone, nothing of it filed; the tokens
  * minted through the package's `TokenDoor` under the harness's store.
  */
-import { root } from '../../test/harness.ts';
+import { NO_TOKEN, root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -47,6 +48,9 @@ type TokenDoorShape = typeof TokenDoor extends { readonly defaultValue: () => in
 
 /** A token of the person's, minted for this file. */
 const personToken = door((d) => d.persons.mint('port-laptop'));
+
+/** A standing token the person minted for the agent `operator`, store-wide and not narrowed. */
+const agentToken = door((d) => d.persons.mint('port-ops', { kind: 'agent', agent: 'operator', factory: null, narrowed: null }));
 
 /** A run planted as its record alone: one step, nothing of it filed yet. */
 const planted = (id: string) => {
@@ -371,7 +375,7 @@ test("REFUSED 401 at the port: no token, a session's token, a token never minted
         headers: {
           'content-type': 'application/json',
           accept: 'application/json, text/event-stream',
-          ...(bearer === undefined ? {} : { authorization: `Bearer ${bearer}` }),
+          ...(bearer === undefined ? NO_TOKEN : { authorization: `Bearer ${bearer}` }),
         },
         body,
       });
@@ -441,6 +445,18 @@ test("in an exposed store a person's call reaches its endpoint with their token,
     assert.notEqual(result.isError, true, textOf(result));
     await client.close();
   }
+});
+
+test("an agent's standing token reaches the port, the store marked exposed or not, and its call reaches its endpoint, in both eras", async () => {
+  const exposed = appOver(standIn(), stand(), storeConfigLayer({ ...process.env, WF_ROOT: root, WF_EXPOSED: '1' }));
+  for (const on of [app(), exposed])
+    for (const era of ERAS) {
+      const client = await connected(() => on, era, agentToken);
+      assert.ok((await client.listTools()).tools.length > 0, `${era}: the tools listed to the agent`);
+      const result = await client.callTool({ name: 'ls', arguments: {} });
+      assert.notEqual(result.isError, true, textOf(result));
+      await client.close();
+    }
 });
 
 test('a call given a progress token answers text/event-stream from its start; on 2026-07-28 one given none answers application/json', async () => {

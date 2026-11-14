@@ -400,3 +400,69 @@ test("an ask a verb would not write is refused in that verb's words, reason by r
     });
   });
 });
+
+test('who acted reads off each file a person writes where it says, and a file written before actors were said reads with none', async (t) => {
+  const person = { kind: 'person', token: 'laptop' } as const;
+  const agent = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
+  await t.test(
+    'an approval, an acceptance, a retry and a round each read with the actor their file names, and with none where it names none',
+    () => {
+      assert.deepEqual(approvalIn(ask('by-a1', { at: AT, actor: person }), 'plan', 1), { step: 'plan', try: 1, at: AT, actor: person });
+      assert.deepEqual(approvalIn(ask('by-a2', { at: AT }), 'plan', 1), { step: 'plan', try: 1, at: AT });
+      assert.deepEqual(acceptanceIn(ask('by-c1', { at: AT, message: 'fine', actor: agent }), 'review', 2), {
+        step: 'review',
+        try: 2,
+        at: AT,
+        message: 'fine',
+        actor: agent,
+      });
+      assert.deepEqual(askIn(ask('by-r1', { mode: 'continue', at: AT, actor: agent }), 'plan', 2), {
+        step: 'plan',
+        try: 2,
+        mode: 'continue',
+        at: AT,
+        actor: agent,
+      });
+      assert.deepEqual(roundAskIn(ask('by-o1', { at: AT, actor: person }), 'review', 3), {
+        step: 'review',
+        round: 3,
+        at: AT,
+        actor: person,
+      });
+    },
+  );
+  await t.test('an actor that does not read as one is left out, and the ask it rides on still reads', () => {
+    assert.deepEqual(approvalIn(ask('by-a3', { at: AT, actor: { kind: 'robot' } }), 'plan', 1), { step: 'plan', try: 1, at: AT });
+    assert.deepEqual(askIn(ask('by-r2', { mode: 'fresh', at: AT, actor: 'ann' }), 'plan', 2), {
+      step: 'plan',
+      try: 2,
+      mode: 'fresh',
+      at: AT,
+    });
+  });
+  await t.test('a hold reads its actor beside its `by`; a hold file written before actors reads with none', () => {
+    put('r-held-by', aRecord('r-held-by'));
+    fs.writeFileSync(holdFile(ROOT, 'r-held-by'), JSON.stringify({ at: AT, until: [], by: 'ann', actor: person }));
+    assert.deepEqual(runRecord(ROOT, 'r-held-by').hold, { at: AT, until: [], by: 'ann', actor: person });
+    fs.writeFileSync(holdFile(ROOT, 'r-held-by'), JSON.stringify({ at: AT, until: [], by: 'ann' }));
+    assert.deepEqual(runRecord(ROOT, 'r-held-by').hold, { at: AT, until: [], by: 'ann' });
+  });
+  await t.test(
+    'a cancellation reads its time from the plain text a former nemia wrote, and its time and actor from the JSON one writes now',
+    () => {
+      put('r-called', aRecord('r-called'));
+      fs.writeFileSync(store.cancelFile(ROOT, 'r-called'), `${AT}\n`);
+      const old = runRecord(ROOT, 'r-called');
+      assert.deepEqual([old.cancelledAt, 'cancelledBy' in old], [AT, false]);
+      fs.writeFileSync(store.cancelFile(ROOT, 'r-called'), JSON.stringify({ at: AT, actor: agent }));
+      const now = runRecord(ROOT, 'r-called');
+      assert.deepEqual([now.cancelledAt, now.cancelledBy], [AT, agent]);
+    },
+  );
+  await t.test('a cancellation written with an actor keeps the first: a second neither moves its time nor its actor', () => {
+    put('r-called-twice', aRecord('r-called-twice'));
+    const first = store.markCancelled(ROOT, 'r-called-twice', person);
+    assert.equal(store.markCancelled(ROOT, 'r-called-twice', agent), first);
+    assert.deepEqual(runRecord(ROOT, 'r-called-twice').cancelledBy, person);
+  });
+});

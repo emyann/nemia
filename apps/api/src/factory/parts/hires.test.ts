@@ -4,7 +4,7 @@
  * what a hire refuses — in a scratch store whose factory is filed with the package's own verbs. Every write is read back from the
  * factory's file, and every refusal leaves it as it was.
  */
-import { root } from '../../../test/harness.ts';
+import { root, seatPerson } from '../../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -157,6 +157,7 @@ test('the Hire writes: what a hire or a fire refuses, the factory file as it was
   });
   await t.test("and one of yours, read under the app's store root, its factory's repository holding no make of its own", async () => {
     const home = scratch('nemia-api-hires-home-');
+    seatPerson(home);
     const file = naming(home, 'mine', 'otto');
     fs.mkdirSync(path.join(home, 'factories'), { recursive: true });
     const record = JSON.parse(fs.readFileSync(RECORD, 'utf8')) as { repos: string[] };

@@ -1,8 +1,8 @@
 /**
  * The kit's parts draw Material's secondary on the board: in the stories' page (`parts/main.tsx`), built as the board is, a selected
  * tonal toggle's ground, a selected tonal icon toggle's ground, a collapsed rail's active label and a secondary meter's indicator each
- * take the colour of `--md-sys-color-secondary`, in light and dark, and not shadcn's quiet surface. `npm run e2e` runs this first; it
- * needs Chromium.
+ * take the colour of `--md-sys-color-secondary`, in light and dark, and not shadcn's quiet surface. `npm run e2e -- --look` runs this,
+ * and a whole `npm run e2e` first; it needs Chromium.
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';

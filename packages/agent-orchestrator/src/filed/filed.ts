@@ -14,9 +14,9 @@ import { filedSettings, SETTINGS_HARNESS } from '../harness-settings/harness-set
 import { splitServers, type FactoryServer, type FactoryServers } from '../factory/servers/index.ts';
 import type { HandedRunMounts } from '../../contracts/handed-runs.contract.ts';
 import type { HandedRunFolders } from '../../contracts/handed-folders.contract.ts';
-import { handedFolders } from '../handed-folders/handed-folders.ts';
+import { handedFolders } from './handed-folders/handed-folders.ts';
 
-export { handedFolders } from '../handed-folders/handed-folders.ts';
+export { handedFolders } from './handed-folders/handed-folders.ts';
 
 export type { HandedRunFolders } from '../../contracts/handed-folders.contract.ts';
 

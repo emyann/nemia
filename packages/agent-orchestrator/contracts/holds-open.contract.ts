@@ -1,5 +1,5 @@
 /**
- * Whether a step's task, held open, waits for a person's word on this pass (agent-orchestrator, src/holds-open/holds-open.ts,
+ * Whether a step's task, held open, waits for a person's word on this pass (agent-orchestrator, src/gate/holds-open/holds-open.ts,
  * `holdsOpen`), which `approvalRefusal`'s laws read (`gate.contract.ts`), leaning on what this spec proves of it. The task turns on where
  * the step stands (`standing`, status.ts): the spec takes what `standing.contract.ts` proves of it, and nothing of its body.
  */

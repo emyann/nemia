@@ -10,7 +10,7 @@ import { assume, type Implementation, spec } from '@emyann/tsverify';
 import { isRemoteHarness } from '../src/harness/harness.ts';
 import type { Mount } from '../src/record/record.ts';
 import type { StepSpec } from '../src/step/step.ts';
-import { handedFolders } from '../src/handed-folders/handed-folders.ts';
+import { handedFolders } from '../src/filed/handed-folders/handed-folders.ts';
 import { sandboxed } from '../src/workflow/index.ts';
 import type { HandedRunFolders } from './handed-folders.contract.ts';
 

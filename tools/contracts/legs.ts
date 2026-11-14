@@ -57,7 +57,7 @@ export interface Alone {
 /**
  * The files proved in a leg of their own, each by the leg that bears its contract's name. The file's other contracts come along,
  * seconds each: `decide` and `lifecycleOf` with `observe`; `holdsOpen`, proved beside `approvalRefusal` until it moved to a file of its own
- * (`src/holds-open/holds-open.ts`), is proved in `rest`.
+ * (`src/gate/holds-open/holds-open.ts`), is proved in `rest`.
  */
 export const ALONE: Readonly<Record<Exclude<Leg, 'rest'>, Alone>> = {
   observe: { file: 'packages/agent-runtime/src/core/domain.ts', contract: 'observe' },

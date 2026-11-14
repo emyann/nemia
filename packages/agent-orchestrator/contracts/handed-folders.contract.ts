@@ -1,5 +1,5 @@
 /**
- * Each folder the pass found of the runs a run is handed (agent-orchestrator, src/handed-folders/handed-folders.ts, `handedFolders`),
+ * Each folder the pass found of the runs a run is handed (agent-orchestrator, src/filed/handed-folders/handed-folders.ts, `handedFolders`),
  * which `handedRunMounts`'s laws read (`handed-runs.contract.ts`), leaning on what this spec proves of it.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
@@ -30,6 +30,6 @@ const handedFoldersSpec = spec<(found: readonly HandedRunFolders[]) => string[]>
 
 /**
  * The type of each folder the pass found of the runs a run is handed, by its absolute path (`handedFolders`,
- * src/handed-folders/handed-folders.ts).
+ * src/filed/handed-folders/handed-folders.ts).
  */
 export type HandedFolders = Implementation<typeof handedFoldersSpec>;

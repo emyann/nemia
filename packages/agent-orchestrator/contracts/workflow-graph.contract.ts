@@ -4,7 +4,7 @@
  * every workflow, routed or not, so a client never infers a node's kind from the keys of its step (decision 12 of resource-objects).
  */
 import { type Implementation, assume, spec } from '@emyann/tsverify';
-import { type ObjectGraph, inputGraphOf } from '../src/input-graph/input-graph.ts';
+import { type ObjectGraph, inputGraphOf } from '../src/summary/input-graph/input-graph.ts';
 
 /** A step as the graph reads it: the keys `inputGraphOf` takes. */
 type GraphStep = Parameters<typeof inputGraphOf>[0][number];

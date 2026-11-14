@@ -23,7 +23,7 @@ import { firstPiece } from '../piece/piece.ts';
 import type { ApprovalRefusal } from '../../contracts/gate.contract.ts';
 import type { TakeBackStopOf } from '../../contracts/take-back.contract.ts';
 
-export { holdsOpen } from '../holds-open/holds-open.ts';
+export { holdsOpen } from './holds-open/holds-open.ts';
 
 /**
  * Why the words given with an approval cannot ride on it — or null. Pure, and asked before anything about the run: words that are empty.

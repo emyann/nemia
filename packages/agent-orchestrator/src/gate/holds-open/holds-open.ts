@@ -1,7 +1,7 @@
 /** Whether a step's task, held open, waits for a person's word on this pass (`holdsOpen`, `contracts/holds-open.contract.ts`). */
-import { endedForGood } from '../record/record.ts';
-import { hasGate, standing } from '../status/status.ts';
-import type { HoldsOpen } from '../../contracts/holds-open.contract.ts';
+import { endedForGood } from '../../record/record.ts';
+import { hasGate, standing } from '../../status/status.ts';
+import type { HoldsOpen } from '../../../contracts/holds-open.contract.ts';
 
 /**
  * Whether a step's task, filed held open (`holdsOpenOn`) and waiting for a person's word — the runtime's `input-required` — stays open on

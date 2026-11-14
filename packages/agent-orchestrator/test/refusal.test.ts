@@ -154,8 +154,8 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * loaded, and types, and neither touching a disk.
  *
  * `agent-orchestrator/run` is two more since no contract reads the code that implements it (`tools/guards/test/contract-first.test.ts`):
- * `holds-open/holds-open.ts`, `holdsOpen` out of `gate/gate.ts`, which hands it on, so the gate's contract reads it without reading
- * `gate.ts`; and `agent-frame/agent-frame.ts`, the frame an agent's words are said in, out of `say/say.ts`, which reads it and hands it
+ * `gate/holds-open/holds-open.ts`, `holdsOpen` out of `gate/gate.ts`, which hands it on, so the gate's contract reads it without reading
+ * `gate.ts`; and `say/agent-frame/agent-frame.ts`, the frame an agent's words are said in, out of `say/say.ts`, which reads it and hands it
  * on, so the step speaker's contract reads it without reading `say.ts`. Both pure, importing nothing but files already loaded and
  * types, and neither touching a disk.
  */

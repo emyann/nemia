@@ -15,7 +15,7 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { Caller } from './proposal-approval.contract.ts';
-import { AGENT_OPENS, AGENT_WRITES } from '../src/agent-frame/agent-frame.ts';
+import { AGENT_OPENS, AGENT_WRITES } from '../src/say/agent-frame/agent-frame.ts';
 import { framedFor } from '../src/chat/framed.ts';
 import type { Speaker } from './speaker.contract.ts';
 

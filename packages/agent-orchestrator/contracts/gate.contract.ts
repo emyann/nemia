@@ -1,6 +1,6 @@
 /**
  * A gate, from a person's side (agent-orchestrator, src/gate/gate.ts): why `nemia approve` will not approve a step
- * (`approvalRefusal`), and whether a step's task, held open, waits for a person's word (`holdsOpen`, src/holds-open/holds-open.ts,
+ * (`approvalRefusal`), and whether a step's task, held open, waits for a person's word (`holdsOpen`, src/gate/holds-open/holds-open.ts,
  * its spec `holds-open.contract.ts`'s). The task turns on where
  * the step stands (`standing`, status.ts), which reads some forty functions of the run's record and closeouts: the gate
  * takes what its spec proves of it (`standing.contract.ts`), and nothing of its body. The approval turns on the word the run
@@ -17,7 +17,7 @@ import type { StepSpec } from '../src/step/step.ts';
 import { retryable } from '../src/retry/retry.ts';
 import { type BranchStanding, notHandedOn, type SpendOf, standing } from '../src/status/status.ts';
 import { runWords } from '../src/route/routed/routed-words.ts';
-import { holdsOpen } from '../src/holds-open/holds-open.ts';
+import { holdsOpen } from '../src/gate/holds-open/holds-open.ts';
 import { approved, gated, tryNow } from './laws.ts';
 
 export const sendBack = assume(retryable, { pure: true });

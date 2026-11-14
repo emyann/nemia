@@ -7,7 +7,7 @@ import {
   type GraphStep,
   type ObjectGraph,
   type RunGraph,
-} from '../input-graph/input-graph.ts';
+} from './input-graph/input-graph.ts';
 
 export {
   inputGraphOf,
@@ -17,7 +17,7 @@ export {
   type InputEdge,
   type ObjectGraph,
   type RunGraph,
-} from '../input-graph/input-graph.ts';
+} from './input-graph/input-graph.ts';
 
 export type { TypedGraph } from '../../contracts/workflow-graph.contract.ts';
 

@@ -222,12 +222,13 @@ export const quotaHarnesses = (): string[] => Object.keys(HARNESSES).filter((nam
  * words. A step already filed on it runs on no other harness: the runtime routes a task whose harness it does not have to none, so one at
  * work on the agent is held, neither there nor gone, and one not yet started is refused its start (`composite` in the runtime).
  *
- * Each task it files without a memory limit of its own is filed under `WF_MEMORY_LIMIT`'s (`defaultLimits`), its scope made in
- * `WF_CGROUP_PARENT`'s slice where one is set (`cgroupParent`): a value either variable refuses gives the engine neither, and the tick
- * refuses its pass on the same read (`ceilings`), so nothing is filed without the limit it was set to hold. Each is filed asking
- * `WF_MEMORY_REQUEST`'s memory where set (`defaultRequests`), else its limit, and admitted only while what it asks fits the machine's
- * memory above the floor kept for the daemon and the machine (`reserved`: `WF_MEMORY_RESERVED`, else an eighth of the machine, 1 GiB
- * at least); a queued task the floor holds says so on its view (`TaskView.waits`), which `nemia ls` words.
+ * Each task it files without resources of its own starts under `WF_MEMORY_LIMIT`'s (`defaultLimits`) as the daemon holds it then,
+ * its scope made in `WF_CGROUP_PARENT`'s slice where one is set (`cgroupParent`): a value either variable refuses gives the engine
+ * neither, and the tick refuses its pass on the same read (`ceilings`), so nothing starts without the limit it was set to hold. Each
+ * is counted at `WF_MEMORY_REQUEST`'s memory where set (`defaultRequests`), else its limit, as the daemon holds them when it admits,
+ * and admitted only while what it asks fits the machine's memory above the floor kept for the daemon and the machine (`reserved`:
+ * `WF_MEMORY_RESERVED`, else an eighth of the machine, 1 GiB at least); a queued task the floor holds says so on its view
+ * (`TaskView.waits`), which `nemia ls` words.
  *
  * Each harness's program is looked for first in the store's tools folder's `bin/` (`harnessBin`, `toolsBinDir`), where `nemia doctor
  * fix` activates one, read by the runtime at every spawn.

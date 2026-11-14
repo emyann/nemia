@@ -2,7 +2,7 @@ apiVersion: nemia.dev/v1alpha1
 kind: Workflow
 metadata:
   name: intake
-  description: Turn a loose idea into an intent someone can build from, and route it to the workflow that builds it. Iris, a product engineer, interviews the person who had the idea, a round of questions at a time, and signs off with the intent once they share an understanding, saying whether it needs a design. The condition next proposes build or quick from that answer, and the person approves the intent and its route together at its gate.
+  description: Turn a loose idea into an intent someone can build from, and route it to the workflow that builds it. Iris, a product engineer, interviews the person who had the idea, a round of questions at a time, and signs off with the intent once they share an understanding, saying what it hands over — a design to make, a change, or nothing. The condition next proposes build, quick, or end from that answer, end ending the run on the intent with no build or quick run, and the person approves the intent and its route together at its gate.
 spec:
   steps:
     - name: intake
@@ -19,11 +19,15 @@ spec:
       routes:
         - build
         - quick
+        - end
       route:
-        from: intake.needsDesign
+        from: intake.handsOver
         table:
-          "yes": build
-          "no": quick
+          design: build
+          change: quick
+          nothing: end
+      ends:
+        - end
     - name: to-build
       after:
         - next

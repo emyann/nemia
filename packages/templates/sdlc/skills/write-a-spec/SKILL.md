@@ -20,7 +20,11 @@ intent, so restate the intent's goal and constraints in it.
    where it lives, the rule that puts it there, and the alternative rejected. A placement the rules do not settle is the person's:
    ask it in a round.
 5. **List every change by path**, the **steps in order**, and the **tests**: for each rule the change adds, the fixture that makes it
-   refuse, and the check that it fails without the rule.
+   refuse, and the check that it fails without the rule. **Name the one layer that proves each rule, and ask for it there alone**: a
+   proof where the repository proves its pure decisions, a schema where the rule is a boundary's shape, else the cheapest test that
+   can fail for it. A test of the running whole, in a browser or end to end, is for what only the running whole shows: an
+   interaction, a layout, two parts wired together. A rule restated at every level is three tests to change for one fact, and every
+   round after pays for each.
 6. **Cut it by its seams, never by its cost.** Cut the work into parts by where each lives: a layer, a package or a door, the
    boundaries your placement already names. Each part is a distinct area, says what it needs of the others, and is ordered only where
    one needs another, so parts with no need of each other can be built at the same time. Propose a second intent only for a seam of

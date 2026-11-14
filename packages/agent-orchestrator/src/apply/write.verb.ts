@@ -5,6 +5,8 @@
  * instruction through the Factory door, so a Factory's spec is written through the doors alone. Answers the revision it made:
  * `<resource>/<name>#<n>`, the ledger's number, for a kind the ledger counts, else `<resource>/<name>`.
  */
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { Effect } from 'effect';
 import {
@@ -22,7 +24,7 @@ import type { Refusal } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { factoryWriteOf } from '../workflows/workflows.verb.ts';
-import { AgentDoor } from '../agents/agent-door.store.ts';
+import { AgentDoor, type AgentDoorShape } from '../agents/agent-door.store.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
 import type { AgentDraft } from '../agents/agents.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
@@ -36,6 +38,8 @@ import { ownAgentRefusal } from '../factory/wiring/own-agent.store.ts';
 import { wire } from '../factory/wiring/wire.verb.ts';
 import { withoutEntry } from '../factory/wiring/wiring.ts';
 import { treeDir, type ProposalNeeds, type ProposalPlace } from '../propose/current.verb.ts';
+import { AGENTS_FOLDER } from '../step/step.ts';
+import type { Entry } from '../factory/applied/applied.store.ts';
 import { verbOf } from '../propose/propose.verb.ts';
 
 /** A step as the object says it, as the Workflow door takes it: its keys, `output` as the file it names, and its body. */
@@ -70,11 +74,49 @@ const counted = (kind: RevisionKind, object: ProposedObject, version: string) =>
 /** The revision of a kind the ledger does not count. */
 const uncounted = (object: ProposedObject): string => `${RESOURCE_PLURALS[object.kind]}/${object.metadata.name}`;
 
+/** The agents' folder of a factory's tree, `workflows/agents/`, as its files' paths in the tree begin. */
+const TREE_AGENTS = `workflows/${AGENTS_FOLDER}/`;
+
+/**
+ * `program` with the Agent door it is given finding a workflow's agents in the tree `against` rather than in the factory's (`found`): its
+ * agents' folder, each agent's file and the result schema beside it, written into a folder of its own for the program's span and
+ * removed after it, where a workflow beside it would look first; the places after it as they were. The door's other methods, the version
+ * a write is judged at and answers among them, still read the factory's tree. `program` as it is where no tree is given.
+ */
+const agentsFoundIn = <A, E, R>(against: readonly Entry[] | undefined, program: Effect.Effect<A, E, R>) =>
+  against === undefined
+    ? program
+    : Effect.scoped(
+        Effect.gen(function* () {
+          const root = yield* Effect.acquireRelease(
+            Effect.sync(() => fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-composed-'))),
+            (dir) => Effect.sync(() => fs.rmSync(dir, { recursive: true, force: true })),
+          );
+          const folder = path.join(root, 'workflows', AGENTS_FOLDER);
+          fs.mkdirSync(folder, { recursive: true });
+          for (const entry of against) {
+            const file = entry.path.slice(TREE_AGENTS.length);
+            if (entry.path.startsWith(TREE_AGENTS) && file.length > 0 && !file.includes('/'))
+              fs.writeFileSync(path.join(folder, file), entry.bytes);
+          }
+          const door = yield* AgentDoor;
+          const composed: AgentDoorShape = {
+            ...door,
+            agents: {
+              ...door.agents,
+              found: ({ dir, places }) => door.agents.found({ dir: path.join(root, 'workflows', path.basename(dir)), places }),
+            },
+          };
+          return yield* Effect.provideService(program, AgentDoor, composed);
+        }),
+      );
+
 /**
  * A Workflow of the factory's tree written or removed. A spec that gives `files` gives the whole set of the folder's other text files,
- * so one it leaves out is removed (`whole`); one that gives none leaves them as they are.
+ * so one it leaves out is removed (`whole`); one that gives none leaves them as they are. Its steps are judged against the agents of
+ * `against` where it is given (`agentsFoundIn`), the tree an upgrade composes, else against the factory's tree.
  */
-const workflowWritten = (place: ProposalPlace, factory: string, object: ProposedObject) =>
+const workflowWritten = (place: ProposalPlace, factory: string, object: ProposedObject, against?: readonly Entry[]) =>
   Effect.gen(function* () {
     const name = object.metadata.name;
     const dir = yield* tried(() => workflowDirAt(path.join(treeDir(place.home, factory, 'workflows'), name)));
@@ -85,16 +127,19 @@ const workflowWritten = (place: ProposalPlace, factory: string, object: Proposed
       return uncounted(object);
     }
     const spec = object.spec as WorkflowSpec;
-    const saved = yield* door.write(
-      dir,
-      {
-        steps: spec.steps.map(stepDraftOf),
-        ...(typeof spec.readme === 'string' && { readme: spec.readme }),
-        ...(spec.files !== undefined && { files: spec.files, whole: true }),
-      },
-      object.metadata.resourceVersion,
-      places,
-      fills,
+    const saved = yield* agentsFoundIn(
+      against,
+      door.write(
+        dir,
+        {
+          steps: spec.steps.map(stepDraftOf),
+          ...(typeof spec.readme === 'string' && { readme: spec.readme }),
+          ...(spec.files !== undefined && { files: spec.files, whole: true }),
+        },
+        object.metadata.resourceVersion,
+        places,
+        fills,
+      ),
     );
     return yield* counted('workflow', object, saved.version);
   });
@@ -176,16 +221,20 @@ const factoryWritten = (factory: string, object: ProposedObject) =>
     return uncounted(object);
   });
 
-/** `object` written into the factory `factory`: the revision it made. Refused as the door or the verb that writes it refuses. */
+/**
+ * `object` written into the factory `factory`: the revision it made. Refused as the door or the verb that writes it refuses. A Workflow
+ * is judged against the agents of `against`, where it is given: the tree the upgrade a resolution resolves composes.
+ */
 export const objectWritten = (
   place: ProposalPlace,
   factory: string,
   object: ProposedObject,
+  against?: readonly Entry[],
 ): Effect.Effect<string, Refusal, ProposalNeeds> => {
   const written = (() => {
     switch (object.kind) {
       case 'Workflow':
-        return workflowWritten(place, factory, object);
+        return workflowWritten(place, factory, object, against);
       case 'Agent':
         return agentWritten(place, factory, object);
       case 'Skill':

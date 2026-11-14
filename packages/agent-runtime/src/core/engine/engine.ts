@@ -23,7 +23,9 @@ import {
   type Now,
   type SessionAsk,
   type Sighting,
+  type Attempt,
   type State,
+  type TaskResources,
   type Usage,
 } from '../domain.ts';
 import { atWorkState, LIVE_PHASE, type SessionState, type TaskPhase } from '../session.ts';
@@ -37,7 +39,7 @@ import { CEILING_INSTEAD } from './filing.ts';
 import { ReconcileRefused, reconcileRefusalOf, settleRefusalOf } from './reconcile-refusal.ts';
 
 export { ReconcileRefused, reconcileRefusalOf, settleRefusalOf } from './reconcile-refusal.ts';
-import { ownPool, toAdmit, type AdmissionRule, type AdmissionWait } from '../admission.ts';
+import { ownPool, runsUnder, toAdmit, type AdmissionRule, type AdmissionWait } from '../admission.ts';
 import { notedOf } from './noted.ts';
 import { instantNow } from './now.ts';
 import { spawnedEntry, stamped } from './stamped.ts';
@@ -261,13 +263,19 @@ const endFacts = (state: State, n: number, seen: Sighting | undefined) => ({
   ...parkedEnd(state, n, seen),
 });
 
+/** What attempt `attempt` of `state` runs under: what its `starting` entry recorded, else the filing's (`runsUnder`). */
+const attemptRuns = (state: State, attempt: Attempt | undefined): TaskResources | undefined =>
+  runsUnder({ filed: state.resources, inFlight: { resources: attempt?.resources }, defaults: undefined });
+
 /**
  * What a harness is asked to start for attempt `n` of task `taskId`, named `name`: its brief (or the words that nudge it), folder,
  * harness and configuration for its turn — handed what is left of its cap where it continues a parked attempt (`continuedCap`) — the
- * session it continues, the labels its telemetry says, the task's id among them, and what its process tree may use of the host.
+ * session it continues, the labels its telemetry says, the task's id among them, and what its process tree may use of the host: what
+ * its `starting` entry recorded (`runsUnder`), else, on an attempt an older runtime started, what the task was filed with.
  */
 const spawnRequestOf = (taskId: string, state: State, name: string, n: number): SpawnRequest => {
   const attempt = state.attempts.find((a) => a.n === n);
+  const resources = attemptRuns(state, attempt);
   return {
     name,
     brief: attempt?.nudge ?? state.brief,
@@ -279,10 +287,26 @@ const spawnRequestOf = (taskId: string, state: State, name: string, n: number): 
     resumeFrom: attempt?.resumeFrom,
     resource: { ...state.labels, [TASK_LABEL]: taskId },
     traceparent: state.traceparent,
-    ...(state.resources ? { resources: state.resources } : {}),
+    ...(resources ? { resources } : {}),
     ...continuedCap(state, n, configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config)),
   };
 };
+
+/**
+ * The `starting` entry `start` journals, unstamped: the attempt, what it continues and is told, and what it runs under (`runsUnder`):
+ * the task's own resources, else the engine's defaults in force now (`Admission`), as a LimitRange's land on a Pod when it is made.
+ */
+const startingOf = Effect.fn('startingOf')(function* (state: State, action: Extract<Action, { do: 'start' }>) {
+  const defaults = (yield* Admission).defaultsOf?.(state.harness);
+  const resources = runsUnder({ filed: state.resources, inFlight: null, defaults });
+  return {
+    kind: 'starting' as const,
+    attempt: action.attempt,
+    resumeFrom: action.resumeFrom,
+    nudge: action.nudge,
+    ...(resources ? { resources } : {}),
+  };
+});
 
 /**
  * `reconcile`, told which names the pass's observation could not read (`Now.unread`): the pass's own, which `reconcile`'s door does not
@@ -290,7 +314,8 @@ const spawnRequestOf = (taskId: string, state: State, name: string, n: number): 
  * meets them:
  *
  * 1. `start` journals `starting` — the attempt, the session it continues (`resumeFrom`) and what it is told in place of the
- *    brief (`nudge`, a later turn's answer) — and spawns nothing. The intent is journalled BEFORE the spawn, and the
+ *    brief (`nudge`, a later turn's answer), and what it runs under (`runsUnder`: the task's own resources, else the engine's
+ *    defaults in force now, `Admission`) — and spawns nothing. The intent is journalled BEFORE the spawn, and the
  *    session's name is derived from it (`nameFor`): that ordering is the whole crash-safety story, since a session asked for
  *    always has a record, and the record implies the name, so a restart finds it instead of starting a second one. What an
  *    attempt continues and what it is told are facts on the record, never re-derived later.
@@ -331,13 +356,7 @@ const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed
       break;
 
     case 'start':
-      yield* journal.append(TaskId.read(taskId), {
-        kind: 'starting',
-        ...stamped(),
-        attempt: action.attempt,
-        resumeFrom: action.resumeFrom,
-        nudge: action.nudge,
-      });
+      yield* journal.append(TaskId.read(taskId), { ...(yield* startingOf(state, action)), ...stamped() });
       break;
 
     case 'spawn': {

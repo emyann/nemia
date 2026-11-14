@@ -17,19 +17,25 @@ const TOKEN_BYTES = 32;
 /**
  * The folder the holder's token is kept in, under the runtime's store `root`.
  * Exported only for the tests that import it.
+ * @param root The runtime's store folder.
  */
 export const tokenFolderOf = (root: string): string => path.join(root, 'a2a');
 
 /**
  * The file the holder's token is kept in.
  * Exported only for the tests that import it.
+ * @param root The runtime's store folder.
  */
 export const tokenFileOf = (root: string): string => path.join(tokenFolderOf(root), 'holder-token');
 
 /** A token no one can guess: 32 random bytes, base64url. */
 export const tokenOf = (): string => crypto.randomBytes(TOKEN_BYTES).toString('base64url');
 
-/** `token` written under `root`, 0600 in a 0700 folder, whatever modes a folder already there was made with. */
+/**
+ * `token` written under `root`, 0600 in a 0700 folder, whatever modes a folder already there was made with.
+ * @param root The runtime's store folder, under which `a2a/` is made.
+ * @param token The token minted for the hold (`tokenOf`).
+ */
 export const writeToken = (root: string, token: string): void => {
   const dir = tokenFolderOf(root);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -43,6 +49,7 @@ export const writeToken = (root: string, token: string): void => {
  * The token a holder under `root` minted, trimmed, or `undefined` where there is no file — what a viewer's `credentials`
  * answers for the served card's `bearer` scheme. It reads alone: no folder is made, no file written, and an absent store is
  * no error. The path is the runtime's own, so no layer above joins it for itself.
+ * @param root The runtime's store folder.
  */
 export const holderTokenOf = (root: string): string | undefined => {
   try {
@@ -52,12 +59,17 @@ export const holderTokenOf = (root: string): string | undefined => {
   }
 };
 
-/** The token under `root` forgotten; an absence is no error. */
+/**
+ * The token under `root` forgotten; an absence is no error.
+ * @param root The runtime's store folder.
+ */
 export const forgetToken = (root: string): void => fs.rmSync(tokenFileOf(root), { force: true });
 
 /**
  * Whether `given` is `token`, compared over the sha256 of each so that two of any lengths are compared in constant time:
  * a request with no token is no match.
+ * @param token The holder's own token.
+ * @param given The token a request presents, or undefined where it presents none.
  */
 export const tokenHolds = (token: string, given: string | undefined): boolean => {
   if (given === undefined) return false;
@@ -65,7 +77,10 @@ export const tokenHolds = (token: string, given: string | undefined): boolean =>
   return crypto.timingSafeEqual(digest(token), digest(given));
 };
 
-/** The bearer token an `authorization` header carries, or `undefined` where it carries none. */
+/**
+ * The bearer token an `authorization` header carries, or `undefined` where it carries none.
+ * @param header The request's `authorization` header, or undefined where it has none.
+ */
 export const bearerOf = (header: string | undefined): string | undefined => {
   const m = header === undefined ? null : /^Bearer\s+(\S+)$/i.exec(header.trim());
   return m ? m[1] : undefined;

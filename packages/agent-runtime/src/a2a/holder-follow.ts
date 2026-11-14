@@ -75,6 +75,11 @@ const holderFollowOf =
  * guard that fires on a transition, which the level-triggered rule refuses. `undefined` means the holder is gone, or there
  * never was one, and the follow is `ops.follow`'s: read off the files both engines share, as a viewer with no holder reads
  * today. An agent it answers that this runtime cannot take is refused at that follow (`holderAgentRefusal`).
+ * @param holder Asked at each follow for the agent that holds the harness's sessions, `undefined` while none does; undefined where no
+ * holder function is given, which leaves `ops` as it is.
+ * @param harness The name of the harness, said in a refusal.
+ * @param credentials What answers a secret for a scheme the holder's card declares, or undefined where none is given.
+ * @param ops The harness's seam verbs, whose `follow` is the one taken while no one holds.
  */
 export const holderSeamOf = (
   holder: (() => HolderAgent | undefined) | undefined,
@@ -129,6 +134,9 @@ const local =
  * agent are `holderAgentRefusal`'s, made at the follow that asks for it, in the same words. A `credentials` that answers for no
  * scheme is not refused here either: only `authOf` knows whether it answers for this scheme and this agent, and it refuses the
  * first follow in words naming the fix.
+ * @param harness The name of the harness the holder is given for.
+ * @param holder The holder as given, which must be a function.
+ * @param place The harnesses this engine runs (`harnesses`), and whether it runs this one attached, its sessions held in one process.
  */
 export const holderRefusal = (
   harness: string,
@@ -153,6 +161,8 @@ export const holderRefusal = (
  * `card`, and a card that does not decode, worded by `cardOfJson` as a configured agent's is. Asked at the follow and not at
  * the build, because the function is asked at the follow: the agent does not exist until then. The follow fails with it, as
  * a refusal, and nothing is dialled.
+ * @param harness The name of the harness, said in the refusal.
+ * @param agent What the holder function answered: an entry holding `card` alone.
  */
 export const holderAgentRefusal = (harness: string, agent: unknown): string | undefined => {
   if (typeof agent !== 'object' || agent === null || Object.keys(agent).some((k) => k !== 'card')) {

@@ -187,6 +187,9 @@ const seamOf = (harness: string, ops: RunnerOps, events: (taskId: string) => Pro
 /**
  * A client of one harness, over its handler in this process. `polling`: a send answers once the session starts.
  * Exported only for the tests that import it.
+ * @param harness The name of the harness the client sends to.
+ * @param ops The harness's driver, which its handler calls.
+ * @param events Reads the events journaled for a task, by its id.
  */
 export const clientOf = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): Client =>
   seamOf(harness, ops, events).client;
@@ -330,6 +333,9 @@ const spawnThrough =
  * read: the handler answers `null` only for a name it found no session under, so a `null` by id is a defect. A verb is
  * offered as the card says — the verbs the harness's driver lacks are left off it — so the engine reads the absences the
  * driver itself shows. `refuses` is the driver's own, handed on directly: it is no call to a session.
+ * @param harness The name of the harness, said on its card and in its errors.
+ * @param ops The harness's driver, which the handler beneath the client calls.
+ * @param events Reads the events journaled for a task, by its id.
  */
 export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): SeamOps => {
   const { card, transport, client } = seamOf(harness, ops, events);
@@ -471,6 +477,8 @@ const transcriptsThrough = (transport: InProcessTransport) => ({
  * `Journal` the program provides. `Runner.layer(ops)` calls the driver directly; this is the one to use for the path `Engine.layer`
  * takes. A function beside `Runner`, as `sdkRunner` is, rather than a static on it: `harness/seam.ts` would then import
  * this file, which imports `harness/seam.ts`.
+ * @param ops The driver whose session verbs the seam carries.
+ * @param harness The name the harness goes by on its card and in its errors; `runner` where none is given.
  */
 export const a2aRunner = (ops: RunnerOps, harness = 'runner'): Layer.Layer<Runner, never, Journal> =>
   Layer.unwrap(

@@ -74,7 +74,10 @@ export const SEND_MS = 15 * 60_000;
  */
 export const SPAWN_WAIT_MS = 1_000;
 
-/** Why a task cannot be filed on a remote agent, or `undefined`: a remote agent takes no harness arguments. */
+/**
+ * Why a task cannot be filed on a remote agent, or `undefined`: a remote agent takes no harness arguments.
+ * @param harness The name of the remote harness, said in the refusal.
+ */
 export const remoteRefuses =
   (harness: string) =>
   (task: Omit<SpawnRequest, 'name'>): string | undefined => {
@@ -144,6 +147,13 @@ export type RemoteOptions = {
  * - `forget` removes the session's entry, open or let go of, and names the Task the remote party keeps, which is not ours.
  * - `kept` names each session's entry, open or let go of, and no record: the Task is the remote party's.
  * - `follow`, `transcript` and `transcriptOf` are `remoteFollowOf`'s, `remoteTranscriptOf`'s and `remoteTranscriptByName`'s.
+ * @param harness The name of the remote harness: its registry's entries, its card and its words are under it.
+ * @param agent The agent, by its address (`url`) or by its card (`card`).
+ * @param root The store's folder, beneath which the registry is kept.
+ * @param credentials What answers a secret for a scheme the agent's card declares, or undefined where none is given.
+ * @param requestMs How long a request to the agent is waited on, in milliseconds; `REQUEST_MS` where not given.
+ * @param o The rest of the bounds and words, each absent one at its default: `sendMs`, `spawnWaitMs`, `missingCredential`, and a follow's
+ * paces.
  */
 export const remoteOps = (
   harness: string,

@@ -15,7 +15,10 @@ import { stepsFilled } from '../roster/fills.store.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { BUILTIN_SKILLS, REPOSITORY_HOLDER } from '../skills/read.store.ts';
 import { builtinServers, BUILTIN_SERVERS } from '../factory/servers/servers.store.ts';
-import { Missing } from '../refusal/refusal.ts';
+import { Effect } from 'effect';
+import { Missing, type Refusal } from '../refusal/refusal.ts';
+import { tried } from '../runtime-client.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import type { BuiltinServer, FactoryServer, FactoryServers } from '../factory/servers/servers.ts';
 import { addName, libraryAddRefusal, libraryAddState, libraryAddsOf, sameAdd, type LibraryKind, type LibraryRef } from './library.ts';
 import { libraryAddsFile, libraryDir, libraryServers, readLibraryAdds, writeLibraryAdds } from './library.store.ts';
@@ -246,3 +249,52 @@ export function addedServers(home: string, name: string): FactoryServers {
 
 /** A builtin server as a record holds it: its fields but its name. */
 const withoutName = ({ name: _name, ...server }: BuiltinServer): FactoryServer => server;
+
+/**
+ * Adds to the factory `name`'s record each builtin skill an agent of its tree gives that neither its tree nor the record holds, so a
+ * template's apply and upgrade bring the builtins its agents name. Nothing for a factory with no record of its adds: its adds are derived
+ * from what it runs, which holds them already.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param tree The factory's tree, whose `workflows/agents/` and `workflows/skills/` are read.
+ */
+export function addTemplateBuiltins(home: string, name: string, tree: string): void {
+  const recorded = readLibraryAdds(home, name);
+  if (recorded === undefined) return;
+  const agents = path.join(tree, 'workflows', AGENTS_FOLDER);
+  let files: string[];
+  try {
+    files = fs.readdirSync(agents).filter((f) => f.endsWith('.md'));
+  } catch {
+    return;
+  }
+  const own = (skill: string) => fs.existsSync(path.join(tree, 'workflows', SKILLS_FOLDER, skill, 'SKILL.md'));
+  const wanted = files
+    .flatMap((file) => givenSkills(path.join(agents, file)))
+    .filter((skill) => !skill.includes(':') && !own(skill) && librarySkill(home, skill) === 'builtin')
+    .map((skill): LibraryRef => ({ kind: 'Skill', name: skill }))
+    .filter((ref, i, all) => !recorded.some((a) => sameAdd(a, ref)) && all.findIndex((b) => sameAdd(b, ref)) === i);
+  if (wanted.length) writeLibraryAdds(home, name, [...recorded, ...wanted]);
+}
+
+/**
+ * The add `addname` (`<kind>.<name>`) of the factory `factory` written or taken off, as a program over the store's root: what the api's
+ * LibraryAdd put and delete run. Refused (`Missing`) for a name that is no add, and as `writeLibraryAdd` refuses.
+ * @param factory The factory's name, `default` among them.
+ * @param does Whether the item is added or its add taken off.
+ * @param addname The add's object name, `<kind>.<name>`.
+ */
+export const libraryAddWritten = (
+  factory: string,
+  does: 'add' | 'remove',
+  addname: string,
+): Effect.Effect<LibraryAdd, Refusal, StoreRoot> =>
+  Effect.gen(function* () {
+    const home = yield* StoreRoot;
+    const ref = refOf(addname);
+    if (ref === undefined)
+      return yield* Effect.fail(
+        new Missing({ message: `${addname} is no add: name it <kind>.<name>, its kind Agent, Skill or McpServer.` }),
+      );
+    return yield* tried(() => writeLibraryAdd(home, factory, does, ref));
+  });

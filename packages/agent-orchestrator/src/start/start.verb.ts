@@ -22,6 +22,7 @@ import { SkillDoor } from '../skills/skill-door.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import type { SkillsFound } from '../agents/agents.ts';
 import { placesOf } from '../folder/lookup.store.ts';
+import { addedOf } from '../library/library.store.ts';
 import { pinsOf } from '../revisions/pin.verb.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
@@ -753,7 +754,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const home = yield* StoreRoot;
   const edits = yield* labelEditsOf(opts);
   const isolate = opts.isolate ?? true;
-  const places = placesOf(home, opts.repo, opts.factory ?? DEFAULT_NAMESPACE);
+  const places = placesOf(home, opts.repo, addedOf(home, opts.factory ?? DEFAULT_NAMESPACE));
   const factory = yield* factoryOrNone(opts.factory);
   const harnessSettings = yield* settingsAt(factory);
   const refused = yield* StartRefusal;

@@ -5,20 +5,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { AGENTS_FOLDER, CARRIED_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
-import type { Places } from '../skills/read.store.ts';
-import { addedOf } from '../library/library.store.ts';
+import type { LibraryAdded, Places } from '../skills/read.store.ts';
 
 /**
  * Where a run on `repo` looks for its steps' agents and skills beside its folder's own (`lookupRoots`): the repository, then the store at
- * `home`, whose library is read for the names the run's factory has added (`addedOf`).
+ * `home`, whose library is read for the names the run's factory has added.
  * @param home The store's root folder.
  * @param repo The repository the run is on, or undefined for a run on none.
- * @param factory The factory the run is in, `default` among them; undefined for a read in no factory, which reads the library whole.
+ * @param added The names the run's factory has added from the library (`addedOf`); undefined reads the library whole.
  */
-export const placesOf = (home: string, repo: string | undefined, factory?: string): Places => {
-  const added = addedOf(home, factory);
-  return { ...(repo ? { repo } : {}), home, ...(added !== undefined && { added }) };
-};
+export const placesOf = (home: string, repo: string | undefined, added?: LibraryAdded): Places => ({
+  ...(repo ? { repo } : {}),
+  home,
+  ...(added !== undefined && { added }),
+});
 
 /**
  * The folders directly in `dir`, sorted, a link to one included. None when `dir` is not there. A hidden folder is not a

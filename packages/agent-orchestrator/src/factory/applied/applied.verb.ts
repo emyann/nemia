@@ -70,6 +70,7 @@ import {
 } from '../upgrade/index.ts';
 import { FACTORY_APPLY_WORDS, type ProposalPhase } from 'objects';
 import { ProposalDoor } from '../../proposal/proposal.store.ts';
+import { addTemplateBuiltins } from '../../library/library.verb.ts';
 
 /**
  * A template rendered with a factory's parameters: its name (its tree's, which the lint holds equal to its manifest's), its version, the
@@ -496,7 +497,8 @@ const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
  * upgrade merged where one is due (`upgradePass`), and its status written where it changed. The version its base holds is the template's
  * wherever the base is its render, else the one last written, else unknown, said by its own condition. The proposals the upgrade's
  * resolutions name are read as they are now (`phasesNamed`), so an owner's conflicts are taken once its proposal applied. The status it
- * observed.
+ * observed. The builtin skills its tree's agents give are added to its record of library adds, where it keeps one
+ * (`addTemplateBuiltins`).
  */
 export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory: Factory & { template: FactoryTemplate }) {
   const home = yield* StoreRoot;
@@ -504,7 +506,9 @@ export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory
   const recorded = yield* recordedOf(factory, now, readStatus(home, factory.name));
   const phases = yield* phasesNamed(factory.name, readResolutions(home, factory.name)?.proposals ?? {});
   const at = new Date(yield* Clock.currentTimeMillis).toISOString();
-  return reconciledWith(home, factory, now, named, at, recorded, phases);
+  const status = reconciledWith(home, factory, now, named, at, recorded, phases);
+  if (factory.tree !== undefined) addTemplateBuiltins(home, factory.name, factory.tree);
+  return status;
 });
 
 /**

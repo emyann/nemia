@@ -16,7 +16,7 @@ import { WorkflowError } from '../step/step.ts';
 import { skillEntryOf } from './skills.ts';
 import { LOOKUP } from '../definition/served.ts';
 import { placesOf } from '../folder/lookup.store.ts';
-import { writeLibraryAdds } from '../library/library.store.ts';
+import { addedOf, writeLibraryAdds } from '../library/library.store.ts';
 import {
   BUILTIN_SKILLS,
   copySkillFiles,
@@ -420,7 +420,7 @@ test("a factory finds a library skill and a builtin one once it has added it, an
   const home = scratch('wf-library-gate-');
   written(home, { 'workflows/skills/tidy/SKILL.md': SKILL });
   const repo = checkout();
-  const lookup = (factory?: string) => skillsFor(path.join(repo, 'workflows', 'dev'), placesOf(home, repo, factory)).at;
+  const lookup = (factory?: string) => skillsFor(path.join(repo, 'workflows', 'dev'), placesOf(home, repo, factory === undefined ? undefined : addedOf(home, factory))).at;
   const record = (adds: ReadonlyArray<{ kind: 'Agent' | 'Skill' | 'McpServer'; name: string }>) =>
     writeLibraryAdds(home, 'acme', adds);
   await t.test('unrecorded: the library skill and the builtin are found, as before the library had adds', () => {

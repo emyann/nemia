@@ -48,6 +48,7 @@ import { splitFrontmatter, type StepSpec } from '../step/step.ts';
 import { realRepoOf } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn } from '../agents/agents.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
+import { addedOf } from '../library/library.store.ts';
 import { workflowDescription } from '../folder/folder.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
@@ -102,7 +103,7 @@ export const toldOf = Effect.fnUntraced(function* (run: Run, step: StepSpec) {
 const skillsTold = Effect.fnUntraced(function* (step: StepSpec, run: Run) {
   const home = yield* StoreRoot;
   const door = (yield* SkillDoor).skills;
-  const found = yield* door.found({ dir: run.workflowDir, places: placesOf(home, run.repo, run.factory ?? DEFAULT_NAMESPACE) });
+  const found = yield* door.found({ dir: run.workflowDir, places: placesOf(home, run.repo, addedOf(home, run.factory ?? DEFAULT_NAMESPACE)) });
   const told: SkillAgain[] = [];
   for (const name of step.agent?.skills ?? []) {
     const from = found.at.get(name);

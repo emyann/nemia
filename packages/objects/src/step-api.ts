@@ -6,7 +6,7 @@
  * Each under `/api/runs/:runId/steps/:step/`, found among the runs the store lists, in any namespace. Served by the api's step handlers
  * (`apps/api/src/steps/steps.ts`).
  */
-import { Schema, SchemaTransformation } from 'effect';
+import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BadRequest, Gone, Invalid, Missing, ReadFailed, Unjudged } from './api-errors.ts';
 import { StepLog } from './run.ts';
@@ -160,9 +160,7 @@ const sse = <E extends string, D extends Schema.Top>(event: E, data: D) =>
       }),
     ),
     event: Schema.Literal(event).annotate({ description: "The event's name." }),
-    data: Schema.String.annotate({ description: "The event's data, as JSON." }).pipe(
-      Schema.decodeTo(data, SchemaTransformation.fromJsonString()),
-    ),
+    data: Schema.fromJsonString(data).pipe(Schema.annotateEncoded({ description: "The event's data, as JSON." })),
   });
 
 /**

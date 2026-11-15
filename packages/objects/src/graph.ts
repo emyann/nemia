@@ -4,7 +4,7 @@
  * Run's graph unchanged by the move out of `run.ts`.
  */
 import { Schema } from 'effect';
-import { describedNumber } from './meta.ts';
+import { describedOne } from './meta.ts';
 import { NODE_KINDS } from './words.ts';
 
 const List = <S extends Schema.Top>(item: S) => Schema.mutable(Schema.Array(item));
@@ -26,7 +26,7 @@ export const GraphEdge = Schema.Union([
     from: Schema.String.annotate({ description: 'The looping step.' }),
     to: Schema.String.annotate({ description: 'The step a round runs again; the one edge that points backwards.' }),
     kind: Schema.Literal('loop').annotate({ description: 'loop: from loops back to run to again.' }),
-    rounds: describedNumber('How many rounds the loop may run, the first included.'),
+    rounds: describedOne(Schema.Finite, 'How many rounds the loop may run, the first included.'),
   }),
   Schema.Struct({
     from: Schema.String.annotate({ description: 'The condition that routes.' }),

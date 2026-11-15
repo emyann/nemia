@@ -49,7 +49,10 @@ export const Health = Schema.Struct({
 export type Health = typeof Health.Type;
 
 /** Where the code runs from: the two words a session's release says (`SessionRelease`, run.ts). */
-const ReleaseKind = Schema.Union([SessionReleaseSchema.members[0].fields.kind, SessionReleaseSchema.members[1].fields.kind]);
+const ReleaseKind = Schema.Literals([
+  SessionReleaseSchema.members[0].fields.kind.literal,
+  SessionReleaseSchema.members[1].fields.kind.literal,
+]);
 
 /** The code the api runs, as the lease records it: the repository's working copy's folder, or an install's folder, tag and commit. */
 export const Release = Schema.Struct({

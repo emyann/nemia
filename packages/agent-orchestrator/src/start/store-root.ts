@@ -23,6 +23,10 @@ const ruledUnderStore = (step: StepSpec, steps: readonly StepSpec[], t: StoreFol
  * folder for a run given inputs) on a harness whose rules cannot carry a character of `root` (`unruledIn`), so the rule would name another
  * folder, or none. Its words name the step, `WF_ROOT`, its value and the character, and the fix: a root of plain characters, the store's
  * folder moved there. A root every rule carries, or steps that name nothing under it in a rule, are let through. Pure.
+ * @param root The store's root.
+ * @param steps The workflow's steps.
+ * @param t The folders a step's first filing would name: the run's artifacts folder, the inbox, and the run's inputs folder where it is
+ *   given.
  */
 export const storeRootRefusal = (root: string, steps: readonly StepSpec[], t: StoreFolders): string | undefined => {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {

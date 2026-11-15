@@ -120,6 +120,7 @@ const serverRead = (env: NodeJS.ProcessEnv): Promise<Readiness | 'refused'> =>
 /**
  * The read as this client prints it: the server's pieces where it answered, then the client's, `ready` over them all, and whether a
  * run was ever started on the server, as it answered.
+ * @param env The environment read for the context in use, the store and the token.
  */
 export async function doctorRead(env: NodeJS.ProcessEnv = process.env): Promise<Readiness> {
   const chosen = chosenOf(env);
@@ -202,7 +203,10 @@ function pieceLines(p: ReadinessPiece): string[] {
   return [head, ...shown.map((fix) => fixLine(p, fix))];
 }
 
-/** The read's lines: each area holding a piece, its pieces (`pieceLines`), and last whether a run waits on it (`readinessSaid`). */
+/**
+ * The read's lines: each area holding a piece, its pieces (`pieceLines`), and last whether a run waits on it (`readinessSaid`).
+ * @param read The readiness read, the server's pieces and the client's.
+ */
 export function doctorLines(read: Readiness): string[] {
   const lines = READINESS_AREAS.flatMap((area) => {
     const ofArea = read.pieces.filter((p) => p.area === area);
@@ -376,7 +380,11 @@ async function fix(args: readonly string[], env: NodeJS.ProcessEnv): Promise<num
   return 1;
 }
 
-/** `nemia doctor …`, on the words after `doctor`: answers its exit code, or throws its refusal. */
+/**
+ * `nemia doctor …`, on the words after `doctor`: answers its exit code, or throws its refusal.
+ * @param args The words typed after `doctor`.
+ * @param env The environment read for the context in use, the store and the token, and given a spawned verb.
+ */
 export async function doctor(args: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
   if (args[0] === 'fix') return fix(args.slice(1), env);
   if (args[0] === 'carry') return spawned([DOCTOR_VERB, ...args], 'nemia', env);

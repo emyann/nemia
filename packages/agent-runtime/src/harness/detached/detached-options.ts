@@ -22,6 +22,7 @@ export type DetachedOptions = {
 /**
  * The bounds `options` give, each defaulted to the shipped one. Throws a `RangeError` for a beat not above 0 and under `STALE_MS`:
  * the lease would read a live worker beating so as dead.
+ * @param options The runner's options, whose `stopGraceMs` and `beatMs` are read, in milliseconds.
  */
 export function workerBoundsOf(options: DetachedOptions): { stopGraceMs: number; beatMs: number } {
   const stopGraceMs = options.stopGraceMs ?? WORKER_STOP_GRACE_MS;

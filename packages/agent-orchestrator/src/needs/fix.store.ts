@@ -24,13 +24,24 @@ export const FixRecord = Schema.StructWithRest(
 );
 export type FixRecord = typeof FixRecord.Type;
 
-/** The folder of the fixes' records of the store at `home`. */
+/**
+ * The folder of the fixes' records of the store at `home`.
+ * @param home The store's root folder.
+ */
 export const fixesDir = (home: string): string => path.join(home, 'fixes');
 
-/** The record of the fix `id` of the store at `home`. */
+/**
+ * The record of the fix `id` of the store at `home`.
+ * @param home The store's root folder.
+ * @param id The fix's id.
+ */
 export const fixFile = (home: string, id: string): string => path.join(fixesDir(home), `${id}.json`);
 
-/** Writes `record` whole, by a temporary file and a rename, so no reader meets half of one. */
+/**
+ * Writes `record` whole, by a temporary file and a rename, so no reader meets half of one.
+ * @param home The store's root folder.
+ * @param record The fix's record, written to its id's file.
+ */
 export function writeFixRecord(home: string, record: FixRecord): void {
   fs.mkdirSync(fixesDir(home), { recursive: true });
   const file = fixFile(home, record.id);
@@ -39,7 +50,11 @@ export function writeFixRecord(home: string, record: FixRecord): void {
   fs.renameSync(hidden, file);
 }
 
-/** The record of the fix `id`, or undefined where the store has none that reads: an id no fix was started under is no fix. */
+/**
+ * The record of the fix `id`, or undefined where the store has none that reads: an id no fix was started under is no fix.
+ * @param home The store's root folder.
+ * @param id The fix's id, as a caller gave it.
+ */
 export function readFixRecord(home: string, id: string): FixRecord | undefined {
   if (id === '' || id.includes('/') || id.startsWith('.')) return undefined;
   try {

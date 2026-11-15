@@ -131,6 +131,9 @@ const ownLevel = (home: string, name: string): { level: Level } | { error: strin
  * The object of one factory `listing` of the store, read at the store `home`: a file that reads as its spec, its status the controller's
  * file and its places not trusted among `listed`'s, its version moved by its rules and its instruction too (`partsOf`); one that does not
  * read with no spec but its name's, its error saying why.
+ * @param listing The factory's file as the store listed it, or why it does not read.
+ * @param listed The store's listing whole, whose places a harness does not trust are read.
+ * @param home The store's root.
  */
 export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, home: string): FactoryObject => {
   const { metadata, spec } = filedOf(listing, home);
@@ -153,6 +156,8 @@ export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, 
 /**
  * The factory of one `listing` of the store as its parts read it, at the store `home`: a file that reads as its spec, its own level among
  * it; one that does not with no spec but its name's. No status: neither the controller's file nor a harness's trust is read.
+ * @param listing The factory's file as the store listed it, or why it does not read.
+ * @param home The store's root.
  */
 export const filedOf = (listing: FactoryListing, home: string): FiledFactory => {
   const meta = { name: listing.name, creationTimestamp: bornAt(listing.file) };
@@ -181,6 +186,7 @@ export const filedOf = (listing: FactoryListing, home: string): FiledFactory => 
 /**
  * The default factory's object: on no repository (a repository is a factory's own, filed with `nemia factory add`), offering every
  * workflow (no `workflows`), hiring no one, keeping no file.
+ * @param home The store's root, whose time of birth is the default factory's.
  */
 export const defaultFactoryObject = (home: string): FactoryObject =>
   objectOf(
@@ -189,13 +195,20 @@ export const defaultFactoryObject = (home: string): FactoryObject =>
     { conditions: [], untrusted: [] },
   );
 
-/** Every factory's object: the default, then each of `listed`, read at `home`. */
+/**
+ * Every factory's object: the default, then each of `listed`, read at `home`.
+ * @param listed The store's listing of its factories' files.
+ * @param home The store's root.
+ */
 export const factoryObjectsOf = (listed: FactoryListed, home: string): FactoryObject[] => [
   defaultFactoryObject(home),
   ...listed.factories.map((l) => factoryObjectOf(l, listed, home)),
 ];
 
-/** The refusal of a factory no object has the name of: it names the list. */
+/**
+ * The refusal of a factory no object has the name of: it names the list.
+ * @param name The name asked for.
+ */
 export const noFactory = (name: string): Missing =>
   new Missing({
     message: `no factory ${name}: list them with nemia factory (GET /api/factories), or file one with nemia factory add ${name} --repo <path>`,
@@ -268,6 +281,8 @@ const named = (name: string) => {
  * The lines a person types for the factory `name`, built off the command table: a workflow attached, its file removed and filed again,
  * a workflow scheduled, its places trusted again, a volume mounted; and of the factory's own parts, each schedule taken back, by its
  * workflow, and each volume unmounted, by its name.
+ * @param factory The factory as its parts read it.
+ * @param schedules The workflows the factory schedules, each by its folder name.
  */
 export const factoryCommands = (factory: FiledFactory, schedules: readonly string[]): FactoryCommands => {
   const name = factory.metadata.name;

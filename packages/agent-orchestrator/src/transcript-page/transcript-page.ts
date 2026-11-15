@@ -21,6 +21,10 @@ const taken = (n: number | null): boolean => n === null || (Number.isInteger(n) 
  * The events `[from, to)` of the `count` a read holds after its cursor: the first `limit` (the default page where neither is asked), or
  * the last `last`, never more than `bounds.most`; whether any is left after them; or the refusal of a read that asks both, or a `limit` or
  * a `last` that is no whole number from 1. A size is compared with what there is before it is taken, so no difference is below 0.
+ * @param count How many events the read holds after its cursor.
+ * @param limit The first events asked; null where not asked.
+ * @param last The last events asked; null where not asked.
+ * @param bounds The page sizes: the default and the most a page holds.
  */
 export const transcriptCut: TranscriptCut = (count, limit, last, bounds) => {
   if (limit !== null && last !== null) return { refused: 'both' };
@@ -41,12 +45,17 @@ const MARK = '~';
 /** Where a read of a conversation starts: after the engine's cursor (none for the start), past the first `skip` events it reads. */
 export type TranscriptAt = { readonly engine: string | undefined; readonly skip: number };
 
-/** The cursor the api answers for `skip` events read after the engine's cursor `engine` (none for the start): `<engine>~<skip>`. */
+/**
+ * The cursor the api answers for `skip` events read after the engine's cursor `engine` (none for the start): `<engine>~<skip>`.
+ * @param engine The engine's cursor the events were read after; undefined for the start.
+ * @param skip How many events after it the read has answered.
+ */
 export const transcriptCursorOf = (engine: string | undefined, skip: number): string => `${engine ?? ''}${MARK}${skip}`;
 
 /**
  * Where the cursor `after` starts a read (`TranscriptAt`): none for the start; a bare engine cursor, with no `~`, at its first event, as a
  * read before the api paged gave it; `<engine>~<n>` past `n` events after it — or `Invalid` where `n` is no whole number from 0.
+ * @param after The cursor the request gave; undefined or empty for the start.
  */
 export const transcriptCursorRead = (after: string | undefined): TranscriptAt | Invalid => {
   if (after === undefined || after === '') return { engine: undefined, skip: 0 };
@@ -65,6 +74,7 @@ export const transcriptCursorRead = (after: string | undefined): TranscriptAt | 
 /**
  * The kinds `?kinds=` asks for, `SAID_AFTER`'s words comma-separated, in `SAID_AFTER`'s order: undefined for every kind, where none is
  * asked; `Invalid` for a word that is no kind.
+ * @param kinds The `?kinds=` the request gave; undefined where it gave none.
  */
 export const transcriptKindsOf = (kinds: string | undefined): readonly SaidAfter[] | undefined | Invalid => {
   if (kinds === undefined || kinds.trim() === '') return undefined;
@@ -97,6 +107,8 @@ export type TranscriptPaged<E> = { readonly events: E[]; readonly cursor: string
 /**
  * The kinds `asked` keeps, or its refusal before anything is read: a `limit` or a `last` that is no whole number from 1, both asked, or a
  * kind `SAID_AFTER` has not.
+ * @param asked What the request asked: its limit, its last and its kinds.
+ * @param bounds The page sizes: the default and the most a page holds.
  */
 export const transcriptAskedRead = (
   asked: TranscriptAsked,
@@ -119,6 +131,10 @@ export const transcriptAskedRead = (
  * `at.skip`, the ones of the kinds asked, cut by `transcriptCut` within `bounds`. Its cursor counts every event up to the last it answers,
  * kept or not, and is the engine's own, bare, where that reaches the end of what the engine read. `more` is absent where the page holds
  * every event after the cursor, and says otherwise whether events are left after it. `Invalid` as `transcriptAskedRead` refuses.
+ * @param read Every event the engine read after the cursor, and its new cursor.
+ * @param at Where the request's cursor starts the read (`transcriptCursorRead`).
+ * @param asked What the request asked: its limit, its last and its kinds.
+ * @param bounds The page sizes: the default and the most a page holds.
  */
 export const transcriptPaged = <E extends Said>(
   read: { readonly events: readonly E[]; readonly cursor: string },

@@ -13,7 +13,10 @@ const heldBy = (t: Token): string =>
     ? 'yours'
     : `${t.agent ?? 'an agent'}'s, ${t.factory === undefined ? 'store-wide' : `in ${t.factory}`}${t.narrowed === undefined ? '' : `, narrowed to ${t.narrowed}`}`;
 
-/** `nemia token add`'s runner: the token, shown this once, and the header it is sent in. */
+/**
+ * `nemia token add`'s runner: the token, shown this once, and the header it is sent in.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function tokenAdd(args: Args): Promise<number> {
   const name = textArg(args, 'name') ?? '';
   const agent = textArg(args, 'agent');
@@ -47,7 +50,10 @@ export async function tokenLs(): Promise<number> {
   return 0;
 }
 
-/** `nemia token rm`'s runner: the token retired. */
+/**
+ * `nemia token rm`'s runner: the token retired.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function tokenRm(args: Args): Promise<number> {
   const name = textArg(args, 'name') ?? '';
   const t = await asked(TOKEN_RM_WORDS.name, (c) => c.tokens.retire({ params: { name } }));

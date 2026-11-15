@@ -19,6 +19,8 @@ export type ScopeAt = { cgroupParent?: string | undefined; scopeProgram?: string
  * A spawn's scope: under a limit, its bytes and the argv before its command, or why it cannot be held; with none, the argv alone where
  * the host makes a scope (the probe, `scopeRefusal`, passes), and `undefined` where it does not, so the session runs bare as it did
  * before scopes, never refused for it.
+ * @param r The spawn asked for, whose `resources.limits.memory` is the limit, where it has one.
+ * @param at The slice to put the scope in and the program that makes it, each the default where unset.
  */
 export const scopeFor = (r: SpawnRequest, at: ScopeAt): { memoryLimit?: number; argv: string[] } | { refused: string } | undefined => {
   const memory = r.resources?.limits?.memory;

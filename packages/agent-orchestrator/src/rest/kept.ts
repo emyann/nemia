@@ -39,6 +39,9 @@ export type RecordsRead = {
  *
  * With no `memo`, every record is read and nothing is kept. Under `read.verify`, a run answered from memory is read and projected afresh
  * too, and a projection that differs throws naming the run: something the projection reads is not in the stamp.
+ * @param memo The projections kept, by run, or undefined where none is kept.
+ * @param read The store's stamps, the reader of a run by id, and whether to verify.
+ * @param project What a run is projected to.
  */
 export function keptRecords<P>(memo: RecordMemo<P> | undefined, read: RecordsRead, project: (run: Run) => P): P[] {
   const ids = [...read.stamps.keys()].sort((a, b) => a.localeCompare(b));

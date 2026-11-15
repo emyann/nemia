@@ -28,6 +28,7 @@ export type Listed = {
 /**
  * The kind of a listed run, asked in this order so each run has one: `waiting`, it waits on a person (`waitsOnYou`), though something
  * of it may still move; else `inFlight`, something of it moves, or it is running and waits on nobody; else `finished`.
+ * @param run The listed run.
  */
 export const kindOf = (run: Listed): RunState => {
   if (waitsOnYou(run)) return 'waiting';
@@ -38,6 +39,7 @@ export const kindOf = (run: Listed): RunState => {
 /**
  * When a finished run's work stopped: the later of the end of its last session or check and its cancellation; its creation for a run
  * that ran nothing and nobody cancelled.
+ * @param run The listed run: the end of its last session or check, its cancellation, and its creation.
  */
 export const finishedAtOf = (run: Pick<Listed, 'atWork' | 'cancelledAt' | 'createdAt'>): string => {
   const ends = [run.atWork?.endedAt ?? null, run.cancelledAt].filter((at): at is string => at !== null);
@@ -48,16 +50,23 @@ export const finishedAtOf = (run: Pick<Listed, 'atWork' | 'cancelledAt' | 'creat
  * The instant a run's clock is read at, in epoch milliseconds: when its work stopped (`finishedAtOf`) for a finished run, so that a
  * finished run's breakdown is frozen where its work ended; `now` for a run still going. `wallMsOf` measures to this same instant, so a
  * clock's `wallMs` and the row's own are one number, which is what makes a breakdown's rows add up to the row.
+ * @param run The listed run.
+ * @param now The instant the list is read at, in epoch ms.
  */
 export const clockUntilOf = (run: Listed, now: number): number => (kindOf(run) === 'finished' ? Date.parse(finishedAtOf(run)) : now);
 
 /**
  * A run's wall time in ms, never negative: from its creation until its work stopped (`finishedAtOf`), or until `now` for one not
  * finished (`clockUntilOf`).
+ * @param run The listed run.
+ * @param now The instant the list is read at, in epoch ms.
  */
 export const wallMsOf = (run: Listed, now: number): number => Math.max(0, clockUntilOf(run, now) - Date.parse(run.createdAt));
 
-/** How a finished run ended (`RunOutcome`). */
+/**
+ * How a finished run ended (`RunOutcome`).
+ * @param run The finished run: its cancellation, what it leaves to decide, and its status.
+ */
 export const outcomeOf = (run: Pick<Listed, 'cancelledAt' | 'toDecide' | 'status'>): RunOutcome => {
   if (run.cancelledAt) return 'cancelled';
   if (run.toDecide?.kind === 'result') return 'undecided';
@@ -67,6 +76,7 @@ export const outcomeOf = (run: Pick<Listed, 'cancelledAt' | 'toDecide' | 'status
 /**
  * Whether a listed run is of `factory`, a run whose record names none being of the default one; every run where `factory` is undefined.
  * Named apart from the roster's `inFactory`, which reads an agent's.
+ * @param factory The factory whose runs are kept, or undefined to keep every run.
  */
 export const runInFactory =
   (factory: string | undefined) =>

@@ -8,6 +8,14 @@ import type { AppendRefusal } from '../../../contracts/journal.contract.ts';
 export type { AppendRefusalReason } from './append-refusals.ts';
 export { APPEND_REFUSALS } from './append-refusals.ts';
 
+/**
+ * Why the door refuses one append, with the words that say what to do, or `undefined` where it takes it: a filing under a malformed
+ * id or of a task already filed, any other entry to a task with no journal, and a start out of its attempts' order.
+ * Proved by `contracts/journal.contract.ts`.
+ * @param idRefusal What is wrong with the task's id (`taskIdRefusal`), or undefined where it can name a file.
+ * @param event The entry to append.
+ * @param held What the door holds of the task before the append: whether it has a journal, and how many attempts it started.
+ */
 export const appendRefusal: AppendRefusal = (idRefusal, event, held) => {
   if (event.kind === 'filed') {
     if (idRefusal !== undefined) return { reason: 'malformed-id', message: idRefusal };

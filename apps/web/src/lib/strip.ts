@@ -58,7 +58,10 @@ type StripIn = {
   factory?: string;
 };
 
-/** The start of the day `now` is in, midnight in the time zone the process runs in: the browser's on the page. */
+/**
+ * The start of the day `now` is in, midnight in the time zone the process runs in: the browser's on the page.
+ * @param now The instant, in epoch ms.
+ */
 export const dayStartOf = (now: number): number => {
   const day = new Date(now);
   day.setHours(0, 0, 0, 0);
@@ -150,6 +153,8 @@ const sessionsOf = (open: readonly RunView[]): number =>
  * list's own states, a run it could not judge counted where the list puts it and in no other number; landed and failed the outcome the
  * list gives each run finished since the day began, one called off or undecided in neither; and Spent the open runs worked today with
  * those finished today.
+ * @param given What the page reads: the open and finished runs, the factories, the caps, now, the day's start
+ * and the factory in view.
  */
 export function stripOf(given: StripIn): Strip {
   const waiting = given.open.waiting.filter(judged);
@@ -191,6 +196,8 @@ const WINDOW_MS: ReadonlyArray<readonly [RegExp, number]> = [
 /**
  * When a window is used up at the pace it has been used so far, in epoch ms: from its length (`WINDOW_MS`) and its reset, the time it
  * has run; null for a window of no known length, with no reset, unused, reset since the reading, or that resets before it runs out.
+ * @param w The quota's window, as the api gives it.
+ * @param now The instant, in epoch ms.
  */
 export const runsOutAt = (w: QuotaWindow, now: number): number | null => {
   const length = WINDOW_MS.find(([key]) => key.test(w.key))?.[1];
@@ -205,6 +212,9 @@ export const runsOutAt = (w: QuotaWindow, now: number): number | null => {
 /**
  * The quota's line under its meters: when it runs out, if a window would before it resets — the soonest — and when that window resets;
  * else when the window used most resets. Null where no window says when it resets.
+ * @param windows The quota's windows, as the api gives them.
+ * @param now The instant, in epoch ms.
+ * @param timeZone The time zone the times are said in; undefined for the browser's own.
  */
 export function quotaLineOf(
   windows: readonly QuotaWindow[],

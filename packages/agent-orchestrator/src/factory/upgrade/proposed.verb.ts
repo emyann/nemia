@@ -37,7 +37,14 @@ const proposedBy =
       return proposal.metadata.name;
     });
 
-/** The object of `kind` named `name` of `factory` proposed as `spec`, or its removal, by the session's caller: the proposal's name. */
+/**
+ * The object of `kind` named `name` of `factory` proposed as `spec`, or its removal, by the session's caller: the proposal's name.
+ * @param factory The factory's name.
+ * @param kind The owner's kind: a Workflow, an Agent, a Skill, a Hire or the Factory.
+ * @param name The owner's name.
+ * @param spec The spec proposed, or undefined to propose the owner's removal.
+ * @param why What the proposal says of itself, shown with it.
+ */
 export const resolutionProposed: ResolutionProposed = (factory, kind, name, spec, why) =>
   Effect.gen(function* () {
     const place: ProposalPlace = { home: yield* StoreRoot };
@@ -51,13 +58,18 @@ export const resolutionProposed: ResolutionProposed = (factory, kind, name, spec
     return yield* proposedBy(caller, place)(factory, kind, name, spec, why);
   });
 
-/** `program` given the command line's proposer of an owner's resolution. */
+/**
+ * `program` given the command line's proposer of an owner's resolution.
+ * @param program The program that may propose a resolution.
+ */
 export const withResolutionProposer = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
   Effect.provideService(program, ResolutionProposer, resolutionProposed);
 
 /**
  * `program` given the api's proposer of an owner's resolution: by `caller`, the request's, at `place`, the store and repository the
  * request is served at.
+ * @param caller The request's caller, by whom the resolution is proposed.
+ * @param place The store and repository the request is served at.
  */
 export const withResolutionProposerAs =
   (caller: ProposalCaller, place: ProposalPlace) =>

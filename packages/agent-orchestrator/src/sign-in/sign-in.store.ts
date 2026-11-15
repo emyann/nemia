@@ -25,7 +25,10 @@ export const TOKEN_MAKER = DEFAULT_SIGN_IN.maker;
 /** The variable the default harness signs in with, which the daemon's sessions inherit, as the runtime names it. */
 export const TOKEN_VARIABLE = DEFAULT_SIGN_IN.variable;
 
-/** The token file of the store at `home`. */
+/**
+ * The token file of the store at `home`.
+ * @param home The store's root.
+ */
 export const claudeTokenFile = (home: string): string => path.join(home, TOKEN_NAME);
 
 /** Whether the store keeps a sign-in token (`set`) or not (`unset`). */
@@ -64,6 +67,8 @@ const modeWords = (mode: number): string => `0${(mode & 0o777).toString(8).padSt
  * Keeps `token` as the store's sign-in token: written to a file beside the token file with mode 0600, then renamed over it, so no
  * reader meets half of one or a moment it is readable by another. Refused (`Invalid`): a token that is empty or spans words once
  * trimmed.
+ * @param home The store's root.
+ * @param token The token as given, trimmed before it is kept.
  */
 export function writeClaudeToken(home: string, token: string): string {
   const trimmed = token.trim();
@@ -90,6 +95,8 @@ const warningOf = (setMs: number, now: number): ClaudeTokenWarning | undefined =
 /**
  * Whether the store at `home` keeps a sign-in token, its file's mode, and, read at `now`, when it was set and how long its year has left
  * (its file's write time); never the token.
+ * @param home The store's root.
+ * @param now The time read at, in ms since the epoch; the clock's where not given.
  */
 export function claudeTokenStatus(home: string, now: number = Date.now()): ClaudeTokenStatus {
   const file = claudeTokenFile(home);
@@ -106,7 +113,10 @@ export function claudeTokenStatus(home: string, now: number = Date.now()): Claud
   };
 }
 
-/** A kept token's age in words: the day it was set, and the days left of its year or how long it is past it. */
+/**
+ * A kept token's age in words: the day it was set, and the days left of its year or how long it is past it.
+ * @param status The kept token's status (`claudeTokenStatus`); no words where it carries no set time.
+ */
 export function tokenAgeWords(status: ClaudeTokenStatus): string | undefined {
   if (status.setAt === undefined || status.daysLeft === undefined) return undefined;
   const day = status.setAt.slice(0, 10);
@@ -122,6 +132,7 @@ export const TOKEN_RENEWAL = `${TOKEN_MAKER} on a machine with a browser, then n
 /**
  * The warning of a kept token near or past its year, naming the fix (`TOKEN_RENEWAL`): none for a token younger than `TOKEN_WARN_DAYS`
  * or none kept. `nemia <TOKEN_NAME> status`, the daemon's start and the readiness read say it alike.
+ * @param status The token's status (`claudeTokenStatus`).
  */
 export function tokenWarningLine(status: ClaudeTokenStatus): string | undefined {
   if (status.warning === undefined) return undefined;
@@ -133,7 +144,10 @@ export function tokenWarningLine(status: ClaudeTokenStatus): string | undefined 
   return `the ${capitalHarness} token in ${status.file} was ${age}: ${end}. Make a new one: ${TOKEN_RENEWAL}`;
 }
 
-/** Removes the store's sign-in token; answers whether there was one. */
+/**
+ * Removes the store's sign-in token; answers whether there was one.
+ * @param home The store's root.
+ */
 export function removeClaudeToken(home: string): boolean {
   const file = claudeTokenFile(home);
   const had = fs.existsSync(file);
@@ -148,6 +162,8 @@ export type ClaudeTokenLoad = 'loaded' | 'given' | 'none';
  * Sets the harness's variable (`TOKEN_VARIABLE`) in `env` from the token file of `env`'s store (`WF_ROOT`) where it is unset or empty, as
  * the daemon does at its start: the process's own environment, which every session it starts inherits. Refused (`Invalid`, exit 2) where
  * the file's mode lets its group or others read or write it, naming `chmod 600 <file>`, and where it holds no token.
+ * @param env The environment to set the variable in, whose `WF_ROOT` names the store.
+ * @param root The store's root; the one `env` names where not given.
  */
 export function loadClaudeToken(env: Record<string, string | undefined>, root: string = wfRoot(env)): ClaudeTokenLoad {
   if (env[TOKEN_VARIABLE]) return 'given';

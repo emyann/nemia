@@ -80,6 +80,7 @@ const specOf = (s: RunSpecStep | undefined): StepSpecView | null => {
 /**
  * The view of a run (`RunView`): its object's spec and status under the names the board reads, its factory, the graph without what a
  * step is handed, and each step with the step the run froze of its name.
+ * @param object The Run object as the api serves it.
  */
 export const runViewOf = (object: Run): RunView => {
   const { metadata, spec, status } = object;
@@ -115,6 +116,7 @@ export const runViewOf = (object: Run): RunView => {
 /**
  * When the step's task still at work started: the earliest `spawnedAt` of a session or check of its tries that has not ended, as the
  * orchestrator's `atWork` of the step alone says it; null while none runs.
+ * @param step The step, by its tries' timeline.
  */
 export function sinceOf(step: Pick<RunStep, 'timeline'>): string | null {
   const open = step.timeline
@@ -123,7 +125,10 @@ export function sinceOf(step: Pick<RunStep, 'timeline'>): string | null {
   return open.length === 0 ? null : open.reduce((a, b) => (Date.parse(b) < Date.parse(a) ? b : a));
 }
 
-/** The agent a step is given, as the run froze it; null for none. */
+/**
+ * The agent a step is given, as the run froze it; null for none.
+ * @param step The step, by the spec the run froze of it.
+ */
 export const agentOf = (step: Pick<RunStep, 'spec'>): string | null => step.spec?.agent ?? null;
 
 /**
@@ -135,5 +140,8 @@ export type UnjudgedRun = { readonly id: string; readonly factory: string | null
 /** A run of a list: judged into its view (`RunView`), or one the list could not judge (`UnjudgedRun`). */
 export type RunRow = RunView | UnjudgedRun;
 
-/** Whether a run of a list was judged: an `UnjudgedRun` has nothing else to read. */
+/**
+ * Whether a run of a list was judged: an `UnjudgedRun` has nothing else to read.
+ * @param row A run of a list.
+ */
 export const judged = <R extends object>(row: R | UnjudgedRun): row is R => !('unjudged' in row);

@@ -41,7 +41,11 @@ const parsed = (spec: Parameters<typeof parseArgv>[0], rest: readonly string[]):
   }
 };
 
-/** Runs the moved command `name` on the words after its name, `rest`, and answers its exit code. */
+/**
+ * Runs the moved command `name` on the words after its name, `rest`, and answers its exit code.
+ * @param name The moved command to run, the key of its words and its runner.
+ * @param rest The words typed after the command's name, its flags and positionals.
+ */
 export async function commanded(name: MovedCommand, rest: readonly string[]): Promise<number> {
   const words = COMMAND_WORDS.find((command) => command.name === name);
   if (words === undefined) throw new Error(`${name} is in MOVED_COMMANDS and has no words in objects' COMMAND_WORDS: add them there`);

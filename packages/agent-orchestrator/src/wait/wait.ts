@@ -13,6 +13,7 @@ export type { Wait } from '../../contracts/hold.contract.ts';
 /**
  * Whether any step of the run has been filed, on any try — a step a round moved behind still has its tries. A run that has
  * started never waits on a run again.
+ * @param run The run asked about.
  */
 export const hasStarted = (run: Run): boolean => Object.values(run.steps).some((s) => Boolean(s.taskId) || Boolean(s.tries?.length));
 
@@ -21,12 +22,14 @@ export const hasStarted = (run: Run): boolean => Object.values(run.steps).some((
  * been filed. None for a run with no `after`; none for a cancelled run, which files nothing anyway; and none for a
  * run that has started — whose parents are never read again, so a parent's branch deleted after the merge (`nemia decide`'s "drop it", a
  * `git branch -d` after landing) cannot un-ready it.
+ * @param run The run asked about.
  */
 export const gated = (run: Run): boolean => Boolean(run.after?.length) && !run.cancelledAt && !hasStarted(run);
 
 /**
  * The runs this run's pass reads as runs it waits on: its `after` while the gate applies (`gated`), and the runs a person holds it until
  * while the hold stands (`Run.hold`), in that order, a run named twice named twice. Pure.
+ * @param run The run asked about.
  */
 export const waitedOn = (run: Run): string[] => [
   ...(gated(run) && run.after ? run.after : []),
@@ -35,6 +38,8 @@ export const waitedOn = (run: Run): string[] => [
 
 /**
  * The runs in `after` that have not landed, in the order they were given. Pure; none, and `landed` never called, for a run not `gated`.
+ * @param run The run whose `after` is read.
+ * @param landed Whether the run of an id has landed, as `nemia decide` says it.
  */
 export function waitingOn(run: Run, landed: (runId: string) => boolean): string[] {
   if (!gated(run) || !run.after) return [];
@@ -45,6 +50,8 @@ export function waitingOn(run: Run, landed: (runId: string) => boolean): string[
  * Whether the tick may file this run's roots: true when every run in its `after` has landed, as `nemia decide` says it of that run —
  * not running, not cancelled, and every result branch on the base branch — never when its steps say they are done, because the run
  * boundary is the human gate. Pure. True for a run that is not `gated`, without asking.
+ * @param run The run whose `after` is read.
+ * @param landed Whether the run of an id has landed, as `nemia decide` says it.
  */
 export const runReady = (run: Run, landed: (runId: string) => boolean): boolean => waitingOn(run, landed).length === 0;
 
@@ -55,7 +62,11 @@ export const runReady = (run: Run, landed: (runId: string) => boolean): boolean 
  */
 export type ParentRun = { record?: Run; landed: boolean; gone?: string[]; unread?: string };
 
-/** Each run this one waits on that has not landed (`waitingOn`), and why it may never. Pure. */
+/**
+ * Each run this one waits on that has not landed (`waitingOn`), and why it may never. Pure.
+ * @param run The run whose `after` is read.
+ * @param parentOf How a run another waits on reads, by its id: its record, whether it landed, and a result branch gone.
+ */
 export function waitsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {
   return waitingOn(run, (id) => parentOf(id).landed).map((id) => waitOf(id, parentOf(id)));
 }
@@ -79,6 +90,7 @@ const neverLands = (w: Wait): boolean => Boolean(w.missing || w.cancelledAt || w
  * cancelled one, a result branch gone. Pure, and proved by `contracts/hold.contract.ts`. A hold that names no run asks nothing: it is the
  * person's word already given, lifted by their hand alone (`nemia hold <run> --off`). `holdingOf`, `nemia ls` and `nemia decide` read it
  * alike.
+ * @param holds Each run the hold names that has not landed (`holdsOf`).
  */
 export const holdNeedsYou: HoldNeedsYou = (holds) => holds.some(neverLands);
 
@@ -87,6 +99,8 @@ export const holdNeedsYou: HoldNeedsYou = (holds) => holds.some(neverLands);
  * a run cancelled, pruned or finished, of which nothing is left to file; one already held, since a hold is put once, whole; and a folder
  * run asked to wait on runs to land, which it has no branch for. A hold that names no run is no reason to refuse: it holds the run until a
  * person lifts it, and a folder run may take one.
+ * @param p What of the run stops a hold: whether it is cancelled, pruned, finished or held, whether it is a folder run, and the runs
+ * asked to wait on.
  */
 export const holdStop: HoldStopOf = (p): HoldStop | null => {
   const move = runMarkMove(runMarkOf(p), 'hold');
@@ -98,7 +112,10 @@ export const holdStop: HoldStopOf = (p): HoldStop | null => {
   return null;
 };
 
-/** A run's roots, waiting, as `nemia ls` says it in the status column: `waiting on a-1x2y (cancelled), b-3z4w`. */
+/**
+ * A run's roots, waiting, as `nemia ls` says it in the status column: `waiting on a-1x2y (cancelled), b-3z4w`.
+ * @param waits Each run waited on that has not landed, and why it may never (`waitsOf`).
+ */
 export const waitWord = (waits: readonly Wait[]): string => `waiting on ${waits.map(waitName).join(', ')}`;
 
 /**
@@ -116,6 +133,8 @@ function neverWhy(w: Wait, branch: string | undefined): string {
  * What a run waiting on runs leaves a person to do, in one line, for `nemia decide` and for `nemia ls`'s `→ waiting on you`. Pure. Nothing,
  * while each parent may still land: the tick files the roots when it does. For a parent that never will without a person — no such run, a
  * cancelled one, a result branch gone — why, and the two ways out: cancel this run, or start the work again without that edge.
+ * @param run The run whose roots wait.
+ * @param waits Each run waited on that has not landed, and why it may never (`waitsOf`).
  */
 export function waitAdvice(run: Run, waits: readonly Wait[]): string {
   const never = waits.filter(neverLands);
@@ -131,6 +150,8 @@ export function waitAdvice(run: Run, waits: readonly Wait[]): string {
  * never (`waitsOf`'s words). Pure. None for a run nobody holds, and for a hold that names no run, which a person alone lifts. While every
  * one has landed and the tick has not yet lifted the hold, each is named all the same, marked `landed`: the run is still held, and says why
  * for the moment it is.
+ * @param run The run whose hold is read.
+ * @param parentOf How a run another waits on reads, by its id: its record, whether it landed, and a result branch gone.
  */
 export function holdsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {
   if (!run.hold) return [];
@@ -163,6 +184,7 @@ const saidWord = ({ why, by }: Pick<Hold, 'why' | 'by'>): string => {
  * is given: `held until a-1x2y lands (why: merge conflicts; by operator)`. Pure. Never `waiting on you`: a hold is a person's word already
  * given, and nothing is asked of anyone while it stands.
  *
+ * @param waits Each run the hold waits on (`holdsOf`); none for a hold that names no run.
  * @param said The hold's `why` and `by`, each shown when it is there; a hold file older code wrote has neither, and shows the plain line.
  */
 export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> = {}): string {
@@ -180,6 +202,8 @@ export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> 
  * still land: the tick lifts the hold when they have, and what the run's steps ask is asked then. Nothing either for a hold that names
  * no run: it is the person's word already given, and only `--off` lifts it. For a run that never will without a person — no such run, a
  * cancelled one, a result branch gone — why, and the ways out: lift the hold, or cancel the run.
+ * @param run The held run.
+ * @param waits Each run the hold waits on (`holdsOf`); none for a hold that names no run.
  */
 export function holdAdvice(run: Run, waits: readonly Wait[]): string {
   const off = `nemia hold ${run.id} --off`;
@@ -257,6 +281,11 @@ function stopWords(run: Run, stop: HoldStop, until: readonly string[]): string {
  * folder run, another repository or another base branch, one that worked on its base (`--no-worktree`), a cancelled run and one whose
  * result branch is gone. And one already landed, which there is nothing to wait for. And a circle: a run named that already waits on this
  * one — through `--after` while it has not started (`gated`), or a hold — however far round, since each would wait on the other for ever.
+ * @param run The run to hold.
+ * @param until The runs it is asked to wait on to land, by id; none for a hold a person alone lifts.
+ * @param parentOf How a run another waits on reads, by its id: its record, whether it landed, and a result branch gone.
+ * @param others Every run in the store, read for a circle of waits.
+ * @param finished That the run has `landed`, or `succeeded` and waits on nothing but a merge; undefined for neither.
  */
 export function holdRefusal(
   run: Run,
@@ -322,6 +351,9 @@ export function holdRefusal(
  * folder run is refused on either side, since it lands on no branch: as the parent, and as this run, whatever the id names. Handed only
  * what the record and git say (`parentRecord` in branches.store.ts): nothing here needs the engine. The run itself cannot be named: it has
  * no id yet.
+ * @param after The runs `--after` names, by id, in the order given.
+ * @param child The run to start: its repository, its base branch and its place.
+ * @param parentOf How each parent reads, by its id: its record and whether its result branch is gone.
  */
 export function afterRefusal(
   after: readonly string[],

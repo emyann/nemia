@@ -10,7 +10,10 @@ import { durationWord } from '../../usage/usage.ts';
  */
 export type ScheduleTry = { due: string; at: string; run?: string; why?: string; refused?: boolean };
 
-/** The fire a kept try settled, a start or a lasting refusal, in milliseconds; none for a failure, which the next pass tries again. */
+/**
+ * The fire a kept try settled, a start or a lasting refusal, in milliseconds; none for a failure, which the next pass tries again.
+ * @param kept The tick's kept try of the schedule, or undefined where it keeps none.
+ */
 export const settledFire = (kept: ScheduleTry | undefined): number | undefined =>
   kept && (kept.run !== undefined || kept.refused === true) ? Date.parse(kept.due) : undefined;
 
@@ -18,6 +21,8 @@ export const settledFire = (kept: ScheduleTry | undefined): number | undefined =
  * Whether a schedule starts a run on this pass: its latest fire (`latest`) is later than when it was written (`since`), than the newest run
  * it started (`last`, by the fire that run was for), and than the fire its kept try settled (`settled`). Only the latest fire is compared,
  * so a daemon down across three fires starts one run, and a run removed from the store does not bring its fire back while its try stands.
+ * @param at The instants compared, in milliseconds since the epoch: `latest`, `since`, and `last` and `settled`, each absent
+ *   where there is none.
  */
 export function scheduleDue(at: { latest: number; since: number; last?: number; settled?: number }): boolean {
   return at.latest > at.since && at.latest > (at.last ?? -Infinity) && at.latest > (at.settled ?? -Infinity);
@@ -32,7 +37,10 @@ export type ScheduleStarted =
   | { factory: string; workflow: string; due: string; refused: string }
   | { factory: string; workflow: string; due: string; failed: string; again: boolean };
 
-/** The line `nemia up` says of a pass's scheduled start. */
+/**
+ * The line `nemia up` says of a pass's scheduled start.
+ * @param s What the pass did with the schedule: started a run, kept a lasting refusal, or failed.
+ */
 export function scheduleLine(s: ScheduleStarted): string {
   const named = `${s.factory}/${s.workflow}`;
   if ('refused' in s) {
@@ -58,7 +66,11 @@ export type ScheduleListed = {
   refused: string | null;
 };
 
-/** An instant `iso` as `nemia ls` says a schedule's fire or run at `now`: the instant, and how far off it is (`in 3d23h`, `2h05m ago`). */
+/**
+ * An instant `iso` as `nemia ls` says a schedule's fire or run at `now`: the instant, and how far off it is (`in 3d23h`, `2h05m ago`).
+ * @param iso The instant, an ISO timestamp.
+ * @param now The time it is said at, in milliseconds since the epoch.
+ */
 export function fireWord(iso: string, now: number): string {
   const ms = Date.parse(iso) - now;
   return `${iso}, ${ms >= 0 ? `in ${durationWord(ms)}` : `${durationWord(-ms)} ago`}`;
@@ -67,6 +79,8 @@ export function fireWord(iso: string, now: number): string {
 /**
  * The lines `nemia ls` prints after the runs, one per schedule and a second for a kept refusal; none without a schedule. `clock` words an
  * instant as the listing does.
+ * @param schedules Every factory's schedules as they are listed (`ScheduleListed`).
+ * @param clock How an ISO instant is worded in the listing.
  */
 export function scheduleLines(schedules: readonly ScheduleListed[], clock: (iso: string) => string): string[] {
   return schedules.flatMap((s) => [

@@ -16,6 +16,8 @@ export type { WatchChanges };
  * What changed between the objects sent a watcher (`sent`) and those the list holds now (`now`): each object of `now` it was never sent,
  * ADDED; each it was sent at another version, MODIFIED; then each of `sent` the list no longer holds, DELETED. With nothing sent, every
  * object is ADDED: a watch's first read. The three are apart, so each key is said at most once.
+ * @param sent The objects the watcher was sent, each by its key and its version.
+ * @param now The objects the list holds now.
  */
 export const watchChanges: WatchChanges = (sent, now) =>
   [

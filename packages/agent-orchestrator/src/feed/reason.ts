@@ -158,15 +158,22 @@ export const REASON_CODES = Object.keys(REASONS) as readonly Reason[];
 /** What the table says of one reason, read as the one shape every entry has. */
 const entryOf = (reason: Reason): Entry => REASONS[reason];
 
-/** How serious a reason is, by the table: what a line's `type` says. */
+/**
+ * How serious a reason is, by the table: what a line's `type` says.
+ * @param reason The reason to look up.
+ */
 export const typeOf = (reason: Reason): LineType => entryOf(reason).type;
 
-/** The kinds a reason is written of, by the table: what a line's `involved.kind` may be where it names that reason. */
+/**
+ * The kinds a reason is written of, by the table: what a line's `involved.kind` may be where it names that reason.
+ * @param reason The reason to look up.
+ */
 export const kindsOf = (reason: Reason): readonly InvolvedKind[] => entryOf(reason).kinds;
 
 /**
  * Who a line of `reason` is the deed of, by the table: the tick's where the table names none, so a reason added without a source is the
  * tick's judgement, which is what every word it judges is.
+ * @param reason The reason to look up.
  */
 export const sourceOf = (reason: Reason): LineSource => entryOf(reason).source ?? 'tick';
 
@@ -178,6 +185,7 @@ export const sourceOf = (reason: Reason): LineSource => entryOf(reason).source ?
  * **The reason this is asked of is a line's own, as its writer wrote it** (`reasonOfLine`), so it may be a code a newer `nemia` names and
  * this table does not have: such a line is no one-shot of ours and folds as a word does. The type says the code is one of ours; the line
  * came off a journal, which does not. Every other reader of the table is handed what `reasonOf` classified, which is total.
+ * @param reason The line's own reason, as its writer wrote it.
  */
 export const isOnce = (reason: Reason): boolean => (REASONS as Partial<Record<string, Entry>>)[reason]?.once === true;
 
@@ -301,6 +309,8 @@ const codesOfRule = ({ reason, on, via }: Rule): Codes => ({ reason, ...(on ? { 
  * selector its meaning and never costs the feed a line. Pure.
  *
  * A daemon says one word and the type system holds it to that word (`startedLine`), so a daemon's line is `DaemonStarted`.
+ * @param said The line's word and note.
+ * @param kind The kind of thing the line is about.
  */
 export function codesOf(said: Said, kind: InvolvedKind): Codes {
   if (kind === 'Daemon') return { reason: 'DaemonStarted' };
@@ -319,7 +329,11 @@ export function codesOf(said: Said, kind: InvolvedKind): Codes {
   return { reason: 'Unknown' };
 }
 
-/** The reason `said` names, of a thing of `kind`, read off its word: `codesOf`'s, without what qualifies it. Pure. */
+/**
+ * The reason `said` names, of a thing of `kind`, read off its word: `codesOf`'s, without what qualifies it. Pure.
+ * @param said The line's word and note.
+ * @param kind The kind of thing the line is about.
+ */
 export const reasonOf = (said: Said, kind: InvolvedKind): Reason => codesOf(said, kind).reason;
 
 /**
@@ -328,12 +342,14 @@ export const reasonOf = (said: Said, kind: InvolvedKind): Reason => codesOf(said
  *
  * A watcher's guarantee: no stop wakes fewer people than the retired wake words woke, which `reason.test.ts` holds as a superset over
  * every word the package writes (`FORMER_DEFAULT_WAKE`, and the selectors `selectorsOfWake` converts it to).
+ * @param reason The line's reason.
  */
 export const waitsOf = (reason: Reason): boolean => PERSON_WAITS.has(reason);
 
 /**
  * What a person reads of `said`: the word, and the note after it — `awaiting approval · approve it: nemia approve r-1 plan`. The one
  * writer of a line's `message`, for a v1 line stamped and for a v0 line upgraded on read alike, so both say the same sentence. Pure.
+ * @param said The line's word and note.
  */
 export const messageOf = (said: Said): string =>
   said.note === undefined || said.note === '' ? said.word : `${said.word}${PART}${said.note}`;

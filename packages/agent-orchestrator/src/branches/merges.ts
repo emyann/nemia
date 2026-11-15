@@ -15,11 +15,18 @@ export type MergeWord = { clean: true } | { clean: false; conflicts: string[] } 
 /** Whether a branch ahead of the base still merges onto it (`MergeWord`), and that in words (`mergeWord`). */
 export type StandingMerge = MergeWord & { said: string };
 
-/** A place's trial merge as a `MergeWord`: one it could not say is an `error`, in its words. */
+/**
+ * A place's trial merge as a `MergeWord`: one it could not say is an `error`, in its words.
+ * @param trial The place's trial merge.
+ */
 export const mergeWordOf = (trial: TrialMerge): MergeWord =>
   'unknown' in trial ? { error: trial.unknown } : trial.clean ? { clean: true } : { clean: false, conflicts: [...trial.conflicts] };
 
-/** The fact in a person's words: `merges cleanly onto main`, or which files it conflicts in, or why git could not say. */
+/**
+ * The fact in a person's words: `merges cleanly onto main`, or which files it conflicts in, or why git could not say.
+ * @param merge Whether the branch merges, and if not where it conflicts or what git said.
+ * @param onto The branch it merges onto.
+ */
 export const mergeWord = (merge: MergeWord, onto: string): string =>
   'error' in merge
     ? `whether it merges onto ${onto} is not known: ${merge.error}`

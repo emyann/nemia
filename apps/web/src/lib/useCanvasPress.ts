@@ -13,6 +13,8 @@ const opensNothing = () => {};
  * click having shown its bar and its second taken wherever it lands (`useSecondClick`); with no `open`, for nodes that have no page, a
  * double click does only what its first click did. A click on the pane closes a bar a canvas opened
  * (`inspects`), never the start of a run. Returns what the bar shows (`shown`) and React Flow's handlers.
+ * @param barFor The bar a node shows, by the node's id.
+ * @param open What a double click on a node opens, by the node's id; nothing by default, for nodes that have no page.
  */
 export function useCanvasPress(barFor: (id: string) => Bar, open: (id: string) => void = opensNothing) {
   const { open: shown, toggle, close } = useBar();

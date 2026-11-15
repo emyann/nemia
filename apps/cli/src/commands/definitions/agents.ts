@@ -41,13 +41,19 @@ function agentLines({ metadata: { name }, spec, status }: Agent): string[] {
   ];
 }
 
-/** `nemia agents`' lines: each agent, and how to get one's card; or where an agent would be, for none. */
+/**
+ * `nemia agents`' lines: each agent, and how to get one's card; or where an agent would be, for none.
+ * @param agents The agents the api lists, in its order; none prints where an agent would be.
+ */
 export const agentsLines = (agents: readonly Agent[]): string[] =>
   agents.length
     ? [...agents.flatMap(agentLines), `\none in A2A's shape: nemia agents card <name>`]
     : ["no agents — an agent is a file in <workflows>/agents: the repository's, or yours in the store"];
 
-/** `nemia agents`' runner: every agent the api lists in `default`, on the repository `--repo` names or it is typed in. */
+/**
+ * `nemia agents`' runner: every agent the api lists in `default`, on the repository `--repo` names or it is typed in.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function agentsListed(args: Args): Promise<number> {
   const list = await asked(AGENTS_WORDS.name, (c) =>
     onRepo(args, (repo) =>
@@ -58,7 +64,10 @@ export async function agentsListed(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia agents card <name>`'s runner: the card printed as JSON, and on stderr that it is a card, not an address. */
+/**
+ * `nemia agents card <name>`'s runner: the card printed as JSON, and on stderr that it is a card, not an address.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function agentsCard(args: Args): Promise<number> {
   const name = textArg(args, 'name') ?? '';
   const origin = textArg(args, 'from');
@@ -96,7 +105,10 @@ export function sourcesLines({ sources }: AgentSources): string[] {
   return [...lines, '', 'copy one into your library: nemia agents copy <file> [--as <name>]'];
 }
 
-/** `nemia agents sources`' runner: the folder `--path` names a path on the daemon's machine. */
+/**
+ * `nemia agents sources`' runner: the folder `--path` names a path on the daemon's machine.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function agentsSources(args: Args): Promise<number> {
   const at = textArg(args, 'path');
   const query = at === undefined ? {} : { path: pathSent(at) };
@@ -111,7 +123,10 @@ export const copiedLines = ({ name, copied, reused }: AgentCopied): string[] => 
   `give it to a step: nemia factory hire <factory> ${name} --step <workflow>/<step>`,
 ];
 
-/** `nemia agents copy <file>`'s runner: the file a path on the daemon's machine, which reads and judges it. */
+/**
+ * `nemia agents copy <file>`'s runner: the file a path on the daemon's machine, which reads and judges it.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function agentsCopy(args: Args): Promise<number> {
   const file = pathSent(textArg(args, 'file') ?? '');
   const as = textArg(args, 'as');

@@ -341,6 +341,10 @@ const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(r
  * A file beside the run of `spec` under `name`, `<name>.<end>`, kept with the run's own: what a spec's `prepare` is given to name one
  * of its process's (`HarnessSpec.prepare`), and what its runner reads it by. An end of `json` would be listed as a run file, and is
  * refused.
+ * @param spec The harness, by its name.
+ * @param root The runtime's store, whose `runs` folder keeps each harness's runs.
+ * @param name The run's name.
+ * @param end The file's end, a lowercase word other than `json`.
  */
 export const besideRun = (spec: Pick<HarnessSpec, 'name'>, root: string, name: string, end: string): string => {
   if (end === 'json' || end.endsWith('.json') || !/^[a-z][a-z.-]*$/.test(end))
@@ -370,6 +374,8 @@ const runAt = (spec: HarnessSpec, root: string, name: string): { run: RunFile } 
  * A run found by its name, from its own run file alone: no other run is read, and no output. A detached run's handle
  * is its name, so that is the id found. A file whose name is not this one — `safe` folds two names into one path — is
  * not this run, and a file that cannot be read yet is not found.
+ * @param spec The harness whose runs are looked in.
+ * @param root The runtime's store, whose `runs` folder keeps each harness's runs.
  */
 export const detachedFind =
   (spec: HarnessSpec, root: string) =>
@@ -393,6 +399,9 @@ const wordOf = (spec: HarnessSpec, root: string, name: string, run: RunFile, now
  * Whether the run of `spec` under `name` lost its worker: its run file says `working`, its heartbeat is stale and its worker is not
  * seen running (`wordOf`), so its worker died without writing an end, killed or with the machine. `false` where there is no run file,
  * it does not read, or its worker wrote an end.
+ * @param spec The harness whose run it is.
+ * @param root The runtime's store, whose `runs` folder keeps each harness's runs.
+ * @param name The run's name.
  */
 export const leaseGone = (spec: HarnessSpec, root: string, name: string): boolean => {
   const at = runAt(spec, root, name);
@@ -727,6 +736,10 @@ const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({
  *   Refused, with nothing appended, where no worker would write the words on: no run under the name, or a run file that
  *   cannot be read; a run its worker started with no input; a run whose harness has printed its closing line; one that is
  *   not working; and words whose line holds a line break, which would reach the harness as two, or as half a message.
+ * @param spec The detached harness its sessions run on.
+ * @param root The runtime's store, whose `runs` folder keeps each harness's runs, its registry.
+ * @param options The worker's stop grace and beat, and the slice and program a limited run's scope is made with, each the shipped default
+ *   where unset.
  */
 export const detachedOps = (spec: HarnessSpec, root: string, options: DetachedOptions = {}): RunnerOps =>
   runnerOf(spec, root, workerBoundsOf(options), options);

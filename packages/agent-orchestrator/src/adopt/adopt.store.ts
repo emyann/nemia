@@ -81,6 +81,11 @@ export const adoptionAt = Effect.fn('adoptionAt')(function* (home: string, facto
  * Any of them changed between the preview and the takeover changes it. The cards and runs, which change by the minute, are judged again
  * at the takeover instead. An upgrade's plan gives `from`, the name of the template its base holds, where it is a switch onto another,
  * hashed after the rest only then: a takeover's digest, and a same-template upgrade's, are the bytes they were.
+ * @param home The store's root, whose factories folder holds the factory's file.
+ * @param name The factory's name, whose file is hashed as it is now.
+ * @param render The template rendered with the factory's parameters: its version, its parameters and its files.
+ * @param source The template's source as the person named it: a folder, an archive or a builtin's name.
+ * @param from The name of the template the base holds, given only on an upgrade that switches onto another; undefined otherwise.
  */
 export function planDigest(home: string, name: string, render: RenderedAt, source: string, from?: string): string {
   const file = path.join(factoriesDirAt(home), `${name}.json`);
@@ -95,6 +100,9 @@ export function planDigest(home: string, name: string, render: RenderedAt, sourc
 /**
  * The render `entries` staged as the factory `name`'s base, read-only, then as its tree: each staged whole and renamed into place, and
  * left as it is where it is there already (`stageFolder`), so a takeover stopped half way is finished by the next.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param entries The render's files, staged as the factory's base and tree.
  */
 export function stageAdoption(home: string, name: string, entries: readonly Entry[]): void {
   stageFolder(appliedDir(home, name), entries, true);

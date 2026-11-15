@@ -28,6 +28,7 @@ const NAME_BYTES = 255;
  * Why `value` cannot name a task, or `undefined`: a task's id is its journal file's name (`<id>.jsonl`), so it is what a file's name
  * can hold — not empty, no `/`, no control character, not `.` or `..`, at most 255 bytes. It takes every id in use: the runtime's
  * `t-<base36>-<8>` (`file`, `engine/filing.ts`) and every id a caller gives `file`, which may hold spaces and punctuation.
+ * @param value The task id to judge.
  */
 export const taskIdRefusal = (value: string): string | undefined => {
   if (value === '') return 'A task id is empty. Give the task an id, or leave `id` out and the runtime mints one.';

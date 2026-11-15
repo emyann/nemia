@@ -51,7 +51,10 @@ const placeChecked = checked(TemplateSource.OnCreate, (at: string) => `a templat
 /** A tree written: what `TemplateTreeWrite` refuses of it. */
 const treeChecked = checked(TemplateTreeWrite, (tree: TreeWrite) => `the template ${tree.name}`);
 
-/** The door over `layer`: each method as `doorOf` makes it, each write's place and tree checked before the layer writes. */
+/**
+ * The door over `layer`: each method as `doorOf` makes it, each write's place and tree checked before the layer writes.
+ * @param layer The layer that reads and writes the templates: the files or the memory.
+ */
 export function templateDoorOver(layer: TemplateLayer): TemplateDoorShape {
   const door = doorOf<TemplateLayer, TemplateSource>(layer);
   const written =
@@ -78,7 +81,10 @@ const misnamed = (at: string, name: string): Invalid =>
     message: `${at} is not written: a template is named by its folder, and this one holds the template ${name}. Write it at a folder named ${name}.`,
   });
 
-/** The refusal of a template's place that is neither a folder nor a file. */
+/**
+ * The refusal of a template's place that is neither a folder nor a file.
+ * @param source The place given.
+ */
 export const noTemplateAt = (source: string): Missing =>
   new Missing({
     message: `${source} is neither a folder nor a file: name a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote.`,
@@ -87,6 +93,8 @@ export const noTemplateAt = (source: string): Missing =>
 /**
  * The refusal of a new folder's place that is taken — `null` where it is free — as both layers word it: something there that is no
  * folder, or a folder that holds files.
+ * @param at The new folder's place.
+ * @param kind What is there: a folder, a file, a folder that holds files, or undefined where nothing is.
  */
 export function takenFolder(at: string, kind: 'folder' | 'file' | 'files' | undefined): Conflict | null {
   if (kind === 'file')
@@ -100,13 +108,19 @@ export function takenFolder(at: string, kind: 'folder' | 'file' | 'files' | unde
   return null;
 }
 
-/** The refusal of a new archive's place that is taken. */
+/**
+ * The refusal of a new archive's place that is taken.
+ * @param at The new archive's place.
+ */
 export const takenArchive = (at: string): Conflict =>
   new Conflict({ message: `${at} is there already, and pack writes a new file: name another with --out, or remove it.` });
 
 /**
  * The files under `dir`, by path from it with `/` between parts, sorted; each link a problem by name, never followed, and each entry
  * that is neither a file nor a folder (a pipe, a socket, a device), never read.
+ * @param dir The folder walked.
+ * @param problems Given a problem for each link found.
+ * @param under The path under `dir` walked now; empty for `dir` itself.
  */
 export function walkFolder(dir: string, problems: Problem[], under = ''): string[] {
   return fs
@@ -221,7 +235,10 @@ export const BuiltinTemplates = Context.Reference<string>('agent-orchestrator/Bu
   defaultValue: () => BUILTIN_TEMPLATES,
 });
 
-/** The names of the templates `folder` holds, sorted: each folder in it whose `nemia.yaml` is a file. None where `folder` is not there. */
+/**
+ * The names of the templates `folder` holds, sorted: each folder in it whose `nemia.yaml` is a file. None where `folder` is not there.
+ * @param folder The folder of builtin templates.
+ */
 export function builtinTemplatesIn(folder: string): string[] {
   if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory()) return [];
   return fs

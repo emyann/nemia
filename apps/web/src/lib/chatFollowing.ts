@@ -47,21 +47,29 @@ type AskDrawn = 'actions' | 'form' | 'many';
  * `actions` for one question whose every choice carries no explanation, which the proposal's buttons say whole (boards 5 and 6); and
  * `form` for one question whose choices explain themselves, which the radio form draws (board 7). Pure, and the same rule the package
  * reads to say whether an ask is a proposal.
+ * @param questions The ask's questions, each with its choices.
  */
 export const drawnAsk = (questions: readonly AskQuestion[]): AskDrawn =>
   questions.length > 1 ? 'many' : (questions[0]?.options ?? []).every((option) => option.description.trim() === '') ? 'actions' : 'form';
 
-/** Whether the question `question` is answered by `pick`: a label chosen, or words of their own with something in them. */
+/**
+ * Whether the question `question` is answered by `pick`: a label chosen, or words of their own with something in them.
+ * @param pick What the person picked for the question, or undefined where they picked nothing.
+ */
 export const askAnswered = (pick: AskPick | undefined): boolean =>
   pick === undefined ? false : pick.words === undefined ? (pick.labels ?? []).length > 0 : pick.words.trim() !== '';
 
-/** What the recap says of how many are left: `2 not answered` while any is, `All answered` once none is. */
+/**
+ * What the recap says of how many are left: `2 not answered` while any is, `All answered` once none is.
+ * @param open How many questions are not answered.
+ */
 export const askLeft = (open: number): string => (open > 0 ? `${open} not answered` : 'All answered');
 
 /**
  * The asks of `events` that wait on the person: what the composer's words and the panel's cue are about. One the person answered
  * waits on nobody, and neither does one whose call was cut (`cutAt`): she has been told as much, and the board asks for nothing it
  * is not holding a call open for.
+ * @param events Her chat's events, oldest first.
  */
 export const asksOpen = (events: readonly ChatEvent[]): ChatAsk[] =>
   events.filter((event): event is ChatAsk => isAsk(event) && event.chose === undefined && event.cutAt === undefined);
@@ -71,6 +79,7 @@ export const asksOpen = (events: readonly ChatEvent[]): ChatAsk[] =>
  * (board 7), one question whose choices explain themselves. A proposal's choices are said whole by its own buttons and take no words
  * of the person's, and several questions are answered in their own flow, each with a row for their words; so for either, and for two
  * asks at once — where the words would name no question — the composer is what it always is, and this is `undefined`. Pure.
+ * @param events Her chat's events, oldest first.
  */
 export const askInWords = (events: readonly ChatEvent[]): ChatAsk | undefined => {
   const open = asksOpen(events);
@@ -78,7 +87,11 @@ export const askInWords = (events: readonly ChatEvent[]): ChatAsk | undefined =>
   return one !== undefined && drawnAsk(one.questions) === 'form' ? one : undefined;
 };
 
-/** The person's own words from the composer as the answer to the one question `ask` waits on: the pick its held call takes. Pure. */
+/**
+ * The person's own words from the composer as the answer to the one question `ask` waits on: the pick its held call takes. Pure.
+ * @param ask The ask the words answer.
+ * @param text The person's words, as typed in the composer.
+ */
 export const wordsAnswer = (ask: ChatAsk, text: string): AskPick[] => [{ question: ask.questions[0]?.question ?? '', words: text }];
 
 /** Where she is before a read answers: down, since nothing says she is up. */
@@ -96,7 +109,10 @@ export type ChatFollowed = Followed & {
   loading: boolean;
 };
 
-/** What the panel holds before its first read: nothing, being read when there is one (`loading`). */
+/**
+ * What the panel holds before its first read: nothing, being read when there is one (`loading`).
+ * @param loading Whether the first read is in flight.
+ */
 export const unreadChat = (loading: boolean): ChatFollowed => ({
   events: [],
   presence: CHAT_DOWN,
@@ -111,6 +127,8 @@ export const unreadChat = (loading: boolean): ChatFollowed => ({
  * `known` with `incoming` merged in: an event whose `id` is already known is replaced where it stands, and one that is not is appended.
  * By the id alone, unlike a step's transcript, which pairs a result with its call and so keys on the kind beside it: her chat gives an
  * event one id for its life, and a call whose state moved from running to done is that same call, drawn once.
+ * @param known The events the panel knows, oldest first.
+ * @param incoming The events a frame brings, in the order they came.
  */
 export function mergeChatEvents(known: readonly ChatEvent[], incoming: readonly ChatEvent[]): ChatEvent[] {
   const merged = [...known];
@@ -134,7 +152,11 @@ type ChatChange =
   | { kind: 'presence'; presence: ChatPresence }
   | { kind: 'cursor'; cursor: string };
 
-/** `s` after the change `c`: events merged in by their id, the presence replaced whole, the cursor moved. */
+/**
+ * `s` after the change `c`: events merged in by their id, the presence replaced whole, the cursor moved.
+ * @param s Her chat as the panel holds it.
+ * @param c The change one frame of the stream brings.
+ */
 export function changedChat(s: ChatFollowed, c: ChatChange): ChatFollowed {
   if (c.kind === 'events') return { ...s, events: mergeChatEvents(s.events, c.events) };
   if (c.kind === 'presence') return { ...s, presence: c.presence };
@@ -186,6 +208,9 @@ const chatFollower: Follower<ChatFollowed, ChatChange> = {
 /**
  * Her chat followed on `stream`, each change written through `update` (`follow`, `chatFollower`), apart from React so a node test
  * proves it without a browser: `useNemiaChat` opens the stream and hands it here. Returns what stops following.
+ * @param stream Her chat's stream, opened.
+ * @param update Writes a change to what the panel holds.
+ * @param frames How the events that arrive together are merged once: the browser's animation frames, or a test's own.
  */
 export const followChat = (stream: StreamLike, update: (change: (s: ChatFollowed) => ChatFollowed) => void, frames: Frames): (() => void) =>
   follow(stream, chatFollower, update, frames);
@@ -198,6 +223,10 @@ export const followChat = (stream: StreamLike, update: (change: (s: ChatFollowed
  * that is not the run list's, so neither part is read from it. She reads as down when her session is not up, and only then: no level
  * says it, since a factory raised above Manual keeps her session up while the store's own level is at Manual. Whether she is at Manual
  * everywhere is `anyAbove` (`lib/nemia.ts`), off every factory's level the api answers.
+ * @param api Where she is, as the api last said.
+ * @param notSent Whether this browser keeps a message the api would not take.
+ * @param runsWaiting How many runs wait on the person, as the run list counts them.
+ * @param events Her chat's events, oldest first.
  */
 export const presenceOf = (api: ChatPresence, notSent: boolean, runsWaiting: number, events: readonly ChatEvent[]): Presence => ({
   runsWaiting,
@@ -235,6 +264,7 @@ const turnOf = (calls: ChatCall[]): ChatTurn => ({
 /**
  * Her chat drawn as blocks, in the order it came: each run of consecutive calls folded into one turn (`turnOf`), everything else as
  * itself. A turn still running is drawn open, with its last call alive; a finished one folds into its one line (`turnWords`).
+ * @param events Her chat's events, oldest first.
  */
 export function foldChat(events: readonly ChatEvent[]): ChatItem[] {
   const out: ChatItem[] = [];
@@ -258,6 +288,7 @@ export function foldChat(events: readonly ChatEvent[]): ChatItem[] {
  * How a message is drawn, by who it is from: the keeper's words as one quiet marker line, since the keeper frames what the person wrote
  * and writes nothing of its own; the person's own words as their bubble; another agent's as that agent's (`peer`), never the person's;
  * hers as hers. Only an outbox entry the person wrote is drawn as the person's.
+ * @param message The message, who it is from read.
  */
 export const drawnAs = (message: ChatMessage): 'marker' | 'person' | 'peer' | 'agent' =>
   message.from === 'keeper' ? 'marker' : message.from === 'person' ? 'person' : message.from === 'peer' ? 'peer' : 'agent';
@@ -268,6 +299,8 @@ const hers = (event: ChatEvent): event is ChatMessage => event.kind === 'message
 /**
  * The id of the first of her messages the person has not read, which the `N new` line is drawn over: null where none is unread, and
  * where the page holds fewer of her messages than the api counts unread, so no line is drawn over the wrong one.
+ * @param events Her chat's events, oldest first.
+ * @param unread How many of her messages the api counts unread.
  */
 export function newFrom(events: readonly ChatEvent[], unread: number): string | null {
   if (unread < 1) return null;
@@ -275,7 +308,10 @@ export function newFrom(events: readonly ChatEvent[], unread: number): string | 
   return unread > mine.length ? null : (mine[mine.length - unread]?.id ?? null);
 }
 
-/** The id the read mark is posted through: her latest message, since hers alone go unread; null where she has said nothing. */
+/**
+ * The id the read mark is posted through: her latest message, since hers alone go unread; null where she has said nothing.
+ * @param events Her chat's events, oldest first.
+ */
 export const readableFrom = (events: readonly ChatEvent[]): string | null => events.filter(hers).at(-1)?.id ?? null;
 
 /** A link read out of her words: the words it was written on, and where it goes. */
@@ -295,6 +331,7 @@ const ours = (href: string): boolean => href.startsWith('/') && !href.startsWith
  * words in its place, and `links` holds each address in the order she wrote it, which the panel draws as the canvas's filled buttons
  * under her bubble. A link that leaves the board, and one whose address the board would not open at all, is left in her words as she
  * wrote it, for `Markdown` to draw — a button through the router leads to a route, and those are not routes.
+ * @param text Her message's words, as markdown.
  */
 export function linksOf(text: string): { text: string; links: ChatLink[] } {
   const links: ChatLink[] = [];
@@ -376,6 +413,7 @@ function saidOf(message: ChatMessage): ConversationItem<ChatOwn> {
  * (`drawnAsk`). After her words, an `own` item for each step of a run they link to (`broughtOf`) and each proposal (`proposalLinkOf`),
  * once each, in her order: her talk draws the run's page's, or the proposal page's, own part for it there. An event the board has no
  * drawing for is left out. Pure: a node test proves the whole mapping without a browser.
+ * @param events Her chat's events, oldest first.
  */
 export function chatItems(events: readonly ChatEvent[]): ConversationItem<ChatOwn>[] {
   const out: ConversationItem<ChatOwn>[] = [];

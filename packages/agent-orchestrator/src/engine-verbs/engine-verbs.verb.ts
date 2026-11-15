@@ -65,6 +65,9 @@ export const ENGINE_VERBS = {
   up: { changes: 'pass' },
 } as const satisfies Record<EngineVerb, VerbKind>;
 
-/** The table's verb `key`, or undefined for a key that is no verb of the engine. */
+/**
+ * The table's verb `key`, or undefined for a key that is no verb of the engine.
+ * @param key The key to look up.
+ */
 export const verbOf = (key: string): VerbKind | undefined =>
   Object.hasOwn(ENGINE_VERBS, key) ? (ENGINE_VERBS as Record<string, VerbKind>)[key] : undefined;

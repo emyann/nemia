@@ -215,6 +215,13 @@ function placeSkillRefusal(steps: readonly StepSpec[], found: SkillsFound | unde
  * permission rule names, a mount's or an allow's, whether the rule can carry it, never whether it is there; a store whose own path no
  * rule can carry is refused before it, in the store's words (`storeRootRefusal`). A step whose sandbox its file writes as
  * `permissionMode:` (`written`, by the step's name) is quoted by that line.
+ * @param home The store's root.
+ * @param steps The workflow's steps.
+ * @param places The repository and the store's root the run's agents and skills are found in.
+ * @param gates The gates the run is started at, beside the workflow's own.
+ * @param denied What the run's place denies a landing session.
+ * @param written The mode line each step's file writes, by the step's name; none where not given.
+ * @param harnessSettings The factory's judged harness settings, or undefined where it sets none.
  */
 export const configRefused = (
   home: string,
@@ -434,6 +441,8 @@ function mountRefusal(
 /**
  * The factory's folders `startRun` left out of `run`'s mounts, as `nemia start` says them: each of its repositories but the run's own that
  * is no directory now, as none was at start. None for a run in the default factory, or in one whose file no longer reads.
+ * @param home The store's root.
+ * @param run The run started.
  */
 export function leftOutMounts(home: string, run: Run): string[] {
   return leftOut(home, run).mounts;
@@ -441,6 +450,8 @@ export function leftOutMounts(home: string, run: Run): string[] {
 
 /**
  * The factory's volumes `startRun` left out of `run`'s volumes, as `nemia start` says them: each no directory now, as none was at start.
+ * @param home The store's root.
+ * @param run The run started.
  */
 export function leftOutVolumes(home: string, run: Run): string[] {
   return leftOut(home, run).volumes;
@@ -634,6 +645,10 @@ const factoryNamed = (home: string, name: string | undefined): Factory | undefin
  * the factory's one repository, else `fallback`. Kept for the command line's start in the default factory alone: a card, a brief and a
  * schedule are placed by the factory's wiring (`wiredRepoFor`). Refused as `start` refuses the factory: none by that name, or one whose
  * file does not read (`readFactory`).
+ * @param home The store's root.
+ * @param name The factory's name, or undefined for the default factory.
+ * @param named The repository `--repo` names, or undefined where none is named.
+ * @param fallback The repository taken where neither names one.
  */
 export const repoFor = (home: string, name: string | undefined, named: string | undefined, fallback: string): string =>
   factoryRepo(factoryNamed(home, name), named, fallback);
@@ -643,6 +658,9 @@ export const repoFor = (home: string, name: string | undefined, named: string | 
  * name, else its only one; none for the default factory, which is no file and has no wiring. Refused, `Invalid`, in
  * `workflowRepoRefusal`'s words naming `nemia factory attach <factory> <workflow> --repo <name>`: a
  * factory of several repositories that names none for it, or a name none or two of them have; and as `start` refuses the factory.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param workflow The workflow's name.
  */
 export const wiredRepoFor = (home: string, name: string, workflow: string): string | undefined => {
   const factory = filedAtOnce(home, name);

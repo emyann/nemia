@@ -3,9 +3,15 @@
  */
 import type { Token } from 'objects';
 
-/** Who holds a token, in the board's words: `yours` for the person's, the agent's name for an agent's. */
+/**
+ * Who holds a token, in the board's words: `yours` for the person's, the agent's name for an agent's.
+ * @param token The token: its holder and, for an agent's, the agent's name.
+ */
 export const holderWord = (token: Pick<Token, 'holder' | 'agent'>): string =>
   token.holder === 'person' ? 'yours' : (token.agent ?? 'an agent');
 
-/** Where a token reaches: the factory it is bound to, or `store-wide` where it names none. */
+/**
+ * Where a token reaches: the factory it is bound to, or `store-wide` where it names none.
+ * @param token The token: the factory it is bound to, if any.
+ */
 export const reachWord = (token: Pick<Token, 'factory'>): string => token.factory ?? 'store-wide';

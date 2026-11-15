@@ -25,11 +25,19 @@ import {
 import { lookedUp } from '../skills/skills.ts';
 import { folderForVersion, lookupOf, lookupRoots, readForVersion, skillsFor, type Places } from '../skills/read.store.ts';
 
-/** The file of a person's custom instructions for the agent `name`, in the store `home`: `<home>/custom-instructions/<name>.md`. */
+/**
+ * The file of a person's custom instructions for the agent `name`, in the store `home`: `<home>/custom-instructions/<name>.md`.
+ * @param home The store's root.
+ * @param name The agent's name.
+ */
 export const customInstructionsFile = (home: string, name: string): string =>
   path.join(path.resolve(home), CUSTOM_INSTRUCTIONS_FOLDER, `${name}.md`);
 
-/** The file of the record of the agent `name` copied into the library of the store `home`: `<home>/agent-sources/<name>.json`. */
+/**
+ * The file of the record of the agent `name` copied into the library of the store `home`: `<home>/agent-sources/<name>.json`.
+ * @param home The store's root.
+ * @param name The agent's name.
+ */
 export const copyRecordFile = (home: string, name: string): string => path.join(path.resolve(home), 'agent-sources', `${name}.json`);
 
 /** What `copyRecordFile` holds: the agent file it was copied from, the version that file was at then (`agentVersion`), and when. */
@@ -41,6 +49,8 @@ export type CopyRecord = typeof CopyRecordSchema.Type;
 /**
  * The record of the agent `name` copied into the library of the store `home`, or null for one never copied. A file that is not JSON or not
  * a record is said on stderr, naming it, and read as none: it stops no listing.
+ * @param home The store's root.
+ * @param name The agent's name.
  */
 export function readCopyRecord(home: string, name: string): CopyRecord | null {
   const file = copyRecordFile(home, name);
@@ -65,6 +75,8 @@ export function readCopyRecord(home: string, name: string): CopyRecord | null {
 /**
  * Where the skills of the agent file `file` are found, as a start beside it finds them (`skillsFor`): its folder's own root, then the
  * repository it is in — the one whose places for agents (`lookupRoots`) its `agents/` is in — then the store `home`'s.
+ * @param file The agent's file.
+ * @param home The store's root.
  */
 export function sourceSkills(file: string, home: string): SkillsFound {
   const holder = path.dirname(path.dirname(path.resolve(file)));
@@ -73,15 +85,26 @@ export function sourceSkills(file: string, home: string): SkillsFound {
   return skillsFor(path.join(holder, '_'), { ...(inRepo && { repo }), home });
 }
 
-/** The places of the repository `repo` that hold agents and skills, as a start on it looks (`lookupRoots`): its own, then its harness's. */
+/**
+ * The places of the repository `repo` that hold agents and skills, as a start on it looks (`lookupRoots`): its own, then its harness's.
+ * @param repo The repository's root.
+ */
 export const repositoryRoots = (repo: string): string[] =>
   lookupRoots(path.join(path.resolve(repo), 'workflows', '_'), { repo: path.resolve(repo) });
 
-/** The version of the agent file `file` now (`agentVersion`), its skills found as `sourceSkills` finds them; null for a file not there. */
+/**
+ * The version of the agent file `file` now (`agentVersion`), its skills found as `sourceSkills` finds them; null for a file not there.
+ * @param file The agent's file.
+ * @param home The store's root, whose skills are found last.
+ */
 export const sourceVersion = (file: string, home: string): string | null =>
   agentVersion(path.dirname(path.resolve(file)), path.basename(file, '.md'), sourceSkills(file, home));
 
-/** Why `file`, the custom instructions of the agent `name`, is refused when it is there but no file nor link, and the fix: the clear. */
+/**
+ * Why `file`, the custom instructions of the agent `name`, is refused when it is there but no file nor link, and the fix: the clear.
+ * @param file The custom instructions' file.
+ * @param name The agent's name.
+ */
 export const notAFileRefusal = (file: string, name: string): string =>
   `${file} is not a file: custom instructions are one file per agent. Remove it: nemia agents custom ${name} --clear.`;
 
@@ -89,6 +112,8 @@ export const notAFileRefusal = (file: string, name: string): string =>
  * A person's custom instructions for the agent `name`, read from the store `home` (`customInstructionsFile`): the words, or `undefined`
  * when there are none or the file is blank. Refused as a `WorkflowError` naming the file and the fix: a link, whose words would change
  * with what it points at, anything else not a file (`notAFileRefusal`), and a frontmatter block (`customInstructionsRefusal`).
+ * @param home The store's root.
+ * @param name The agent's name.
  */
 export function readCustomInstructions(home: string, name: string): string | undefined {
   const file = customInstructionsFile(home, name);
@@ -121,6 +146,8 @@ function withCustom(agent: Agent | WorkflowError, name: string, home: string | u
  * Every agent a workflow's steps may name (`lookupRoots`), each read or the refusal of it, as `loadAgents` reads one folder: the first root
  * that has a name wins, and a name one repository has in both `workflows/agents/` and `.claude/agents/` is refused, naming both. Each is
  * given the person's custom instructions for its name from the store (`places.home`, `readCustomInstructions`), whichever place it is in.
+ * @param workflowDir The workflow's folder, whose root is looked in first.
+ * @param places The repository and the store looked in after it, each left out where absent.
  */
 export function agentsFor(workflowDir: string, places: Places = {}): Agents {
   const roots = lookupRoots(workflowDir, places);
@@ -148,6 +175,7 @@ export function agentsFor(workflowDir: string, places: Places = {}): Agents {
  * The agents in `dir` — a workflow's are in `agentsDir(<workflow>)` — by name: every `.md` but a README, each read (`parseAgent`) or the
  * refusal of it, which is thrown only at a step that names it, so a broken agent stops no workflow that does not use it. A file that is a
  * link is refused by name: an agent's file is its own, as a step's is. None for a folder that is not there.
+ * @param dir The folder of agents.
  */
 export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
   const agents = new Map<string, Agent | WorkflowError>();
@@ -195,6 +223,9 @@ export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
  *
  * `skills` are where the skills are found (`skillsFor`); without them, in the `skills/` beside `dir`. A skill found nowhere counts as
  * missing.
+ * @param dir The folder of agents.
+ * @param name The agent's name.
+ * @param skills Where its skills are found; absent, in the `skills/` beside `dir`.
  */
 export function agentVersion(dir: string, name: string, skills?: SkillsFound): string | null {
   const at = path.join(dir, `${name}.md`);
@@ -217,6 +248,7 @@ export function agentVersion(dir: string, name: string, skills?: SkillsFound): s
 /**
  * The skills an agent's text gives by name, as `parseAgent` reads its `skills:` line — none for a line that names a card file, which it
  * refuses.
+ * @param text The agent file's text.
  */
 export function skillNamesIn(text: string): string[] {
   const line = frontmatterKey(text, 'skills');

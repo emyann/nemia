@@ -36,6 +36,7 @@ export type MainClaim = { id: string; repo: string; step: string; holds: boolean
  *
  * Level-triggered, like the rest: the claims are read from the world on the pass that asks, including what that pass has already filed,
  * and a run held on one pass is asked again on the next.
+ * @param claims Each run's claim on its repository's checkout: whether its ending step holds it, else since when it waits for it.
  */
 export function heldCheckouts(claims: readonly MainClaim[]): Map<string, CheckoutHold> {
   const held = new Map<string, CheckoutHold>();
@@ -77,6 +78,10 @@ export type RunSlot = { inFlight: number; cap: number };
  * Neither, for a run whose workflow takes no slot at all (`takesNoSlot`, `slot: none`): it is a session that watches the runs the cap
  * holds, so the cap neither counts it nor holds it.
  *
+ * @param run The run's record.
+ * @param phaseOf The phase of a task the engine holds, by its id.
+ * @param a The pass's assessment of the run: the steps ready, the checks, tries and rounds due, and those the checkout or the pause holds.
+ * @param landed Whether the run of that id has landed, which a run waiting on runs (`--after`) asks.
  * @param steps The run's steps, for the one workflow the cap does not hold (`takesNoSlot`). Left out, every run is counted.
  */
 export function slotNeed(
@@ -100,6 +105,7 @@ export function slotNeed(
 /**
  * Whether a run of these steps is outside the cap on runs in flight: its workflow says `slot: none`, which `validate` allows only on a
  * workflow of one step. Pure. It counts against nothing and waits for nothing — a session that watches the runs the cap holds.
+ * @param steps The run's steps, the slot each says.
  */
 export const takesNoSlot = (steps: readonly Pick<StepSpec, 'slot'>[]): boolean => steps.some((s) => s.slot === 'none');
 
@@ -107,6 +113,9 @@ export const takesNoSlot = (steps: readonly Pick<StepSpec, 'slot'>[]): boolean =
  * Whether the tick may file the roots of this run on this pass: fewer runs in flight than the cap, or no cap. Pure. Always, for a run that
  * has started — the cap holds only a run with nothing filed — for one judged with no slot, which is `advance` called outside a tick, and
  * for one whose workflow takes no slot at all (`takesNoSlot`).
+ * @param run The run's record.
+ * @param slot The cap and the count in flight, or undefined where `advance` is called outside a tick.
+ * @param steps The run's steps, the slot each says; left out, the run takes a slot.
  */
 export const runAdmitted = (run: Run, slot: RunSlot | undefined, steps: readonly Pick<StepSpec, 'slot'>[] = []): boolean =>
   hasStarted(run) || !slot || slotFree(slot) || takesNoSlot(steps);
@@ -114,10 +123,14 @@ export const runAdmitted = (run: Run, slot: RunSlot | undefined, steps: readonly
 /**
  * Whether a run slot is free: fewer runs in flight than the cap, or no cap. Pure. What a queued card is started on, after every run has
  * been advanced.
+ * @param slot The cap and the count in flight; a cap of 0 is no cap.
  */
 export const slotFree = (slot: RunSlot): boolean => slot.cap <= 0 || slot.inFlight < slot.cap;
 
-/** Runs in the order a pass admits them: oldest by `createdAt`, then by id. Pure. */
+/**
+ * Runs in the order a pass admits them: oldest by `createdAt`, then by id. Pure.
+ * @param runs The runs to order.
+ */
 export const admissionOrder = <R extends Pick<Run, 'id' | 'createdAt'>>(runs: readonly R[]): R[] =>
   [...runs].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 
@@ -125,6 +138,8 @@ export const admissionOrder = <R extends Pick<Run, 'id' | 'createdAt'>>(runs: re
  * The runs the cap holds, each with the count it was held at, as a pass would judge them from the store as it stands (`slotNeed`): every
  * run in flight counted, then each that wants a slot admitted oldest first while one is free — and counted — and held once none is. Pure.
  * What `nemia ls` and `nemia decide` say between passes; none with no cap.
+ * @param runs Each run with what it asks of the cap (`slotNeed`).
+ * @param cap The most runs in flight at once; 0 or less is no cap.
  */
 export function heldRuns(
   runs: ReadonlyArray<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }>,
@@ -143,7 +158,10 @@ export function heldRuns(
 /** A run the cap holds, in the words the feed keeps of it (`feedWords`): the count in flight is left to `nemia ls`. */
 export const SLOT_WAIT = 'waiting for a run slot';
 
-/** A run the cap holds, as `nemia ls` says it on its roots: `waiting for a run slot (2 of 2 in flight)`. */
+/**
+ * A run the cap holds, as `nemia ls` says it on its roots: `waiting for a run slot (2 of 2 in flight)`.
+ * @param slot The cap and the count in flight it was held at.
+ */
 export const slotWord = (slot: RunSlot): string => `${SLOT_WAIT} (${slot.inFlight} of ${slot.cap} in flight)`;
 
 /**
@@ -153,6 +171,8 @@ export const slotWord = (slot: RunSlot): string => `${SLOT_WAIT} (${slot.inFligh
  * only where one is set; and, where the floor of the machine's memory is given (`reserved`), its admission by memory on a line of its
  * own: what each session asks (`request`, `WF_MEMORY_REQUEST`, else its limit) and the floor kept for the daemon and the machine
  * (`WF_MEMORY_RESERVED`, else its default), which no session is admitted into.
+ * @param c The daemon's ceilings: sessions per pool, runs in flight (0 is no cap), and the memory limit, slice, request and floor,
+ * each undefined where none is set.
  */
 export const ceilingLines = (c: {
   sessions: number;
@@ -181,6 +201,8 @@ export type InFlight = { name: string; taskId: string };
 /**
  * The tasks the engine is still holding for this run — steps and their checks: filed, and settled neither way. A check is stopped with a
  * run called off like any task, and a `pending` task counts, since the next tick would start it.
+ * @param run The run's record.
+ * @param phaseOf The phase of a task the engine holds, by its id.
  */
 export function inFlight(run: Run, phaseOf: (taskId: string) => TaskPhase): InFlight[] {
   const live: InFlight[] = [];
@@ -201,5 +223,6 @@ export function inFlight(run: Run, phaseOf: (taskId: string) => TaskPhase): InFl
  * Whether the cap may leave a run out of its count without judging it again (`slot-settled.contract.ts`): its judgement as the informer
  * serves it, none where the informer judges it again, says it ended — succeeded, failed or called off — and nothing of it moves or is
  * due. Such a run is neither in flight nor held (`slotNeed`); every other run is judged as a pass judges it. Pure.
+ * @param kept The run's judgement as the informer serves it, or undefined where the informer judges it again.
  */
 export const slotSettled: SlotSettled = (kept) => kept !== undefined && !kept.moving && runEnded(kept.status);

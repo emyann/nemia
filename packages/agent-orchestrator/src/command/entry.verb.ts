@@ -85,9 +85,18 @@ export type Ran = CommandSpec & { readonly only: { readonly side: 'cli'; readonl
  * A typed entry (`Command<D, I>`) as the table holds it, beside the entries that take the CLI's `Args`: its input erased, as the table's
  * callers never hand it what it does not take — the CLI decodes its parsed `Args` through the entry's `input` first (`inputOf`), and the
  * api calls the typed entry itself, by its exported name.
+ * @param command The typed entry.
  */
 export function tableEntry<D extends object, I>(command: Command<D, I>): Command;
+/**
+ * A served typed entry (`Served<D, I>`) as the table holds it, its input erased (`tableEntry`).
+ * @param command The served typed entry.
+ */
 export function tableEntry<D extends object, I>(command: Served<D, I>): Served;
+/**
+ * A typed entry as the table holds it, its input erased: the one body of both forms of `tableEntry`.
+ * @param command The typed entry.
+ */
 export function tableEntry<D extends object, I>(command: Served<D, I>): Served {
   return command as unknown as Served;
 }
@@ -96,6 +105,7 @@ export function tableEntry<D extends object, I>(command: Served<D, I>): Served {
  * A typed entry's own check of what it was handed: the refusal its spec's `check` words, said before anything is read — nothing where
  * `wrong` is none, else `Invalid` in its words. The CLI runs the `check` on what it parsed first; the api hands the entry's `input`
  * straight to its handler, which runs the same words through this, so a request is refused as the command line is.
+ * @param wrong What the spec's `check` said was wrong, or null or undefined where nothing was.
  */
 export const checked = (wrong: string | null | undefined): Effect.Effect<void, Invalid> =>
   wrong ? Effect.fail(new Invalid({ message: wrong })) : Effect.void;
@@ -103,18 +113,23 @@ export const checked = (wrong: string | null | undefined): Effect.Effect<void, I
 /**
  * The selectors an entry of the table is given under `selector`, in the order given — `-l` at the command line, each given again for
  * another, and the api's `?selector=`, one or many — none where unset: a list's read takes the runs whose labels one of them takes.
+ * @param args The arguments the entry was given, parsed by the command line or sent to the api.
  */
 export const selectorTexts = (args: Args): readonly string[] => {
   const value = args['selector'];
   return typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
 };
 
-/** Why the selectors under `selector` are refused, or null where each is one: an entry's `check`. */
+/**
+ * Why the selectors under `selector` are refused, or null where each is one: an entry's `check`.
+ * @param args The arguments the entry was given, parsed by the command line or sent to the api.
+ */
 export const selectorCheck = (args: Args): string | null => selectorsRefusal(selectorTexts(args)) ?? null;
 
 /**
  * The selectors under `selector`, parsed (`parseSelectors`); refused as `Invalid` (exit 2, 422 on the api) where one is no selector, in
  * the grammar's own words (`selectorsRefusal`), which end on the form it takes. None where none was given.
+ * @param args The arguments the entry was given, parsed by the command line or sent to the api.
  */
 export const selectorsIn = (args: Args): Effect.Effect<Selectors, Invalid> => {
   const refusal = selectorCheck(args);
@@ -124,6 +139,7 @@ export const selectorsIn = (args: Args): Effect.Effect<Selectors, Invalid> => {
 /**
  * `-l <selector>`, `--show-labels` and `-L <key>` of the command `command`: the runs whose labels a selector takes, each given again for
  * another; each line with its whole map; and that label's value beside each line, given again for another (`labelsShown`).
+ * @param command The command's name, which the flags' words name.
  */
 export const labelFlags = (command: string): Flag[] => [
   selectorFlag(command),
@@ -137,19 +153,29 @@ export const labelFlags = (command: string): Flag[] => [
   },
 ];
 
-/** What a line of `map`'s ends on as `--show-labels` and `-L` ask under `args` (`labelSegments`): nothing with neither. */
+/**
+ * What a line of `map`'s ends on as `--show-labels` and `-L` ask under `args` (`labelSegments`): nothing with neither.
+ * @param args The arguments the command was given, its `--show-labels` and `-L` among them.
+ * @param map The line's labels, each key with its value.
+ */
 export const labelsShown = (args: Args, map: Labels): string => {
   const columns = args['labelColumns'];
   return labelSegments(map, { all: args['showLabels'] === true, columns: Array.isArray(columns) ? columns : [] });
 };
 
-/** What each run's head line ends on as `--show-labels` and `-L` ask under `args`, of the run's whole map (`runLabelMap`). */
+/**
+ * What each run's head line ends on as `--show-labels` and `-L` ask under `args`, of the run's whole map (`runLabelMap`).
+ * @param args The arguments the command was given, its `--show-labels` and `-L` among them.
+ */
 export const runsShown =
   (args: Args) =>
   (run: Run): string =>
     labelsShown(args, runLabelMap(run));
 
-/** `-l <selector>`, given again for another, of the command `command`: the runs whose labels one of them takes. */
+/**
+ * `-l <selector>`, given again for another, of the command `command`: the runs whose labels one of them takes.
+ * @param command The command's name, which the flag's words name.
+ */
 export const selectorFlag = (command: string): Flag => ({
   flag: '-l',
   kind: 'text',

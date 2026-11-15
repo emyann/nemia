@@ -41,6 +41,9 @@ const harnessSaid = (need: Extract<Need, { kind: 'harness' }>): string =>
  * next try, which takes it out of `waitingOnYou`. Its approval, for a step waiting at its gate, while it waits on you — not once it is
  * approved, nor sent back. That the harness blocked its session, for as long as it does. Nothing on a run called off: nobody is waiting
  * for the answer any more.
+ * @param step The step, as the list or a run's detail gives it.
+ * @param waitingOnYou Whether the run's `waitingOnYou` names the step.
+ * @param runCancelled Whether the run was called off.
  */
 export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boolean): Need | null {
   if (runCancelled) return null;
@@ -55,6 +58,7 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
  *
  * Without the ending step whose gate the run's to-decide line already says, as the CLI's `ls` leaves it out of `→ waiting on you`
  * (cli/main.ts): that line names the step and the command that approves it, and the same step is not asked for twice.
+ * @param run The run: its steps, the steps waiting on you, when it was called off, and its to-decide line where it has one.
  */
 export const needsOf = (
   run: Frozen<Pick<RunView, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[]; toDecide?: RunToDecide | null }>,
@@ -73,6 +77,7 @@ export const needsOf = (
  *
  * What a person does about the wait is not here — a card has one line and a node has one line, and `advice` needs its own (the step's
  * part, `PartAsks`).
+ * @param need The step's need.
  */
 export const needText = (need: Need): string => {
   if (need.kind === 'asks') return `asks: ${need.needs}`;
@@ -87,6 +92,7 @@ export const needText = (need: Need): string => {
  * above the line already says the session asks, and `blocked by the harness: ` is twenty-four characters, which would leave room for a
  * few of the wait's. The whole of it, with what the session said last, is the line's `title`
  * and the step's part's. Every other need, and a harness that said nothing about what for, reads as it does anywhere else.
+ * @param need The step's need.
  */
 export const needNodeText = (need: Need): string => (need.kind === 'harness' && need.waitingFor ? need.waitingFor.words : needText(need));
 
@@ -94,12 +100,14 @@ export const needNodeText = (need: Need): string => (need.kind === 'harness' && 
  * What the harness denied a step's current try, as its node says it: how many calls, never which. The node's line is about thirty
  * characters and truncates, and `denied: Skill(look), Bash(pytest)` is thirty-three — a path-scoped call alone can fill it — so the
  * names would be cut on the one line that has to be read whole. They are the line's `title` and the step section's `denied` row.
+ * @param calls The calls the harness denied the try, one entry each.
  */
 export const deniedNodeText = (calls: readonly string[]): string => `denied ${calls.length} call${calls.length === 1 ? '' : 's'}`;
 
 /**
  * A need with the step it is of, as the card says it: `implement asks: <needs>`, `implement is blocked by the harness: <…>`,
  * and `approve plan`, whose words name their step already.
+ * @param need The step's need.
  */
 export const needLine = (need: Need): string =>
   need.kind === 'approve' ? need.said : `${need.step} ${need.kind === 'asks' ? '' : 'is '}${needText(need)}`;
@@ -109,13 +117,21 @@ export const needLine = (need: Need): string =>
  * `ls` asks it (`approve plan`), on a run nobody called off. Only words offer it: a step approved or sent back carries none, and neither
  * does a run from an api that has no approve route, whose `approve` is not there at all (the read refuses such an object first,
  * `runObjectQuery`).
+ * @param step The step, its `approve` words read.
+ * @param runCancelled Whether the run was called off.
  */
 export const gateOffered = (step: Pick<StepView, 'approve'>, runCancelled: boolean): boolean => Boolean(step.approve) && !runCancelled;
 
-/** Where a step's section is on its run's page, as a URL's hash: what the run's asks link to, where its part answers them. */
+/**
+ * Where a step's section is on its run's page, as a URL's hash: what the run's asks link to, where its part answers them.
+ * @param step The step's name.
+ */
 export const stepAnchor = (step: string): string => `step-${step}`;
 
-/** The questions a step's closeout asks as data, each of its question fields in turn, in the schema's order; none without a closeout. */
+/**
+ * The questions a step's closeout asks as data, each of its question fields in turn, in the schema's order; none without a closeout.
+ * @param closeout The step's closeout, or null or undefined where it has none.
+ */
 export const askedIn = (closeout: Frozen<Pick<StepCloseout, 'questions'>> | null | undefined): Frozen<Question>[] =>
   closeout?.questions.flatMap((a) => a.questions) ?? [];
 
@@ -179,6 +195,7 @@ type Offerable = Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { h
  * try a person already asked for: that is a note (`askedOf`). Nothing on a run called off, and nothing on a run a person holds (the CLI's
  * `hold`): the package refuses every one of these verbs on it (`heldRefusal`), so an offer would be a button that fails. A run without
  * `holding` is taken for one nobody holds.
+ * @param run The run's detail: its steps, the steps waiting on you, when it was called off and who holds it.
  */
 export function offersOf(run: Offerable): Offer[] {
   if (run.cancelledAt !== null || run.holding != null) return [];
@@ -208,6 +225,8 @@ export function offersOf(run: Offerable): Offer[] {
 /**
  * The try a person asked for of `step`, which the next tick files, as the CLI `ls`'s note says it — none for a step nobody asked a try
  * of, and none on a run called off or held, which files nothing. A note beside the step, never an offer: there is nothing left to choose.
+ * @param run The run's detail: its steps, when it was called off and who holds it.
+ * @param step The step's name.
  */
 export function askedOf(run: Offerable, step: string): { try: number; note: string | null } | null {
   if (run.cancelledAt !== null || run.holding != null) return null;
@@ -218,15 +237,20 @@ export function askedOf(run: Offerable, step: string): { try: number; note: stri
 /**
  * The amount a raise's box starts at: the first whole dollar above what the package says the budget has to pass (`StepRaise.above`) — $5
  * for a step whose tries cost $4.25, $4 for one ended at a $3 cap. A person changes it; the package refuses one not above, in its words.
+ * @param above The amount the budget has to pass, in dollars.
  */
 export const raiseTo = (above: number): number => Math.floor(above) + 1;
 
-/** The offers answered by a row, in the run's order: every offer but Continue (`Answer`). */
+/**
+ * The offers answered by a row, in the run's order: every offer but Continue (`Answer`).
+ * @param run The run's detail: its steps, the steps waiting on you, when it was called off and who holds it.
+ */
 export const answersOf = (run: Offerable): Answer[] => offersOf(run).filter((offer): offer is Answer => offer.case !== 'continue');
 
 /**
  * A try the api has just taken, as the board says it until the run is read again and the step's note says it in the CLI `ls`'s words: what
  * the tick does with it — for a step whose session the harness blocked (`stopFirst`, the package's), stop that session first.
+ * @param asked The try the api took: its number, and whether the tick stops a blocked session first.
  */
 export const askedSaid = (asked: { try: number; stopFirst: boolean }): string =>
   `try ${asked.try} asked — ${asked.stopFirst ? 'stopping its blocked session, then the tick files it' : 'the next tick files it'}`;

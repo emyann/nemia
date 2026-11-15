@@ -27,6 +27,7 @@ export type StepValue = { name: string; value: string; link: string | null };
 /**
  * A value a closeout handed on, as the board shows it (`StepValue`): linked only where the value is a whole URL whose protocol is
  * `http:` or `https:`, so a `javascript:` value, or text that is no URL, is shown and never followed.
+ * @param v The value's name and its text, as the closeout handed it on.
  */
 export function valueOf(v: { name: string; value: string }): StepValue {
   let link: string | null = null;
@@ -60,13 +61,17 @@ const TYPES: Record<string, { type: string; kind: ArtifactKind }> = {
   ),
 };
 
-/** The type the file `name` is served with, by its extension, and what the board does with it; an unknown one is bytes, linked. */
+/**
+ * The type the file `name` is served with, by its extension, and what the board does with it; an unknown one is bytes, linked.
+ * @param name The file's name.
+ */
 export const typeOf = (name: string) =>
   TYPES[path.extname(name).toLowerCase()] ?? { type: 'application/octet-stream', kind: 'other' as const };
 
 /**
  * Why a name is not one the artifacts route serves, or null when it is. A name, never a path: one with a separator of either
  * kind, or `..`, is refused before the disk is touched — and one with a NUL, which no file has.
+ * @param name The name the route was asked for.
  */
 export function refusedName(name: string): string | null {
   if (!name || /[/\\\0]/.test(name) || name.includes('..')) {
@@ -84,6 +89,10 @@ function fileIn(dir: string, name: string): fs.Stats | undefined {
 /**
  * A path a closeout named, as the board shows it (`StepArtifact`). Once the step's artifacts directory is pruned, a file anywhere under it
  * is pruned with it, one in a directory beneath it included.
+ * @param home The store's folder.
+ * @param run The run, its id and what was pruned of it.
+ * @param step The step's name.
+ * @param file The path the closeout named.
  */
 export function artifactOf(home: string, run: Pick<Run, 'id' | 'pruned'>, step: string, file: string): StepArtifact {
   const dir = artifactsDir(home, run, step);
@@ -131,6 +140,10 @@ const isDirectory = (at: string): boolean => {
  * listed it would stand in every folder of every run started with `--input`, so *the folder is empty* could never be said of a step
  * that made nothing. The name comes from the package, not spelled a second time here. A `given` that is not a directory is a step's
  * own file and is listed: what the run makes is a directory.
+ * @param run The run, whose id the links name.
+ * @param step The step's name.
+ * @param dir The step's folder whose files are listed.
+ * @param route The route the files are linked under.
  */
 export function folderFiles(
   run: Pick<Run, 'id'>,
@@ -161,5 +174,7 @@ export function folderFiles(
 /**
  * The folder a step of a folder run works in, off the run's record (`folderPlace` made it): null for a step of a repository run, which
  * works on a branch, and for one the run has not filed yet, which has no folder.
+ * @param run The run's record.
+ * @param step The step's name.
  */
 export const workFolderOf = (run: Run, step: string): string | null => (isRepositoryRun(run) ? null : (run.steps[step]?.workspace ?? null));

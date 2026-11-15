@@ -120,7 +120,10 @@ export type Factory = {
  */
 export type Volume = { path: string; readOnly: boolean; name?: string };
 
-/** A volume's own keys, its path, its mark and its name where it has one, and no other a file kept beside them. */
+/**
+ * A volume's own keys, its path, its mark and its name where it has one, and no other a file kept beside them.
+ * @param v The volume as read, with any key a file kept beside its own.
+ */
 export const volumeEntry = (v: Volume): Volume => ({
   path: v.path,
   readOnly: v.readOnly,
@@ -130,6 +133,7 @@ export const volumeEntry = (v: Volume): Volume => ({
 /**
  * The volumes of `factory` as a run mounts them, each as `path.resolve` spells it, sorted, once each: the first named of a path given
  * twice; its path and mark alone, a name being no mount's (`factoryVolumesNamed`, `volume/volume.ts`, names them).
+ * @param factory The factory, by its volumes.
  */
 export function factoryVolumes(factory: Pick<Factory, 'volumes'>): Volume[] {
   const seen = new Map<string, Volume>();
@@ -140,10 +144,16 @@ export function factoryVolumes(factory: Pick<Factory, 'volumes'>): Volume[] {
   return [...seen.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
 
-/** How a volume is said: `:ro` or `:rw`, as docker compose marks it. */
+/**
+ * How a volume is said: `:ro` or `:rw`, as docker compose marks it.
+ * @param v The volume, by its mark.
+ */
 export const volumeMark = (v: Pick<Volume, 'readOnly'>): ':ro' | ':rw' => (v.readOnly ? ':ro' : ':rw');
 
-/** The revisions policy of `factory`: what it says, else `pinned`, which is also the default factory's, which says nothing. */
+/**
+ * The revisions policy of `factory`: what it says, else `pinned`, which is also the default factory's, which says nothing.
+ * @param factory The factory, by its revisions policy, or undefined for the default factory.
+ */
 export const revisionsOf = (factory: Pick<Factory, 'revisions'> | undefined): RevisionsPolicy => factory?.revisions ?? DEFAULT_REVISIONS;
 
 /** The template a factory was made from (`nemia factory apply`): its folder, its version then, and the parameters given, by name. */
@@ -159,6 +169,8 @@ export type InstructionPlace = { in: 'folder'; folder: string; path: string; fil
  * file `storeFile` when its file says the store; else the path it names, or
  * `NEMIA.md` when it names none, in its first folder, the first of `repos` as filed. Throws `Invalid` for a factory of no repository,
  * which its file's schema refuses.
+ * @param factory The factory, by its repositories, its instruction's key and its tree.
+ * @param storeFile The file the store keeps the factory's instruction in.
  */
 export function instructionAt(factory: Pick<Factory, 'repos' | 'instruction' | 'tree'>, storeFile: string): InstructionPlace {
   if (factory.tree !== undefined) return { in: 'store', file: path.join(factory.tree, DEFAULT_INSTRUCTION) };
@@ -173,6 +185,7 @@ export function instructionAt(factory: Pick<Factory, 'repos' | 'instruction' | '
 /**
  * Why `p` cannot name a factory's instruction in its first folder, or undefined: a path is relative to the folder and stays in it, so an
  * empty one, an absolute one, the folder itself and one that climbs out of it are refused.
+ * @param p The path as given, from the factory's first folder.
  */
 export function instructionPathRefusal(p: string): string | undefined {
   const fix = 'Name a file inside the folder by its path from it — NEMIA.md or docs/NEMIA.md, say — or keep the instruction in the store.';
@@ -235,7 +248,10 @@ export type FactoryCondition = {
  */
 export type TemplateStatus = { applied: string | null; conditions: readonly FactoryCondition[] };
 
-/** Why `name` cannot name a factory, or undefined: empty, or not a lowercase slug — the slug suggested when lowering its case makes one. */
+/**
+ * Why `name` cannot name a factory, or undefined: empty, or not a lowercase slug — the slug suggested when lowering its case makes one.
+ * @param name The name as given.
+ */
 export function factoryNameRefusal(name: string): string | undefined {
   if (!name) return 'A factory is named by a lowercase slug, and this name is empty. Give the name: nemia factory ls lists them.';
   if (FACTORY_NAME.test(name)) return undefined;
@@ -287,13 +303,17 @@ const INSTEAD: Record<FactoryWrite, string> = {
     'It holds every run and card that names no factory: take over a factory nemia factory ls lists, or make one with nemia factory apply.',
 };
 
-/** The refusal of `nemia factory <verb>` on the default factory, which is read, never written. */
+/**
+ * The refusal of `nemia factory <verb>` on the default factory, which is read, never written.
+ * @param verb The `nemia factory` verb asked of the default factory.
+ */
 export const defaultFactoryRefusal = (verb: FactoryWrite): string =>
   `\`${DEFAULT_NAMESPACE}\` is the default factory: it holds every run and card that names no factory, and is read, never written, so nemia factory ${verb} does not take it. ${INSTEAD[verb]}`;
 
 /**
  * The Factory door's refusal of a write of the default factory that no verb refused first: its spec written back (`spec`), or its level,
  * which is the store's (`level`).
+ * @param what What was to be written: the default factory's spec (`spec`), or its level (`level`).
  */
 export const defaultWriteRefusal = (what: 'spec' | 'level'): string =>
   what === 'level'
@@ -303,6 +323,7 @@ export const defaultWriteRefusal = (what: 'spec' | 'level'): string =>
 /**
  * Why `workflow` cannot name a workflow, or undefined: a workflow is named by its folder, which is not empty, not hidden, holds no slash,
  * and is none of the agents', the skills' and the carried files' folders. Whether it exists is the start's to judge.
+ * @param workflow The name as given.
  */
 export function workflowNameRefusal(workflow: string): string | undefined {
   if (!workflow || workflow.startsWith('.') || /[\\/]/.test(workflow))
@@ -318,6 +339,8 @@ export function workflowNameRefusal(workflow: string): string | undefined {
  * Why `step` and `agent` cannot be a hire, or undefined: `step` is `<workflow>/<step>` — a workflow's name (`workflowNameRefusal`), then a
  * step's name (`stepNameRefusal`) — and `agent` names an agent's file, not empty, hidden, nor holding a slash or a space. Whether they
  * exist is the start's to judge.
+ * @param step The step as given, `<workflow>/<step>`.
+ * @param agent The agent's name as given.
  */
 export function hireRefusal(step: string, agent: string): string | undefined {
   const [workflow, name, ...more] = step.split('/');
@@ -332,7 +355,11 @@ export function hireRefusal(step: string, agent: string): string | undefined {
   return undefined;
 }
 
-/** A factory's hires into the steps of the workflow whose folder is named `workflow`, by step; none of another workflow's. */
+/**
+ * A factory's hires into the steps of the workflow whose folder is named `workflow`, by step; none of another workflow's.
+ * @param hires The factory's hires, by step as `<workflow>/<step>`.
+ * @param workflow The workflow's folder name.
+ */
 export function fillsOf(hires: Hires, workflow: string): Record<string, string> {
   const prefix = `${workflow}/`;
   return Object.fromEntries(
@@ -342,14 +369,17 @@ export function fillsOf(hires: Hires, workflow: string): Record<string, string> 
   );
 }
 
-/**
- * Why a run of `workflow` in the factory `factory` cannot start, or undefined: every step that is left with no agent — its file names none,
- * no hire fills it, and it runs on no remote agent — named, with the hire that fills each: in a factory, hiring is the way to fill a step.
- */
 /** Whether a step runs an agent: every step but a condition a table or a script answers, and a workflow node, which files a card. */
 const runsAnAgent = (s: Pick<StepSpec, 'routes' | 'route' | 'workflow'>): boolean =>
   s.workflow === undefined && (s.routes === undefined || s.route?.kind === 'judge');
 
+/**
+ * Why a run of `workflow` in the factory `factory` cannot start, or undefined: every step that is left with no agent — its file names none,
+ * no hire fills it, and it runs on no remote agent — named, with the hire that fills each: in a factory, hiring is the way to fill a step.
+ * @param steps The workflow's steps, by their names, agents, harnesses and routes.
+ * @param factory The factory's name.
+ * @param workflow The workflow's folder name.
+ */
 export function unfilledRefusal(
   steps: readonly Pick<StepSpec, 'name' | 'agent' | 'harness' | 'routes' | 'route' | 'workflow'>[],
   factory: string,
@@ -368,6 +398,8 @@ export function unfilledRefusal(
 /**
  * Why a run of `workflow` cannot start in `factory`, or undefined when the factory offers it: a factory offers only the workflows attached
  * to it, and none when none is — named, with the attach that adds it.
+ * @param factory The factory, by its name and the workflows it offers.
+ * @param workflow The workflow's folder name.
  */
 export function unattachedRefusal(factory: Pick<Factory, 'name' | 'workflows'>, workflow: string): string | undefined {
   if (factory.workflows.includes(workflow)) return undefined;
@@ -378,6 +410,8 @@ export function unattachedRefusal(factory: Pick<Factory, 'name' | 'workflows'>, 
 /**
  * Why `factory` hires no one into the steps of `workflow`, which it does not offer: the attach that offers it, then the hire. Said by the
  * hire it refuses (`hireAgent`) and by a step's page before anyone hires.
+ * @param factory The factory's name.
+ * @param workflow The workflow's folder name.
  */
 export const unattachedHireRefusal = (factory: string, workflow: string): string =>
   `${factory} does not offer the workflow ${workflow}, so it hires no one into its steps. Attach it first — nemia factory attach ${factory} ${workflow} — then hire.`;
@@ -387,6 +421,9 @@ export const unattachedHireRefusal = (factory: string, workflow: string): string
  * which hires no one (`defaultFactoryRefusal`); a workflow the factory does not offer (`unattachedHireRefusal`); and a step whose own file
  * names an agent, `named` — null for none — which fills it in every factory, so a start would refuse a hire beside it. Said by a step's
  * page before anyone hires, and by the hire it refuses (`hireAgent`), which says the file after it.
+ * @param factory The factory, by its name and the workflows it offers, or undefined for the default factory.
+ * @param workflow The workflow's folder name.
+ * @param named The agent the step's own file names, or null where it names none.
  */
 export function hireRefusalOf(
   factory: Pick<Factory, 'name' | 'workflows'> | undefined,
@@ -403,6 +440,9 @@ export function hireRefusalOf(
  * The repository a run in `factory` works on where no wiring places it (a card, a brief and a schedule are placed by `workflowRepo`):
  * `named` when a person named one, else the factory's repository when it has only one, else `fallback` — where `nemia start` is typed.
  * With no factory — the default — `named`, else `fallback`. Whether it is one of the factory's is `outsideRefusal`'s to judge.
+ * @param factory The factory, by its repositories, or undefined for the default factory.
+ * @param named The repository a person named, or undefined where they named none.
+ * @param fallback The folder where `nemia start` is typed.
  */
 export function factoryRepo(factory: Pick<Factory, 'repos'> | undefined, named: string | undefined, fallback: string): string {
   if (named !== undefined) return named;
@@ -418,6 +458,9 @@ export type { NamedRepo, WorkflowRepoOf, WorkflowRepoRefusal } from '../../contr
  * The repository a run of `workflow` works on in a factory of `repos`, each with its folder name: the one named `wired[workflow]`,
  * else the only one; refused where the factory has several and names none (`unwired`), names one none has (`unknown`), or one two share
  * (`shared`). A prototype's name (`constructor`) names no workflow's repository: the wiring is a person's file, read as JSON.
+ * @param repos The factory's repositories, each with its folder name.
+ * @param wired The repository each workflow works on, by its folder name, or undefined where the factory names none.
+ * @param workflow The workflow's folder name.
  */
 export const workflowRepo: WorkflowRepo = (repos, wired, workflow) => {
   const name = wired !== undefined && Object.hasOwn(wired, workflow) ? wired[workflow] : undefined;
@@ -435,17 +478,25 @@ export const workflowRepo: WorkflowRepo = (repos, wired, workflow) => {
 /**
  * The folder name of the repository `repo`, as the wiring names it: the last segment of its path, a trailing separator aside. A factory's
  * file holds each repository as `path.resolve` spelled it (`factoryRepos`), so this reads the string alone, as `path.basename` would.
+ * @param repo The repository's path.
  */
 export const folderName = (repo: string): string => {
   const trimmed = repo.endsWith('/') && repo.length > 1 ? repo.slice(0, -1) : repo;
   return trimmed.slice(trimmed.lastIndexOf('/') + 1);
 };
 
-/** How many of `factory`'s repositories have the folder name `name`: one where the wiring can name it. */
+/**
+ * How many of `factory`'s repositories have the folder name `name`: one where the wiring can name it.
+ * @param factory The factory, by its repositories.
+ * @param name The folder name asked for.
+ */
 export const reposNamed = (factory: Pick<Factory, 'repos'>, name: string): number =>
   factory.repos.filter((r) => folderName(r) === name).length;
 
-/** Each repository of `factory`, as `path.resolve` spells it, with its folder's name: what `workflowRepo` is handed. */
+/**
+ * Each repository of `factory`, as `path.resolve` spells it, with its folder's name: what `workflowRepo` is handed.
+ * @param factory The factory, by its repositories.
+ */
 export const namedRepos = (factory: Pick<Factory, 'repos'>): NamedRepo[] =>
   factory.repos.map((r) => ({ path: path.resolve(r), name: folderName(path.resolve(r)) }));
 
@@ -455,6 +506,10 @@ const repoNames = (factory: Pick<Factory, 'repos'>): string => [...new Set(named
 /**
  * Why `factory` gives `workflow` no repository (`refused`, `workflowRepo`), with the `nemia factory attach … --repo` that fixes it, naming
  * its repositories' folder names to choose from; then what was not done.
+ * @param factory The factory, by its name and its repositories.
+ * @param workflow The workflow's folder name.
+ * @param refused Why the factory gives the workflow no repository (`workflowRepo`).
+ * @param notDone What was not done, said last; `Nothing was started.` by default.
  */
 export function workflowRepoRefusal(
   factory: Pick<Factory, 'name' | 'repos'>,
@@ -473,6 +528,8 @@ export function workflowRepoRefusal(
 /**
  * The repository a run of `workflow` works on in `factory` (`workflowRepo`, over its repositories as `namedRepos` names them), or why it
  * has none, in `workflowRepoRefusal`'s words.
+ * @param factory The factory, by its name, its repositories and the repository each workflow works on.
+ * @param workflow The workflow's folder name.
  */
 export function wiredRepo(
   factory: Pick<Factory, 'name' | 'repos' | 'workflowRepos'>,
@@ -490,6 +547,7 @@ export type { ScheduleRepoAsk, ScheduleRepoRefusal } from '../../contracts/sched
  * the one it has, is retired (`repo`), since the factory's wiring places its runs (`wiredRepo`); and a workflow the wiring places on
  * none of the factory's repositories is refused (`unwired`). The retired `repo` is said first. An old schedule's `repo` sent back as it
  * is, or left out, is let through.
+ * @param ask What the schedule says of its repository: the one it had, the one sent, and whether the wiring places its runs.
  */
 export const scheduleRepoRefusal: ScheduleRepoRefusalOf = (ask) => {
   if (ask.repoSent !== undefined && ask.repoSent !== ask.repoNow) return 'repo';
@@ -500,6 +558,10 @@ export const scheduleRepoRefusal: ScheduleRepoRefusalOf = (ask) => {
  * Why `factory` refuses to schedule `workflow` for its repository (`refused`, `scheduleRepoRefusal`), naming the `nemia factory attach …
  * --repo` that places its runs and its repositories' folder names: a `repo` set, which is retired; or a workflow the wiring places on
  * none, in `workflowRepoRefusal`'s words for why (`wiring`, `wiredRepo`'s). Then that nothing was scheduled.
+ * @param factory The factory, by its name and its repositories.
+ * @param workflow The workflow's folder name.
+ * @param refused Why the schedule is refused for its repository (`scheduleRepoRefusal`).
+ * @param wiring Why the wiring places the workflow on none of the repositories; `unwired` by default.
  */
 export function scheduleRepoRefusalWords(
   factory: Pick<Factory, 'name' | 'repos'>,
@@ -514,6 +576,10 @@ export function scheduleRepoRefusalWords(
 /**
  * Why an attach of `workflow` to `factory` cannot name `name` its repository: `count` of its repositories have that folder name
  * (`reposNamed`), none or several; then the attach that names one.
+ * @param factory The factory, by its name and its repositories.
+ * @param workflow The workflow's folder name.
+ * @param name The folder name the attach gives.
+ * @param count How many of the factory's repositories have that folder name.
  */
 export function repoNameRefusal(factory: Pick<Factory, 'name' | 'repos'>, workflow: string, name: string, count: number): string {
   const why =
@@ -527,6 +593,8 @@ export function repoNameRefusal(factory: Pick<Factory, 'name' | 'repos'>, workfl
  * Why a repository run on `repo` cannot start in `factory`, or undefined when `repo` is one of its repositories, each compared as
  * `path.resolve` spells it: the factory's list named, sorted, with the `--repo` that starts it in one, or the `nemia factory add` that
  * files a factory on `repo`, since none adds a repository to a factory.
+ * @param factory The factory, by its name and its repositories.
+ * @param repo The repository the run is asked on.
  */
 export function outsideRefusal(factory: Pick<Factory, 'name' | 'repos'>, repo: string): string | undefined {
   const repos = factory.repos.map((r) => path.resolve(r));
@@ -546,6 +614,8 @@ const holds = (repo: string, folder: string): boolean =>
  * Every factory of `factories` with a repository that is the folder `at` or one of its ancestors, in their order, each with that repository
  * — its deepest, when two of one factory's hold it. No winner is chosen: a start resolves a factory only when one alone holds its folder,
  * so nested repositories of two factories are two holders.
+ * @param factories The store's factories that read.
+ * @param at The folder the start is made from.
  */
 export function factoriesHolding(factories: readonly Factory[], at: string): Holding[] {
   const folder = path.resolve(at);
@@ -569,6 +639,10 @@ const choices = (names: readonly string[]): string =>
  * Why a start that names no factory cannot start in the folder `at`: no factory of the store works on it. Names the store's factories
  * (`names`), the start's own fix (`fix`, `--factory <name>` or `?factory=<name>`), the `nemia factory add` that files one on the folder's
  * repository, and the factories whose files do not read (`unread`), which were not looked at.
+ * @param at The folder the start is made from.
+ * @param names The store's factories, by name.
+ * @param fix The start's words for naming a factory, `<name>` in them.
+ * @param unread The factories whose files do not read; none by default.
  */
 export function noFactoryRefusal(at: string, names: readonly string[], fix: string, unread: readonly string[] = []): string {
   const skipped = unread.length
@@ -580,6 +654,9 @@ export function noFactoryRefusal(at: string, names: readonly string[], fix: stri
 /**
  * Why a start that names no factory cannot start in the folder `at`: more than one factory works on it (`holding`), each named with the
  * repository that holds the folder, and a factory is taken from a folder only when one alone does; the fix (`fix`) for each.
+ * @param at The folder the start is made from.
+ * @param holding Each factory that works on the folder, with the repository that holds it.
+ * @param fix The start's words for naming a factory, `<name>` in them.
  */
 export function ambiguousFactoryRefusal(at: string, holding: readonly Holding[], fix: string): string {
   const sorted = [...holding].sort((a, b) => a.factory.name.localeCompare(b.factory.name));
@@ -591,6 +668,8 @@ export function ambiguousFactoryRefusal(at: string, holding: readonly Holding[],
 /**
  * Why a start cannot name the default factory: it holds the history of the runs and cards that named none, and no run is started in it
  * now. Names the fix (`fix`) and the store's factories (`names`).
+ * @param fix The start's words for naming a factory, `<name>` in them.
+ * @param names The store's factories, by name.
  */
 export const defaultStartRefusal = (fix: string, names: readonly string[]): string =>
   `\`${DEFAULT_NAMESPACE}\` is the default factory: it holds the history of the runs and cards that named no factory, and no run is started in it. Name a factory — ${fix}, ${choices(names)}. Nothing was started.`;
@@ -598,6 +677,9 @@ export const defaultStartRefusal = (fix: string, names: readonly string[]): stri
 /**
  * Why a run in `factory` cannot start: the runtime refuses the step `where` (`<workflow>/<step>`) a folder of the factory, mounted for
  * it (`factoryMounts`), in its words (`why`); then where the mount came from, and what a person can do, since no flag leaves one off.
+ * @param factory The factory, by its name.
+ * @param where The step the runtime refuses, `<workflow>/<step>`.
+ * @param why The runtime's words for why.
  */
 export const factoryMountRefusal = (factory: Pick<Factory, 'name'>, where: string, why: string): string =>
   `${why}\nThat folder is the factory ${factory.name}'s: a run in it mounts every repository of the factory but its own, read-only, ` +
@@ -609,6 +691,8 @@ export const factoryMountRefusal = (factory: Pick<Factory, 'name'>, where: strin
 /**
  * The folders a run in `factory` mounts: its repositories, each as `path.resolve` spells it, sorted and once each, but `repo`, the one
  * the run works on; every one read-only. A folder run works on none of them, gives no `repo`, and mounts them all.
+ * @param factory The factory, by its repositories.
+ * @param repo The repository the run works on, or undefined for a folder run.
  */
 export function factoryMounts(factory: Pick<Factory, 'repos'>, repo: string | undefined): Mount[] {
   const own = repo === undefined ? undefined : path.resolve(repo);
@@ -621,13 +705,19 @@ export function factoryMounts(factory: Pick<Factory, 'repos'>, repo: string | un
 /**
  * The folders the step `step` is filed with, of those its run mounts (`mounts`, frozen at start): each writable that its `writable:` names
  * by its directory's name, and read-only otherwise. Undefined for a run that mounts none.
+ * @param step The step, by its `writable:`.
+ * @param mounts The folders its run mounts, frozen at start, or undefined for a run that mounts none.
  */
 export function stepMounts(step: Pick<StepSpec, 'writable'>, mounts: readonly Mount[] | undefined): Mount[] | undefined {
   if (!mounts) return undefined;
   return mounts.map((m) => (step.writable?.includes(path.basename(m.path)) ? { path: m.path, readOnly: false } : m));
 }
 
-/** Each folder of `mounts` a local step of `steps` writes (`stepMounts`), with those steps by name, in `mounts`' order. */
+/**
+ * Each folder of `mounts` a local step of `steps` writes (`stepMounts`), with those steps by name, in `mounts`' order.
+ * @param steps The workflow's steps, by their names, harnesses and `writable:`.
+ * @param mounts The folders the run mounts, or undefined for a run that mounts none.
+ */
 export const writersOf = (
   steps: readonly Pick<StepSpec, 'name' | 'harness' | 'writable'>[],
   mounts: readonly Mount[] | undefined,
@@ -670,6 +760,11 @@ function writableNameRefusal(
  * Why a run of `workflow` in `factory` on the repository `repo` (none for a folder run), mounting `mounts` (`factoryMounts`, each a
  * directory now), cannot start, or undefined: a step's `writable:` names a folder by a name no folder of the factory has, or two have, or
  * one that is no directory at start (`writableNameRefusal`); or names any in a run started in no factory, which mounts none.
+ * @param steps The workflow's steps, by their names and `writable:`.
+ * @param workflow The workflow's folder name.
+ * @param factory The factory, by its name and its repositories, or undefined for a run started in none.
+ * @param repo The repository the run works on, or undefined for a folder run.
+ * @param mounts The folders the run mounts (`factoryMounts`), each a directory now.
  */
 export function writableRefusal(
   steps: readonly Pick<StepSpec, 'name' | 'writable'>[],
@@ -695,6 +790,9 @@ export function writableRefusal(
 /**
  * Why a run in `factory` cannot start: the runtime refuses the step `where` (`<workflow>/<step>`) a folder of the factory its `writable:`
  * names, mounted writable for it (`stepMounts`), in its words (`why`); then what a person can do.
+ * @param factory The factory, by its name.
+ * @param where The step the runtime refuses, `<workflow>/<step>`.
+ * @param why The runtime's words for why.
  */
 export const writableMountRefusal = (factory: Pick<Factory, 'name'>, where: string, why: string): string =>
   `${why}\nThat folder is the factory ${factory.name}'s, and ${where} names it in \`writable:\`, so the run would mount it writable for that ` +
@@ -704,6 +802,9 @@ export const writableMountRefusal = (factory: Pick<Factory, 'name'>, where: stri
 /**
  * Why a run in `factory` cannot start: the runtime refuses the step `where` (`<workflow>/<step>`) a volume of the factory, mounted for it
  * as it is marked (`volumeMounts`), in its words (`why`); then where the mount came from, and what a person can do.
+ * @param factory The factory, by its name.
+ * @param where The step the runtime refuses, `<workflow>/<step>`.
+ * @param why The runtime's words for why.
  */
 export const volumeMountRefusal = (factory: Pick<Factory, 'name'>, where: string, why: string): string =>
   `${why}\nThat folder is a volume of the factory ${factory.name}: a run in it mounts each volume for every local step, a writable one ` +
@@ -788,6 +889,10 @@ const costLineLines = (lines: Factory['costLines'], width: number): string[] =>
 /**
  * What `nemia factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read;
  * each schedule with its next fire and last run as `listed` reads them at `now`, and each place in `untrusted` under its factory.
+ * @param listing Each factory's file as the store listed it, or why it does not read.
+ * @param listed The schedules as `schedulesListed` read them; none by default.
+ * @param now The time the next fires and last runs are worded at, in ms since the epoch; the clock's by default.
+ * @param untrusted The places a harness does not trust, each under its factory; none by default.
  */
 export function factoryLines(
   listing: readonly FactoryListing[],
@@ -819,47 +924,91 @@ export function factoryLines(
   ];
 }
 
-/** That the store has no factory `name`, and which it has, by name; the default factory is never one to remove. */
+/**
+ * That the store has no factory `name`, and which it has, by name; the default factory is never one to remove.
+ * @param name The factory's name asked for.
+ * @param names The store's factories, by name.
+ */
 export const noFactoryLine = (name: string, names: readonly string[]): string =>
   `no factory ${name} in the store. ${names.length ? `Its factories are: ${[...names].sort().join(', ')}.` : 'It has none but the default: file one with nemia factory add <name> --repo <path>.'}`;
 
-/** Why `factory` cannot be relieved of `workflow`: it has not attached it, naming those it offers. */
+/**
+ * Why `factory` cannot be relieved of `workflow`: it has not attached it, naming those it offers.
+ * @param factory The factory, by its name and the workflows it offers.
+ * @param workflow The workflow's folder name.
+ */
 export const unattachedDetachRefusal = (factory: Pick<Factory, 'name' | 'workflows'>, workflow: string): string =>
   `${factory.name} has not attached ${workflow}. ${factory.workflows.length ? `It offers: ${factory.workflows.join(', ')}.` : 'It offers none.'} Nothing was detached.`;
 
-/** Why `factory` cannot be relieved of `workflow` while it hires into its steps `hired`: the fire of each, then the detach. */
+/**
+ * Why `factory` cannot be relieved of `workflow` while it hires into its steps `hired`: the fire of each, then the detach.
+ * @param factory The factory's name.
+ * @param workflow The workflow's folder name.
+ * @param hired The steps it hires into, each `<workflow>/<step>`.
+ */
 export const hiredDetachRefusal = (factory: string, workflow: string, hired: readonly string[]): string =>
   `${factory} hires into ${workflow}'s steps: ${[...hired].sort().join(', ')}. Fire each first — ${[...hired]
     .sort()
     .map((step) => `nemia factory fire ${factory} --step ${step}`)
     .join('; ')} — then detach it. Nothing was detached.`;
 
-/** Why `factory` cannot be relieved of `workflow` while it schedules it: the unschedule, then the detach. */
+/**
+ * Why `factory` cannot be relieved of `workflow` while it schedules it: the unschedule, then the detach.
+ * @param factory The factory's name.
+ * @param workflow The workflow's folder name.
+ */
 export const scheduledDetachRefusal = (factory: string, workflow: string): string =>
   `${factory} schedules ${workflow}: unschedule it first — nemia factory unschedule ${factory} ${workflow} — then detach it. Nothing was detached.`;
 
-/** Why `factory` cannot be relieved of `workflow` while it sets a cost line for it: the line taken back, then the detach. */
+/**
+ * Why `factory` cannot be relieved of `workflow` while it sets a cost line for it: the line taken back, then the detach.
+ * @param factory The factory's name.
+ * @param workflow The workflow's folder name.
+ */
 export const costLinedDetachRefusal = (factory: string, workflow: string): string =>
   `${factory} sets a cost line for ${workflow}: take it back first — nemia factory cost-line rm ${factory} ${workflow} — then detach it. Nothing was detached.`;
 
-/** Why `factory` fires no one from `step`: it hires no one there, naming the steps it hires into. */
+/**
+ * Why `factory` fires no one from `step`: it hires no one there, naming the steps it hires into.
+ * @param factory The factory's name.
+ * @param step The step as given, `<workflow>/<step>`.
+ * @param hires The factory's hires, by step.
+ */
 export const unhiredFireRefusal = (factory: string, step: string, hires: Hires): string => {
   const there = Object.keys(hires).sort();
   return `${factory} hires no agent into ${step}. ${there.length ? `It hires into: ${there.join(', ')}.` : 'It hires none.'} Nothing was fired.`;
 };
 
-/** Why `factory` schedules none of the runs of `workflow`, which it does not offer: the attach, then the schedule. */
+/**
+ * Why `factory` schedules none of the runs of `workflow`, which it does not offer: the attach, then the schedule.
+ * @param factory The factory's name.
+ * @param workflow The workflow's folder name.
+ */
 export const unofferedScheduleRefusal = (factory: string, workflow: string): string =>
   `${factory} does not offer the workflow ${workflow}, so it schedules none of its runs. Attach it first — nemia factory attach ${factory} ${workflow} — then schedule it. Nothing was scheduled.`;
 
-/** Why `factory` unschedules nothing of `workflow`: it does not schedule it, naming those it does. */
+/**
+ * Why `factory` unschedules nothing of `workflow`: it does not schedule it, naming those it does.
+ * @param factory The factory's name.
+ * @param workflow The workflow's folder name.
+ * @param scheduled The workflows it schedules, by folder name.
+ */
 export const unscheduledRefusal = (factory: string, workflow: string, scheduled: readonly string[]): string =>
   `${factory} does not schedule ${workflow}. ${scheduled.length ? `It schedules: ${[...scheduled].sort().join(', ')}.` : 'It schedules none.'} Nothing was unscheduled.`;
 
-/** Why a factory `name` is not filed: there is one already, at `file`, left as it was. */
+/**
+ * Why a factory `name` is not filed: there is one already, at `file`, left as it was.
+ * @param name The factory's name.
+ * @param file The file of the factory already there.
+ */
 export const takenFactoryRefusal = (name: string, file: string): string =>
   `There is a factory ${name} already, at ${file}, and it was left as it was. See it with nemia factory ls; to name other repositories, nemia factory rm ${name}, then add it again; to put a template onto it in place, keeping its cards and runs, nemia factory diff ${name} --template <name|folder|archive>, then nemia factory adopt.`;
 
-/** Why the wiring of a templated factory `name` is not written: its tree, at `tree`, is not rendered yet; then what was not done. */
+/**
+ * Why the wiring of a templated factory `name` is not written: its tree, at `tree`, is not rendered yet; then what was not done.
+ * @param name The factory's name.
+ * @param tree The factory's tree.
+ * @param notDone What was not done, said last.
+ */
 export const unrenderedTreeRefusal = (name: string, tree: string, notDone: string): string =>
   `${name} is made from a template, and its tree is not rendered yet, at ${tree}: start the daemon, nemia up, and try again once nemia factory ls shows it applied. ${notDone}`;

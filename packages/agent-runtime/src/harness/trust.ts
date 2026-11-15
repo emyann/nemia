@@ -30,6 +30,10 @@ const keepsTrust = (harness: string): boolean => harness === 'claude';
  * What harness `harness` says of its trust of the folder `dir`, read off the harness's own file (`file`, its default when absent):
  * kept under the root of the repository's main checkout where `repository` names it, else under the folder itself. `undefined` for a
  * harness that keeps no trust of a folder.
+ * @param harness The harness's name.
+ * @param dir The folder whose trust is read.
+ * @param file The harness's own file its trust is kept in, or undefined for its default.
+ * @param repository The root of the repository's main checkout, where the trust is kept; undefined to keep it under `dir`.
  */
 export function folderTrust(harness: string, dir: string, file?: string, repository?: string): FolderTrust | undefined {
   if (!keepsTrust(harness)) return undefined;
@@ -53,6 +57,10 @@ export function folderTrust(harness: string, dir: string, file?: string, reposit
  * `folderTrust` takes them): a folder already trusted is left alone, and one the harness can never keep a trust for is given nothing.
  * Answers the trust as it reads afterwards, with whether this call wrote it and, where it is still not given, why and what to do.
  * `undefined`, and nothing written, for a harness that keeps no trust of a folder.
+ * @param harness The harness's name.
+ * @param dir The folder to trust.
+ * @param file The harness's own file its trust is kept in, or undefined for its default.
+ * @param repository The root of the repository's main checkout, where the trust is kept; undefined to keep it under `dir`.
  */
 export function trustFolder(harness: string, dir: string, file?: string, repository?: string): FolderTrusted | undefined {
   const before = folderTrust(harness, dir, file, repository);
@@ -66,6 +74,10 @@ export function trustFolder(harness: string, dir: string, file?: string, reposit
  * Whether harness `harness` trusts the folder `dir`, read off the harness's own file (`file`, its default when absent), as the
  * harness keeps it: under `repository`, the root of the repository's main checkout, where the caller names it. `undefined` for a
  * harness that keeps no trust of a folder.
+ * @param harness The harness's name.
+ * @param dir The folder whose trust is read.
+ * @param file The harness's own file its trust is kept in, or undefined for its default.
+ * @param repository The root of the repository's main checkout, where the trust is kept; undefined to keep it under `dir`.
  */
 export const trustedFolder = (harness: string, dir: string, file?: string, repository?: string): boolean | undefined =>
   folderTrust(harness, dir, file, repository)?.trusted;

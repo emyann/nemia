@@ -11,6 +11,7 @@ type Priced = Pick<StepView, 'spent' | 'budget'>;
  * What a step's tries have cost, as its node and the inspector say it: of its cap where it has one (`$4.25 of $3`), all of them where it
  * has none (`$4.25`), or its cap before anything of it was measured (`budget $3`). Null for a step with neither: nothing measured, and no
  * cap.
+ * @param step The step, its cost so far and its cap read.
  */
 export function costText(step: Priced): string | null {
   if (step.budget) return step.budget.of ?? `budget ${step.budget.said}`;
@@ -20,12 +21,15 @@ export function costText(step: Priced): string | null {
 /**
  * Whether a step's tries have cost its cap or more — what holds it, where another session of it is the way on: what its cost is drawn red
  * for.
+ * @param step The step, its cap read.
  */
 export const pastBudget = (step: Pick<Priced, 'budget'>): boolean => step.budget?.over === true;
 
 /**
  * What a cost adds up, on hover: how many ended sessions the harness priced — and for a cost that reads `≥`, how many had no cost on them,
  * so the figure is the least it was; and that a session still running is in it only once it ends, when its harness prices it.
+ * @param spent The cost, with how many sessions were measured and how many had no cost.
+ * @param of What the cost is of, as the sentence names it: `the run's tries`.
  */
 export function spentTitle(spent: Spent, of: string): string {
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;

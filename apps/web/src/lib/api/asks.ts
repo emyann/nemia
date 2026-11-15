@@ -57,6 +57,10 @@ type Approved = { try: number; at: string; message: string | null; file: string 
  * not fit, and writes the rest as the try's message.
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
+ * @param namespace The namespace of the run: its factory's, `default` for a run of none.
+ * @param runId The run's id.
+ * @param step The step to try again.
+ * @param how How it is tried: the mode, a model, words for the try, the budget raised to in dollars, and the answers to its questions.
  */
 export async function askTry(
   namespace: string,
@@ -77,6 +81,10 @@ export async function askTry(
  * and an answer the board does not read, saying the ask may be written.
  *
  * Sent as `application/json`, which the api requires of it, as of a try.
+ * @param namespace The namespace of the run: its factory's, `default` for a run of none.
+ * @param runId The run's id.
+ * @param step The step that closes the loop.
+ * @param how The budget the loop's cap is raised to, in dollars, or none.
  */
 export async function askRound(namespace: string, runId: string, step: string, how: { budget?: number }): Promise<AskedRound> {
   const asked = await runs.retry(namespace, runId, step, { mode: 'continue', round: true, ...how }, ROUND_MAY);
@@ -102,6 +110,10 @@ export async function askRound(namespace: string, runId: string, step: string, h
  * the work is good enough with its findings open, and the package refuses it missing or empty.
  *
  * Sent as `application/json`, which the api requires of it, as of an ask. Sending the step back is an ask for a try with words (`askTry`).
+ * @param namespace The namespace of the run: its factory's, `default` for a run of none.
+ * @param runId The run's id.
+ * @param step The step waiting at its gate, or the loop's step out of rounds.
+ * @param how The approval's words, the answers to the step's questions, and the caps changed at the gate.
  */
 export const approveStep = (
   namespace: string,
@@ -120,6 +132,10 @@ export const approveStep = (
  * the words may have been said.
  *
  * Sent as `application/json`, which the api requires of it, as of a start and an ask.
+ * @param namespace The namespace of the run: its factory's, `default` for a run of none.
+ * @param runId The run's id.
+ * @param step The step whose running session is told.
+ * @param text The words handed to the session.
  */
 export const sayToStep = (namespace: string, runId: string, step: string, text: string): Promise<Said> =>
   runs.say(

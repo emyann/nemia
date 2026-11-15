@@ -31,6 +31,7 @@ export type GateAsk = { step: string; ends: boolean; back: readonly string[]; on
  * waits. A to-decide gate whose `back` names the step itself holds after the step ran (`sendBackTo` gives the step once it has a task); one
  * whose `back` does not is an ending, not filed until approved. A list from an api without `back` reads the step alone as where a send-back
  * goes, which the package would refuse for an ending, in its words.
+ * @param run The run as the list shows it: its calling off, its hold, its steps, its gates on you and its to-decide.
  */
 export function gateOfSummary(
   run: Pick<RunView, 'cancelledAt' | 'waitingOnYou' | 'steps' | 'toDecide'> & { holding?: RunView['holding'] },
@@ -49,6 +50,8 @@ export function gateOfSummary(
  * The same gate off a run's detail, for one step: the inspector's and the node's. Null unless the step waits at its gate on you, on a run
  * nobody called off. `ends` off the workflow the run froze (`workspace: base`); `back` as the package names it, off the graph's `after`
  * edges for an ending that has no task yet.
+ * @param run The run's detail: its calling off, its gates on you, its base branch and its graph.
+ * @param step The step asked about: its name, whether it holds at a gate, its spec and its task, if any.
  */
 export function gateOfStep(
   run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'branch' | 'graph'>,
@@ -62,12 +65,17 @@ export function gateOfStep(
   return { step: step.name, ends: ends && !step.taskId, back, onto: run.branch };
 }
 
-/** Who a send-back names in a sentence: the one step, or `the work` where there are several to pick from. */
+/**
+ * Who a send-back names in a sentence: the one step, or `the work` where there are several to pick from.
+ * @param back The steps a send-back goes to.
+ */
 export const backName = (back: readonly string[]): string => (back.length === 1 ? back[0] : 'the work');
 
 /**
  * What approving an ending does, said before a person approves it, on the card and at the run page's gate alike: it runs in the
  * repository's own checkout, on the base branch where it is known (`onto`), and cannot be taken back.
+ * @param step The ending step's name.
+ * @param onto The base branch it runs on, or null where it is not known.
  */
 export const endingWarning = (step: string, onto: string | null): string =>
   `This runs ${step} in the repository's own checkout${onto ? ` on ${onto}` : ''}, and it cannot be taken back.`;
@@ -77,6 +85,7 @@ export const endingWarning = (step: string, onto: string | null): string =>
  * `approve to run ship on main, or send review back`; for a gate that holds after its step ran,
  * `approve what review handed on, or send it back`. Long names cut it short on the card, which has it whole on hover beside the step's own
  * prose; the inspector says it all, whole.
+ * @param gate The gate the card answers.
  */
 export function gateCardLine(gate: GateAsk): string {
   const approving = gate.ends ? `approve to run ${gate.step}${gate.onto ? ` on ${gate.onto}` : ''}` : `approve what ${gate.step} handed on`;
@@ -89,6 +98,7 @@ export function gateCardLine(gate: GateAsk): string {
  * the run's page it goes. A step that has signed off opens its inspector (`step`), on its Output tab, where its closeout is:
  * `Read what it handed on`, whatever the step is named. An ending has handed nothing on and has no closeout of its own: its section
  * (`hash`), where what it would act on is drawn beside its gate.
+ * @param gate The gate: its step, and whether it is an ending.
  */
 export const readLink = (gate: Pick<GateAsk, 'step' | 'ends'>): { words: string; step: string } | { words: string; hash: string } =>
   gate.ends ? { words: 'Read what it acts on', hash: stepAnchor(gate.step) } : { words: 'Read what it handed on', step: gate.step };
@@ -96,6 +106,7 @@ export const readLink = (gate: Pick<GateAsk, 'step' | 'ends'>): { words: string;
 /**
  * A gate's node, under its name, where one line fits: `approve ship to run it`, or `approve review's hand-off`. Both name the step as
  * the CLI's `ls` does (`approve review`), and the inspector says the rest.
+ * @param gate The gate: its step, and whether it is an ending.
  */
 export const gateNodeLine = (gate: Pick<GateAsk, 'step' | 'ends'>): string =>
   gate.ends ? `approve ${gate.step} to run it` : `approve ${gate.step}'s hand-off`;
@@ -107,6 +118,9 @@ export const gateNodeLine = (gate: Pick<GateAsk, 'step' | 'ends'>): string =>
  * what it does there is the package's `toDecide.says`, the first line of the step's own note, quoted, never the board's guess. Approving
  * any other gate files the steps that wait on it (`next`), handed the words. Sending back asks a new try of the step it goes to with the
  * person's words, and the gate holds again once that try signs off.
+ * @param gate The gate the inspector opens on.
+ * @param says The first line of the ending's own note (`toDecide.says`), or null where the package says none.
+ * @param next The steps that wait on the gate, filed once it is approved.
  */
 export function gateBrief(
   gate: GateAsk,
@@ -130,6 +144,8 @@ export function gateBrief(
 /**
  * What the card says once a person's word is taken, until the run is read again and moves: `approved — the next pass files ship`, or
  * `sent back to review — try 2 asked (--continue, with your answer) — the next tick files it`.
+ * @param taken The word the person gave: an approval, or a send-back with the try it asked and the step it goes to.
+ * @param gate The gate the word answered.
  */
 export const takenLine = (
   taken: { approved: true } | { asked: StepAsked | { try: number; stopFirst: boolean }; to: string },
@@ -158,6 +174,8 @@ function acceptedWords(looping: Pick<RunDetail['steps'][number], 'gate'>, findin
  * without them says it signed off, and how. A step not run says so. A looping step a person approved out of rounds (an approval of a
  * loop, its gate's approval) is said accepted as it stands, with their words, not as asking another round, though its closeout still says
  * `again: true` (`acceptedWords`).
+ * @param run The run's detail: its steps and what it has cost.
+ * @param decision The run's decision, or null where it has not been read.
  */
 export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Decidable | null): GateFact[] {
   const facts: GateFact[] = [];
@@ -217,6 +235,7 @@ function decisionFacts(decision: Decidable): GateFact[] {
 /**
  * The facts an ending's collisions add under its gate: the runs in flight on the base in one line — good when it collides with none, bad
  * when it conflicts with one — then each branch of theirs one of ours does not merge onto cleanly, and the semantic conflict.
+ * @param collisions The ending's collisions with the runs in flight on the base.
  */
 export function collisionFacts(collisions: Collisions): GateFact[] {
   const conflicts = (c: Collision): boolean => 'clean' in c.merge;
@@ -235,6 +254,7 @@ export function collisionFacts(collisions: Collisions): GateFact[] {
 /**
  * The card's line for a result nobody decided, which fits whatever the branch is called: `decide its result: a branch ahead of the base
  * that nothing merges`. The CLI `ls`'s own words, with the branch and the command, are the card's title and the run page's Decide section.
+ * @param branches The result's branches ahead of the base.
  */
 export const decideLine = (branches: readonly string[]): string =>
   `decide its result: ${branches.length === 1 ? 'a branch' : `${branches.length} branches`} ahead of the base that nothing merges`;
@@ -242,6 +262,7 @@ export const decideLine = (branches: readonly string[]): string =>
 /**
  * A step's need, for the inspector, in full: what it asks, or what the harness waits for, where to answer it, and what its session said
  * last.
+ * @param need The step's need.
  */
 export const needWords = (need: Need): string =>
   need.kind === 'asks'

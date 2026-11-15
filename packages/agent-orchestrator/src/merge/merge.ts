@@ -62,17 +62,31 @@ export type Tried = { readonly trial: Trial; readonly base: string | null };
 /** A person's merge ask, whole: the looping step and the round it is on, when, and what merges (`MergeOf`). */
 export type MergeAsk = RoundAsk & { merge: MergeOf };
 
-/** The merge a person asked of a loop and the run has not filed: an ask naming the target's next try. */
+/**
+ * The merge a person asked of a loop and the run has not filed: an ask naming the target's next try.
+ * @param run The run's record, whose tries of the target are counted.
+ * @param looping The looping step whose loop the merge was asked of.
+ * @param asks The asks written on the run.
+ */
 export const mergePending = (run: Run, looping: StepSpec, asks: readonly RoundAsk[]): RoundAsk | undefined =>
   asks.find((a) => a.merge && a.step === looping.name && a.merge.target === looping.loop && a.merge.try === tryOf(run, a.merge.target) + 1);
 
-/** The merge asks a record already answers — each names a try its target has reached. The tick consumes these. */
+/**
+ * The merge asks a record already answers — each names a try its target has reached. The tick consumes these.
+ * @param run The run's record, whose tries of the target are counted.
+ * @param a The ask, a merge or a round.
+ */
 export const mergeSpent = (run: Run, a: RoundAsk): boolean => (a.merge ? tryOf(run, a.merge.target) >= a.merge.try : false);
 
 /**
  * Why a verb that ends or turns a loop waits on a merge a person asked of it (`mergePending`): the tick files the merge once, and a round
  * or an acceptance written over it would drop it unsaid. `ended` says what the verb would do to the merge, `instead` the verb to ask once
  * the merge is taken back. Undefined when no merge is pending.
+ * @param run The run's record.
+ * @param looping The looping step the verb ends or turns.
+ * @param asks The asks written on the run.
+ * @param ended What the verb would do to the merge, said in the refusal.
+ * @param instead The verb to ask once the merge is taken back.
  */
 export function mergeWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[], ended: string, instead: string): string | undefined {
   const pending = mergePending(run, looping, asks);
@@ -100,6 +114,12 @@ function backOf(steps: readonly StepSpec[], run: Run, looping: StepSpec, stopped
  * The merge due now of `looping`'s loop, if any: a person's ask naming its target's next try, once the loop's round is over and nothing
  * waiting on it is filed but an ending stopped on the base branch, which goes back to its gate (`back`). The round is the one the loop is
  * on, which the merge does not spend.
+ * @param steps The workflow's steps.
+ * @param run The run's record.
+ * @param looping The looping step whose loop is asked of.
+ * @param status The looping step's standing, which says whether its round is over.
+ * @param asks The asks written on the run.
+ * @param stopped Whether a step stopped, as the run's one read says it.
  */
 export function mergeDue(
   steps: readonly StepSpec[],
@@ -125,6 +145,8 @@ export function mergeDue(
 /**
  * What `nemia decide` offers for a merge the verb would take now (`mergeAsk`): the sentence, written around the bare `nemia refresh --base`
  * it ends on (`Offer`).
+ * @param run The run, whose id the command names.
+ * @param ask The merge the verb would take now.
  */
 export function mergeOffer(run: Run, ask: MergeAsk): Offer {
   const command = `nemia refresh ${run.id} ${ask.step} --base`;
@@ -143,15 +165,25 @@ export function mergeOffer(run: Run, ask: MergeAsk): Offer {
 const semantic = (merge: MergeOf, landing: MergeLanding): string =>
   `${landing.step}'s check refused the merged tree at ${merge.sha.slice(0, 7)}: the conflict is semantic`;
 
-/** A merge filed, as the tick's feed says it: the base, the commit its target merges, and the round it leaves as it is. */
+/**
+ * A merge filed, as the tick's feed says it: the base, the commit its target merges, and the round it leaves as it is.
+ * @param r The round filed by the merge.
+ */
 export const mergeNote = (r: Round): string =>
   `${r.step}: merge of ${r.merge?.onto} — ${r.target} merges ${r.merge?.sha.slice(0, 7)}, round ${r.round} unchanged`;
 
-/** A merge due now, as `nemia ls` and `nemia decide` say it. */
+/**
+ * A merge due now, as `nemia ls` and `nemia decide` say it.
+ * @param r The round due by the merge.
+ */
 export const mergeDueNote = (r: Round): string =>
   `merge of ${r.merge?.onto} asked (nemia refresh --base) — the next tick files ${r.target}, round ${r.round} unchanged`;
 
-/** What `nemia refresh --base` says once its ask is written. */
+/**
+ * What `nemia refresh --base` says once its ask is written.
+ * @param a The merge ask written.
+ * @param looping The looping step, whose cap the round is said against.
+ */
 export const mergeAskedLine = (a: MergeAsk, looping: StepSpec): string =>
   `asked: merge ${a.merge.onto} at ${a.merge.sha.slice(0, 7)} into ${a.merge.target}'s work${a.merge.landing ? `, where ${semantic(a.merge, a.merge.landing)}` : ''} — the next tick files it, once; ${roundWord(a.round, capOf(looping))} unchanged`;
 
@@ -169,6 +201,13 @@ export const mergeAskedLine = (a: MergeAsk, looping: StepSpec): string =>
  * A clean trial merge is asked all the same where the ending's last landing check refused the merge staged on that commit
  * (`refusedLanding`): the conflict is semantic, and the ask carries that landing (`MergeOf.landing`). One refused on another commit of the
  * base, or a check that did not finish, lets nothing through: the landing is tried again on the base as it is.
+ * @param steps The workflow's steps.
+ * @param run The run's record.
+ * @param name The looping step or its target; undefined where the workflow has one loop.
+ * @param reads What the run's one read says of each step: its standing, whether it stopped, whether its loop goes round itself.
+ * @param asks The asks written on the run.
+ * @param tried Makes the trial merge of a branch onto the base.
+ * @param at When the ask is made, an ISO time.
  */
 export function mergeAsk(
   steps: readonly StepSpec[],
@@ -298,6 +337,8 @@ function refusedLanding(steps: readonly StepSpec[], run: Run, looping: StepSpec,
 /**
  * The task of the check that refused the merge an ending staged on `sha`, a commit of the base, as the ending's `record` says it
  * (`LandingRecord`'s `refusedOn`): undefined when the ending's landing was not aborted on that commit, or names no check.
+ * @param record The ending's record, undefined where it has none.
+ * @param sha The commit of the base the merge was staged on.
  */
 export function landingRefusedOn(record: StepRecord | undefined, sha: string): string | undefined {
   const landed = record?.landed;
@@ -326,8 +367,10 @@ function cleanNext(steps: readonly StepSpec[], run: Run, looping: StepSpec, read
  * and the ending's check refused the merged tree (`landing`), the conflict is semantic: the merge is made without a commit, what broke is
  * fixed inside it, and what that check said follows, as data (`landingSaidSection`).
  *
+ * @param step The loop's target, filed by the merge.
  * @param merge The base branch, the commit of it the person's trial merge read, and what the refusing check said, where one did.
  * @param loop The looping step, which reads the merge once the target signs off.
+ * @param steps The workflow's steps, which say the steps between the target and the looping step.
  * @param say The run's place's words for a merge (`PlaceSay`). Absent, and the step is sent to its place's skill.
  */
 export function mergeSection(
@@ -398,6 +441,8 @@ const mergeRead = (onto: string, say: PlaceSay | undefined): string[] =>
  * its place shows it (`mergeRead`) — and its own closeout before the merge, as data, to sign off with again unless the merge broke
  * something. A finding with `again: true` sends the target round again, and that round is counted.
  *
+ * @param step The looping step, filed after its target merged the base.
+ * @param run The run's record, which says the round and the base branch.
  * @param closeoutOf How each step signed off; the looping step's own is its closeout before the merge.
  * @param say The run's place's words for reading a merge (`PlaceSay`). Absent, and the step is sent to its place's skill.
  */

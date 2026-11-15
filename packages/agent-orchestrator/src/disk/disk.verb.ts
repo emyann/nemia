@@ -192,6 +192,8 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
 /**
  * The measure, for as long as the daemon runs: a sweep (`diskOnce`) over what `answers` gives then, its reading handed to `keep`, and a
  * rest of `DISK_EVERY` (`sweepLoop`). A sweep that fails hands `keep` no reading, so nothing stale is said for the store.
+ * @param answers Gives the runs the latest pass answered, read at each sweep.
+ * @param keep Takes each sweep's reading, or undefined where the sweep failed.
  */
 export const disk = (answers: () => readonly Answered[], keep: (reading: DiskReading | undefined) => void) => {
   const memory = freshDiskMemory();

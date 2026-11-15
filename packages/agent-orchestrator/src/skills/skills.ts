@@ -61,6 +61,9 @@ type EntryKey = (typeof ENTRY_KEYS)[number];
  * text. Refused, with the form to write: a block still in the former line form, at its line (`readFrontmatter`), a list where a text is
  * read, a text where a list is, a map, an empty list or one with an empty item, and a card key set twice. `test/skills-rendered.test.ts`
  * holds this reading to js-yaml's on every SKILL.md the repository has. Keys the card does not read are passed over, whatever their form.
+ * @param file What a refusal calls the SKILL.md.
+ * @param id The skill's folder's name.
+ * @param text The SKILL.md's text.
  */
 export function skillEntryOf(file: string, id: string, text: string): AgentSkill {
   const { words, list } = entryValuesOf(file, text);
@@ -155,6 +158,7 @@ export type SkillOther = { readonly path: string; readonly text: string };
  * Why the files a write of a skill gives are not its other text files, or undefined where they are: each path in the folder, written with
  * `/` — never absolute, empty, with an empty, `.` or `..` part, or a `\\` — never its SKILL.md, which the spec's body writes, and each
  * given once. Pure.
+ * @param files The other text files a write gives, or undefined where it gives none.
  */
 export function skillFilesRefusal(files: readonly SkillOther[] | undefined): string | undefined {
   if (files === undefined) return undefined;
@@ -177,6 +181,9 @@ const SKILL_WRITES = ['name', 'title', 'description', 'tags', 'examples', 'prelo
  * The draft of the skill `id` from its SKILL.md's `text`: what the board's form is filled from. Its title, tags and examples as written —
  * none where the file writes none, not the card's fallbacks — and refused, in `skillEntryOf`'s words, where the card reader refuses the
  * file.
+ * @param file What a refusal calls the SKILL.md.
+ * @param id The skill's folder's name.
+ * @param text The SKILL.md's text.
  */
 export function skillDraftOf(file: string, id: string, text: string): SkillDraft {
   const { words, list } = entryValuesOf(file, text);
@@ -200,6 +207,8 @@ export function skillDraftOf(file: string, id: string, text: string): SkillDraft
  * says so; and its instructions. What the card reader reads (`skillEntryOf`), which judges the result before it is returned: a draft the
  * reader would refuse — no description, an empty list — is refused here, in its words. Refused before that: a name that is not a skill's
  * (`skillNameRefusal`), and a line break in a value, since a card's value is one line. Pure.
+ * @param draft The skill as the board's form gives it.
+ * @param was The SKILL.md as it is, on an edit; undefined for a skill made.
  */
 export function renderSkill(draft: SkillDraft, was?: string): string {
   const named = skillNameRefusal(draft?.name);
@@ -248,6 +257,9 @@ function keptKeys(text: string): string {
  * its comments as written (`withKey`), and the body as it was. What the board's switch writes, so a skill whose other keys a render would
  * not keep is changed in that one key. Refused, naming the fix, for a file with no frontmatter; and judged by the reader after
  * (`frontmatterKey`), so a file it would read otherwise is refused rather than written.
+ * @param file What a refusal calls the SKILL.md.
+ * @param text The SKILL.md's text.
+ * @param on Whether the skill is to be told whole.
  */
 export function withPreload(file: string, text: string, on: boolean): string {
   const { block } = splitFrontmatter(file, text);
@@ -271,6 +283,7 @@ export function withPreload(file: string, text: string, on: boolean): string {
  * The globs a SKILL.md's `applies:` key names (`text`, the whole file): a YAML list of globs, or one glob, each from the folder a session
  * runs in (`apps/web/**`). `[]` where it names none, or holds anything else — a map, an empty item — or the frontmatter does not read,
  * a block in the former line form among them.
+ * @param text The SKILL.md's whole text.
  */
 export function appliesOf(text: string): string[] {
   let block: string | null;
@@ -306,7 +319,11 @@ const globPattern = (glob: string): RegExp =>
       .join('')}$`,
   );
 
-/** Whether the file `file`, a path from the folder a session ran in, is one of the paths `globs` name (`appliesOf`). */
+/**
+ * Whether the file `file`, a path from the folder a session ran in, is one of the paths `globs` name (`appliesOf`).
+ * @param file A path from the folder a session ran in.
+ * @param globs The globs a SKILL.md's `applies:` names.
+ */
 export const appliesMatch = (file: string, globs: readonly string[]): boolean => globs.some((g) => globPattern(g).test(file));
 
 /**
@@ -320,6 +337,11 @@ export type { Looked, LookupRoot } from '../../contracts/lookup.contract.ts';
 const holdsAt = (roots: readonly LookupRoot[], at: number, repo?: string): boolean =>
   roots.at(at)?.has === true && (repo === undefined || roots.at(at)?.repo === repo);
 
+/**
+ * Which of the lookup roots a name is read from, or the refusal of a name one repository holds in both of its places, as the doc of its
+ * contract's types above says.
+ * @param roots The lookup roots, in their order: which repository each is a place of, and whether it holds the name.
+ */
 export const lookedUp: LookedUp = (roots) => {
   const at = holdsAt(roots, 0) ? 0 : holdsAt(roots, 1) ? 1 : holdsAt(roots, 2) ? 2 : -1;
   if (at < 0) return { kind: 'none' };

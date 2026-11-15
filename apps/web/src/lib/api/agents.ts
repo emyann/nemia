@@ -108,7 +108,10 @@ export type LibraryAgent = AgentListing & { factories: string[] };
 const roleKeysOf = (keys: AgentSpec['keys']): Partial<Record<AgentRoleKey, string>> =>
   Object.fromEntries(ROLE_KEYS.flatMap((key) => (typeof keys?.[key] === 'string' ? [[key, keys[key]]] : [])));
 
-/** An Agent, as the board reads it (`LibraryAgent`, an `AgentListing` with the factories it fills a step in). */
+/**
+ * An Agent, as the board reads it (`LibraryAgent`, an `AgentListing` with the factories it fills a step in).
+ * @param agent The Agent object the api serves.
+ */
 export const agentViewOf = (agent: Agent): LibraryAgent => {
   const { spec, status } = agent;
   return {
@@ -153,13 +156,21 @@ export const agentsQuery = queryOptions({
 /**
  * One agent, read from disk now, from the origin `from`, in `place`'s factory on its repository (none: the default namespace):
  * `agentQuery`'s read, for a page that must read it past the cache.
+ * @param from The origin it is read from (`yours`, `repo`, `factory`); a word no origin has reads with none.
+ * @param name The agent's name.
+ * @param place The factory and repository it is read in; empty for the default namespace on no repository.
  */
 export const readAgent = async (from: string, name: string, place: PagePlace = {}): Promise<AgentListing> =>
   agentViewOf(
     await served.get(namespaceOf(place.factory), name, { origin: originWord(from), ...(place.repo ? { repo: place.repo } : {}) }),
   );
 
-/** One agent, for its page, read in `place` (a factory's own agent is read in its factory alone). */
+/**
+ * One agent, for its page, read in `place` (a factory's own agent is read in its factory alone).
+ * @param from The origin it is read from, as `readAgent` takes it.
+ * @param name The agent's name.
+ * @param place The factory and repository it is read in; empty for the default namespace on no repository.
+ */
 export const agentQuery = (from: string, name: string, place: PagePlace = {}) =>
   queryOptions({
     queryKey: place.factory ? ['agents', from, name, place.factory, place.repo ?? null] : ['agents', from, name],
@@ -223,12 +234,20 @@ const refused: Refuse = (words, status, answer) =>
     status,
   );
 
-/** Make an agent of yours. Rejects with an `AgentRefusal`: a name taken, or a key or value the package refuses. */
+/**
+ * Make an agent of yours. Rejects with an `AgentRefusal`: a name taken, or a key or value the package refuses.
+ * @param draft The agent to make: its name, keys, instructions and schema.
+ */
 export const createAgent = async (draft: AgentDraft): Promise<AgentSaved> => ({
   agent: agentViewOf(await served.create(DEFAULT_NAMESPACE, { metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused)),
 });
 
-/** Put an agent of yours back — renamed, when the draft names it otherwise — against the version it was read at. */
+/**
+ * Put an agent of yours back — renamed, when the draft names it otherwise — against the version it was read at.
+ * @param name The agent's name as it was read.
+ * @param version The version it was read at (`AgentListing.version`).
+ * @param draft What it now holds, its name included.
+ */
 export const saveAgent = async (name: string, version: string, draft: AgentDraft): Promise<AgentSaved> => ({
   agent: agentViewOf(
     await served.replace(
@@ -240,7 +259,11 @@ export const saveAgent = async (name: string, version: string, draft: AgentDraft
   ),
 });
 
-/** Remove an agent of yours, against the version it was read at: refused while a node still names it, saying which. */
+/**
+ * Remove an agent of yours, against the version it was read at: refused while a node still names it, saying which.
+ * @param name The agent's name.
+ * @param version The version it was read at (`AgentListing.version`).
+ */
 export const removeAgent = async (name: string, version: string): Promise<AgentListing> =>
   agentViewOf(await served.delete(DEFAULT_NAMESPACE, name, version, refused));
 
@@ -250,6 +273,8 @@ type AgentTried = { id: string };
 /**
  * Try an agent of yours on a short brief: a one-step folder run of it, fenced to its folder with a dollar to spend. Rejects with an
  * `AgentRefusal`: an empty brief, a try of it still running, an agent that does not read or gives a skill only the repository has.
+ * @param name The agent's name.
+ * @param brief What the try asks of it, in a person's words.
  */
 export const tryAgent = async (name: string, brief: string): Promise<AgentTried> => ({
   id: (await served.try(DEFAULT_NAMESPACE, name, brief, refused)).id,
@@ -268,6 +293,8 @@ const NEMIA = 'nemia';
  * A person's custom instructions for the agent `name`, read from the store on each request: Nemia's (`GET /api/nemia/instructions`), or
  * the record of an agent's name, read in `default` (`GET /api/namespaces/default/agents/:name/instructions`), the name looked for in yours
  * and, given `repo`, in that repository, which a factory works on (`?repo=`): the default namespace reads none of its own.
+ * @param name The agent's name; `nemia` reads Nemia's own.
+ * @param repo The repository its name is looked for in besides yours; undefined for yours alone.
  */
 export const customInstructionsQuery = (name: string, repo?: string) =>
   queryOptions({
@@ -291,6 +318,9 @@ const CUSTOM_WRITTEN = "The words may be written: read the agent's page again be
 /**
  * Write `words` as the custom instructions for the agent `name`: the words as they now read. Rejects with a `WriteRefusal` in the
  * package's words: a name no place has (404), blank words or a frontmatter block (422). `repo`, as the read's.
+ * @param name The agent's name; `nemia` writes Nemia's own.
+ * @param words The custom instructions to write.
+ * @param repo The repository its name is looked for in besides yours; undefined for yours alone.
  */
 export const writeCustomInstructions = (name: string, words: string, repo?: string): Promise<CustomInstructions> =>
   call(
@@ -304,6 +334,8 @@ export const writeCustomInstructions = (name: string, words: string, repo?: stri
 /**
  * Remove the custom instructions for the agent `name`: whether there were any. Rejects with a `WriteRefusal` for a name no place has.
  * `repo`, as the read's.
+ * @param name The agent's name; `nemia` clears Nemia's own.
+ * @param repo The repository its name is looked for in besides yours; undefined for yours alone.
  */
 export const clearCustomInstructions = (name: string, repo?: string): Promise<CustomInstructionsCleared> =>
   call(

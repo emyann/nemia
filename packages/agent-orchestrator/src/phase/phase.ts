@@ -217,7 +217,10 @@ export const PHASE_OF: typeof STEP_PHASE_OF = {
   Sent: 'succeeded',
 };
 
-/** A step's codes from its qualified reason: the phase is the reason's (`PHASE_OF`). Pure. */
+/**
+ * A step's codes from its qualified reason: the phase is the reason's (`PHASE_OF`). Pure.
+ * @param q The step's reason, with what it waits on or who asks where the reason carries one.
+ */
 export const codedStep = (q: QualifiedStep): CodedStep => ({ ...q, phase: PHASE_OF[q.reason] });
 
 /** Where a run stands, as `assess` decides it. */
@@ -285,6 +288,7 @@ export const PERSON_WAITS: ReadonlySet<Reason> = new Set<Reason>([
  * call under `denials: fail`, or on a check that refused or did not finish holds its run; `failed` and `stopped` do not. `nemia ls` says
  * such a step waits on you (`listing`), and a run with nothing in flight and such a step is not finished to `nemia cancel` (`cancelPlan`).
  * A try or a round the run has due moves such a step on, and its readers read that first. Pure.
+ * @param status The step's status, as the run's judgement says it.
  */
 export const holdsTheRun = (status: StepStatus): boolean => {
   const { reason } = REASON_OF[status];
@@ -309,6 +313,9 @@ const stoppedOn = (step: CodedStep): QualifiedRun =>
  * person, so they cannot judge it. Where they part, it is on purpose: a running run that waits on a run that never lands without a
  * person, or is held until one, is `Running` or `Waiting` on `run` here and waits on you there. A screen that asks whether a person has
  * to act reads `waitsOnYou`, never `phase === 'waiting'`.
+ * @param status The run's status, as `assess` says it.
+ * @param holding The runs a person's hold on the run waits for, empty for a hold that names none, or null when nobody holds it.
+ * @param steps The run's steps' codes, in the workflow's order; none where none is given.
  */
 export function runCodes(status: RunStatus, holding: readonly unknown[] | null, steps: readonly CodedStep[] = []): CodedRun {
   const stop = status === 'waiting' ? steps.find((s) => s.phase === 'waiting' && s.reason !== 'AwaitingApproval') : undefined;
@@ -332,6 +339,7 @@ export type WaitFacts = {
 /**
  * Whether a run waits on a person — the one decider of it: nobody called it off, and a step of it waits on one, or a run it waits on never
  * lands without one, or a hold on it only a person lifts. What the list's state reads (`kindOf` in run-state.ts). Pure.
+ * @param run What the run says of who it waits on: whether it was called off, its steps waiting on a person, its wait and its hold.
  */
 export const waitsOnYou = (run: WaitFacts): boolean =>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));

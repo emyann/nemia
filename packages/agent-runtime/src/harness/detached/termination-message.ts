@@ -10,6 +10,7 @@ export const TERMINATION_MESSAGE_BYTES = 4096;
 /**
  * The text of the file at `file`, its first `TERMINATION_MESSAGE_BYTES` bytes — or `undefined` where it is missing or no regular
  * file. Opened without blocking, so a FIFO left there never holds the worker.
+ * @param file The command's `config.terminationMessagePath`, read once at its process's exit.
  */
 export const terminationMessageAt = (file: string): string | undefined => {
   let fd: number;

@@ -8,6 +8,8 @@ const pad = (n: number): string => String(n).padStart(2, '0');
 /**
  * A duration in its two largest units. To the second: `45s`, `12m 04s`, `1h 05m`, `1d 2h`. To the minute: `under 1m`, `12m`, `1h 05m`,
  * `1d 2h`. One below zero, where this clock is behind the one that wrote the instant, is read as none.
+ * @param ms The duration, in ms.
+ * @param grain How fine it is said: to the second or to the minute.
  */
 export function durationWords(ms: number, grain: DurationGrain): string {
   const s = Math.max(0, Math.floor(ms / 1000));

@@ -114,6 +114,9 @@ const heldCount = ({ staged, held }: Paused): string => {
  * The pause as `paused` says it at `now`: Pausing with how many tasks still finish — under a timeout, how many sessions finish a tool call
  * and when what is left is cut (`pausingHead`) — Paused once none does, each with how many checks it holds back, when any, and each
  * session it parked named; all factories running where no pause stands, and reading while nothing is read; a read that failed says why.
+ * @param paused The pause as `GET /api/pause` answered it, or undefined while nothing is read.
+ * @param error Why the last read failed, or null where it did not.
+ * @param now The instant it is now, against which the pause's start and its cut are said.
  */
 export function pauseWords(paused: Paused | undefined, error: Error | null, now: Date): PauseWords {
   const lists = {

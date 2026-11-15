@@ -53,6 +53,8 @@ export type Retained = {
 /**
  * The tag a process's release pins: an install's own tag, or for one recorded without it, the tag its real folder sits under in the
  * store's `releases/`, as a session's image is placed (`sessionRelease`); a checkout pins none.
+ * @param release The release the process records.
+ * @param home The store's folder.
  */
 export function pinnedBy(release: ProcessRelease, home: string): string[] {
   if (release.kind !== 'install') return [];
@@ -151,6 +153,7 @@ export const retainOnce = Effect.fn('retainOnce')(function* (
 /**
  * The retention, for as long as the daemon runs: a sweep (`retainOnce`) of the store `StoreRoot` names, then a rest of `RETAIN_EVERY`
  * (`sweepLoop`).
+ * @param processes The releases the store's processes run.
  */
 export const retain = (processes: readonly ProcessRelease[]) =>
   Effect.gen(function* () {

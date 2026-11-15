@@ -15,13 +15,19 @@ export type Transform = readonly [x: number, y: number, zoom: number];
 /** A view to move to, as React Flow's `setViewport` takes it. */
 type View = { x: number; y: number; zoom: number };
 
-/** How big `el` is laid out, in its own pixels: 0 × 0 while it is hidden or off the page. */
+/**
+ * How big `el` is laid out, in its own pixels: 0 × 0 while it is hidden or off the page.
+ * @param el The element the frame is drawn in, by its client width and height.
+ */
 export const sizeOf = (el: { clientWidth: number; clientHeight: number }): Size => ({ width: el.clientWidth, height: el.clientHeight });
 
 /** What a card is to React Flow's store, in so far as it says where the card is drawn on the floor and how big it measured. */
 type Measured = { internals: { positionAbsolute: { x: number; y: number } }; measured: { width?: number; height?: number } };
 
-/** The boxes of `nodes` on the floor, as React Flow's store keeps them (`nodeLookup`); a card not measured yet takes no room. */
+/**
+ * The boxes of `nodes` on the floor, as React Flow's store keeps them (`nodeLookup`); a card not measured yet takes no room.
+ * @param nodes The cards as React Flow's store keeps them: where each is drawn and how big it measured.
+ */
 export function boxesOf(nodes: Iterable<Measured>): Box[] {
   return [...nodes].map(({ internals, measured }) => ({
     ...internals.positionAbsolute,
@@ -44,13 +50,23 @@ function drawn(box: Box, [x, y, zoom]: Transform): Box {
   return { x: box.x * zoom + x, y: box.y * zoom + y, width: box.width * zoom, height: box.height * zoom };
 }
 
-/** Whether all of `box` is drawn inside a frame of `size` under `transform`. */
+/**
+ * Whether all of `box` is drawn inside a frame of `size` under `transform`.
+ * @param box The card's box on the floor, in the floor's units.
+ * @param transform React Flow's transform: the pan, in the frame's pixels, and the zoom.
+ * @param size How big the frame is drawn, in its own pixels.
+ */
 export function wholeInView(box: Box, transform: Transform, size: Size): boolean {
   const at = drawn(box, transform);
   return at.x >= 0 && at.y >= 0 && at.x + at.width <= size.width && at.y + at.height <= size.height;
 }
 
-/** Whether any of `boxes` is drawn, even in part, inside a frame of `size` under `transform`; none is in no frame without a size. */
+/**
+ * Whether any of `boxes` is drawn, even in part, inside a frame of `size` under `transform`; none is in no frame without a size.
+ * @param boxes The cards' boxes on the floor, in the floor's units.
+ * @param transform React Flow's transform: the pan, in the frame's pixels, and the zoom.
+ * @param size How big the frame is drawn, in its own pixels.
+ */
 export function anyInView(boxes: readonly Box[], transform: Transform, size: Size): boolean {
   return boxes.some((box) => {
     const at = drawn(box, transform);
@@ -72,6 +88,11 @@ function aim(start: number, length: number, room: number, zoom: number): number 
  * room's middle, or, on a side it does not fit even then, its left at the room's left or its top at the room's top. Null when all of it
  * is in that room already, and when the frame has no room below its panels — hidden, squeezed flat, or a strip — which has no middle
  * to aim at: a caller that must bring the card into view waits until the frame has one.
+ * @param box The card's box on the floor, in the floor's units.
+ * @param transform React Flow's transform now: the pan, in the frame's pixels, and the zoom.
+ * @param size How big the frame is drawn, in its own pixels.
+ * @param minZoom The least zoom the view may take to fit the card.
+ * @param top How many pixels at the frame's top the panels drawn over it take: none by default.
  */
 export function revealView(box: Box, transform: Transform, size: Size, minZoom: number, top = 0): View | null {
   const room = { width: size.width, height: size.height - top };

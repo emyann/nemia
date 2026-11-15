@@ -23,6 +23,8 @@ export const NO_ALLOWS: Allows = { rules: [], untrusted: () => undefined };
  * its trust said where the harness does not have it (`untrustedNote`, read only when the thunk is asked). `NO_ALLOWS` for a run that
  * works on no repository, whose steps work in folders the run makes. `factory` names the factory the run is started in, whose verb
  * asks the trust again.
+ * @param repo The repository's folder; undefined for a run that works on none.
+ * @param factory The factory the run is started in; undefined for none.
  */
 export function repoAllows(repo: string | undefined, factory?: string): Allows {
   if (repo === undefined) return NO_ALLOWS;

@@ -53,6 +53,7 @@ const UNSENT = new Set([SayUnsent, InterruptUnsent, AnswerUnsent].map((unsent) =
  * What `verb` failed with, `e`, in words: a refusal as an `Error` whose `exitCode` is 2 and whose message is led by the verb, a reach
  * that failed and may pass (`SayUnsent`, `InterruptUnsent`, `AnswerUnsent`) as an `Error` led by the verb with its `cause` and no
  * `exitCode`, and anything else — a `JournalError`, a `RunnerError` — as it is.
+ * @param verb The name of the verb that failed, which leads the words.
  */
 export const refusalWords =
   (verb: string) =>

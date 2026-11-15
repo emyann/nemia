@@ -12,7 +12,10 @@ import { scheduleDue, settledFire, type ScheduleListed, type ScheduleTry } from 
 /** What a schedule reads of a run: which fire of which schedule started it, and the run itself, for its last run's line. */
 export type ScheduleRun = Pick<Run, 'id' | 'createdAt' | 'scheduled'>;
 
-/** A run as a schedule's listing reads it (`ScheduleRun`): which fire of which schedule started it, and when the run was created. */
+/**
+ * A run as a schedule's listing reads it (`ScheduleRun`): which fire of which schedule started it, and when the run was created.
+ * @param run The run's record.
+ */
 export const scheduleRun = (run: Run): ScheduleRun => ({
   id: run.id,
   createdAt: run.createdAt,
@@ -41,7 +44,12 @@ const lastRun = (runs: readonly ScheduleRun[], factory: string, workflow: string
     })
     .sort((a, b) => b.due - a.due)[0]?.run;
 
-/** Every schedule of every factory that reads, factories by name, then workflows by name, each read at `now`. */
+/**
+ * Every schedule of every factory that reads, factories by name, then workflows by name, each read at `now`.
+ * @param home The store's root.
+ * @param runs The store's runs as a schedule reads them (`ScheduleRun`), whose newest of each schedule is its last run.
+ * @param now The time the fires are read around, in milliseconds since the epoch.
+ */
 export function schedulesRead(home: string, runs: readonly ScheduleRun[], now: number): Read[] {
   return listedAtOnce(home)
     .filter((f): f is Factory & { file: string } => !('error' in f))
@@ -62,7 +70,10 @@ export function schedulesRead(home: string, runs: readonly ScheduleRun[], now: n
     );
 }
 
-/** Whether the schedule read is due now (`scheduleDue`): never when its cron gives no fire. */
+/**
+ * Whether the schedule read is due now (`scheduleDue`): never when its cron gives no fire.
+ * @param r The schedule as a pass read it (`schedulesRead`).
+ */
 export const isDue = (r: Read): r is Read & { fires: { latest: number; next: number } } =>
   !('error' in r.fires) &&
   scheduleDue({
@@ -87,6 +98,9 @@ function refusedOf(r: Read): string | null {
 /**
  * Every factory's schedules as `nemia ls` and the api list them (`ScheduleListed`), at `now`. An old schedule's retired `repo` is listed
  * as it reads, so a write that sends it back keeps it, and is ignored: its runs work on the factory's wiring's repository.
+ * @param home The store's root.
+ * @param runs The store's runs as a schedule reads them (`ScheduleRun`), whose newest of each schedule is its last run.
+ * @param now The time the fires are read around, in milliseconds since the epoch; absent, the clock's.
  */
 export function schedulesListed(home: string, runs: readonly ScheduleRun[], now: number = Date.now()): ScheduleListed[] {
   return schedulesRead(home, runs, now).map((r) => ({

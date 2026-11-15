@@ -36,6 +36,8 @@ export type KeptDelivery = Delivery & { of: { task: string; from: number } };
 /**
  * Where the deliverer starts a subscription: where its file says, when the file was written for this subscription; else from its `from`,
  * as a file left by another of the same name, a deliverer's that had not yet stopped, is none of its.
+ * @param kept The deliverer's file, or undefined where it has none.
+ * @param sub The subscription, whose task and `from` the file must match.
  */
 export const resumedAt = (kept: KeptDelivery | undefined, sub: Subscription): Delivery =>
   kept && kept.of.task === sub.task && kept.of.from === sub.from
@@ -58,6 +60,9 @@ export type Watched = { json?: boolean };
 /**
  * A line of the feed as `nemia watch` prints it, `cursor` the byte just after it: in words (`feedLineWords`), or one JSON object, the line
  * whole with its cursor. Pure. Every line given is printed: a line its selectors do not take never reaches here.
+ * @param line The feed's line to print.
+ * @param cursor The feed's byte just after the line.
+ * @param how How the watch prints: as JSON where `json` is set, else in words.
  */
 export const watchedLine = (line: FeedLine, cursor: number, how: Watched): string =>
   how.json === true ? JSON.stringify({ ...line, cursor }) : feedLineWords(line);
@@ -73,6 +78,8 @@ export const BOOKMARK_EVERY = '30 seconds';
  * The bookmark a silent watch prints at `cursor`: under `--json`, a line of its own carrying the cursor and nothing else — no `word`, so
  * a reader that filters the feed's words skips it; in words, nothing at all, since a person reading a still feed is told nothing by a
  * number. Pure.
+ * @param cursor The feed's byte the watch has read to.
+ * @param how How the watch prints: as JSON where `json` is set, else in words.
  */
 export const bookmarkLine = (cursor: number, how: Watched): string | undefined =>
   how.json === true ? JSON.stringify({ cursor }) : undefined;
@@ -86,6 +93,8 @@ const digestLines = (lines: readonly FeedLine[]): string[] => [
 /**
  * What a subscriber is told of the wake lines of one read: each line in the order given, and under them the digest that rides them, when it
  * holds any line. Pure.
+ * @param lines The wake lines of the read, in feed order.
+ * @param digest The routine lines folded so far, said under the wake lines; empty where none is.
  */
 export const messageOf = (lines: readonly FeedLine[], digest: readonly FeedLine[]): string =>
   [
@@ -102,6 +111,11 @@ export type ReadDelivered = { message?: string; wakes: number; next: Delivery };
  * feed order. Where one wakes — `selects`, over the subscription's parsed selectors — every wake line is said in one message, with the
  * digest and every routine line of the read riding it, and the digest is emptied; else each routine line is folded into the digest, begun
  * at `now` where it was empty. Pure.
+ * @param at Where the deliverer is with the subscription before the read.
+ * @param carried The lines of the read the subscription carries, in feed order.
+ * @param selectors The subscription's parsed selectors, which say which lines wake it.
+ * @param cursor The feed's byte the read ended at.
+ * @param now The read's time, the digest's start where it was empty.
  */
 export function readDelivered(
   at: Delivery,
@@ -118,13 +132,19 @@ export function readDelivered(
   return { wakes: 0, next: { cursor, digest, since: at.since ?? now } };
 }
 
-/** What a subscriber is told of routine news with no wake to ride: the digest, one line each, and its count. Pure. */
+/**
+ * What a subscriber is told of routine news with no wake to ride: the digest, one line each, and its count. Pure.
+ * @param lines The digest's routine lines, in feed order.
+ */
 export const digestOf = (lines: readonly FeedLine[]): string =>
   ['News from the feed, nothing waiting on you:', ...digestLines(lines)].join('\n');
 
 /**
  * Whether a digest begun at `since` is due at `now`, `everyMinutes` minutes after it (`elapsedMs`): never while it is empty (no `since`).
  * Pure.
+ * @param since When the digest began, or undefined where it is empty.
+ * @param everyMinutes How many minutes after `since` the digest is due.
+ * @param now The time asked of.
  */
 export const digestDue = (since: Instant | undefined, everyMinutes: number, now: Instant): boolean =>
   since !== undefined && elapsedMs(since, now) >= everyMinutes * 60_000;
@@ -135,7 +155,10 @@ const NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 /** The usage the refusals of a subscription end on. */
 export const SUBSCRIBE_FORM = 'nemia subscribe <name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]';
 
-/** Why `name` is no subscription's name, or undefined where it is one. Pure. */
+/**
+ * Why `name` is no subscription's name, or undefined where it is one. Pure.
+ * @param name The name typed.
+ */
 export const subscriptionNameRefusal = (name: string): string | undefined =>
   NAME.test(name)
     ? undefined

@@ -28,6 +28,8 @@ const isDirectory = (p: string) => {
  * memory limit that cannot be held (`scopeFor`), its attempt ending `unstartable`. Else what its plan carries of its scope: its limit
  * (`memoryLimit`, bytes), absent with none, and `scoped` whenever the worker is put behind a scope's argv (`argv`), limited or not, which
  * tells the worker to record the scope's folder; both absent, with the argv, where the host makes no scope and the run has no limit.
+ * @param r The spawn asked for: its `cwd`, and its memory limit, where it has one.
+ * @param at The slice a scope is made in and the program that makes it, each the default where unset.
  */
 export const startable = (r: SpawnRequest, at: ScopeAt): { memoryLimit?: number; argv?: string[]; scoped?: true } => {
   if (!isDirectory(r.cwd)) throw new Error(`cwd ${r.cwd} is not a directory`);
@@ -51,6 +53,9 @@ export const startable = (r: SpawnRequest, at: ScopeAt): { memoryLimit?: number;
  *
  * Answers the pid of the process launched (the spawn records it, `.launched`, so a look tells a slow worker from a gone one), or
  * `undefined` where the launch failed at once.
+ * @param file The run file the worker reads its plan from.
+ * @param cwd The folder the worker is started in.
+ * @param scope The argv that makes a scope (`scopeArgv`), or none for a worker started bare.
  */
 export const startWorker = (
   file: string,

@@ -22,6 +22,10 @@ type PickerFactory = { name: string; factory?: Factory };
  * The factories the picker offers after All factories, from what the api answered: those Home lists (`factoriesShown`), in its order, the
  * default one among them only while it holds a run (`held`), and `picked`, the address's, after them when they leave it out — the default
  * factory once one is filed, or a name no factory has.
+ *
+ * @param factories the factories the api listed
+ * @param held whether the default factory holds a run
+ * @param picked the factory the address picks, none for All factories
  */
 export function pickerFactories(factories: readonly Factory[], held: boolean, picked: string | undefined): PickerFactory[] {
   const listed: PickerFactory[] = factoriesShown(factories, held).map((factory) => ({ name: factory.name, factory }));
@@ -33,6 +37,10 @@ export function pickerFactories(factories: readonly Factory[], held: boolean, pi
  * The factories the picker offers after All factories, from what is read so far: none while `factories` is unread, and none while no
  * factory is named and `held`, the default factory's light answer, is unread — whether the default is shown is not known before it;
  * else `pickerFactories`, the default among them only while its answer counts a run.
+ *
+ * @param factories the factories the api listed, undefined while they are unread
+ * @param held the default factory's light answer, undefined while it is unread
+ * @param picked the factory the address picks, none for All factories
  */
 export function pickerOffer(
   factories: readonly Factory[] | undefined,
@@ -45,7 +53,12 @@ export function pickerOffer(
   return pickerFactories(factories, held !== undefined && holdsRuns(held), picked);
 }
 
-/** How many runs are in flight, in words: `none in flight`, `1 in flight`, with `runs` named for every factory's (`5 runs in flight`). */
+/**
+ * How many runs are in flight, in words: `none in flight`, `1 in flight`, with `runs` named for every factory's (`5 runs in flight`).
+ *
+ * @param count how many runs are in flight
+ * @param runs whether to name the word runs, as for every factory's count
+ */
 export function inFlightWords(count: number, runs: boolean): string {
   if (count === 0) return 'none in flight';
   return runs ? `${count} ${count === 1 ? 'run' : 'runs'} in flight` : `${count} in flight`;
@@ -61,6 +74,9 @@ const aboutOf = (factory: Factory | undefined): string | undefined =>
 /**
  * What a factory's item says under its name: its runs in flight, that the api lists no factory by that name, or that its file does not
  * read.
+ *
+ * @param item the factory item the picker offers
+ * @param open the runs in flight, undefined while they are unread
  */
 export function supportOf(item: PickerFactory, open: OpenRuns | undefined): string | undefined {
   if (!item.factory) return 'no such factory';

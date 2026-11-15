@@ -55,6 +55,10 @@ const addedText = (diff: string): string =>
  * once for the files each changed and the base's `package.json`, whose `workspaces` group them (`workspacesIn`), then once for the diffs
  * of the files `globs` names — the check-affecting ones by default — and of the notes each added. A branch the place has not is not known,
  * and so is everything of a read the place refused or never answered, in the place's words.
+ * @param place The run's place, which reads the repository.
+ * @param run The repository run, whose base the branches are read against.
+ * @param branches The branches read.
+ * @param globs The files whose diffs are read; the check-affecting ones (`CHECK_AFFECTING`) where absent.
  */
 export function changesOf(
   place: Place,
@@ -108,6 +112,10 @@ function notesFrom(files: readonly string[], diffOf: (p: string) => string | { e
 /**
  * What is at each of `paths` at the tip of `branch` of `run`, as `place` answers: a file, a directory, or absent — absent for every
  * path of a branch the place has not, whose files are on no branch — or what the place said instead of answering.
+ * @param place The run's place, which reads the repository.
+ * @param run The repository run.
+ * @param branch The branch whose tip is read.
+ * @param paths The paths looked for, each from the repository's root.
  */
 export function presentOn(
   place: Place,

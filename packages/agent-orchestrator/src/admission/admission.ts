@@ -46,6 +46,8 @@ const PROGRAMS = ['nemia', 'wf'];
  * Each command of `table` typed on the shell line `line`, in order: a word naming the program (`nemia`, by any path, or `wf`), anywhere
  * on the line, then the longest name of a command the command line serves, word for word, a renamed group read as its new name
  * (`renamedIn`), and the words after it up to the command's end.
+ * @param line The shell line the agent is about to run.
+ * @param table The command table, whose entries served on the api's side alone are never typed.
  */
 export function typedIn(line: string, table: readonly Entry[]): Typed[] {
   const parts = line.match(PARTS) ?? [];
@@ -105,7 +107,11 @@ function namedBy(typed: Typed, table: readonly Entry[]): Named {
   return { runs: valuesAt(args, RUN_KEY), factories: valuesAt(args, FACTORY_KEY), unread: false };
 }
 
-/** The runs and factories each command of `table` typed on the shell line `line` names, in order (`typedIn`, `namedBy`). */
+/**
+ * The runs and factories each command of `table` typed on the shell line `line` names, in order (`typedIn`, `namedBy`).
+ * @param line The shell line the agent is about to run.
+ * @param table The command table, whose entries' specs read each command's words.
+ */
 export const namedIn = (line: string, table: readonly Entry[]): Array<Typed & Named> =>
   typedIn(line, table).map((typed) => ({ ...typed, ...namedBy(typed, table) }));
 
@@ -166,6 +172,7 @@ const rounds = (args: readonly string[]): boolean => args.includes('--round');
  * Why a typed answer is asked of the person, or undefined where it waits on no one. A retry asks where it raises a cap (`--budget`), asks
  * for another round (`--round`), names no run and step, or tries a step `waitOf` says waits on the person; any other answer always asks,
  * since it only answers what waits.
+ * @param waitOf Why the step of a run waits on the person, or undefined where it waits on no one.
  */
 export function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) => string | undefined): string | undefined {
   const line = ['nemia', name, ...args].join(' ');
@@ -191,7 +198,11 @@ export type PolicyReads = {
   formOf: (runId: string, step: string) => ApproveForm | undefined;
 };
 
-/** The run and step a typed answer names, read by its entry's spec, or undefined where its words do not parse or name none. */
+/**
+ * The run and step a typed answer names, read by its entry's spec, or undefined where its words do not parse or name none.
+ * @param typed The answer command typed on the line, with its words.
+ * @param table The command table, whose entry of the typed command's name gives the spec its words are read by.
+ */
 export function answerOf(typed: Typed, table: readonly Entry[]): { runId: string; step: string } | undefined {
   const spec = table.find((e) => e.name === typed.name)?.spec;
   if (spec === undefined) return undefined;
@@ -212,6 +223,9 @@ export function answerOf(typed: Typed, table: readonly Entry[]): { runId: string
  * asking for no round, naming a run and a step — an approval, one at the step's gate, never a loop's end (`formOf`), which was `nemia
  * accept` and is the person's every time — the run's factory at `auto`, and a rule that allows it in the run's facts at the call
  * (`allowedBy`).
+ * @param typed The answer command typed on the line, with its words.
+ * @param table The command table, whose entry's spec reads the run and step the answer names.
+ * @param auto What admission reads at `auto`; undefined where no rule is read, and nothing is let through.
  */
 export function policyAllows(typed: Typed, table: readonly Entry[], auto: PolicyReads | undefined): boolean {
   if (auto === undefined || !(RULE_ANSWERS as readonly string[]).includes(typed.name) || raises(typed.args) || rounds(typed.args))
@@ -239,6 +253,11 @@ function alwaysAsked(line: string, table: readonly Entry[]): AdmissionAnswer | u
  * `table` that waits on the person (`askedOf`) and no rule of `auto` lets through (`policyAllows`); else none, and the call meets the
  * session's own rules. `waitOf` says why a step waits on the person — at its gate, on its question, out of rounds, at its cap, or not there
  * to read — or undefined where it waits on no one.
+ * @param call The call the agent is about to make: its tool and that tool's input.
+ * @param table The command table.
+ * @param waitOf Why a step of a run waits on the person, or undefined where it waits on no one.
+ * @param scope What the agent's calls are scoped by; undefined where no floor holds.
+ * @param auto What admission reads at `auto`; undefined where no rule of the person's list is read.
  */
 export function admissionOf(
   call: AdmissionCall,

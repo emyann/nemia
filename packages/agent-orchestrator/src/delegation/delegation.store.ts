@@ -43,7 +43,11 @@ export type DelegationLayer = {
 /** The Delegation door's shape: each method of `DelegationLayer` answering an Effect. */
 export type DelegationDoorShape = DoorOf<DelegationLayer, string>;
 
-/** The factory's and agent's names, refused (`Invalid`) where either is no name; what both layers check before they touch a record. */
+/**
+ * The factory's and agent's names, refused (`Invalid`) where either is no name; what both layers check before they touch a record.
+ * @param factory The factory's name.
+ * @param agent The agent's name.
+ */
 export function delegationNamed(factory: string, agent: string): void {
   const bad = factoryNameRefusal(factory) ?? agentNameRefusal(agent);
   if (bad !== undefined) throw new Invalid({ message: bad });
@@ -53,7 +57,10 @@ export function delegationNamed(factory: string, agent: string): void {
 const specChecked = (record: DelegationRecord) =>
   checked(DelegationSpec, () => `the delegation of ${record.agent} in ${record.factory}`)(record.spec);
 
-/** The door over `layer`: each method as `doorOf` makes it, each write's grants checked before the layer writes. */
+/**
+ * The door over `layer`: each method as `doorOf` makes it, each write's grants checked before the layer writes.
+ * @param layer The layer that reads and writes the delegations.
+ */
 export function delegationDoorOver(layer: DelegationLayer): DelegationDoorShape {
   const door = doorOf<DelegationLayer, string>(layer);
   return {
@@ -64,10 +71,19 @@ export function delegationDoorOver(layer: DelegationLayer): DelegationDoorShape 
   };
 }
 
-/** The folder of the factory `factory`'s delegations, under the store `home`. */
+/**
+ * The folder of the factory `factory`'s delegations, under the store `home`.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param factory The factory's name.
+ */
 export const delegationsDir = (home: string, factory: string): string => path.join(home, 'factories', factory, 'delegations');
 
-/** The file of `agent`'s delegation in `factory`, under the store `home`. Refused (`Invalid`): a name that is no factory's or agent's. */
+/**
+ * The file of `agent`'s delegation in `factory`, under the store `home`. Refused (`Invalid`): a name that is no factory's or agent's.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param factory The factory's name.
+ * @param agent The agent's name.
+ */
 export function delegationFile(home: string, factory: string, agent: string): string {
   delegationNamed(factory, agent);
   return path.join(delegationsDir(home, factory), `${agent}.json`);
@@ -76,6 +92,9 @@ export function delegationFile(home: string, factory: string, agent: string): st
 /**
  * `agent`'s delegation in `factory`, or undefined where none is written. Refused (`Invalid`), naming the file and its fix, where it does
  * not read.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param factory The factory's name.
+ * @param agent The agent's name.
  */
 export function readDelegation(home: string, factory: string, agent: string): DelegationRecord | undefined {
   const file = delegationFile(home, factory, agent);
@@ -101,7 +120,10 @@ export function readDelegation(home: string, factory: string, agent: string): De
   return { factory, agent, since: read.success.since, spec: read.success.spec };
 }
 
-/** The delegations of the store `home`, as a layer of the door. */
+/**
+ * The delegations of the store `home`, as a layer of the door.
+ * @param home The store's directory (`WF_ROOT`).
+ */
 export function delegationFiles(home: string): DelegationLayer {
   return {
     delegations: {
@@ -143,6 +165,9 @@ export const DelegationDoor = Context.Reference<DelegationDoorShape>('agent-orch
   defaultValue: () => rootedDoor((root) => delegationDoorOver(delegationFiles(root)), 'Delegation door'),
 });
 
-/** The Delegation door over the files of the store `root`, as a layer. */
+/**
+ * The Delegation door over the files of the store `root`, as a layer.
+ * @param root The store's directory (`WF_ROOT`).
+ */
 export const delegationDoorFiles = (root: string): Layer.Layer<never> =>
   Layer.succeed(DelegationDoor)(delegationDoorOver(delegationFiles(root)));

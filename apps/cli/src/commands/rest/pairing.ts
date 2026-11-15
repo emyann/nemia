@@ -19,7 +19,10 @@ export async function pairingsLs(): Promise<number> {
   return 0;
 }
 
-/** `nemia pairings approve <code>`'s runner: the pairing approved, and how its token is named and revoked. */
+/**
+ * `nemia pairings approve <code>`'s runner: the pairing approved, and how its token is named and revoked.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function pairingsApprove(args: Args): Promise<number> {
   const code = textArg(args, 'code') ?? '';
   const p = await asked(PAIRINGS_APPROVE_WORDS.name, (c) => c.pairings.approve({ params: { code } }));
@@ -30,7 +33,10 @@ export async function pairingsApprove(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia board link`'s runner: the link, under `--base` where given, else where the api says the board is, and how long it holds. */
+/**
+ * `nemia board link`'s runner: the link, under `--base` where given, else where the api says the board is, and how long it holds.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function boardLink(args: Args): Promise<number> {
   const base = textArg(args, 'base');
   const { url, expiresAt } = await asked(BOARD_LINK_WORDS.name, (c) => c.pairings.link({ payload: base === undefined ? {} : { base } }));

@@ -178,6 +178,9 @@ export const hireList = Effect.fn('hireList')(function* (home: string, namespace
 /**
  * The Hire `name` of `hires`, of the factory `namespace`: `Missing` where no step joins to it, `Conflict` naming both steps and the fix
  * where two do.
+ * @param hires The factory's Hires.
+ * @param namespace The factory's name.
+ * @param name The Hire's name, `<workflow>.<step>`.
  */
 export const hireNamedIn = (hires: readonly Hire[], namespace: string, name: string): Effect.Effect<Hire, Missing | Conflict | Invalid> => {
   const found = hires.filter((h) => h.metadata.name === name);

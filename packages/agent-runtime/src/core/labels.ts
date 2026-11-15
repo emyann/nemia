@@ -24,6 +24,7 @@ const labelValueRefusalOf = (key: string, value: unknown): string | undefined =>
 /**
  * Why a task's `labels` cannot be carried, or `undefined`. Refuses anything but an object of at most 16 entries, each keyed by a
  * lowercase word (`LABEL_KEY`) other than `task`, which the runtime says itself, with a value `labelValueRefusalOf` takes.
+ * @param labels The task's labels as the caller gave them, or undefined where it gave none.
  */
 export const labelsRefusalOf = (labels: unknown): string | undefined => {
   if (labels === undefined) return undefined;

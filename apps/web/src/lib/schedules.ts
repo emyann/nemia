@@ -9,6 +9,9 @@ const WEEKDAY_MS = 6 * 24 * 60 * 60_000;
  * A fire or a run's start as a person reads it where they are: as `clockWord` says it within six days of `now` (`4:40 PM`,
  * `Tue 9:00 AM`); further off, as `instantWords` says a whole instant: by its date in the runs page's order (`14 Oct 12:00 PM`),
  * with its year and a comma when it is not `now`'s (`1 Jan 2027, 9:00 AM`).
+ * @param at The time of the fire or the start.
+ * @param now The instant it is now, against which the time is said.
+ * @param timeZone The IANA time zone to say it in, or undefined for the person's own.
  */
 export function fireWord(at: Date, now: Date, timeZone?: string): string {
   if (Math.abs(at.getTime() - now.getTime()) < WEEKDAY_MS) return clockWord(at, now, timeZone);

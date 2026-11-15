@@ -130,6 +130,8 @@ const refusal = (where: string, kind: RolloutKind, entry: unknown, error: Schema
  * A parsed rollout record decoded when it is of a kind the runtime reads: `{ kind, record }` when it decodes, `{ wrong }` when it
  * does not (a sentence that names `where` the record is, its kind, its first wrong field and the fix, quoting at most 60 characters
  * of what it found), and `undefined` for any other value, a record of another kind included.
+ * @param entry A record of the rollout, parsed from its JSON line, of any shape.
+ * @param where Where the record is, in words a refusal names it by.
  */
 export const rolloutRecordOf = (entry: unknown, where: string): RolloutRecord | { wrong: string } | undefined => {
   const kind = kindOf(entry);

@@ -53,7 +53,10 @@ const v6Of = (text: string): readonly [number, number, number, number, number, n
   return [g0, g1, g2, g3, g4, g5, g6, g7];
 };
 
-/** An address's text parsed, or `undefined` for a text that is no IPv4 or IPv6 address (a host's name, `localhost`). */
+/**
+ * An address's text parsed, or `undefined` for a text that is no IPv4 or IPv6 address (a host's name, `localhost`).
+ * @param text The address's text, spaces around it ignored.
+ */
 export const addressParsed = (text: string): Parsed | undefined => {
   const octets = v4Of(text.trim());
   if (octets !== undefined) return { v: 4, octets };
@@ -82,16 +85,24 @@ const v6Kind = (g: readonly [number, number, number, number, number, number, num
   return g[0] >= 0xfc00 && g[0] <= 0xfdff ? 'unique-local' : 'public';
 };
 
-/** The kind of a parsed address, by its range: the contract's laws. */
+/**
+ * The kind of a parsed address, by its range: the contract's laws.
+ * @param a The parsed address: its version, and its octets or groups.
+ */
 export const addressKind: AddressKindOf = (a) => (a.v === 4 ? v4Kind(a.octets) : v6Kind(a.groups));
 
-/** Whether a bind of `kind` is listened on, or refused until the person acknowledges a public or wildcard one. */
+/**
+ * Whether a bind of `kind` is listened on, or refused until the person acknowledges a public or wildcard one.
+ * @param kind The bind's kind (`AddressKind`).
+ * @param acknowledged Whether the person acknowledged a public or wildcard bind.
+ */
 export const bindExposure: BindExposure = (kind, acknowledged) =>
   (kind === 'public' || kind === 'wildcard') && !acknowledged ? 'unacknowledged' : 'listen';
 
 /**
  * The kind of a bind's text: an address's by its range, `localhost` this machine's, and any other name `public`, the safe side — a
  * name may resolve anywhere.
+ * @param text The bind's text: an address, or a host's name.
  */
 export const kindOfBind = (text: string): AddressKind => {
   if (text.trim() === 'localhost') return 'loopback';
@@ -113,7 +124,10 @@ export type MachineAddress = {
 /** An interface's address as `os.networkInterfaces` gives it, the two fields read here. */
 export type InterfaceAddress = { readonly address: string; readonly family: string };
 
-/** A machine's addresses with their kinds, from its interfaces as `os.networkInterfaces` gives them, loopback first. Pure. */
+/**
+ * A machine's addresses with their kinds, from its interfaces as `os.networkInterfaces` gives them, loopback first. Pure.
+ * @param interfaces The machine's interfaces by name, each with its addresses, or undefined for one with none.
+ */
 export const machineAddresses = (
   interfaces: Readonly<Record<string, readonly InterfaceAddress[] | undefined>>,
 ): readonly MachineAddress[] =>

@@ -41,6 +41,7 @@ import type { Followed, PlaceRequests } from '../place/place.ts';
 /**
  * The real path of a repository run's repository, its symlinks resolved; undefined for a folder run, and for a repository no longer there
  * to resolve, so a filing that reads it goes on without it rather than stopping the pass.
+ * @param run The run whose repository is resolved.
  */
 export const realRepoOf = (run: Run): string | undefined => {
   if (!isRepositoryRun(run)) return undefined;
@@ -64,6 +65,8 @@ const execFileAsync = promisify(execFile);
  * asked (`keepCheckoutInstalled`), so that is a person's checkout nobody installed, or a clone whose install failed — so its lockfile is
  * compared byte for byte instead: a different one is installed in the worktree, and the same one leaves nothing to provision. A worktree
  * without a lockfile parts only from a main checkout that has one — a repository without one is not npm's, and links are all there is.
+ * @param mainRoot The main checkout's root folder.
+ * @param worktree The worktree's root folder.
  */
 export function lockfileParts(mainRoot: string, worktree: string): string | null {
   const read = (file: string): string | null => {
@@ -90,6 +93,7 @@ export function lockfileParts(mainRoot: string, worktree: string): string | null
  * workspace's `node_modules` is compared as it is installed.
  *
  * Null for a checkout with no lockfile, and for one with no `node_modules`: nobody installed a tree there to bring up to date.
+ * @param repo The repository's checkout folder.
  */
 export function checkoutParts(repo: string): string | null {
   if (!fs.statSync(path.join(repo, 'node_modules'), { throwIfNoEntry: false })?.isDirectory()) return null;
@@ -118,6 +122,8 @@ export type CheckoutKept =
  * clone nobody installed is not left with none. `npm install --no-save` (`INSTALL_ARGS`), never `npm ci`, which would empty the tree
  * under a check or a session running in the clone; npm replaces packages by rename, so a worktree cut before keeps the files it was cut
  * with. A person's checkout is never written. It does not throw: a failed install is said, and tried again at the next cut.
+ * @param home The store's root folder.
+ * @param repo The repository's checkout folder.
  */
 export async function keepCheckoutInstalled(home: string, repo: string): Promise<CheckoutKept> {
   const tree = fs.statSync(path.join(repo, 'node_modules'), { throwIfNoEntry: false })?.isDirectory() ?? false;
@@ -138,7 +144,11 @@ export async function keepCheckoutInstalled(home: string, repo: string): Promise
   }
 }
 
-/** What the run's log says of a checkout's own install: nothing where it was left as it was. Pure. */
+/**
+ * What the run's log says of a checkout's own install: nothing where it was left as it was. Pure.
+ * @param repo The repository's checkout folder, said in the note.
+ * @param kept What came of the checkout's install (`keepCheckoutInstalled`).
+ */
 export function keptNotes(repo: string, kept: CheckoutKept): string[] {
   const why = (because: string) =>
     because === 'node_modules' ? 'it had no node_modules' : `its package-lock.json asks for ${because}, which its node_modules lacks`;
@@ -312,6 +322,8 @@ function hardlinkTree(from: string, to: string): number {
  * renamed into it whole, so one a pass died making is never taken for a package, and is made again. It
  * writes nothing under the main checkout. It does not throw: a tick that threw here would throw on every
  * pass after, and a step can run `npm ci` itself.
+ * @param mainRoot The main checkout's root folder, whose packages are linked.
+ * @param worktree The worktree's root folder, whose `node_modules` is made.
  */
 export async function provisionDeps(mainRoot: string, worktree: string): Promise<Provisioned> {
   const modules = path.join(worktree, 'node_modules');
@@ -387,6 +399,7 @@ function depsNotes(deps: Provisioned): string[] {
  * they part at (`lockfileParting`), or null. Read through each link that leaves the worktree (`installedAt`'s `through`), so a tree whose
  * packages are main's, linked, parts only where main's do. Null for a worktree with no lockfile, and for one with no `node_modules` of its
  * own: there is no tree of its own to part.
+ * @param worktree The worktree's root folder.
  */
 export function worktreeParts(worktree: string): string | null {
   if (!fs.lstatSync(path.join(worktree, 'node_modules'), { throwIfNoEntry: false })?.isDirectory()) return null;
@@ -442,6 +455,10 @@ export type Reinstalled = {
  * Only a worktree under the store's `worktrees/<run>/`, and neither the repository's checkout nor a folder inside it, is ever written; a
  * `node_modules` that is one link (`shared`) is left as it is. It does not throw: a failed install is said in `deps`, and tried again
  * at the next filing.
+ * @param home The store's root folder.
+ * @param runId The run's id, whose `worktrees/<run>/` alone is written.
+ * @param repo The repository's checkout folder.
+ * @param worktree The worktree's root folder.
  */
 export async function keepWorktreeInstalled(home: string, runId: string, repo: string, worktree: string): Promise<Reinstalled | undefined> {
   const modules = lstatOf(path.join(worktree, 'node_modules'));
@@ -481,6 +498,8 @@ function isRunWorktree(home: string, runId: string, repo: string, worktree: stri
  * What the run's log says of a worktree's `node_modules` brought to its lockfile before a filing (`keepWorktreeInstalled`): that it was
  * provisioned again and where its lockfile parted from it, then the checkout's own install and the tree's notes as a cut says them. Of a
  * worktree that had none, only what a cut would say. Pure.
+ * @param repo The repository's checkout folder, said in the notes.
+ * @param r What came of the worktree's `node_modules` (`keepWorktreeInstalled`).
  */
 export function reinstalledNotes(repo: string, r: Reinstalled): string[] {
   return [
@@ -507,7 +526,11 @@ export type Cut = {
 /** A step's workspace made, or why it was not, in words for the run's log. */
 export type CutOutcome = { readonly cut: Cut } | { readonly uncut: string };
 
-/** What the run's log says of step `name`'s workspace: the notes of its cut, or why it was not cut. */
+/**
+ * What the run's log says of step `name`'s workspace: the notes of its cut, or why it was not cut.
+ * @param name The step's name, each note said under it.
+ * @param made What came of the cut: its notes, or why it was not cut.
+ */
 export const cutNotes = (name: string, made: CutOutcome): string[] =>
   ('cut' in made ? made.cut.notes : [made.uncut]).map((note) => `${name}: ${note}`);
 
@@ -539,7 +562,11 @@ const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceReques
   return { made: outcome.answer } as const;
 });
 
-/** What the run's log says of a checkout `follow` answered of, in the place's words: nothing where nothing was to be said. Pure. */
+/**
+ * What the run's log says of a checkout `follow` answered of, in the place's words: nothing where nothing was to be said. Pure.
+ * @param repo The repository's checkout folder, said in the note.
+ * @param followed What `follow` answered of the checkout.
+ */
 export function followedNotes(repo: string, followed: Followed): string[] {
   if (followed.state === 'fast-forwarded')
     return [
@@ -652,6 +679,9 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
  * The workflow as its workspaces are cut: each condition (`routes:`) left out and a step after one waiting on the condition's first parent
  * instead, its own workspace being that parent's; and `step` waiting only on the parents that ran — filed, or a condition's first parent
  * that was — so a skipped one, never filed, is no line of work to merge. A workflow with no condition is the workflow. Pure.
+ * @param run The run's steps, which say which were filed.
+ * @param steps The run's workflow.
+ * @param step The step whose workspace is cut.
  */
 export function ranShape(run: Pick<Run, 'steps'>, steps: readonly StepSpec[], step: StepSpec): { steps: StepSpec[]; step: StepSpec } {
   const byName = new Map(steps.map((s) => [s.name, s]));

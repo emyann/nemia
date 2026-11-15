@@ -8,6 +8,8 @@ import type { CardWriteRefusalOf } from '../../contracts/card-write.contract.ts'
  * Why a card's whole write is refused, the first of started, stale, `queued` changed, a retired `repo:` set
  * or changed, and no body, or null where it may be written: what
  * `replaceCard` asks before it writes anything.
+ * @param ask What the write sends beside what stands: whether the card has started, the version, `queued` and `repo:` sent and now,
+ * and the body sent.
  */
 export const cardWriteRefusal: CardWriteRefusalOf = (ask) => {
   if (ask.started) return 'started';

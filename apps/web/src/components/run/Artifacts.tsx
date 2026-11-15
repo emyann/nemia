@@ -6,7 +6,11 @@ import { viewOpened } from '../../lib/viewAddress';
 import { cn, focusRing } from '../ui/ds/utils';
 import { when } from '../step/Facts';
 
-/** Bytes as a person reads them, as the CLI's `decide` prints a file's size and the CLI's `prune` a worktree's (`sizeOf`). */
+/**
+ * Bytes as a person reads them, as the CLI's `decide` prints a file's size and the CLI's `prune` a worktree's (`sizeOf`).
+ *
+ * @param bytes the size, in bytes
+ */
 export const bytesWord = (bytes: number): string =>
   bytes < 1024
     ? `${bytes} B`

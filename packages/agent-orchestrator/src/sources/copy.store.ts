@@ -37,7 +37,11 @@ export type SkillJudged = SourceSkill & { library: DefinitionThere; source: stri
 const deleteFix = (file: string): string =>
   `To copy it all the same, copy ${file} somewhere of yours, delete that line there, and copy from that path: nemia agents copy <that path>.`;
 
-/** The agent file `file`, read: refused as `Missing` where it is not there, and as `Invalid` where it is no agent the store would run. */
+/**
+ * The agent file `file`, read: refused as `Missing` where it is not there, and as `Invalid` where it is no agent the store would run.
+ * @param file The agent's file.
+ * @param as The name the copy takes (`--as`), or undefined to keep the agent's own.
+ */
 export function readSource(file: string, as: string | undefined): Source {
   const at = path.resolve(file);
   if (!fs.lstatSync(at, { throwIfNoEntry: false })?.isFile())
@@ -76,6 +80,8 @@ export function readSource(file: string, as: string | undefined): Source {
  * The skills the agent of `source` gives, by name and the folder each is found in. Nemia's own, a place skill or a builtin one, found by
  * name in every factory, are left out, and so is one named with its folder (`givenSkillOf`), a repository's own, which the agent names
  * and the library never holds.
+ * @param source The agent read (`readSource`).
+ * @param home The store's root.
  */
 export function skillsOf(source: Source, home: string): SourceSkill[] {
   const names = (source.draft.skills ?? '')
@@ -125,6 +131,10 @@ function heldOwn(file: string, whose: string): boolean {
  * library's or not there, else differing, and the fix of each that differs. A skill is judged by the versions the Skill door gave
  * (`SkillJudged`), held where anything is at its name in the library, the same where that is at the source's version. A link where the
  * agent or its schema would be is refused.
+ * @param source The agent read (`readSource`).
+ * @param skills Each skill the agent gives, as the Skill door judged it.
+ * @param keep The parts whose library copy is kept (`--keep`), by name or schema file.
+ * @param home The store's root.
  */
 export function partsOf(source: Source, skills: readonly SkillJudged[], keep: readonly string[], home: string): Part[] {
   const agents = yoursOf('agents', home);
@@ -166,19 +176,31 @@ export function partsOf(source: Source, skills: readonly SkillJudged[], keep: re
   return parts;
 }
 
-/** The result schema `schema` written into the library's agents of `home`, beside an agent it holds already; the file written. */
+/**
+ * The result schema `schema` written into the library's agents of `home`, beside an agent it holds already; the file written.
+ * @param home The store's root.
+ * @param schema The schema's file name and its text.
+ */
 export function writeCopySchema(home: string, schema: { file: string; text: string }): string {
   const file = path.join(yoursOf('agents', home), schema.file);
   fs.writeFileSync(file, schema.text);
   return file;
 }
 
-/** Each of `paths` a failed copy wrote, removed, a folder with all it holds. */
+/**
+ * Each of `paths` a failed copy wrote, removed, a folder with all it holds.
+ * @param paths The files and folders the copy wrote.
+ */
 export function removeWritten(paths: readonly string[]): void {
   for (const at of paths) fs.rmSync(at, { recursive: true, force: true });
 }
 
-/** The record of the copy of `name` from `file` written, unless the one there already names that file at its version now; its file. */
+/**
+ * The record of the copy of `name` from `file` written, unless the one there already names that file at its version now; its file.
+ * @param home The store's root.
+ * @param name The agent's name in the library.
+ * @param file The agent's file copied from.
+ */
 export function writeCopyRecord(home: string, name: string, file: string): string {
   const at = copyRecordFile(home, name);
   const version = sourceVersion(file, home) ?? '';

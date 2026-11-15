@@ -12,7 +12,11 @@ import { textOf as fileText } from '../files.ts';
 import { said, switchArg, textArg } from '../requests.ts';
 import { textOf } from './lines.ts';
 
-/** The words `--file` names for `command`: the file's text, or stdin's for `-`; refused, naming it, where it cannot be read. */
+/**
+ * The words `--file` names for `command`: the file's text, or stdin's for `-`; refused, naming it, where it cannot be read.
+ * @param file The path of the file to read, or `-` for stdin.
+ * @param command The command's name, said in a refusal.
+ */
 export function wordsOf(file: string, command: string): string {
   if (file !== '-') return fileText(file, command);
   try {
@@ -27,7 +31,11 @@ export function wordsOf(file: string, command: string): string {
 /** What a run already started does with the rules, said after a write. */
 const KEPT = 'a run already started keeps the rules it was started with';
 
-/** What `nemia factory rules` prints of what it read, wrote (`wrote`) or removed. */
+/**
+ * What `nemia factory rules` prints of what it read, wrote (`wrote`) or removed.
+ * @param data The factory's rules as the api answers them: its file, its words, why they cannot be told, or whether they were removed.
+ * @param wrote Whether the command wrote the rules.
+ */
 export function rulesLines(data: FactoryRules, wrote: boolean): string[] {
   const { name } = data;
   if (data.removed !== undefined)
@@ -39,7 +47,10 @@ export function rulesLines(data: FactoryRules, wrote: boolean): string[] {
   return [`${name}: rules kept in ${data.file}`, '', data.words];
 }
 
-/** `nemia factory rules`: a factory's rules, read bare, written from `--file`, removed with `--clear`. */
+/**
+ * `nemia factory rules`: a factory's rules, read bare, written from `--file`, removed with `--clear`.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryRules(args: Args): Promise<number> {
   const name = textOf(args, 'factory');
   const file = textArg(args, 'file');
@@ -59,7 +70,10 @@ export async function factoryRules(args: Args): Promise<number> {
 const keptLine = (data: FactoryInstruction): string =>
   data.store ? `kept in the store: ${data.file}` : `read from ${data.file}, in the factory's first folder`;
 
-/** What `nemia factory instruction` prints of a read: where it is kept, then the words, or why there are none. */
+/**
+ * What `nemia factory instruction` prints of a read: where it is kept, then the words, or why there are none.
+ * @param data The factory's instruction as the api answers it: where it is kept, its words, or why it does not read.
+ */
 export function instructionLines(data: FactoryInstruction): string[] {
   const where = `${data.name}: ${keptLine(data)}`;
   if (data.error !== null) return [where, `it does not read: ${data.error}`];
@@ -73,7 +87,10 @@ export function instructionLines(data: FactoryInstruction): string[] {
   return [where, '', data.words];
 }
 
-/** `nemia factory instruction`: where a factory's instruction is kept, read bare, or set with `--path`, `--store` or `--clear`. */
+/**
+ * `nemia factory instruction`: where a factory's instruction is kept, read bare, or set with `--path`, `--store` or `--clear`.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryInstruction(args: Args): Promise<number> {
   const name = textOf(args, 'factory');
   const at = textArg(args, 'path');
@@ -91,7 +108,10 @@ export async function factoryInstruction(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory instruct`: the instruction the store keeps for a factory, written from `--file` or removed with `--clear`. */
+/**
+ * `nemia factory instruct`: the instruction the store keeps for a factory, written from `--file` or removed with `--clear`.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryInstruct(args: Args): Promise<number> {
   const name = textOf(args, 'factory');
   const file = textArg(args, 'file');

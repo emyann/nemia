@@ -35,7 +35,11 @@ const finishingWords = ({ run, step, kind, stopping, resumed, calling }: Finishi
     ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop${resumed ? `, and is tried again on ${RESUME_LINE}` : ''}`
     : `${run}'s ${step} is finishing: ${atWorkWords(kind, calling)}`;
 
-/** Every line said of the pause: none when the store is not paused, else the pause, each task finishing and each check it holds. */
+/**
+ * Every line said of the pause: none when the store is not paused, else the pause, each task finishing and each check it holds.
+ * @param paused What the api says of the store's pause: whether it is paused, and each task it finishes and holds.
+ * @param now The moment the time left of the pause's timeout is counted from: now where it is left out.
+ */
 export const pausedLines = (paused: Paused, now: Date = new Date()): string[] => {
   const line = pausedWords(paused, now);
   if (line === null) return [];
@@ -62,7 +66,11 @@ const fireWord = (iso: string, now: number): string => {
 /** A factory's schedules, by the factory's name. */
 export type FactorySchedules = { readonly factory: string; readonly schedules: readonly Schedule[] };
 
-/** A line per schedule, factories by name and workflows by name, its refusal under it where its latest fire was refused. */
+/**
+ * A line per schedule, factories by name and workflows by name, its refusal under it where its latest fire was refused.
+ * @param factories Each factory's schedules, by its name.
+ * @param now The moment each fire's distance is counted from, in ms since the epoch.
+ */
 export const scheduleLines = (factories: readonly FactorySchedules[], now: number): string[] =>
   [...factories]
     .sort((a, b) => a.factory.localeCompare(b.factory))

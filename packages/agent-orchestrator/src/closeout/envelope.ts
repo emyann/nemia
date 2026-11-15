@@ -67,6 +67,7 @@ export const ENVELOPE_SCHEMA = {
 /**
  * A summary as every reader shows it: its first non-empty line, trimmed, and when that is longer than `SUMMARY_MAX` it is cut at the
  * last space that leaves room for an ellipsis, or hard where it has none, and ends `…`.
+ * @param text The summary as it was given.
  */
 export function summaryLine(text: string): string {
   const line =
@@ -86,6 +87,7 @@ export type ValueArtifact = { name: string; value: string };
 /**
  * An envelope's `artifacts` read into the files it names, by path, and the values it gives. A string is a file, as v0 wrote one, and
  * so is `{path}`; `{name, value}` of two strings is a value; anything else is dropped.
+ * @param list The envelope's `artifacts`, of any shape: anything but an array holds none.
  */
 export function artifactsOf(list: unknown): { files: string[]; values: ValueArtifact[] } {
   const files: string[] = [];
@@ -104,6 +106,9 @@ export function artifactsOf(list: unknown): { files: string[]; values: ValueArti
 /**
  * A closeout's body as the reader gives it: the body given, led by the whole summary when the cut changed it, so nothing written is
  * lost. Undefined when there is nothing beyond the summary.
+ * @param whole The summary as it was given.
+ * @param summary The summary cut to a line (`summaryLine`).
+ * @param given The body given, or undefined where none was.
  */
 export function bodyOf(whole: string, summary: string, given: string | undefined): string | undefined {
   const lead = whole.trim() !== summary ? whole.trim() : '';
@@ -113,6 +118,7 @@ export function bodyOf(whole: string, summary: string, given: string | undefined
 /**
  * What the run refuses of a closeout's envelope, each a sentence saying what to do instead: a `needs` on a `done` v1 closeout. A v0
  * closeout is never refused: it was given before the rule.
+ * @param c The closeout's envelope: its version, its outcome and its `needs`.
  */
 export function envelopeRefusals(c: { apiVersion?: string; outcome: string; needs?: string }): string[] {
   if (c.apiVersion !== CLOSEOUT_V1 || c.outcome !== 'done' || !c.needs) return [];

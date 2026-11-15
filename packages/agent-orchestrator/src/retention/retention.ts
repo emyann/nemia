@@ -13,11 +13,18 @@ export type { Installed, InUse, Retention } from '../../contracts/retention.cont
 /** How many of the newest releases are kept whatever runs on them. */
 export const RELEASES_KEPT = 2;
 
-/** The installed releases newest first: by `builtAt` descending, then by tag descending, so two built at once still order. */
+/**
+ * The installed releases newest first: by `builtAt` descending, then by tag descending, so two built at once still order.
+ * @param installed The installed releases.
+ */
 export const newestFirst = (installed: readonly Installed[]): Installed[] =>
   [...installed].sort((a, b) => (a.builtAt === b.builtAt ? (a.tag < b.tag ? 1 : a.tag > b.tag ? -1 : 0) : a.builtAt < b.builtAt ? 1 : -1));
 
-/** The releases to remove of `installed`, given newest first, by what is in use (`Retention`). */
+/**
+ * The releases to remove of `installed`, given newest first, by what is in use (`Retention`).
+ * @param installed The installed releases, newest first.
+ * @param inUse What is in use: the pointer's release, the releases processes pin, and the sessions that recorded none.
+ */
 export const retention: ReleaseRetention = (installed, inUse) => {
   if (inUse.current === null) return { remove: [], held: 'no pointer' };
   if (inUse.unrecorded > 0) return { remove: [], held: 'unrecorded' };
@@ -26,7 +33,11 @@ export const retention: ReleaseRetention = (installed, inUse) => {
   return { remove, held: null };
 };
 
-/** What a sweep says: each release removed, and why it held, naming what it waits on. */
+/**
+ * What a sweep says: each release removed, and why it held, naming what it waits on.
+ * @param answer What the retention answered.
+ * @param unrecorded How many local sessions in flight recorded no release.
+ */
 export function retentionLines(answer: Retention, unrecorded: number): string[] {
   if (answer.held === 'no pointer') return [];
   if (answer.held === 'unrecorded')

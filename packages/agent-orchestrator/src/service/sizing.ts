@@ -24,10 +24,16 @@ export type { CeilingFit, Configured, Machine as MachineSize, MemoryFit, Sized, 
 /** The machine's memory each session asks on average, in MiB: the contract's own number, which a law reads. */
 export const MIB_PER_SESSION = 2560;
 
-/** The floor kept for the daemon and the machine on a machine of `memoryMiB`, in MiB: an eighth of it, and 1 GiB at least. */
+/**
+ * The floor kept for the daemon and the machine on a machine of `memoryMiB`, in MiB: an eighth of it, and 1 GiB at least.
+ * @param memoryMiB The machine's memory, in MiB.
+ */
 export const reservedFor = (memoryMiB: number): number => Math.max(1024, Math.floor(memoryMiB / 8));
 
-/** The sessions at once, the limit and the request of each and the floor kept, in MiB, on a machine of `memoryMiB` and `cpus`. */
+/**
+ * The sessions at once, the limit and the request of each and the floor kept, in MiB, on a machine of `memoryMiB` and `cpus`.
+ * @param machine The machine's memory, in MiB, and its CPUs.
+ */
 export const sizedFor: SizedFor = (machine) => {
   const memoryLimitMiB = Math.floor(machine.memoryMiB / 2);
   const memoryReservedMiB = reservedFor(machine.memoryMiB);
@@ -46,6 +52,8 @@ export const sizedFor: SizedFor = (machine) => {
  * none where it has neither (`uncounted`); the sessions at once over what the machine allocates (its memory less the floor), with how
  * many would fit — fewer than are set; or, where they fit, one session's limit over it. `asked * 1` is `asked`: tsverify divides no
  * value read off `number | null`, even narrowed, and reads the product as a number.
+ * @param configured The sessions at once, the limit and the request of each and the machine's memory and floor, in bytes; a limit or a
+ *   request null where none is set.
  */
 export const memoryFit: MemoryFitOf = (configured) => {
   const asked = configured.requestBytes ?? configured.limitBytes;
@@ -63,6 +71,7 @@ export const memoryFit: MemoryFitOf = (configured) => {
  * Whether the sessions' slice holds them to what the machine allocates: no ceiling (`infinity`, read as null) is `none`; a ceiling more
  * than the machine allocates (its memory less the floor) is `over`, naming both; any other is `held`, naming the ceiling. `ceiling * 1`
  * is `ceiling`, read as a number, as `memoryFit` reads `asked`.
+ * @param slice The sessions' slice's ceiling, in bytes, null where it has none, and what the machine allocates, in bytes.
  */
 export const ceilingFit: CeilingFitOf = (slice) => {
   const ceiling = slice.ceilingBytes;
@@ -75,6 +84,7 @@ export const ceilingFit: CeilingFitOf = (slice) => {
 /**
  * Why `machine` cannot be sized, or null: under 2 GiB or no CPU, or past a pebibyte or 65,536 CPUs, as the contract's `requires` rules
  * out, said as found.
+ * @param machine The machine's memory, in MiB, and its CPUs.
  */
 export const sizeRefusal = (machine: Machine): string | null =>
   Number.isInteger(machine.memoryMiB) &&

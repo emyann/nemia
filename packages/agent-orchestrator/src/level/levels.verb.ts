@@ -49,7 +49,10 @@ const rowsOf = (door: FactoryDoorShape, names: readonly string[], at: number): E
     return rows;
   });
 
-/** Every factory's level at `at`, the default factory first, then each factory of the store that reads, by name. */
+/**
+ * Every factory's level at `at`, the default factory first, then each factory of the store that reads, by name.
+ * @param at The time asked of, in ms since the epoch; now where not given.
+ */
 export const levelsNow = (at: number = Date.now()): Effect.Effect<FactoryLevel[], Refusal, StoreRoot> =>
   Effect.gen(function* () {
     const door = yield* FactoryDoor;
@@ -61,14 +64,21 @@ export const levelsNow = (at: number = Date.now()): Effect.Effect<FactoryLevel[]
     );
   });
 
-/** The level at `at` of the factory `name`, the default factory where none is named. */
+/**
+ * The level at `at` of the factory `name`, the default factory where none is named.
+ * @param name The factory's name, undefined for the default factory.
+ * @param at The time asked of, in ms since the epoch; now where not given.
+ */
 export const levelOfFactory = (name: string | undefined, at: number = Date.now()): Effect.Effect<Level, Refusal, StoreRoot> =>
   Effect.gen(function* () {
     const [row] = yield* rowsOf(yield* FactoryDoor, [runNamespace(name)], at);
     return row?.level ?? storeLevel(yield* StoreRoot);
   });
 
-/** The factory the run `runId` was started in, frozen on its record: the default factory where it names none. Refused: no such run. */
+/**
+ * The factory the run `runId` was started in, frozen on its record: the default factory where it names none. Refused: no such run.
+ * @param runId The run's id.
+ */
 export const runFactory = (runId: string): Effect.Effect<string, Refusal> =>
   Effect.map(
     Effect.flatMap(RunDoor, (door) => door.runs.read(RunId.read(runId))),

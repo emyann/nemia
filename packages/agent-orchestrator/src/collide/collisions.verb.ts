@@ -21,6 +21,12 @@ const ahead = (standings: readonly BranchStanding[]): string[] => standings.filt
  * them) tried onto the base and onto each branch ahead of it of every other run in flight (`othersInFlight`), whose standings `git` reads.
  * Undefined, asking nothing, for a folder run, a run without worktrees, or one with no branch ahead of its base. Fails with a refusal a
  * read threw; dies of anything else (`tried`).
+ * @param home The store's root folder, whose runs are read.
+ * @param run The run whose ending lands.
+ * @param ending The ending's name.
+ * @param standings Where the run's branches stand against its base, as the decision read them.
+ * @param git What reads where the other runs' branches stand.
+ * @param place The place whose trial verb merges.
  */
 export const collisionsAt = (
   home: string,

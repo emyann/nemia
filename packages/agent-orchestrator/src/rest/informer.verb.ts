@@ -76,6 +76,9 @@ export const informerMemo = <T = Judgement, O = RunObject>(): InformerMemo<T, O>
 /**
  * The listed object kept for the run `id` on the very entry that holds `judgement`, the one this read was served or judged: none where
  * the entry holds another judgement, since an object is served exactly while the judgement it was built on is.
+ * @param memo The informer.
+ * @param id The run's id.
+ * @param judgement The judgement the read was served or judged on.
  */
 export const keptObject = <T, O>(memo: InformerMemo<T, O>, id: string, judgement: T): O | undefined => {
   const entry = memo.runs.get(id);
@@ -85,6 +88,10 @@ export const keptObject = <T, O>(memo: InformerMemo<T, O>, id: string, judgement
 /**
  * Keep `object`, the run `id`'s listed object built on `judgement`, on the entry that holds that judgement, and on no other: an entry a
  * request since replaced with a newer judgement is never given an older object. Its disk parts are read again on every request.
+ * @param memo The informer.
+ * @param id The run's id.
+ * @param judgement The judgement the object was built on.
+ * @param object The run's listed object.
  */
 export const keepObject = <T, O>(memo: InformerMemo<T, O>, id: string, judgement: T, object: O): void => {
   const entry = memo.runs.get(id);
@@ -100,12 +107,19 @@ export const Informer = Context.Reference<InformerMemo | undefined>('agent-orche
 /** One informer for a process, made by its layer: the api gives one per app, read by the daemon's pass and every request alike. */
 export const informerLayer = (): Layer.Layer<never> => Layer.sync(Informer, () => informerMemo());
 
-/** A pass begins: an entry of a run still moving that an earlier pass or request kept is judged again from now on. */
+/**
+ * A pass begins: an entry of a run still moving that an earlier pass or request kept is judged again from now on.
+ * @param memo The informer.
+ */
 export const passStarted = (memo: InformerMemo<unknown>): void => {
   memo.pass = (memo.pass ?? 0) + 1;
 };
 
-/** Forget the run `id`: a write just touched it, and the next read judges it again. */
+/**
+ * Forget the run `id`: a write just touched it, and the next read judges it again.
+ * @param memo The informer.
+ * @param id The run's id.
+ */
 export const dropInformed = (memo: InformerMemo<unknown>, id: string): void => {
   memo.runs.delete(id);
 };

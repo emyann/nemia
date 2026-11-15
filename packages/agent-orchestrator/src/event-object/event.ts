@@ -19,13 +19,21 @@ import {
 import type { EventInvolvedKind, EventNamespace, EventReason } from '../../contracts/event.contract.ts';
 import { isFactoryLine, isRunLine, isStoreLine, messageOf, REASON_CODES, sourceOf, typeOf, type FeedLine } from '../feed/index.ts';
 
-/** The namespace an event is in: the factory its line names, `default` for a run's or a step's that names none, else none. */
+/**
+ * The namespace an event is in: the factory its line names, `default` for a run's or a step's that names none, else none.
+ * @param kind What the line is about.
+ * @param factory The factory the line names, or undefined or empty where it names none.
+ */
 export const eventNamespace: EventNamespace = (kind, factory) => {
   if (factory !== undefined && factory !== '') return factory;
   return kind === 'Run' || kind === 'Step' ? DEFAULT_NAMESPACE : undefined;
 };
 
-/** The reason an event is served under: its line's, where it is one of `known`, else `Unknown`. */
+/**
+ * The reason an event is served under: its line's, where it is one of `known`, else `Unknown`.
+ * @param reason The reason the line says.
+ * @param known The reasons an event is served under.
+ */
 export const eventReason: EventReason = (reason, known) => (known.includes(reason) ? reason : 'Unknown');
 
 /** Whether `word` is one of `words`, narrowed to them. */
@@ -63,12 +71,16 @@ const labelsOf = (line: FeedLine): Record<string, string> | undefined => {
 /**
  * An event's `resourceVersion`: a position, not a digest — the byte of the feed just after its line, where a read from it goes on, which
  * only grows as the feed is written.
+ * @param end The byte of the feed just after the event's line.
  */
 export const feedPosition = (end: number): string => String(end);
 
 /**
  * The line `line`, which starts at byte `start` of the feed and ends just before `end`, as an Event: who acted (`actor`) carried where the
  * line says, a person's act's.
+ * @param line The feed's line.
+ * @param start The byte of the feed the line starts at.
+ * @param end The byte of the feed just after the line.
  */
 export const eventOf = (line: FeedLine, start: number, end: number): Event => {
   const labels = labelsOf(line);

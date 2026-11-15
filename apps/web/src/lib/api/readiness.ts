@@ -18,14 +18,20 @@ export const readinessQuery = queryOptions({
   refetchInterval: READINESS_EVERY_MS,
 });
 
-/** A fix started by the server: its id and phase, the output it printed so far, and the pattern of the code its output shows. */
+/**
+ * A fix started by the server: its id and phase, the output it printed so far, and the pattern of the code its output shows.
+ * @param start The fix to start, as the readiness read names it.
+ */
 export const startFix = (start: FixStart): Promise<Fix> =>
   call(
     (c) => c.readiness.fix({ payload: start }),
     write(Fix, 'The fix may have started: read the Setup page again before starting it again.'),
   );
 
-/** Where a fix's output is followed, as server-sent events: `output`, a chunk of what it printed; `ended`, its end, its data the `Fix`. */
+/**
+ * Where a fix's output is followed, as server-sent events: `output`, a chunk of what it printed; `ended`, its end, its data the `Fix`.
+ * @param id The fix's id, as its start answered.
+ */
 export const fixOutputPath = (id: string): string => `/api/readiness/fixes/${encodeURIComponent(id)}/output`;
 
 /** The data of the stream's events: `output` is text as printed, never JSON, so only `ended` is decoded. */

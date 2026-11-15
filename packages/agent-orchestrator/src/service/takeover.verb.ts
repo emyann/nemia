@@ -58,6 +58,9 @@ const opening = (pid: number, by: string): string => (by === INSTALL_BY ? `${by}
 /**
  * Why `pid` is not the daemon to stop, or null: the lease must name it ticking, and the process table must say it is the process that
  * wrote the lease (`same`), so a pid reused by another process is never signalled. Its words open on `by`, the command asking.
+ * @param pid The process asked to be taken over.
+ * @param lease The store's lease as it reads now.
+ * @param by The command asking, which the words open on; install's where not given.
  */
 export function takeOverRefusal(pid: number, lease: DaemonStanding, by: string = INSTALL_BY): string | null {
   const said = opening(pid, by);
@@ -73,6 +76,9 @@ export function takeOverRefusal(pid: number, lease: DaemonStanding, by: string =
 /**
  * Refuses (`Conflict`) a pid that is not the confirmed holder (`takeOverRefusal`): asked before anything is written, and again before the
  * signal.
+ * @param pid The process asked to be taken over.
+ * @param host The machine as a take-over sees it, whose lease is read.
+ * @param by The command asking, which a refusal opens on; install's where not given.
  */
 export const takeOverConfirmed = (pid: number, host: TakeoverHost, by: string = INSTALL_BY) =>
   tried(() => {
@@ -204,6 +210,11 @@ const firstPassDue = (lease: DaemonStanding, pid: number): boolean =>
  * Waits for the first pass of the daemon of `pid`, saying once that it waits; no deadline while its lease reads it ticking, since its beat
  * runs through a long pass and a dead one stops beating. Refused (`Conflict`) when the lease reads it otherwise before a pass — stopped,
  * gone, stalled, or another pid in its place — naming its log, the lease and `left`, what becomes of the store's pause.
+ * @param pid The daemon waited on.
+ * @param host The machine as a take-over sees it, whose lease is read and which says the wait.
+ * @param service The started service, whose log a refusal names.
+ * @param by The command asking, which a refusal opens on.
+ * @param left What becomes of the store's pause, said at the end of a refusal.
  */
 export const firstPassed = (pid: number, host: TakeoverHost, service: Started, by: string, left: string) =>
   Effect.gen(function* () {
@@ -225,6 +236,11 @@ export const firstPassed = (pid: number, host: TakeoverHost, service: Started, b
  * has completed its first pass (`firstPassed`). Refused (`Conflict`): the unit still runs `old` past the host's `stopMs`; the system
  * refuses the start; no daemon but `old` ticks the store within the host's `waitMs`, its words chosen by what the unit runs then
  * (`notTickingWords`: the start line where it runs nothing); or the one that does ends before its first pass; each naming `left`.
+ * @param host The machine as a take-over sees it.
+ * @param service The service to start.
+ * @param by The command asking, which a refusal opens on.
+ * @param old The daemon the unit ran before, or null where it ran none.
+ * @param left What becomes of the store's pause, said at the end of a refusal.
  */
 export const startedPassed = (host: TakeoverHost, service: Started, by: string, old: number | null, left: string) =>
   Effect.gen(function* () {

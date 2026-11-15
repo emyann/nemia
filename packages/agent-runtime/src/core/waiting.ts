@@ -8,6 +8,7 @@ import { turnOf } from './turn.ts';
 /**
  * A task held open, its current turn ended `succeeded` (with its statement or without), not closed and not settled: it waits on a person's
  * answer, with no process running.
+ * @param state The task's fold.
  */
 export function waitsForInput(state: State): boolean {
   const last = state.attempts.at(-1);
@@ -21,6 +22,7 @@ export function waitsForInput(state: State): boolean {
  * without the key, which reads as queued — not settled, not asked to stop, no attempt in flight, its turn not yet
  * started, not waiting on a person and not closed, and no `admitted` entry for this turn. The one reading of it:
  * `decide` holds the start on it, `admit` writes an entry only while it holds, and a view says `queued` by it.
+ * @param state The task's fold.
  */
 export function awaitsAdmission(state: State): boolean {
   return admissionOf(state) === 'queued';
@@ -30,6 +32,7 @@ export function awaitsAdmission(state: State): boolean {
  * Where a queued task stands with the layer above, for a view: `queued` while it waits for its word, `admitted`
  * once given and until the turn starts — a slot the upper layer has handed out — and nothing for a task not queued, or
  * one whose turn has started or has nothing left to start, which the phase says.
+ * @param state The task's fold.
  */
 export function admissionOf(state: State): 'queued' | 'admitted' | undefined {
   if (state.queued === false || state.settled || state.stopRequested) return undefined;

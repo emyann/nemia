@@ -20,7 +20,10 @@ const PROPOSES = / · proposes (\S+)$/;
 const SKIPPED = /^skipped \((\S+): (\S+)\)/;
 const SENT = /^sent → (\S+)/;
 
-/** What `message`, a step's sentence, says of its routing; null for a sentence that says none. */
+/**
+ * What `message`, a step's sentence, says of its routing; null for a sentence that says none.
+ * @param message The step's sentence, as the listing writes it.
+ */
 export function routedOf(message: string): Routed | null {
   const sent = SENT.exec(message);
   if (sent?.[1]) return { kind: 'sent', card: sent[1] };
@@ -33,7 +36,10 @@ export function routedOf(message: string): Routed | null {
   return null;
 }
 
-/** Each node of the graph that is no plain step, by name: none for a workflow with no condition and no workflow node. */
+/**
+ * Each node of the graph that is no plain step, by name: none for a workflow with no condition and no workflow node.
+ * @param graph The run's graph.
+ */
 export function nodeKinds(graph: Frozen<RunGraph>): Map<string, Frozen<GraphNode>> {
   return new Map((graph.nodes ?? []).filter((n) => n.kind !== 'step').map((n) => [n.name, n]));
 }
@@ -41,6 +47,7 @@ export function nodeKinds(graph: Frozen<RunGraph>): Map<string, Frozen<GraphNode
 /**
  * The route each condition of a run took, by its name: its own sentence's (`routed: <route>`), else the one a node it passed by names
  * (`skipped (<condition>: <route>)`), which is how a condition its session answered is known. None for a condition not answered yet.
+ * @param steps The run's steps, each with its name and its sentence.
  */
 export function takenRoutes(steps: ReadonlyArray<{ name: string; message: string }>): Map<string, string> {
   const taken = new Map<string, string>();
@@ -55,7 +62,11 @@ export function takenRoutes(steps: ReadonlyArray<{ name: string; message: string
   return taken;
 }
 
-/** The routes a condition answers in its graph, in the graph's order: each its route edges name, then each it ends on. */
+/**
+ * The routes a condition answers in its graph, in the graph's order: each its route edges name, then each it ends on.
+ * @param graph The run's graph.
+ * @param condition The condition's name.
+ */
 export function routesOf(graph: Frozen<RunGraph>, condition: string): string[] {
   const routes = graph.edges.flatMap((e) => (e.kind === 'route' && e.from === condition ? [e.route] : []));
   const ends = nodeKinds(graph).get(condition)?.ends ?? [];

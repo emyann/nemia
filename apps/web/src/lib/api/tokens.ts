@@ -23,6 +23,7 @@ export const tokensQuery = queryOptions({
  * Retires the token `name`, as the package's `token rm` does: from then on it is refused as unknown, wherever it is kept. Answers the
  * token as it was listed; rejects with the api's refusal in full — a token retired elsewhere first (404), or a caller that is no person
  * (403).
+ * @param name The token's name.
  */
 export const retireToken = (name: string): Promise<Token> =>
   call(

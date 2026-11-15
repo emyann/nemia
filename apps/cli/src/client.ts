@@ -14,6 +14,7 @@ import { storeCredential } from './where.ts';
  * session; else the person's token of the context in use (`callerToken`): a remote one's, the one the config keeps for this machine's
  * own daemon, or the store's credential; none where none is, which the api refuses naming how to present one. Every request of this
  * client carries it.
+ * @param env The environment read: its `WF_SESSION_TOKEN`, and what `callerToken` reads besides.
  */
 export const sessionHeaders = (env: NodeJS.ProcessEnv = process.env): Readonly<Record<string, string>> => {
   const token = callerToken(env);
@@ -24,6 +25,7 @@ export const sessionHeaders = (env: NodeJS.ProcessEnv = process.env): Readonly<R
  * The token this client calls with, as `sessionHeaders` presents it: the session's where `WF_SESSION_TOKEN` holds one; else the
  * person's of the context in use (`chosenToken`, context.ts); else, under this machine's context, the credential the daemon keeps in
  * the store for the person (`storeCredential`, where.ts), so the person's `nemia` on the store's machine needs nothing typed.
+ * @param env The environment read: its `WF_SESSION_TOKEN`, the context in use and the store it names.
  */
 export const callerToken = (env: NodeJS.ProcessEnv = process.env): string | undefined => {
   const session = env.WF_SESSION_TOKEN;
@@ -33,7 +35,12 @@ export const callerToken = (env: NodeJS.ProcessEnv = process.env): string | unde
 /** A query's words: each key once, or several times for a list (`selector`). */
 export type Query = Readonly<Record<string, string | readonly string[] | undefined>>;
 
-/** `path` with `query` on it, against `base`. */
+/**
+ * `path` with `query` on it, against `base`.
+ * @param base The daemon's url the path is read against.
+ * @param path The route's path.
+ * @param query The query's words, none where it is left out; a key whose value is undefined is not put on.
+ */
 export const urlOf = (base: string, path: string, query: Query = {}): URL => {
   const url = new URL(path, base);
   for (const [key, value] of Object.entries(query))
@@ -41,13 +48,23 @@ export const urlOf = (base: string, path: string, query: Query = {}): URL => {
   return url;
 };
 
-/** A daemon that answered its readiness and then took no request: refused, naming its status and the restart. */
+/**
+ * A daemon that answered its readiness and then took no request: refused, naming its status and the restart.
+ * @param verb The verb the person typed, named in the command to type again.
+ * @param base The daemon's url that did not answer.
+ * @param err What the request failed with, its message named.
+ */
 export const unanswered = (verb: string, base: string, err: unknown): Refused =>
   new Refused(
     `the daemon at ${base} does not answer (${err instanceof Error ? err.message : String(err)}). See whether it is up, \`nemia service status\`, or restart it, \`nemia service restart\`, then type \`nemia ${verb}\` again`,
   );
 
-/** A daemon that serves no `path` at all, a 404 with no `error`: older than this client, refused naming the restart. */
+/**
+ * A daemon that serves no `path` at all, a 404 with no `error`: older than this client, refused naming the restart.
+ * @param verb The verb the person typed, named in the command to type again.
+ * @param base The daemon's url that answered.
+ * @param path The route's path it does not serve.
+ */
 export const olderThanThis = (verb: string, base: string, path: string): Refused =>
   new Refused(
     `the daemon at ${base} does not serve ${path}: it is older than this nemia. Restart it, \`nemia service restart\`, then type \`nemia ${verb}\` again`,

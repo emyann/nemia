@@ -143,19 +143,29 @@ export type FactoryLine = { at: string; factory: string; word: string; note?: st
 /** One line of the feed: a run's (`RunLine`), a daemon's (`DaemonLine`), the store's (`StoreLine`) or a factory's (`FactoryLine`). */
 export type FeedLine = RunLine | DaemonLine | StoreLine | FactoryLine;
 
-/** Whether `line` is a run's line, which the fold, a subscription's scope and the board's events read by its run. */
+/**
+ * Whether `line` is a run's line, which the fold, a subscription's scope and the board's events read by its run.
+ * @param line The feed's line to judge.
+ */
 export const isRunLine = (line: FeedLine): line is RunLine => 'run' in line;
 
-/** Whether `line` is the store's (`StoreLine`): its pause put or lifted, or a factory's level. */
+/**
+ * Whether `line` is the store's (`StoreLine`): its pause put or lifted, or a factory's level.
+ * @param line The feed's line to judge.
+ */
 export const isStoreLine = (line: FeedLine): line is StoreLine => 'store' in line;
 
-/** Whether `line` is a factory's (`FactoryLine`): its upgrade's conflicts pending or settled. */
+/**
+ * Whether `line` is a factory's (`FactoryLine`): its upgrade's conflicts pending or settled.
+ * @param line The feed's line to judge.
+ */
 export const isFactoryLine = (line: FeedLine): line is FactoryLine => 'factory' in line;
 
 /**
  * What `line` is about, read off its `involved` where it has one and derived from its `run` and `step` where it has not, so a v0 line and
  * the v1 line of the same thing come to the same thing: a run by its id, a step as `<run>/<step>`, a daemon by its pid, the store and a
  * factory by their names. Pure.
+ * @param line The feed's line, of any version.
  */
 export const involvedOf = (line: FeedLine): Involved =>
   line.involved ??
@@ -193,6 +203,7 @@ const labelsOf = (line: FeedLine): FeedLabels =>
  * A line built with its `reason` keeps it: a run's and a step's word carry the code the listing judged them by (`feedWords`), and only
  * a line that carries none — a v0 line, a one-shot offered by its word — is classified off its word (`reasonOf`). The reason is placed
  * where a classified one would be, so a line written says its fields in one order whichever way its reason came.
+ * @param line The line as written or as built, signed or not.
  */
 export function upgraded(line: FeedLine): FeedLine {
   if (line.apiVersion !== undefined) return current(line);
@@ -247,6 +258,7 @@ function current(line: FeedLine): FeedLine {
  * string where this version writes a literal, so a line a newer `nemia` wrote is never dropped — and the typed line every reader works
  * with. The schemas that decode a line (`FeedLineSchema`, and the digest the deliverer keeps) read through here and nowhere else. A wait on
  * the base branch's checkout, which a line written before the word was renamed says `on: 'checkout'`, reads as `base` (`WAIT_ON`).
+ * @param line The line's keys as the store's schema decoded them.
  */
 export const lineAsRead = (line: Readonly<Record<string, unknown>>): FeedLine =>
   upgraded((line.on === 'checkout' ? { ...line, on: 'base' } : line) as unknown as FeedLine);
@@ -254,6 +266,10 @@ export const lineAsRead = (line: Readonly<Record<string, unknown>>): FeedLine =>
 /**
  * The line a daemon of pid `pid` writes once it has taken the store, at `at`, saying how the holder it `replaced` ended: stopped (when),
  * gone without a stop (`takeoverLine`'s words, `now` the clock they measure by), or none before it. Pure.
+ * @param pid The process id of the daemon that took the store.
+ * @param replaced How the holder before it ended: stopped, gone without a stop, or none.
+ * @param at When the daemon took the store, an ISO time.
+ * @param now The clock the words of a holder gone without a stop measure by, in ms since the epoch.
  */
 export function startedLine(pid: number, replaced: DaemonStanding, at: string, now: number): DaemonLine {
   const gone = takeoverLine(replaced, 'the store', now);
@@ -277,6 +293,9 @@ export function startedLine(pid: number, replaced: DaemonStanding, at: string, n
  * The line the daemon's free sweep writes once it has ended the processes a finished run `run` left running, at `at`, `note` naming the
  * run and each process (`leftLineNote`): the store's, labelled with the run alone, so a subscription scoped to that run is handed it.
  * Built from its own fields. Pure.
+ * @param run The id of the finished run whose processes were ended.
+ * @param note The words naming the run and each process ended.
+ * @param at When the sweep ended them, an ISO time.
  */
 export const leftEndedLine = (run: string, note: string, at: string): StoreLine =>
   upgraded({
@@ -367,6 +386,8 @@ const counted = (fold: FeedFold, line: FeedLine, involved: Involved, reason: Rea
  * back), and a readiness line the last said of the store's readiness (`READINESS_KEY`, `readinessLines` reads it back); any other
  * store line — a code a newer `nemia` names — is no word the fold keeps. A factory's conflicts line is the last word said of its conflicts
  * (`conflictsKey`, `conflictLines` reads it back), and any other factory line is passed. A daemon's line is no run's. Pure.
+ * @param fold The fold to move, changed in place and answered.
+ * @param lines The feed's lines to fold on, in the order they were written.
  */
 export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]): FeedFold {
   for (const l of lines) {
@@ -713,6 +734,8 @@ export type FeedConflicts = readonly { factory: string; pending: boolean; messag
 /**
  * What a pass owes the feed of one factory's conflicts (`contracts/conflicts-said.contract.ts`): `ConflictsPending` where they are
  * pending and the feed did not last say so, `ConflictsSettled` where they are not and it did, else nothing. Pure.
+ * @param said What the feed last said of the factory's conflicts, or undefined where it has said nothing of them.
+ * @param pending Whether the factory's `ConflictsPending` condition is `True` now.
  */
 export const conflictsDue: ConflictsDue = (said, pending) =>
   pending ? (said === 'ConflictsPending' ? undefined : 'ConflictsPending') : said === 'ConflictsPending' ? 'ConflictsSettled' : undefined;
@@ -808,6 +831,15 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): R
  *
  * `now` is every run in the store, as the pass read it: a run not in it is a run that is gone — but for one of `unjudged`, which the pass
  * read and could not judge, and of which it says nothing. A removed run's steps get no line of their own.
+ * @param fold What the feed has said so far, as folded (`foldFeed`).
+ * @param now The words of every run in the store as the pass read it, by run id.
+ * @param at When the pass wrote, an ISO time each line carries.
+ * @param unjudged The ids of the runs the pass read and could not judge; none where not given.
+ * @param pause The store's pause as the pass read it, or undefined where it read none.
+ * @param levels Each factory's level in force, or undefined where the pass read none.
+ * @param conflicts Each factory's `ConflictsPending` condition, or undefined where the pass read none.
+ * @param readiness The store's readiness as the daemon last read it, or undefined where none was handed.
+ * @param resumed Who last lifted the store's pause by hand, and the pause it lifted; undefined where none was left.
  */
 export function feedChanges(
   fold: FeedFold,
@@ -874,6 +906,7 @@ const storeChanges = (
  * What one line of the feed says, without its time: `r-1  plan  awaiting approval  · approve it: …`, a daemon's `pid 4242  daemon
  * started  · …`, the store's `store  —  store paused by ann  · merging by hand  · since …`, or a factory's `acme  —  conflicts pending
  * · …`; the message `emitFeed` logs.
+ * @param l The feed's line to say.
  */
 export const feedSaidWords = (l: FeedLine): string => {
   const who = isStoreLine(l) && l.by ? ` by ${l.by}` : '';
@@ -890,6 +923,7 @@ export const feedSaidWords = (l: FeedLine): string => {
 
 /**
  * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`: what `nemia watch` prints of it.
+ * @param l The feed's line to say.
  */
 export const feedLineWords = (l: FeedLine): string => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
 
@@ -998,7 +1032,10 @@ const FEED_WORD: Record<EnginePhase | 'unknown', ListedPhase> = {
   unknown: 'unknown',
 };
 
-/** The engine's word for a task as the feed keeps it (`FEED_WORD`). Pure. */
+/**
+ * The engine's word for a task as the feed keeps it (`FEED_WORD`). Pure.
+ * @param word The engine's phase of the task, or `unknown`.
+ */
 export const feedPhase = (word: EnginePhase | 'unknown'): ListedPhase => FEED_WORD[word];
 
 /** The runs a person's hold on `run` waits for, none for a hold that names no run; null where nobody holds it, or it was called off. */
@@ -1023,6 +1060,8 @@ const holdingOn = (run: Pick<Run, 'hold'>, status: Assessment['status']): readon
  * What a step's sessions were denied is no part of its word: each denial is a one-shot signal of its own (`denialLines`), written once
  * per denial, and `labelled.denials` is what the pass read of them.
  *
+ * @param l The run's listing, as `nemia ls` prints it.
+ * @param run The run's record: whether it was pruned, and a person's hold on it.
  * @param closeoutOf How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its
  *   word.
  * @param labelled The labels of the run and of each of its steps, from the one source a filing's labels come from (`stepLabels`), and the

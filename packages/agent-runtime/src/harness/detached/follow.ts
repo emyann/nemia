@@ -73,6 +73,8 @@ const wholeLinesOf = (file: string, from: number): { text: string; bytes: number
 /**
  * `marks` taken from `at`: where it is after them, and the pieces said, each a `partial` moment. A piece is said under the key of
  * its message and block, added to what came before under that key (`append`), and a block written whole ends with a `last` piece.
+ * @param at Where the follow is: the message open and the text block open in it, if any.
+ * @param marks The marks read off the session's stdout since, in order.
  */
 export const marked = <A extends PartialAt>(at: A, marks: readonly PartialMark[]): [A, Followed[]] => {
   let { message, open } = at;
@@ -138,6 +140,8 @@ const pass = (source: FollowSource, name: string, at: At) =>
  *
  * Fails, as a `RunnerError` of the verb `follow`, where there is no run of `name`, and where its stdout says a line that does not
  * decode or its transcript cannot be read.
+ * @param source Where the session is found: its run, its stdout's file and folder, and how its stdout and its transcript read.
+ * @param name The session's run name.
  */
 export const followOf = (source: FollowSource, name: string): Stream.Stream<Followed, RunnerError> =>
   Stream.callback<Followed, RunnerError>((queue) =>

@@ -20,6 +20,10 @@ const NONE: readonly string[] = [];
  * A state carries the size its layout gave it as the node's own `width` and `height`, never in its `style` alone: React Flow draws a node
  * whose size it does not know `visibility: hidden` until it has measured the box, and it forgets what it measured every time these nodes
  * are built again, as the lit state moves.
+ *
+ * @param drawing the machine's drawing: its states and its routes
+ * @param lit the id of the state that is lit, none where none is
+ * @param taken the ids of the routes taken
  */
 export function flowOf(drawing: Drawing, lit: string | undefined, taken: readonly string[]) {
   const nodes: MachineFlowNode[] = drawing.states.map((box) => ({

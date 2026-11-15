@@ -359,7 +359,10 @@ export type StepOutput = {
   shapes?: Record<string, FieldShape>;
 };
 
-/** `shapes` as a step's output keeps them (`StepOutput.shapes`): none where no field was marked. */
+/**
+ * `shapes` as a step's output keeps them (`StepOutput.shapes`): none where no field was marked.
+ * @param shapes Each marked field's shape, by the field's name.
+ */
 export const shapesKept = (shapes: Record<string, FieldShape>): Pick<StepOutput, 'shapes'> =>
   Object.keys(shapes).length ? { shapes } : {};
 
@@ -538,6 +541,7 @@ export const CLOSEOUT_FIELDS = ['apiVersion', 'outcome', 'summary', 'body', 'art
 /**
  * Where a step works: its `place:`, or `git` for a step frozen on a run record before the key, as every step worked then; a step file
  * without the line is refused at load (`placeRequired`). The one reader of a step's place. Pure.
+ * @param step The step, its `place:` among it.
  */
 export const stepPlace = (step: Pick<StepSpec, 'place'>): PlaceKind => step.place ?? 'git';
 
@@ -547,10 +551,14 @@ export const stepPlace = (step: Pick<StepSpec, 'place'>): PlaceKind => step.plac
  *
  * It is what a run's ending is: the one step of a workflow that works where a person's own work is, on the branch everything lands on
  * (`validateBaseWorkspace` refuses a second, and refuses anything waiting on it).
+ * @param step The step, its `workspace:` among it.
  */
 export const endsOnBase = (step: Pick<StepSpec, 'workspace'>): boolean => step.workspace === 'base';
 
-/** The fields a step's `output:` declares, in the schema's order. `[]` for a step that declares none. */
+/**
+ * The fields a step's `output:` declares, in the schema's order. `[]` for a step that declares none.
+ * @param step The step.
+ */
 export const outputFields = (step: StepSpec): string[] => Object.keys(step.output?.schema.properties ?? {});
 
 /**
@@ -578,10 +586,18 @@ export class WorkflowError extends Invalid {
   }
 }
 
+/**
+ * Throws a `WorkflowError` saying `why`: how a workflow, a step or an agent file that does not read is refused.
+ * @param why What is wrong, and the fix.
+ */
 export function refuse(why: string): never {
   throw new WorkflowError(why);
 }
 
+/**
+ * Whether `key` is a key a step's frontmatter takes (`STEP_KEYS`).
+ * @param key A frontmatter key, as written.
+ */
 export const isStepKey = (key: string): key is StepKey => (STEP_KEYS as readonly string[]).includes(key);
 
 export const FRONTMATTER = /^---[ \t]*\n([\s\S]*?\n)?---[ \t]*(?:\n|$)/;
@@ -592,6 +608,8 @@ export const FRONTMATTER = /^---[ \t]*\n([\s\S]*?\n)?---[ \t]*(?:\n|$)/;
  *
  * A byte-order mark and `\r\n` are read away first: left in, either one hides the frontmatter in the body, and every key in it is
  * dropped without a word. Refused: a frontmatter opened on the first line that never closes.
+ * @param name What a refusal calls the file.
+ * @param text The file's text.
  */
 export function splitFrontmatter(name: string, text: string): { block: string | null; body: string } {
   text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
@@ -604,11 +622,16 @@ export function splitFrontmatter(name: string, text: string): { block: string | 
   return { block: m ? (m[1] ?? '') : null, body: (m ? text.slice(m[0].length) : text).trim() };
 }
 
+/**
+ * Whether `v` is an object that is no list and not null, as a YAML or JSON map reads.
+ * @param v Any value read.
+ */
 export const isObject = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 
 /**
  * A folder's README, in any case — `readme.md` is the same file to the person who wrote it. It says what the workflow
  * is for, and is never a step: read as one, it would be an agent told the folder's documentation.
+ * @param file A file's name.
  */
 export const isReadme = (file: string): boolean => /^readme\.md$/i.test(file);
 

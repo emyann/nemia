@@ -56,7 +56,10 @@ const upgraded = (e: Entry): Entry => {
 /** The file of the session `name`'s entry in the registry folder `under`. */
 const entryFileOf = (under: string, name: string): string => path.join(under, `${encodeURIComponent(name)}.json`);
 
-/** The entry in `file`, read as this code reads it (`upgraded`); `undefined` when there is none. */
+/**
+ * The entry in `file`, read as this code reads it (`upgraded`); `undefined` when there is none.
+ * @param file The path of the entry's JSON file.
+ */
 export const readEntry = (file: string): Entry | undefined => {
   try {
     return upgraded(JSON.parse(fs.readFileSync(file, 'utf8')) as Entry);
@@ -96,7 +99,11 @@ const keptEntryOf =
   (sessions) =>
     keptOf(harness, sessions, ({ name }) => ({ files: entryFilesOf(dir, name), records: [] }));
 
-/** The remote harness `harness`'s verbs over its registry in `dir` alone: `forget` (`forgetEntryOf`) and `kept` (`keptEntryOf`). */
+/**
+ * The remote harness `harness`'s verbs over its registry in `dir` alone: `forget` (`forgetEntryOf`) and `kept` (`keptEntryOf`).
+ * @param harness The name of the remote harness, said in what `forget` leaves and in what `kept` names.
+ * @param dir The registry's folder, whose `done/` holds the entries let go of.
+ */
 export const entryVerbsOf = (harness: string, dir: string): Required<Pick<RunnerOps, 'forget' | 'kept'>> => ({
   forget: forgetEntryOf(harness, dir),
   kept: keptEntryOf(harness, dir),
@@ -117,6 +124,8 @@ const entryNames = (under: string): string[] => {
  * a session's entry file, open or under `done`; `write` writes an entry whole, to a temporary file renamed; `open` reads the open
  * entries sent through this harness; `bySession` an entry open or let go of, by the Task's id, the id it was seen under, the
  * message's id, or its context — the latest Task sent in it.
+ * @param harness The name of the remote harness: the open entries read are those sent through it.
+ * @param root The store's folder, beneath which `remote/` is kept.
  */
 export const registryOf = (harness: string, root: string) => {
   const dir = path.join(root, 'remote');

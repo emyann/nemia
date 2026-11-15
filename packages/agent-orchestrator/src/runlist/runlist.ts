@@ -8,6 +8,7 @@ import type { MeasuredToNow } from '../../contracts/measured-to-now.contract.ts'
 /**
  * Whether the frame of a run in `state` (its status's `state`, undefined where the status carries no frame) has its `wallMs` and `clock`
  * measured to the instant its list was read at: a run still going, as `clockUntilOf` reads it to `now`. A finished run's stand still.
+ * @param state The run's state, as its status says it, or undefined where the status carries no frame.
  */
 export const measuredToNow: MeasuredToNow = (state) => state === 'waiting' || state === 'inFlight';
 
@@ -20,6 +21,7 @@ const runStateOf = (word: unknown): RunState | undefined => RUN_STATES.find((s) 
 /**
  * The version a watch compares a run at (`Versioned`): its JSON as served, its status's `wallMs` and `clock` left out where they are
  * measured to the read (`measuredToNow`), so time passing alone is no change of the run. Any other object is its JSON as is.
+ * @param object The object as served: a run, or any other a watch follows.
  */
 export const runWatchVersion = (object: WatchedObject): string => {
   const status = object['status'];

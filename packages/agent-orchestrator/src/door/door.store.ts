@@ -18,6 +18,7 @@ import { Invalid, isRefusal, type Refusal } from '../refusal/refusal.ts';
 /**
  * A synchronous act as an Effect: what `act` returns, or the refusal it threw as the failure (`isRefusal`); anything else it threw, the
  * program dies of.
+ * @param act The synchronous act to run.
  */
 export const fromThrow = <A>(act: () => A): Effect.Effect<A, Refusal> =>
   Effect.try({ try: act, catch: (err) => err }).pipe(Effect.catch((err) => (isRefusal(err) ? Effect.fail(err) : Effect.die(err))));
@@ -35,6 +36,7 @@ export type DoorOf<T, I extends string> = {
 /**
  * A layer's plain value of synchronous methods as a door: each method's act run by `fromThrow` when the Effect runs, never when it is
  * built, so a read is made where the program yields it.
+ * @param layer The layer's plain value: groups of synchronous methods.
  */
 export function doorOf<T extends Record<string, Record<string, (...args: never[]) => unknown>>, I extends string>(layer: T): DoorOf<T, I> {
   return Object.fromEntries(
@@ -48,6 +50,7 @@ export function doorOf<T extends Record<string, Record<string, (...args: never[]
 /**
  * A door as a layer's plain value again: each method runs the door's Effect at once, its refusal thrown and a defect thrown as it was.
  * What a synchronous caller that no program yields yet reads a door through, its writes checked as the door checks them.
+ * @param door The door to read and write through.
  */
 export function atOnce<T, I extends string>(door: DoorOf<T, I>): T {
   return Object.fromEntries(
@@ -63,6 +66,8 @@ export function atOnce<T, I extends string>(door: DoorOf<T, I>): T {
 /**
  * Why `value` breaks `schema`: the words of its first issue, the check's own where a check refused it (each says its fix), or null when
  * it decodes. What a layer refuses a write by.
+ * @param schema The aggregate's schema.
+ * @param value The value to decode.
  */
 export function brokenBy(schema: Schema.Top, value: unknown): string | null {
   const decoded = Schema.decodeUnknownResult(schema as Schema.Codec<unknown>)(value);
@@ -74,6 +79,8 @@ export function brokenBy(schema: Schema.Top, value: unknown): string | null {
 
 /**
  * The write check of a door: `value` as given, or `Invalid` naming what of `subject` it breaks (`brokenBy`), before any layer writes it.
+ * @param schema The aggregate's schema the write is checked by.
+ * @param subject Names what is written, for the refusal, from the value.
  */
 export const checked =
   <S extends Schema.Top>(schema: S, subject: (value: never) => string) =>
@@ -89,6 +96,8 @@ export const checked =
  * given no root, `Invalid` naming the fix — a program reads no store it was not pointed at. What a definition door defaults to, so a
  * program given `StoreRoot` (the CLI's, the api's) reads its files and a test gives the door's memory layer with no root at all. `over`
  * is built once with no root for its methods' names, none of which runs; `door` names the door in the refusal.
+ * @param over Builds the door's layer at a store's root.
+ * @param door The door's name, said in the refusal.
  */
 export function rootedDoor<D extends object>(over: (root: string) => D, door: string): D {
   const unrooted = new Invalid({

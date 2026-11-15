@@ -13,6 +13,12 @@ const [, ALLOWS, DENIES, MODE] = FENCE_KEYS;
 /** Whether `after` holds a rule `before` does not. */
 const gained = (before: readonly string[], after: readonly string[]): boolean => after.some((rule) => !before.includes(rule));
 
+/**
+ * Whether going from `before` to `after` widens access, narrows it, or leaves it the same; widening is judged first, so a
+ * change that does both widens.
+ * @param before The object's access before the change; `NO_ACCESS` where it was not there.
+ * @param after The object's access after the change; `NO_ACCESS` where it is no longer there.
+ */
 export const accessChange: AccessChangeOf = (before, after) => {
   if (gained(before.allows, after.allows) || gained(after.denies, before.denies) || after.mode > before.mode) return 'widens';
   if (gained(after.allows, before.allows) || gained(before.denies, after.denies) || after.mode < before.mode) return 'narrows';
@@ -37,13 +43,19 @@ const MODE_RANKS: Readonly<Record<string, number>> = Object.fromEntries(
 /** The rank of a mode no rank names: above the widest. */
 const UNKNOWN_MODE = Math.max(0, ...Object.values(MODE_RANKS)) + 1;
 
-/** The rank of the mode `mode` names: the runtime's given mode's where none is named. */
+/**
+ * The rank of the mode `mode` names: the runtime's given mode's where none is named.
+ * @param mode The permission mode as written; undefined, null or empty where none is named.
+ */
 export const modeRank = (mode: unknown): number => {
   const named = mode === undefined || mode === null || mode === '' ? REACH?.given : mode;
   return typeof named === 'string' ? (MODE_RANKS[named] ?? UNKNOWN_MODE) : UNKNOWN_MODE;
 };
 
-/** A list of rules as a line writes them, `Read, Bash(git diff *)`, split at the commas outside parentheses; a list given as is. */
+/**
+ * A list of rules as a line writes them, `Read, Bash(git diff *)`, split at the commas outside parentheses; a list given as is.
+ * @param value A line of rules, or a list of them; anything else holds none.
+ */
 export function rulesIn(value: unknown): string[] {
   if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string').map((v) => v.trim());
   if (typeof value !== 'string') return [];
@@ -90,6 +102,9 @@ const joined = (all: readonly Access[]): Access => ({
  * The access of an object of `kind` whose spec is `spec`, as `accessChange` compares it: an Agent's keys; a Workflow's steps' keys, each
  * rule led by its step; a Hire's agent in its step; an McpServer's address; a Factory's attached workflows. A Skill lets nothing through
  * of its own. A spec absent (an object not there) is `NO_ACCESS`. Pure.
+ * @param kind The object's kind: Agent, Workflow, Hire, McpServer, Factory or Skill; any other lets nothing through.
+ * @param name The object's name, which an McpServer's rule carries.
+ * @param spec The object's spec; undefined or null where the object is not there.
  */
 export function accessOf(kind: string, name: string, spec: unknown): Access {
   if (spec === undefined || spec === null) return NO_ACCESS;

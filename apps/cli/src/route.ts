@@ -47,6 +47,7 @@ export const routeOf: RouteOf = ({ name, local, help, remote }) => {
 /**
  * The name `argv` opens with as the route reads it: the longest of `MOVED_COMMANDS` its words open with (`inbox add` over `inbox`), else
  * its first word. A word a command does not take is refused by its own words, before the api is asked anything.
+ * @param argv The words typed after the bin's name.
  */
 export const nameOf = (argv: readonly string[]): string => {
   const opens = moved.filter((name) => {

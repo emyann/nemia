@@ -52,6 +52,9 @@ function resolved(q: Question, typed: Typed, value: string): Answer {
 /**
  * Each of `typed` resolved against `questions`, numbered as `nemia decide <runId>` prints them; refused, exit 2, naming the forms or the
  * command that prints the numbering, where one cannot be read. None for a step that asks none, which the api refuses in its own words.
+ * @param questions The questions the step asks now, in the order `nemia decide` numbers them.
+ * @param typed Each `--answer` as typed.
+ * @param runId The run's id, said in a refusal.
  */
 export function numberedAnswers(questions: readonly Question[], typed: readonly string[], runId: string): Answer[] {
   if (!questions.length) return [];
@@ -67,14 +70,25 @@ export function numberedAnswers(questions: readonly Question[], typed: readonly 
   });
 }
 
-/** The questions the current try of `step` of run `runId` asks, field by field, in the order its closeout lists them. */
+/**
+ * The questions the current try of `step` of run `runId` asks, field by field, in the order its closeout lists them.
+ * @param command The command's name, said in the api's refusal.
+ * @param runId The run's id.
+ * @param step The step's name.
+ */
 export async function askedNow(command: string, runId: string, step: string): Promise<Question[]> {
   const { tries } = await asked(command, (c) => c.steps.tries({ params: { runId, step }, query: {} }));
   const current = tries.find((t) => t.current) ?? tries.at(-1);
   return (current?.closeout?.questions ?? []).flatMap((asked) => asked.questions);
 }
 
-/** The `answers` the api takes for `typed`, the `--answer`s given to `command` for `step` of `runId`; none where none were typed. */
+/**
+ * The `answers` the api takes for `typed`, the `--answer`s given to `command` for `step` of `runId`; none where none were typed.
+ * @param command The command's name, said in a refusal.
+ * @param runId The run's id.
+ * @param step The step's name.
+ * @param typed Each `--answer` as typed.
+ */
 export async function answersOf(command: string, runId: string, step: string, typed: readonly string[]): Promise<{ answers?: Answer[] }> {
   if (!typed.length) return {};
   return { answers: numberedAnswers(await askedNow(command, runId, step), typed, runId) };

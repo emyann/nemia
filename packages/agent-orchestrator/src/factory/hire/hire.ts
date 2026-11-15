@@ -7,20 +7,32 @@
 import type { HireStatus } from 'objects';
 import type { FillOriginOf, SettingOriginOf } from '../../../contracts/hire-origin.contract.ts';
 
-/** Who fills a step: its own file's `agent:` (`written`), the factory's hire (`hired`), neither, or both, which a start refuses. */
+/**
+ * Who fills a step: its own file's `agent:` (`written`), the factory's hire (`hired`), neither, or both, which a start refuses.
+ * @param written Whether the step's own file names an agent.
+ * @param hired Whether the factory hires an agent into the step.
+ */
 export const fillOrigin: FillOriginOf = (written, hired) => {
   if (written && hired) return 'refused';
   if (written) return 'step';
   return hired ? 'factory' : 'unfilled';
 };
 
-/** Where a setting came from: the step's own file where it writes it, else its agent's where it gives it, else the harness's default. */
+/**
+ * Where a setting came from: the step's own file where it writes it, else its agent's where it gives it, else the harness's default.
+ * @param stepSets Whether the step's own file writes the setting.
+ * @param agentGives Whether the step's agent gives the setting.
+ */
 export const settingOrigin: SettingOriginOf = (stepSets, agentGives) => {
   if (stepSets) return 'step';
   return agentGives ? 'agent' : 'default';
 };
 
-/** The name of the Hire of the step `step` of the workflow `workflow`: the two joined by a dot, `build.implement`. */
+/**
+ * The name of the Hire of the step `step` of the workflow `workflow`: the two joined by a dot, `build.implement`.
+ * @param workflow The workflow's name.
+ * @param step The step's name.
+ */
 export const hireNamed = (workflow: string, step: string): string => `${workflow}.${step}`;
 
 /** A step of a workflow, as a Hire names it. */
@@ -29,6 +41,7 @@ export type HiredStep = { readonly workflow: string; readonly step: string };
 /**
  * The steps among `steps` whose names join to the name of another's (`a.b` step `c`, `a` step `b.c`): by the joined name, each step
  * that holds it. A name only one step joins to is not there.
+ * @param steps The steps of a factory's workflows, each by its workflow and its name.
  */
 export function hiresCollided(steps: readonly HiredStep[]): ReadonlyMap<string, readonly HiredStep[]> {
   const by = new Map<string, HiredStep[]>();
@@ -58,6 +71,8 @@ export type HireRead = {
  * A Hire's status off its step's read (`HireRead`): who fills the step (`fillOrigin`) and the agent that does, the step's own before the
  * factory's, each of the settings `keys` — the Hire's, as `objects` names them — with its value and where it came from
  * (`settingOrigin`), the factory's harness settings, and why it does not read.
+ * @param read What the read of the factory's step says of its hire.
+ * @param keys The names of the settings the Hire says.
  */
 export function hireStatusOf(read: HireRead, keys: readonly string[]): HireStatus {
   const agent = read.written ?? read.hired;

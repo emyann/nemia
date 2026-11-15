@@ -52,7 +52,11 @@ const SETTINGS_TABS = [
 /** A tab of Settings (`SETTINGS_TABS`): its page and its name. */
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
-/** The tabs of the place whose tab's page `path` is, itself and not a page under it; none on any other page. */
+/**
+ * The tabs of the place whose tab's page `path` is, itself and not a page under it; none on any other page.
+ *
+ * @param path the address of the page
+ */
 export const tabsOf = (path: string): readonly SettingsTab[] | undefined =>
   SETTINGS_TABS.some((tab) => tab.to === path) ? SETTINGS_TABS : undefined;
 
@@ -76,11 +80,20 @@ export const DESTINATIONS: readonly Destination[] = [
   { id: 'settings', label: 'Settings', icon: Settings, lights: (path) => SETTINGS_TABS.some((tab) => under(tab.to)(path)) },
 ];
 
-/** Every destination of `table` that the page at `path` lights: one for each of the board's routes. */
+/**
+ * Every destination of `table` that the page at `path` lights: one for each of the board's routes.
+ *
+ * @param path the address of the page
+ * @param table the destinations to read, the rail's by default
+ */
 export const destinationsLit = (path: string, table: readonly Destination[] = DESTINATIONS): Destination[] =>
   table.filter((destination) => destination.lights(path));
 
-/** The one destination the page at `path` lights, none for an address no route has. */
+/**
+ * The one destination the page at `path` lights, none for an address no route has.
+ *
+ * @param path the address of the page
+ */
 export const destinationOf = (path: string): Destination | undefined => {
   const lit = destinationsLit(path);
   return lit.length === 1 ? lit[0] : undefined;
@@ -93,6 +106,10 @@ const floorHref = (factory: string): string => `/factories/${encodeURIComponent(
  * Where the destination `id` leads with `picked` the factory the address picks and `first` the first factory listed: a list of the Inbox,
  * Runs or Workflows narrowed to `picked`, every factory's under none; Factories to the floor of `picked`, else of `first`, else Overview;
  * any other its own page.
+ *
+ * @param id the destination's key
+ * @param picked the factory the address picks, none for All factories
+ * @param first the first factory listed, none where there is none
  */
 export function destinationHref(id: string, picked: string | undefined, first: string | undefined): string {
   if (id === 'factories') {
@@ -108,6 +125,9 @@ export function destinationHref(id: string, picked: string | undefined, first: s
  * The factory the address at `path` with `search` picks, from the address alone: the name of a factory's own page, its floor or its
  * settings, else the `?factory=` of a section's page — the Inbox, Runs, Workflows or Capabilities — or of a workflow's page or a step's,
  * which read in it, and of a factory's own agent or skill, and of no other page under them; none, All factories, on every other page.
+ *
+ * @param path the address of the page
+ * @param search the page's search
  */
 export function pickedOf(path: string, search: Record<string, unknown>): string | undefined {
   return ownerOf(path) ?? (isListing(path) || workflowPageAt(path) || ownDefinitionAt(path) ? factorySearch(search).factory : undefined);
@@ -117,6 +137,9 @@ export function pickedOf(path: string, search: Record<string, unknown>): string 
  * The open runs the frame counts at `path` with `search`: the run list of the factory the address picks (`pickedOf`), every factory's
  * under none — the one query the rail's Runs badge and Nemia's cue read their `counts.waiting` from, and the Runs page's own when no
  * label selector narrows it, so the three say one number and are read again together.
+ *
+ * @param path the address of the page
+ * @param search the page's search
  */
 export const frameRunsQuery = (path: string, search: Record<string, unknown>) => openRunsQuery(pickedOf(path, search));
 
@@ -143,6 +166,10 @@ type PickTarget =
  * a factory's own page, its floor or its settings, the picked factory's floor, or Overview for All factories; on a factory's own agent or
  * skill, the same name read in the picked factory, or the Agents page for All factories; on any other page, the picked
  * factory's floor, and nowhere for All factories, which that page already shows.
+ *
+ * @param path the address of the page
+ * @param search the page's search
+ * @param factory the factory picked, none for All factories
  */
 export function pickTo(path: string, search: Record<string, unknown>, factory: string | undefined): PickTarget | null {
   if (isListing(path)) {

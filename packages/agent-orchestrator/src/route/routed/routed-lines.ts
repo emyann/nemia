@@ -13,7 +13,11 @@ import { answeredRoute, personRouted, runWords } from './routed-words.ts';
 /** A routed step's row: its whole line, or (`besides`) words said after the line its own work gives, as a gate's proposed route. */
 export type RoutedRow = (CodedStep & { message: string; note?: string }) | { besides: string };
 
-/** The line a person types to route a condition by hand. */
+/**
+ * The line a person types to route a condition by hand.
+ * @param run The run, named by its id in the line.
+ * @param condition The condition to route: its name and the routes it declares.
+ */
 export const routeLine = (run: Pick<Run, 'id'>, condition: StepSpec): string =>
   `nemia route ${run.id} ${condition.name} <${(condition.routes ?? []).join('|')}>`;
 
@@ -36,7 +40,10 @@ const readableOf =
     return c && !('error' in c) ? c : undefined;
   };
 
-/** Every step's word on this pass (`runWords`), off the run's one read: its readers as the pass made them (`readersOf`). */
+/**
+ * Every step's word on this pass (`runWords`), off the run's one read: its readers as the pass made them (`readersOf`).
+ * @param read The run's one read: its steps, the run, and its readers as the pass made them.
+ */
 export const listedWords = (
   read: Pick<AssessRead, 'steps' | 'run' | 'phaseOf' | 'signedOff' | 'asked' | 'spendOf' | 'verdictOf'>,
 ): Map<string, StepStatus> => runWords(read.steps, read.run, read.phaseOf, read.signedOff, read.asked, read.spendOf, read.verdictOf);
@@ -47,6 +54,7 @@ export const listedWords = (
  * that its table answers none, with the line that routes it by hand while no node after it is filed; a filed condition that stopped on no
  * route of its own (`blocked`, `unsigned`) that line too, and one a person routed its route.
  *
+ * @param input What the rows read of the listing: the run, its steps, and each step's closeout as the list is given it.
  * @param words Every step's word on this pass (`runWords`), judged once by the caller (`listing`, or `listedWords` off the run's read).
  */
 export function routedRows(input: RoutedInput, words: ReadonlyMap<string, StepStatus>): Map<string, RoutedRow> {

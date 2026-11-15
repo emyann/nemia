@@ -40,6 +40,7 @@ export type DecisionHow = { sensitive?: readonly string[] };
 /**
  * A diff `git diff` gave for several files, one entry per file, each cut to `DIFF_LINES`, with the lines its hunks add and remove counted
  * whole. Named for a person — `from → to` for a rename — off the file's own header lines, before its first hunk.
+ * @param diff The text `git diff` gave, every file's header and hunks.
  */
 export function diffFiles(diff: string): DiffFile[] {
   const files: string[][] = [];

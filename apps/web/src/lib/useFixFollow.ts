@@ -16,6 +16,8 @@ type FixFollowed = { output: string; phase: FixPhase; ended?: Fix; unread?: stri
  * api keeps, is what it printed. A stream that opens again (the EventSource's own reconnect) is sent the output from its start, so what
  * was printed is read afresh then. The stream is closed on the error its end fires, or a grace after its end, never on the end itself.
  * `onEnded`, as the last render gave it, is told the fix once it ends.
+ * @param fix The started fix, as the api answered its start.
+ * @param onEnded Told the fix as it ended; undefined where nobody is told.
  */
 export function useFixFollow(fix: Fix, onEnded?: (ended: Fix) => void): FixFollowed {
   const [followed, setFollowed] = useState<FixFollowed>({ output: fix.output, phase: fix.phase });

@@ -48,6 +48,7 @@ const versionOf = (held: Held): string =>
 /**
  * A fresh Workflow door over a map: no workflow held. Its agents and skills found through `defs`, the Agent and Skill doors given, else
  * through those the program is given.
+ * @param defs The Agent and Skill doors to find agents and skills through; left out, those the program is given.
  */
 export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
   const workflows = new Map<string, Held>();

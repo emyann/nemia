@@ -36,6 +36,9 @@ const countsOf = (usage: Usage): Usage => {
  * passes is written once — or when the reading has fewer responses than the record: a count from a later start, not the attempt's.
  * Nothing for a job, whose spend is written at its end, a settled task, an ended attempt, a session the pass did not see, or a
  * sighting that carries no usage, as a busy session's does not.
+ * @param state The task's fold.
+ * @param sighting What the pass saw of the attempt's session, or undefined where it saw nothing.
+ * @param at The moment the entry is stamped, an ISO time.
  */
 export function countedFacts(state: State, sighting: Sighting | undefined, at: string): Event[] {
   const last = state.attempts.at(-1);

@@ -6,10 +6,17 @@
 import type { ListItem, OnceEach, WithSharedLines } from '../../contracts/shared-lines.contract.ts';
 import { isPathItem } from './layout.ts';
 
-/** `lines` with each line kept at its first place and left out after it. */
+/**
+ * `lines` with each line kept at its first place and left out after it.
+ * @param lines The lines, in order.
+ */
 export const onceEach: OnceEach = (lines) => lines.filter((line, i) => !lines.slice(0, i).includes(line));
 
-/** The list `items` with each `{ path }` item replaced by the lines `linesOf` holds for its file, a line already written left out. */
+/**
+ * The list `items` with each `{ path }` item replaced by the lines `linesOf` holds for its file, a line already written left out.
+ * @param items The list's items: each a `{ line }` or a `{ path }`.
+ * @param linesOf The lines a file of shared lines holds, given its path.
+ */
 export const withSharedLines: WithSharedLines = (items, linesOf) =>
   onceEach(items.flatMap((item) => ('path' in item ? linesFor(linesOf, item.path) : [item.line])));
 
@@ -17,6 +24,9 @@ export const withSharedLines: WithSharedLines = (items, linesOf) =>
 const linesFor = (linesOf: Readonly<Record<string, readonly string[]>>, file: string): readonly string[] =>
   Object.entries(linesOf).find(([name]) => name === file)?.[1] ?? [];
 
-/** The items of a list field as `withSharedLines` takes them: a string as its own `{ line }`, a `{ path }` as it is; anything else none. */
+/**
+ * The items of a list field as `withSharedLines` takes them: a string as its own `{ line }`, a `{ path }` as it is; anything else none.
+ * @param value The list field's value.
+ */
 export const listItemsOf = (value: readonly unknown[]): ListItem[] =>
   value.flatMap((item): ListItem[] => (typeof item === 'string' ? [{ line: item }] : isPathItem(item) ? [{ path: item.path }] : []));

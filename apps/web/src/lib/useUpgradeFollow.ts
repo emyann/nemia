@@ -26,6 +26,7 @@ type UpgradeFollowed = { output: string; phase: UpgradePhase; ended?: Upgrade; u
  * up on after it had opened (an answer that is not the stream's) is opened again after a pause; the api sends the output from its start,
  * so what was printed is read afresh then. On its end the version, the readiness and the upgrades read are read again, the server now
  * running what it runs. The stream is closed on the error its end fires, or a grace after its end, never on the end itself.
+ * @param upgrade The started upgrade, as the api answered its start.
  */
 export function useUpgradeFollow(upgrade: Upgrade): UpgradeFollowed {
   const queryClient = useQueryClient();

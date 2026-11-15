@@ -23,6 +23,7 @@ function folderOf(home: string, name: string): string {
 /**
  * Why the file `at` cannot be placed in a factory's folder, or undefined: a path is split by `/`, stands under the folder, and names a
  * file there — an empty one, a whole one, one with a backslash or a part that is empty, `.` or `..` is refused.
+ * @param at The file's path from the factory's folder, split by `/`.
  */
 export function folderPathRefusal(at: string): string | undefined {
   const parts = at.split('/');
@@ -31,7 +32,10 @@ export function folderPathRefusal(at: string): string | undefined {
   return undefined;
 }
 
-/** Whether the file at `at`, a path from a factory's folder, stays with the store (`FOLDER_STAYS`). */
+/**
+ * Whether the file at `at`, a path from a factory's folder, stays with the store (`FOLDER_STAYS`).
+ * @param at The file's path from the factory's folder, split by `/`.
+ */
 export const staysWithStore = (at: string): boolean => (FOLDER_STAYS as readonly string[]).includes(firstPiece(at, '/'));
 
 /** The regular files under `dir`, by their path from `top` split by `/`; a link, a device or a socket is no file of it. */
@@ -47,7 +51,11 @@ function filesUnder(top: string, dir: string): TreeFile[] {
 /** A factory's folder as a move reads it: the files that move, by path, sorted, and the folders of `FOLDER_STAYS` it holds, which stay. */
 export type FolderRead = { readonly files: readonly TreeFile[]; readonly stays: readonly string[] };
 
-/** The files of the factory `name`'s folder in the store `home`, and what of it stays with the store (`FolderRead`); none for no folder. */
+/**
+ * The files of the factory `name`'s folder in the store `home`, and what of it stays with the store (`FolderRead`); none for no folder.
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export function folderReadAt(home: string, name: string): FolderRead {
   const dir = folderOf(home, name);
   if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()) return { files: [], stays: [] };
@@ -61,6 +69,9 @@ export function folderReadAt(home: string, name: string): FolderRead {
  * The factory `name`'s folder in the store `home` made of `files`: written in a hidden sibling, then renamed into place, and that sibling
  * removed whatever happens. Refused before anything is written: a path that is no file of it (`Invalid`, `folderPathRefusal`), and a
  * folder already there (`Conflict`, left as it was). Answers the folder.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param files The files of the folder, each by its path from it, its mode and its bytes.
  */
 export function folderPlacedAt(home: string, name: string, files: readonly TreeFile[]): string {
   const dir = folderOf(home, name);
@@ -92,7 +103,11 @@ export function folderPlacedAt(home: string, name: string, files: readonly TreeF
   return dir;
 }
 
-/** The factory `name`'s folder in the store `home` removed whole: whether there was one. */
+/**
+ * The factory `name`'s folder in the store `home` removed whole: whether there was one.
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export function folderRemovedAt(home: string, name: string): boolean {
   const dir = folderOf(home, name);
   const there = fs.lstatSync(dir, { throwIfNoEntry: false }) !== undefined;

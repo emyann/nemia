@@ -9,6 +9,8 @@ import type { State } from './domain.ts';
  * configuration gives for itself — the last one given with those words, whole, which the engine lays over the filing's
  * (`configForTurn`). Turn 0 is the task as filed: every attempt of a task not held open, told the brief, with nothing of
  * its own.
+ * @param state The task's fold.
+ * @param n The turn's number, from 0; the current turn by default.
  */
 export function turnOf(state: State, n = state.inputs.length) {
   const attempts = state.attempts.filter((a) => (a.turn ?? 0) === n);

@@ -34,6 +34,8 @@ export type SaidTo = Said & { try: number };
 /**
  * Whether words said to the step `name` now are kept for its first try rather than said to a session: nothing of it is filed — no task,
  * and no try behind it. Pure. `sayRefusal` still judges a cancelled or pruned run, and a step the run does not have.
+ * @param run The run whose step's record is read.
+ * @param name The step the words are said to.
  */
 export const saidAhead = (run: Run, name: string): boolean => {
   const step = run.steps[name];
@@ -52,6 +54,10 @@ export const saidAhead = (run: Run, name: string): boolean => {
  * about the session — words that are empty, an attempt not started, a harness with no way in, a session its harness does not list — is the
  * engine's to refuse, in its own words (`Engine.say`). A settled step of a pruned or a held run is told that the try that would carry the
  * words is refused (`prunedRefusal`, `heldRefusal`).
+ * @param steps The workflow the run is judged by: the steps it has.
+ * @param run The run whose step is said to.
+ * @param name The step the words are said to.
+ * @param phaseOf The phase of each of the run's tasks, by its id: whether the current try's task has settled.
  */
 export function sayRefusal(steps: readonly StepSpec[], run: Run, name: string, phaseOf: (taskId: string) => TaskPhase): string | null {
   if (!steps.some((s) => s.name === name) || !run.steps[name])
@@ -77,12 +83,16 @@ export function sayRefusal(steps: readonly StepSpec[], run: Run, name: string, p
   return null;
 }
 
-/** How `nemia ls` notes a step whose current try a person said something to (`nemia say`): `said to 2×`. Empty when nobody did. */
+/**
+ * How `nemia ls` notes a step whose current try a person said something to (`nemia say`): `said to 2×`. Empty when nobody did.
+ * @param times How many times a person said something to the step's current try.
+ */
 export const saidWord = (times: number): string => (times > 0 ? `said to ${times}×` : '');
 
 /**
  * How `nemia ls` notes a step said to before it was filed (`nemia say`, kept for its first try): `said to 2× before it ran`, while it is
  * on its first try or has none yet. Empty when nobody did.
+ * @param times How many times a person said something to the step before it was filed.
  */
 export const saidBeforeWord = (times: number): string => (times > 0 ? `said to ${times}× before it ran` : '');
 
@@ -91,6 +101,7 @@ export const saidBeforeWord = (times: number): string => (times > 0 ? `said to $
  * the order given — when, to which try, and to which attempt where it was not the first — and the words as data, in a fence longer than any
  * run of backticks in them (`fenced`), as a try's brief carries an answer: words that read as a heading or a command are shown as what was
  * said. Pure. None when nothing was said, so the screen of a step nobody spoke to is what it was.
+ * @param said What a person said to the step's sessions, in the order given: when, to which try and attempt, and the words.
  */
 export function saidLines(said: readonly SaidTo[]): string[] {
   return said.flatMap((s) => [
@@ -107,6 +118,7 @@ export function saidLines(said: readonly SaidTo[]): string[] {
  *
  * Two of its tests hold of every text the others pass, and are made so the verifier need not prove them of `indexOf` and `slice`: that
  * the name, cut at the first `AGENT_WRITES`, holds none; and that the frame written again around the name and the words is the text.
+ * @param text The words as the step's journal holds them.
  */
 export const saidBy: SaidBy = (text) => {
   const asJournalled = { from: { kind: 'person' }, words: text } as const;
@@ -126,6 +138,7 @@ export const saidBy: SaidBy = (text) => {
 /**
  * A said as the run's step status shows it (`objects`' `Said`): the engine's entry as journalled, with who wrote it (`from`) and its
  * words without the frame (`words`) where an agent did; the person's unchanged, no key added. Pure.
+ * @param said The engine's entry as journalled, its words in `text`.
  */
 export function saidOf<S extends { text: string }>(said: S): S | (S & SaidFrom) {
   const by = saidBy(said.text);

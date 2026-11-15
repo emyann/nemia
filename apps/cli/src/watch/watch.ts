@@ -51,7 +51,10 @@ function askedOf(args: Args): Asked {
   };
 }
 
-/** The cursor a cursor file holds, none where there is no file, or `'refused'` for one holding no whole number. */
+/**
+ * The cursor a cursor file holds, none where there is no file, or `'refused'` for one holding no whole number.
+ * @param file The cursor file's path, undefined where none was named.
+ */
 export function savedIn(file: string | undefined): number | undefined | 'refused' {
   if (file === undefined || fs.statSync(file, { throwIfNoEntry: false }) === undefined) return undefined;
   const text = fs.readFileSync(file, 'utf8').trim();
@@ -72,7 +75,11 @@ function watchSaved(file: string | undefined): number | undefined {
   );
 }
 
-/** Writes `cursor` to the cursor file, whole: to a temp name beside it, then renamed over it, as the in-process watch writes it. */
+/**
+ * Writes `cursor` to the cursor file, whole: to a temp name beside it, then renamed over it, as the in-process watch writes it.
+ * @param file The cursor file's path; undefined where none was named, and nothing is written.
+ * @param cursor The feed's offset read to, in bytes.
+ */
 export const kept = (file: string | undefined, cursor: number): void => {
   if (file === undefined) return;
   const temp = `${file}.${process.pid}.tmp`;
@@ -83,7 +90,10 @@ export const kept = (file: string | undefined, cursor: number): void => {
 /** One event of the stream: its name, its data and its id, as an EventSource reads a block. */
 export type Sent = { event: string; data: string; id?: string };
 
-/** The whole blocks of `text`, and what is left after them. A comment line is nothing. A fix's output stream is read with it too. */
+/**
+ * The whole blocks of `text`, and what is left after them. A comment line is nothing. A fix's output stream is read with it too.
+ * @param text The stream's text read so far, blocks parted by a blank line.
+ */
 export function blocksOf(text: string): { sent: Sent[]; rest: string } {
   const parts = text.split('\n\n');
   const rest = parts.pop() ?? '';
@@ -361,7 +371,10 @@ async function followed(asked: Asked): Promise<number> {
   return runMain(program);
 }
 
-/** `nemia watch`, its words parsed against `objects`' `WATCH_WORDS`, over the api's stream; answers its exit code. */
+/**
+ * `nemia watch`, its words parsed against `objects`' `WATCH_WORDS`, over the api's stream; answers its exit code.
+ * @param args The command's words as parsed against `WATCH_WORDS`.
+ */
 export const watch = (args: Args): Promise<number> => {
   const asked = askedOf(args);
   return asked.once ? once(asked) : followed(asked);

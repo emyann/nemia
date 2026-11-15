@@ -21,7 +21,11 @@ export const PERMISSION_DENY = 'Deny';
 export const PERMISSION_DENIED =
   'The person denied this call where it was shown to them. Do not run it again unasked: say in your answer what you were denied, and ask them if you need it.';
 
-/** The command a shell call was typed with, as its input holds it: nothing for another tool, or for an input with no command string. */
+/**
+ * The command a shell call was typed with, as its input holds it: nothing for another tool, or for an input with no command string.
+ * @param tool The tool's name, as the call names it.
+ * @param input The call's input.
+ */
 export const commandOf = (tool: string, input: Record<string, unknown>): string | undefined => {
   const command = input['command'];
   return tool === 'Bash' && typeof command === 'string' ? command : undefined;

@@ -26,7 +26,11 @@ export const CONTEXT_VARIABLE = 'NEMIA_CONTEXT';
 /** The verb that reads and writes the client's config: `nemia config <use-context|set-context|get-contexts|current-context|headers>`. */
 export const CONFIG_VERB = 'config';
 
-/** Which daemon a command asks, from the config and the name `NEMIA_CONTEXT` holds, trimmed, if any: pure. */
+/**
+ * Which daemon a command asks, from the config and the name `NEMIA_CONTEXT` holds, trimmed, if any: pure.
+ * @param config The client's config, as its file holds it.
+ * @param asked The context's name `NEMIA_CONTEXT` holds, trimmed; undefined or empty where it names none, and the config's then holds.
+ */
 export const contextOf: ContextOf = (config, asked) => {
   const name = asked !== undefined && asked !== '' ? asked : config.current;
   if (name === undefined || name === LOCAL_CONTEXT) return { kind: 'local' };
@@ -34,7 +38,10 @@ export const contextOf: ContextOf = (config, asked) => {
   return context === undefined ? { kind: 'refused', name } : { kind: 'remote', name, server: context.server, token: context.token };
 };
 
-/** The client's config file: `$XDG_CONFIG_HOME/nemia/config.yaml`, else under `~/.config`. */
+/**
+ * The client's config file: `$XDG_CONFIG_HOME/nemia/config.yaml`, else under `~/.config`.
+ * @param env The environment read for `XDG_CONFIG_HOME` and `HOME`.
+ */
 export const configFileOf = (env: NodeJS.ProcessEnv = process.env): string => {
   const xdg = env.XDG_CONFIG_HOME;
   const home = env.HOME !== undefined && env.HOME !== '' ? env.HOME : os.homedir();
@@ -66,7 +73,10 @@ const contextsIn = (file: string, listed: unknown): Context[] => {
   });
 };
 
-/** The client's config, as its file holds it: none, where there is no file. Refused where the file does not read as one. */
+/**
+ * The client's config, as its file holds it: none, where there is no file. Refused where the file does not read as one.
+ * @param env The environment read for where the config file is.
+ */
 export function configRead(env: NodeJS.ProcessEnv = process.env): ClientConfig {
   const file = configFileOf(env);
   let text: string;
@@ -88,7 +98,11 @@ export function configRead(env: NodeJS.ProcessEnv = process.env): ClientConfig {
   return { contexts, current: textOf(read, 'current-context'), ...(localToken === undefined ? {} : { localToken }) };
 }
 
-/** `config` written whole to the client's config file, mode 0600 in a folder of mode 0700, through a temporary file renamed over it. */
+/**
+ * `config` written whole to the client's config file, mode 0600 in a folder of mode 0700, through a temporary file renamed over it.
+ * @param config The config to write, whole: its contexts, the one in use and the token kept for this machine.
+ * @param env The environment read for where the config file is.
+ */
 export function configWritten(config: ClientConfig, env: NodeJS.ProcessEnv = process.env): void {
   const file = configFileOf(env);
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
@@ -103,13 +117,17 @@ export function configWritten(config: ClientConfig, env: NodeJS.ProcessEnv = pro
   fs.renameSync(temporary, file);
 }
 
-/** Which daemon a command run with `env` asks: the config file read, `NEMIA_CONTEXT` over it (`contextOf`). */
+/**
+ * Which daemon a command run with `env` asks: the config file read, `NEMIA_CONTEXT` over it (`contextOf`).
+ * @param env The environment read for the config file and `NEMIA_CONTEXT`.
+ */
 export const chosenOf = (env: NodeJS.ProcessEnv = process.env): Chosen => contextOf(configRead(env), env[CONTEXT_VARIABLE]?.trim());
 
 /**
  * The token of the config a command run with `env` presents, where `WF_SESSION_TOKEN` is not set: the remote context's, or under this
  * machine's context the person's token for its own daemon where the config keeps one (`set-context local --token-file`); none otherwise,
  * where the client presents the store's credential under this machine's context (`callerToken`, client.ts).
+ * @param env The environment read for the config file and `NEMIA_CONTEXT`.
  */
 export function chosenToken(env: NodeJS.ProcessEnv = process.env): string | undefined {
   const config = configRead(env);
@@ -117,7 +135,10 @@ export function chosenToken(env: NodeJS.ProcessEnv = process.env): string | unde
   return chosen.kind === 'remote' ? chosen.token : chosen.kind === 'local' ? config.localToken : undefined;
 }
 
-/** A context named that the file does not hold: refused, naming the list and how to add one. */
+/**
+ * A context named that the file does not hold: refused, naming the list and how to add one.
+ * @param name The context's name that was asked.
+ */
 export const unheld = (name: string): Refused =>
   new Refused(
     `no context named ${name} in ${CONTEXT_VARIABLE} or the config: see the contexts there are with \`nemia config get-contexts\`, or add it with \`nemia config set-context ${name} --server <url> --token-file <file>\``,
@@ -245,6 +266,8 @@ function currentContext(env: NodeJS.ProcessEnv): number {
  * The token `nemia config headers` prints, from `env` and the words after `headers`: `NEMIA_TOKEN` where set and not empty; else the
  * context `--context` names, or the one in use, a remote one's token or, for `local`, the one kept for this machine's own daemon; none
  * where neither holds one. Refused, naming the list, for a context the config does not hold.
+ * @param args The words typed after `headers`, where `--context <name>` may be.
+ * @param env The environment read for `NEMIA_TOKEN`, the config file and `NEMIA_CONTEXT`.
  */
 export function headersToken(args: readonly string[], env: NodeJS.ProcessEnv): string | undefined {
   const given = env[TOKEN_VARIABLE];
@@ -267,7 +290,11 @@ function headers(args: readonly string[], env: NodeJS.ProcessEnv): number {
   return 0;
 }
 
-/** `nemia config <verb> …`, on the words after `config`: answers its exit code, or throws its refusal. */
+/**
+ * `nemia config <verb> …`, on the words after `config`: answers its exit code, or throws its refusal.
+ * @param args The words typed after `config`: the verb and its words.
+ * @param env The environment read for the config file and `NEMIA_CONTEXT`.
+ */
 export async function config(args: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
   const [verb, ...rest] = args;
   if (verb === undefined || verb === '--help' || verb === '-h') {

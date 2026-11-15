@@ -300,6 +300,7 @@ const reconcile = (fibers: FiberMap.FiberMap<string>, started: Map<string, strin
 /**
  * The deliverer, for as long as it runs: the subscriptions read again each `every` (`reconcile`), each delivered by a fiber of its own.
  * A read that throws is a warning, and the next is tried a beat later.
+ * @param options The deliverer's pace (`every`, `beat`, `digestCheck`, `retry`, `retryCap`); each left out takes its default.
  */
 export const deliver = (options: Partial<DeliverOptions> = {}): Effect.Effect<never, never, EngineService | StoreRoot> => {
   const o = { ...DELIVER_DEFAULTS, ...options };

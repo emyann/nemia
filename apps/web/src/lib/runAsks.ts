@@ -30,6 +30,9 @@ const questionsSaid = (n: number): string => `asks ${n} question${n === 1 ? '' :
 /**
  * What the step `step` of `run` asks (`asks`), in one line and its kind: its gate's, its harness's wait, the questions its closeout asks,
  * its need, the note of a try a person asked for, the calls denied it, what it waits for; else what its state means to a person.
+ * @param run The run's detail.
+ * @param step The step asked about, one of the run's.
+ * @param asks What the step's part asks (`asksOf`), never none.
  */
 export function askOf(run: RunDetail, step: StepView, asks: Asks): { kind: Exclude<RunAskKind, 'decide'>; line: string } {
   const gate = gateOfStep(run, step);
@@ -51,6 +54,7 @@ export function askOf(run: RunDetail, step: StepView, asks: Asks): { kind: Exclu
  * Every line the run asks, top to bottom: what there is to decide about its result (`toDecide`), linked to its step where it is a
  * step's approval; then each step whose part asks, in the run's order, but the step the first line names already, and each step whose
  * next try a person asked for, its note, until the tick files it. None on a run called off: nobody waits for an answer any more.
+ * @param run The run's detail.
  */
 export function runAsksOf(run: RunDetail): RunAsk[] {
   if (run.cancelledAt !== null) return [];

@@ -60,10 +60,16 @@ type Held<R extends { readonly steps: object }> = {
 export const PLACE_KINDS = ['git', 'folder'] as const satisfies readonly PlaceKind[];
 export type { PlaceKind };
 
-/** Which kind of workspace a run's steps work in. Pure. */
+/**
+ * Which kind of workspace a run's steps work in. Pure.
+ * @param run The run, whose `place` says its kind; a run with none works in git.
+ */
 export const placeOf = (run: Pick<Run, 'place'>): PlaceKind => run.place?.kind ?? 'git';
 
-/** Whether a run is a repository run: what reading its repository, base and branches needs. */
+/**
+ * Whether a run is a repository run: what reading its repository, base and branches needs.
+ * @param run The run judged.
+ */
 export const isRepositoryRun = (run: Run): run is RepositoryRun => placeOf(run) === 'git';
 
 /**
@@ -180,10 +186,16 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  */
 export type StepStatus = StepStatusWord;
 
-/** What a follower may be filed on: work a step did, or a card a workflow node filed (`sent`). `skipped` neither satisfies nor stops. */
+/**
+ * What a follower may be filed on: work a step did, or a card a workflow node filed (`sent`). `skipped` neither satisfies nor stops.
+ * @param s The status of the step waited on.
+ */
 export const satisfiesAfter = (s: StepStatus): boolean => s === 'verified' || s === 'unverified' || s === 'sent';
 
-/** A step in one of these stops what waits on it: for good where it broke, or until a person answers — a gate approved, a question met. */
+/**
+ * A step in one of these stops what waits on it: for good where it broke, or until a person answers — a gate approved, a question met.
+ * @param s The status of the step waited on.
+ */
 export const stopsFollowers = (s: StepStatus): boolean =>
   s === 'blocked' ||
   s === 'unsigned' ||
@@ -200,6 +212,7 @@ export const stopsFollowers = (s: StepStatus): boolean =>
  * Whether the run will never file anything again: it was called off (`nemia cancel`) or pruned (`nemia prune`). A hold ends nothing, since
  * it lifts and the run files on after it: a read of what the run still needs once a hold lifts reads this. Pure, and proved by
  * `contracts/honours-asks.contract.ts`.
+ * @param run The run, with its marks composed on it.
  */
 export const endedForGood: EndedForGood = (run) => MARK_MEANS[marksOf(run)].endedForGood;
 
@@ -207,14 +220,21 @@ export const endedForGood: EndedForGood = (run) => MARK_MEANS[marksOf(run)].ende
  * Whether a person's ask of the run is honoured, and anything may be asked of a person, on this pass: never of a run called off, pruned
  * or held (a hold until it lifts). A read of what the run does on this pass reads this. Pure, and proved by
  * `contracts/honours-asks.contract.ts`.
+ * @param run The run, with its marks composed on it.
  */
 export const honoursAsks: HonoursAsks = (run) => MARK_MEANS[marksOf(run)].honoursAsks;
 
-/** The marks a run carries, as its record reads with them composed on it (`runMarkOf`): called off, pruned, held. */
+/**
+ * The marks a run carries, as its record reads with them composed on it (`runMarkOf`): called off, pruned, held.
+ * @param run The run's record, with when it was called off, its prune marker and its hold, each absent where it has none.
+ */
 export const marksOf = (run: { cancelledAt?: string | null | undefined; pruned?: unknown; hold?: unknown }): RunMark =>
   runMarkOf({ cancelled: Boolean(run.cancelledAt), pruned: run.pruned !== undefined, held: run.hold !== undefined });
 
-/** The first line of some prose that is not blank, trimmed; empty where there is none. Pure. */
+/**
+ * The first line of some prose that is not blank, trimmed; empty where there is none. Pure.
+ * @param body The prose read.
+ */
 export const firstLine = (body: string): string =>
   body
     .split('\n')
@@ -225,13 +245,19 @@ export const firstLine = (body: string): string =>
 export const TRIED_FROM: ReadonlySet<StepStatus> = new Set(['unsigned', 'failed (check)', 'failed', 'stopped', 'blocked', 'denied']);
 export const SETTLED: ReadonlySet<TaskPhase> = new Set(['succeeded', 'failed', 'stopped']);
 
-/** The try a step is on: the first, and one more for each try its record keeps behind it. */
+/**
+ * The try a step is on: the first, and one more for each try its record keeps behind it.
+ * @param run The run.
+ * @param step The step's name.
+ */
 export const tryOf = (run: Run, step: string): number => (run.steps[step]?.tries?.length ?? 0) + 1;
 
 /**
  * The try the task a step is on was first filed for, from 1: the try it is on, unless a later try kept the same task — a recheck, which
  * replaces the check alone, or one answered into the session the task holds open — in which case the try that filed it. What a fact read
  * off the task's own journal belongs to, since the journal does not move when the try does. Pure.
+ * @param run The run.
+ * @param step The step's name.
  */
 export const taskTryOf = (run: Run, step: string): number => {
   const record = run.steps[step];
@@ -244,6 +270,8 @@ export const taskTryOf = (run: Run, step: string): number => {
  * The try the current turn of a step's task was given, from 1: the try it is on, less each recheck behind it, since a recheck replaces the
  * check alone and the session's turn — and the closeout it gave — stays the try's before it. A try answered into the session the task
  * holds open is a turn of its own, and its own try. What a closeout read off the task's current turn belongs to (`closeoutsOf`). Pure.
+ * @param run The run.
+ * @param step The step's name.
  */
 export const turnTryOf = (run: Run, step: string): number => {
   const tries = run.steps[step]?.tries ?? [];
@@ -259,11 +287,19 @@ export const turnTryOf = (run: Run, step: string): number => {
  *
  * The current try's, unless another is named: `<run>-<step>-check` on the first try, and
  * `<run>-<step>-try<n>-check` on the n-th.
+ * @param run The run.
+ * @param step The step's name.
+ * @param n The try, from 1; the try the step is on where absent.
  */
 export const checkTaskId = (run: Run, step: string, n = tryOf(run, step)): string =>
   n <= 1 ? `${run.id}-${step}-check` : `${run.id}-${step}-try${n}-check`;
 
-/** The id of a step's own task on its n-th try: `<run>-<step>`, then `<run>-<step>-try<n>`. Derived, for the reason a check's is. */
+/**
+ * The id of a step's own task on its n-th try: `<run>-<step>`, then `<run>-<step>-try<n>`. Derived, for the reason a check's is.
+ * @param run The run, by its id.
+ * @param step The step's name.
+ * @param n The try, from 1; the first where absent.
+ */
 export const stepTaskId = (run: { readonly id: string }, step: string, n = 1): string =>
   n <= 1 ? `${run.id}-${step}` : `${run.id}-${step}-try${n}`;
 
@@ -271,6 +307,8 @@ export const stepTaskId = (run: { readonly id: string }, step: string, n = 1): s
  * The names on a run's record in the order its steps run — `steps` as `stepsOf` gives them (`orderSteps`) — then any the record has that
  * the workflow does not, in the record's order. Pure. What `nemia decide` prints each step in: a record may be keyed in the folder's order,
  * and read by its keys a `plan → implement ⇄ review` run would print implement first.
+ * @param run The run, whose record's steps are named.
+ * @param steps The workflow's steps, in the order they run.
  */
 export const namesInOrder = (run: Pick<Run, 'steps'>, steps: readonly Pick<StepSpec, 'name'>[]): string[] => [
   ...steps.map((s) => s.name).filter((name) => Object.hasOwn(run.steps, name)),
@@ -345,7 +383,10 @@ export type LackedFile = { path: string; why: string };
  */
 export type FilesRead = { taskId: string; lacked: Readonly<Record<string, string>> };
 
-/** The files the closeout of the task a step is on named that the run did not have (`StepRecord.filesRead`): none of another task's. */
+/**
+ * The files the closeout of the task a step is on named that the run did not have (`StepRecord.filesRead`): none of another task's.
+ * @param record The step's record; undefined where the step has none.
+ */
 export const lackedOf = (record: StepRecord | undefined): LackedFile[] =>
   record?.filesRead && record.filesRead.taskId === record.taskId
     ? Object.entries(record.filesRead.lacked).map(([path, why]) => ({ path, why }))
@@ -371,16 +412,22 @@ export type LandingRecord = { commit: string } | { aborted: string; refusedOn?: 
  * words it: `unfinished`. Read the other way, a caller that passed none would call a check stopped at its
  * deadline refused, and a run the tick left waiting on a person would read running, with a try due that the
  * tick never files.
+ * @param phase The phase the check's task settled in.
+ * @param verdict The check's exit code, or its verdict; undefined where nobody read one.
  */
 export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): boolean => phase === 'failed' && typeof verdict === 'number';
 
-/** `a` and `b`, or `a, b and c`. */
+/**
+ * `a` and `b`, or `a, b and c`.
+ * @param items The words listed, in order.
+ */
 export const andList = (items: readonly string[]): string =>
   items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items.at(-1)}` : (items[0] ?? '');
 
 /**
  * A pruned run in words, as `nemia decide` says it under the run's line and where a decision would otherwise wait on a person's verb: when
  * it was pruned — or that its marker no longer says — and what was removed. Pure.
+ * @param pruned The run's prune marker, as read.
  */
 export const prunedWords = (pruned: Pruned): string => {
   const files = pruned.artifacts ? filesPrunedWords(pruned.artifacts) : '';
@@ -392,6 +439,7 @@ export const prunedWords = (pruned: Pruned): string => {
 /**
  * That `nemia prune --artifacts` removed a run's files, and when, as every surface that reads a pruned run says it: `nemia decide`, a
  * refusal, and the api's answer for a file that was there. Pure.
+ * @param files What the marker says of the files removed: when, empty where it no longer says.
  */
 export const filesPrunedWords = (files: PrunedFiles): string =>
   `its files were removed at ${files.at || 'a time its marker no longer says'} (nemia prune --artifacts)`;
@@ -400,6 +448,8 @@ export const filesPrunedWords = (files: PrunedFiles): string =>
  * Free text from outside — a harness's word, a closeout's `needs` — made one line of at most `cap` characters: every run of whitespace, a
  * newline included, becomes one space, and what is over the cap is clipped with `…`. Pure. What `waitingWords` does to a harness's word,
  * for every screen that prints such text into a line of its own.
+ * @param text The free text.
+ * @param cap The most characters the line may hold.
  */
 export function oneLine(text: string, cap: number): string {
   const line = text.trim().replace(/\s+/g, ' ');
@@ -414,13 +464,18 @@ export const DENIED_CAP = 60;
 
 /**
  * Text in a fence longer than any run of backticks inside it, so what it quotes cannot close the fence, nor open a section of the brief's.
+ * @param text The text quoted.
+ * @param info The word after the opening fence, as `json`; none where empty.
  */
 export function fenced(text: string, info = ''): string[] {
   const fence = '`'.repeat(Math.max(3, ...(text.match(/`+/g) ?? []).map((ticks) => ticks.length + 1)));
   return [`${fence}${info}`, text, fence];
 }
 
-/** JSON in a fence longer than any run of backticks inside it (`fenced`). */
+/**
+ * JSON in a fence longer than any run of backticks inside it (`fenced`).
+ * @param value The value written as JSON.
+ */
 export function dataBlock(value: unknown): string[] {
   return fenced(JSON.stringify(value, null, 2), 'json');
 }
@@ -435,6 +490,7 @@ export const stepTasks = ({ taskId, check, tries }: StepRecord): string[] => [
 /**
  * Every task a run has filed (`stepTasks`), step by step: what a read of the whole run reads, and what a journal that does not read can
  * cost it.
+ * @param run The run, whose steps' records are read.
  */
 export const runTasks = (run: Pick<Run, 'steps'>): string[] => Object.values(run.steps).flatMap(stepTasks);
 
@@ -443,6 +499,10 @@ export const runTasks = (run: Pick<Run, 'steps'>): string[] => Object.values(run
  * (`runTasks`), or undefined for a task of a run it waits on; `why`, the runtime's words; `by`, what does not judge it — `the board`,
  * `nemia ls`, `nemia decide`. One sentence wherever a run is left unjudged, as the tick leaves it: what reads, what does not, and what that
  * costs.
+ * @param runId The id of the run left unjudged.
+ * @param own The task of its own whose journal does not read; undefined for a task of a run it waits on.
+ * @param why The runtime's words for why the journal does not read.
+ * @param by What does not judge the run: `the board`, `nemia ls`, `nemia decide`.
  */
 export function unjudgedWords(runId: string, own: string | undefined, why: string, by: string): string {
   const what = own ? `the journal of its task ${own} does not: ${why}` : `the journal of a task of a run it waits on does not: ${why}`;
@@ -452,6 +512,9 @@ export function unjudgedWords(runId: string, own: string | undefined, why: strin
 /**
  * Why `by` leaves a run unjudged whose unfrozen workflow folder does not load, followed by the refusal's words (`unloadedFolder`), which
  * name the folder and the two ways on: one sentence wherever such a run is left unjudged, as the tick leaves it.
+ * @param runId The id of the run left unjudged.
+ * @param why The refusal's words (`unloadedFolder`).
+ * @param by What does not judge the run: `the board`, `nemia ls`, `nemia decide`.
  */
 export function unloadedWords(runId: string, why: string, by: string): string {
   return `${runId}'s workflow folder does not load, so ${by} does not judge the run, and the tick does not advance it, until it loads again: ${why}`;

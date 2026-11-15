@@ -70,10 +70,16 @@ const STATES: Record<SessionState, TaskState> = {
   rejected: TaskState.TASK_STATE_REJECTED,
 };
 
-/** A session's state as A2A's `TaskState`: the same word. */
+/**
+ * A session's state as A2A's `TaskState`: the same word.
+ * @param state The session's state.
+ */
 export const stateOf = (state: SessionState): TaskState => STATES[state];
 
-/** The runtime's name for an A2A state, or `undefined` for one it has no name for (`UNSPECIFIED`, or one a later A2A adds). */
+/**
+ * The runtime's name for an A2A state, or `undefined` for one it has no name for (`UNSPECIFIED`, or one a later A2A adds).
+ * @param state A2A's state, as a Task or an update carries it.
+ */
 export const nameOf = (state: TaskState): SessionState | undefined =>
   (Object.keys(STATES) as SessionState[]).find((o) => STATES[o] === state);
 
@@ -100,6 +106,8 @@ const agentSays = (messageId: string, name: string, contextId: string, text: str
  * `contextId`, empty for a spawn that starts cold; `config` travels whole, unopened. Every other key of the request is on the
  * metadata, `restartPolicy` among them: a harness reads off it whether the session stays open between turns, and one that reached
  * this seam without it would run a long-lived session as a job (`attachedLongLived`).
+ * @param r The spawn request.
+ * @param messageId The id the message is sent under.
  */
 export const messageOf = (r: SpawnRequest, messageId: string): Message => ({
   messageId,
@@ -124,6 +132,9 @@ export const messageOf = (r: SpawnRequest, messageId: string): Message => ({
 /**
  * Words said to a running session, as A2A's follow-up: a user Message on the session's Task, one text part, no mark, and
  * no context, which the Task already has.
+ * @param name The session's name, the Task's id.
+ * @param text The words said to the session.
+ * @param messageId The id the message is sent under.
  */
 export const followUpOf = (name: string, text: string, messageId: string): Message => ({
   messageId,
@@ -148,6 +159,9 @@ const sessionRefusal = (taskId: string): string | undefined =>
  * Why words sent in `contextId` are not for the session `name` the harness lists as `s`, in words — or `undefined`. A
  * follow-up sends no context, or the session's own: A2A reads a context as the conversation a message belongs to, and
  * words for another conversation are not this session's to hear.
+ * @param name The session's name, said in the refusal.
+ * @param contextId The context the message was sent in, empty for none.
+ * @param s The session as the harness lists it, whose `nativeId` is its context.
  */
 export const contextRefusal = (name: string, contextId: string, s: Sighting): string | undefined => {
   if (!contextId || contextId === s.nativeId) return undefined;
@@ -156,7 +170,10 @@ export const contextRefusal = (name: string, contextId: string, s: Sighting): st
     : `the message's contextId \`${contextId}\` is not the context of session \`${name}\`, which has none known yet: send none.`;
 };
 
-/** Why a message cannot be read as a spawn, in words — or `undefined`. What `spawnOf` reads, it has checked here. */
+/**
+ * Why a message cannot be read as a spawn, in words — or `undefined`. What `spawnOf` reads, it has checked here.
+ * @param m The message sent to spawn a session.
+ */
 export const messageRefusal = (m: Message): string | undefined => {
   if (!m.taskId) return 'the message names no task: send the session name, `ae/<task>/<n>`, as its taskId.';
   const named = sessionRefusal(m.taskId);
@@ -172,6 +189,7 @@ export const messageRefusal = (m: Message): string | undefined => {
 /**
  * Why a message cannot be read as words said to a session, in words — or `undefined`. A message with no taskId asks
  * A2A for a new Task, and this agent starts a session only on a spawn, which carries the mark.
+ * @param m The message sent to a session.
  */
 export const followUpRefusal = (m: Message): string | undefined => {
   if (!m.taskId) {
@@ -188,7 +206,10 @@ export const followUpRefusal = (m: Message): string | undefined => {
   return undefined;
 };
 
-/** The words a message `followUpRefusal` passed says. */
+/**
+ * The words a message `followUpRefusal` passed says.
+ * @param m The message, one `followUpRefusal` passed.
+ */
 export const followUpText = (m: Message): string => passedText(m, 'followUpText');
 
 /** The text of a message whose one part is text, or `undefined` for any other. */
@@ -208,6 +229,7 @@ const passedText = (m: Message, read: string): string => {
 /**
  * The spawn a message asks for, every key of the request present, as the engine builds it: a harness is handed the same
  * object whether it is reached directly or through this seam. Read only a message `messageRefusal` passed.
+ * @param m The message, one `messageRefusal` passed.
  */
 export const spawnOf = (m: Message): SpawnRequest => {
   const md = m.metadata ?? {};
@@ -232,6 +254,8 @@ export const spawnOf = (m: Message): SpawnRequest => {
  * as `text/plain` when it is a string, as Codex's prose arrives — and, when the harness said when it was given, `at`
  * (milliseconds) in its metadata. A resumed session can carry its parent's statement; `at` is how a reader tells.
  * Exported only for the tests that import it.
+ * @param payload What the workload said it finished with: a string, or any data.
+ * @param at When the harness said it was given, in milliseconds; undefined where it did not say.
  */
 export const closeoutArtifact = (payload: unknown, at?: number): Artifact => ({
   artifactId: 'closeout',
@@ -249,6 +273,7 @@ export const closeoutArtifact = (payload: unknown, at?: number): Artifact => ({
 /**
  * What a closeout Artifact carries, or `undefined` for a Task with none. The payload as it was given, string or not.
  * Exported only for the tests that import it.
+ * @param t The Task.
  */
 export const closeoutOf = (t: Task): unknown => {
   const content = t.artifacts.find((a) => a.artifactId === 'closeout')?.parts[0]?.content;
@@ -270,6 +295,9 @@ const task = (name: string, contextId: string, state: TaskState, fill: Fill = {}
  * A session the harness sees, as a Task: its state mapped, its context the harness's id for it, what it closed with its
  * Artifact, and the whole sighting in `metadata.sighting`. `state` is for the one Task whose state is not its sighting's —
  * an ended session its task holds open for a person (`INPUT_REQUIRED`) — which then carries no sighting `sightingOf` reads.
+ * @param name The session's name, the Task's id.
+ * @param s What the harness saw of the session.
+ * @param state The Task's state; the sighting's own state, mapped, where not given.
  */
 export const taskOfSighting = (name: string, s: Sighting, state = stateOf(s.state)): Task =>
   task(name, s.nativeId ?? '', state, {
@@ -277,19 +305,31 @@ export const taskOfSighting = (name: string, s: Sighting, state = stateOf(s.stat
     ...(s.closeout ? { artifacts: [closeoutArtifact(s.closeout.payload, s.closeout.at)] } : {}),
   });
 
-/** What a harness saw of a session, off a Task `taskOfSighting` built — or `undefined` for a Task that carries none. */
+/**
+ * What a harness saw of a session, off a Task `taskOfSighting` built — or `undefined` for a Task that carries none.
+ * @param t The Task, whose `metadata.sighting` is read.
+ */
 export const sightingOf = (t: Task): Sighting | undefined => {
   const s = t.metadata?.sighting as Sighting | undefined;
   return s && nameOf(t.status?.state ?? TaskState.TASK_STATE_UNSPECIFIED) === s.state ? s : undefined;
 };
 
-/** A spawn the harness took: working, with the message that asked for it, in no context known until the harness lists it. */
+/**
+ * A spawn the harness took: working, with the message that asked for it, in no context known until the harness lists it.
+ * @param name The session's name, the Task's id.
+ * @param asked The message that asked for the spawn, the Task's history.
+ */
 export const startedTask = (name: string, asked: Message): Task => task(name, '', TaskState.TASK_STATE_WORKING, { history: [asked] });
 
 /**
  * A spawn that failed, in the harness's words. `REJECTED` when the harness vouched nothing started — final, as the engine
  * ends the attempt `unstartable` — and `SUBMITTED` when a session may still exist: A2A's terminal states are final, and
  * this one may yet be adopted in the grace window.
+ * @param name The session's name, the Task's id.
+ * @param asked The message that asked for the spawn, the Task's history.
+ * @param words The harness's words for the failure, the status message.
+ * @param refused Whether the harness vouched nothing started: `REJECTED` then, else `SUBMITTED`.
+ * @param messageId The id of the status message.
  */
 export const failedSpawnTask = (name: string, asked: Message, words: string, refused: boolean, messageId: string): Task =>
   task(name, '', refused ? TaskState.TASK_STATE_REJECTED : TaskState.TASK_STATE_SUBMITTED, {
@@ -297,10 +337,17 @@ export const failedSpawnTask = (name: string, asked: Message, words: string, ref
     history: [asked],
   });
 
-/** A session stopped, as A2A answers a cancel, in the context the harness listed it under. */
+/**
+ * A session stopped, as A2A answers a cancel, in the context the harness listed it under.
+ * @param name The session's name, the Task's id.
+ * @param s The session as the harness listed it, whose `nativeId` is the context.
+ */
 export const canceledTask = (name: string, s: Sighting): Task => task(name, s.nativeId ?? '', TaskState.TASK_STATE_CANCELED);
 
-/** The words of a Task's status message, or `undefined` when it has none. */
+/**
+ * The words of a Task's status message, or `undefined` when it has none.
+ * @param t The Task.
+ */
 export const wordsOf = (t: Task): string | undefined => {
   const part = t.status?.message?.parts.find((p) => p.content?.$case === 'text');
   return part?.content?.$case === 'text' ? part.content.value : undefined;
@@ -311,6 +358,10 @@ export const wordsOf = (t: Task): string | undefined => {
  * `REJECTED`; ended succeeded → `COMPLETED`, or `INPUT_REQUIRED` when its task is held open waiting on a person (`waiting`),
  * stopped → `CANCELED`, anything else → `FAILED`. Its context is the id the attempt was recorded with, what it closed with
  * its Artifact; the reason and the rest of the attempt ride in `metadata.attempt`, and a refusal's words in `status.message`.
+ * @param name The session's name, the Task's id.
+ * @param a The attempt as the journal records it.
+ * @param messageId The id of the status message that carries the attempt's error, where it has one.
+ * @param waiting Whether the attempt's task is held open waiting on a person; false where not given.
  */
 export const taskOfAttempt = (name: string, a: Attempt, messageId: string, waiting = false): Task => {
   const state =
@@ -350,6 +401,7 @@ const WAITS: ReadonlyMap<TaskState, string> = new Map([
  * agent may publish an Artifact while it works, and a statement read then would end the attempt early (`endedOnStatement`).
  * It has no time: the Task was made by this attempt's message, so nothing on it was said before the attempt began,
  * and the engine keeps it whatever the clock says. None, and the end is recorded `closedOut: false`.
+ * @param t The remote agent's Task.
  */
 export const sightingOfTask = (t: Task): Sighting => {
   const state = t.status?.state ?? TaskState.TASK_STATE_UNSPECIFIED;
@@ -380,6 +432,8 @@ const statementOf = (artifacts: readonly Artifact[]): unknown => {
  * agent names a new one itself. The closing statement's schema rides in the metadata under the runtime's extension, for an
  * agent that reads it; the message is not marked with the extension (`messageOf`'s spawn by name), and carries nothing of
  * the local harnesses' (`cwd`, `config`), which a remote agent has no use for.
+ * @param r The spawn request.
+ * @param messageId The id the message is sent under.
  */
 export const remoteMessageOf = (r: SpawnRequest, messageId: string): Message => ({
   messageId,
@@ -392,7 +446,13 @@ export const remoteMessageOf = (r: SpawnRequest, messageId: string): Message => 
   referenceTaskIds: [],
 });
 
-/** Words for a remote Task that waits on its caller, as A2A's follow-up: a user message on that Task, in its context. */
+/**
+ * Words for a remote Task that waits on its caller, as A2A's follow-up: a user message on that Task, in its context.
+ * @param taskId The id of the remote Task.
+ * @param contextId The Task's context.
+ * @param text The words said.
+ * @param messageId The id the message is sent under.
+ */
 export const remoteFollowUpOf = (taskId: string, contextId: string, text: string, messageId: string): Message => ({
   messageId,
   contextId,
@@ -430,6 +490,8 @@ export const LOGS_CUT =
  * words, last, so that the end kept always says how it stands. Each part is quoted to `LOG_PART_CHARS`, and the whole kept to
  * its last `LOGS_CHARS` under `LOGS_CUT` when anything was cut — a part, or a history as long as the `asked` messages, which
  * the agent may have read from a longer one.
+ * @param t The remote Task, read with the history the agent gave.
+ * @param asked How many of the latest messages were asked for (`historyLength`); undefined where the whole history was asked.
  */
 export const logsOfTask = (t: Task, asked?: number): string => {
   let cut = asked !== undefined && t.history.length >= asked;
@@ -448,5 +510,8 @@ export const logsOfTask = (t: Task, asked?: number): string => {
   return endOf(text, LOGS_CHARS, LOGS_CUT, cut);
 };
 
-/** A remote agent's reply, a Message that ended its session with no Task, as its `logs` reads it: bounded as a Task's are. */
+/**
+ * A remote agent's reply, a Message that ended its session with no Task, as its `logs` reads it: bounded as a Task's are.
+ * @param reply The agent's words.
+ */
 export const logsOfReply = (reply: string): string => endOf(`agent: ${reply}`, LOGS_CHARS, LOGS_CUT, false);

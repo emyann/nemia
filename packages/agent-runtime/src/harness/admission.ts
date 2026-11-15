@@ -37,6 +37,7 @@ const isWord = (v: unknown): v is string => typeof v === 'string' && v !== '' &&
  * Why a task's `config.admission` cannot be run before its calls — or `undefined`. Refuses a value that is not an object of
  * `command` and `tools` alone, a `command` that is not a list of strings with no NUL, the program first and named, and `tools` that
  * is not a list of tools' names, at least one: admission that sees no call decides nothing.
+ * @param admission The task's `config.admission` as filed, of any shape; undefined where it is left out, which is no refusal.
  */
 export const admissionRefusalOf = (admission: unknown): string | undefined => {
   if (admission === undefined) return undefined;

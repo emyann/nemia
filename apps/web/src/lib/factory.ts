@@ -30,6 +30,7 @@ import type { Frozen } from './frozen.ts';
  * So is a run a person holds until runs land (the CLI's `hold`), and on the same terms. `assess` calls a held run running whatever its
  * steps say, and the tick lifts the hold when those runs land, though nothing of it is filed before then. Not once only a person lifts it
  * (`holding.waitingOnYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
+ * @param run The run: its status, whether it moves, and what it waits on and who holds it, where the listing says them.
  */
 export const inFlight = (run: Frozen<Pick<RunView, 'status' | 'moving'> & Held>): boolean =>
   run.moving || (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou);
@@ -37,6 +38,7 @@ export const inFlight = (run: Frozen<Pick<RunView, 'status' | 'moving'> & Held>)
 /**
  * The runs of the light answer as one list: those that wait on a person, then those in flight, each run once. Every run the board calls
  * in flight (`inFlight`) is among them, a run at its gate that still moves with the waiting.
+ * @param open The light answer's rows: those that wait on a person, and those in flight.
  */
 export const openRows = <T>(open: { waiting: readonly T[]; inFlight: readonly T[] }): T[] => [...open.waiting, ...open.inFlight];
 
@@ -47,6 +49,7 @@ type Held = { waiting?: RunView['waiting']; holding?: RunView['holding']; cancel
  * What a person has to decide about the run's result, off the api's `toDecide`: its ending step's gate, or a branch nobody merged. Null
  * while there is nothing — and for a listing without `toDecide`, read tolerantly as `onYouOf` is, since the Factory polls the list and a
  * refusal would take the whole floor down for a word.
+ * @param run The run, by the api's `toDecide`; absent or null where there is nothing to decide.
  */
 export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }): Frozen<RunToDecide> | null => run.toDecide ?? null;
 
@@ -55,6 +58,7 @@ export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }): Froz
  * waits on never lands without one — what the CLI's `ls` prints `→ waiting on you` for, either way — or a hold on it only a person lifts
  * (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on
  * nobody, whatever its steps last said.
+ * @param run The run: the steps that wait on you, when it was called off, and what it waits on and who holds it.
  */
 export const waitsOnYou = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>): boolean =>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
@@ -63,6 +67,7 @@ export const waitsOnYou = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelled
  * Whether a run waits on runs, and on nothing else: started `--after` runs not landed, each of which may still land, with nothing of it
  * filed yet (the api's `waiting`, null once a step is filed), and nobody to act (`waitsOnYou`). The floor draws such a run as a ghost, as
  * the queue lane draws a card not started, until it starts. Not a cancelled run, which waits on nobody.
+ * @param run The run: the steps that wait on you, when it was called off, and what it waits on and who holds it.
  */
 export const waitsOnRuns = (run: Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held): boolean =>
   !run.cancelledAt && Boolean(run.waiting) && !waitsOnYou(run);
@@ -74,6 +79,7 @@ export const waitsOnRuns = (run: Pick<RunView, 'waitingOnYou' | 'cancelledAt'> &
  * Without the ending step whose gate the to-decide line already says, as the CLI's `ls` prints it (cli/main.ts): that line is above, it
  * names the step and the command, and the same step is not asked for twice. A run may then wait on you with nothing here to name — the
  * whole of what is asked is the decision — so a caller that says `waiting on you:` asks whether there is anything to say first.
+ * @param run The run: the steps that wait on you, the api's words for them where it gave them, and what it has to decide.
  */
 export const onYouOf = (
   run: Frozen<Pick<RunView, 'waitingOnYou'> & { waitingOnYouWords?: readonly string[]; toDecide?: RunToDecide | null }>,
@@ -86,6 +92,7 @@ export const onYouOf = (
 /**
  * Where a run stands, in a word, as the start form offers it to wait on: called off; waiting on you (`waitsOnYou`) — a run that waits on
  * a run that never lands is one, though it has filed nothing and is not in flight; in flight; or finished.
+ * @param run The run as the api lists it.
  */
 export const standingOf = (run: Pick<RunView, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): string =>
   run.cancelledAt ? ENDED.cancelled.word : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
@@ -94,7 +101,10 @@ type Clocked = Frozen<
   Pick<RunView, 'createdAt' | 'startedAt' | 'cancelledAt'> & Held & { waitingOnYou?: RunView['waitingOnYou']; atWork?: AtWork | null }
 >;
 
-/** How long a run waited before it started — created to its first filing — or null while nothing of it is filed. */
+/**
+ * How long a run waited before it started — created to its first filing — or null while nothing of it is filed.
+ * @param run The run: when it was created, and when it started (null while nothing of it is filed).
+ */
 export const waitedMs = (run: Pick<RunView, 'createdAt' | 'startedAt'>): number | null =>
   run.startedAt === null ? null : Math.max(0, Date.parse(run.startedAt) - Date.parse(run.createdAt));
 
@@ -102,6 +112,8 @@ export const waitedMs = (run: Pick<RunView, 'createdAt' | 'startedAt'>): number 
  * Whether a run's clock still counts, second by second: the time at work of a run a task of which still runs (`AtWork.since`), and the
  * wait of a run nothing of which is filed yet and nobody called off — `finished` on the floor for one that waits on a run that never
  * lands, and waiting all the same. A run without the api's time at work counts while it is in flight, as `finished` says.
+ * @param run The run's times: created, started, called off, and its time at work where the api gives it.
+ * @param finished Whether the floor reads the run as finished, not in flight.
  */
 export const clockCounts = (run: Clocked, finished: boolean): boolean => {
   if (run.startedAt === null) return run.cancelledAt === null;
@@ -166,6 +178,10 @@ const rowWords = (run: Clocked, now: number): string => {
  * then waits, doing nothing, until they land, and that wait is not time at work. Until it starts it says it is waiting, for as long as it
  * has — what it waits on is the card's line above (`waiting.word`), and the title's — and a run called off before it started never did.
  * A run the api could not judge has no time at work, and says when it started.
+ * @param run The run's times: created, started, called off, and its time at work where the api gives it.
+ * @param now The instant the clock reads, in ms since the epoch.
+ * @param finished Whether the floor reads the run as finished, not in flight.
+ * @param place Where the words are drawn: on a card, the default, or in a row of a table.
  */
 export function runClock(
   run: Clocked,
@@ -225,6 +241,8 @@ type FloorRun = Pick<RunView, 'id' | 'createdAt' | 'status' | 'moving' | 'waitin
  * The finished card, and not a stub: it is dimmed as a finished card is, it says what the run was for and whether it landed or was
  * called off, and it opens into the run's steps — a stub would say only an id, and send a person to Runs to learn the rest. One level: a
  * finished parent brings none of its own parents onto the floor, since it waits on nothing any more.
+ * @param runs The runs the floor may draw, each judged.
+ * @param showFinished Whether "Show finished" is on: every run is then on the floor.
  */
 export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: boolean): T[] {
   const waitedOn = new Set(runs.filter(inFlight).flatMap(liveWaits));
@@ -237,6 +255,7 @@ export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: 
  * of the factory not finished, or a run of another factory. Each once, the waits first, in the order the rows name them; a row the list
  * could not judge names nothing. One level, as `floorRuns` draws them; a run read only for its title is no card unless it is finished
  * and Show finished is on.
+ * @param rows The light answer's rows, in their order; a row the list could not judge among them.
  */
 export function parentsWanted(rows: readonly ((FloorRun & Pick<RunView, 'context'>) | UnjudgedRun)[]): string[] {
   const listed = new Set(rows.map((row) => row.id));
@@ -250,6 +269,10 @@ export function parentsWanted(rows: readonly ((FloorRun & Pick<RunView, 'context
  * The rows the floor is drawn from (`floorRuns` picks its cards): the light answer's waiting, then its in flight, then the parents read
  * by id (`parentsWanted`), then the finished runs nobody decided (`undecided`), then the page of the finished runs while Show finished is
  * on, each run once, the first read of it kept.
+ * @param open The light answer's rows: those that wait on a person, and those in flight.
+ * @param parents The runs read by id beside the light answer (`parentsWanted`).
+ * @param undecided The finished runs nobody decided.
+ * @param finished The page of the finished runs; empty while Show finished is off.
  */
 export function floorRowsOf<T extends { id: string }>(
   open: { waiting: readonly T[]; inFlight: readonly T[] },
@@ -285,6 +308,7 @@ type RunEdge = { id: string; source: string; target: string; state: Extract<Edge
  * the floor. A run that has started draws none from its waits, and a run it reads as context none at all (`contextEdges`).
  *
  * Reduced transitively: an edge u→w is dropped when another path u→…→w joins the two among the edges drawn, since the chain says it.
+ * @param runs The runs on the floor, each with what its roots wait on and a person's hold on it.
  */
 export function runEdges(runs: readonly Waits[]): RunEdge[] {
   const floor = new Set(runs.map((run) => run.id));
@@ -320,6 +344,8 @@ type ContextEdge = { id: string; source: string; target: string };
 /**
  * The lines of what the focused card reads: one from each run in its `context` that is on the floor, to it. None without a focus — the
  * card hovered, else the one selected — so the floor draws only its waits until a person looks at a card.
+ * @param runs The runs on the floor, each with the runs it reads as context.
+ * @param focus The id of the focused card's run, or null where no card is focused.
  */
 export function contextEdges(runs: ReadonlyArray<Pick<RunView, 'id' | 'context'>>, focus: string | null): ContextEdge[] {
   const card = runs.find((run) => run.id === focus);
@@ -330,7 +356,10 @@ export function contextEdges(runs: ReadonlyArray<Pick<RunView, 'id' | 'context'>
     .map((source) => ({ id: `read:${source}->${card.id}`, source, target: card.id }));
 }
 
-/** A card's title: the brief's first line with words on it, without a heading's hashes; else the run id. */
+/**
+ * A card's title: the brief's first line with words on it, without a heading's hashes; else the run id.
+ * @param run The run, by its id and its brief.
+ */
 export const titleOf = (run: Pick<RunView, 'id' | 'brief'>): string =>
   run.brief
     .split('\n')
@@ -340,6 +369,8 @@ export const titleOf = (run: Pick<RunView, 'id' | 'brief'>): string =>
 /**
  * What a card's chip of the runs it reads says on hover: a line per run in its `context`, its id and its title where `runs` has it, its
  * id alone where it does not.
+ * @param run The card's run, by the runs it reads as context.
+ * @param runs The runs the board holds, whose titles name those it reads.
  */
 export const readsLines = (run: Frozen<Pick<RunView, 'context'>>, runs: ReadonlyArray<Pick<RunView, 'id' | 'brief'>>): string[] => {
   const byId = new Map(runs.map((source) => [source.id, source]));
@@ -349,14 +380,20 @@ export const readsLines = (run: Frozen<Pick<RunView, 'context'>>, runs: Readonly
   });
 };
 
-/** The repo by its folder's name, which is what a person calls it; the full path is for machines. */
+/**
+ * The repo by its folder's name, which is what a person calls it; the full path is for machines.
+ * @param repo The repository's path.
+ */
 export const repoName = (repo: string): string =>
   repo
     .split(/[\\/]+/)
     .filter(Boolean)
     .at(-1) ?? repo;
 
-/** Oldest first, so a run that starts takes the next free cell and moves no card already down. */
+/**
+ * Oldest first, so a run that starts takes the next free cell and moves no card already down.
+ * @param runs The runs, by their ids and when each was created; ties go by id.
+ */
 export const byAge = <T extends Pick<RunView, 'id' | 'createdAt'>>(runs: readonly T[]): T[] =>
   [...runs].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 
@@ -397,6 +434,7 @@ export const ONE_CELL: Span = { columns: 1, rows: 1 };
  * The cells an open run takes: its card's, and as many more to the right as its tiles reach and as many rows down, with a gap's
  * room past them. From the tiles' size alone (`tilesOf`), which reads the steps' names and the graph and not their words, so a
  * refetch that moves a status moves no card. Never less than the card's own cell.
+ * @param tiles The open card's tiles, by their width and height in pixels.
  */
 export function openSpan(tiles: Pick<Flow, 'width' | 'height'>): Span {
   return {
@@ -405,7 +443,11 @@ export function openSpan(tiles: Pick<Flow, 'width' | 'height'>): Span {
   };
 }
 
-/** The Factory's open runs after a click on one: closed if it was open, else open, and opened last. */
+/**
+ * The Factory's open runs after a click on one: closed if it was open, else open, and opened last.
+ * @param open The ids of the open runs, the one opened last at the end.
+ * @param id The id of the run clicked.
+ */
 export const toggleOpen = (open: readonly string[], id: string): string[] =>
   open.includes(id) ? open.filter((other) => other !== id) : [...open, id];
 
@@ -415,6 +457,8 @@ export const toggleOpen = (open: readonly string[], id: string): string[] =>
  * again or a run in flight waiting on it. A card drawn open on the last pass is not opening, however its tiles grew — a step added
  * to a run moves no card. `drawn` is what the last pass remembered, and `spans` the cards drawn open now. The floor starts with the
  * cards left open on the last visit remembered, so they are not taken for cards opening over the ones a person left around them.
+ * @param drawn The ids of the cards drawn open on the last pass.
+ * @param spans The cards drawn open now, each with the cells it takes.
  */
 export function unfoldingNow(drawn: ReadonlySet<string>, spans: ReadonlyMap<string, Span>): { unfolding: Set<string>; drawn: Set<string> } {
   return { unfolding: new Set([...spans.keys()].filter((id) => !drawn.has(id))), drawn: new Set(spans.keys()) };
@@ -458,6 +502,12 @@ export function unfoldingNow(drawn: ReadonlySet<string>, spans: ReadonlyMap<stri
  * an open run in the cells its span covers from there, beyond the grid's edges as well as on the grid, so a
  * card opening past the edge moves a card a person parked there; only (3) keeps to the grid. A card off the
  * floor holds no cell: finished runs pile up, and holding their cells would leave holes that never close.
+ * @param ids The ids of the runs on the floor, oldest first.
+ * @param onFloor Where each card on the floor now stands.
+ * @param saved Where each card was last left, or null where nothing is saved.
+ * @param spans The runs drawn open and the cells each takes, the one opened last first; none by default.
+ * @param after Each run's parents, the runs it waits on (`after`); none by default.
+ * @param unfolding The open cards opening now (`unfoldingNow`); every open run by default.
  */
 export function placeRuns(
   ids: readonly string[],
@@ -614,6 +664,7 @@ export const NARROW_CELL_WIDTH = 320;
  * was, and as far into its cell, so a card on the third column is on the third column still. Read unchanged, the cards would stand
  * `NARROW_CELL_WIDTH` apart, each on a cell of its own by `placeRuns`' rounding, and every card would cover the right of the one beside it.
  * Down is unchanged: a cell is as tall in both.
+ * @param saved The arrangement saved on the narrow grid, each card's point by its run's id, or null where none is saved.
  */
 export function widenLayout(saved: ReadonlyMap<string, Point> | null): Map<string, Point> | null {
   if (!saved) return null;
@@ -623,6 +674,9 @@ export function widenLayout(saved: ReadonlyMap<string, Point> | null): Map<strin
 /**
  * What to save: every card where it was last left — the ones on the floor now over what was saved —
  * and nothing for a run the store no longer lists.
+ * @param saved What was saved, each card's point by its run's id, or null where nothing is.
+ * @param now Where each card on the floor stands now.
+ * @param known The ids of the runs the store lists.
  */
 export function keepLayout(
   saved: ReadonlyMap<string, Point> | null,

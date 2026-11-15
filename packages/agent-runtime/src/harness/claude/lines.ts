@@ -167,6 +167,9 @@ const refusal = (where: string, kind: LineKind, entry: unknown, error: Schema.Sc
  * A parsed transcript line decoded when its `type` is one of `kinds`: `{ line }` when it decodes, `{ wrong }` when it does not (a
  * sentence that names `where` the line is, its kind, its first wrong field and the fix, quoting at most 60 characters of what it
  * found), and `undefined` for any other value, a line of another type included.
+ * @param entry The line, parsed from its JSON.
+ * @param kinds The line types to decode; a line of any other type is left unread.
+ * @param where Where the line is, as a refusal names it: its offset, and its transcript's path where known.
  */
 export const decodeLine = <K extends LineKind>(
   entry: unknown,
@@ -182,6 +185,9 @@ export const decodeLine = <K extends LineKind>(
 /**
  * A transcript line's text decoded when it is a JSON object whose `type` is one of `kinds` (`decodeLine`), or `undefined` for any
  * other line, one that is no JSON included. Throws an `Error` whose message is the refusal's words when it does not decode.
+ * @param text The line's text, as the transcript holds it.
+ * @param kinds The line types to decode; a line of any other type is left unread.
+ * @param where Where the line is, as a refusal names it: its offset, and its transcript's path where known.
  */
 export const lineOf = <K extends LineKind>(text: string, kinds: readonly K[], where: string): Line<K> | undefined => {
   let entry: unknown;
@@ -199,6 +205,8 @@ export const lineOf = <K extends LineKind>(text: string, kinds: readonly K[], wh
  * When a transcript line says it was written, in milliseconds, or `undefined` when it is no JSON object or says no time that
  * parses. A line of a kind the runtime reads (`LINES`) has its `timestamp` checked: one there that is no date and time throws an
  * `Error` naming `where` the line is and the fix. A line of any other kind is read as it is.
+ * @param text The line's text, as the transcript holds it.
+ * @param where Where the line is, as a refusal names it: its offset, and its transcript's path where known.
  */
 export const writtenAt = (text: string, where: string): number | undefined => {
   let entry: unknown;

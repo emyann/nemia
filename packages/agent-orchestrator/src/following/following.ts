@@ -49,6 +49,8 @@ export type Next = { follow: FollowedAttempt } | 'wait' | 'finished';
  * record's task changed (a try), or its task has a later attempt (a person's answer, the next turn). Else a settled task has finished the
  * step, and anything else waits: a task with no attempt yet, and one whose attempt ended — a step held on a person — until its next
  * starts; the runtime follows no attempt that has ended. Pure.
+ * @param at The attempt followed so far, or undefined where none has been followed.
+ * @param now The step as it was read: its task, its last attempt, and whether that is live and the task settled.
  */
 export const nextOf = (at: FollowedAttempt | undefined, now: StepNow): Next => {
   if (now.taskId === null) return 'wait';

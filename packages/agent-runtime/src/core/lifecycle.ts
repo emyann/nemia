@@ -542,6 +542,8 @@ export const transition: Move = moveOn(MACHINE);
 /**
  * The machine with one state's edges for one event taken away. Never shipped: what a test plants a refusal with.
  * Exported only for the tests that import it.
+ * @param from The state whose edges are taken away.
+ * @param event The kind of event whose edges are taken away.
  */
 export const machineWithout = (from: LifecycleState, event: EventType) => {
   const states = Object.fromEntries(
@@ -556,6 +558,8 @@ export const machineWithout = (from: LifecycleState, event: EventType) => {
 /**
  * The lifecycle with one edge taken away — the refusal a test plants, to prove a stalled task is reported. Never shipped.
  * Exported only for the tests that import it.
+ * @param from The state whose edges are taken away.
+ * @param event The kind of event whose edges are taken away.
  */
 export const withoutEdge = (from: LifecycleState, event: EventType): Move => moveOn(machineWithout(from, event));
 
@@ -568,6 +572,7 @@ const nodesOf = (machine: ReturnType<typeof machineOf>) => toDirectedGraph(machi
 /**
  * The states of a machine, in the order its table names them.
  * Exported only for the tests that import it.
+ * @param machine The machine to read, the shipped lifecycle's by default.
  */
 export const statesOf = (machine = MACHINE): LifecycleState[] => nodesOf(machine).map((n) => n.stateNode.key as LifecycleState);
 
@@ -576,6 +581,7 @@ export const statesOf = (machine = MACHINE): LifecycleState[] => nodesOf(machine
  * copy of it. An edge with no target is drawn back to its source. A guard named in the table is kept as its name; one
  * given as an object, by its type.
  * Exported only for the tests that import it.
+ * @param machine The machine to read, the shipped lifecycle's by default.
  */
 export const edgesOf = (machine = MACHINE): Edge[] =>
   nodesOf(machine).flatMap((node) =>
@@ -604,6 +610,8 @@ export const FINAL: ReadonlySet<LifecycleState> = new Set(
  * between its `diagram:lifecycle` markers, and the repository's diagram test fails when the two differ. Mermaid takes no `-`
  * in a state's id, so `input-required` is drawn under its own name, by an id without one.
  * Exported only for the tests that import it.
+ * @param machine The machine to read, the shipped lifecycle's by default.
+ * @param verbs The person's verbs to draw beside the edges, the shipped `VERBS` by default.
  */
 export const diagram = (machine = MACHINE, verbs: readonly Verb[] = VERBS): string => {
   const id = (s: string) => s.replace(/-/g, '_');

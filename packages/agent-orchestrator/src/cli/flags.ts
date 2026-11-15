@@ -27,6 +27,9 @@ export type Engine = ReturnType<typeof engine>;
  * `program` given `place`, and the store's root and settings from `env`, the environment `main` composes from (`storeConfigLayer`:
  * `StoreRoot`, `StoreConfig`), and still to be run: how a command gives its program the place `main` was handed, the root a read of the
  * store asks (a run's unfrozen steps among them) and the settings a verb reads (`WF_MAX_RUNS`).
+ * @param env The environment the store's root and settings are read from.
+ * @param place The place the program is given.
+ * @param program The program to give them.
  */
 export const placedIn = <A, E, R>(
   env: Env,
@@ -38,6 +41,11 @@ export const placedIn = <A, E, R>(
 /**
  * What `command`'s handler answers for `input`, the one seam `commanded` calls an entry through: its handler run over the engine `e`,
  * given `place` and the store `env` names (`placedIn`). A refusal is thrown as it was.
+ * @param env The environment the store's root and settings are read from.
+ * @param e The engine the handler runs over.
+ * @param place The place the handler is given.
+ * @param command The command, by its handler.
+ * @param input The handler's input, decoded (`inputFor`).
  */
 export function answered<D extends object, I>(
   env: Env,
@@ -49,7 +57,12 @@ export function answered<D extends object, I>(
   return runWith(e, placedIn(env, place, command.handler(input)));
 }
 
-/** The lines `command` prints of `data`, where it prints: a command the client holds prints there, and none here. */
+/**
+ * The lines `command` prints of `data`, where it prints: a command the client holds prints there, and none here.
+ * @param command The command, by its printer where it has one.
+ * @param data What its handler answered.
+ * @param input The input its handler was given.
+ */
 export const printed = <D extends object, I>(command: Partial<Pick<Command<D, I>, 'print'>>, data: D, input: I): readonly string[] =>
   command.print?.(data, input) ?? [];
 
@@ -107,11 +120,18 @@ a run's task ids carry the run and the step, so its output already names the wor
 
     AE_ROOT="\${WF_ROOT:-$HOME/.agent-workflows}/engine" ae watch`;
 
+/**
+ * A refusal of the command line, thrown as `Invalid` (exit 2): never returns.
+ * @param message What was wrong, and the command to type instead.
+ */
 export const usage = (message: string): never => {
   throw new Invalid({ message });
 };
 
-/** A person's yes, asked on the terminal: false with no terminal to ask on, and for anything but y or yes. */
+/**
+ * A person's yes, asked on the terminal: false with no terminal to ask on, and for anything but y or yes.
+ * @param question The question, as the terminal shows it.
+ */
 export async function confirmed(question: string): Promise<boolean> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -125,6 +145,8 @@ export async function confirmed(question: string): Promise<boolean> {
 /**
  * `args` as the handler of `command` takes them, decoded through its `input`: a key its handler takes that a runner left out or gave
  * another type refused, exit 2, before anything is read. What a runner hands a typed entry's handler.
+ * @param command The command: its name and usage, which a refusal names, and its input's schema.
+ * @param args The arguments a runner read off the command line.
  */
 export function inputFor<I>(
   command: { name: string; usage: string; input: Schema.Decoder<I> },

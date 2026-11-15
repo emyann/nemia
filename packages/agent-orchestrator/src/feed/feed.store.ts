@@ -46,10 +46,16 @@ import {
 import { FeedCursor, FeedLine as FeedLineModel } from './feed.model.ts';
 import { Invalid, type Refusal } from '../refusal/refusal.ts';
 
-/** The feed of the store `root`: beside `runs/`, one for the store. */
+/**
+ * The feed of the store `root`: beside `runs/`, one for the store.
+ * @param root The store's root folder.
+ */
 export const feedAt = (root: string): string => path.join(root, 'feed.jsonl');
 
-/** The workflow layer's feed (`feed.ts`) under the store `home`: written by the daemon alone, its tick and `up`'s start. */
+/**
+ * The workflow layer's feed (`feed.ts`) under the store `home`: written by the daemon alone, its tick and `up`'s start.
+ * @param home The store's root folder.
+ */
 export const feedFile = (home: string): string => feedAt(home);
 
 /**
@@ -86,6 +92,10 @@ export type FeedDoorShape = DoorOf<FeedLayer, string>;
  * feed's `size`. A cursor inside a line would have the reader take the rest of that line for one; one past the end was handed out by a
  * feed that has been truncated or replaced, and nothing after it means what the reader thinks. `byteBefore(at)` is the byte at `at`, and
  * `where` the feed a message names. Both layers say it.
+ * @param after The cursor asked to read from, in bytes.
+ * @param size The feed's size in bytes.
+ * @param byteBefore The byte of the feed at a given offset.
+ * @param where The feed a message names: its file, or the stand-in in memory.
  */
 export function cursorRefusalOf(after: number, size: number, byteBefore: (at: number) => number, where: string): string | undefined {
   if (!Number.isSafeInteger(after) || after < 0)
@@ -105,6 +115,9 @@ export function cursorRefusalOf(after: number, size: number, byteBefore: (at: nu
  * characters of the text — a note with a dash in it is three bytes of one character. A line nobody can read keeps no end, and moves the
  * cursor all the same. Where `limit` is given, no more than that many lines are taken, and the cursor is the byte after the last taken.
  * Both layers read by it.
+ * @param buf The feed's bytes from `after` on.
+ * @param after The cursor `buf` starts at, in bytes of the feed.
+ * @param limit The most lines to take; every complete line where it is not given.
  */
 export function linesIn(buf: Buffer, after: number, limit = Infinity): FeedRead {
   const lines: FeedLine[] = [];
@@ -124,6 +137,8 @@ export function linesIn(buf: Buffer, after: number, limit = Infinity): FeedRead 
  * The text an append of `lines` writes after the feed's `last` byte (undefined for an empty feed): one JSON line each, after a newline
  * where the last line was left unended — one a writer died in, which then ends as the line nobody can read (`parseLine`) and the lines
  * after it are whole. Both layers write by it.
+ * @param lines The lines to append.
+ * @param last The feed's last byte, or undefined for an empty feed.
  */
 export function appendedText(lines: readonly FeedLine[], last: number | undefined): { text: string; leading: string } {
   const leading = last !== undefined && last !== 0x0a ? '\n' : '';
@@ -156,7 +171,10 @@ const linesChecked = (lines: readonly FeedLine[]): Effect.Effect<void, Invalid> 
   return Effect.void;
 };
 
-/** The door over `layer`: each method as `doorOf` makes it, a read's cursor checked first and each appended line before any is written. */
+/**
+ * The door over `layer`: each method as `doorOf` makes it, a read's cursor checked first and each appended line before any is written.
+ * @param layer The Feed door's layer the door's methods run on: the files, or the stand-in in memory.
+ */
 export function feedDoorOver(layer: FeedLayer): FeedDoorShape {
   const door = doorOf<FeedLayer, string>(layer);
   return {
@@ -228,7 +246,10 @@ function appendLines(file: string, lines: readonly FeedLine[]): FeedAppended {
   return { lines: [...lines], before, after: statOf(file)?.size ?? 0, leading };
 }
 
-/** The Feed door's files layer over the store `root`'s feed: its end by the file's size and inode. */
+/**
+ * The Feed door's files layer over the store `root`'s feed: its end by the file's size and inode.
+ * @param root The store's root folder.
+ */
 export function feedFiles(root: string): FeedLayer {
   const file = feedAt(root);
   return {
@@ -252,7 +273,10 @@ export const FeedDoor = Context.Reference<FeedDoorShape>('agent-orchestrator/Fee
   defaultValue: () => rootedDoor((root) => feedDoorOver(feedFiles(root)), 'Feed door'),
 });
 
-/** The Feed door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`. */
+/**
+ * The Feed door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`.
+ * @param root The store's root folder.
+ */
 export const feedDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(FeedDoor)(feedDoorOver(feedFiles(root)));
 
 /**
@@ -269,6 +293,9 @@ export const feedDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed
  * last pass, and any another wrote — and read again from the start when it does not fit the feed: another generation (a file cut and put
  * back), or a cursor the feed has no line boundary at. It is not moved past what this call writes: the next call reads those lines back,
  * so what it compares against is always what the feed says.
+ * @param door The Feed door the pass reads the feed from and writes its lines to.
+ * @param memo The fold its caller has read so far, moved by this call.
+ * @param now The words of every run the pass judged, by run id.
  */
 export const feedPass = (
   door: FeedDoorShape,
@@ -325,6 +352,8 @@ function ran<A>(effect: Effect.Effect<A, Refusal>): A {
  * Write what the pass judged of every run in the store, where it is not what the feed said of it last (`feedPass`), on the module's feed:
  * the lines written, and where their bytes went (`FeedAppended`). `memo` is the fold the caller has read so far, a fresh one where it
  * gives none — a caller that keeps none reads the whole feed, and writes what a restarted daemon would.
+ * @param home The store's root folder.
+ * @param now The words of every run the pass judged, by run id.
  */
 export const recordFeed = (
   home: string,
@@ -347,6 +376,8 @@ export const recordFeed = (
 /**
  * Appends a daemon's line (`startedLine`) to the feed, after a newline where its last line was left unended, as `recordFeed` appends; no
  * fold is moved, since a daemon's line is no run's. Answers where its bytes went (`FeedAppended`).
+ * @param home The store's root folder.
+ * @param line The daemon's line to append.
  */
 export const recordDaemonLine = (home: string, line: DaemonLine): FeedAppended =>
   within('act', () => ran(doorAt(home).lines.append([line])));
@@ -356,27 +387,41 @@ export const freshFeedMemo = freshMemo;
 
 /**
  * The feed's lines after `after`, and the cursor to read on from: a cursor inside a line, or past the end, is refused by name (exit 2).
+ * @param home The store's root folder.
+ * @param after The cursor to read from, in bytes: 0, the start, where it is not given.
  */
 export const readFeed = (home: string, after = 0): { lines: FeedLine[]; cursor: number } => {
   const { lines, cursor } = ran(doorAt(home).lines.read(after));
   return { lines, cursor };
 };
 
-/** Why `after` cannot be read from — or undefined when it can (`cursorRefusalOf`). */
+/**
+ * Why `after` cannot be read from — or undefined when it can (`cursorRefusalOf`).
+ * @param home The store's root folder.
+ * @param after The cursor to judge, in bytes.
+ */
 export const feedCursorRefusal = (home: string, after: number): string | undefined => ran(doorAt(home).lines.cursorRefusal(after));
 
-/** The feed's size in bytes, 0 for a feed not written yet: what a live reader compares its cursor with before it reads. */
+/**
+ * The feed's size in bytes, 0 for a feed not written yet: what a live reader compares its cursor with before it reads.
+ * @param home The store's root folder.
+ */
 export const feedSize = (home: string): number => ran(doorAt(home).lines.end())?.cursor ?? 0;
 
 /**
  * The lines after `after`, each with the byte just after it (`ends`), and the cursor to read on from: what a live reader hands on. A
  * cursor that is not the start of a line, or is past the end, is refused by name (exit 2).
+ * @param home The store's root folder.
+ * @param after The cursor to read from, in bytes.
  */
 export const readFeedEnds = (home: string, after: number): FeedRead => ran(doorAt(home).lines.read(after));
 
 /**
  * Follow the feed from `from` until `stop()` (`watchFeedFile`), each line with the cursor just after it: refused before anything is watched
  * when the cursor cannot be read from.
+ * @param home The store's root folder.
+ * @param opts Where the watch starts (`from`, 0 where not given), its timer's beat in ms (`intervalMs`), and what it hands each line,
+ * error, read and cut to.
  */
 export const watchFeed = (home: string, opts: Parameters<typeof watchFeedFile>[1]): { stop(): void } => watchFeedFile(feedFile(home), opts);
 

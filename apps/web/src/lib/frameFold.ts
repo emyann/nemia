@@ -13,6 +13,7 @@ export type { FrameFold } from '../../contracts/frame-fold.contract.ts';
  * nothing; it is modal on a narrow screen and docked wider. The rail is the drawer on a narrow screen; wider it is narrow where the person
  * closed it, or where it makes room for the docked sheet under 1600 and they have not asked for it back; and it is said folded for the
  * sheet exactly where they keep it open and it is narrow.
+ * @param at What holds now: the screen's width, the rail as the person left it, what the address's `?bar=` names and her sheet.
  */
 export const frameFold: FrameFoldOf = (at: FrameAt): FrameFold => {
   const shows = at.barOpen ? 'bar' : at.sheetOpen && !at.ownsChat ? 'her' : 'none';

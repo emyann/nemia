@@ -193,6 +193,9 @@ export const freeOnce = Effect.fn('freeOnce')(function* (
  * A daemon's sweep for as long as it runs: `once()`, then a rest of `every`, for ever, which no caller shortens. A sweep that ends hands
  * what it answered to `done`; one that fails calls `failed`, and is a warning — `words`, then its reason (`whyOf`) — said once while its
  * reason stands; the next is tried a rest later. What free, the retention and the disk measure each run.
+ * @param once The sweep, run anew each time round.
+ * @param every The rest between the end of one sweep and the start of the next.
+ * @param words The warning's words a failed sweep says before its reason.
  */
 export const sweepLoop = <A, E, R>(
   once: () => Effect.Effect<A, E, R>,
@@ -222,6 +225,7 @@ export const sweepLoop = <A, E, R>(
 /**
  * The retention, for as long as the daemon runs: a sweep (`freeOnce`) over what `answers` gives then — the latest pass's runs — and a
  * rest of `FREE_EVERY` (`sweepLoop`).
+ * @param answers What the latest pass answered, read again at each sweep.
  */
 export const free = (answers: () => readonly Answered[]) => {
   const memory = freshFreeMemory();

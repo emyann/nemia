@@ -151,7 +151,9 @@ export function skillDoorOver(layer: SkillLayer): SkillDoorShape {
           const name = SkillName.read(asked);
           const there = yield* door.there(name, at);
           if (there.kind === 'none')
-            return yield* Effect.fail(new Missing({ message: `No skill ${name} in ${at}: list the skills there, and remove one it holds.` }));
+            return yield* Effect.fail(
+              new Missing({ message: `No skill ${name} in ${at}: list the skills there, and remove one it holds.` }),
+            );
           const refused = definitionVersionRefusal('skill', name, 'remove', there, version);
           if (refused !== null) return yield* Effect.fail(refusalOf(refused));
           return yield* door.remove(name, at);

@@ -292,8 +292,10 @@ export const filedAt = (
  * that does not read: this is spread into every filing, and a throw would be a defect that stops the whole pass over one bad file. The pass
  * refuses the step itself and says why (`fileReady`), where a note can carry the file and the command to type, and `nemia factory servers`
  * refuses it loudly to the person who asks.
+ * @param factory The run's factory, or undefined for the default one.
+ * @param home The store's root.
  */
-const recordedServers = (factory: string | undefined, home: string): FactoryServers => {
+export const recordedServers = (factory: string | undefined, home: string): FactoryServers => {
   try {
     const name = factory ?? DEFAULT_NAMESPACE;
     const own = doorAtOnce(home, (door) => door.servers.read(FactoryName.read(name)));

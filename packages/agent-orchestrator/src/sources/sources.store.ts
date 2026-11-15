@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Missing } from '../refusal/refusal.ts';
+import { userAgentFolders } from '../runtime-client.ts';
 import { knownReposAt } from '../folder/write.store.ts';
 import { Effect, Result } from 'effect';
 import { repositoryRoots, sourceSkills } from '../agents/read.store.ts';
@@ -46,8 +47,9 @@ const homeOf = (at: string): string => (at === '~' || at.startsWith('~/') ? path
 
 /**
  * Every agent file the store knows of, read through the Agent door: each repository's a factory names, sorted, in its two places for
- * agents in the order a start looks (`repositoryRoots`); then the library of the store `home`; then the folder `at`, when named, `~` its
- * machine's home (`~/.claude/agents`, Claude Code's own). A folder named that is not there is refused as `Missing`.
+ * agents in the order a start looks (`repositoryRoots`); then the library of the store `home`; then each folder a harness keeps its user's
+ * own agents in that is there (`userAgentFolders`); then the folder `at`, when named, `~` its machine's home. A folder named that is not
+ * there is refused as `Missing`.
  */
 export const agentSources = Effect.fn('agentSources')(function* ({ at, home }: { at?: string; home: string }) {
   const named = at === undefined ? undefined : path.resolve(homeOf(at));
@@ -59,6 +61,8 @@ export const agentSources = Effect.fn('agentSources')(function* ({ at, home }: {
   for (const repo of [...knownReposAt(home)].sort())
     for (const root of repositoryRoots(repo)) sources.push(...(yield* sourcesIn('repository', repo, path.join(root, AGENTS_FOLDER), home)));
   sources.push(...(yield* sourcesIn('library', null, yoursOf('agents', home), home)));
+  for (const { folder } of userAgentFolders())
+    if (fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory()) sources.push(...(yield* sourcesIn('harness', null, folder, home)));
   if (named !== undefined) sources.push(...(yield* sourcesIn('path', null, named, home)));
   return { sources };
 });

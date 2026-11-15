@@ -399,8 +399,11 @@ export const DEFINITION_ORIGINS = ['factory', 'repo', 'user', 'builtin'] as cons
 /** One of `DEFINITION_ORIGINS`. */
 export type DefinitionOrigin = (typeof DEFINITION_ORIGINS)[number];
 
-/** Where an agent file the store knows of was found: a repository a factory names, your library, or the folder `?path=` names. */
-export const AGENT_SOURCE_PLACES = ['repository', 'library', 'path'] as const;
+/**
+ * Where an agent file the store knows of was found: a repository a factory names, your library, the folder a harness keeps its user's own
+ * agents in, or the folder `?path=` names.
+ */
+export const AGENT_SOURCE_PLACES = ['repository', 'library', 'harness', 'path'] as const;
 
 /** One of `AGENT_SOURCE_PLACES`. */
 export type AgentSourcePlace = (typeof AGENT_SOURCE_PLACES)[number];

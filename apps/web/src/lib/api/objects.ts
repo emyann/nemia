@@ -540,7 +540,7 @@ export const library = {
     ]),
   workflows: (): Promise<Workflow[]> =>
     everyPage((asked) => call((c) => c.workflows.listLibrary({ query: asked }), read(WorkflowList))).then((l) => [...l.items]),
-  agentSources: (folder: string): Promise<AgentSources> => call((c) => c.agents.sources({ query: { path: folder } }), read(AgentSources)),
+  agentSources: (): Promise<AgentSources> => call((c) => c.agents.sources({ query: {} }), read(AgentSources)),
   copyAgent: (file: string): Promise<AgentCopied> =>
     call((c) => c.agents.copyLibrary({ payload: { file } }), write(AgentCopied, AGENT_COPY_WRITTEN)),
 };

@@ -10,33 +10,31 @@ import { OUT, store } from '../world.ts';
 const IMPORTED = 'importee';
 
 /**
- * Claude Code's own agents, offered to import: the api's read of `~/.claude/agents` answered with a file the page plants in its store,
- * since the api reads the machine's home, which no page may plant in. Its Import copies it through the api into the user library, the
- * Library then lists it as the user library's, and the row says it is held; the page takes back the copy and its record.
+ * The agents the harness keeps for its user, offered to import: a file the page plants where the api's harness keeps them (its config
+ * folder, `CLAUDE_CONFIG_DIR` in `apiEnvOf`), listed by the api's own read. Its Import copies it through the api into the user library,
+ * the Library then lists it as the user library's, and the row says it is held; the page takes back the file, the copy and its record.
  */
 async function imports(page: Page): Promise<void> {
-  const dir = path.join(store!, 'claude-agents');
+  const dir = path.join(store!, 'claude', 'agents');
   const file = path.join(dir, `${IMPORTED}.md`);
   const copied = [path.join(store!, 'workflows', 'agents', `${IMPORTED}.md`), path.join(store!, 'agent-sources', `${IMPORTED}.json`)];
+  const planted = !fs.existsSync(dir);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(file, `---\nname: ${IMPORTED}\ndescription: Imports things.\n---\nImport them.\n`);
-  const source = { place: 'path', repo: null, dir, file, name: IMPORTED, description: 'Imports things.', version: 'v1', error: null };
-  await page.route('**/api/agent-sources*', (route) => route.fulfill({ json: { sources: [source] } }));
   try {
     await page.reload({ waitUntil: 'load' });
     await idle(page);
-    const row = page.locator(`[data-claude-import] [data-claude-agent="${IMPORTED}"]`);
-    await expectVisible(row, `${IMPORTED} offered to import from Claude Code`);
-    await row.locator('[data-claude-import-press]').click();
-    await expectVisible(row.locator('[data-claude-held]'), 'imported, it is in the library');
+    const row = page.locator(`[data-harness-import] [data-harness-agent="${IMPORTED}"]`);
+    await expectVisible(row, `${IMPORTED} offered to import`);
+    await row.locator('[data-harness-import-press]').click();
+    await expectVisible(row.locator('[data-harness-held]'), 'imported, it is in the library');
     await expectVisible(
       page.locator(`[data-library-item="Agent.${IMPORTED}"] [data-library-origin="user"]`),
       `${IMPORTED} listed as the user library's`,
     );
-    await photograph(page.locator('[data-claude-import]'), path.join(OUT, `library-import-${await themeOf(page)}.png`));
+    await photograph(page.locator('[data-harness-import]'), path.join(OUT, `library-import-${await themeOf(page)}.png`));
   } finally {
-    await page.unroute('**/api/agent-sources*');
-    for (const one of [...copied, dir]) fs.rmSync(one, { recursive: true, force: true });
+    for (const one of [...copied, planted ? dir : file]) fs.rmSync(one, { recursive: true, force: true });
   }
 }
 
@@ -45,7 +43,7 @@ export default {
    * The store's library, lit in the rail: each kind under its heading, the seeded agent and skill as the user library's. On a factory
    * with no adds recorded, its settings page lists none, and Add from library adds the seeded skill: it resolves, and the Library says
    * the factory uses it. Removed, the page takes back the factory's record of its adds, so each visit reads the store as seeded. And
-   * Claude Code's own agents are offered to import (`imports`).
+   * the agents the harness keeps for its user are offered to import (`imports`).
    */
   name: 'library',
   route: '/library',

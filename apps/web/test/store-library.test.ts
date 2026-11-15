@@ -1,6 +1,6 @@
 /**
  * The store's library as the board reads it (`src/lib/api/storeLibrary.ts`): every kind's items in one list, each with its origin and
- * the factories that use it, what a factory may still add from it, its count in words, and Claude Code's agents it may import.
+ * the factories that use it, what a factory may still add from it, its count in words, and the agents a harness keeps that it may import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -73,22 +73,23 @@ const item = (kind: LibraryItem['kind'], name: string): LibraryItem => ({
 const source = (place: AgentSource['place'], name: string, error: string | null = null): AgentSource => ({
   place,
   repo: place === 'repository' ? '/code/app' : null,
-  dir: `/home/p/.claude/agents`,
-  file: `/home/p/.claude/agents/${name}.md`,
+  dir: '/srv/agents',
+  file: `/srv/agents/${name}.md`,
   name,
   description: error === null ? `${name} things` : null,
   version: error === null ? 'v1' : null,
   error,
 });
 
-test("Claude Code's agents to import: the folder named alone, each said held where the library has its name, one that does not read with why", () => {
+test("a harness's own agents to import: its place alone, each said held where the library has its name, one that does not read with why", () => {
   const offered = importablesOf(
     [
       source('repository', 'theirs'),
       source('library', 'drafter'),
-      source('path', 'drafter'),
-      source('path', 'scout'),
-      source('path', 'odd', 'no name'),
+      source('path', 'named'),
+      source('harness', 'drafter'),
+      source('harness', 'scout'),
+      source('harness', 'odd', 'no name'),
     ],
     [item('Agent', 'drafter'), item('Skill', 'scout')],
   );
@@ -101,7 +102,7 @@ test("Claude Code's agents to import: the folder named alone, each said held whe
     ],
     'a skill of the same name holds no agent',
   );
-  assert.equal(offered[1]?.file, '/home/p/.claude/agents/scout.md', 'imported by its file, as the copy takes it');
+  assert.equal(offered[1]?.file, '/srv/agents/scout.md', 'imported by its file, as the copy takes it');
 });
 
 test('the library counted in words, each kind it holds in its order, one and several', () => {

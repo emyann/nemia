@@ -97,32 +97,28 @@ export function libraryCount(items: readonly LibraryItem[]): string {
   return said.length === 0 ? 'nothing yet' : said.join(', ');
 }
 
-/** Where Claude Code keeps a person's own agents, on the api's machine: the folder the Library page imports from. */
-export const CLAUDE_AGENTS = '~/.claude/agents';
-
-/** An agent file of Claude Code's own the Library page offers to import: its name, its file, what it is for, and whether it reads. */
+/** An agent file a harness keeps for its user, offered to import: its name, its file, what it is for, and whether it reads. */
 export type Importable = { name: string; file: string; description: string | null; error: string | null; held: boolean };
 
 /**
- * The agent files of the folder named (`place: 'path'`) among `sources`, each said held where the library has an agent of its name
- * already, so its import would be refused; the store's own places left out, the library holding them already or a repository's.
+ * The agent files a harness keeps for its user (`place: 'harness'`) among `sources`, each said held where the library has an agent of its
+ * name already, so its import would be refused; the store's own places left out, the library holding them already or a repository's.
  *
- * @param sources the agent files the store knows of, the folder named among them
+ * @param sources the agent files the store knows of
  * @param items the library's items
  */
 export function importablesOf(sources: readonly AgentSource[], items: readonly LibraryItem[]): Importable[] {
   const held = new Set(items.filter((one) => one.kind === 'Agent').map((one) => one.name));
   return sources
-    .filter((one) => one.place === 'path')
+    .filter((one) => one.place === 'harness')
     .map((one) => ({ name: one.name, file: one.file, description: one.description, error: one.error, held: held.has(one.name) }));
 }
 
-/** Claude Code's own agents on the api's machine (`CLAUDE_AGENTS`), as the store lists them; refused where there is no such folder. */
-export const claudeAgentsQuery = () =>
+/** The agent files the store knows of, to copy into its library, those a harness keeps for its user among them. */
+export const agentSourcesQuery = () =>
   queryOptions({
-    queryKey: ['library', 'claude-agents'],
-    queryFn: async (): Promise<AgentSource[]> => [...(await library.agentSources(CLAUDE_AGENTS)).sources],
-    retry: false,
+    queryKey: ['library', 'agent-sources'],
+    queryFn: async (): Promise<AgentSource[]> => [...(await library.agentSources()).sources],
   });
 
 /**

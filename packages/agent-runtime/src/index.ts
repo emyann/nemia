@@ -215,6 +215,8 @@ export { CONFIG_FOLDERS, configFolderIn } from './harness/config-folders.ts';
  * (`folderTrust`), and the act of giving it (`trustFolder`); each `undefined` for a harness that keeps none.
  */
 export { folderTrust, trustFolder, trustedFolder, type FolderTrust, type FolderTrusted } from './harness/trust.ts';
+/** Where each harness keeps its user's own agent files, which the store lists to copy into its library. */
+export { userAgentFolders, type UserAgentFolder } from './harness/user-agents.ts';
 /**
  * What a harness says of the MCP servers a caller records: the five words it has for a state (`MCP_STATES`), one server's state as it
  * says it, and what a whole read answers — the states, or that the look failed and why, never an empty list. Read through the engine's

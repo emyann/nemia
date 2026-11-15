@@ -3,8 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  CLAUDE_AGENTS,
-  claudeAgentsQuery,
+  agentSourcesQuery,
   importablesOf,
   importAgent,
   type Importable,
@@ -13,31 +12,33 @@ import {
 } from '../../lib/api/storeLibrary.ts';
 
 /**
- * Claude Code's own agents on the api's machine (`~/.claude/agents`), each with an Import that copies it into the user library through the
- * api's copy: one the library has an agent of its name already is said so and offers none, one that does not read says
- * why; where there is no such folder, the store's refusal, as it comes.
+ * The agents a harness keeps for its user on the api's machine, each with an Import that copies it into the user library through the
+ * api's copy: one the library has an agent of its name already is said so and offers none, one that does not read says why; a line
+ * saying none where no harness keeps any there.
  */
-export function ClaudeImport({ items }: { items: readonly LibraryItem[] }) {
+export function HarnessImport({ items }: { items: readonly LibraryItem[] }) {
   const queryClient = useQueryClient();
-  const sources = useQuery(claudeAgentsQuery());
+  const sources = useQuery(agentSourcesQuery());
   const copy = useMutation({
     mutationFn: importAgent,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: libraryQuery().queryKey }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['library'] }),
   });
   const offered = sources.data ? importablesOf(sources.data, items) : [];
   return (
-    <section aria-label="Import from Claude Code" data-claude-import className="flex flex-col gap-2">
-      <h2 className="text-title-medium">Import from Claude Code</h2>
+    <section aria-label="Import your own agents" data-harness-import className="flex flex-col gap-2">
+      <h2 className="text-title-medium">Import your own agents</h2>
       <p className="text-body-medium text-muted-foreground">
-        The agents in <code className="font-mono text-body-small">{CLAUDE_AGENTS}</code> on the api's machine. An import copies one into the
-        user library, with the skills it gives.
+        The agents your harness keeps for you on the api's machine, outside any repository. An import copies one into the user library, with
+        the skills it gives.
       </p>
       {sources.error && (
-        <p data-claude-import-unread className="text-body-medium text-muted-foreground">
+        <p data-harness-import-unread className="text-body-medium text-failure">
           {sources.error.message}
         </p>
       )}
-      {sources.data && offered.length === 0 && <p className="text-body-medium text-muted-foreground">No agent there.</p>}
+      {sources.data && offered.length === 0 && (
+        <p className="text-body-medium text-muted-foreground">No agent of your own outside the library.</p>
+      )}
       {offered.length > 0 && (
         <ul className="flex flex-col gap-2">
           {offered.map((one) => (
@@ -46,7 +47,7 @@ export function ClaudeImport({ items }: { items: readonly LibraryItem[] }) {
         </ul>
       )}
       {copy.error && (
-        <Alert variant="destructive" data-claude-import-refused>
+        <Alert variant="destructive" data-harness-import-refused>
           <AlertTitle>Not imported</AlertTitle>
           <AlertDescription>{copy.error.message}</AlertDescription>
         </Alert>
@@ -55,10 +56,10 @@ export function ClaudeImport({ items }: { items: readonly LibraryItem[] }) {
   );
 }
 
-/** One agent of Claude Code's: its name, what it is for or why it does not read, and its Import, or that the library holds its name. */
+/** One agent a harness keeps: its name, what it is for or why it does not read, and its Import, or that the library holds its name. */
 function ImportRow({ one, pending, onImport }: { one: Importable; pending: boolean; onImport: () => void }) {
   return (
-    <li data-claude-agent={one.name} className="flex flex-wrap items-center gap-2 text-body-medium">
+    <li data-harness-agent={one.name} className="flex flex-wrap items-center gap-2 text-body-medium">
       <span className="font-mono">{one.name}</span>
       {one.error === null ? (
         one.description !== null && <span className="text-body-small text-muted-foreground">{one.description}</span>
@@ -66,7 +67,7 @@ function ImportRow({ one, pending, onImport }: { one: Importable; pending: boole
         <span className="text-body-small text-failure">{one.error}</span>
       )}
       {one.held ? (
-        <Badge variant="outline" className="ml-auto" data-claude-held>
+        <Badge variant="outline" className="ml-auto" data-harness-held>
           in the library
         </Badge>
       ) : (
@@ -74,7 +75,7 @@ function ImportRow({ one, pending, onImport }: { one: Importable; pending: boole
           size="xs"
           variant="outline"
           className="ml-auto"
-          data-claude-import-press={one.name}
+          data-harness-import-press={one.name}
           isDisabled={pending || one.error !== null}
           onPress={onImport}
         >

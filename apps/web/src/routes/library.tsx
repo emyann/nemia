@@ -2,7 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Badge } from '@/components/ui/badge';
 import { TextLink } from '@/components/look';
-import { ClaudeImport } from '@/components/library/ClaudeImport';
+import { HarnessImport } from '@/components/library/HarnessImport';
 import { LIBRARY_KINDS, libraryQuery, type LibraryItem, type LibraryKind } from '../lib/api/storeLibrary.ts';
 
 export const Route = createFileRoute('/library')({
@@ -21,8 +21,8 @@ const HEADINGS: Record<LibraryKind, string> = { Skill: 'Skills', Agent: 'Agents'
 
 /**
  * The store's library, in no factory: each kind's items, the user library's and Nemia's builtins, each with the factories that use it,
- * a link to each, and a copy of a builtin that has changed since it was made said so; and Claude Code's own agents, to import. A factory
- * adds an item on its settings page.
+ * a link to each, and a copy of a builtin that has changed since it was made said so; and the agents a harness keeps for its user, to
+ * import. A factory adds an item on its settings page.
  */
 function LibraryPage() {
   const { data } = useSuspenseQuery(libraryQuery());
@@ -35,7 +35,7 @@ function LibraryPage() {
       {LIBRARY_KINDS.map((kind) => (
         <LibrarySection key={kind} kind={kind} items={data.filter((one) => one.kind === kind)} />
       ))}
-      <ClaudeImport items={data} />
+      <HarnessImport items={data} />
     </article>
   );
 }

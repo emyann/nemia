@@ -1,4 +1,4 @@
-import { partOf, sidebar } from '../board.ts';
+import { machineBarOf, partOf, sidebar } from '../board.ts';
 import { expectCount, expectInside, expectNone, expectTexts, expectVisible, Refused } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -7,7 +7,7 @@ export default {
   /**
    * A settled step's session, read once, drawn by the one conversation family: its name and a link back to the run at the top, its part
    * whole under it (its chip in the part's head), then the band that says nothing more arrives here, and the talk, the part and the talk
-   * scrolling together down to the window's foot — the brief folded to a line that opens, the calls and the thoughts among them folded into
+   * scrolling together down to the machine bar at the window's foot — the brief folded to a line that opens, the calls and the thoughts among them folded into
    * one turn, the session's words from their markdown in the agent's bubble, a line the harness wrote on its own as a quiet marker, and the
    * closeout's one line, which points up to what the step said in its part. The session has ended, so no composer is drawn at all: the band
    * carries why, and where to go instead. Read back, the talk says so and a pill offers the way to the latest, with no count: nothing of a
@@ -38,10 +38,10 @@ export default {
     );
     await expectCount(page.locator('[data-session-composer]'), 0, 'and no composer at all: the fact is said once, in one voice');
     const scope = page.locator(`[data-step-scope="${SESSION.step}"]`);
-    const [box, foot] = [await scope.boundingBox(), { y: page.viewportSize()?.height ?? 0 }];
+    const [box, foot] = [await scope.boundingBox(), { y: (await machineBarOf(page).boundingBox())?.y ?? 0 }];
     if (!box || Math.abs(box.y + box.height - foot.y) > 24) {
       throw new Refused(
-        `the part and the talk take the page's height down to the window's foot — they end at ${box ? Math.round(box.y + box.height) : 'nothing'} px, the window at ${foot.y} px`,
+        `the part and the talk take the page's height down to the machine bar — they end at ${box ? Math.round(box.y + box.height) : 'nothing'} px, the bar starts at ${foot.y} px`,
       );
     }
 

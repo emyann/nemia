@@ -8,6 +8,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import zlib from 'node:zlib';
 import type { AddressInfo } from 'node:net';
 import { Cause, Effect, Exit, Option } from 'effect';
 import { FetchHttpClient } from 'effect/http';
@@ -18,8 +19,14 @@ type Sent = { readonly method: string; readonly path: string; readonly headers: 
 
 const sent: Sent[] = [];
 
-/** What the stand-in answers every request: a status and a JSON body; none, to take the request and never answer. */
-let answer: { readonly status: number; readonly body: unknown } | 'none' = { status: 404, body: { error: 'none here' } };
+/**
+ * What the stand-in answers every request: a status and a JSON body, gzipped where `gzip` is set and the request accepts it, as the api's
+ * `compress` answers; none, to take the request and never answer.
+ */
+let answer: { readonly status: number; readonly body: unknown; readonly gzip?: true } | 'none' = {
+  status: 404,
+  body: { error: 'none here' },
+};
 
 const standIn = http.createServer((req, res) => {
   let body = '';
@@ -27,8 +34,14 @@ const standIn = http.createServer((req, res) => {
   req.on('end', () => {
     sent.push({ method: req.method ?? '', path: req.url ?? '', headers: req.headers, body });
     if (answer === 'none') return;
+    const json = JSON.stringify(answer.body);
+    if (answer.gzip && /\bgzip\b/.test(req.headers['accept-encoding'] ?? '')) {
+      res.writeHead(answer.status, { 'content-type': 'application/json', 'content-encoding': 'gzip', vary: 'Accept-Encoding' });
+      res.end(zlib.gzipSync(json));
+      return;
+    }
     res.writeHead(answer.status, { 'content-type': 'application/json' });
-    res.end(JSON.stringify(answer.body));
+    res.end(json);
   });
 });
 await new Promise<void>((resolve) => standIn.listen(0, '127.0.0.1', resolve));
@@ -108,6 +121,22 @@ test('a status the Api declares no error for is decoded into Answered: its statu
   const wordless = failureOf(await called('discovery.resources'));
   assert.ok(wordless instanceof Answered);
   assert.equal(wordless.said, undefined);
+});
+
+test('a list the api answers gzipped is asked for so and decoded whole, as the cli reads it', async () => {
+  const list = { apiVersion: 'nemia/v1', kind: 'CardList', metadata: {}, items: [] as unknown[] };
+  answer = { status: 200, body: list, gzip: true };
+  sent.length = 0;
+  const exit = await Effect.runPromiseExit(
+    apiClient({ baseUrl: base }).pipe(
+      Effect.flatMap((client) => client.cards.listAll({ query: {} })),
+      Effect.provide(FetchHttpClient.layer),
+    ),
+  );
+  assert.match(String(sent[0]?.headers['accept-encoding']), /\bgzip\b/, 'the client accepts gzip');
+  assert.ok(Exit.isSuccess(exit), `decoded, not ${String(failureOf(exit))}`);
+  assert.deepEqual(exit.value, list);
+  answer = { status: 404, body: { error: 'none here' } };
 });
 
 /** The bound the test gives a call, in place of the shipped one. */

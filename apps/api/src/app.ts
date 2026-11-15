@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import { Layer, ManagedRuntime } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
+import { compress } from 'hono/compress';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
@@ -108,6 +109,9 @@ const boardFiles: BoardFiles = {
  * this app's own `fetch`, mounted before the `Api`. After the mount, a GET of any other path is a page of the board, served from its
  * built files (`boardOf`, board/board.ts, its files read here: `boardFiles`). A path none serves is the api's own 404 (`noRoute`).
  *
+ * Every answer, the board's files, the OpenAPI routes, the MCP port and the refusals among them, is compressed where the request
+ * accepts it (Hono's `compress`, its defaults kept: gzip before deflate, nothing under 1,024 bytes, and no `text/event-stream`, so a
+ * watch, the feed and an MCP stream stay live), with `Vary: Accept-Encoding`; a request that accepts none is answered as it is.
  * Before any of them, every request says one line and is traced as a server span (`saidRequest`, request/request.ts); who it is from is
  * resolved (`callerGate`, caller/caller.ts: the person with no `Authorization`, an agent's session by the token it presents, a token
  * refused 401 whatever the route); and every write under `/api/` meets the one guard (`writeGuard`, guard.ts: a 403 off the host or the
@@ -122,6 +126,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
       c.set('runtime', runtime);
       await next();
     })
+    .use(compress())
     .use(saidRequest)
     .use(callerGate)
     .use(writeGuard)

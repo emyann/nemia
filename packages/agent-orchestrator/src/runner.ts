@@ -618,10 +618,5 @@ export {
   refOf,
   type FactoryAdds,
 } from './library/library.verb.ts';
-export {
-  builtinCopies,
-  libraryServers,
-  recordBuiltinCopy,
-  writeLibraryServers,
-} from './library/library.store.ts';
+export { builtinCopies, libraryServers, recordBuiltinCopy, writeLibraryServers } from './library/library.store.ts';
 export { addName, type LibraryRef } from './library/library.ts';

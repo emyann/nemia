@@ -20,7 +20,17 @@ import { SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
 import { skillTurnCost, type SkillsFound } from '../agents/agents.ts';
 import { lookedUp } from './skills.ts';
 import { renderSkill, skillEntryOf, withPreload, type SkillOther } from './skills.ts';
-import { addedIn, BUILTIN_SKILLS, isBuiltinSkill, libraryRootOf, lookupOf, lookupRoots, packageSkillFolders, PLACE_SKILLS, type Places } from './read.store.ts';
+import {
+  addedIn,
+  BUILTIN_SKILLS,
+  isBuiltinSkill,
+  libraryRootOf,
+  lookupOf,
+  lookupRoots,
+  packageSkillFolders,
+  PLACE_SKILLS,
+  type Places,
+} from './read.store.ts';
 import { SkillDoor, skillDoorOver, type SkillLayer, type SkillPage, type SkillWhere } from './skill-door.store.ts';
 
 /** Where the stand-in says a skill's folder is: the root its paths are named under, as the files' are under the store's root. */

@@ -87,7 +87,8 @@ const definitionWriteRefusalSpec = spec<
     },
     builtinReplaceIsACopy: {
       description: "A replace of a builtin at the library goes on: it is written as the person's copy, which shadows the builtin",
-      condition: ({ input: [at, does, there], output }) => !(at === 'library' && does === 'replace' && there === 'builtin') || output === null,
+      condition: ({ input: [at, does, there], output }) =>
+        !(at === 'library' && does === 'replace' && there === 'builtin') || output === null,
     },
     builtinNeverRemoved: {
       description: 'A removal of a builtin is Invalid: what Nemia ships is never removed from the library',
@@ -95,7 +96,8 @@ const definitionWriteRefusalSpec = spec<
         !(at === 'library' && does === 'remove' && there === 'builtin') || output?.kind === 'Invalid',
     },
     actionOnABuiltinGoes: {
-      description: "An action on a builtin goes on, judged by the action itself: a copy makes the person's, and a try says why it cannot run",
+      description:
+        "An action on a builtin goes on, judged by the action itself: a copy makes the person's, and a try says why it cannot run",
       condition: ({ input: [at, does, there], output }) => !(at === 'library' && does === 'act' && there === 'builtin') || output === null,
     },
     noneIsMissing: {

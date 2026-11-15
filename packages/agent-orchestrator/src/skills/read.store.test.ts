@@ -416,13 +416,13 @@ test("the folders a workflow's definitions are looked for in follow the one look
   assert.deepEqual(lookupRoots(workflow), [origins.factory], 'with no repository and no store, only its own');
 });
 
-test("a factory finds a library skill and a builtin one once it has added it, and every one while it has no record of its adds", async (t) => {
+test('a factory finds a library skill and a builtin one once it has added it, and every one while it has no record of its adds', async (t) => {
   const home = scratch('wf-library-gate-');
   written(home, { 'workflows/skills/tidy/SKILL.md': SKILL });
   const repo = checkout();
-  const lookup = (factory?: string) => skillsFor(path.join(repo, 'workflows', 'dev'), placesOf(home, repo, factory === undefined ? undefined : addedOf(home, factory))).at;
-  const record = (adds: ReadonlyArray<{ kind: 'Agent' | 'Skill' | 'McpServer'; name: string }>) =>
-    writeLibraryAdds(home, 'acme', adds);
+  const lookup = (factory?: string) =>
+    skillsFor(path.join(repo, 'workflows', 'dev'), placesOf(home, repo, factory === undefined ? undefined : addedOf(home, factory))).at;
+  const record = (adds: ReadonlyArray<{ kind: 'Agent' | 'Skill' | 'McpServer'; name: string }>) => writeLibraryAdds(home, 'acme', adds);
   await t.test('unrecorded: the library skill and the builtin are found, as before the library had adds', () => {
     assert.equal(lookup('acme').get('tidy'), path.join(home, 'workflows', 'skills', 'tidy'));
     assert.equal(lookup('acme').get('create-an-agent'), path.join(BUILTIN_SKILLS, 'create-an-agent'));

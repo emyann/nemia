@@ -34,9 +34,7 @@ const holds = (roots: readonly LookupRoot[], at: number, added: boolean): boolea
 const heldAgain = (roots: readonly LookupRoot[], at: number, added: boolean): boolean => {
   const first = roots[at];
   return (
-    first !== undefined &&
-    first.repo !== undefined &&
-    roots.slice(at + 1).some((root) => reads(root, added) && root.repo === first.repo)
+    first !== undefined && first.repo !== undefined && roots.slice(at + 1).some((root) => reads(root, added) && root.repo === first.repo)
   );
 };
 

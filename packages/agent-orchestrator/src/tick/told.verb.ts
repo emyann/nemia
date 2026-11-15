@@ -103,7 +103,10 @@ export const toldOf = Effect.fnUntraced(function* (run: Run, step: StepSpec) {
 const skillsTold = Effect.fnUntraced(function* (step: StepSpec, run: Run) {
   const home = yield* StoreRoot;
   const door = (yield* SkillDoor).skills;
-  const found = yield* door.found({ dir: run.workflowDir, places: placesOf(home, run.repo, addedOf(home, run.factory ?? DEFAULT_NAMESPACE)) });
+  const found = yield* door.found({
+    dir: run.workflowDir,
+    places: placesOf(home, run.repo, addedOf(home, run.factory ?? DEFAULT_NAMESPACE)),
+  });
   const told: SkillAgain[] = [];
   for (const name of step.agent?.skills ?? []) {
     const from = found.at.get(name);

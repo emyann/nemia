@@ -23,7 +23,16 @@ import {
   type SkillsFound,
 } from './agents.ts';
 import { lookedUp } from '../skills/skills.ts';
-import { addedIn, folderForVersion, libraryRootOf, lookupOf, lookupRoots, readForVersion, skillsFor, type Places } from '../skills/read.store.ts';
+import {
+  addedIn,
+  folderForVersion,
+  libraryRootOf,
+  lookupOf,
+  lookupRoots,
+  readForVersion,
+  skillsFor,
+  type Places,
+} from '../skills/read.store.ts';
 
 /**
  * The file of a person's custom instructions for the agent `name`, in the store `home`: `<home>/custom-instructions/<name>.md`.

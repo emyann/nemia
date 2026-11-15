@@ -609,5 +609,5 @@ export {
   libraryServerThere,
   libraryServerWritten,
 } from './library/library-servers.verb.ts';
-export { builtinCopies, recordBuiltinCopy } from './library/library.store.ts';
+export { addedOf, builtinCopies, recordBuiltinCopy } from './library/library.store.ts';
 export { type LibraryRef } from './library/library.ts';

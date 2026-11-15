@@ -50,6 +50,7 @@ import { answered, answeredWriteIn, readerRefused } from '../objects/refused.ts'
 import { wantsTable } from '../objects/table.ts';
 import { filesUnder, skillFoldersIn, skillTextOf } from '../workflows/builder.ts';
 import {
+  addsGated,
   listed,
   originIn,
   servedNamed,
@@ -236,7 +237,11 @@ async function copied(s: Served, name: string): Promise<void> {
 
 /** The skill `name` the namespace serves (from `asked`, where one is), read now. */
 async function skillAt(s: Served, namespace: string, name: string, asked?: Origin): Promise<Skill> {
-  const [one] = await skillObjectsOf(s, [servedNamed(await heldIn(s), name, asked, listPath(namespace))], namespace);
+  const [one] = await skillObjectsOf(
+    s,
+    [servedNamed(addsGated(s.home, namespace, 'skills', await heldIn(s)), name, asked, listPath(namespace))],
+    namespace,
+  );
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
   return one;
 }
@@ -325,7 +330,11 @@ export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
       Effect.flatMap(wantsTable, (table) =>
         answeredWriteIn(namespace, async (s) => {
           const { origin, ...page } = query;
-          const list = listed('Skill', await skillObjectsOf(s, servedOf(await heldIn(s), originIn(s, origin)), namespace), queryOf(page));
+          const list = listed(
+            'Skill',
+            await skillObjectsOf(s, servedOf(addsGated(s.home, namespace, 'skills', await heldIn(s)), originIn(s, origin)), namespace),
+            queryOf(page),
+          );
           return table ? skillTable(list) : list;
         }),
       ),
@@ -379,7 +388,10 @@ export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
     .handle('read', ({ payload }) => answered(async () => skillReadOf(payload)))
     .handle('files', ({ params: { namespace, name }, query }) =>
       answeredWriteIn(namespace, async (s) => ({
-        paths: filesUnder(servedNamed(await heldIn(s), name, originIn(s, query.origin), listPath(namespace)).item.dir),
+        paths: filesUnder(
+          servedNamed(addsGated(s.home, namespace, 'skills', await heldIn(s)), name, originIn(s, query.origin), listPath(namespace)).item
+            .dir,
+        ),
       })),
     ),
 );

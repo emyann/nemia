@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 const PINNED: Record<string, string[]> = {
   'agent-orchestrator': [
+    'addedOf',
     'builtinCopies',
     'libraryAddList',
     'libraryAddNamed',

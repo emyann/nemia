@@ -60,6 +60,7 @@ import { answered, answeredIn, answeredWriteIn } from '../objects/refused.ts';
 import { wantsTable } from '../objects/table.ts';
 import { markdownNamesIn } from '../workflows/builder.ts';
 import {
+  addsGated,
   listed,
   originIn,
   servedNamed,
@@ -199,7 +200,11 @@ const listPath = (namespace: string) => `GET /api/namespaces/${namespace}/agents
 
 /** The agent `name` the namespace serves (from `asked`, where one is), read now. */
 async function agentAt(s: Served, namespace: string, name: string, asked?: Origin): Promise<Agent> {
-  const [one] = await agentObjectsOf(s, [servedNamed(await heldIn(s), name, asked, listPath(namespace))], namespace);
+  const [one] = await agentObjectsOf(
+    s,
+    [servedNamed(addsGated(s.home, namespace, 'agents', await heldIn(s)), name, asked, listPath(namespace))],
+    namespace,
+  );
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
   return one;
 }
@@ -309,7 +314,7 @@ async function triedIn(s: Served, name: string, brief: string | undefined): Prom
 
 /** The A2A card of the agent `name` from `origin` (`nemia agents card`'s entry), beside why nothing serves it over A2A. */
 async function cardIn(s: Served, namespace: string, name: string, origin: string | undefined) {
-  const served = servedNamed(await heldIn(s), name, originIn(s, origin), listPath(namespace));
+  const served = servedNamed(addsGated(s.home, namespace, 'agents', await heldIn(s)), name, originIn(s, origin), listPath(namespace));
   if (served.item.error !== null) throw new Invalid({ error: served.item.error });
   if (served.origin === 'factory')
     throw new Invalid({
@@ -379,7 +384,11 @@ export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
       Effect.flatMap(wantsTable, (table) =>
         answeredWriteIn(namespace, async (s) => {
           const { origin, ...page } = query;
-          const list = listed('Agent', await agentObjectsOf(s, servedOf(await heldIn(s), originIn(s, origin)), namespace), queryOf(page));
+          const list = listed(
+            'Agent',
+            await agentObjectsOf(s, servedOf(addsGated(s.home, namespace, 'agents', await heldIn(s)), originIn(s, origin)), namespace),
+            queryOf(page),
+          );
           return table ? agentTable(list) : list;
         }),
       ),

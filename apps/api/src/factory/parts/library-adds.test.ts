@@ -36,7 +36,7 @@ async function answered<T>(res: Response | Promise<Response>, status = 200): Pro
 
 const tidy = { title: 'Tidy notes', description: 'Rewrites notes.', tags: ['notes'], examples: ['tidy my notes'], body: 'Tidy.' };
 
-test('a person adds a skill of the library to a factory: listed with it, its removal refused naming it, missing once the library loses it, and the add taken off', async (t) => {
+test('a person adds a skill of the library to a factory: listed with it, served in its namespace, its removal refused naming it, missing once the library loses it, and the add taken off, no longer served there', async (t) => {
   const s = story(t);
   await s.test('a skill is made at the library, in no namespace, with no factory adding it', async () => {
     const made = await answered<Skill>(send('POST', '/api/skills', { metadata: { name: 'tidy' }, spec: tidy }), 201);
@@ -56,6 +56,8 @@ test('a person adds a skill of the library to a factory: listed with it, its rem
     assert.ok(list.items.some((one) => one.metadata.name === 'Skill.tidy'));
     const skill = await answered<Skill>(app.request('/api/skills/tidy'));
     assert.deepEqual(skill.status.factories, ['shop']);
+    const served = await answered<SkillList>(app.request('/api/namespaces/shop/skills'));
+    assert.ok(served.items.some((one) => one.metadata.name === 'tidy'), 'the factory serves what it added');
   });
   await s.test('REFUSED: the removal of a skill a factory adds is a 409 naming each factory, and the skill is kept', async () => {
     const skill = await answered<Skill>(app.request('/api/skills/tidy'));
@@ -83,6 +85,9 @@ test('a person adds a skill of the library to a factory: listed with it, its rem
   await s.test('the add taken off, the skill is removed from the library', async () => {
     await answered<LibraryAdd>(send('DELETE', `${ADDS}/Skill.tidy`));
     assert.equal((await app.request(`${ADDS}/Skill.tidy`)).status, 404, 'no add of that name now');
+    const served = await answered<SkillList>(app.request('/api/namespaces/shop/skills'));
+    assert.ok(!served.items.some((one) => one.metadata.name === 'tidy'), 'its record without tidy, the factory serves it no more');
+    assert.equal((await app.request('/api/namespaces/shop/skills/tidy')).status, 404, 'nor reads it by name');
     const skill = await answered<Skill>(app.request('/api/skills/tidy'));
     const res = await app.request(`/api/skills/tidy?resourceVersion=${skill.metadata.resourceVersion}`, {
       method: 'DELETE',

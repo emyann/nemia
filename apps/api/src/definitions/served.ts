@@ -4,7 +4,7 @@
  * (`definitionWriteRefusal`) as the `Api`'s error.
  */
 import { Effect, Result } from 'effect';
-import { objectsListed, type ObjectQuery } from 'agent-orchestrator';
+import { addedOf, objectsListed, type ObjectQuery } from 'agent-orchestrator';
 import { definitionsServed, definitionWriteRefusal, type DefinitionWrite, type WriteAt } from 'agent-orchestrator/workflow';
 import { Conflict, DEFAULT_NAMESPACE, DEFINITION_ORIGINS, Invalid, Missing, type DefinitionOrigin } from 'objects';
 import { repoNeeded, type Place } from '../factory/place.ts';
@@ -136,3 +136,18 @@ export const listed = <const K extends string, T extends Named>(kind: K, items: 
   if (Result.isFailure(page)) throw new Invalid({ error: page.failure.message });
   return page.success;
 };
+
+/**
+ * What a namespace serves of `held` once its factory's adds gate the library: a definition of the user library or a builtin only where the
+ * factory has added it, as its runs resolve it (`addedOf`); every one while the factory records no adds, its lookup reading the library
+ * whole.
+ * @param home The store's root.
+ * @param namespace The namespace read, `default` among them.
+ * @param kind Which of the factory's adds gate `held`: its agents or its skills.
+ * @param held What the namespace holds at each origin.
+ */
+export function addsGated<T>(home: string, namespace: string, kind: 'agents' | 'skills', held: readonly Held<T>[]): Held<T>[] {
+  const added = addedOf(home, namespace);
+  if (added === undefined) return [...held];
+  return held.filter((h) => (h.origin !== 'user' && h.origin !== 'builtin') || added[kind].has(h.name));
+}

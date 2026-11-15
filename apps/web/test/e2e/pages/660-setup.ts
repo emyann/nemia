@@ -422,7 +422,7 @@ async function approvesPairing(page: Page): Promise<void> {
   await settled(page);
   await photograph(page, path.join(OUT, `setup-approvals-${await themeOf(page)}.png`));
   const [approved] = await Promise.all([
-    page.waitForResponse((r) => r.request().method() === 'POST' && /\/api\/pairings\/[^/]+\/approve$/.test(new URL(r.url()).pathname)),
+    page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/pairings/approve'),
     row.getByRole('button', { name: 'Approve' }).click(),
   ]);
   if (approved.status() !== 200) throw new Refused(`the code the client shows approves it — the api answered ${approved.status()}`);

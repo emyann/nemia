@@ -5,12 +5,11 @@
  * Open button visits the page of what it shows, for everything that has one (`barOpens`), read in the place the page beside it is read
  * in, the address's `factory` and `repo`.
  */
+import { usePagePlace } from '@/components/nav/useSeat';
 import { useEffect, useId, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
-import { useSearch } from '@tanstack/react-router';
 import { XIcon } from 'lucide-react';
 import { Button, LinkButton } from '@/components/ui/button';
 import { barOpens, barValue, escapeDoes, focusGoesBack, type FocusPlace } from '@/lib/bar';
-import { pagePlaceOf } from '@/lib/factories';
 import { useBar } from '@/lib/useBar';
 import { routeLink } from '../nav/routeLink';
 
@@ -103,7 +102,7 @@ export function BarPanel({
   children: ReactNode;
 }) {
   const { open, close } = useBar();
-  const place = pagePlaceOf(useSearch({ strict: false }));
+  const place = usePagePlace();
   const page = open ? barOpens(open, place) : null;
   const bar = useRef<HTMLElement>(null);
   const heading = useId();

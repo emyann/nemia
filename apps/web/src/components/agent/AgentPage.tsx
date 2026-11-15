@@ -1,0 +1,253 @@
+import { useState, type ReactNode } from 'react';
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery, type QueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { Button } from '@/components/ui/button';
+import { AgentForm } from './AgentForm';
+import { BackToAgents, AgentFace, AgentRefused, FromBadge, personOf, UsedBy } from './AgentParts';
+import { CustomInstructions } from '../step/CustomInstructions';
+import { AsWritten } from '../field/FilePage';
+import { TryAgent, TryYours } from './TryAgent';
+import {
+  agentQuery,
+  AgentRefusal,
+  customInstructionsQuery,
+  readAgent,
+  removeAgent,
+  saveAgent,
+  type AgentDraft,
+  type AgentListing,
+} from '@/lib/api/agents';
+import { keyFormQuery } from '@/lib/api/builder';
+import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } from '@/lib/agents';
+import { invalidateAgents } from '@/lib/agentWrites';
+import { FACTORY_WAY } from '@/lib/factories';
+import type { PagePlace } from '@/lib/api/workflows';
+import { factoriesQuery, type Factory } from '@/lib/api/factories';
+
+/**
+ * What an agent's page loads before it draws: the agent read in `place`, the form's keys, and for one of yours its custom instructions.
+ * @param client The board's query client.
+ * @param from Where the agent is read from.
+ * @param name The agent's name.
+ * @param place The factory and the repository it is read in.
+ */
+export const loadAgent = (client: QueryClient, from: string, name: string, place: PagePlace) =>
+  Promise.all([
+    client.ensureQueryData(agentQuery(from, name, place)),
+    client.prefetchQuery(keyFormQuery),
+    from === 'user' ? client.prefetchQuery(customInstructionsQuery(name)) : null,
+  ]);
+
+const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
+
+/**
+ * One agent: the nodes it is attached to, each linked, and its form — to edit, when it is yours; to read, with its Source, when it is the
+ * repository's, which the board does not write. Yours has no Source, whose toggle would drop what was typed. The form is drawn under
+ * `formKeyOf`'s key, so a new version is a new form. Save puts it back against the version it was read at, and Remove takes it away while
+ * no node names it. Once the form copies a skill, the page reads the agent past the cache, before the copy's invalidation lands, to keep
+ * the form (`keptAfterCopy`); a read that fails keeps nothing, and the page reads the agent again as after any write. Under it, your custom
+ * instructions for its name, for an agent of either place, then the Try panel for an agent of yours; the repository's is not tried, since a
+ * try runs with no repository, where its agents are not read.
+ */
+export function AgentPage({ from, name, place }: { from: string; name: string; place: PagePlace }) {
+  const { data: agent } = useSuspenseQuery(agentQuery(from, name, place));
+  const { data: keyForm } = useQuery(keyFormQuery);
+  const { data: factories } = useQuery({ ...factoriesQuery, enabled: agent.from === 'repo' && place.repo === undefined });
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const mine = agent.from === 'user';
+  const [kept, setKept] = useState<KeptForm | null>(null);
+  const formKey = formKeyOf(agent.version, kept);
+
+  const save = useMutation({
+    mutationFn: (draft: AgentDraft) => saveAgent(agent.name, agent.version, draft),
+    onSuccess: (saved) =>
+      settleSave({
+        rename:
+          saved.agent.name !== agent.name
+            ? () => navigate({ to: '/agents/$from/$agent', params: { from: 'user', agent: saved.agent.name } })
+            : undefined,
+        invalidate: () => invalidateAgents(queryClient),
+        release: () =>
+          setKept((was) => keptAfterSave(was, queryClient.getQueryData(agentQuery('user', saved.agent.name).queryKey)?.version)),
+      }),
+  });
+  const remove = useMutation({
+    mutationFn: () => removeAgent(agent.name, agent.version),
+    onSuccess: async () => {
+      await navigate({ to: '/agents' });
+      await invalidateAgents(queryClient);
+    },
+  });
+  const error = save.error ?? remove.error;
+  const form = (
+    <AgentForm
+      key={formKey}
+      listing={agent}
+      keyForm={keyForm}
+      readOnly={!mine}
+      onSkillCopied={async () => {
+        const now = await readAgent(from, name, place).catch(() => null);
+        setKept(now && keptAfterCopy(agent, now, formKey));
+      }}
+      saving={save.isPending || remove.isPending}
+      refusal={error && <AgentRefused message={error.message} users={error instanceof AgentRefusal ? error.users : []} from="user" />}
+      onSave={(draft) => {
+        remove.reset();
+        save.mutate(draft);
+      }}
+      footer={
+        mine && (
+          <Remove
+            agent={agent}
+            pending={remove.isPending}
+            onRemove={() => {
+              save.reset();
+              remove.mutate();
+            }}
+          />
+        )
+      }
+    />
+  );
+
+  return (
+    <article className="space-y-6">
+      <BackToAgents />
+
+      <AgentHeader agent={agent} mine={mine} />
+
+      {agent.error !== null && <Unread error={agent.error} />}
+
+      <FormIn agent={agent} mine={mine}>
+        {form}
+      </FormIn>
+
+      {agent.from === 'user' && <CustomInstructions name={agent.name} />}
+      {agent.from === 'repo' && <RepoInstructions name={agent.name} repo={repoOfPlace(place, factories)} />}
+
+      {mine ? <TryAgent agent={agent} /> : <TryYours agent={agent} />}
+    </article>
+  );
+}
+
+/** The form in its frame: under the file's path for an agent of yours, beside its Source for the repository's. */
+function FormIn({ agent, mine, children }: { agent: AgentListing; mine: boolean; children: ReactNode }) {
+  if (!mine)
+    return (
+      <AsWritten file={agent.file} source={agent.source}>
+        {children}
+      </AsWritten>
+    );
+  return (
+    <>
+      <p className="border-b border-outline-variant pb-2 font-mono text-body-small break-all text-muted-foreground">{agent.file}</p>
+      {children}
+    </>
+  );
+}
+
+/** Why the agent's file does not read as an agent, in the parser's words: no run can start a node that names it. */
+function Unread({ error }: { error: string }) {
+  return (
+    <div data-agent-error className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="text-body-medium font-medium text-on-failure-container">
+        Does not read as an agent, so no run can start a node that names it:
+      </p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{error}</p>
+    </div>
+  );
+}
+
+/**
+ * Who the agent is, at the head of its page: its face and name as a person's, the job it holds and the name a node gives it, what it is
+ * for, the nodes that name it, and, for the repository's, how to start one of yours from it: the copy the api answers (`untried`).
+ */
+function AgentHeader({ agent, mine }: { agent: AgentListing; mine: boolean }) {
+  return (
+    <header className="space-y-2">
+      <div className="flex items-center gap-4">
+        <AgentFace name={agent.name} size={96} follows plate />
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="text-title-large">{personOf(agent.name)}</h1>
+            <FromBadge from={agent.from} />
+          </div>
+          <p data-agent-role className="text-body-medium text-muted-foreground">
+            {agent.role ?? 'No role yet'} · <span className="font-mono text-body-small">agent: {agent.name}</span>
+          </p>
+        </div>
+      </div>
+      {agent.description && <p className="text-body-medium text-foreground">{agent.description}</p>}
+      <UsedBy listing={agent} />
+      {!mine && agent.from === 'factory' && (
+        <p data-read-only data-way="factory" className="text-body-small text-muted-foreground">
+          A factory&apos;s own agents are read here, not written: {FACTORY_WAY}.
+        </p>
+      )}
+      {!mine && agent.from !== 'factory' && (
+        <p data-read-only className="text-body-small text-muted-foreground">
+          The repository's agents are read here, not written: they change with the repository, in a commit.
+          {agent.untried?.copy && <> To start one of yours from this one, {code(agent.untried.copy)}.</>}
+        </p>
+      )}
+    </header>
+  );
+}
+
+/**
+ * Remove, asked twice: the first press asks, the second removes. The question names the agent's file and the file it names beside it, its
+ * result schema (`output`), which goes with it unless another agent names it.
+ */
+function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: boolean; onRemove: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const beside = [agent.keys.output].filter((file): file is string => Boolean(file));
+  if (!asking)
+    return (
+      <Button variant="outline" className="ml-auto" onPress={() => setAsking(true)} isDisabled={pending}>
+        Remove…
+      </Button>
+    );
+  return (
+    <span data-remove-asks className="ml-auto flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
+      Remove {code(`agents/${agent.name}.md`)}
+      {beside.length > 0 && (
+        <>
+          and{' '}
+          {beside.map((file, i) => (
+            <span key={file}>
+              {i > 0 && <>, </>}
+              {code(file)}
+            </span>
+          ))}
+          , unless another agent names {beside.length === 1 ? 'it' : 'them'}
+        </>
+      )}
+      ?
+      <Button variant="destructive" onPress={onRemove} isDisabled={pending}>
+        {pending ? 'Removing…' : 'Remove'}
+      </Button>
+      <Button variant="ghost" onPress={() => setAsking(false)} isDisabled={pending}>
+        Keep it
+      </Button>
+    </span>
+  );
+}
+
+/**
+ * The repository a repository's agent was read from: the page's `?repo=`, else the only one of the factory it was read in. Undefined while
+ * the factories are read, or where the factory names several and the page none.
+ */
+const repoOfPlace = (place: { factory?: string; repo?: string }, factories: readonly Factory[] | undefined): string | undefined => {
+  if (place.repo !== undefined) return place.repo;
+  const repos = factories?.find((f) => f.name === place.factory)?.repos ?? [];
+  return repos.length === 1 ? repos[0] : undefined;
+};
+
+/**
+ * A repository's agent's custom instructions, looked for by name on the repository it was read from (`?repo=`): the default namespace,
+ * where they are written, reads no repository of its own. None drawn until that repository is known.
+ */
+function RepoInstructions({ name, repo }: { name: string; repo: string | undefined }) {
+  return repo === undefined ? null : <CustomInstructions name={name} repo={repo} />;
+}

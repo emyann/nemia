@@ -3,11 +3,11 @@
  * its keys, and the steps it waits on — read from the workflows listed in the place the page under it is read in, the address's `factory`
  * and `repo` (`listPlace`). Its page, which Open visits, has what it is told and its keys explained.
  */
+import { usePagePlace } from '@/components/nav/useSeat';
 import { useQuery } from '@tanstack/react-query';
-import { useSearch } from '@tanstack/react-router';
 import { factoriesQuery } from '@/lib/api/factories';
 import { fromMatches, workflowsInQuery, type WorkflowListing } from '@/lib/api/workflows';
-import { fromWord, listPlace, pagePlaceOf, type ListPlace } from '@/lib/factories';
+import { fromWord, listPlace, type ListPlace } from '@/lib/factories';
 import { BarPanel } from '../frame/BarPanel';
 import { runsOn, specLines } from './StepNode';
 
@@ -18,7 +18,7 @@ import { runsOn, specLines } from './StepNode';
  * the bar, which stays open until a person closes it.
  */
 export function SpecBar({ from, workflow, step }: { from: WorkflowListing['from']; workflow: string; step: string }) {
-  const address = pagePlaceOf(useSearch({ strict: false }));
+  const address = usePagePlace();
   const factories = useQuery(factoriesQuery);
   const where: ListPlace | null =
     listPlace(address, []).kind === 'every' ? { kind: 'every' } : factories.data ? listPlace(address, factories.data) : null;

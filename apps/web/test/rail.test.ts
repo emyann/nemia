@@ -1,12 +1,13 @@
 /**
- * The rail lights one destination on every page (`destinationsLit`, src/components/nav/nav.ts): each route of the board's route tree,
- * read from `src/routeTree.gen.ts`, lights exactly one, and a route that lights none or two is refused.
+ * Every page of the board sits somewhere in the frame (`seatOf`, src/components/nav/nav.ts): each route of the board's route tree, read
+ * from `src/routeTree.gen.ts`, has a seat, and each route under `/factories/<name>` sits in that factory at a place of its pane; a route
+ * with no seat is refused, named.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { type Destination, DESTINATIONS, destinationsLit } from '../src/components/nav/nav.ts';
+import { PANE_PLACES, seatOf, type Seat } from '../src/components/nav/nav.ts';
 
 /** Every full path of the board's routes, as the router's generated tree declares them, each parameter given a value. */
 function routePaths(): string[] {
@@ -21,19 +22,23 @@ function routePaths(): string[] {
   return paths;
 }
 
-/** Each of `paths` that does not light exactly one destination of `table`, said with what it lights. */
-const unlit = (paths: readonly string[], table: readonly Destination[]): string[] =>
+/** Each of `paths` that `seat` seats nowhere, or under `/factories/x` anywhere but a place of factory x's pane, said with why. */
+const unseated = (paths: readonly string[], seat: (path: string) => Seat | undefined): string[] =>
   paths.flatMap((one) => {
-    const lit = destinationsLit(one, table).map((destination) => destination.label);
-    return lit.length === 1 ? [] : [`${one} lights ${lit.length ? lit.join(' and ') : 'none'}`];
+    const at = seat(one);
+    if (at === undefined) return [`${one} has no seat`];
+    if (!one.startsWith('/factories/')) return [];
+    const placed = at.level === 'factory' && at.factory === 'x' && PANE_PLACES.some((place) => place.id === at.place);
+    return placed ? [] : [`${one} is no place of factory x's pane`];
   });
 
-test('REFUSED: every route of the board lights exactly one destination of the rail', () => {
-  assert.deepEqual(unlit(routePaths(), DESTINATIONS), []);
+test('REFUSED: every route of the board has a seat, a factory’s path a place of its pane', () => {
+  assert.deepEqual(unseated(routePaths(), seatOf), []);
 });
 
-test('REFUSED: a route that lights no destination, or two, is named', () => {
-  assert.deepEqual(unlit(['/nowhere'], DESTINATIONS), ['/nowhere lights none']);
-  const overlapping = [...DESTINATIONS, { ...DESTINATIONS[0], id: 'twice', label: 'Twice', lights: (one: string) => one === '/settings' }];
-  assert.deepEqual(unlit(['/settings'], overlapping), ['/settings lights Settings and Twice']);
+test('REFUSED: a route with no seat, or a factory’s path seated off its pane, is named', () => {
+  assert.deepEqual(unseated(['/nowhere'], seatOf), ['/nowhere has no seat']);
+  const storeOnly = (one: string): Seat | undefined =>
+    one.startsWith('/factories/') ? { level: 'store', rail: 'factories' } : seatOf(one);
+  assert.deepEqual(unseated(['/factories/x/runs'], storeOnly), ["/factories/x/runs is no place of factory x's pane"]);
 });

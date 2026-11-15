@@ -28,8 +28,6 @@ import {
   photograph,
   photographBothWidths,
   reachClock,
-  SECTIONS,
-  sectionsOf,
   sidebar,
   themeOf,
   railPlace,
@@ -51,12 +49,12 @@ import { OUT, photographing, store } from '../world.ts';
  * a click. The browser clicks a link on Enter's keydown, and React Aria lets that click through: only the root's `RouterProvider` keeps it
  * from loading the whole page. Nothing else in the e2e presses a link from the keyboard.
  */
-async function enterOnPlace(page: Page, place: (typeof SECTIONS)[number], route: string): Promise<void> {
+async function enterOnPlace(page: Page, place: string, route: string): Promise<void> {
   const before = await page.evaluate(() => {
     (window as unknown as { e2eNotReloaded?: true }).e2eNotReloaded = true;
     return history.length;
   });
-  await sectionsOf(page).filter({ hasText: place }).focus();
+  await railPlace(page, place).focus();
   await page.keyboard.press('Enter');
   await page.waitForURL((url) => url.pathname === route, { timeout: WAIT_MS });
   const [kept, after] = await page.evaluate(
@@ -1161,9 +1159,9 @@ async function withRegated(page: Page, drawn: () => FinishedPage | undefined): P
   await narrow(page);
   await contrastHolds(page, ['[data-sentence]']);
 
-  await enterOnPlace(page, 'Inbox', '/inbox');
-  await expectVisible(railPlace(page, 'Inbox').and(litOf(page)), 'reached with Enter, the Inbox is lit in the menu');
-  await enterOnPlace(page, 'Runs', '/runs');
+  await enterOnPlace(page, 'Agents', '/agents');
+  await expectVisible(railPlace(page, 'Agents').and(litOf(page)), 'reached with Enter, Agents is lit in the rail');
+  await enterOnPlace(page, 'Waiting', '/runs');
   await expectCount(
     section(page, 'waiting').locator('article[data-run]'),
     open.counts.waiting,

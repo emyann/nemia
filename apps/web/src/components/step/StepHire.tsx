@@ -143,7 +143,7 @@ function NewAgent({ page, where }: { page: WorkflowStepPage; where: 'page' | 'ro
     return (
       <RouteLink
         to="/agents/new"
-        search={{ factory: page.factory ?? undefined, workflow: page.workflow, step: page.step }}
+        search={{ into: page.factory ?? undefined, workflow: page.workflow, step: page.step }}
         data-new-agent
         className={`text-body-small text-muted-foreground ${LINK}`}
       >

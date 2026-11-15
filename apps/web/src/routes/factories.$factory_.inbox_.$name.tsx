@@ -1,0 +1,31 @@
+import { createFileRoute, redirect } from '@tanstack/react-router';
+import { BackToInbox, CardPage } from '../components/inbox/CardPage';
+import { cardQuery } from '../lib/api/inbox.ts';
+import { namespaceOf } from '../lib/api/namespace.ts';
+import { objectHome } from '../lib/factoryAddress';
+
+/**
+ * The page of an inbox card, at /factories/$factory/inbox/$name: `inbox_` draws it on its own, not inside the Inbox page, which has no
+ * outlet for it. A card of another factory, or of the default one, is loaded again at the address it belongs at (`objectHome`), its search
+ * kept.
+ */
+export const Route = createFileRoute('/factories/$factory_/inbox_/$name')({
+  loader: async ({ context, params, location }) => {
+    const card = await context.queryClient.ensureQueryData(cardQuery(params.name));
+    const home = objectHome(`/inbox/${encodeURIComponent(params.name)}`, namespaceOf(card.factory), params.factory);
+    if (home) throw redirect({ href: `${home}${location.searchStr}`, replace: true });
+    return card;
+  },
+  component: Page,
+  errorComponent: ({ error }) => (
+    <div className="space-y-3">
+      <BackToInbox />
+      <p className="text-body-medium text-failure">Could not load this card: {error instanceof Error ? error.message : String(error)}</p>
+    </div>
+  ),
+});
+
+/** The card's page, read off its address. */
+function Page() {
+  return <CardPage name={Route.useParams().name} />;
+}

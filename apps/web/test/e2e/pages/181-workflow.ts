@@ -10,6 +10,9 @@ const { hiring } = FACTORIES;
 /** The checkout's `dev` read in FACTORIES' `hiring`, the one factory on the checkout: the default one works on no repository. */
 const IN = `?factory=${hiring.name}`;
 
+/** The factory's path, where the page's old address is sent. */
+const AT = `/factories/${hiring.name}`;
+
 export default {
   /**
    * A workflow's page, the checkout's `dev`, read in FACTORIES' `hiring`, the factory on the checkout, made to offer it with no hire: its
@@ -57,8 +60,8 @@ export default {
       await expectTexts(rows.locator('[data-step-row] > div > a'), good.steps, 'a row per step, in the order they run');
       for (const step of good.steps) {
         const href = await row(step).getByRole('link', { name: step, exact: true }).getAttribute('href');
-        if (href !== `/workflows/repo/${good.name}/${step}${IN}`)
-          throw new Refused(`${step}'s row links its page, /workflows/repo/${good.name}/${step}${IN} — it goes to ${href}`);
+        if (href !== `${AT}/workflows/repo/${good.name}/${step}`)
+          throw new Refused(`${step}'s row links its page, ${AT}/workflows/repo/${good.name}/${step} — it goes to ${href}`);
       }
       await expectVisible(row('implement').locator(`a[data-agent-link="${good.agent.name}"]`), "implement's row links its agent");
       await expectVisible(row('implement').getByText('Implement what was asked.', { exact: true }), 'and says its own words');
@@ -225,21 +228,21 @@ export default {
           .getByRole('list', { name: `Steps of ${good.name}` })
           .getByRole('link', { name: 'review', exact: true })
           .click();
-        await again.waitForURL(`**/workflows/repo/${good.name}/review${IN}`, { timeout: WAIT_MS });
+        await again.waitForURL(`**${AT}/workflows/repo/${good.name}/review`, { timeout: WAIT_MS });
         await expectVisible(again.locator('h1', { hasText: /^review$/ }), "a step's row opens the step's page");
         await again.getByRole('link', { name: `← ${good.name}` }).click();
-        await again.waitForURL((url) => url.pathname === `/workflows/repo/${good.name}`, { timeout: WAIT_MS });
+        await again.waitForURL((url) => url.pathname === `${AT}/workflows/repo/${good.name}`, { timeout: WAIT_MS });
         await idle(again);
         const block = again.locator('.react-flow__node[data-id="implement"]');
         await expectVisible(block, "the step's page leads back to its workflow's, and its graph");
         await block.dblclick();
-        await again.waitForURL(`**/workflows/repo/${good.name}/implement${IN}`, { timeout: WAIT_MS });
+        await again.waitForURL(`**${AT}/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
         await expectVisible(
           again.locator('h1', { hasText: /^implement$/ }),
           "a double click on a block on the graph opens its step's page",
         );
         await again.goBack({ waitUntil: 'load' });
-        await again.waitForURL((url) => url.pathname === `/workflows/repo/${good.name}`, { timeout: WAIT_MS });
+        await again.waitForURL((url) => url.pathname === `${AT}/workflows/repo/${good.name}`, { timeout: WAIT_MS });
         await idle(again);
       });
 

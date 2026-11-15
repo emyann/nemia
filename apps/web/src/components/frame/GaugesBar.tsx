@@ -1,5 +1,5 @@
 /**
- * The frame's side sheet for the machine's gauges, which the top bar's gauges button opens (`GaugesButton`): each of its facts whole —
+ * The frame's side sheet for the machine's gauges, which the machine bar opens (`MachineBar`): each of its facts whole —
  * whether a daemon ticks the store and how to start one (`DaemonLine`), whether the board follows the feed, what is at work, the quota
  * (`QuotaLine`) and the version. They are the machine's, not a page's, so the bar has no Open (`barOpens`).
  */

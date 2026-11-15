@@ -50,15 +50,18 @@ const seenBy = (rail: Locator): Promise<Record<string, unknown> & { covered: str
   });
 
 /**
- * Brings `rail` to the window's `edge`, then slides the pointer from bar to bar of `bars`, never leaving the rail: each bar opens its own
- * card, read once its run is, which stands over no bar of the rail and inside the window across; where `unscrolled`, its action shows
- * whole inside the window and the preview, the preview unscrolled. Refuses the first bar that does not, naming the window.
+ * Brings `rail` to the window's `edge`, puts the pointer just before its first bar, crossing no other card's parts on its way, then
+ * slides it from bar to bar of `bars`, never leaving the rail: each bar opens its own card, read once its run is, which stands over no
+ * bar of the rail and inside the window across; where `unscrolled`, its action shows whole inside the window and the preview, the
+ * preview unscrolled. Refuses the first bar that does not, naming the window.
  */
 async function slideAlong(page: Page, rail: Locator, bars: Locator[], edge: 'center' | 'end', unscrolled: boolean): Promise<void> {
   const where = JSON.stringify(page.viewportSize());
   await rail.evaluate((found, block) => found.scrollIntoView({ block }), edge);
   await page.mouse.move(0, 0);
   await expectCount(previewOf(page), 0, 'no card open before the pointer comes to the rail');
+  const first = await bars[0]?.boundingBox();
+  if (first) await page.mouse.move(first.x - 4, first.y + first.height / 2);
   for (const bar of bars) {
     const [name, said, box] = await Promise.all([bar.getAttribute('data-step-bar'), bar.getAttribute('aria-label'), bar.boundingBox()]);
     if (!box) throw new Refused(`the bar "${said}" is drawn`);

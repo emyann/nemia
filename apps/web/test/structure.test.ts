@@ -352,7 +352,7 @@ function frameReach(texts: ReadonlyMap<string, string>, from: readonly string[] 
 }
 
 /** The Runs page's route. */
-const RUNS = 'src/routes/runs.index.tsx';
+const RUNS = 'src/components/run/RunsPage.tsx';
 
 /** Every page of `texts`: the root route and each route file. */
 const pagesOf = (texts: ReadonlyMap<string, string>): string[] => [...texts.keys()].filter((file) => file.startsWith(ROUTES)).sort();

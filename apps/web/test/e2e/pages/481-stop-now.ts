@@ -10,7 +10,7 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 /** The top bar's pause: its one button. */
-const pauseOf = (page: Page) => page.locator('header[data-frame-header] button[data-pause]');
+const pauseOf = (page: Page) => page.locator('footer[data-machine-bar] button[data-pause]');
 
 /** The pause's popover. */
 const popoverOf = (page: Page) => page.locator('[data-pause-popover]');

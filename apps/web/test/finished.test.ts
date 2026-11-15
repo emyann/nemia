@@ -46,22 +46,25 @@ async function read(value: unknown, older: string[] = []): Promise<FinishedPage>
 }
 
 test('finishedSearch, trailOf, newerOf, olderTrailOf, pageSaid and rowsSaid: the finished pager by its trail', async (t) => {
-  await t.test('the address round-trips: a trail and a factory in, the same out, and the first page is the bare address', () => {
+  await t.test('the address round-trips: a trail in, the same out, the factory its path’s, and the first page is the bare address', () => {
     assert.equal(finishedSearch({ older: 'bogus' }).older, undefined, 'a trail that is no token reads as the first page');
     assert.equal(finishedSearch({ older: 'f.a~bogus' }).older, undefined, 'and so does one a piece of which is none');
-    const at = { factory: 'nemia', older: 'f.a~f.b' };
+    const at = { older: 'f.a~f.b' };
     assert.deepEqual(finishedSearch(at), at);
+    assert.deepEqual(finishedSearch({ ...at, factory: 'nemia' }), at, 'the factory is no key of the search');
     assert.deepEqual(trailOf(finishedSearch(at)), ['f.a', 'f.b']);
     assert.deepEqual(finishedSearch(trailSearch(at, ['f.a', 'f.b'])), at);
-    assert.deepEqual(trailSearch(at, []), { factory: 'nemia' });
+    assert.deepEqual(trailSearch({ ...at, l: 'a=b' }, []), { l: 'a=b' });
     assert.deepEqual(trailSearch({}, []), {}, 'REFUSED: the first page never spells an empty trail');
     assert.deepEqual(trailSearch({ factory: 'nemia', tab: 'x' }, ['f.a']), { factory: 'nemia', tab: 'x', older: 'f.a' }, 'every key kept');
     assert.deepEqual(trailOf(finishedSearch({})), []);
   });
   await t.test('REFUSED: a trail that is no string of tokens, or holds an empty one, is no trail', () => {
     for (const older of ['', '~', 'f.a~', '~f.a', 'f.a~~f.b', 3, null, undefined, ['f.a']]) {
-      assert.deepEqual(finishedSearch({ factory: 'nemia', older }), { factory: 'nemia' }, JSON.stringify(older));
+      assert.deepEqual(finishedSearch({ older }), {}, JSON.stringify(older));
+      assert.deepEqual(trailOf({ older }), [], `read unvalidated, ${JSON.stringify(older)} is the first page too`);
     }
+    assert.deepEqual(trailOf({ older: 'bogus' }), [], 'a search that carries its parent’s raw `older` sends no token that is none');
   });
   await t.test("Older puts the page's continue on the trail, Newer takes the last off: none at each end", () => {
     const first = { trail: [], next: 'f.a', count: 9 };

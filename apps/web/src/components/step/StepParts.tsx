@@ -10,6 +10,7 @@ import { stepAnchor } from '../../lib/asks';
 import { SOURCE_BADGES } from '../../lib/skills';
 import { titleOf } from '../../lib/factory';
 import { placeOfAddress } from '../../lib/factories';
+import { definitionLink, workflowLink } from '../../lib/factoryAddress';
 import { clockWord } from '../../lib/quota';
 import { useNow } from '../../lib/useNow';
 import { cn } from '../../lib/utils';
@@ -58,9 +59,7 @@ export function StepAgent({ page, place = {} }: { page: WorkflowStepPage; place?
           {hiredIn.map((hire) => (
             <RouteLink
               key={hire.factory}
-              to="/workflows/$from/$workflow/$step"
-              params={{ from, workflow, step }}
-              search={{ factory: hire.factory }}
+              {...workflowLink({ factory: hire.factory }, from, workflow, step)}
               data-hired-in={hire.factory}
               className={cn('text-foreground', LINK)}
             >
@@ -96,9 +95,7 @@ function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
       <>
         written on{' '}
         <RouteLink
-          to="/agents/$from/$agent"
-          params={{ from: page.from, agent }}
-          search={page.from === 'repo' ? place : {}}
+          {...definitionLink('agent', page.from, agent, place)}
           hash="custom-instructions"
           data-home-link="custom"
           className={cn('font-mono', LINK)}
@@ -119,13 +116,7 @@ function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
       page.from === 'user' ? (
         <>
           lives in its file, edited in{' '}
-          <RouteLink
-            to="/workflows/$from/$workflow"
-            params={{ from: page.from, workflow: page.workflow }}
-            search={{ ...place, build: true }}
-            data-home-link="words"
-            className={LINK}
-          >
+          <RouteLink {...workflowLink(place, page.from, page.workflow, undefined, true)} data-home-link="words" className={LINK}>
             the workflow's builder
           </RouteLink>
         </>
@@ -217,9 +208,7 @@ export function StepPageLink({ page, step }: { page: WorkflowPageAddress | null;
   if (!page) return null;
   return (
     <RouteLink
-      to="/workflows/$from/$workflow/$step"
-      params={{ from: page.from, workflow: page.workflow, step }}
-      search={placeOfAddress(page)}
+      {...workflowLink(placeOfAddress(page), page.from, page.workflow, step)}
       data-step-page-link={step}
       className="text-body-small text-muted-foreground hover:text-foreground"
     >

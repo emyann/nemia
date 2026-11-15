@@ -1,13 +1,13 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { frameTabsOf, sidebar, railPlace, litOf, photograph, themeOf } from '../board.ts';
-import { expectCount, expectTexts, expectVisible, idle } from '../checks.ts';
+import { frameTabsOf, litOf, photograph, placeLitOf, placeOf, railPlace, sidebar, themeOf } from '../board.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused } from '../checks.ts';
 import { CHECKOUT, checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 /** The page read on the checkout: in FACTORIES' `hiring`, the one factory on it; the default one works on no repository. */
-const ON_CHECKOUT = `/capabilities?factory=${FACTORIES.hiring.name}`;
+const ON_CHECKOUT = `/factories/${FACTORIES.hiring.name}/skills`;
 
 /** The page at `to`, from where the page is. */
 const visit = async (page: Page, to: string): Promise<void> => {
@@ -88,19 +88,23 @@ async function unread(page: Page): Promise<void> {
 
 export default {
   /**
-   * The Capabilities page, a tab of Settings: the checkout's skills, agents, MCP servers, deny rules and ask rules, each
-   * with where it was read from, and what each step gets — the checkout's dev, review fenced to its tools in dontAsk and implement on the
-   * harness's own set, and yours, on Codex, which claims nothing it was not measured to have. Read in FACTORIES' `hiring`, the factory on
-   * the checkout, made to offer `dev` and yours with no hire and taken back after; in the default factory, which works on no repository,
-   * it reads none, drawing no section of this repository's; with All picked, on the seed's several factories, it reads none and says why
-   * (`unread`).
+   * The Capabilities page, a tab of Settings, and a factory's Skills, which its old address `?factory=` reaches: the checkout's skills,
+   * agents, MCP servers, deny rules and ask rules, each with where it was read from, and what each step gets — the checkout's dev, review
+   * fenced to its tools in dontAsk and implement on the harness's own set, and yours, on Codex, which claims nothing it was not measured to
+   * have. Read in FACTORIES' `hiring`, the factory on the checkout, made to offer `dev` and yours with no hire and taken back after; in the
+   * default factory, which works on no repository, it reads none, drawing no section of this repository's; with All picked, on the seed's
+   * several factories, it reads none and says why (`unread`).
    */
   name: 'capabilities',
-  route: '/capabilities?factory=default',
+  route: '/capabilities',
   expect: async (page) => {
     await sidebar(page);
     await expectVisible(railPlace(page, 'Settings').and(litOf(page)), 'the rail lights Settings on its page');
     await expectTexts(frameTabsOf(page).locator('[aria-selected="true"]'), ['Capabilities'], "the strip's Capabilities tab is selected");
+    await visit(page, '/capabilities?factory=default');
+    if (new URL(page.url()).pathname !== '/factories/default/skills')
+      throw new Refused(`the old address of the default factory's capabilities reaches its Skills — it is at ${page.url()}`);
+    await expectVisible(placeLitOf(page).and(placeOf(page, 'Skills')), "the pane lights the factory's Skills");
     await expectVisible(page.locator('[data-unread]'), 'the default factory, on no repository, reads none and says why');
     await expectCount(page.locator('section[aria-label]'), 0, 'and draws no section, none of this repository');
     const takeBack = checkoutIn(store!, [WORKFLOWS.good.name, WORKFLOWS.yours.name]);

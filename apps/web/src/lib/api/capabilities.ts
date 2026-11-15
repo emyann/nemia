@@ -313,8 +313,11 @@ const CapabilitiesSchema = decodes<Capabilities>()(
   }),
 );
 
-/** Where the page is read: the factory the address picks (`?factory=`) and one of its repositories (`?repo=`), each where it names one. */
+/** Where the page is read: the factory its path names and one of its repositories (`?repo=`), each where it names one. */
 type CapabilitiesPlace = { factory?: string; repo?: string };
+
+/** The query `place` sends: its factory and its repository where it names them, and no other key a page's search carries. */
+const queryOf = ({ factory, repo }: CapabilitiesPlace): CapabilitiesPlace => ({ ...(factory && { factory }), ...(repo && { repo }) });
 
 /**
  * What the repository of `place` offers a step, read in the factory it names, else in the one the store's factories leave. Not polled: it
@@ -325,7 +328,7 @@ export const capabilitiesQuery = (place: CapabilitiesPlace) =>
   queryOptions({
     queryKey: ['capabilities', place.factory ?? null, place.repo ?? null],
     queryFn: () =>
-      call((c) => c.server.capabilities({ query: place }), read(CapabilitiesWithSteps)).then((answer) =>
+      call((c) => c.server.capabilities({ query: queryOf(place) }), read(CapabilitiesWithSteps)).then((answer) =>
         decoded('GET /api/capabilities', CapabilitiesSchema, answer),
       ),
   });

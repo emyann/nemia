@@ -1,6 +1,17 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { expectInstant, nextVisit, openFold, partOf, photograph, PLACES_SAID, sidebar, stepBar, themeOf } from '../board.ts';
+import {
+  expectInstant,
+  expectUncovered,
+  nextVisit,
+  openFold,
+  partOf,
+  photograph,
+  PLACES_SAID,
+  sidebar,
+  stepBar,
+  themeOf,
+} from '../board.ts';
 import {
   cardOf,
   cardsOf,
@@ -114,7 +125,9 @@ export default {
    * The Factory: the queue's ghosts at the floor's left edge and the run slots over it; the runs in flight, to decide and waiting on you
    * as cards on the floor, the finished ones once asked for; the diamond drawn as a graph of cards, whose picture is the floor as a person
    * first finds it; each card dragged alone and kept where it was put down; a card opened on its steps, a press on a tile opening the
-   * step's inspector; and the loop's arrow back.
+   * step's inspector; and the loop's arrow back. The open card is dragged onto its neighbour in a window 1600 by 1100: in the e2e's
+   * 1280 by 800 the floor beside the factory pane and over the machine bar fits its neighbour below its foot, where a drop makes React
+   * Flow pan the whole floor under the drag.
    */
   name: 'factory',
   route: '/factories/default',
@@ -547,7 +560,10 @@ export default {
     await card.getByRole('button', { name: 'Show steps' }).click();
     await expectCount(tiles, FAKE.steps.length, "the card's chevron opens it again");
 
+    const size = page.viewportSize();
+    await page.setViewportSize({ width: 1600, height: 1100 });
     await settled(page);
+    await expectUncovered(card.locator('time'), "the open card's grip stands clear of the floor's panels, to be dragged by");
     const [from, onto, grip] = [await card.boundingBox(), await beside.boundingBox(), await card.locator('time').boundingBox()];
     if (!from || !onto || !grip) throw new Refused('the cards to drag and drop onto — one of them is not on the page');
     await expectMovedAlone(
@@ -572,6 +588,7 @@ export default {
     if (!samePlace(still, put))
       throw new Refused(`a drag started on a tile leaves its card where it is, ${said(put)} — it is at ${said(still)}`);
     await expectCount(tiles, FAKE.steps.length, 'and does not close the card');
+    if (size) await page.setViewportSize(size);
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
     await photograph(page, path.join(OUT, `factory-dragged-${await themeOf(page)}.png`), { fullPage: true });

@@ -598,13 +598,13 @@
       }
     },
     {
-      "files": ["apps/web/src/routes/agents_.skills.$from.$skill.tsx"],
+      "files": ["apps/web/src/components/agent/SkillPage.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 103, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 102, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/routes/capabilities.tsx"],
+      "files": ["apps/web/src/components/settings/CapabilitiesPage.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 170, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 21 }],
@@ -612,7 +612,7 @@
       }
     },
     {
-      "files": ["apps/web/src/routes/inbox.tsx"],
+      "files": ["apps/web/src/components/inbox/InboxPage.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 104, "skipBlankLines": true, "skipComments": true }]
       }

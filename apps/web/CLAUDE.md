@@ -159,9 +159,18 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `chat`, a step's session `session`, and `test/conversation.test.ts` reads both forms off every `.tsx` of the folder — and what is one
   conversation's alone stays in that conversation's folder: hers is `components/nemia/chat/` (her kept message, her asks), a step's session's
   is `components/step/session/` (its brief, its told turns, its closeout, its bands, its composer).
-- How the frame stands around its one side sheet — what it shows (what the address's `?bar=` names, else Nemia's chat), the rail folded
-  for it under 1600, docked or modal — is `frameFold` (`lib/frameFold.ts`, proved by `contracts/frame-fold.contract.ts`), read through
-  `useFrameFold` and never written to the `sidebar_state` cookie; the sheet is `components/frame/FrameSheet.tsx`, a bar's panel in it
+- The frame is a row over the machine bar (`components/frame/MachineBar.tsx`, `--frame-foot` tall: the gauges, the version, the
+  pause): the store's rail (`components/frame/FrameRail.tsx`), a factory's pane on a page under its path
+  (`components/frame/FactoryPane.tsx`), the page's column, then the one side sheet; a full-window height subtracts `--frame-top` and
+  `--frame-foot` (`staleFrameHeights`, `lib/footer.ts`). Where a page sits — the store's level under a destination of the rail, or a
+  factory's under a place of its pane — is `seatOf` (`components/nav/nav.ts`), read from the path alone, through `useSeat`; a page's
+  factory is a segment of its path, never `?factory=`, which `factoryRedirect` (`lib/factoryAddress.ts`, in the root's `beforeLoad`)
+  sends to its path, and `test/factory-address.test.ts` refuses in any other file. A page both levels draw is one body under
+  `components/<noun>/` (`RunsPage`, `InboxPage`, `WorkflowPage`, `AgentPage`, …), its two route files thin.
+- How the frame stands around its one side sheet — what it shows (what the address's `?bar=` names, else Nemia's chat), the pane
+  covered by it under 1600, folded by the menu button or Ctrl+B, docked, in a drawer or modal — is `frameFold` (`lib/frameFold.ts`,
+  proved by `contracts/frame-fold.contract.ts`), read through `useFrameFold`; only the person's fold is written to the `sidebar_state`
+  cookie; the sheet is `components/frame/FrameSheet.tsx`, a bar's panel in it
   `components/frame/BarPanel.tsx`, her face `components/nemia/NemiaRailFace.tsx`, her sheet's state and panel
   `components/frame/HerSheet.tsx`, and her presence for both `useNemiaPresence`.
 - A step her message links to (`/runs/<run>?step=<step>`, read by `broughtOf` in `lib/stepLink.ts`) is drawn under her words by

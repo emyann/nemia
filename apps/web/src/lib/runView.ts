@@ -233,11 +233,12 @@ export function useRunRead(id: string): { view: RunDetail | undefined; error: un
 /**
  * What a run's page loads before it draws: the run object into `client`'s cache (`runObjectQuery`), then its lines and every step's tries
  * and told at once, so the page draws whole on its first paint; and `gone` when the store has no such run (`readGone`), so the page says so
- * in place of a failure. Any other failure is thrown, for the route's error to say.
+ * in place of a failure, else the run's namespace, which says the factory whose path its page belongs at. Any other failure is thrown, for
+ * the route's error to say.
  * @param client The board's query client, loaded.
  * @param id The run's id.
  */
-export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolean }> =>
+export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolean; namespace?: string }> =>
   client.ensureQueryData(runObjectQuery(id)).then(
     (run) =>
       Promise.all([
@@ -249,7 +250,7 @@ export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolea
             client.ensureQueryData(stepToldQuery(id, step.name, stamp)),
           ];
         }),
-      ]).then(() => ({ gone: false })),
+      ]).then(() => ({ gone: false, namespace: run.metadata.namespace })),
     (error: unknown) => {
       if (readGone(error)) return { gone: true };
       throw error;

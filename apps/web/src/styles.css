@@ -302,32 +302,28 @@
 }
 
 /*
- * The height of the frame's top bar, which a page that fills the window stands under: one line where the bar is wide
- * enough, two where it says it takes two (`data-lines`, `FrameHeader.tsx`, which decides by its own width beside the rail and Nemia's
- * sheet), the page's name then standing over the factory switcher and the bar's buttons. Under it, the frame's lines
- * (a newer release, the setup banner, a refused link) are as tall as `--frame-lines`, which the frame measures and sets on the column
- * the page stands in (`__root.tsx`): a page that fills the window is `100svh` less both.
+ * The frame's heights, which a page that fills the window stands between: the page's head (`FrameHeader.tsx`), one line, as tall as
+ * `--frame-top`; under it the frame's lines (a newer release, the setup banner, a refused link), as tall as `--frame-lines`, which the
+ * frame measures and sets on the column the page stands in (`__root.tsx`); and at the window's foot the machine bar (`MachineBar.tsx`), as
+ * tall as `--frame-foot`. A page that fills the window is `100svh` less the three. What stands in the page's column and is brought into
+ * view, by a focus or by `scrollIntoView`, stops above the machine bar, which stays over the window's foot (`scroll-margin-bottom`); a
+ * popover, portaled over the frame and the bar alike, keeps the window's whole height.
  */
 :root {
-  --frame-top: 5rem;
+  --frame-top: 3.5rem;
   --frame-lines: 0px;
+  --frame-foot: 2.25rem;
 }
 
-:root:has([data-frame-header][data-lines='two']) {
-  --frame-top: 9rem;
+main[data-frame-page] * {
+  scroll-margin-bottom: var(--frame-foot);
 }
 
 /*
- * The rail's counts in the board's meanings, never the kit's red, which on the board is failure: Runs counts what waits on you, in
- * yours; the Inbox counts cards not started, in rest. Each destination is found by the name the kit gives it, its label then its
- * badge's words.
+ * The rail's count in the board's meanings, never the kit's red, which on the board is failure: Waiting counts what waits on you, in
+ * yours. The destination is found by the name the kit gives it, its label then its badge's words.
  */
-[data-frame-rail] [data-slot='navigation-rail-item'][aria-label^='Runs,'] [data-slot='badge'] {
+[data-frame-rail] [data-slot='navigation-rail-item'][aria-label^='Waiting,'] [data-slot='badge'] {
   background-color: var(--meaning-yours);
   color: var(--meaning-on-yours);
-}
-
-[data-frame-rail] [data-slot='navigation-rail-item'][aria-label^='Inbox,'] [data-slot='badge'] {
-  background-color: var(--meaning-rest);
-  color: var(--meaning-on-rest);
 }

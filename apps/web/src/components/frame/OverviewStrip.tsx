@@ -27,23 +27,22 @@ const DAEMON_TAG: Record<DaemonTone, 'secondary' | 'neutral' | 'error'> = {
 const FIGURE = 'shrink-0 font-mono text-body-small whitespace-nowrap text-on-surface-variant';
 
 /**
- * The Overview's strip, above the factories' canvas: the factories' day, the agents at work and the quota, three cut frames that wrap
- * by their own widths, never the window's: each asks for its heading row (Today for its six stickers' line), what is cut or wraps by
- * design asking for no width (`contain-inline-size`), so a frame shares a line only where its heading reads whole, and on a line of its
- * own takes the whole of it. It counts the factory in view (`factory`), or every
- * factory, off the light answer of the runs not finished and the runs finished since the day began (`stripOf`); the caps, the daemon
- * and the quota are the machine's.
+ * The Overview's strip, above the factories' canvas: the factories' day, the agents at work and the quota, three cut frames that wrap by
+ * their own widths, never the window's: each asks for its heading row (Today for its six stickers' line), what is cut or wraps by design
+ * asking for no width (`contain-inline-size`), so a frame shares a line only where its heading reads whole, and on a line of its own takes
+ * the whole of it. It counts every factory, off the light answer of the runs not finished and the runs finished since the day began
+ * (`stripOf`); the caps, the daemon and the quota are the machine's.
  */
-export function OverviewStrip({ factory }: { factory?: string }) {
+export function OverviewStrip() {
   const now = useNow(30_000);
   const dayStart = dayStartOf(now);
-  const { data: open } = useSuspenseQuery(openRunsQuery(factory));
-  const { data: finished } = useSuspenseQuery(finishedTodayQuery(factory, dayStart));
+  const { data: open } = useSuspenseQuery(openRunsQuery());
+  const { data: finished } = useSuspenseQuery(finishedTodayQuery(undefined, dayStart));
   const { data: factories } = useSuspenseQuery(factoriesQuery);
   const ceilings = useQuery(ceilingsQuery);
   const daemon = useQuery(daemonQuery);
   const quota = useQuery(quotaQuery);
-  const strip = stripOf({ open, finished, factories, ceilings: ceilings.data, now, dayStart, factory });
+  const strip = stripOf({ open, finished, factories, ceilings: ceilings.data, now, dayStart });
   return (
     <StripView
       strip={strip}

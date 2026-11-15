@@ -3,7 +3,7 @@ import type { Locator, Page } from 'playwright';
 import { notStarted } from '../../../src/lib/inbox.ts';
 import { type CardList, LIST_PAGE } from 'objects';
 import { entriesOf } from '../../../src/lib/api/inbox.ts';
-import { openAnswered, pick, photograph, railPlace, sectionsOf, sidebar, startOf, themeOf } from '../board.ts';
+import { openAnswered, pick, pickedIn, photograph, placeOf, railPlace, sectionsOf, sidebar, startOf, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, FOLDER } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -11,6 +11,9 @@ import { OUT } from '../world.ts';
 
 /** The factory the page picks. */
 const FACTORY = FACTORIES.hiring.name;
+
+/** The factory picked from it. */
+const OTHER = FACTORIES.others[0];
 
 /** Goes to `to` in this tab and waits for its reads. */
 async function visit(page: Page, to: string): Promise<void> {
@@ -26,30 +29,35 @@ async function expectAt(page: Page, pathname: string, search: string, assertion:
     throw new Refused(`${assertion}: the address is ${pathname}${search} — it is ${url.pathname}${url.search}`);
 }
 
-/** Each list's `href`, in the rail's order: the Inbox, Runs and Workflows. */
+/** Each list's `href` in the pane, in its order: Runs, the Inbox and Workflows. */
 const hrefsOf = (page: Page) => sectionsOf(page).evaluateAll((links) => links.map((link) => link.getAttribute('href')));
 
-/** The badge the rail draws on `place`, the count it shows. */
-const badgeOf = (page: Page, place: string): Locator => railPlace(page, place).locator('[data-slot="badge"]');
+/** The badge the rail draws on Waiting, the count it shows. */
+const badgeOf = (page: Page): Locator => railPlace(page, 'Waiting').locator('[data-slot="badge"]');
 
 /** What the api answers at `pathname`, read apart from the page. */
 async function answer<T>(page: Page, pathname: string): Promise<T> {
   return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
 }
 
-/**
- * The rail's counts are the api's, for the factory picked: Runs the light answer's runs that wait on you, the Inbox its cards not yet
- * started; none drawn for none.
- */
-async function countsAre(page: Page, picked: string | undefined, where: string): Promise<void> {
-  const open = await openAnswered(page, picked || undefined);
-  const cards = notStarted(entriesOf(await answer<CardList>(page, `/api/cards?limit=${LIST_PAGE.most}`)), picked).length;
-  await expectTexts(
-    badgeOf(page, 'Runs'),
-    open.counts.waiting ? [String(open.counts.waiting)] : [],
-    `${where}: Runs counts what waits on you`,
+/** The rail's Waiting counts the runs that wait on you in every factory, as the light answer says; none drawn for none. */
+async function waitingIs(page: Page, where: string): Promise<void> {
+  const open = await openAnswered(page);
+  await expectTexts(badgeOf(page), open.counts.waiting ? [String(open.counts.waiting)] : [], `${where}: Waiting counts what waits on you`);
+}
+
+/** The pane's lines are `factory`'s own: Runs what waits on you there, the Inbox its cards not yet started. */
+async function linesAre(page: Page, factory: string): Promise<void> {
+  const open = await openAnswered(page, factory);
+  const cards = notStarted(entriesOf(await answer<CardList>(page, `/api/cards?limit=${LIST_PAGE.most}`)), factory).length;
+  await expectVisible(
+    placeOf(page, 'Runs').getByText(open.counts.waiting ? `${open.counts.waiting} waiting on you` : 'nothing waits on you'),
+    `${factory}'s Runs says what waits on you there`,
   );
-  await expectTexts(badgeOf(page, 'Inbox'), cards ? [String(cards)] : [], `${where}: the Inbox counts its cards not yet started`);
+  await expectVisible(
+    placeOf(page, 'Inbox').getByText(cards ? `${cards} not started` : 'every card started'),
+    `${factory}'s Inbox says its cards not yet started`,
+  );
 }
 
 /** The colour `role`, a meaning of the board's stylesheet, computes to in this page. */
@@ -63,59 +71,61 @@ const meaning = (page: Page, role: string): Promise<string> =>
     return colour;
   }, role);
 
-/** Runs' badge is drawn in yours, what waits on you, and the Inbox's in rest: never the kit's red, which is failure on the board. */
-async function badgeColours(page: Page): Promise<void> {
-  for (const [place, role] of [
-    ['Runs', '--meaning-yours'],
-    ['Inbox', '--meaning-rest'],
-  ] as const) {
-    const want = await meaning(page, role);
-    const drawn = await badgeOf(page, place).evaluate((badge) => getComputedStyle(badge).backgroundColor);
-    if (drawn !== want) throw new Refused(`the ${place} badge is drawn in ${role}, ${want} — it is ${drawn}`);
-  }
+/** Waiting's badge is drawn in yours, what waits on you: never the kit's red, which is failure on the board. */
+async function badgeColour(page: Page): Promise<void> {
+  const want = await meaning(page, '--meaning-yours');
+  const drawn = await badgeOf(page).evaluate((badge) => getComputedStyle(badge).backgroundColor);
+  if (drawn !== want) throw new Refused(`the Waiting badge is drawn in --meaning-yours, ${want} — it is ${drawn}`);
 }
 
 /**
- * A factory picked on a list's page stays on it with `?factory=`, every list carrying it, the counts its own, and Factories leading to its
- * floor; All factories on the floor leads to the Overview. On a run's page a factory picked opens its floor.
+ * On a factory's list, another factory picked keeps the place under its path, every place of the pane leading under it and its lines its
+ * own; on a run's page a factory picked opens its runs; Factories in the rail leads to the store's floor.
  */
 async function picks(page: Page): Promise<void> {
-  await countsAre(page, undefined, 'under All factories');
-  await badgeColours(page);
-  await pick(page, FACTORY);
-  await expectAt(page, '/runs', `?factory=${FACTORY}`, `${FACTORY} picked on Runs stays on Runs`);
+  await waitingIs(page, 'on the store');
+  await badgeColour(page);
+  await visit(page, `/factories/${FACTORY}/runs`);
   await sidebar(page);
-  await countsAre(page, FACTORY, `${FACTORY} picked`);
+  await linesAre(page, FACTORY);
+  await pick(page, OTHER);
+  await expectAt(page, `/factories/${OTHER}/runs`, '', `${OTHER} picked on Runs stays on Runs`);
+  await sidebar(page);
+  await linesAre(page, OTHER);
+  await waitingIs(page, `in ${OTHER}`);
   const hrefs = await hrefsOf(page);
-  const want = ['runs', 'inbox', 'workflows'].map((s) => `/${s}?factory=${FACTORY}`);
-  if (hrefs.join() !== want.join()) throw new Refused(`every list carries ${FACTORY}: ${want.join(', ')} — they are ${hrefs.join(', ')}`);
+  const want = ['runs', 'inbox', 'workflows'].map((s) => `/factories/${OTHER}/${s}`);
+  if (hrefs.join() !== want.join())
+    throw new Refused(`every place leads under ${OTHER}: ${want.join(', ')} — they are ${hrefs.join(', ')}`);
   await settled(page);
   await photograph(page, path.join(OUT, `sidebar-picked-${await themeOf(page)}.png`));
-  await railPlace(page, 'Workflows').click();
-  await expectAt(page, '/workflows', `?factory=${FACTORY}`, 'Workflows keeps the factory picked');
+  await placeOf(page, 'Workflows').click();
+  await expectAt(page, `/factories/${OTHER}/workflows`, '', 'Workflows stays in the factory');
   await sidebar(page);
   await railPlace(page, 'Factories').click();
-  await expectAt(page, `/factories/${FACTORY}`, '', 'Factories opens its floor');
+  await expectAt(page, '/', '', 'Factories leads to the store floor');
   await sidebar(page);
-  await pick(page, 'All factories');
-  await expectAt(page, '/', '', 'All factories picked on a floor leads to the Overview');
+  await visit(page, `/runs/${FOLDER.id}`);
+  const home = pickedIn(new URL(page.url()));
+  if (home === null) throw new Refused(`${FOLDER.id}, a run of a named factory, opens under its factory's path — it is at ${page.url()}`);
   await sidebar(page);
-  await visit(page, `/runs/${FOLDER.id}?factory=${FACTORY}`);
-  await sidebar(page);
-  await pick(page, FACTORY);
-  await expectAt(page, `/factories/${FACTORY}`, '', "picked on a run's page, a factory opens its floor");
+  const picked = home === FACTORY ? OTHER : FACTORY;
+  await pick(page, picked);
+  await expectAt(page, `/factories/${picked}/runs`, '', "picked on a run's page, a factory opens its runs");
 }
 
 /**
- * Under All factories, Start a run asks for the factory first; moving through the factories with the keyboard picks none, and pressing one
- * opens the start in it, named in the address.
+ * The pane's Start a run starts in its factory, named in the address. An address naming the start in no factory asks for the factory
+ * first; moving through the factories with the keyboard picks none, and pressing one opens the start in it, named in the address.
  */
 async function asksItsFactory(page: Page): Promise<void> {
-  await visit(page, '/runs');
+  await visit(page, `/factories/${FACTORY}/runs`);
   await startOf(page).click();
+  await expectVisible(page.getByRole('complementary', { name: `Start a run in ${FACTORY}` }), `the pane's start starts in ${FACTORY}`);
+  await expectAt(page, `/factories/${FACTORY}/runs`, `?bar=start%3A${FACTORY}`, `and the address names it start:${FACTORY}`);
+  await visit(page, '/runs?bar=start');
   const bar = page.getByRole('complementary', { name: 'Start a run', exact: true });
-  await expectVisible(bar, 'under All factories, Start a run opens the bar asking for the factory');
-  await expectAt(page, '/runs', '?bar=start', 'the address names the start in no factory yet with the bare word');
+  await expectVisible(bar, 'the start in no factory opens the bar asking for the factory');
   await expectTexts(
     bar.locator('[data-start-factory] button'),
     [FACTORIES.broken, ...FACTORIES.others.slice(0, 2), FACTORY, FACTORIES.bare, FACTORIES.others[2]],
@@ -141,23 +151,23 @@ async function asksItsFactory(page: Page): Promise<void> {
   await expectCount(page.getByRole('complementary'), 0, 'Close closes it');
 }
 
-/** On a phone's screen the drawer holds the destinations, with their counts; a destination pressed there closes it. */
+/** On a phone's screen the drawer holds the destinations, Waiting's count with them; a destination pressed there closes it. */
 async function onPhone(page: Page): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
   await visit(page, '/runs');
   await page.locator('header[data-frame-header] [data-menu-button]').click();
   const drawer = page.getByRole('dialog');
   await expectVisible(drawer, 'the menu button opens the drawer');
-  await railPlace(page, 'Inbox').click();
+  await railPlace(page, 'Agents').click();
   await expectCount(drawer, 0, 'a destination pressed closes the drawer');
-  await expectAt(page, '/inbox', '', 'and opens its page');
+  await expectAt(page, '/agents', '', 'and opens its page');
 }
 
 export default {
   /**
-   * The rail and the switcher together: the counts on Runs and the Inbox, the api's for the factory picked, in yours and rest; the
-   * switcher read from the address and written to it, every list carrying the factory picked and Factories leading to its floor; the FAB
-   * asking for a factory under All factories; and the drawer on a phone, which a pick closes. The window's size is taken back.
+   * The rail, the pane and its switcher together: Waiting's count, the api's across every factory, in yours; the pane's lines its
+   * factory's own; the switcher read from the path and moving the page under the picked factory's path; the pane's start in its factory,
+   * and the start in no factory asking for one; and the drawer on a phone, which a pick closes. The window's size is taken back.
    */
   name: 'sidebar',
   route: '/runs',

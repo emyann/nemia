@@ -103,6 +103,24 @@ test("get, the Factory's and the inbox's reads: each decodes what the api gives,
       assert.deepEqual(offered, capabilities({ steps: [stepReach()] }));
     },
   );
+  await t.test(
+    'the capabilities are asked for the factory and the repository a place names, and nothing a page left undefined',
+    async (t) => {
+      const before = globalThis.fetch;
+      const asked: string[] = [];
+      globalThis.fetch = async (input) => {
+        asked.push(new URL(input instanceof Request ? input.url : String(input), 'http://board').search);
+        return new Response(JSON.stringify(capabilities()), { status: 200, headers: { 'content-type': 'application/json' } });
+      };
+      t.after(() => {
+        globalThis.fetch = before;
+      });
+      const place = { factory: 'mill', repo: undefined, bar: 'gauges' } as { factory?: string; repo?: string };
+      const read = capabilitiesQuery(place).queryFn as unknown as () => Promise<Capabilities>;
+      assert.deepEqual(await read(), capabilities(), 'a repository left undefined is no key the api refuses');
+      assert.deepEqual(asked, ['?factory=mill']);
+    },
+  );
   await t.test("a card the api refused still rejects in the api's words and status, not as an answer unread", async (t) => {
     answering(t, { error: 'no card x in the inbox' }, 404);
     const err: unknown = await readCard().then(

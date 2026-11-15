@@ -74,10 +74,10 @@ const goto = async (page: Page, to: string): Promise<void> => {
   await idle(page);
 };
 
-/** Refuses unless the page reaches `pathname` in the factory TREED within the wait. */
+/** Refuses unless the page reaches `pathname` under the factory TREED's path within the wait. */
 async function expectIn(page: Page, pathname: string, assertion: string): Promise<void> {
   try {
-    await page.waitForURL((url) => url.pathname === pathname && url.searchParams.get('factory') === TREED, { timeout: WAIT_MS });
+    await page.waitForURL((url) => url.pathname === `/factories/${TREED}${pathname}`, { timeout: WAIT_MS });
   } catch {
     throw new Refused(`${assertion} — the page is at ${page.url()}`);
   }
@@ -182,7 +182,7 @@ export default {
 
       await goto(page, `/workflows/factory/${OWN.name}?factory=${TREED}`);
       await page.locator(`[data-step-row="${OWN.step}"] [data-agent-link="${TREE_AGENT.name}"]`).click();
-      await expectIn(page, `/agents/factory/${TREE_AGENT.name}`, `${OWN.name}'s step row links the tree's own agent in ${TREED}`);
+      await expectIn(page, `/agents/${TREE_AGENT.name}`, `${OWN.name}'s step row links the tree's own agent in ${TREED}`);
       const picker = page.locator('[data-factory-picker]');
       await expectVisible(picker.getByText(TREED, { exact: true }), `the top bar says ${TREED} on the agent's page`);
       const agentPage = page.locator('article');
@@ -199,7 +199,7 @@ export default {
       const hired = agentPage.locator(`[data-used-by] a[data-node="${OWN.name}/${OWN.hired}"]`);
       await expectCount(hired, 1, `and the step of its tree ${TREED} hires it into, which no step's own line names`);
       await expectVisible(
-        agentPage.locator(`[data-used-by] a[href="/workflows/factory/${OWN.name}/${OWN.hired}?factory=${TREED}"]`),
+        agentPage.locator(`[data-used-by] a[href="/factories/${TREED}/workflows/factory/${OWN.name}/${OWN.hired}"]`),
         `linked to its page in ${TREED}`,
       );
       await expectVisible(
@@ -235,7 +235,7 @@ export default {
       await shoot('pick');
       await pick.getByRole('link', { name: TWIN.repos[1], exact: true }).click();
       await page.waitForURL(
-        (url) => url.searchParams.get('factory') === TWIN.name && url.searchParams.get('repo')?.endsWith(TWIN.repos[1]) === true,
+        (url) => url.pathname === `/factories/${TWIN.name}/workflows` && url.searchParams.get('repo')?.endsWith(TWIN.repos[1]) === true,
       );
       await idle(page);
       await expectVisible(
@@ -244,7 +244,7 @@ export default {
       );
       await goto(page, `/workflows/repo/${good.name}?factory=${TWIN.name}`);
       await expectCount(
-        page.locator(`[data-pick-repo="${TWIN.name}"] a[href^="/workflows/repo/${good.name}?factory=${TWIN.name}&repo="]`),
+        page.locator(`[data-pick-repo="${TWIN.name}"] a[href^="/factories/${TWIN.name}/workflows/repo/${good.name}?repo="]`),
         2,
         "a workflow's page asks the same, each link to that page in the factory on the repository",
       );

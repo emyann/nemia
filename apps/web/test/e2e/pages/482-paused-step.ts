@@ -50,7 +50,7 @@ const fakeRead = (url: URL) => url.pathname === `/api/runs/${FAKE.id}`;
 const pauseRead = (url: URL) => url.pathname === '/api/pause';
 
 /** The top bar's pause: its one button. */
-const pauseOf = (page: Page) => page.locator('header[data-frame-header] button[data-pause]');
+const pauseOf = (page: Page) => page.locator('footer[data-machine-bar] button[data-pause]');
 
 export default {
   /**

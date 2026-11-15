@@ -13,8 +13,8 @@ const { hiring } = FACTORIES;
 /** The step the page inspects first, which waits on the other: `review`, after `implement`. */
 const [FIRST, WAITS] = good.steps;
 
-/** The page of the workflow `name`, read from `from`: the checkout's in FACTORIES' `hiring`, yours with no factory. */
-const pageOf = (from: string, name: string) => `/workflows/${from}/${name}${from === 'repo' ? `?factory=${hiring.name}` : ''}`;
+/** The page of the workflow `name`, read from `from`: the checkout's in FACTORIES' `hiring`, under its path, yours at the store's. */
+const pageOf = (from: string, name: string) => `${from === 'repo' ? `/factories/${hiring.name}` : ''}/workflows/${from}/${name}`;
 
 /** The canvas of the workflow `name`, whose page is open. */
 const canvasOf = (page: Page, name: string) => page.locator(`article[aria-label="Workflow ${name}"] .react-flow`);
@@ -112,7 +112,7 @@ async function presses(page: Page): Promise<void> {
   await expectSpec(page, 'repo', good.name, WAITS, `a click on ${WAITS}'s node then switches the bar to it`);
   await settled(page);
   const [mine] = yours.steps;
-  await visit(page, `${pageOf('user', yours.name)}?factory=${hiring.name}&bar=spec:repo/${good.name}/${WAITS}`);
+  await visit(page, `/factories/${hiring.name}/workflows/user/${yours.name}?bar=spec:repo/${good.name}/${WAITS}`);
   await expectVisible(specBar(page, 'repo', good.name, WAITS), `the bar showing ${WAITS} stays open on ${yours.name}'s page`);
   await nodeOf(page, yours.name, mine).click();
   const theirs = await expectSpec(
@@ -140,9 +140,9 @@ async function presses(page: Page): Promise<void> {
 
 /** The bar's Open and a double click on a step each open the step's page, with no bar. */
 async function opens(page: Page): Promise<void> {
-  const to = `/workflows/repo/${good.name}/${WAITS}`;
+  const to = `/factories/${hiring.name}/workflows/repo/${good.name}/${WAITS}`;
   const inHiring = (assertion: string) => {
-    if (new URL(page.url()).searchParams.get('factory') !== hiring.name)
+    if (!new URL(page.url()).pathname.startsWith(`/factories/${hiring.name}/`))
       throw new Refused(`${assertion}, in ${hiring.name} — it is ${page.url()}`);
   };
   await nodeOf(page, good.name, WAITS).click();

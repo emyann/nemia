@@ -56,13 +56,14 @@ const HAIRLINE: CSSProperties = { backgroundColor: 'var(--md-sys-color-outline-v
 const LIT: CSSProperties = { backgroundColor: paint.alive };
 
 /**
- * A page's name in the look: the brand face in capitals, as the page's `h1`, 18 pixels over its rule. The rule is a line of its own
- * nobody reads, under the name, so the name keeps a ground a contrast measure can read: lit in the hue of a session at work exactly as
- * wide as the name, whatever its length, and a hairline on to the end of the `h1`.
+ * A page's name in the look: the brand face in capitals, as the page's `h1`, 18 pixels over its rule; a display's size in a page's column
+ * of 512 pixels or more, a headline's in a narrower one, the column beside a factory's pane at 768 among them, so a long name stays in it.
+ * The rule is a line of its own nobody reads, under the name, so the name keeps a ground a contrast measure can read: lit in the hue of a
+ * session at work exactly as wide as the name, whatever its length, and a hairline on to the end of the `h1`.
  */
 export function PageName({ children }: { children: ReactNode }) {
   return (
-    <h1 data-page-name className="relative m-0 pb-4.5 font-brand text-display-small text-on-surface uppercase">
+    <h1 data-page-name className="relative m-0 pb-4.5 font-brand text-headline-small text-on-surface uppercase @lg/page:text-display-small">
       <span aria-hidden="true" data-page-rule className="absolute inset-x-0 bottom-0 h-px" style={HAIRLINE} />
       <span data-page-name-text className="relative block w-fit">
         {children}

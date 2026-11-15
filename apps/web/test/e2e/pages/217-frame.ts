@@ -1,12 +1,33 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { litOf, photograph, RAIL_PLACES, railColumnOf, railOf, railPlace, themeOf, topBarOf } from '../board.ts';
+import {
+  frameSheetOf,
+  herFaceOf,
+  litOf,
+  machineBarOf,
+  paneOf,
+  photograph,
+  PANE_PLACES,
+  placeOf,
+  RAIL_PLACES,
+  railColumnOf,
+  railPlace,
+  themeOf,
+  topBarOf,
+} from '../board.ts';
 import { expectCount, expectNone, expectVisible, idle, Refused, settled } from '../checks.ts';
+import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
-/** The rail's width with its border, closed and open. */
-const WIDTH = { closed: 97, open: 221 };
+/** The factory whose floor the page stands on. */
+const FACTORY = FACTORIES.hiring.name;
+
+/** The pane's width, as the design draws it. */
+const PANE = 360;
+
+/** The least room a page's column keeps beside the rail and the pane at 768: 768 less the rail's 80 and the pane's 360. */
+const COLUMN_AT_768 = 328;
 
 /** The box of `target`, refused when it is not drawn. */
 async function boxOf(target: Locator, what: string) {
@@ -15,171 +36,146 @@ async function boxOf(target: Locator, what: string) {
   return box;
 }
 
-/** The button that opens and closes the rail, or on a phone its drawer. */
-const menuOf = (page: Page) => page.locator('[data-menu-button]');
+/** The button that folds the pane, or on a phone opens the drawer. */
+const menuOf = (page: Page) => page.locator('[data-menu-button]').first();
 
-/** Waits until the rail is `width` wide, its transition done, and refuses if it never is. */
-const expectWidth = (page: Page, width: number, assertion: string) =>
-  expectNone(async () => {
-    const box = await railColumnOf(page).boundingBox();
-    return box && Math.abs(box.width - width) <= 1 ? null : `it is ${box?.width ?? 'not drawn'} wide`;
-  }, `${assertion}: the rail is ${width} wide`);
+/** The page's column. */
+const columnOf = (page: Page) => page.locator('main[data-frame-page]');
 
-/** Refuses unless `target` holds the keyboard's focus. */
-async function expectFocused(target: Locator, what: string): Promise<void> {
-  if (!(await target.evaluate((element) => element === document.activeElement))) throw new Refused(`${what} holds the focus`);
-}
+/** Waits until the pane is drawn `PANE` wide, or not at all when `shown` is false. */
+const expectPane = (page: Page, shown: boolean, assertion: string) =>
+  expectNone(
+    async () => {
+      const box = (await paneOf(page).count()) ? await paneOf(page).boundingBox() : null;
+      if (!shown) return box ? `it is drawn ${box.width} wide` : null;
+      return box && Math.abs(box.width - PANE) <= 1 ? null : `it is ${box?.width ?? 'not drawn'} wide`;
+    },
+    `${assertion}: the pane is ${shown ? `${PANE} wide` : 'not drawn'}`,
+  );
 
-/** The rail stands the window's height at its left, and the top bar beside it, across the rest of the top. */
-async function railBesideBar(page: Page): Promise<void> {
+/** The rail at the window's left, then the pane when docked, then the column, then the sheet when open, on one row over the machine bar. */
+async function inRow(page: Page, width: number, pane: boolean, sheet: boolean): Promise<void> {
   const rail = await boxOf(railColumnOf(page), 'the rail');
-  const bar = await boxOf(topBarOf(page), 'the top bar');
-  if (Math.abs(rail.x) > 1 || Math.abs(rail.y) > 1)
-    throw new Refused(`the rail starts at the window's top left — it is at ${rail.x},${rail.y}`);
-  if (Math.abs(bar.x - (rail.x + rail.width)) > 1 || Math.abs(bar.y) > 1)
-    throw new Refused(
-      `the top bar starts beside the rail, at the top — it is at ${bar.x},${bar.y}, the rail ending at ${rail.x + rail.width}`,
-    );
-}
-
-/**
- * The top bar holds, left to right, the page's name, the factory switcher, the search when `searched` (a window under 1024 pixels hides
- * it), the pause, the gauges and the account, each inside the bar and clear of the one before it on its line, or on a line below.
- */
-async function barClear(page: Page, searched: boolean): Promise<void> {
-  const bar = topBarOf(page);
-  const parts: Array<[string, Locator]> = [
-    ["the page's name", bar.locator('[data-page-name]')],
-    ['the factory switcher', bar.locator('[data-factory-picker]')],
-    ...(searched ? [['the search', bar.locator('[data-slot="search-bar"]')] as [string, Locator]] : []),
-    ['the pause', bar.locator('[data-pause]')],
-    ['the gauges', bar.locator('[data-gauges-button]')],
-    ['the account', bar.locator('[data-account-to-come]')],
-  ];
-  const whole = await boxOf(bar, 'the top bar');
-  const boxes = await Promise.all(parts.map(([what, part]) => boxOf(part, what)));
-  const wrong = boxes.flatMap((box, at) => {
-    const [what] = parts[at];
-    const outside =
-      box.x + box.width > whole.x + whole.width + 0.5 || box.y + box.height > whole.y + whole.height + 0.5
-        ? [`${what} runs out of the bar, to ${box.x + box.width},${box.y + box.height}`]
-        : [];
-    if (at === 0) return outside;
-    const before = boxes[at - 1];
-    const below = box.y >= before.y + before.height - 0.5;
-    const clear = below || box.x >= before.x + before.width - 0.5;
-    return clear ? outside : [...outside, `${parts[at - 1][0]} ends at ${before.x + before.width}, ${what} starts at ${box.x}`];
-  });
-  if (wrong.length)
-    throw new Refused(
-      `${page.viewportSize()?.width} wide, the top bar holds ${parts.map(([what]) => what).join(', ')} in order, each clear of the ` +
-        `last and inside the bar — ${wrong.join('; ')}`,
-    );
-}
-
-/** The top bar's parts stay clear of each other on this window, and on one too narrow for the search, the rail open; it names the page. */
-async function barInOrder(page: Page): Promise<void> {
-  await barClear(page, true);
-  const size = page.viewportSize();
-  if (size) {
-    await page.setViewportSize({ width: 800, height: size.height });
-    await expectWidth(page, WIDTH.open, '800 wide, the rail stays open');
-    await barClear(page, false);
-    await settled(page);
-    await photograph(page, path.join(OUT, `frame-two-lines-${await themeOf(page)}.png`));
-    await page.setViewportSize(size);
+  const column = await boxOf(columnOf(page), "the page's column");
+  const bar = await boxOf(machineBarOf(page), 'the machine bar');
+  const wrong: string[] = [];
+  if (Math.abs(rail.x) > 1) wrong.push(`the rail starts at ${rail.x}`);
+  let edge = rail.x + rail.width;
+  if (pane) {
+    const box = await boxOf(paneOf(page), 'the pane');
+    if (Math.abs(box.x - edge) > 1) wrong.push(`the pane starts at ${box.x}, the rail ending at ${edge}`);
+    edge = box.x + box.width;
   }
-  await expectVisible(
-    topBarOf(page).locator('[data-page-name]').getByText('Overview', { exact: true }),
-    'the top bar names the page Overview',
+  if (Math.abs(column.x - edge) > 1) wrong.push(`the column starts at ${column.x}, what is before it ending at ${edge}`);
+  if (sheet) {
+    const box = await boxOf(frameSheetOf(page), 'the sheet');
+    if (Math.abs(box.x + box.width - width) > 1) wrong.push(`the sheet ends at ${box.x + box.width} of ${width}`);
+  }
+  if (Math.abs(bar.x) > 1 || Math.abs(bar.width - width) > 1) wrong.push(`the machine bar runs ${bar.x} to ${bar.x + bar.width}`);
+  if (bar.y < column.y) wrong.push('the machine bar stands above the column');
+  if (wrong.length) throw new Refused(`${width} wide, the frame stands in its row: ${wrong.join('; ')}`);
+}
+
+/** Her sheet comes in, or goes, as `open` says, by her face. */
+async function sheetTo(page: Page, open: boolean): Promise<void> {
+  const shown =
+    (await frameSheetOf(page)
+      .getAttribute('data-sheet-shows')
+      .catch(() => 'none')) === 'her';
+  if (shown !== open) await herFaceOf(page).first().click();
+  await expectNone(
+    async () => {
+      const now =
+        (await frameSheetOf(page)
+          .getAttribute('data-sheet-shows')
+          .catch(() => 'none')) === 'her';
+      return now === open ? null : `the sheet ${now ? 'shows' : 'does not show'} her`;
+    },
+    `her face ${open ? 'opens' : 'closes'} her sheet`,
   );
+  await idle(page);
 }
 
 /**
- * The search and the account say they are not built yet, to the eye and to a screen reader, and neither takes the keyboard: Tab from the
- * factory switcher reaches the pause, and from the gauges leaves the bar.
+ * At `width`, the frame plain then with her sheet open: the pane docked at 1600 and wider whatever the sheet, under 1600 covered by the
+ * sheet; the column never under `COLUMN_AT_768` beside the pane; each pictured.
  */
-async function toCome(page: Page): Promise<void> {
-  const bar = topBarOf(page);
-  const search = bar.getByRole('searchbox', { name: 'Search, not built yet' });
-  await expectVisible(search, 'the search is named not built yet');
-  if (!(await search.isDisabled())) throw new Refused('the search is disabled: it takes no text and no focus');
-  if ((await search.getAttribute('placeholder')) !== 'Search · to come') throw new Refused('the search says to the eye it is to come');
-  const account = bar.getByRole('img', { name: 'Account, not built yet' });
-  await expectVisible(account, 'the account is an image named not built yet');
-  await expectCount(bar.locator('[data-account-to-come] [tabindex], [data-account-to-come] button'), 0, 'the account takes no focus');
-  await bar.locator('[data-factory-picker] button').first().focus();
-  await page.keyboard.press('Tab');
-  await expectFocused(bar.locator('[data-pause]'), 'Tab from the factory switcher passes the search: the pause');
-  await page.keyboard.press('Tab');
-  await expectFocused(bar.locator('[data-gauges-button] button'), 'Tab from the pause: the gauges button');
+async function atWidth(page: Page, width: number): Promise<void> {
+  const size = page.viewportSize();
+  await page.setViewportSize({ width, height: size?.height ?? 900 });
+  await sheetTo(page, false);
+  await expectPane(page, true, `${width} wide, the sheet closed`);
+  await inRow(page, width, true, false);
+  const column = await boxOf(columnOf(page), "the page's column");
+  if (column.width < COLUMN_AT_768 - 1) throw new Refused(`${width} wide, the column keeps ${COLUMN_AT_768} — it is ${column.width}`);
+  await settled(page);
+  await photograph(page, path.join(OUT, `frame-${width}-plain-${await themeOf(page)}.png`));
+  await sheetTo(page, true);
+  await expectPane(page, width >= 1600, `${width} wide, the sheet open`);
+  await inRow(page, width, width >= 1600, true);
+  await settled(page);
+  await photograph(page, path.join(OUT, `frame-${width}-sheet-${await themeOf(page)}.png`));
+  await sheetTo(page, false);
 }
 
-/** The menu button closes the rail to its icons and opens it again, and so does Ctrl+B; each state outlives a reload. */
-async function toggles(page: Page): Promise<void> {
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await expectWidth(page, WIDTH.open, 'open as this browser left it');
-  await expectVisible(menuOf(page).and(page.getByRole('button', { name: 'Close the menu' })), 'open, the menu button closes it');
-  await expectVisible(
-    railColumnOf(page).getByRole('button', { name: 'Start a run' }).getByText('Start a run'),
-    'open, the FAB says Start a run',
-  );
-  await settled(page);
-  await photograph(page, path.join(OUT, `frame-open-${await themeOf(page)}.png`));
+/** The menu button folds the pane and unfolds it, and so does Ctrl+B; each state outlives a reload. */
+async function folds(page: Page): Promise<void> {
+  await expectPane(page, true, 'unfolded as this browser left it');
+  await expectVisible(menuOf(page).and(page.getByRole('button', { name: 'Fold the factory pane' })), 'unfolded, the menu button folds it');
   await menuOf(page).click();
-  await expectWidth(page, WIDTH.closed, 'the menu button closes it');
-  await expectVisible(menuOf(page).and(page.getByRole('button', { name: 'Open the menu' })), 'closed, the menu button opens it');
-  for (const place of RAIL_PLACES) await expectVisible(railPlace(page, place), `closed, the rail keeps ${place}`);
-  await settled(page);
-  await photograph(page, path.join(OUT, `frame-closed-${await themeOf(page)}.png`));
+  await expectPane(page, false, 'the menu button folds it');
+  await expectVisible(
+    menuOf(page).and(page.getByRole('button', { name: 'Unfold the factory pane' })),
+    'folded, the menu button unfolds it',
+  );
   await page.reload({ waitUntil: 'load' });
   await idle(page);
-  await expectWidth(page, WIDTH.closed, 'closed, it stays closed across a reload');
+  await expectPane(page, false, 'folded, it stays folded across a reload');
+  await page.locator('body').click({ position: { x: 600, y: 300 } });
   await page.keyboard.press('Control+b');
-  await expectWidth(page, WIDTH.open, 'Ctrl+B opens it');
+  await expectPane(page, true, 'Ctrl+B unfolds it');
   await page.reload({ waitUntil: 'load' });
   await idle(page);
-  await expectWidth(page, WIDTH.open, 'open, it stays open across a reload');
+  await expectPane(page, true, 'unfolded, it stays unfolded across a reload');
 }
 
-/**
- * On a phone's screen the rail leaves the page's side: the top bar's menu button opens the destinations in a drawer, which a pick closes.
- */
+/** On a phone's screen the rail and the pane leave the page's side: the menu button opens a drawer that holds both, which a pick closes. */
 async function onPhone(page: Page): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
   await expectCount(railColumnOf(page), 0, "on a phone the rail leaves the page's side");
-  await settled(page);
-  await photograph(page, path.join(OUT, `frame-narrow-page-${await themeOf(page)}.png`));
+  await expectCount(paneOf(page), 0, 'and so does the pane');
   await topBarOf(page).locator('[data-menu-button]').click();
   const drawer = page.getByRole('dialog');
   await expectVisible(drawer, 'the menu button opens the drawer');
   for (const place of RAIL_PLACES) await expectVisible(railPlace(page, place), `the drawer holds ${place}`);
+  for (const place of PANE_PLACES) await expectVisible(placeOf(page, place), `the drawer holds the pane's ${place}`);
   await settled(page);
-  await photograph(page, path.join(OUT, `frame-narrow-${await themeOf(page)}.png`));
-  await railPlace(page, 'Agents').click();
+  await photograph(page, path.join(OUT, `frame-390-drawer-${await themeOf(page)}.png`));
+  await placeOf(page, 'Runs').click();
   await expectCount(drawer, 0, 'a pick in the drawer closes it');
-  await page.waitForURL((url) => url.pathname === '/agents');
+  await page.waitForURL((url) => url.pathname === `/factories/${FACTORY}/runs`);
 }
 
 export default {
   /**
-   * The frame on the Overview: the rail at the left, the window's height, the top bar beside it holding the page's name, the factory
-   * switcher, the search and the account to come, the pause and the gauges; Overview alone lit. The rail opens and closes by its menu
-   * button and by Ctrl+B, each state kept across a reload; on a phone a drawer holds the destinations. The rail is left open, as a fresh
-   * browser finds it, and the window's size is taken back.
+   * The frame on a factory's floor: the store's rail at the left, Factories alone lit; the factory pane beside it, then the page's
+   * column, then her sheet when open, over the machine bar across the foot; at 1600 the sheet is a third pane, under it the sheet covers
+   * the pane; at 768 the column keeps its 328 pixels. The menu button and Ctrl+B fold the pane, kept across a reload; on a phone a
+   * drawer holds the rail and the pane. The pane is left unfolded and the window's size taken back.
    */
   name: 'frame',
-  route: '/',
+  route: `/factories/${FACTORY}`,
   expect: async (page) => {
     const size = page.viewportSize();
     try {
-      await railBesideBar(page);
-      await barInOrder(page);
-      await expectVisible(railPlace(page, 'Overview').and(litOf(page)), 'the rail lights Overview on its page');
+      await expectVisible(railPlace(page, 'Factories').and(litOf(page)), "the rail lights Factories on a factory's page");
       await expectCount(litOf(page), 1, 'and no other destination');
-      await expectCount(railOf(page), 1, 'one rail of destinations');
-      await toCome(page);
-      await toggles(page);
+      await expectVisible(placeOf(page, 'Floor').and(page.locator('[aria-current="page"]')), 'the pane lights its Floor');
+      await expectCount(page.locator('[data-gauges-button]'), 1, 'the gauges stand once, in the machine bar');
+      await expectCount(topBarOf(page).locator('[data-pause], [data-factory-picker]'), 0, 'the page head holds no pause and no switcher');
+      for (const width of [1600, 1280, 1024, 768]) await atWidth(page, width);
+      if (size) await page.setViewportSize(size);
+      await folds(page);
       await onPhone(page);
     } finally {
       if (size) await page.setViewportSize(size);

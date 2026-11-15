@@ -25,9 +25,9 @@ function usePlaceLines(path: string, factory: string): Partial<Record<PanePlace,
 /**
  * The places of `factory`'s pane, each a link to its page under the factory's path (`placeHref`), which the root's `RouterProvider`
  * navigates, the one the page sits at (`lit`)
- * selected, on `secondary-container`, and said current to a screen reader.
+ * selected, on `secondary-container`, and said current to a screen reader; a place pressed calls `onPicked`, which closes a drawer.
  */
-function PanePlaces({ path, factory, lit }: { path: string; factory: string; lit: PanePlace }) {
+function PanePlaces({ path, factory, lit, onPicked }: { path: string; factory: string; lit: PanePlace; onPicked?: () => void }) {
   const lines = usePlaceLines(path, factory);
   return (
     <nav aria-label={`${factory}'s places`} className="flex flex-col gap-0.5">
@@ -36,11 +36,12 @@ function PanePlaces({ path, factory, lit }: { path: string; factory: string; lit
           key={place.id}
           href={placeHref(place.id, factory)}
           data-pane-place={place.id}
+          onPress={onPicked}
           aria-current={place.id === lit ? 'page' : undefined}
           className="block rounded-shape-full outline-none data-focus-visible:ring-2 data-focus-visible:ring-ring/50"
         >
           <ListItem
-            headline={place.label}
+            headline={<span className="text-body-large">{place.label}</span>}
             supportingText={lines[place.id]}
             className={cn(
               'min-h-12 rounded-shape-full py-1.5',
@@ -57,9 +58,10 @@ function PanePlaces({ path, factory, lit }: { path: string; factory: string; lit
  * The factory pane, one factory's: the list pane of the frame's list-detail layout, 360 wide on `surface-container-low`. At its head the
  * switcher (`FactoryPicker`) on `surface-container-high`, then Start a run (`PaneStart`); under them the factory's places (`PanePlaces`),
  * the one the page at `path` sits at lit. Docked, it stands as tall as the window less the machine bar; in the narrow screen's drawer
- * (`inDrawer`) it takes the drawer's height.
+ * (`inDrawer`) it takes the drawer's height, and a place pressed closes the drawer (`onPicked`).
  *
- * @param props the props: the page's path and search, the factory, the place it sits at, and whether the pane stands in the drawer
+ * @param props the props: the page's path and search, the factory, the place it sits at, whether the pane stands in the drawer, and what
+ *   a place pressed there calls
  */
 export function FactoryPane({
   path,
@@ -67,12 +69,14 @@ export function FactoryPane({
   factory,
   lit,
   inDrawer = false,
+  onPicked,
 }: {
   path: string;
   search: Record<string, unknown>;
   factory: string;
   lit: PanePlace;
   inDrawer?: boolean;
+  onPicked?: () => void;
 }) {
   return (
     <aside
@@ -87,7 +91,7 @@ export function FactoryPane({
         <FactoryPicker path={path} search={search} picked={factory} />
         <PaneStart name={factory} />
       </div>
-      <PanePlaces path={path} factory={factory} lit={lit} />
+      <PanePlaces path={path} factory={factory} lit={lit} onPicked={onPicked} />
     </aside>
   );
 }

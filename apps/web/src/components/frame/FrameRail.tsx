@@ -88,7 +88,14 @@ export function FrameRail({ path, search }: { path: string; search: Record<strin
         onClose={() => setOpenMobile(false)}
         header={
           seat?.level === 'factory' ? (
-            <FactoryPane path={path} search={search} factory={seat.factory} lit={seat.place} inDrawer />
+            <FactoryPane
+              path={path}
+              search={search}
+              factory={seat.factory}
+              lit={seat.place}
+              inDrawer
+              onPicked={() => setOpenMobile(false)}
+            />
           ) : undefined
         }
         sections={groups.map(({ group, items }) => ({ headline: group.label, items }))}
@@ -123,7 +130,7 @@ export function FrameRail({ path, search }: { path: string; search: Record<strin
 function RailGroupOf({ group, items, selected }: { group: RailGroup; items: NavigationItem[]; selected: string | null }) {
   return (
     <div data-rail-group={group.id} className="flex w-20 flex-col items-center pt-2">
-      <span aria-hidden className="w-full truncate px-1 text-center text-label-small text-on-surface-variant">
+      <span aria-hidden className="w-full px-1 text-center text-label-small text-balance text-on-surface-variant">
         {group.label}
       </span>
       <NavigationRail

@@ -88,7 +88,8 @@ export const machineBarOf = (page: Page): Locator => page.locator('footer[data-m
 export const pickerOf = (page: Page): Locator => page.locator('[data-factory-picker]');
 
 /** The pane's lists, each a link: the Runs, the Inbox and the Workflows of its factory. */
-export const sectionsOf = (page: Page): Locator => paneOf(page).locator('a[data-pane-place="runs"], a[data-pane-place="inbox"], a[data-pane-place="workflows"]');
+export const sectionsOf = (page: Page): Locator =>
+  paneOf(page).locator('a[data-pane-place="runs"], a[data-pane-place="inbox"], a[data-pane-place="workflows"]');
 
 /** The pane's Start a run, which opens the start of a run in the frame's side sheet. */
 export const startOf = (page: Page): Locator => paneOf(page).getByRole('button', { name: 'Start a run' });
@@ -126,7 +127,11 @@ export async function pickLevel(page: Page, trigger: Locator, word: 'Manual' | '
 export async function sidebar(page: Page): Promise<void> {
   await expectVisible(gaugesButtonOf(page), 'the machine bar has its gauges');
   for (const place of RAIL_PLACES) await expectVisible(railPlace(page, place), `the rail has ${place}`);
-  await expectCount(railColumnOf(page).getByRole('link'), RAIL_PLACES.length, `the rail holds its ${RAIL_PLACES.length} destinations alone`);
+  await expectCount(
+    railColumnOf(page).getByRole('link'),
+    RAIL_PLACES.length,
+    `the rail holds its ${RAIL_PLACES.length} destinations alone`,
+  );
   const order = await Promise.all(RAIL_PLACES.map(async (place) => (await railPlace(page, place).boundingBox())?.y ?? -1));
   if (order.some((y, at) => at > 0 && y <= order[at - 1]))
     throw new Refused(`the rail lists its places in order, ${RAIL_PLACES.join(', ')}`);

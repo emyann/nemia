@@ -73,6 +73,11 @@ const floorOfSpec = spec<(call: FloorCall, holder: FloorHolder) => FloorAnswer>(
       condition: ({ input: [call, holder], output }) =>
         holder.factory === null || call.factory === null || call.factory === holder.factory || output.decision === 'deny',
     },
+    aBoundTokenWritesNothingStoreWide: {
+      description: 'A token bound to one factory is refused a write in no factory, the library’s among them: a store-wide token makes it',
+      condition: ({ input: [call, holder], output }) =>
+        holder.factory === null || call.factory !== null || call.class === 'read' || output.decision === 'deny',
+    },
     belowTheLevelIsLeftAlone: {
       description: 'A write in a factory below the level an agent’s call needs is refused, as admission denies it',
       condition: ({ input: [call], output }) =>
@@ -94,7 +99,7 @@ const floorOfSpec = spec<(call: FloorCall, holder: FloorHolder) => FloorAnswer>(
       condition: ({ input: [call, holder], output }) =>
         call.class !== 'act' ||
         holder.narrowed === 'read' ||
-        !(holder.factory === null || call.factory === null || call.factory === holder.factory) ||
+        !(holder.factory === null || call.factory === holder.factory) ||
         !(call.level === null || atLeast(call.level, call.least)) ||
         output.decision === 'allow',
     },
@@ -103,7 +108,7 @@ const floorOfSpec = spec<(call: FloorCall, holder: FloorHolder) => FloorAnswer>(
       condition: ({ input: [call, holder], output }) =>
         call.class !== 'answer' ||
         holder.narrowed !== null ||
-        !(holder.factory === null || call.factory === null || call.factory === holder.factory) ||
+        !(holder.factory === null || call.factory === holder.factory) ||
         !(call.level === null || atLeast(call.level, call.least)) ||
         (call.waits && !call.ruled) ||
         output.decision === 'allow',

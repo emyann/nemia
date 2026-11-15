@@ -32,7 +32,7 @@ import { gateBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
 import type { SpendOf } from '../status/status.ts';
 import { filedOwed } from '../pinned/pinned.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { artifactOf, valueOf, type StepArtifact, type StepValue } from './files.store.ts';
+import { artifactOf, valueOf, workFolderOf, type StepArtifact, type StepValue } from './files.store.ts';
 import { checkIn, type CheckStderr, type StepCheck } from './checks.verb.ts';
 import type { Actor, FieldShape, Outcome } from 'objects';
 
@@ -225,7 +225,7 @@ export function closeoutIn(
     summary: c.summary,
     body: c.body ?? null,
     needs: c.needs ?? null,
-    artifacts: c.artifacts.map((file) => artifactOf(home, run, name, file)),
+    artifacts: c.artifacts.map((file) => artifactOf(home, run, name, file, workFolderOf(run, name))),
     values: (c.values ?? []).map(valueOf),
     refused: closeoutRefusals(step, c, steps),
     output: given,

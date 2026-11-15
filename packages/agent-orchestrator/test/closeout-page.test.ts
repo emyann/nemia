@@ -62,7 +62,7 @@ test("closeoutIn: a step's closeout read in either version", async (t) => {
     const c = read({ outcome: 'done', summary: 'First line.\n\nMore.', artifacts: ['a.md'], needs: 'x' })!;
     assert.deepEqual(
       [c.apiVersion, c.summary, c.body, c.values, c.refused, c.artifacts],
-      [null, 'First line.', 'First line.\n\nMore.', [], [], [{ path: 'a.md' }]],
+      [null, 'First line.', 'First line.\n\nMore.', [], [], [{ path: 'a.md', relativePath: 'a.md' }]],
     );
   });
 });
@@ -113,8 +113,9 @@ test("what a step's values and files link: valueOf, folderFiles, artifactOf", as
     fs.mkdirSync(dir, { recursive: true });
     const picture = path.join(dir, 'page-1.png');
     fs.writeFileSync(picture, 'png');
-    assert.deepEqual(artifactOf(STORE, pictures, 'design', picture), {
+    assert.deepEqual(artifactOf(STORE, pictures, 'design', picture, null), {
       path: picture,
+      relativePath: 'page-1.png',
       name: 'page-1.png',
       url: '/api/runs/r-pictures/steps/design/artifacts/page-1.png',
       kind: 'image',
@@ -122,9 +123,38 @@ test("what a step's values and files link: valueOf, folderFiles, artifactOf", as
     });
   });
   await t.test('one under /tmp/playwright-mcp, by its path alone', () => {
-    assert.deepEqual(artifactOf(STORE, pictures, 'design', '/tmp/playwright-mcp/page-1.png'), {
+    assert.deepEqual(artifactOf(STORE, pictures, 'design', '/tmp/playwright-mcp/page-1.png', null), {
       path: '/tmp/playwright-mcp/page-1.png',
     });
+  });
+  await t.test("every file a step's folder lists carries its path from that folder, one that is a directory included", () => {
+    const dir = artifactsDir(STORE, { id: 'r-relative' }, 'implement');
+    fs.mkdirSync(path.join(dir, 'sub'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'shot.png'), 'png');
+    const files = folderFiles(RUN, 'implement', dir, 'artifacts').files;
+    assert.deepEqual(
+      files.map((f) => f.relativePath),
+      ['shot.png', 'sub'],
+    );
+    for (const f of files) assert.equal(path.dirname(path.resolve(dir, f.relativePath ?? '/')), path.resolve(dir));
+  });
+  await t.test('a named file carries its path from the step folder that holds it, and none outside every one', async (u) => {
+    const dir = artifactsDir(STORE, pictures, 'design');
+    const work = path.join(STORE, 'folders', 'r-pictures-design');
+    const rows: [string, string, string | null, string | undefined][] = [
+      ['a picture in the artifacts folder', path.join(dir, 'page-1.png'), null, 'page-1.png'],
+      ['one nested under it', path.join(dir, 'sub', 'x.png'), null, path.join('sub', 'x.png')],
+      ['a path from the workspace root', 'notes/./x.md', null, path.join('notes', 'x.md')],
+      ["a folder run's absolute path in its own folder", path.join(work, 'out', 'y.md'), work, path.join('out', 'y.md')],
+      ['an absolute path in no folder of the step', '/tmp/playwright-mcp/page-1.png', work, undefined],
+      ['one that climbs out of the workspace', '../x', null, undefined],
+      ["the run's own closeout", 'closeout.json', null, undefined],
+    ];
+    for (const [name, file, folder, relative] of rows) {
+      await u.test(name, () => {
+        assert.equal(artifactOf(STORE, pictures, 'design', file, folder).relativePath, relative);
+      });
+    }
   });
 });
 

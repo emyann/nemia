@@ -227,6 +227,13 @@ test("a git run's step lists every file of its artifacts folder, named or not, u
     ['notes.md', 'shot.png'].map((name) => `/api/runs/${id}/steps/work/artifacts/${name}`),
     "both files, the run's own closeout.json left out",
   );
+  for (const f of listed?.files ?? []) {
+    assert.equal(
+      path.dirname(path.resolve(dir, f.relativePath ?? '/')),
+      path.resolve(dir),
+      'each served file names its path from its folder',
+    );
+  }
   assert.deepEqual((await statusOf(id, 'after')).artifactsFolder?.files ?? [], [], 'a step not filed yet lists none');
   fs.chmodSync(dir, 0o100);
   try {

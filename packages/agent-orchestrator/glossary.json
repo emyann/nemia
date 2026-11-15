@@ -1043,7 +1043,7 @@
     },
     {
       "term": "Pairing",
-      "meaning": "a single-use ticket a client asks for with no token (`nemia pair <url>`, `POST /api/pair`): a short code the person approves at the server (`nemia pairings approve <code>`, or the board's Setup page), then claimed with its secret, which mints a person token named after the client at that moment; the store keeps only digests, and it lapses unclaimed after ten minutes (`ticketState`, `packages/agent-orchestrator/src/pairing/`)."
+      "meaning": "a single-use ticket a client asks for with no token (`nemia pair <url>`, `POST /api/pairings`): a short code the person approves at the server (`nemia pairings approve <code>`, or the board's Setup page), then claimed with its secret, which mints a person token named after the client at that moment; the store keeps only digests, and it lapses unclaimed after ten minutes (`ticketState`, `packages/agent-orchestrator/src/pairing/`)."
     },
     {
       "term": "First-visit link",

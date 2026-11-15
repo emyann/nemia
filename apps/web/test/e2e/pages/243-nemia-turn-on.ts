@@ -11,8 +11,9 @@ const isFactories = (url: URL) => url.pathname === '/api/factories';
 export default {
   /**
    * The Factories with no factory, the factories read as none: beside how to make one, Nemia off is offered Turn Nemia on, with the line
-   * that does it from the command line. Pressed, it writes Semi-auto, one act, and the card says she is on, her session waiting on her
-   * folder's trust with the line that trusts it. The page takes her level back to Manual and removes the level file it wrote.
+   * that does it from the command line. Pressed, it writes Semi-auto, one act, and the card says she is on, her session not filed yet,
+   * with nothing said of her folder's trust, which the keeper gives itself. The page takes her level back to Manual and removes the level
+   * file it wrote.
    */
   name: 'nemia-turn-on',
   route: '/',
@@ -41,9 +42,9 @@ export default {
       if (answered.status() !== 200)
         throw new Refused(`and it is written — the api answered ${answered.status()}: ${await answered.text()}`);
       await idle(page);
-      const on = page.locator('[data-nemia-on][data-state="untrusted"]');
-      await expectVisible(on, 'the card says she is on, her session waiting on her folder trusted');
-      await expectVisible(on.locator('[data-nemia-trust] code'), 'with the line that trusts it');
+      const on = page.locator('[data-nemia-on][data-state="not-filed"]');
+      await expectVisible(on, "the card says she is on, her session filed at the keeper's next beat");
+      if (await on.locator('[data-nemia-trust]').count()) throw new Refused('nothing is said of her trust: the keeper gives it');
       if (await page.locator('[data-nemia-turn-on]').count()) throw new Refused('once on, Turn Nemia on is offered no more');
       if (!fs.existsSync(levelFile)) throw new Refused(`her level is written — ${levelFile} is not there`);
       await settled(page);

@@ -6,7 +6,7 @@
 export function TrustLine({ untrusted }: { untrusted: string | null }) {
   if (untrusted === null) return null;
   return (
-    <p data-nemia-trust className="text-body-small break-all text-failure">
+    <p data-nemia-trust className="text-body-small break-words text-failure">
       {untrusted}
     </p>
   );

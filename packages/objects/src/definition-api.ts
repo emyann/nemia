@@ -248,7 +248,7 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
     error: definitionErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a namespace's agents, a page at a time: the repository's, yours and, in a factory made from a template, its tree's, each with the steps that name it and the hires that fill a step with it. ?origin= reads one origin's. Answers an AgentList, or the same page as a Table where the request asks for one.",
+    "Lists a namespace's agents, a page at a time: the repository's, the user library's added to it and, in a factory made from a template, its tree's, each with the steps that name it and the hires that fill a step with it. ?origin= reads one origin's. Answers an AgentList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/agents/:name', {
     params: cardParams,
@@ -388,7 +388,7 @@ export class SkillsGroup extends HttpApiGroup.make('skills').add(
     error: definitionErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a namespace's skills, a page at a time: the factory's tree's, the repository's, yours and Nemia's builtin, each name served once, the first origin that holds it, unless ?origin= reads one origin's. Answers a SkillList, or the same page as a Table where the request asks for one.",
+    "Lists a namespace's skills, a page at a time: the factory's tree's, the repository's, the user library's and Nemia's builtin it has added, each name served once, the first origin that holds it, unless ?origin= reads one origin's. Answers a SkillList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/skills/:name', {
     params: cardParams,

@@ -28,19 +28,19 @@ test("the library's items, each kind in its order and each by name, with their o
   const skill = skillObject(consistentSkill({ skill: skillRow({ name: 'tidy', from: 'user', found: null }) }));
   const items = libraryItemsOf(
     [{ ...skill, status: { ...skill.status, origin: 'user', factories: ['shop'], builtinChanged: true } }],
-    [agentObject(listedAgent({ name: 'iris', from: 'builtin' }))],
+    [agentObject(listedAgent({ name: 'implementer', from: 'builtin' }, ['acme']))],
     [server('zeta', 'builtin', ['mill']), server('alpha')],
     [workflowObject(workflow({ name: 'dev', from: 'user' }))],
   );
   assert.deepEqual(
     items.map((one) => `${one.kind}.${one.name}`),
-    ['Skill.tidy', 'Agent.iris', 'McpServer.alpha', 'McpServer.zeta', 'Workflow.dev'],
+    ['Skill.tidy', 'Agent.implementer', 'McpServer.alpha', 'McpServer.zeta', 'Workflow.dev'],
   );
   assert.deepEqual(
     items.map((one) => [one.origin, [...one.factories], one.builtinChanged]),
     [
       ['user', ['shop'], true],
-      ['builtin', ['nemia'], false],
+      ['builtin', ['acme'], false],
       ['user', [], false],
       ['builtin', ['mill'], false],
       ['user', [], false],
@@ -52,12 +52,12 @@ test("the library's items, each kind in its order and each by name, with their o
 test('a factory may add each agent, skill or MCP server it has not added; a workflow is attached, never added', () => {
   const items = libraryItemsOf(
     [skillObject(consistentSkill({ skill: skillRow({ name: 'tidy', from: 'user', found: null }) }))],
-    [agentObject(listedAgent({ name: 'iris' }))],
+    [agentObject(listedAgent({ name: 'implementer' }))],
     [server('github')],
     [workflowObject(workflow({ name: 'dev' }))],
   );
   assert.deepEqual(
     addable(items, [add('Skill.tidy')]).map((one) => `${one.kind}.${one.name}`),
-    ['Agent.iris', 'McpServer.github'],
+    ['Agent.implementer', 'McpServer.github'],
   );
 });

@@ -24,8 +24,8 @@ const answered = (page: Page, method: 'PUT' | 'DELETE', at = route) =>
 
 /**
  * A repository's agent's custom instructions, saved and cleared on its page in FACTORIES' `hiring`, the factory on the checkout: the
- * write goes to the store's level with the repository the agent was read from (`?repo=`), since the default namespace reads none of its own,
- * and the api answers what the page says — saved, the file written; cleared, gone.
+ * write goes to the store's level with the repository the agent was read from (`?repo=`), since the default namespace reads none of its
+ * own, and the api answers what the page says — saved, the file written; cleared, gone.
  */
 async function savedForRepoAgent(page: Page): Promise<void> {
   const { good } = WORKFLOWS;

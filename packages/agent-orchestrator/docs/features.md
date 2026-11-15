@@ -2460,11 +2460,14 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   `$WF_ROOT/nemia/level.json` (`{ level, since, task }`), its one writer. Bare, it says her level, her task's phase, how to reach her
   session (`claude attach <8 characters>`, measured, or the web link the session shows) and any allow rule a person gave her at a prompt,
   read from her folder's local settings. `auto` is refused as to come (slice 6), as is a word that is no level (`Invalid`). `semi-auto`
-  is accepted while her folder is not trusted by the harness: her session waits in `untrusted`, and `nemia level` and `GET /api/level`
-  answer the command that trusts it once, by hand (`trust`), which the board shows beside the switch and in its empty state; the keeper
-  reads the trust each beat and files her once it is given. Her own folder's trust is still given by hand: no pass writes the
-  harness's config, and the keeper only reads it (`trustedFolder`, the runtime's). A factory's places are another matter: each is
-  given its trust when a person adds it (`nemia factory add`, `apply`, `trust`), through the runtime's `trustFolder`.
+  is accepted whatever her folder's trust: the keeper reads it each beat (`trustedFolder`, the runtime's), and on a beat that owes her
+  session and finds her folder not trusted (`untrusted`) it makes the folder and gives the trust itself (`trustFolder`, the runtime's),
+  then files her in the same beat. That is safe because the folder is Nemia's own: the store makes it and only Nemia writes it. No person
+  runs a command for it. Only a refused write reaches a person: the keeper records its words, which name the fix
+  (`$WF_ROOT/nemia/untrusted.json`, there only while it is refused), `nemia level` and `GET /api/level` answer them as `untrusted`, the
+  board shows them beside the switch and in its empty state, and `nemia doctor` lists them as the `nemia-folder` piece; the next beat
+  that owes her session asks again. A factory's places are another matter: each is given its trust when a person adds it (`nemia
+  factory add`, `apply`, `trust`), since a repository's settings are another party's.
 - **The keeper** (`keep`, `src/nemia/keep.verb.ts`), forked by `up` beside the deliverer, beats every 5 s and acts on what her
   machine owes (`nemiaDue`, `src/nemia/nemia.ts`): at `semi-auto`, her task filed once under `nemia-<since>`, then her subscription put;
   at `manual`, her task stopped and her subscription dropped. A task stopped or ended from outside is never filed again — the keeper
@@ -2494,7 +2497,8 @@ stateDiagram-v2
   [*] --> off
   due --> filed: NO_TASK / file
   due --> untrusted: FOLDER_UNTRUSTED / nothing
-  untrusted --> due: FOLDER_TRUSTED / nothing
+  untrusted --> filed: TRUST_WRITTEN / trust, file
+  untrusted --> untrusted: TRUST_REFUSED / trust
   filed --> kept: NOT_SUBSCRIBED / subscribe
   filed --> stopped: SETTLED_OUTSIDE / nothing
   kept --> stopped: SETTLED_OUTSIDE / nothing
@@ -2542,7 +2546,7 @@ stateDiagram-v2
 instruction` is not on her allow list, since its write flags share its prefix.
 
 Tested in `src/nemia/nemia.test.ts` (what the keeper owes; a task stopped from outside never filed again; the levels; the diagram;
-`denied:` waking her alone), `src/nemia/keep.verb.test.ts` (the untrusted wait, the filing and its fields, the quota allow, her spend,
+`denied:` waking her alone), `src/nemia/keep.verb.test.ts` (her folder trusted by the keeper, the filing and its fields, the quota allow, her spend,
 a stop from outside, manual, memory), `src/feed/feed.test.ts` (the one-shot: one line for a denial over ten passes, a restart and a recheck that say it neither again nor
 never, and the step's own note left alone),
 `src/stats/discipline.test.ts` (the calls so far beside the ended ones the stats count),
@@ -2608,7 +2612,7 @@ A factory at Manual is left alone; one at Semi-auto is hers to work. The level i
   (`Scope`, `src/admission/admission.ts`). Nemia's keeper puts both at `semi-auto` (`NEMIA_FLOOR`).
 - **Her session follows the levels**: kept while any factory, the default included, is above `manual`, and stopped at the keeper's next
   beat once none is (`Keeping`, `nemiaDue`); a subscription of hers without her floor is put again with it. The verb that puts a factory
-  above `manual` names a fresh task where none is open, whatever her folder's trust: the keeper files it once the folder is trusted.
+  above `manual` names a fresh task where none is open, whatever her folder's trust: the keeper trusts the folder and files it.
 - **`nemia level`** says each factory's level, its default and whose it is, and a raise with its end; `GET /api/level` answers them as
   `factories`, and `PUT /api/level` takes `factory`, `for` and `end`. The board's Settings page shows them, one row per factory, and sets
   a default, raises a factory for a stretch and ends a raise.

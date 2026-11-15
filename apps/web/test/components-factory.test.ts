@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { listed, summary } from './run-fixtures.ts';
 import './tsx.ts';
-import { at, filed, inboxCard, LISTED, nemiaUp, pagedWith, routedWith, STORE_ANSWER, TRUST } from './markup-fixtures.ts';
+import { at, filed, inboxCard, LISTED, nemiaUp, pagedWith, routedWith, STORE_ANSWER, UNTRUSTED, trustLineOf } from './markup-fixtures.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -226,7 +226,7 @@ async function noFactoryWith(level: Record<string, unknown> | null): Promise<str
       spend: null,
       allows: [],
       factories: [],
-      trust: null,
+      untrusted: null,
       ...level,
     });
   return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(FactoriesCanvas, { blocks: [] })));
@@ -244,11 +244,16 @@ test('no factory and Nemia off: Turn Nemia on, beside the line that does it from
   const raised = await noFactoryWith({ factories: [{ factory: 'mill', level: 'semi-auto', default: 'manual', own: null, raise: null }] });
   assert.doesNotMatch(raised, /data-nemia-turn-on/, 'a factory above Manual keeps her: she is on');
 
-  const waiting = await noFactoryWith({ level: 'semi-auto', task: 'nemia-1', trust: TRUST });
+  const waiting = await noFactoryWith({ level: 'semi-auto', task: 'nemia-1', untrusted: UNTRUSTED });
   assert.doesNotMatch(waiting, /data-nemia-turn-on/);
-  assert.match(waiting, /data-nemia-on="true" data-state="untrusted"[\s\S]*Nemia is on\. Waiting on your trust/);
-  assert.match(waiting, /data-nemia-trust[\s\S]*<code[^>]*>cd &#x27;\/store\/nemia&#x27; &amp;&amp; claude<\/code>/);
-  assert.equal(waiting.split('in a terminal').length, 2, 'how to trust it is said once');
+  assert.match(waiting, /data-nemia-on="true" data-state="untrusted"[\s\S]*Nemia is on\. Not filed:/);
+  assert.match(
+    waiting,
+    /data-nemia-trust[\s\S]*\/home\/me\/\.claude\.json did not take the trust/,
+    "the refusal's words, which name the fix",
+  );
+  assert.doesNotMatch(trustLineOf(waiting), /<code|data-copy/, 'no command to run by hand');
+  assert.equal(waiting.split('data-nemia-trust').length, 2, 'said once');
 
   const up = await noFactoryWith({ ...nemiaUp });
   assert.match(up, /data-nemia-on="true" data-state="up"[\s\S]*Nemia is on\. Up: her session runs\./);

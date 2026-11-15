@@ -28,7 +28,7 @@ import { EngineService, asked, tried, trustedFolder, type Engine } from '../runt
 import { taskSpend, type Spend } from '../status/status.ts';
 import { bridgeOf, type Bridge } from '../views/views.verb.ts';
 import type { EnginePhase } from '../views/views-words.ts';
-import { nemiaDir, promptAllows, readLevel, writeLevel } from './level.store.ts';
+import { nemiaDir, promptAllows, readLevel, readUntrusted, writeLevel } from './level.store.ts';
 import { LEVEL_FORM, nemiaTaskId, type Level, type LevelFile } from './nemia.ts';
 
 /**
@@ -36,8 +36,9 @@ import { LEVEL_FORM, nemiaTaskId, type Level, type LevelFile } from './nemia.ts'
  * first; her task, its phase and its session where one is filed; how a person reaches her session (`reach`), and her session's web link
  * where it was asked (`bridge`, null where not; `bridgeOf`); whether her task was stopped
  * from outside (`stopped`); what her sessions cost (`spend`, counted as each ends, as a step's; null where none is filed); and the allow
- * rules a person gave her at a prompt (`allows`); and the command a person runs once to trust her folder (`trust`, `trustCommand`), null
- * where her harness trusts it or keeps no trust: while it is not, her session waits for it.
+ * rules a person gave her at a prompt (`allows`); and why the keeper could not trust her folder, naming the fix (`untrusted`, the keeper's
+ * record), null where her harness trusts it or keeps no trust, or where the keeper's write was not refused: the keeper trusts her own
+ * folder itself before it files her, and no person runs a command for it.
  */
 export type NemiaLevel = {
   level: Level;
@@ -51,15 +52,8 @@ export type NemiaLevel = {
   spend: Spend | null;
   allows: string[];
   factories: FactoryLevel[];
-  trust: string | null;
+  untrusted: string | null;
 };
-
-/**
- * The command a person runs once to trust her folder, which her session's harness refuses to start in until they do: accepted at its
- * prompt and exited, it is the one approval her harness asks; it offers no program a way to give it.
- * @param home The store's root folder, whose folder of hers is trusted.
- */
-export const trustCommand = (home: string): string => `mkdir -p ${nemiaDir(home)} && cd ${nemiaDir(home)} && ${DEFAULT_HARNESS}`;
 
 /**
  * How a person reaches her session `sessionId`: attached on this machine, then through its web link (`bridge`) where it is up, or why it
@@ -77,6 +71,10 @@ const spendOf = (view: Parameters<typeof taskSpend>[0]): Spend | null => {
   const spent = taskSpend(view);
   return spent === undefined ? null : { usd: spent.usd, measured: spent.measured, unmeasured: spent.unmeasured };
 };
+
+/** Why the keeper could not trust her folder, off its record, while her folder is still not trusted; null otherwise. */
+const untrustedNow = (home: string): string | null =>
+  trustedFolder(DEFAULT_HARNESS, nemiaDir(home)) === false ? (readUntrusted(home) ?? null) : null;
 
 /** Where she is, off the level files and her task's view. */
 const levelNow = (e: Engine) =>
@@ -102,14 +100,14 @@ const levelNow = (e: Engine) =>
       spend: filed ? spendOf(view) : null,
       allows: yield* tried(() => promptAllows(home)),
       factories,
-      trust: trustedFolder(DEFAULT_HARNESS, nemiaDir(home)) === false ? trustCommand(home) : null,
+      untrusted: yield* tried(() => untrustedNow(home)),
     } satisfies NemiaLevel;
   });
 
 /**
  * The store's level file once the store's level is `level` (the same where only a factory changes, `storeSet` false) and some factory is
  * above `manual` or none (`above`), after `now`; undefined where nothing of it changes. Above `manual`, her task is kept where it is open
- * or not yet filed and some factory already was, and a fresh one named otherwise, whatever her folder's trust, which the keeper reads; at
+ * or not yet filed and some factory already was, and a fresh one named otherwise, whatever her folder's trust, which the keeper gives; at
  * none, the task stays named, so the keeper stops it.
  */
 function storeAsked(level: Level, storeSet: boolean, above: boolean, now: NemiaLevel, at: string): LevelFile | undefined {
@@ -200,7 +198,7 @@ function factoryArgsRefusal(args: Args): string | null {
  * for a stretch with `--for`, its raise ended with `--end`: the levels the keeper acts on. Refused: a word that is no level, arguments that
  * ask no write (`Invalid`); no such factory (`Missing`); a raise that raises nothing over the factory's default
  * (`Invalid`); an end with no raise in force (`Conflict`); a level file that does not read (`Invalid`). Never refused for her folder's
- * trust: her session waits for it, and `trust` names the command that gives it.
+ * trust: the keeper gives it, and `untrusted` says why where its write was refused.
  */
 export const LEVEL: Served<NemiaLevel, LevelInput> = {
   ...LEVEL_WORDS,

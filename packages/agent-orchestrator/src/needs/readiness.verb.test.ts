@@ -8,7 +8,8 @@
  * repository need is read per factory; the service, linger, bind and machine pieces follow what their commands and the environment
  * answer; a harness nothing runs on and nobody activated is `inactive`, never counted against `ready`, until it is installed or a
  * factory's workflow names it, its checks run over a PATH of the test's own, with no stand-in of it (`test/ambient.ts` puts one of each
- * harness first); and the read is `ready` only where no piece is missing. The test's store is its own, at `ROOT`.
+ * harness first); Nemia's folder said only where the keeper's trust of it was refused; and the read is `ready` only where no piece is
+ * missing. The test's store is its own, at `ROOT`.
  */
 import { createFactoryAt } from '../factory/factory.store.ts';
 import path from 'node:path';
@@ -31,6 +32,8 @@ import { RunDoor, type RunDoorShape } from '../runs/runs.store.ts';
 import type { Run } from '../record/record.ts';
 import { aRun } from '../../test/run-walks.ts';
 import { names } from '../../test/assessed.ts';
+import { nemiaDir, writeUntrusted } from '../nemia/level.store.ts';
+import { trustFolder } from '../runtime-client.ts';
 
 const ROOT = scratch('wf-readiness-');
 delete process.env[TOKEN_VARIABLE];
@@ -511,4 +514,20 @@ test("the daemon's sweep reads the machine's facts with no command run, so it ne
   assert.equal(facts.run('sh', ['-c', `touch ${marker}`]), undefined, 'a command reads as not started');
   assert.equal(fs.existsSync(marker), false, 'and nothing ran');
   assert.equal(facts.env, process.env, "the rest are this process's own");
+});
+
+test("Nemia's folder is said only where the keeper's trust of it was refused and it is still not trusted: missing, in the keeper's words", async () => {
+  const PATH = `${toolsBinDir(ROOT)}:/usr/bin:/bin`;
+  const nemiaPiece = async () => (await read(facts({ PATH }))).pieces.find((p) => p.name === 'nemia-folder');
+  assert.equal(await nemiaPiece(), undefined, 'nothing refused: nothing said, the keeper trusts her folder itself');
+  writeUntrusted(ROOT, 'the file did not read: mend it');
+  try {
+    const piece = await nemiaPiece();
+    assert.deepEqual([piece?.state, piece?.area, piece?.cost], ['missing', 'machine', 'server'], 'no run waits on her');
+    assert.equal(piece?.message, 'the file did not read: mend it', "the keeper's words, which name the fix");
+    trustFolder(DEFAULT_HARNESS, nemiaDir(ROOT));
+    assert.equal(await nemiaPiece(), undefined, 'trusted since: nothing said');
+  } finally {
+    writeUntrusted(ROOT, undefined);
+  }
 });

@@ -547,8 +547,15 @@ export const nemiaUp = {
   bridge: { url: 'https://example.test/code/session_0123', why: null },
 };
 
-/** The line that trusts her folder, as the api answers it. */
-export const TRUST = "cd '/store/nemia' && claude";
+/**
+ * The line of `html` that says why her folder could not be trusted, its markup whole, or empty where there is none.
+ * @param html A page's markup.
+ */
+export const trustLineOf = (html: string): string => /<p data-nemia-trust[^>]*>[\s\S]*?<\/p>/.exec(html)?.[0] ?? '';
+
+/** Why the keeper could not trust her folder, as the api answers it: the refusal's words, naming the fix. */
+export const UNTRUSTED =
+  "Claude Code's file /home/me/.claude.json did not take the trust of her folder /store/nemia: make it read as a JSON object again";
 
 /** A card as the inbox lists it, named `idea`, with `extra` over it. */
 export const inboxCard = (extra: Record<string, unknown> = {}) =>

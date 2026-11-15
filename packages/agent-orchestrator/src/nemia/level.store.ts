@@ -1,7 +1,8 @@
 /**
  * Nemia's folder in the store, `$WF_ROOT/nemia/`: the person's level (`level.json`, written by `nemia level` alone), her memory
  * (`memory/`, written by her session alone, read here), the instruction her session is filed with (`prompt.md`, composed by the keeper),
- * the custom words she was last filed or told with (`told.json`, the keeper's record), and what is built in with her in the package's
+ * the custom words she was last filed or told with (`told.json`, the keeper's record), why the keeper could not trust her folder
+ * (`untrusted.json`, the keeper's record, there only while its write is refused), and what is built in with her in the package's
  * `nemia/` folder, a plugin: her definition (`agents/nemia.md`), her skills and the MCP port's server entry.
  *
  * Beneath the controllers, beside `subscription.store.ts`: it imports no store of runs.
@@ -48,6 +49,12 @@ export const promptFile = (home: string): string => path.join(nemiaDir(home), 'p
  * @param home The store's root folder.
  */
 export const toldFile = (home: string): string => path.join(nemiaDir(home), 'told.json');
+
+/**
+ * The keeper's record of why it could not give her harness's trust to her folder: there only while that write is refused.
+ * @param home The store's root folder.
+ */
+export const untrustedFile = (home: string): string => path.join(nemiaDir(home), 'untrusted.json');
 
 /**
  * What is built in with her, a plugin folder: her definition, `agents/nemia.md`, which a coding agent that installs the plugin is given
@@ -177,7 +184,8 @@ export function ownBin(root: string = PACKAGE): string | undefined {
 /**
  * The deny rules on every write in the store `root` but her own folder's: an `Edit` rule on each entry at its top, a folder's whole, the
  * rules for auto among them whether or not their folder is there yet (`POLICY_FOLDER`), and on her level, her instruction and the record
- * of the custom words she was told (`toldFile`), the three files of her folder she does not own. Read at each filing, so a folder the
+ * of the custom words she was told (`toldFile`) and why her folder could not be trusted (`untrustedFile`), the four files of her folder
+ * she does not own. Read at each filing, so a folder the
  * store gains is denied at the next.
  * @param home The store's root folder, whose entries are denied.
  */
@@ -199,6 +207,7 @@ export function storeDenies(home: string): string[] {
     `Edit(/${levelFile(home)})`,
     `Edit(/${promptFile(home)})`,
     `Edit(/${toldFile(home)})`,
+    `Edit(/${untrustedFile(home)})`,
     `Edit(/${path.join(nemiaDir(home), 'chat')}/**)`,
   ];
 }
@@ -252,6 +261,46 @@ export function readTold(home: string): ToldCustom | undefined {
   try {
     const read = Schema.decodeUnknownResult(ToldSchema)(JSON.parse(text));
     return Result.isSuccess(read) ? { ...read.success } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Records why the keeper could not give her harness's trust to her folder (`untrustedFile`), or, where `refused` is undefined, removes
+ * the record: the trust is given.
+ * @param home The store's root folder.
+ * @param refused The words saying why the trust was refused and what to do, or undefined where it is given.
+ */
+export function writeUntrusted(home: string, refused: string | undefined): void {
+  if (refused === undefined) return fs.rmSync(untrustedFile(home), { force: true });
+  fs.mkdirSync(nemiaDir(home), { recursive: true });
+  fs.writeFileSync(
+    untrustedFile(home),
+    `${JSON.stringify({ refused })}
+`,
+  );
+}
+
+/** The decoded record of why her folder could not be trusted. */
+const UntrustedSchema = Schema.Struct({ refused: Schema.String });
+
+/**
+ * Why the keeper could not give her harness's trust to her folder (`untrustedFile`), or undefined where it kept no such record, or one
+ * that does not read as one.
+ * @param home The store's root folder.
+ */
+export function readUntrusted(home: string): string | undefined {
+  let text: string;
+  try {
+    text = fs.readFileSync(untrustedFile(home), 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw err;
+  }
+  try {
+    const read = Schema.decodeUnknownResult(UntrustedSchema)(JSON.parse(text));
+    return Result.isSuccess(read) ? read.success.refused : undefined;
   } catch {
     return undefined;
   }

@@ -28,7 +28,7 @@ import {
   type SkillChange,
 } from 'agent-orchestrator';
 import { frontmatterKey, SKILLS_FOLDER, skillDraftOf, skillNameRefusal, WorkflowError } from 'agent-orchestrator/workflow';
-import { Api, API_VERSION, type DefinitionFiles, Invalid, type Skill, type SkillDrafted, type SkillSpec } from 'objects';
+import { Api, API_VERSION, type DefinitionFiles, Invalid, type Skill, type SkillDrafted, type SkillSpec, type SkillWrite } from 'objects';
 import type { Served } from '../layer.ts';
 import { repoLayer } from '../factory/place.ts';
 import {
@@ -288,6 +288,37 @@ export function skillReadOf({ name, files }: DefinitionFiles): SkillDrafted {
   return { metadata: { name: skill }, spec: rest.length > 0 ? { ...spec, files: rest } : spec };
 }
 
+/** The skill `payload` names made in the user library, read back. */
+async function libraryCreated(s: Served, payload: SkillWrite): Promise<Skill> {
+  const route = 'POST /api/skills';
+  const name = payload.metadata.name;
+  if (name === undefined || !('spec' in payload))
+    throw new Invalid({ error: `${route} makes a skill from its name and its spec: ${SHAPE}.` });
+  writeGoes('library', 'create', thereOf(await libraryHeld(s), name));
+  await written(s, draftOf(payload.spec, name, route), { version: null });
+  return libraryAt(s, name, 'user');
+}
+
+/** The library's skill `name` written over from `payload`, a builtin copied to the user library first, read back. */
+async function libraryReplaced(s: Served, name: string, payload: SkillWrite): Promise<Skill> {
+  const route = `PUT /api/skills/${name}`;
+  const there = thereOf(await libraryHeld(s), name);
+  writeGoes('library', 'replace', there);
+  const version = payload.metadata.resourceVersion;
+  if (version === undefined)
+    throw new Invalid({
+      error: `${route} takes the resourceVersion the Skill was read at, so a skill changed since is not written over.`,
+    });
+  if (payload.metadata.name !== undefined && payload.metadata.name !== name)
+    throw new Invalid({
+      error: `${route}: a skill's name is its folder, and every agent that gives it names it: write a new skill under the new name, and give it in their place.`,
+    });
+  if (there === 'builtin') await copied(s, name);
+  const change = 'spec' in payload ? draftOf(payload.spec, name, route) : { name, preload: payload.preload };
+  await written(s, change, { version, name });
+  return libraryAt(s, name, 'user');
+}
+
 export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
@@ -322,37 +353,8 @@ export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
       ),
     )
     .handle('getLibrary', ({ params: { name }, query }) => answeredWriteIn(LIBRARY, (s) => libraryAt(s, name, originIn(s, query.origin))))
-    .handle('createLibrary', ({ payload }) =>
-      answeredWriteIn(LIBRARY, async (s) => {
-        const route = 'POST /api/skills';
-        const name = payload.metadata.name;
-        if (name === undefined || !('spec' in payload))
-          throw new Invalid({ error: `${route} makes a skill from its name and its spec: ${SHAPE}.` });
-        writeGoes('library', 'create', thereOf(await libraryHeld(s), name));
-        await written(s, draftOf(payload.spec, name, route), { version: null });
-        return libraryAt(s, name, 'user');
-      }),
-    )
-    .handle('replaceLibrary', ({ params: { name }, payload }) =>
-      answeredWriteIn(LIBRARY, async (s) => {
-        const route = `PUT /api/skills/${name}`;
-        const there = thereOf(await libraryHeld(s), name);
-        writeGoes('library', 'replace', there);
-        const version = payload.metadata.resourceVersion;
-        if (version === undefined)
-          throw new Invalid({
-            error: `${route} takes the resourceVersion the Skill was read at, so a skill changed since is not written over.`,
-          });
-        if (payload.metadata.name !== undefined && payload.metadata.name !== name)
-          throw new Invalid({
-            error: `${route}: a skill's name is its folder, and every agent that gives it names it: write a new skill under the new name, and give it in their place.`,
-          });
-        if (there === 'builtin') await copied(s, name);
-        const change = 'spec' in payload ? draftOf(payload.spec, name, route) : { name, preload: payload.preload };
-        await written(s, change, { version, name });
-        return libraryAt(s, name, 'user');
-      }),
-    )
+    .handle('createLibrary', ({ payload }) => answeredWriteIn(LIBRARY, (s) => libraryCreated(s, payload)))
+    .handle('replaceLibrary', ({ params: { name }, payload }) => answeredWriteIn(LIBRARY, (s) => libraryReplaced(s, name, payload)))
     .handle('deleteLibrary', ({ params: { name }, query }) =>
       answeredWriteIn(LIBRARY, async (s) => {
         const held = await libraryHeld(s);

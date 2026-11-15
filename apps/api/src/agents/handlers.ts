@@ -50,6 +50,7 @@ import {
   BadRequest,
   type DefinitionFiles,
   Invalid,
+  type AgentWrite,
 } from 'objects';
 import type { Served } from '../layer.ts';
 import { repoLayer } from '../factory/place.ts';
@@ -353,6 +354,25 @@ export function agentReadOf({ name, files }: DefinitionFiles): AgentDrafted {
   return { metadata: { name: agent }, spec: { role, description, keys, skills, harnessPrompt, mcp, output, instructions: body } };
 }
 
+/** The agent `payload` names made in the user library, read back. */
+async function libraryCreated(s: Served, payload: AgentWrite): Promise<Agent> {
+  const name = named('POST /api/agents', payload.metadata.name);
+  writeGoes('library', 'create', thereOf(await libraryHeld(s), name));
+  await saved(s, agentDraftOf(draftBodyOf(payload.spec), name));
+  return libraryAt(s, name, 'user');
+}
+
+/** The library's agent `name` written over from `payload`, read back. */
+async function libraryReplaced(s: Served, name: string, payload: AgentWrite): Promise<Agent> {
+  const route = `PUT /api/agents/${name}`;
+  writeGoes('library', 'replace', thereOf(await libraryHeld(s), name));
+  const version = versioned(route, payload.metadata.resourceVersion);
+  const to = payload.metadata.name === undefined ? name : named(route, payload.metadata.name);
+  const given = agentDraftOf(draftBodyOf(payload.spec), to);
+  await saved(s, { ...given, version, name });
+  return libraryAt(s, to, 'user');
+}
+
 export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
@@ -392,25 +412,8 @@ export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
       ),
     )
     .handle('getLibrary', ({ params: { name }, query }) => answeredWriteIn(LIBRARY, (s) => libraryAt(s, name, originIn(s, query.origin))))
-    .handle('createLibrary', ({ payload }) =>
-      answeredWriteIn(LIBRARY, async (s) => {
-        const name = named('POST /api/agents', payload.metadata.name);
-        writeGoes('library', 'create', thereOf(await libraryHeld(s), name));
-        await saved(s, agentDraftOf(draftBodyOf(payload.spec), name));
-        return libraryAt(s, name, 'user');
-      }),
-    )
-    .handle('replaceLibrary', ({ params: { name }, payload }) =>
-      answeredWriteIn(LIBRARY, async (s) => {
-        const route = `PUT /api/agents/${name}`;
-        writeGoes('library', 'replace', thereOf(await libraryHeld(s), name));
-        const version = versioned(route, payload.metadata.resourceVersion);
-        const to = payload.metadata.name === undefined ? name : named(route, payload.metadata.name);
-        const given = agentDraftOf(draftBodyOf(payload.spec), to);
-        await saved(s, { ...given, version, name });
-        return libraryAt(s, to, 'user');
-      }),
-    )
+    .handle('createLibrary', ({ payload }) => answeredWriteIn(LIBRARY, (s) => libraryCreated(s, payload)))
+    .handle('replaceLibrary', ({ params: { name }, payload }) => answeredWriteIn(LIBRARY, (s) => libraryReplaced(s, name, payload)))
     .handle('deleteLibrary', ({ params: { name }, query }) =>
       answeredWriteIn(LIBRARY, async (s) => {
         const route = `DELETE /api/agents/${name}`;

@@ -5,8 +5,8 @@
  * as its store keeps it, in files, never through the api's writes but one delegation, cloned. Past the most (`MANY`): the cards, the
  * factories, a factory's MCP servers, proposals and delegations, the subscriptions and the feed's events. Past a default page alone
  * (`SOME`): the runs, the workflows with their hires and schedules, your agents and your skills, whose lists read each object whole on
- * every page. The builtin templates and the library's MCP servers are as many as the package ships, fewer than a page, and the volumes none: their pages
- * are read, and not planted past one.
+ * every page. The builtin templates and the library's MCP servers are as many as the package ships, fewer than a page, and the volumes
+ * none: their pages are read, and not planted past one.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';

@@ -1,8 +1,8 @@
 /**
  * A factory's MCP servers on the board as objects (mcp-servers.ts, `/api/namespaces/<factory>/mcpservers`): the record read where the
- * store keeps it, a server recorded and removed, each header masked, and the store's library of servers (`/api/mcpservers`), the user library's beside Nemia's builtins — in a
- * scratch store whose factory is filed with the package's own verb.
- * Every write is read back from disk, and every refusal is made to refuse, with the record as it was.
+ * store keeps it, a server recorded and removed, each header masked, and the store's library of servers (`/api/mcpservers`), the user
+ * library's beside Nemia's builtins — in a scratch store whose factory is filed with the package's own verb. Every write is read back from
+ * disk, and every refusal is made to refuse, with the record as it was.
  *
  * The states are not read here: a read of one spawns a harness session, which no api test does. What the api answers of a record it
  * could not read states of is the thing to hold, and it is held: no `state` on each server, its `status.error` saying why.

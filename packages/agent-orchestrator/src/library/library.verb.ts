@@ -32,7 +32,7 @@ import { factoryServerRefusal, serverNameRefusal } from '../factory/servers/serv
 import { tried } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { BuiltinServer, FactoryServer, FactoryServers } from '../factory/servers/servers.ts';
-import { addName, libraryAddRefusal, libraryAddState, libraryAddsOf, sameAdd, type LibraryKind, type LibraryRef } from './library.ts';
+import { addName, libraryAddRefusal, libraryAddState, libraryAddsOf, sameAdd, type LibraryRef } from './library.ts';
 import { libraryAddsFile, libraryDir, libraryServers, readLibraryAdds, writeLibraryAdds, writeLibraryServers } from './library.store.ts';
 
 /** When the factory `name`'s adds were last recorded, or the epoch where they never were. */
@@ -73,18 +73,13 @@ const givenSkills = (file: string): string[] => {
     .filter(Boolean);
 };
 
-/**
- * The library items the factory `name` resolves today, from the steps it fills: each library agent a step is credited to (`stepsFilled`,
- * the file a start would run), and each skill an agent that fills a step gives that the library holds.
- * @param home The store's root.
- * @param name The factory's name, `default` among them.
- */
-export function derivedAdds(home: string, name: string): LibraryRef[] {
+/** The files of the agents the steps of the factory `name` are credited to (`stepsFilled`), on each of its repositories. */
+function filledFiles(home: string, name: string): Set<string> {
   const factory = name === DEFAULT_NAMESPACE ? undefined : factoryNamed(home, name);
-  if (name !== DEFAULT_NAMESPACE && factory === undefined) return [];
-  const repos: Array<string | undefined> =
-    factory === undefined ? [undefined] : factory.repos.length === 0 ? [undefined] : factory.repos.map((r) => path.resolve(r));
   const files = new Set<string>();
+  if (name !== DEFAULT_NAMESPACE && factory === undefined) return files;
+  const repos: Array<string | undefined> =
+    factory === undefined || factory.repos.length === 0 ? [undefined] : factory.repos.map((r) => path.resolve(r));
   for (const repo of repos) {
     try {
       for (const filled of stepsFilled(repo, home, factory)) files.add(path.resolve(filled.file));
@@ -92,6 +87,17 @@ export function derivedAdds(home: string, name: string): LibraryRef[] {
       continue;
     }
   }
+  return files;
+}
+
+/**
+ * The library items the factory `name` resolves today, from the steps it fills: each library agent a step is credited to (`stepsFilled`,
+ * the file a start would run), and each skill an agent that fills a step gives that the library holds.
+ * @param home The store's root.
+ * @param name The factory's name, `default` among them.
+ */
+export function derivedAdds(home: string, name: string): LibraryRef[] {
+  const files = filledFiles(home, name);
   const agentsDir = path.join(libraryDir(home), AGENTS_FOLDER);
   const adds: LibraryRef[] = [];
   const add = (ref: LibraryRef) => {

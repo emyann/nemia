@@ -56,9 +56,9 @@ export const REPOSITORY_HOLDER = '.claude';
 /**
  * The folders a workflow's agents and skills are looked for in, each holding an `agents/` and a `skills/`, in the one order a name is
  * looked up (`LOOKUP`, which the served definitions read too): the workflow's own root (the folder beside it, `agentsDir`'s parent), as a
- * factory's tree is, then the repository's `.claude/`, then the person's library, the store's `workflows/`. The builtin skills hold no root: they are
- * found past every root (`skillsFor`). So the repository wins over the store, and a workflow of the store finds its own first. One
- * folder is listed once.
+ * factory's tree is, then the repository's `.claude/`, then the person's library, the store's `workflows/`. The builtin skills hold no
+ * root: they are found past every root (`skillsFor`). So the repository wins over the store, and a workflow of the store finds its own
+ * first. One folder is listed once.
  * @param workflowDir The workflow's folder, whose root is looked in first.
  * @param places The repository and the store's root, each looked in where given.
  */

@@ -750,11 +750,14 @@ export const wiredRepoFor = (home: string, name: string, workflow: string): stri
  * refuses among them, for a run that cuts worktrees — and those above); dies of anything else, an `open` not heard and the copy's and the
  * render's `Error` included (`tried`).
  */
+/** Where a start on `opts.repo` looks for its agents and skills, its factory's library adds among them (`addedOf`). */
+const startPlaces = (home: string, opts: StartOptions) => placesOf(home, opts.repo, addedOf(home, opts.factory ?? DEFAULT_NAMESPACE));
+
 export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const home = yield* StoreRoot;
   const edits = yield* labelEditsOf(opts);
   const isolate = opts.isolate ?? true;
-  const places = placesOf(home, opts.repo, addedOf(home, opts.factory ?? DEFAULT_NAMESPACE));
+  const places = startPlaces(home, opts);
   const factory = yield* factoryOrNone(opts.factory);
   const harnessSettings = yield* settingsAt(factory);
   const refused = yield* StartRefusal;

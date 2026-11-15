@@ -3,8 +3,8 @@
  * pure deciders the api's handlers read, so which definition a factory resolves stays the orchestrator's meaning.
  *
  * `definitionServed`: of the origins that hold one name, in the order the factory looks a name up (its tree, the repository, the person's
- * library, the builtin), the one served — the first, or, with an origin asked, that origin where it holds the name — and what shadows it. Its laws are
- * `contracts/definition-served.contract.ts`'s.
+ * library, the builtin), the one served — the first, or, with an origin asked, that origin where it holds the name — and what shadows it.
+ * Its laws are `contracts/definition-served.contract.ts`'s.
  *
  * `definitionsServed`: a namespace's list, every name found served once, `definitionServed` of the origins that hold it in the lookup
  * order (`heldOrigins`, whose laws are the same file's). Its list laws are held by `served.test.ts`, over every list up to a size: tsverify
@@ -41,8 +41,8 @@ export const definitionServed: DefinitionServedOf = (held, asked) => {
 };
 
 /**
- * The order a factory looks a name up in: its own tree, the repository, the person's library, then Nemia's builtin. `objects`' `DEFINITION_ORIGINS` word
- * for word (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`).
+ * The order a factory looks a name up in: its own tree, the repository, the person's library, then Nemia's builtin. `objects`'
+ * `DEFINITION_ORIGINS` word for word (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`).
  */
 export const LOOKUP = ['factory', 'repo', 'user', 'builtin'] as const satisfies readonly DefinitionOrigin[];
 

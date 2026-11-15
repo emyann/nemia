@@ -38,7 +38,7 @@
     },
     {
       "term": "labelSelector",
-      "meaning": "the query key of a list that keeps the objects whose labels it matches (`team=core`), given again for another, of which each must match (`packages/objects/src/index.ts`, the door it is served through).",
+      "meaning": "the query key of a list that keeps the objects whose labels it matches (`team=core`), given again for another, of which one must match, by every clause of its own (`packages/objects/src/index.ts`, the door it is served through).",
       "retired": [
         {
           "spelling": "selector",

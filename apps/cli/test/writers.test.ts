@@ -127,11 +127,11 @@ test('REFUSED, exit 2, before anything is asked: a flag no writer takes, `factor
   const folder = draftFolder('linked');
   fs.symlinkSync(path.join(folder, 'pictures.ts'), path.join(folder, 'elsewhere.ts'));
   for (const [argv, named] of [
-    [['workflows', 'write', 'yours', 'w', '--folder', folder, '--bogus'], /nemia workflows write/],
+    [['workflows', 'write', 'user', 'w', '--folder', folder, '--bogus'], /nemia workflows write/],
     [['workflows', 'write', 'factory', 'w', '--folder', folder], /--factory <name>/],
-    [['workflows', 'write', 'yours', 'w', '--folder', folder], /elsewhere\.ts/],
-    [['workflows', 'write', 'yours', 'w', '--folder', path.join(DRAFTS, 'nowhere')], /nowhere/],
-    [['agents', 'write', 'yours', '--file', path.join(DRAFTS, 'nobody.md')], /nobody\.md/],
+    [['workflows', 'write', 'user', 'w', '--folder', folder], /elsewhere\.ts/],
+    [['workflows', 'write', 'user', 'w', '--folder', path.join(DRAFTS, 'nowhere')], /nowhere/],
+    [['agents', 'write', 'user', '--file', path.join(DRAFTS, 'nobody.md')], /nobody\.md/],
     [['skills', 'write', 'repo', '--file', path.join(DRAFTS, 'SKILL.md')], /nemia skills write/],
   ] as const) {
     const said = await nemia(argv, env);
@@ -216,7 +216,7 @@ test('`nemia workflows write factory <name> --factory <f>` proposes the workflow
 
 test('a draft folder written, then written again at its --version, leaving a file it does not carry; a stale version refused, exit 1', async () => {
   const folder = draftFolder('notes', { 'landing.ts': 'process.exit(1);\n' });
-  const made = await store.nemia(['workflows', 'write', 'yours', 'notes', '--folder', folder]);
+  const made = await store.nemia(['workflows', 'write', 'user', 'notes', '--folder', folder]);
   assert.equal(made.code, 0, made.err);
   assert.match(made.out, /^workflows\/notes created, at version \S+$/m);
   const read = await store.nemia(['get', 'workflow', 'notes', '-o', 'json']);
@@ -230,14 +230,14 @@ test('a draft folder written, then written again at its --version, leaving a fil
 
   fs.rmSync(path.join(folder, 'landing.ts'));
   fs.appendFileSync(path.join(folder, 'only.md'), 'Again.\n');
-  const changed = await store.nemia(['workflows', 'write', 'yours', 'notes', '--folder', folder, '--version', versionIn(made.out)]);
+  const changed = await store.nemia(['workflows', 'write', 'user', 'notes', '--folder', folder, '--version', versionIn(made.out)]);
   assert.equal(changed.code, 0, changed.err);
   assert.match(changed.out, /^workflows\/notes written, at version \S+$/m);
   const there = path.join(store.root, 'workflows', 'notes');
   assert.match(fs.readFileSync(path.join(there, 'only.md'), 'utf8'), /Again\./);
   assert.equal(fs.readFileSync(path.join(there, 'landing.ts'), 'utf8'), 'process.exit(1);\n', 'a file the draft does not carry is left');
 
-  const stale = await store.nemia(['workflows', 'write', 'yours', 'notes', '--folder', folder, '--version', versionIn(made.out)]);
+  const stale = await store.nemia(['workflows', 'write', 'user', 'notes', '--folder', folder, '--version', versionIn(made.out)]);
   assert.equal(stale.code, 1, `a stale version is the api's Conflict: ${stale.err}`);
   assert.match(stale.err, /notes/);
 });
@@ -250,7 +250,7 @@ test('under a remote context pointed at the served store, the same write lands t
   const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1] ?? assert.fail(minted.out);
   const env = laptop('nemia-writers-laptop-');
   configWritten({ contexts: [{ name: 'vps', server: exposed.url, token }], current: 'vps' }, env);
-  const said = await nemia(['workflows', 'write', 'yours', 'away', '--folder', draftFolder('away')], env);
+  const said = await nemia(['workflows', 'write', 'user', 'away', '--folder', draftFolder('away')], env);
   assert.equal(said.code, 0, said.err);
   assert.ok(fs.existsSync(path.join(exposed.root, 'workflows', 'away', 'only.md')), 'written on the remote store');
   assert.equal(fs.existsSync(env.WF_ROOT ?? ''), false, "nothing read or made on this machine's store");
@@ -260,7 +260,7 @@ test('an agent whose output: names out.json beside it is written with its schema
   const file = path.join(DRAFTS, 'agents', 'scribe.md');
   write(file, SCRIBE);
   write(path.join(DRAFTS, 'agents', 'out.json'), SCHEMA);
-  const made = await store.nemia(['agents', 'write', 'yours', '--file', file]);
+  const made = await store.nemia(['agents', 'write', 'user', '--file', file]);
   assert.equal(made.code, 0, made.err);
   assert.match(made.out, /^agents\/scribe created, at version \S+$/m);
   const agents = path.join(store.root, 'workflows', 'agents');
@@ -268,14 +268,14 @@ test('an agent whose output: names out.json beside it is written with its schema
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(agents, 'out.json'), 'utf8')), JSON.parse(SCHEMA));
 });
 
-test('`nemia skills write yours other --file s/SKILL.md` naming another skill is refused, exit 2, naming the skill; its own name writes it', async () => {
+test('`nemia skills write user other --file s/SKILL.md` naming another skill is refused, exit 2, naming the skill; its own name writes it', async () => {
   const file = path.join(DRAFTS, 'skills', 'tidy', 'SKILL.md');
   write(file, TIDY);
-  const other = await store.nemia(['skills', 'write', 'yours', 'other', '--file', file]);
+  const other = await store.nemia(['skills', 'write', 'user', 'other', '--file', file]);
   assert.equal(other.code, 2, other.err);
   assert.match(other.err, /tidy/);
   assert.equal(fs.existsSync(path.join(store.root, 'workflows', 'skills', 'tidy')), false, 'nothing written');
-  const made = await store.nemia(['skills', 'write', 'yours', 'tidy', '--file', file]);
+  const made = await store.nemia(['skills', 'write', 'user', 'tidy', '--file', file]);
   assert.equal(made.code, 0, made.err);
   assert.match(made.out, /^skills\/tidy created, at version \S+$/m);
 });

@@ -25,7 +25,7 @@ async function says(page: Page): Promise<void> {
   await expectVisible(markOf(page).and(page.locator('[data-daemon-dot="none"][data-tone="down"]')), "the dot: the e2e's api ticks nothing");
   await expectVisible(markOf(page).locator('[data-quota-line][data-quota-mark]'), 'the quota in money: the week is past the mark');
   await expectVisible(
-    machineBarOf(page).getByRole('button', { name: /^This machine: daemon none, .*, quota .*, near its limit$/ }),
+    machineBarOf(page).getByRole('button', { name: /^This machine: daemon not ticking, .*, quota .*, near its limit$/ }),
     'its name says the daemon, what is at work and the quota',
   );
   await feedAnswered(page);

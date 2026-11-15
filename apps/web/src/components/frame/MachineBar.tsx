@@ -6,7 +6,7 @@ import { openRunsQuery } from '@/lib/api/runs';
 import { versionQuery } from '@/lib/api/version';
 import type { Bar } from '@/lib/bar';
 import type { FeedStatus } from '@/lib/feed';
-import { atWork, atWorkWords, type DaemonTone, daemonDot, feedWords, quotaShort, versionWords } from '@/lib/footer';
+import { atWork, atWorkWords, type DaemonTone, daemonDot, feedWords, quotaShort, tickWord, versionWords } from '@/lib/footer';
 import { ink } from '@/lib/meaning';
 import type { Presence } from '@/lib/presence';
 import { useBar } from '@/lib/useBar';
@@ -56,7 +56,7 @@ export function MachineBar({ path, feed }: { path: string; feed: FeedStatus }) {
   const { open, toggle } = useBar();
   const dot = daemonDot(daemon.data, daemon.error, now);
   const short = quotaShort(quota.data, quota.error, now);
-  const tick = pause.data?.pause ? 'paused' : dot.word;
+  const tick = tickWord(dot, Boolean(pause.data?.pause));
   const parts = [
     tick,
     runs.data ? atWorkWords(atWork(runs.data)).text : undefined,

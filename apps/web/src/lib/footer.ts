@@ -94,6 +94,18 @@ const DAEMON_WORDS: Record<Daemon['kind'], string> = {
 };
 
 /**
+ * Whether the store ticks, in the machine bar's first words: `paused` while every factory is paused, `ticking` (with its warning) while a
+ * daemon ticks, `reading` or `unread` while that is not known, else `not ticking`, which daemon is gone or stopped left to the dot's title.
+ * @param dot The daemon's dot (`daemonDot`).
+ * @param paused Whether every factory is paused.
+ */
+export function tickWord(dot: DaemonDot, paused: boolean): string {
+  if (paused) return 'paused';
+  if (dot.kind === 'error' || dot.kind === 'reading' || dot.word.startsWith('ticking')) return dot.word;
+  return 'not ticking';
+}
+
+/**
  * The daemon's dot from what the api judged (`GET /api/daemon`, the api's own standing as the store's daemon), or from the read's `error`:
  * down then, and `unread`, never a daemon that ticks. Its title is the floor's whole sentence when nothing ticks (`daemonWords`), the api's
  * own line while one does, and why the read failed when it did. A daemon that ticks while its last pass could not read a harness

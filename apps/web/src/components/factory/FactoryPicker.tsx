@@ -129,7 +129,7 @@ export function FactoryPicker({ path, search, picked }: { path: string; search: 
         <span
           aria-hidden
           data-factory-initial
-          className="mt-2 flex size-10 shrink-0 items-center justify-center rounded-shape-medium bg-primary-container text-title-medium text-on-primary-container"
+          className="mt-2 flex size-10 shrink-0 items-center justify-center rounded-shape-medium bg-surface-container-highest text-title-medium text-on-surface"
         >
           {picked.slice(0, 1).toUpperCase()}
         </span>

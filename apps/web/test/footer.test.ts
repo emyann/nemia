@@ -17,6 +17,7 @@ import {
   newerReleaseWords,
   quotaShort,
   staleFrameHeights,
+  tickWord,
   versionWords,
 } from '../src/lib/footer.ts';
 import { daemon, quota } from './factory-fixtures.ts';
@@ -79,6 +80,17 @@ test('atWork and atWorkWords: the sessions at work', async (t) => {
     assert.equal(atWorkWords({ runs: 0, sessions: 3 }).text, '0 runs · 3 sessions');
     assert.match(atWorkWords({ runs: 2, sessions: 3 }).title, /2 runs in flight, and 3 sessions working or checking, across every factory/);
   });
+});
+
+test('tickWord: the machine bar says ticking, paused or not ticking', () => {
+  assert.equal(tickWord(daemonDot(daemon(), null, NOW), false), 'ticking');
+  assert.equal(tickWord(daemonDot(daemon(), null, NOW), true), 'paused');
+  for (const kind of ['none', 'stopped', 'gone', 'stalled', 'unreadable'] as const) {
+    assert.equal(tickWord(daemonDot(daemon({ kind, ticking: false }), null, NOW), false), 'not ticking', kind);
+  }
+  assert.equal(tickWord(daemonDot(daemon({ unobserved: ['a harness'] }), null, NOW), false), 'ticking, harness unread');
+  assert.equal(tickWord(daemonDot(undefined, new Error('500'), NOW), false), 'unread');
+  assert.equal(tickWord(daemonDot(undefined, null, NOW), false), 'reading');
 });
 
 test("daemonDot: the daemon's dot and its title", async (t) => {

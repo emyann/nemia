@@ -572,7 +572,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
             </div>
           </div>
         ) : (
-          <Empty anyRuns={light.counts.waiting + light.counts.inFlight + light.counts.finished > 0} queued={queued.length} />
+          <Empty factory={factory.name} anyRuns={light.counts.waiting + light.counts.inFlight + light.counts.finished > 0} queued={queued.length} />
         )}
       </div>
     </div>
@@ -678,8 +678,8 @@ function FloorOptions(props: { factory: FactoryPlace; showFinished: boolean; onS
   );
 }
 
-/** Nothing on the floor: say so, where the runs are, and that the queue beside it starts on its own. */
-function Empty({ anyRuns, queued }: { anyRuns: boolean; queued: number }) {
+/** Nothing on the floor of `factory`: say so, where its runs are, and that the queue beside it starts on its own. */
+function Empty({ factory, anyRuns, queued }: { factory: string; anyRuns: boolean; queued: number }) {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <Card className="w-full max-w-sm">
@@ -701,7 +701,7 @@ function Empty({ anyRuns, queued }: { anyRuns: boolean; queued: number }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <RouterLinkButton to="/runs" variant="outline" size="sm">
+          <RouterLinkButton to="/factories/$factory/runs" params={{ factory }} variant="outline" size="sm">
             Go to Runs
           </RouterLinkButton>
         </CardContent>

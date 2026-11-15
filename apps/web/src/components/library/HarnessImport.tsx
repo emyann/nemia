@@ -21,7 +21,7 @@ export function HarnessImport({ items }: { items: readonly LibraryItem[] }) {
   const sources = useQuery(agentSourcesQuery());
   const copy = useMutation({
     mutationFn: importAgent,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['library'] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: libraryQuery().queryKey }),
   });
   const offered = sources.data ? importablesOf(sources.data, items) : [];
   return (

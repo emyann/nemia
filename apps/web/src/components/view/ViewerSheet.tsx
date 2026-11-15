@@ -11,7 +11,7 @@ import { barOf } from '@/lib/bar';
 import { stepFileQuery } from '@/lib/api/steps';
 import type { StepArtifact } from '@/lib/api/tries';
 import { useRunRead, type StepView } from '@/lib/runView';
-import { stepFilesOf } from '@/lib/stepPart';
+import { fileKey, stepFilesOf } from '@/lib/stepPart';
 import { viewClosed, viewOf, viewOpened } from '@/lib/viewAddress';
 import { extensionOf, viewerOf, type Viewer } from '@/lib/viewers';
 import { cn, focusRing } from '@/components/ui/ds/utils';
@@ -31,7 +31,7 @@ const filesOf = (step: StepView): StepArtifact[] => {
 
 /** The viewer of a file: by the kind the api serves it as and its name's extension; none for one it does not serve. */
 const viewerOfFile = (file: StepArtifact): Viewer =>
-  viewerOf({ kind: 'url' in file ? file.kind : null, extension: extensionOf('name' in file ? file.name : file.path) });
+  viewerOf({ kind: 'url' in file ? file.kind : null, extension: extensionOf(fileKey(file)) });
 
 /** The run the sheet's file is of: the page's, else the bar's. */
 function useViewedRun(): string | null {
@@ -63,7 +63,7 @@ function Viewed({ run, step: name, path }: { run: string; step: string; path: st
   const { view } = useRunRead(run);
   const step = view?.steps.find((s) => s.name === name);
   const files = step ? filesOf(step) : [];
-  const at = files.findIndex((f) => f.path === path);
+  const at = files.findIndex((f) => fileKey(f) === path);
   const file = files[at];
   return (
     <div data-viewer-sheet={`${name}/${path}`} className="flex h-full min-h-0 flex-col">
@@ -103,7 +103,7 @@ function Step({ step, to, words }: { step: string; to: StepArtifact | undefined;
   return (
     <Link
       to="."
-      search={(prev: Record<string, unknown>) => viewOpened(prev, { step, path: to.path })}
+      search={(prev: Record<string, unknown>) => viewOpened(prev, { step, path: fileKey(to) })}
       replace
       resetScroll={false}
       data-viewer-step={words.toLowerCase()}

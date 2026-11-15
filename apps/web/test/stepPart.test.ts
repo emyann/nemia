@@ -17,6 +17,7 @@ const NOW = new Date('2026-09-30T05:20:00.000Z');
 /** A file a step's folder lists, as the api serves it: its path in that folder, the name it is served by, and its link under `route`. */
 const served = (name: string, route: 'files' | 'artifacts' = 'artifacts') => ({
   path: route === 'artifacts' ? `/store/runs/r-1/artifacts/design/${name}` : `/work/r-1/design/${name}`,
+  relativePath: name,
   name,
   url: `/api/runs/r-1/steps/design/${route}/${name}`,
   kind: 'text' as const,
@@ -50,7 +51,7 @@ const design = (): Step =>
       output: { verdict: 'go', pr: 'https://example.test/pr/1' },
       schema: { verdict: { type: 'string' }, pr: { type: ['string', 'null'] } },
       shapes: { pr: 'link' },
-      artifacts: [{ path: 'spec.md' }],
+      artifacts: [{ path: 'spec.md', relativePath: 'spec.md' }],
       values: [],
     }),
     files: [served('spec.md', 'files'), served('notes.txt', 'files')],
@@ -206,7 +207,7 @@ test("a step's Gave and its taker's Got name the packet alike; Gave holds its fi
     ],
   );
   assert.deepEqual(
-    gave.files.map((f) => f.path),
+    gave.files.map((f) => f.relativePath),
     ['spec.md'],
   );
   assert.equal(gave.unnamed, 2, 'notes.txt and shot.png, each counted once across its folders, spec.md being named');
@@ -244,23 +245,55 @@ test('the detail is of the try shown, and the head offers every try with it', ()
   assert.equal(part.detail !== 'none' && part.detail.debug.try, 2);
 });
 
-test("a file the closeout named by its workspace path is its folders' served copy, kept under the path it named, and counted once", () => {
+test("a file the closeout named is its folders' served copy, matched by its path from the step's folder, and counted once", () => {
   const files = stepFilesOf(design());
   assert.deepEqual(
-    files.named.map((f) => [f.path, 'url' in f ? f.url : null]),
+    files.named.map((f) => [f.relativePath, 'url' in f ? f.url : null]),
     [['spec.md', '/api/runs/r-1/steps/design/artifacts/spec.md']],
-    'the relative path resolves to its name in the artifacts folder, and the viewer finds it by the path the closeout gave',
+    'the workspace path resolves to its name in the artifacts folder',
   );
   assert.deepEqual(
-    files.unnamed.map((f) => ('name' in f ? f.name : f.path)),
+    files.unnamed.map((f) => f.relativePath),
     ['notes.txt', 'shot.png'],
     'each held name once across the two folders, spec.md being named',
   );
   const named = design();
-  const absolute = { ...named, closeout: { ...named.closeout!, artifacts: [{ path: '/store/runs/r-1/artifacts/design/shot.png' }] } };
+  const both = {
+    ...named,
+    closeout: {
+      ...named.closeout!,
+      artifacts: [
+        { path: 'spec.md', relativePath: 'spec.md' },
+        { path: '/store/runs/r-1/artifacts/design/shot.png', relativePath: 'shot.png' },
+      ],
+    },
+  };
   assert.deepEqual(
-    stepFilesOf(absolute).unnamed.map((f) => ('name' in f ? f.name : f.path)),
-    ['spec.md', 'notes.txt'],
-    'a path in the artifacts folder names its listed file by that path',
+    stepFilesOf(both).named.map((f) => ('url' in f ? f.url : null)),
+    ['/api/runs/r-1/steps/design/artifacts/spec.md', '/api/runs/r-1/steps/design/artifacts/shot.png'],
+    'a file named by its workspace path and one by its absolute path each find their listed copy',
+  );
+  assert.deepEqual(
+    stepFilesOf(both).unnamed.map((f) => f.relativePath),
+    ['notes.txt'],
+  );
+});
+
+test("a named file is matched by its path from the step's folder alone, never by the server's path", () => {
+  const named = design();
+  const by = (artifacts: { path: string; relativePath?: string }[]) =>
+    stepFilesOf({ ...named, closeout: { ...named.closeout!, artifacts } });
+  const bare = by([{ path: '/store/runs/r-1/artifacts/design/shot.png' }]);
+  assert.deepEqual(
+    bare.named.map((f) => 'url' in f),
+    [false],
+    "the server's path alone matches no listed file",
+  );
+  assert.equal(bare.unnamed.length, 3);
+  const moved = by([{ path: '/elsewhere/shot.png', relativePath: 'shot.png' }]);
+  assert.deepEqual(
+    moved.named.map((f) => ('url' in f ? f.url : null)),
+    ['/api/runs/r-1/steps/design/artifacts/shot.png'],
+    'an equal path from the folder matches, whatever the server calls it',
   );
 });

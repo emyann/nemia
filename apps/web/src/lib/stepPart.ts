@@ -484,29 +484,29 @@ function fieldsOf(step: StepView, spec: StepSpecView | null): GaveField[] {
 }
 
 /**
- * Whether a file a step's folders list is one its closeout named: the same path, or the name the folder serves it by, for a path
- * relative to the step's workspace — the run copies such a file into the step's artifacts folder, which lists it by its own path there.
+ * A file's one key on the board, which it is drawn, keyed and opened by: its path from its step's folder, else the name it is served by,
+ * else, for a file outside every folder of its step, the path its closeout gave, which is shown and never matched.
+ * @param file The file, as the api serves it.
  */
-const namedAs = (named: StepArtifact, listed: StepArtifact): boolean =>
-  named.path === listed.path || (!named.path.startsWith('/') && 'name' in listed && listed.name === named.path);
+export const fileKey = (file: StepArtifact): string => file.relativePath ?? ('name' in file ? file.name : file.path);
 
-/** A listed file's one key across the step's two folders: the name it is served by, else its path. */
-const heldKey = (listed: StepArtifact): string => ('name' in listed ? listed.name : listed.path);
+/** Whether a file a step's folders list is one its closeout named: the same path from the step's folder. */
+const namedAs = (named: StepArtifact, listed: StepArtifact): boolean =>
+  named.relativePath !== undefined && named.relativePath === listed.relativePath;
 
 /**
- * Every file of a step, each once: those its closeout named, by the path it named — served where a folder lists its copy — then those
- * its artifacts folder and its folder hold that it did not name, each name once across the two.
+ * Every file of a step, each once: those its closeout named, served where a folder lists its copy, then those its artifacts folder and
+ * its folder hold that it did not name, each once across the two.
  * @param step The step, as the run's view has it.
  */
 export function stepFilesOf(step: StepView): { named: StepArtifact[]; unnamed: StepArtifact[] } {
   const listed = [...(step.artifactsFolder?.files ?? []), ...step.files];
   const closeout = step.closeout?.artifacts ?? [];
-  const named = [...new Map(closeout.map((n) => [n.path, n])).values()].map((n) => {
-    const copy = 'url' in n ? undefined : listed.find((l) => 'url' in l && namedAs(n, l));
-    return copy ? { ...copy, path: n.path } : n;
-  });
+  const named = [...new Map(closeout.map((n) => [fileKey(n), n])).values()].map(
+    (n) => ('url' in n ? undefined : listed.find((l) => 'url' in l && namedAs(n, l))) ?? n,
+  );
   const unnamed = new Map<string, StepArtifact>();
-  for (const l of listed) if (!closeout.some((n) => namedAs(n, l)) && !unnamed.has(heldKey(l))) unnamed.set(heldKey(l), l);
+  for (const l of listed) if (!closeout.some((n) => namedAs(n, l)) && !unnamed.has(fileKey(l))) unnamed.set(fileKey(l), l);
   return { named, unnamed: [...unnamed.values()] };
 }
 

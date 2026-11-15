@@ -5,7 +5,7 @@
  * graph's node, the first of them on one line.
  */
 import type { StepView } from '@/lib/runView';
-import { stepFilesOf, type PartSize, type StepPartModel } from '@/lib/stepPart';
+import { fileKey, stepFilesOf, type PartSize, type StepPartModel } from '@/lib/stepPart';
 import { Artifacts, Values } from '../../run/Artifacts';
 import { FieldWidgetView } from '../../field/widgets/FieldWidgetView';
 import { Replies } from '../Outcome';
@@ -25,7 +25,7 @@ function First({ gave }: { gave: Gave }) {
   const said = field
     ? `${field.name}: ${lineOf(field.value)}`
     : file
-      ? file.path
+      ? fileKey(file)
       : value
         ? `${value.name}: ${value.value}`
         : gave.fields[0]

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { FileText } from 'lucide-react';
 import type { StepArtifact, StepValue } from '../../lib/api/tries.ts';
+import { fileKey } from '../../lib/stepPart';
 import { viewOpened } from '../../lib/viewAddress';
 import { cn, focusRing } from '../ui/ds/utils';
 import { when } from '../step/Facts';
@@ -46,9 +47,9 @@ function Opens({ artifact, step, className, children }: { artifact: Served; step
   return (
     <Link
       to="."
-      search={(prev: Record<string, unknown>) => viewOpened(prev, { step, path: artifact.path })}
+      search={(prev: Record<string, unknown>) => viewOpened(prev, { step, path: fileKey(artifact) })}
       resetScroll={false}
-      data-opens-view={artifact.path}
+      data-opens-view={fileKey(artifact)}
       title={title}
       className={className}
     >
@@ -83,7 +84,7 @@ export function Artifacts({
       {pictures.length > 0 && (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-2">
           {pictures.map((picture) => (
-            <li key={picture.path} data-artifact="image" className="min-w-0">
+            <li key={fileKey(picture)} data-artifact="image" className="min-w-0">
               <Opens artifact={picture} step={step} className={cn('block', focusRing())}>
                 <img
                   src={picture.url}
@@ -99,7 +100,7 @@ export function Artifacts({
       {rest.length > 0 && (
         <ul className="flex flex-wrap gap-2">
           {rest.map((artifact, i) => (
-            <li key={`${i}:${artifact.path}`} className="max-w-full min-w-0 break-all">
+            <li key={`${i}:${fileKey(artifact)}`} className="max-w-full min-w-0 break-all">
               <Chip artifact={artifact} step={step} size={size} />
             </li>
           ))}
@@ -114,7 +115,7 @@ function Chip({ artifact, step, size }: { artifact: StepArtifact; step: string |
   if ('pruned' in artifact) {
     return (
       <span data-artifact="pruned">
-        <span className="font-mono text-on-surface-variant">{artifact.path}</span>
+        <span className="font-mono text-on-surface-variant">{fileKey(artifact)}</span>
         <span className="text-on-surface-variant"> — its files were removed at {when(artifact.prunedAt)}, by a prune of its files</span>
       </span>
     );
@@ -122,7 +123,7 @@ function Chip({ artifact, step, size }: { artifact: StepArtifact; step: string |
   if (!served(artifact)) {
     return (
       <span data-artifact="path" className="font-mono">
-        {artifact.path}
+        {fileKey(artifact)}
       </span>
     );
   }

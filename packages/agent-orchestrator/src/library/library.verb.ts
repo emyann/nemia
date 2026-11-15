@@ -11,7 +11,7 @@ import { API_VERSION, type DefinitionOrigin, type LibraryAdd, type LibraryAddLis
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { DEFAULT_NAMESPACE, type Factory } from '../factory/factory.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
-import { stepsFilled } from '../roster/fills.store.ts';
+import { stepSkillsNamed, stepsFilled } from '../roster/fills.store.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { BUILTIN_SKILLS, REPOSITORY_HOLDER } from '../skills/read.store.ts';
 import { builtinServers, BUILTIN_SERVERS } from '../factory/servers/servers.store.ts';
@@ -66,26 +66,35 @@ const givenSkills = (file: string): string[] => {
     .filter(Boolean);
 };
 
-/** The files of the agents the steps of the factory `name` are credited to (`stepsFilled`), on each of its repositories. */
-function filledFiles(home: string, name: string): Set<string> {
+/** The repositories the factory `name` is read on, or one undefined for the store's workflows alone; none for a factory with no file. */
+function filledPlaces(home: string, name: string): { factory: Factory | undefined; repos: Array<string | undefined> } | undefined {
   const factory = name === DEFAULT_NAMESPACE ? undefined : factoryNamed(home, name);
-  const files = new Set<string>();
-  if (name !== DEFAULT_NAMESPACE && factory === undefined) return files;
-  const repos: Array<string | undefined> =
-    factory === undefined || factory.repos.length === 0 ? [undefined] : factory.repos.map((r) => path.resolve(r));
-  for (const repo of repos) {
-    try {
-      for (const filled of stepsFilled(repo, home, factory)) files.add(path.resolve(filled.file));
-    } catch {
-      continue;
-    }
-  }
-  return files;
+  if (name !== DEFAULT_NAMESPACE && factory === undefined) return undefined;
+  const repos = factory === undefined || factory.repos.length === 0 ? [undefined] : factory.repos.map((r) => path.resolve(r));
+  return { factory, repos };
 }
+
+/** Each of `read` over the places of the factory `name`, a place that cannot be listed skipped. */
+function overPlaces<T>(home: string, name: string, read: (repo: string | undefined, factory: Factory | undefined) => T[]): T[] {
+  const places = filledPlaces(home, name);
+  if (places === undefined) return [];
+  return places.repos.flatMap((repo) => {
+    try {
+      return read(repo, places.factory);
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** The files of the agents the steps of the factory `name` are credited to (`stepsFilled`), on each of its repositories. */
+const filledFiles = (home: string, name: string): Set<string> =>
+  new Set(overPlaces(home, name, (repo, factory) => stepsFilled(repo, home, factory).map((filled) => path.resolve(filled.file))));
 
 /**
  * The library items the factory `name` resolves today, from the steps it fills: each library agent a step is credited to (`stepsFilled`,
- * the file a start would run), and each skill an agent that fills a step gives that the library holds.
+ * the file a start would run), each skill an agent that fills a step gives, and each a step names on its own `skills:` line, that the
+ * library holds.
  * @param home The store's root.
  * @param name The factory's name, `default` among them.
  */
@@ -100,6 +109,8 @@ export function derivedAdds(home: string, name: string): LibraryRef[] {
     if (inFolder(file, agentsDir)) add({ kind: 'Agent', name: path.basename(file, '.md') });
     for (const skill of givenSkills(file)) if (!skill.includes(':') && librarySkill(home, skill)) add({ kind: 'Skill', name: skill });
   }
+  for (const skill of overPlaces(home, name, (repo, factory) => stepSkillsNamed(repo, home, factory)))
+    if (!skill.includes(':') && librarySkill(home, skill)) add({ kind: 'Skill', name: skill });
   return adds;
 }
 

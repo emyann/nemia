@@ -84,3 +84,16 @@ test("a factory's added library servers: the person's record of each, else Nemia
   assert.equal(typeof servers.github?.url, 'string', "Nemia's builtin github, by name");
   assert.equal(servers.gone, undefined, 'an add the library no longer holds hands nothing to a run');
 });
+
+test("an unrecorded factory's adds hold a library skill a step names on its own skills: line, so its first add keeps it", () => {
+  const home = store();
+  const skill = path.join(home, 'workflows', 'skills', 'tidy');
+  fs.mkdirSync(skill, { recursive: true });
+  fs.writeFileSync(path.join(skill, 'SKILL.md'), '---\nname: tidy\ndescription: Tidies notes.\n---\nTidy.\n');
+  fs.mkdirSync(path.join(home, 'workflows', 'notes'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'workflows', 'notes', 'write.md'), '---\nplace: git\nskills: tidy\n---\nWrite the notes.\n');
+  const tidy = { kind: 'Skill', name: 'tidy' } as const;
+  assert.ok(factoryAdds(home, 'default').adds.some((a) => a.kind === tidy.kind && a.name === tidy.name), 'derived from the step');
+  writeLibraryAdd(home, 'default', 'add', { kind: 'Skill', name: 'create-an-agent' });
+  assert.ok(readLibraryAdds(home, 'default')?.some((a) => a.kind === tidy.kind && a.name === tidy.name), 'kept by the first add');
+});

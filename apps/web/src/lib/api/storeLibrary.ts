@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query';
-import type { Agent, LibraryAdd, McpServer, Skill, Workflow } from 'objects';
+import type { Agent, AgentSource, LibraryAdd, McpServer, Skill, Workflow } from 'objects';
 import { library, libraryAdds } from './objects.ts';
 
 /** The kinds the store's library holds, in the order its page draws them. */
@@ -75,6 +75,62 @@ export const libraryQuery = () =>
       return libraryItemsOf(skills, agents, servers.items, workflows);
     },
   });
+
+/** Each kind's word for one item and for several, as a count says it. */
+const COUNT_WORDS: Record<LibraryKind, readonly [string, string]> = {
+  Skill: ['skill', 'skills'],
+  Agent: ['agent', 'agents'],
+  McpServer: ['MCP server', 'MCP servers'],
+  Workflow: ['workflow', 'workflows'],
+};
+
+/**
+ * The library's items counted in words, each kind it holds in its order (`2 skills, 1 agent`), `nothing yet` for none.
+ *
+ * @param items the library's items
+ */
+export function libraryCount(items: readonly LibraryItem[]): string {
+  const said = LIBRARY_KINDS.flatMap((kind) => {
+    const n = items.filter((one) => one.kind === kind).length;
+    return n === 0 ? [] : [`${n} ${COUNT_WORDS[kind][n === 1 ? 0 : 1]}`];
+  });
+  return said.length === 0 ? 'nothing yet' : said.join(', ');
+}
+
+/** Where Claude Code keeps a person's own agents, on the api's machine: the folder the Library page imports from. */
+export const CLAUDE_AGENTS = '~/.claude/agents';
+
+/** An agent file of Claude Code's own the Library page offers to import: its name, its file, what it is for, and whether it reads. */
+export type Importable = { name: string; file: string; description: string | null; error: string | null; held: boolean };
+
+/**
+ * The agent files of the folder named (`place: 'path'`) among `sources`, each said held where the library has an agent of its name
+ * already, so its import would be refused; the store's own places left out, the library holding them already or a repository's.
+ *
+ * @param sources the agent files the store knows of, the folder named among them
+ * @param items the library's items
+ */
+export function importablesOf(sources: readonly AgentSource[], items: readonly LibraryItem[]): Importable[] {
+  const held = new Set(items.filter((one) => one.kind === 'Agent').map((one) => one.name));
+  return sources
+    .filter((one) => one.place === 'path')
+    .map((one) => ({ name: one.name, file: one.file, description: one.description, error: one.error, held: held.has(one.name) }));
+}
+
+/** Claude Code's own agents on the api's machine (`CLAUDE_AGENTS`), as the store lists them to copy; refused where there is no such folder. */
+export const claudeAgentsQuery = () =>
+  queryOptions({
+    queryKey: ['library', 'claude-agents'],
+    queryFn: async (): Promise<AgentSource[]> => [...(await library.agentSources(CLAUDE_AGENTS)).sources],
+    retry: false,
+  });
+
+/**
+ * Copies the agent file `file` into the user library through the api's copy: the name it took.
+ *
+ * @param file the agent file, by its path as the sources list it
+ */
+export const importAgent = async (file: string): Promise<string> => (await library.copyAgent(file)).name;
 
 /**
  * What the factory `factory` has added from the library, each add with its state.

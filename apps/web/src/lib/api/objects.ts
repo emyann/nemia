@@ -24,6 +24,8 @@ import { FetchHttpClient } from 'effect/http';
 import {
   apiClient,
   Agent,
+  AgentCopied,
+  AgentSources,
   AgentCard,
   AgentList,
   AgentTried,
@@ -518,6 +520,9 @@ export const mcpServers = {
     call((c) => c.mcpservers.signOut({ params: { namespace, name } }), write(SignedOut, SIGN_IN_ASKED)),
 };
 
+/** What an agent's copy into the library may have done, and what to look at before sending it again. */
+const AGENT_COPY_WRITTEN = "The copy may be written: read the library's agents again before copying it again.";
+
 /**
  * The store's library, in no namespace: its MCP servers (`GET /api/mcpservers`), the user library's beside Nemia's own, which a factory
  * adds; and each kind's items with the factories that add each, every page.
@@ -535,6 +540,9 @@ export const library = {
     ]),
   workflows: (): Promise<Workflow[]> =>
     everyPage((asked) => call((c) => c.workflows.listLibrary({ query: asked }), read(WorkflowList))).then((l) => [...l.items]),
+  agentSources: (folder: string): Promise<AgentSources> => call((c) => c.agents.sources({ query: { path: folder } }), read(AgentSources)),
+  copyAgent: (file: string): Promise<AgentCopied> =>
+    call((c) => c.agents.copyLibrary({ payload: { file } }), write(AgentCopied, AGENT_COPY_WRITTEN)),
 };
 
 /** What a factory's add may have done, and what to look at before sending it again. */

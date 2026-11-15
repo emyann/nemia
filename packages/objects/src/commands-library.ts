@@ -44,7 +44,10 @@ const addCheck =
       : `${CLI} library ${verb} takes a kind the library holds, ${LIBRARY_KINDS.join(', ')}, not ${String(args.kind)}: ${CLI} library ${verb} ${ADD_USAGE}.`;
   };
 
-/** `nemia library [skills|agents|mcpservers|workflows]`: the store's library, the user library's beside the builtins. */
+/**
+ * `nemia library [skills|agents|mcpservers|workflows] [--factory <factory>]`: the store's library, the user library's beside the builtins;
+ * with a factory, what that factory has added from it, each add with its state.
+ */
 export const LIBRARY_WORDS = {
   name: 'library',
   served: [
@@ -52,21 +55,34 @@ export const LIBRARY_WORDS = {
     { endpoint: 'agents.listLibrary', as: 'library_agents' },
     { endpoint: 'mcpservers.listLibrary', as: 'library_mcpservers' },
     { endpoint: 'workflows.listLibrary', as: 'library_workflows' },
+    { endpoint: 'libraryadds.list', as: 'library_adds' },
   ],
-  usage: '[skills|agents|mcpservers|workflows]',
+  usage: '[skills|agents|mcpservers|workflows] [--factory <factory>]',
   help: [
     "the store's library: the user library's skills, agents, MCP servers and",
-    'workflows beside the builtins, each with the factories that add it',
+    'workflows beside the builtins, each with the factories that add it;',
+    "--factory: that factory's adds, each with its state and the fix of a missing one",
   ],
   spec: {
     positionals: [{ key: 'kind', takes: 'optional', kind: 'name' }],
-    flags: [],
+    flags: [
+      {
+        flag: '--factory',
+        kind: 'name',
+        key: 'factory',
+        takes: `--factory takes the factory whose adds are listed: ${CLI} library --factory <factory>`,
+        twice: `${CLI} library takes --factory once: one factory's adds at a time.`,
+      },
+    ],
     unknown: (arg) => `${CLI} library takes one kind, skills, agents, mcpservers or workflows, not ${arg}: ${CLI} library [<kind>].`,
   },
-  check: (args) =>
-    args.kind === undefined || ['skills', 'agents', 'mcpservers', 'workflows'].includes(String(args.kind))
+  check: (args) => {
+    if (args.kind !== undefined && typeof args.factory === 'string')
+      return `${CLI} library --factory lists every add of the factory, of each kind: ${CLI} library --factory <factory>, with no kind.`;
+    return args.kind === undefined || ['skills', 'agents', 'mcpservers', 'workflows'].includes(String(args.kind))
       ? null
-      : `${CLI} library lists skills, agents, mcpservers or workflows, not ${String(args.kind)}: ${CLI} library [<kind>].`,
+      : `${CLI} library lists skills, agents, mcpservers or workflows, not ${String(args.kind)}: ${CLI} library [<kind>].`;
+  },
   writes: false,
   class: 'read',
   only: { side: 'cli', why: "the api serves each kind's library list of `objects`' Api, which this command prints" },

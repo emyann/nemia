@@ -118,7 +118,7 @@ export const libraryDir = (home: string): string => path.join(home, 'workflows')
  * @param home The store's root.
  */
 export const libraryServers = (home: string): FactoryServers =>
-  readServersAt(path.join(libraryDir(home), 'mcpservers.json'), 'record the server again with nemia mcp add <server> --url <address>')
+  readServersAt(path.join(libraryDir(home), 'mcpservers.json'), 'write the server again at the library (PUT /api/mcpservers/<server> with its type and url), or remove the file to start over')
     ?.servers ?? {};
 
 /**

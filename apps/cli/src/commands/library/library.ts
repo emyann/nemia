@@ -41,10 +41,12 @@ const heldLine = (kind: string, item: Held): string => {
 };
 
 /**
- * `nemia library [<kind>]`'s runner: each kind's items, or the one kind's.
+ * `nemia library [<kind>] [--factory <factory>]`'s runner: each kind's items, or the one kind's; with a factory, its adds.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function libraryListed(args: Args): Promise<number> {
+  const factory = textArg(args, 'factory');
+  if (factory !== undefined) return factoryAddsListed(factory);
   const asked1 = textArg(args, 'kind');
   const kinds = KINDS.filter((k) => asked1 === undefined || k === asked1);
   const lines: string[] = [];
@@ -53,6 +55,18 @@ export async function libraryListed(args: Args): Promise<number> {
     lines.push(...held.map((item) => heldLine(kind, item)));
   }
   said(lines.length === 0 ? ['the library holds nothing yet'] : lines);
+  return 0;
+}
+
+/** `nemia library --factory <factory>`: each add of the factory, with its state. */
+async function factoryAddsListed(namespace: string): Promise<number> {
+  const adds = await asked(LIBRARY_WORDS.name, (c) =>
+    Effect.map(
+      everyPage((page) => c.libraryadds.list({ params: { namespace }, query: page })),
+      (list) => list.items,
+    ),
+  );
+  said(adds.length === 0 ? [`${namespace} has added nothing from the library`] : adds.map((add) => addLine(add, 'added')));
   return 0;
 }
 

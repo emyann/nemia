@@ -3,7 +3,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { BrowserContext, Locator, Page } from 'playwright';
 import { expectCount, expectNone, expectTexts, expectUncut, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { type Card, CARD_KEY_MEANINGS, CARD_KEYS, type FactoryCommands, type FactoryList, type RunList, type ScheduleList } from 'objects';
+import {
+  type Card,
+  CARD_KEY_MEANINGS,
+  CARD_KEYS,
+  type FactoryCommands,
+  type FactoryList,
+  LIST_PAGE,
+  type RunList,
+  type ScheduleList,
+} from 'objects';
 import {
   FINISHED_SELECTOR,
   FINISHED_SIZE,
@@ -600,11 +609,11 @@ export const runListPath = (factory: string | undefined, query: Record<string, s
 };
 
 /**
- * Every run, read apart from the page as the board reads them: the plain RunList whole (`GET /api/runs`), each run's view (`rowsOf`). The
- * api judges every run of the seed: a run it could not judge is refused.
+ * Every run, read apart from the page as the board reads them: the plain RunList whole (`GET /api/runs`, a page of the most a page
+ * holds), each run's view (`rowsOf`). The api judges every run of the seed: a run it could not judge is refused.
  */
 export const rowsAnswered = async (page: Page): Promise<RunView[]> =>
-  rowsOf(await answered<RunList>(page, '/api/runs')).map((row) => {
+  rowsOf(await answered<RunList>(page, runListPath(undefined, { limit: String(LIST_PAGE.most) }))).map((row) => {
     if (judged(row)) return row;
     throw new Refused(`the api judges every run of the seed: it could not judge ${row.id} (${row.unjudged})`);
   });
@@ -639,11 +648,11 @@ export async function runPath(page: Page, id: string): Promise<string> {
 export const isRunStart = (pathname: string): boolean => /^\/api\/namespaces\/[^/]+\/runs$/.test(pathname);
 
 /**
- * The factories as the board's pages draw them, read apart from the page: the api's `FactoryList`, each factory's lines and, but for the
- * default factory, its schedules, made the board's view as the board makes it (`factoryViewOf`).
+ * The factories as the board's pages draw them, read apart from the page: the api's `FactoryList` (a page of the most a page holds),
+ * each factory's lines and, but for the default factory, its schedules, made the board's view as the board makes it (`factoryViewOf`).
  */
 export async function factoriesAnswered(page: Page): Promise<Factory[]> {
-  const listed = await answered<FactoryList>(page, '/api/factories');
+  const listed = await answered<FactoryList>(page, `/api/factories?limit=${LIST_PAGE.most}`);
   return Promise.all(
     listed.items.map(async (factory) => {
       const name = encodeURIComponent(factory.metadata.name);

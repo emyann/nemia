@@ -74,8 +74,8 @@ export const linesOf = async (app: Asked, id: string): Promise<RunLinesAnswer> =
   (await ok(app, `/api/runs/${encodeURIComponent(id)}/lines`)) as RunLinesAnswer;
 
 /**
- * The RunList `GET /api/runs` answers with `query` (`labelSelector=`, `fieldSelector=`, … without its `?`): its first page, a hundred
- * runs, where it says no limit.
+ * The RunList `GET /api/runs` answers with `query` (`labelSelector=`, `fieldSelector=`, … without its `?`): its first
+ * page, `LIST_PAGE.byDefault` runs, where it says no limit.
  */
 export const runListOf = async (app: Asked, query = ''): Promise<RunList> =>
   (await ok(app, `/api/runs${query === '' ? '' : `?${query.replace(/^\?/, '')}`}`)) as RunList;

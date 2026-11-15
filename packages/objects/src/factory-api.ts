@@ -75,7 +75,7 @@ const McpServerListOrTable = [McpServerListObject, Table] as const;
 export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   HttpApiEndpoint.get('listAll', '/api/factories', { query: listQuery, success: FactoryListOrTable, error: objectErrors }).annotate(
     OpenApi.Description,
-    'Lists the factories, which no namespace holds, a page at a time, the default first; a label selector keeps those that match. Answers a FactoryList, or the same page as a Table where the request asks for one.',
+    'Lists the factories, which no namespace holds, a page at a time, the default first; ?labelSelector= keeps those whose labels match. Answers a FactoryList, or the same page as a Table where the request asks for one.',
   ),
   HttpApiEndpoint.get('get', '/api/factories/:name', { params: factoryParams, success: FactoryObject, error: objectErrors }).annotate(
     OpenApi.Description,
@@ -320,7 +320,7 @@ export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a factory's MCP servers in its namespace, a page at a time, each header's value masked; a label selector keeps those that match. Answers an McpServerList, or the same page as a Table where the request asks for one.",
+    "Lists a factory's MCP servers in its namespace, a page at a time, each header's value masked; ?labelSelector= keeps those whose labels match. Answers an McpServerList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/mcpservers/:name', {
     params: cardParams,

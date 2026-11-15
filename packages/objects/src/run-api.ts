@@ -111,7 +111,7 @@ const takenLater = <S extends Schema.Top>(answer: S) => answer.pipe(Schema.annot
 export class RunsGroup extends HttpApiGroup.make('runs').add(
   HttpApiEndpoint.get('listAll', '/api/runs', { query: runListQuery, success: runListed, error: runReadErrors }).annotate(
     OpenApi.Description,
-    'Lists the runs of every namespace, a page at a time, each judged into its run object; a label or field selector keeps those that match. Answers a RunList, or the same page as a Table where the request asks for one.',
+    'Lists the runs of every namespace, a page at a time, each judged into its run object; ?labelSelector= and ?fieldSelector= keep those that match. Answers a RunList, or the same page as a Table where the request asks for one.',
   ),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/runs', {
     params: namespaceParams,
@@ -120,7 +120,7 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
     error: runReadErrors,
   }).annotate(
     OpenApi.Description,
-    'Lists the runs of one namespace (a factory, default for runs that name none), a page at a time, each judged into its run object; a label or field selector keeps those that match. Answers a RunList, or the same page as a Table where the request asks for one.',
+    'Lists the runs of one namespace (a factory, default for runs that name none), a page at a time, each judged into its run object; ?labelSelector= and ?fieldSelector= keep those that match. Answers a RunList, or the same page as a Table where the request asks for one.',
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/runs/:name', { params: runParams, success: Run, error: runReadErrors }).annotate(
     OpenApi.Description,

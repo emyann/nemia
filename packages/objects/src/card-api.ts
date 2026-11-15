@@ -25,7 +25,7 @@ const CardListOrTable = [CardListObject, Table] as const;
 export class CardsGroup extends HttpApiGroup.make('cards').add(
   HttpApiEndpoint.get('listAll', '/api/cards', { query: cardListQuery, success: CardListOrTable, error: objectErrors }).annotate(
     OpenApi.Description,
-    "Lists the inbox's cards of every namespace, a page at a time; a label selector keeps those that match, and a field selector those still in play or not. Answers a CardList, or the same page as a Table where the request asks for one.",
+    "Lists the inbox's cards of every namespace, a page at a time; ?labelSelector= keeps those whose labels match, and ?fieldSelector= those still in play or not. Answers a CardList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/cards', {
     params: namespaceParams,
@@ -34,7 +34,7 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists the inbox's cards of one namespace (a factory, default for cards that name none), a page at a time; a label or field selector keeps those that match. Answers a CardList, or the same page as a Table where the request asks for one.",
+    "Lists the inbox's cards of one namespace (a factory, default for cards that name none), a page at a time; ?labelSelector= and ?fieldSelector= keep those that match. Answers a CardList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/cards/:name', {
     params: cardParams,

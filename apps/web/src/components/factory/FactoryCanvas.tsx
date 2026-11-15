@@ -572,11 +572,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
             </div>
           </div>
         ) : (
-          <Empty
-            factory={factory.name}
-            anyRuns={light.counts.waiting + light.counts.inFlight + light.counts.finished > 0}
-            queued={queued.length}
-          />
+          <Empty factory={factory.name} counts={light.counts} queued={queued.length} />
         )}
       </div>
     </div>
@@ -682,8 +678,12 @@ function FloorOptions(props: { factory: FactoryPlace; showFinished: boolean; onS
   );
 }
 
-/** Nothing on the floor of `factory`: say so, where its runs are, and that the queue beside it starts on its own. */
-function Empty({ factory, anyRuns, queued }: { factory: string; anyRuns: boolean; queued: number }) {
+/**
+ * Nothing on the floor of `factory`: say so, whether it has any run by its `counts`, where its runs are, and that the queue beside it
+ * starts on its own.
+ */
+function Empty({ factory, counts, queued }: { factory: string; counts: OpenRuns['counts']; queued: number }) {
+  const anyRuns = counts.waiting + counts.inFlight + counts.finished > 0;
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <Card className="w-full max-w-sm">

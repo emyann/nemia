@@ -101,7 +101,7 @@ const DAEMON_WORDS: Record<Daemon['kind'], string> = {
  */
 export function tickWord(dot: DaemonDot, paused: boolean): string {
   if (paused) return 'paused';
-  if (dot.kind === 'error' || dot.kind === 'reading' || dot.word.startsWith('ticking')) return dot.word;
+  if (dot.kind === 'error' || dot.kind === 'reading' || dot.kind === 'ticking') return dot.word;
   return 'not ticking';
 }
 

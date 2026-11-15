@@ -367,7 +367,7 @@ export const Subscribed = Schema.Struct({
     selectors: Schema.Array(Schema.String).annotate({ description: 'The selectors of the lines that wake it.' }),
     digestEvery: describedNumber('The minutes a digest waits.'),
     from: describedNumber("The feed's byte its news starts from."),
-    scope: Schema.optionalKey(SubscriptionScope),
+    scope: Schema.optionalKey(SubscriptionScope.annotate({ description: 'Whose lines it is told by level; absent where not given.' })),
   }).annotate({ description: 'The subscription put: its task, selectors, digest wait, where its news starts and its scope.' }),
   hints: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({

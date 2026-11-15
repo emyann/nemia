@@ -370,7 +370,10 @@ export const RunWaiting = Schema.Struct({
   word: Schema.String.annotate({ description: 'What nemia ls prints under the run for its wait.' }),
   advice: Schema.String.annotate({ description: 'The line nemia decide prints under it: what to do about the wait.' }),
   waitingOnYou: Schema.Boolean.annotate({ description: 'Whether a run it waits on never lands without a person.' }),
-}).annotate({ identifier: 'RunWaiting' });
+}).annotate({
+  identifier: 'RunWaiting',
+  description: "The runs a run's roots wait on that have not landed, with the words nemia ls and nemia decide print for the wait.",
+});
 export type RunWaiting = typeof RunWaiting.Type;
 
 /** A person's hold on a run (`RunHolding`, judged.verb.ts), in the package's words. */
@@ -388,7 +391,10 @@ export const RunHolding = Schema.Struct({
     description: 'Whether the hold waits on a person: exactly when a run it names never lands on its own.',
   }),
   actor: Schema.optionalKey(Actor),
-}).annotate({ identifier: 'RunHolding' });
+}).annotate({
+  identifier: 'RunHolding',
+  description: "A person's hold on the run (nemia hold): when it was put, and the runs it waits on.",
+});
 export type RunHolding = typeof RunHolding.Type;
 
 /** What a person has to decide (`RunToDecide`, judged.verb.ts): an approval at a gate, or the result branches. */

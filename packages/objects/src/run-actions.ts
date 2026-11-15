@@ -150,7 +150,7 @@ export const RunStartedFacts = Schema.Struct({
   }),
   from: Schema.optionalKey(Schema.String.annotate({ description: 'The inbox card it came from; absent for a run from no card.' })),
   factory: Schema.optionalKey(Schema.String.annotate({ description: 'The factory it was started in; absent for the default one.' })),
-  repo: Schema.String.annotate({ description: 'Its repository.' }),
+  repo: Schema.String.annotate({ description: "Its repository; empty where the run's record names none, as on a folder run." }),
   repository: Schema.Boolean.annotate({
     description: 'Whether it works in its repository; false for a folder run, whose steps work in a folder each.',
   }),
@@ -166,7 +166,7 @@ export const RunStartedFacts = Schema.Struct({
     Schema.Array(WrittenBy).annotate({ description: 'The volumes some of its steps write, each with those steps.' }),
   ),
   settings: Schema.optionalKey(Strings.annotate({ description: 'The harness settings it froze from its factory.' })),
-  workspace: Schema.String.annotate({ description: 'Where it works.' }),
+  workspace: Schema.String.annotate({ description: "Where it works; empty where the run's record names none, as on a folder run." }),
   inputs: Schema.optionalKey(
     CopiedInto.annotate({ description: 'The input files it copied, by name, and the folder they were copied into.' }),
   ),
@@ -180,7 +180,10 @@ export const RunStartedFacts = Schema.Struct({
     Schema.String.annotate({ description: 'Where the files its workflow shares with the others beside it were copied.' }),
   ),
   after: Schema.optionalKey(Strings.annotate({ description: 'The runs it waits on to land on its branch.' })),
-  branch: Schema.String.annotate({ description: 'The base branch its result goes to, which the runs it waits on land on.' }),
+  branch: Schema.String.annotate({
+    description:
+      "The base branch its result goes to, which the runs it waits on land on; empty where the run's record names none, as on a folder run.",
+  }),
   context: Schema.optionalKey(Strings.annotate({ description: 'The runs it is handed as context.' })),
   gated: Schema.optionalKey(Strings.annotate({ description: 'The steps gated in it.' })),
   ends: Schema.optionalKey(Strings.annotate({ description: 'Its endings a person approves first.' })),
@@ -395,7 +398,12 @@ export const RunSaid = Schema.Struct({
   at: Schema.String.annotate({ description: "When the session's harness took the words, or when they were kept." }),
   attempt: Schema.Finite.annotate({ description: 'The attempt of the session that took them; its first, for words kept.' }),
   text: Schema.String.annotate({ description: "The words as said, an agent's in its frame." }),
-  after: Schema.NullOr(Schema.Struct({ kind: Schema.Literals(SAID_AFTER), id: Schema.String })).annotate({
+  after: Schema.NullOr(
+    Schema.Struct({
+      kind: Schema.Literals(SAID_AFTER).annotate({ description: 'The kind of the event the words came after.' }),
+      id: Schema.String.annotate({ description: 'The id of the event the words came after.' }),
+    }),
+  ).annotate({
     description: 'What the words came after in the conversation; null for none, and for words kept.',
   }),
   kept: Schema.optionalKey(

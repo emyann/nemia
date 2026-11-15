@@ -36,7 +36,11 @@ export const browserSharing = (): Sharing | undefined =>
     ? { locks: navigator.locks, channel: (name) => new BroadcastChannel(name) }
     : undefined;
 
-/** Whether the cursor `seen` already holds everything the cursor `id` does: each of its counts at least as high. Pure. */
+/**
+ * Whether the cursor `seen` already holds everything the cursor `id` does: each of its counts at least as high. Pure.
+ * @param seen The cursor a tab holds, a dot-separated count of each source.
+ * @param id The cursor a read ended on, in the same shape.
+ */
 export const covers = (seen: string, id: string): boolean => {
   const have = seen.split('.').map(Number);
   return id.split('.').every((n, i) => Number(n) <= (have[i] ?? 0));
@@ -50,6 +54,10 @@ const OWN = ['open', 'error'];
  * A stream to be shared under `name`, listening to the other tabs at once, so nothing one of them hands on while this tab reads its
  * history is lost: `from(after)` then starts it from the cursor `after` that read gave — what was handed on meanwhile and is not covered
  * first — and asks for the lock, opening `url(cursor)` with `open` once it holds it. `close` before `from` lets it go unstarted.
+ * @param name The name of the Web Lock and of the channel the tabs share the stream by.
+ * @param url The stream's address from a cursor, the last one seen.
+ * @param open Opens a stream at an address.
+ * @param sharing The Web Locks and channels the tabs share through; undefined, where the browser has none, opens a stream in each tab.
  */
 export function sharedStream(
   name: string,

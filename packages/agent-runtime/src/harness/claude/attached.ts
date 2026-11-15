@@ -322,6 +322,11 @@ const ended = (root: string, live: Map<string, Live>): Effect.Effect<void> =>
  * show they add up to no more than the budget; `callsShare` is the share of it the calls in flight may take, `LET_GO_CALLS_SHARE` unless
  * the holder was given another.
  * Exported only for the tests that import it.
+ * @param root The engine's store root, whose attached sessions' run files are read and written.
+ * @param live The sessions this holder runs, by name.
+ * @param letGoMs The let-go's whole budget, in ms.
+ * @param purse What each of the three waits takes from; a fresh one of `letGoMs` unless a test hands its own.
+ * @param callsShare The share of the budget the wait for the calls in flight may take, between 0 and 1.
  */
 export const letGoOf = (
   root: string,
@@ -414,6 +419,10 @@ const interruptAsked = (root: string, at: Live | undefined, run: AttachedRun, re
  * and an ask that landed after its turn ended is dropped there, never kept for the next turn. `options` are its let-go's bound,
  * `letGoMs`, and the share of it the calls in flight may take, `callsShare` (`letGoOf`), and how often a call held at its hook and a
  * take-up's wait for a process to be gone read again, `holdPollMs` and `gonePollMs`, the shipped polls where none is given.
+ * @param root The engine's store root, under which each session's files are kept.
+ * @param executable The Claude Code every session runs, a test's stand-in; absent, each session's start finds its own.
+ * @param options The let-go's bound and share, the polls, the harness's bin and the scope's parent and program, each its default
+ *   where absent.
  */
 export const attachedSessions = (
   root: string,

@@ -70,6 +70,7 @@ const transcriptRecords = (sessionIds: readonly string[]): Map<string, string[]>
  * getSessionInfo gives it, read by a stat that reads none of its bytes; `undefined` while no project folder holds it, or when the
  * stat fails.
  * Exported only for the tests that import it.
+ * @param sessionId The Claude Code session's id, its transcript's file name.
  */
 export const transcriptWrittenAt = async (sessionId: string): Promise<number | undefined> => {
   const file = transcriptFile(sessionId);
@@ -92,10 +93,16 @@ const isBlock =
   (block: ContentBlock): block is BlockOf<T> =>
     block.type === type;
 
-/** A Claude Code session's transcript file, for the runners that read one by a spec (`claudeJobSpec`). */
+/**
+ * A Claude Code session's transcript file, for the runners that read one by a spec (`claudeJobSpec`).
+ * @param sessionId The Claude Code session's id, its transcript's file name.
+ */
 export const claudeTranscriptFile = (sessionId: string): string | undefined => transcriptFile(sessionId);
 
-/** A detached spec's `transcript.records` for Claude Code: `transcriptRecords`. */
+/**
+ * A detached spec's `transcript.records` for Claude Code: `transcriptRecords`.
+ * @param sessionIds The Claude Code sessions' ids whose transcript files are looked for.
+ */
 export const claudeTranscriptRecords = (sessionIds: readonly string[]): Map<string, string[]> => transcriptRecords(sessionIds);
 
 /** A tool result's content as text: a string as it is, a list of blocks as their text, naming any that is not text. */
@@ -198,6 +205,9 @@ const isQueued = (a: Attached): a is Extract<Attached, { type: 'queued_command' 
  * A line of those four types is decoded (`lines.ts`) before anything is read of it, a subagent's included, and one that does not
  * decode throws an `Error` naming the line by its offset, in `file` when it is given, its field and the fix: the transcript is refused,
  * never read as saying nothing. Any other value — another type, no object — gives nothing, unread.
+ * @param entry The transcript line, parsed from its JSON.
+ * @param offset The line's offset in the transcript, in bytes.
+ * @param file The transcript's path, named in a refusal; absent, the refusal says only the transcript.
  */
 export const claudeTranscriptEvents = (entry: unknown, offset: number, file?: string): TranscriptEvent[] => {
   const where = `the line at byte ${offset} of ${file ? `the transcript \`${file}\`` : 'the transcript'}`;
@@ -351,6 +361,9 @@ const costOf = ({ before, after, begunAt }: Pick<Attempt, 'before' | 'after' | '
  * `compact_boundary`, an attempt's `assistant` line, and the `timestamp` of a line before the attempt begins — is decoded, and one
  * that does not decode throws an `Error` naming the line, in `file` when it is given, its field and the fix: never read as nothing.
  * Exported only for the tests that import it.
+ * @param jsonl The transcript's text, one JSON line each.
+ * @param since When the attempt began, in ms since the epoch.
+ * @param file The transcript's path, named in a refusal; absent, the refusal says only the transcript.
  */
 export const transcriptUsage = (jsonl: string, since: number, file?: string): Usage => {
   const attempt = attemptIn(jsonl, since, file);
@@ -453,7 +466,10 @@ const tookSaid = (a: Attempt, text: string, since: number, where: () => string):
   for (const call of Array.isArray(content) ? content.filter(isBlock('tool_use')) : []) if (call.id) a.toolCalls.add(call.id);
 };
 
-/** One line per message of the Agent SDK's. Its messages vary in shape, so every field is read as one that may be absent. */
+/**
+ * One line per message of the Agent SDK's. Its messages vary in shape, so every field is read as one that may be absent.
+ * @param messages The SDK's messages, unchecked.
+ */
 export const renderTranscript = (messages: readonly unknown[]): string =>
   messages
     .map((m) => {

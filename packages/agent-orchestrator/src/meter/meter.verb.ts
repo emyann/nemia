@@ -18,12 +18,17 @@ const phaseOf = (key: string): Phase | undefined => verbOf(key)?.phase;
 
 type EngineIo = Effect.Success<ReturnType<Engine['io']>>;
 
-/** The runtime's running totals, or undefined for an engine that keeps none (a test's fake). */
+/**
+ * The runtime's running totals, or undefined for an engine that keeps none (a test's fake).
+ * @param e The engine to read the totals of.
+ */
 export const ioOf = (e: Engine): Effect.Effect<EngineIo | undefined> => (typeof e.io === 'function' ? e.io() : Effect.succeed(undefined));
 
 /**
  * `program` in a tally of the runtime's own (`Engine.tallied`), so that the totals `ioOf` reads inside it are the program's work alone,
  * never a read another caller of the engine makes while it waits; as it is, for an engine that keeps no tally (a test's fake).
+ * @param e The engine whose tally the program runs in.
+ * @param program The program whose work alone the totals are to count.
  */
 export const talliedIn = <A, E, R>(e: Engine, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
   typeof e.tallied === 'function' ? e.tallied(program) : program;
@@ -80,7 +85,10 @@ const engineCall = <A, E>(e: Engine, verb: string, phase: Phase, call: Effect.Ef
     );
   });
 
-/** The engine, each verb counted in its phase (`engineCall`); anything else passed through as it is. */
+/**
+ * The engine, each verb counted in its phase (`engineCall`); anything else passed through as it is.
+ * @param e The engine to count the verbs of.
+ */
 export const meteredEngine = (e: Engine): Engine =>
   new Proxy(e, {
     get(target, key, receiver) {
@@ -97,7 +105,13 @@ export const meteredEngine = (e: Engine): Engine =>
     },
   });
 
-/** A pass's cost from its counts and the runtime's totals before and after it. */
+/**
+ * A pass's cost from its counts and the runtime's totals before and after it.
+ * @param t The pass's counts, phase by phase, with what it saw and what measuring took.
+ * @param ms The pass's time, in ms.
+ * @param before The runtime's totals before the pass, or undefined for an engine that keeps none.
+ * @param after The runtime's totals after the pass, or undefined for an engine that keeps none.
+ */
 export const costOf = (t: Tallies, ms: number, before: EngineIo | undefined, after: EngineIo | undefined): PassCost =>
   passCost({
     at: new Date().toISOString(),
@@ -227,6 +241,11 @@ export const DENIED_SPAN_KEYS = ['run', 'task', 'tool', 'call'] as const satisfi
 /**
  * A span named `name` from `from` to `to`, a root of its own trace, carrying `own` and then `attributes`, refused if one of those is not a
  * step's (`boundedAttributes`): what it says spans passes or belongs to none, so no pass's span is its parent.
+ * @param name The span's name, the one a dashboard reads.
+ * @param from When the span began, an ISO time.
+ * @param to When the span ended, an ISO time.
+ * @param own The span's own keys, as its run, its try or its task, which no metric is kept by.
+ * @param attributes The step's attributes, each one `boundedAttributes` allows.
  */
 export const rootSpan = (
   name: string,

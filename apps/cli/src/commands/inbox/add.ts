@@ -18,7 +18,10 @@ const leftOutLines = (card: Card): string[] =>
       `label ${key} not inherited: ${values.map((v) => `${v.run} has ${key}=${v.value}`).join(', ')} — set it with nemia label inbox ${card.metadata.name} ${key}=<value>`,
   );
 
-/** What `nemia inbox add` prints of the card filed: a line of it, a line per label left out, and how to start it. */
+/**
+ * What `nemia inbox add` prints of the card filed: a line of it, a line per label left out, and how to start it.
+ * @param card The card the api filed.
+ */
 export const filedLines = (card: Card): string[] => {
   const { name, labels } = card.metadata;
   const { spec } = card;
@@ -30,7 +33,10 @@ export const filedLines = (card: Card): string[] => {
   ];
 };
 
-/** `nemia inbox add`'s runner, on the words parsed against its words. */
+/**
+ * `nemia inbox add`'s runner, on the words parsed against its words.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function inboxAdd(args: Args): Promise<number> {
   const body = textOrFile(textArg(args, 'idea') ?? '', COMMAND, 'nemia inbox add "<idea>", or nemia inbox add ./idea.md');
   const workflow = workflowNamed(textArg(args, 'workflow'), COMMAND, 'nemia inbox add "<idea>"');

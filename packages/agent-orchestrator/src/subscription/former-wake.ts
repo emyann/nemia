@@ -71,6 +71,7 @@ const asKeyed = (word: string): string => word.trim().toLowerCase();
  *
  * A list no word of which converts comes to no selector at all, which the store reads as a subscription to leave out: an empty list of
  * selectors takes every line, where an empty wake list took none.
+ * @param wake The wake list a subscription's file stored.
  */
 export function selectorsOfWake(wake: readonly string[]): { selectors: string[]; unconverted: string[] } {
   const asked = wake.map(asKeyed);
@@ -92,6 +93,8 @@ const RETIRED: readonly string[] = ['--wake', '--wake-word'];
  * Why `arg`, typed to `command` (`nemia watch`, `nemia subscribe`), is a flag that no longer exists — or undefined where it is none of
  * them. A line's prose is no longer matched: the message names the selector to type for the lines that wait on a person, and the keys a
  * selector takes. Pure, and asked first by the command's `unknown`.
+ * @param command The command `arg` was typed to, as its message names it.
+ * @param arg The argument the command did not know.
  */
 export function retiredWakeRefusal(command: string, arg: string): string | undefined {
   const flag = firstPiece(arg, '=');

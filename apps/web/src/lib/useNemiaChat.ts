@@ -68,6 +68,8 @@ const CHAT_SHARED = 'nemia-chat-stream';
  * the board's tabs (`sharedStream`): one tab holds it and hands it to the others, so a person's open tabs spend one connection on her
  * between them, beside each tab's feed. A read that did not work is the end: it fills `error` and clears the `retrying` notice an
  * earlier stream may have left, as `follow`'s end does. Returns what stops it: the read abandoned, the retry dropped, the stream closed.
+ * @param sharing The Web Locks and channels the tabs share her stream through; undefined, where the browser has none, opens one
+ * in each tab.
  */
 export function reading({ setState, tryAgain }: Reader, sharing: Sharing | undefined = browserSharing()): () => void {
   const read = new AbortController();

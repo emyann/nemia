@@ -62,7 +62,10 @@ const PERSONS_SETTINGS: Readonly<Record<string, string>> = {
   hires: 'a Hire object, named <workflow>.<step>, in the proposal',
 };
 
-/** The verb an object is proposed with: as given, else `create` where it carries no version and `update` where it carries one. */
+/**
+ * The verb an object is proposed with: as given, else `create` where it carries no version and `update` where it carries one.
+ * @param object The object proposed.
+ */
 export const verbOf = (object: ProposedObject): ChangeVerb =>
   object.verb ?? (object.metadata.resourceVersion === undefined ? 'create' : 'update');
 
@@ -121,6 +124,8 @@ function specRefusal(object: ProposedObject, label: string): string | undefined 
 /**
  * Why `object` is no object a proposal of `factory` carries, or undefined where it is one: another namespace, a setting of the person's,
  * a verb that does not go with what it carries, a spec its kind does not read. Pure.
+ * @param object The object proposed.
+ * @param factory The factory the proposal is in.
  */
 export function objectRefusal(object: ProposedObject, factory: string): string | undefined {
   const label = labelOf(object);
@@ -149,7 +154,10 @@ const objectsChecked = (objects: readonly ProposedObject[], factory: string): Ef
   return Effect.void;
 };
 
-/** A proposal's name: its proposer and five lowercase letters or digits. */
+/**
+ * A proposal's name: its proposer and five lowercase letters or digits.
+ * @param proposer Who proposes, as the name's first part.
+ */
 export const proposalNameOf = (proposer: string): string => {
   const letters = randomBytes(5)
     .reduce((word, byte) => word + (byte % 36).toString(36), '')
@@ -195,7 +203,11 @@ const changeOf = (place: ProposalPlace, factory: string, object: ProposedObject)
     return change;
   });
 
-/** The spec an object will hold once written: a Factory's parts it names over what it holds; any other kind's spec whole. */
+/**
+ * The spec an object will hold once written: a Factory's parts it names over what it holds; any other kind's spec whole.
+ * @param object The object proposed.
+ * @param now The spec the object holds now; undefined where nothing is there.
+ */
 export const mergedSpec = (object: ProposedObject, now: unknown): unknown =>
   object.kind === 'Factory' && typeof now === 'object' && now !== null && typeof object.spec === 'object' && object.spec !== null
     ? { ...now, ...object.spec }

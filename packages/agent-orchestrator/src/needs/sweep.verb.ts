@@ -12,6 +12,7 @@ import { liveFacts, readinessOf, type ReadinessFacts } from './readiness.verb.ts
 /**
  * The sweep, for as long as the daemon runs: `needsOnce` over `memo`, then a rest of `NEEDS_EVERY` (`sweepLoop`). A sweep that fails
  * keeps the readings it had: a check that cannot be read holds nothing new.
+ * @param memo The daemon's memory of its needs' readings, which each sweep fills.
  */
 export const needs = (memo: NeedsMemo) => sweepLoop(() => needsOnce(memo), NEEDS_EVERY, "The machine's needs could not be read this sweep");
 
@@ -29,6 +30,9 @@ export const sweptFacts = (): ReadinessFacts => ({ ...liveFacts(), run: () => un
  * The store's readiness read, for as long as the daemon runs: `readinessOf` over the needs' memory `memo` the sweep above fills, the
  * machine's facts read afresh each time with no command run (`sweptFacts`), each read handed to `keep`, then a rest of `NEEDS_EVERY`. A
  * read that fails keeps the one before, which the passes go on handing the feed.
+ * @param memo The daemon's memory of its needs' readings, which the read is given.
+ * @param keep What each read is handed to, as the passes keep it for the feed.
+ * @param facts What reads the machine's facts each time, `sweptFacts` when absent.
  */
 export const readied = (memo: NeedsMemo, keep: (read: Readiness) => void, facts: () => ReadinessFacts = sweptFacts) =>
   sweepLoop(

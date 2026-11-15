@@ -197,6 +197,11 @@ export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.u
  *   failing inside the bin.
  * - `refuses`: what Claude Code cannot be asked for (`claudeRefuses`); a bridge it opens itself.
  * Exported only for the tests that import it.
+ * @param executable The Claude Code the job's session runs, handed to its process as `AE_CLAUDE_EXECUTABLE`; absent, the one `prepare`
+ *   finds in `harnessBin`, else the SDK's own.
+ * @param hold The store whose sessions' drain holds the job, and the bounds a test shortens; absent, the job is held by none.
+ * @param signInMs How long the sign-in check is given before the spawn, in ms; absent, `CLAUDE_SIGN_IN_MS`.
+ * @param harnessBin The folder a Claude Code is looked for in at each spawn where `executable` names none.
  */
 export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions, signInMs?: number, harnessBin?: string): HarnessSpec => ({
   name: 'claude',
@@ -345,6 +350,8 @@ const verbOf = <K extends keyof RunnerOps>(ops: RunnerOps, verb: K): NonNullable
  * (`withBridgeFiles`, `withHoldFiles`). `quota` asks Claude Code for the plan's usage through the Agent SDK (`claudeQuota`), of the
  * Claude Code its jobs run, a token's answer carrying what the store's sessions last heard (`claudeHeardFile`), and `answer` is the
  * holder's, where this engine holds the sessions.
+ * @param options The runner's store root, the Claude Code it runs, and the bounds and scope parent its jobs are given.
+ * @param attached The attached sessions this process holds; absent where it holds none, so a long-lived task is refused.
  */
 export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): RunnerOps => {
   const root = options.root;
@@ -411,6 +418,8 @@ const answerOf = (attached?: Attached): Pick<RunnerOps, 'answer'> => (attached ?
  * its own process holder or not, so a restart of the holder neither ends it nor moves it to the new release. Read off the world,
  * never off a word invented for one kind of task: every long-lived Claude Code task goes attached without knowing it.
  * Exported only for the tests that import it.
+ * @param r The spawn request, read for its restart policy.
+ * @param attached The attached sessions, asked whether this process holds them; absent where the engine has none.
  */
 export const attachedLongLived = (r: Pick<SpawnRequest, 'restartPolicy'>, attached?: Pick<Attached, 'holding'>): boolean =>
   r.restartPolicy === 'Always' && attached?.holding() === true;

@@ -75,6 +75,10 @@ const sidesOf = ({ daemon, client }: Releases): string =>
  * An answer of the daemon at `base` to `nemia <verb>` that does not decode by the `Api`'s Schema (`failed`, what the decode said): a
  * daemon of another build than this client's, which may say no release at all, so `releaseMet`'s `unsaid` let it through. Refused, exit
  * 2, naming both releases as `releases` know them and `nemia version` on both machines.
+ * @param verb The verb the person typed, named in the refusal.
+ * @param base The daemon's url that answered.
+ * @param failed What the decode failed with, its message named.
+ * @param releases The daemon's release and this client's, as far as they are known.
  */
 export const undecoded = (verb: string, base: string, failed: unknown, releases: Releases): Refused =>
   new Refused(
@@ -111,6 +115,11 @@ const thrown = (said: string, code: number): never => {
 /**
  * What `call` answers of the objects' client, for the read `verb` names, in a process whose environment is `env`: asked once, of the
  * daemon `served` made ready, within `boundMs`, each request carrying `headers`.
+ * @param verb The verb the person typed, named in a refusal.
+ * @param call What is asked of the typed client.
+ * @param env The environment read for the context in use, the store and the token.
+ * @param boundMs How long the call has to answer, in ms: `READ_BOUND_MS` where it is left out.
+ * @param headers Headers each request carries besides the token, none where they are left out.
  */
 export async function asked<A, E>(
   verb: string,
@@ -127,6 +136,10 @@ export async function asked<A, E>(
  * What `call` answers of the objects' client, as `asked` answers it, but of a daemon of any release: the client/daemon release check
  * left out (`servedWith` given no client release), for `nemia server upgrade` alone, the verb that repairs a mismatch and talks to a
  * newer daemon on purpose once it has restarted. The decode by the `Api`'s Schemas still refuses a shape this client does not read.
+ * @param verb The verb the person typed, named in a refusal.
+ * @param call What is asked of the typed client.
+ * @param env The environment read for the context in use, the store and the token.
+ * @param boundMs How long the call has to answer, in ms: `READ_BOUND_MS` where it is left out.
  */
 export async function askedAcross<A, E>(
   verb: string,
@@ -142,6 +155,10 @@ export async function askedAcross<A, E>(
  * What `call` answers of the objects' client at `base`, a server no context names yet (`nemia pair <url>`), for the verb `verb` names:
  * asked once, within `boundMs`, carrying no token at all, since the token of the context in use is another server's and is never sent
  * to this one. Refused as `asked` refuses.
+ * @param verb The verb the person typed, named in a refusal.
+ * @param base The server's url to ask.
+ * @param call What is asked of the typed client.
+ * @param boundMs How long the call has to answer, in ms: `READ_BOUND_MS` where it is left out.
  */
 export async function askedBare<A, E>(
   verb: string,
@@ -155,6 +172,7 @@ export async function askedBare<A, E>(
 /**
  * A list's page, of a list that answers a `Table` only where asked for one (`TABLE_ACCEPT`), which a read of its objects never asks: a
  * `Table` all the same is an api this client does not read, said as such.
+ * @param listed The list asked for, which answers its page or a `Table`.
  */
 export const pageOf = <L extends { readonly items: readonly unknown[] }, E>(
   listed: Effect.Effect<L | Table, E>,
@@ -187,6 +205,7 @@ const joined = <P extends Paged>(first: P, pages: readonly P[]): P => {
  * the `continue` each page answers, until a page answers none (the api answers a page of `LIST_PAGE.byDefault` to a list asked with no
  * `limit`, and `continue` on every page but the last). A page that answers back the `continue` it was asked with is an api that would
  * be asked forever, refused naming the restart.
+ * @param ask Asks for one page of the list, given its `limit` and the `continue` the page before answered.
  */
 export const everyPage = <P extends Paged, E>(ask: (page: PageAsked) => Effect.Effect<P, E>): Effect.Effect<P, E | Error> =>
   Effect.gen(function* () {
@@ -211,11 +230,17 @@ export const everyPage = <P extends Paged, E>(ask: (page: PageAsked) => Effect.E
 /**
  * The factories the api lists (`FactoryList`, `GET /api/factories`), every page, the default first, on no repository, for the read
  * `verb`.
+ * @param verb The verb the person typed, named in a refusal.
+ * @param env The environment read for the context in use, the store and the token.
  */
 export const factoriesListed = (verb: string, env: NodeJS.ProcessEnv = process.env) =>
   asked(verb, (client) => pageOf(everyPage((page) => client.factories.listAll({ query: page }))), env);
 
-/** Every resource the api serves (`GET /api`), for the verb `verb` names: what `get`, `apply` and `explain` resolve a word against. */
+/**
+ * Every resource the api serves (`GET /api`), for the verb `verb` names: what `get`, `apply` and `explain` resolve a word against.
+ * @param verb The verb the person typed, named in a refusal.
+ * @param env The environment read for the context in use, the store and the token.
+ */
 export const discovered = async (verb: string, env: NodeJS.ProcessEnv = process.env): Promise<readonly APIResource[]> =>
   (await asked(verb, (client) => client.discovery.resources(), env)).resources;
 
@@ -229,6 +254,9 @@ const servedNames = (resources: readonly APIResource[]): string =>
 /**
  * The resource `word` names among `resources`, in any case, for the verb `verb` names (`resourceNamed`); refused, naming the resources
  * there are and the command that explains one, where it names none.
+ * @param verb The verb the person typed, named in the refusal.
+ * @param resources The resources discovery lists.
+ * @param word The word typed, in any case.
  */
 export function resourceFor(verb: string, resources: readonly APIResource[], word: string): APIResource {
   const named = resourceNamed(resources, word.toLowerCase());

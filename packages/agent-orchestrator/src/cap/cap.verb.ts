@@ -117,7 +117,12 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
   return { cap, inFlight: admissionOrder(needs.filter((n) => n.inFlight)).map((n) => n.id), held: heldRuns(needs, cap) } satisfies Slots;
 });
 
-/** Every run in the store, a run `given` names answered by the record it holds rather than read again: `slotsRead`'s listing. */
+/**
+ * Every run in the store, a run `given` names answered by the record it holds rather than read again: `slotsRead`'s listing.
+ * @param home The store's root folder.
+ * @param given The record a run's id is answered by, undefined for a run read from the store; left out,
+ * every run is read.
+ */
 export const storeRunsGiven = (home: string, given?: (id: string) => Run | undefined): Run[] =>
   runsAtOnce(home).runs.list(undefined, given);
 
@@ -153,6 +158,12 @@ export type PassRead = {
  * What one pass reads once (`PassRead`) of the store at `home`, over `e` and the pass's listing `runs`, the cap read from `config` as
  * `runSlots` reads it, and the runs others wait on read off `standing`, and what resolving each run's kinds reads, which the caller made
  * for the pass (`passRevisions`).
+ * @param home The store's root folder.
+ * @param e The engine the cap's count reads its tasks from.
+ * @param runs The pass's one listing of the store's runs.
+ * @param config The daemon's settings, whose `WF_MAX_RUNS` is the cap before a pass wrote one.
+ * @param standing Where the pass read its repositories stand, which the runs others wait on are read off.
+ * @param revisions What resolving each run's kinds reads, made for the pass.
  */
 export const passRead = (
   home: string,

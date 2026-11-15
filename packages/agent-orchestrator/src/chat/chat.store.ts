@@ -18,34 +18,59 @@ import { Invalid } from '../refusal/refusal.ts';
 import type { AnswerMark, Ask, AskAnswer, AskClose, DeliveredMark, OutboxEntry, ReadMark, SourceStop } from './chat.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
-/** The chat's folder within `dir`. */
+/**
+ * The chat's folder within `dir`.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const chatDir = (dir: string): string => path.join(dir, 'chat');
 
-/** The person's words, one entry a line. */
+/**
+ * The person's words, one entry a line.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const outboxFile = (dir: string): string => path.join(chatDir(dir), 'outbox.jsonl');
 
-/** The keeper's marks of what it delivered, one a line. */
+/**
+ * The keeper's marks of what it delivered, one a line.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const deliveredFile = (dir: string): string => path.join(chatDir(dir), 'delivered.jsonl');
 
-/** The turns the person stopped, one a line. */
+/**
+ * The turns the person stopped, one a line.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const stopsFile = (dir: string): string => path.join(chatDir(dir), 'stops.jsonl');
 
-/** The person's read mark. */
+/**
+ * The person's read mark.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const readMarkFile = (dir: string): string => path.join(chatDir(dir), 'read.json');
 
-/** The asks the keeper saw waiting on the person — her questions and her session's permissions — one ask a line. */
+/**
+ * The asks the keeper saw waiting on the person — her questions and her session's permissions — one ask a line.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const asksFile = (dir: string): string => path.join(chatDir(dir), 'asks.jsonl');
 
-/** The person's answers to them, one a line. */
+/**
+ * The person's answers to them, one a line.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const answersFile = (dir: string): string => path.join(chatDir(dir), 'answers.jsonl');
 
-/** The keeper's marks of the answers owed no longer, one a line. */
+/**
+ * The keeper's marks of the answers owed no longer, one a line.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const answersDoneFile = (dir: string): string => path.join(chatDir(dir), 'answers-done.jsonl');
 
 /**
  * The keeper's marks of an ask whose call is no longer waiting on the person (`cut`), and of one whose words a call of hers is
  * asking again (`again`), one a line, the latest of an ask's marks the one that holds. An ask is never rewritten, so what became of
  * its call is a mark of its own.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
  */
 export const asksClosedFile = (dir: string): string => path.join(chatDir(dir), 'asks-closed.jsonl');
 
@@ -139,17 +164,29 @@ const appendLine = (file: string, value: unknown): void => {
   fs.appendFileSync(file, `${JSON.stringify(value)}\n`);
 };
 
-/** What was written to the chat, oldest first: an entry carries who wrote it where an agent did. */
+/**
+ * What was written to the chat, oldest first: an entry carries who wrote it where an agent did.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const readOutbox = (dir: string): OutboxEntry[] =>
   linesOf(outboxFile(dir), OutboxSchema).map(({ from, ...e }) => (from === undefined ? { ...e } : { ...e, from: { ...from } }));
 
-/** The keeper's marks of what it delivered, in the order it delivered them. */
+/**
+ * The keeper's marks of what it delivered, in the order it delivered them.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const readDelivered = (dir: string): DeliveredMark[] => linesOf(deliveredFile(dir), DeliveredSchema).map((m) => ({ ...m }));
 
-/** The turns the person stopped, oldest first. */
+/**
+ * The turns the person stopped, oldest first.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const readStops = (dir: string): SourceStop[] => linesOf(stopsFile(dir), StopSchema).map((s) => ({ ...s }));
 
-/** The person's read mark, or undefined where they never set one. Refused (`Invalid`) where the file does not read as one. */
+/**
+ * The person's read mark, or undefined where they never set one. Refused (`Invalid`) where the file does not read as one.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export function readReadMark(dir: string): ReadMark | undefined {
   const text = textOf(readMarkFile(dir));
   if (text === undefined) return undefined;
@@ -165,43 +202,85 @@ export function readReadMark(dir: string): ReadMark | undefined {
 /**
  * The asks the keeper saw waiting, oldest first: a permission where its line says so and carries the call's facts, a question
  * otherwise, which is how every line written before a permission was an ask reads.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
  */
 export const readAsks = (dir: string): Ask[] =>
   linesOf(asksFile(dir), AskSchema).map(({ kind, permission, ...a }) =>
     kind === 'permission' && permission !== undefined ? { ...a, kind, permission: { ...permission } } : { ...a, kind: 'question' },
   );
 
-/** The person's answers to them, oldest first. */
+/**
+ * The person's answers to them, oldest first.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const readAnswers = (dir: string): AskAnswer[] => linesOf(answersFile(dir), AnswerSchema).map((a) => ({ ...a }));
 
-/** The keeper's marks of the answers owed no longer, in the order it made them. */
+/**
+ * The keeper's marks of the answers owed no longer, in the order it made them.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const readAnswersDone = (dir: string): AnswerMark[] => linesOf(answersDoneFile(dir), AnswerDoneSchema).map((m) => ({ ...m }));
 
-/** The keeper's marks of what became of each ask's call, in the order it made them: the last of an ask's is what holds. */
+/**
+ * The keeper's marks of what became of each ask's call, in the order it made them: the last of an ask's is what holds.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ */
 export const readAsksClosed = (dir: string): AskClose[] => linesOf(asksClosedFile(dir), AskCloseSchema).map((m) => ({ ...m }));
 
-/** Appends a question of hers the keeper saw waiting. The keeper's record is its one writer. */
+/**
+ * Appends a question of hers the keeper saw waiting. The keeper's record is its one writer.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ * @param ask The ask, a question or a permission, as the keeper saw it.
+ */
 export const appendAsk = (dir: string, ask: Ask): void => appendLine(asksFile(dir), ask);
 
-/** Appends the person's answer to one. The person's verb is its one writer. */
+/**
+ * Appends the person's answer to one. The person's verb is its one writer.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ * @param answer The person's answer, by the ask's id.
+ */
 export const appendAnswer = (dir: string, answer: AskAnswer): void => appendLine(answersFile(dir), answer);
 
-/** Appends the keeper's mark of an answer owed no longer. The delivery is its one writer. */
+/**
+ * Appends the keeper's mark of an answer owed no longer. The delivery is its one writer.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ * @param mark The mark: the ask's id, how the answer was delivered, and when.
+ */
 export const appendAnswerDone = (dir: string, mark: AnswerMark): void => appendLine(answersDoneFile(dir), mark);
 
-/** One mark of what became of an ask's call, appended by the keeper's record alone. */
+/**
+ * One mark of what became of an ask's call, appended by the keeper's record alone.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ * @param mark The mark: the ask's id, `cut` or `again`, and when.
+ */
 export const appendAskClosed = (dir: string, mark: AskClose): void => appendLine(asksClosedFile(dir), mark);
 
-/** Appends what was written to the chat to the outbox. `chatSay` is its one writer. */
+/**
+ * Appends what was written to the chat to the outbox. `chatSay` is its one writer.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ * @param entry The entry: its id, when, the text, and who wrote it where an agent did.
+ */
 export const appendOutbox = (dir: string, entry: OutboxEntry): void => appendLine(outboxFile(dir), entry);
 
-/** Appends the keeper's mark of an entry delivered. The delivery is its one writer. */
+/**
+ * Appends the keeper's mark of an entry delivered. The delivery is its one writer.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ * @param mark The mark: the entry's id, when it was delivered, and to which attempt.
+ */
 export const appendDelivered = (dir: string, mark: DeliveredMark): void => appendLine(deliveredFile(dir), mark);
 
-/** Appends a turn the person stopped. `chatStop` is its one writer. */
+/**
+ * Appends a turn the person stopped. `chatStop` is its one writer.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ * @param stop When the person stopped the turn, and which attempt was answering.
+ */
 export const appendStop = (dir: string, stop: SourceStop): void => appendLine(stopsFile(dir), stop);
 
-/** Writes the person's read mark whole, through a hidden file renamed over it. The person's verb is its one writer. */
+/**
+ * Writes the person's read mark whole, through a hidden file renamed over it. The person's verb is its one writer.
+ * @param dir The folder the chat is kept in, which holds its folder `chat/`.
+ * @param mark The newest entry the person read through, and when.
+ */
 export function writeReadMark(dir: string, mark: ReadMark): void {
   fs.mkdirSync(chatDir(dir), { recursive: true });
   writeWhole(readMarkFile(dir), `${JSON.stringify(mark)}\n`);

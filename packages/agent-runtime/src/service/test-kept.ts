@@ -19,6 +19,9 @@ export type TestKeeps = {
  * `kept` over the tasks a stand-in holds and the sizes planted: refuses an argument as the engine does, fails while `failures` has
  * any left, as the engine fails over a store that does not list, then names each task held once, in the order filed, with what was
  * planted of it, 0 where nothing was, and no `records` where none was.
+ * @param tasks The tasks the stand-in holds, by id, in the order filed.
+ * @param sizes What a test planted of each task, by its id.
+ * @param failures How many calls are left to fail; each failure takes one.
  */
 export const keptVerbOf = (tasks: Held, sizes: Map<string, TestKeeps>, failures: { left: number }): EngineShape['kept'] =>
   function () {

@@ -138,6 +138,7 @@ const stepChecked = inWritersWords(StepName.OnCreate);
 /**
  * Why a draft may not carry the file named `name`, or undefined where it may: a name in the folder, never a path, and no markdown, which
  * the folder reads as a step or its README. Pure, and asked by the door before either layer, so both refuse the same names.
+ * @param name The name of the file the draft carries.
  */
 export function carriedNameRefusal(name: string): string | undefined {
   if (name === '' || name === '.' || name === '..' || name.includes('/') || name.includes('\\'))
@@ -166,6 +167,8 @@ const workflowChecked = inWritersWords(Workflow);
 /**
  * The workflow at `dir` as the model holds it, from a draft: its name, its folder's, and each step's name and the keys that shape its
  * graph. Pure, and the one way both layers see a draft, so a draft one refuses the other refuses.
+ * @param dir The workflow's folder.
+ * @param draft The draft: its steps and the files it carries.
  */
 export const draftedWorkflow = (dir: string, draft: WorkflowDraft) => ({
   dir,
@@ -195,6 +198,8 @@ export type WorkflowDefs = { readonly agents: AgentDoorShape; readonly skills: S
  * The door over `layer`: each method as `doorOf` makes it, each folder and each write checked before the layer acts, and a read and a
  * write given the agents and skills found through `defs`, or, given none, through the `AgentDoor` and `SkillDoor` the program is given,
  * yielded at the call.
+ * @param layer The layer the door acts through.
+ * @param defs The Agent and Skill doors to find agents and skills through; left out, those the program is given.
  */
 export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs): WorkflowDoorShape {
   const door = doorOf<WorkflowLayer, WorkflowDir>(layer).workflows;
@@ -259,6 +264,7 @@ export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs): Wor
  * The files of the store `home`, as a layer of the door: today's folders, read and written by the folder's own functions. A folder's
  * agents and skills are read in the places given, else, for a write and a version, where a run of it would look (`placesAroundAt`); a
  * read given none looks beside the folder alone.
+ * @param home The store's root folder.
  */
 export function workflowFiles(home: string): WorkflowLayer {
   const around = (dir: string, places?: Places): Places => places ?? placesAroundAt(home, dir);
@@ -300,6 +306,7 @@ export const WorkflowDoor = Context.Reference<WorkflowDoorShape>('agent-orchestr
 /**
  * The Workflow door over the files of the store `root`, as a layer: for a program that names its root by the door, which finds a
  * workflow's agents and skills through the Agent and Skill doors over the same files.
+ * @param root The store's root folder.
  */
 export const workflowDoorFiles = (root: string): Layer.Layer<never> =>
   Layer.succeed(WorkflowDoor)(
@@ -320,6 +327,9 @@ const foundOnDisk = (home: string, dir: string, places: Places): Found => {
  * against the agents and skills the Agent and Skill doors' files find beside the folder or in `places`, and its hires `fills`. Refused
  * as the folder's own read refuses it, a `WorkflowError` naming what to write, with no check of the folder as the door's id before it: a
  * plain path is read as it is. No file of `src` calls it but this one; the root exports it, and the tests read a folder by it.
+ * @param dir The folder of steps.
+ * @param places The places its agents and skills are looked for in, and the store as `places.home`; none given, beside the folder alone.
+ * @param fills The hires each step is filled with; undefined for none.
  */
 export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): Step[] {
   const home = places.home ?? '';

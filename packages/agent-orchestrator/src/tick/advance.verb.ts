@@ -350,6 +350,8 @@ const marksOf = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, st
  * Whether a pass may file for this run still, read off the store before each filing: not once the run is called off, forgotten, pruned
  * or held, or the store paused, while the pass was at work. Once it has said no it says no for the rest of the pass, whatever the store
  * reads after.
+ * @param home The store's root folder.
+ * @param run The run the pass files for.
  */
 export const mayFileOf = (home: string, run: Run): (() => boolean) => {
   let calledOff = false;
@@ -615,6 +617,9 @@ function answerOf(
  * since what the step left went with it; a hand-off tried there would fail on every pass, keep the run out of the tick's memo of runs at
  * rest, and have `nemia prune` refuse the run as still owed one. What the pass hands off, what its memo judges, and what `nemia prune`
  * waits for, read off this one function.
+ * @param steps The steps the run is judged by.
+ * @param run The run.
+ * @param phaseOf The phase of a task, by its id, as the engine views it.
  */
 export const handOffOwed = (steps: readonly StepSpec[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] =>
   run.pruned

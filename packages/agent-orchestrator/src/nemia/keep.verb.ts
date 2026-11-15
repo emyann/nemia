@@ -94,7 +94,10 @@ const quotaUrl = (home: string): string | undefined => {
   }
 };
 
-/** The call that reads the quota at `quota`, allowed her unasked: a read of the daemon's own api. */
+/**
+ * The call that reads the quota at `quota`, allowed her unasked: a read of the daemon's own api.
+ * @param quota The quota's URL, `<url>/api/quota` at the address the daemon's api serves.
+ */
 export const quotaCall = (quota: string): string => `curl -s ${quota}`;
 
 /** What her session is told first, once filed, and how she reads the quota at `quota`, where the daemon serves one. */
@@ -119,6 +122,10 @@ const factoryFolders = (home: string): Mount[] => {
  * harness's settings, and her admission (`nemia admit`, with her floor and her rules for auto) asked before each of her shell calls. A
  * prompt allowed while she runs is widened the next time she is filed. Her instruction is composed with the person's custom words for
  * her, `custom` (`herCustom`), and her session token, minted as she is filed (`herToken`), is in her environment as `SESSION_TOKEN`.
+ * @param id The id her task is filed under.
+ * @param custom The person's custom words for her, or undefined where there are none.
+ * @param token Her session token, minted as she is filed.
+ * @param home The store's root folder.
  */
 export function nemiaSpec(id: string, custom: string | undefined, token: string, home: string): Parameters<Engine['file']>[0] {
   const step = readNemia();
@@ -288,7 +295,10 @@ export const keepOnce = Effect.fn('keepOnce')(function* () {
   return owed;
 });
 
-/** The keeper, for as long as it runs: a beat each `every`; a beat that fails is a warning, and the next is tried a beat later. */
+/**
+ * The keeper, for as long as it runs: a beat each `every`; a beat that fails is a warning, and the next is tried a beat later.
+ * @param options The keeper's pace, each one left out taken from `KEEP_DEFAULTS`.
+ */
 export const keep = (options: Partial<KeepOptions> = {}): Effect.Effect<never, never, EngineService | StoreRoot> => {
   const o = { ...KEEP_DEFAULTS, ...options };
   const beat = Effect.suspend(() => keepOnce()).pipe(

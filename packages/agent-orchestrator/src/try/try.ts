@@ -16,13 +16,23 @@ import { directoryFence } from '../workflow/index.ts';
 /** The cap on a try, in dollars: what its step's `budget:` says. */
 export const TRY_BUDGET = 1;
 
-/** Where every try's folder is: `tries/` in the store `home`, beside `workflows/`. */
+/**
+ * Where every try's folder is: `tries/` in the store `home`, beside `workflows/`.
+ * @param home The store's root folder.
+ */
 export const triesDir = (home: string): string => path.join(home, 'tries');
 
-/** The folder the agent `name`'s try is started from. */
+/**
+ * The folder the agent `name`'s try is started from.
+ * @param name The agent's name.
+ * @param home The store's root folder.
+ */
 export const tryDir = (name: string, home: string): string => path.join(triesDir(home), name);
 
-/** Where your agents are, in the store `home`: what a copy into yours copies into, and the one place an agent is tried from. */
+/**
+ * Where your agents are, in the store `home`: what a copy into yours copies into, and the one place an agent is tried from.
+ * @param home The store's root folder.
+ */
 export const yourAgentsDir = (home: string): string => path.join(home, 'workflows', AGENTS_FOLDER);
 
 /** What the step's frontmatter records the agent's version under: a comment, which the parser skips. */
@@ -34,12 +44,17 @@ export type FencedKeys = { permissionMode?: string; allowedTools?: string };
 /** The fence a try writes: its permission mode and allow rules. */
 export type TryFence = { permissionMode: string; allowedTools: string[] };
 
-/** `text` quoted for a POSIX shell, as a command a person pastes says a path. */
+/**
+ * `text` quoted for a POSIX shell, as a command a person pastes says a path.
+ * @param text The text to quote.
+ */
 export const shellQuoted = (text: string): string => `'${text.replace(/'/g, `'\\''`)}'`;
 
 /**
  * The fence a try of agent `name`, whose keys are `keys`, writes (`directoryFence`), or why it has none: the agent's mode asks first and
  * every one of its allow rules reaches outside the try's folder, so a step that narrows it to the folder cannot be written.
+ * @param name The agent's name, said in the refusal.
+ * @param keys The agent's keys that say its fence: its mode and its allow rules.
  */
 export function tryFence(name: string, keys: FencedKeys): TryFence | string {
   return (
@@ -51,6 +66,9 @@ export function tryFence(name: string, keys: FencedKeys): TryFence | string {
 /**
  * The try's step file: the agent, the cap, the agent's version it was written at, and the try's fence `fence` (`tryFence`). Its keys are
  * written as YAML (`renderFrontmatter`), after the version's comment line.
+ * @param name The agent's name.
+ * @param version The agent's version, written as a comment line.
+ * @param fence The try's fence (`tryFence`).
  */
 export const tryText = (name: string, version: string, fence: TryFence): string =>
   [
@@ -74,6 +92,8 @@ export const tryText = (name: string, version: string, fence: TryFence): string 
  * Why an agent's try cannot be started from `tries/<name>`, or null. A try's folder is one level under `tries/`, so `tries/` is its root,
  * where a start looks for `agents/` and `skills/` before the store's (`lookupRoots`): a folder named either is no workflow
  * (`agentsFolderRefusal`), and one agent's try would stand where every other try looks for agents or skills.
+ * @param name The agent's name.
+ * @param home The store's root folder.
  */
 export function tryNameRefusal(name: string, home: string): string | null {
   if (name !== AGENTS_FOLDER && name !== SKILLS_FOLDER) return null;
@@ -122,6 +142,8 @@ const offerUntried = (name: string, line: string): string =>
  * Why the agent cannot be tried (`Untried`) in the store `home`, or null: an agent of the repository's, a reserved name, a harness or a
  * mode a try cannot fence, a bridged session, MCP servers it names (`mcp`), which a try has no checkout to load from, or an `overridable:`
  * line that does not offer the fence the try narrows.
+ * @param agent The agent asked about: where it is from, its file and its keys.
+ * @param home The store's root folder.
  */
 export function untriedOf(agent: TriedAgent, home: string): Untried | null {
   if (agent.from === 'repo') {
@@ -165,6 +187,8 @@ export function untriedOf(agent: TriedAgent, home: string): Untried | null {
  * The command a person runs to copy the skill folder `dir` into the skills folder `into`, as `into/<name>/`. `cp -r dir into/` makes `into`
  * itself the copy when `into` is not there yet — a repository with a `.claude/` and no `skills/` would get `skills/SKILL.md` — so it makes
  * `into` first; and each path is quoted, for a home with a space in it.
+ * @param dir The skill's folder.
+ * @param into The skills folder it is copied into.
  */
 export const skillCopyCommand = (dir: string, into: string): string =>
   `mkdir -p ${shellQuoted(into)} && cp -r ${shellQuoted(dir)} ${shellQuoted(`${into}/`)}`;
@@ -172,6 +196,9 @@ export const skillCopyCommand = (dir: string, into: string): string =>
 /**
  * Why the agent `name` cannot be tried while it gives skills only the repository has (`theirs`, each its folder), which a try that runs
  * with no repository does not find, with the command that copies each into your library (`library`); null for none.
+ * @param name The agent's name.
+ * @param theirs The skills only the repository has, each its name and folder.
+ * @param library Your library's skills folder, which the copies go into.
  */
 export function repoSkillsRefusal(name: string, theirs: ReadonlyArray<{ name: string; dir: string }>, library: string): string | null {
   if (!theirs.length) return null;

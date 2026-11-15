@@ -13,6 +13,7 @@ export class ReconcileRefused extends Schema.TaggedError<ReconcileRefused>()('Re
 /**
  * Why `reconcile` refuses what it was handed past the task and the observation, or `undefined` when it was handed nothing more:
  * a caller built against a `reconcile` that took the ceiling's `slots` third would otherwise have them dropped without a word.
+ * @param extra The arguments `reconcile` was handed past the task and the observation.
  */
 export const reconcileRefusalOf = (extra: readonly unknown[]): string | undefined =>
   extra.length === 0
@@ -23,6 +24,8 @@ export const reconcileRefusalOf = (extra: readonly unknown[]): string | undefine
  * Why `settleTask` refuses its `maxSteps`, or `undefined`: the count of passes it may take is a whole number above nought, and nothing
  * follows it. A caller built against a `settleTask` that took the ceiling's `slots` third hands a `{ used, max }` in
  * `maxSteps`'s place, which compares false and would settle nothing.
+ * @param maxSteps The count of passes `settleTask` was handed, as the caller gave it.
+ * @param extra The arguments `settleTask` was handed past its count of passes.
  */
 export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]): string | undefined =>
   Number.isInteger(maxSteps) && (maxSteps as number) > 0 && extra.length === 0

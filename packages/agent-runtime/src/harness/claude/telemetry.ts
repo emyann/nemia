@@ -19,6 +19,7 @@ const resourceAttributes = (resource: Record<string, string>): string =>
  * metrics, events and spans, each over OTLP/HTTP as JSON; its resource the spawn's (`r.resource`); and the trace context it joins
  * (`r.traceparent`). The prompts' and their contents' words stay off, and so do
  * the tools' inputs — a command's text, a file's path, an error's words — unless the collector asks for them (`toolDetails`).
+ * @param r The spawn request, read for its telemetry, its resource and its trace context.
  */
 export const claudeTelemetryEnv = (r: SpawnRequest): Record<string, string> => {
   if (!r.telemetry) return {};

@@ -6,7 +6,10 @@ import { firstLine } from '../record/record.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { JUDGE_ROUTE, type StepSpec } from '../step/step.ts';
 
-/** Whether `step` is a judge: a condition whose eval is `route: judge`. */
+/**
+ * Whether `step` is a judge: a condition whose eval is `route: judge`.
+ * @param step The step read: only its `route`.
+ */
 export const isJudge = (step: Pick<StepSpec, 'route'>): boolean => step.route?.kind === 'judge';
 
 /**
@@ -19,6 +22,9 @@ export type JudgeFence = { writesNothing: (s: StepSpec) => boolean; fencedItself
  * Why the judge `s` cannot run, or `undefined`: it declares the `route` the run owes it, or its fence writes (`JudgeFence`). A remote agent
  * writes nothing here. With `hireable`, at load, a judge with no agent and no fence of its own is left to the hire a factory files into
  * it; a start judges it again with its hire, or with none (`hireable` false).
+ * @param s The step judged.
+ * @param fence How load and start tell the step's fence: whether it writes nothing, and whether the step's own file sets one.
+ * @param hireable Whether a judge with no agent and no fence of its own may be left to a hire: true at load, false at a start.
  */
 export function judgeRefusal(s: StepSpec, fence: JudgeFence, hireable: boolean): string | undefined {
   if (!isJudge(s)) return undefined;
@@ -45,6 +51,9 @@ function described(target: StepSpec, targets: Readonly<Record<string, string>>):
  * What a judge's brief says of its routes: each with what it reaches — each node after the judge that takes it, by its first line, a
  * workflow node by its workflow's description (`targets`) — or that it ends the run (`ends:`), and the field its closeout owes. Empty for
  * any other step.
+ * @param step The step whose brief is written: a judge, or any other, which gets nothing.
+ * @param steps The workflow's steps: the nodes after the judge that take each route.
+ * @param targets Each workflow node's workflow description, by the node's name, which says what it reaches. Left out, none.
  */
 export function judgeSection(step: StepSpec, steps: readonly StepSpec[], targets: Readonly<Record<string, string>> = {}): string {
   if (!isJudge(step)) return '';

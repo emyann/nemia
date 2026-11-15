@@ -29,16 +29,25 @@ const CLIENT_NAME_MAX = 56;
 /** A client's name a pairing takes: a name a person's token takes, `CLIENT_NAME_MAX` at most. */
 const CLIENT_NAME = new RegExp(`^[A-Za-z0-9][A-Za-z0-9._-]{0,${CLIENT_NAME_MAX - 1}}$`);
 
-/** The digest a code or a secret is kept and found by: its sha-256, in hex. */
+/**
+ * The digest a code or a secret is kept and found by: its sha-256, in hex.
+ * @param text The code or the secret.
+ */
 export const ticketDigest = (text: string): string => crypto.createHash('sha256').update(text).digest('hex');
 
 /** How long a ticket's files are kept past its time, for the list: a day. */
 const KEPT_MS = 24 * 60 * 60_000;
 
-/** The folder of pairings, under the store `home`. */
+/**
+ * The folder of pairings, under the store `home`.
+ * @param home The store's root.
+ */
 export const pairingsDir = (home: string): string => path.join(home, 'pairings');
 
-/** The folder of first-visit links, under the store `home`. */
+/**
+ * The folder of first-visit links, under the store `home`.
+ * @param home The store's root.
+ */
 export const linksDir = (home: string): string => path.join(home, 'links');
 
 /** What a pairing's file holds: its id, the client's name, the digests of its code and its secret, and its times in ms. */
@@ -177,6 +186,9 @@ const pairingShown = (p: PairingFiled, claimed: number | undefined, nowMs: numbe
 /**
  * A pairing asked for by the client `client` at `nowMs`: its id, its short code (shown `XXXX-XXXX`), its secret, each answered this once,
  * and when it lapses. The store keeps the digests of the code and the secret. Refused (`Invalid`): a client's name no token takes.
+ * @param home The store's root.
+ * @param client The client's name, which its token is to be named after.
+ * @param nowMs The time it is asked at, in ms since the epoch.
  */
 export function pairingAsked(home: string, client: string, nowMs: number): PairingAsked {
   if (!CLIENT_NAME.test(client))
@@ -212,6 +224,10 @@ const markTaken = (file: string, name: string, nowMs: number): Marked => {
  * The pairing `id`'s claim with `secret` at `nowMs`, marked: a pairing that waits for its approval answers its phase alone, and the
  * client asks again; an approved one is marked claimed, its token to be minted under its client's name. Refused: a pairing the store
  * does not keep or a secret not its own (`Missing`), and one claimed already or past its time (`Conflict`).
+ * @param home The store's root.
+ * @param id The pairing's id.
+ * @param secret The secret the client presents, which must be the pairing's own.
+ * @param nowMs The time of the claim, in ms since the epoch.
  */
 export function pairingMarked(home: string, id: string, secret: string, nowMs: number): { phase: 'waiting' } | Marked {
   const file = PAIRING_ID.test(id) ? pairingFile(home, id) : undefined;
@@ -234,7 +250,11 @@ const claimRefusal = (phase: Exclude<TicketState, 'claimable' | 'waiting'>, kind
         : `this ${kind} has lapsed, unclaimed: ${next}.`,
   });
 
-/** The pairings the store keeps at `nowMs`, newest first: each its id, client, phase and times, never its code nor its secret. */
+/**
+ * The pairings the store keeps at `nowMs`, newest first: each its id, client, phase and times, never its code nor its secret.
+ * @param home The store's root.
+ * @param nowMs The time it is read at, in ms since the epoch.
+ */
 export function pairingsListed(home: string, nowMs: number): PairingList {
   return {
     pairings: pairingsKept(home)
@@ -247,6 +267,9 @@ export function pairingsListed(home: string, nowMs: number): PairingList {
  * The pairing whose short code is `code` (`XXXX-XXXX`, in either case, with or without its dash) approved at `nowMs`: its client may
  * claim its token from then on. One approved already is answered as it stands. Refused: no pairing kept under that code (`Missing`), and
  * one past its time or claimed already (`Conflict`).
+ * @param home The store's root.
+ * @param code The short code as the person typed it.
+ * @param nowMs The time of the approval, in ms since the epoch.
  */
 export function pairingApproved(home: string, code: string, nowMs: number): Pairing {
   const read = codeRead(code);
@@ -273,6 +296,9 @@ const linkFile = (home: string, digest: string): string => path.join(linksDir(ho
  * A first-visit link minted at `nowMs`: the board's address `base` with the link's secret (`<base>/?link=<secret>`), answered this once,
  * and when it lapses. The store keeps the secret's digest alone, as the link's file's name. Refused (`Invalid`): a base that is no
  * http or https address.
+ * @param home The store's root.
+ * @param base The board's address the link is printed under.
+ * @param nowMs The time it is minted at, in ms since the epoch.
  */
 export function linkMinted(home: string, base: string, nowMs: number): LinkMinted {
   if (!/^https?:$/.test(URL.parse(base)?.protocol ?? ''))
@@ -291,6 +317,9 @@ const boardName = (nowMs: number): string => `board-${iso(nowMs).slice(0, 10)}`;
 /**
  * The claim of the first-visit link whose secret is `secret` at `nowMs`, marked: its token to be minted for the browser that opened it,
  * named `board-<day>`. Refused: a link the store does not keep (`Missing`), and one claimed already or past its time (`Conflict`).
+ * @param home The store's root.
+ * @param secret The link's secret, as the browser presents it.
+ * @param nowMs The time of the claim, in ms since the epoch.
  */
 export function linkMarked(home: string, secret: string, nowMs: number): Marked {
   const file = linkFile(home, ticketDigest(secret));

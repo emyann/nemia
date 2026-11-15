@@ -13,6 +13,9 @@ export type StreamUnreadable = { error: string; retrying: boolean };
  * The data `data` of a stream event named `event`, decoded by its schema in `schemas`; an `UnreadAnswer` for data that is no JSON or not
  * of the event's shape, its `route` the event's name and its message naming the key that is wrong, so the follower says it rather than
  * drop it.
+ * @param schemas The schema of each event's data, by the event's name.
+ * @param event The name the event was sent under.
+ * @param data The event's data, as sent.
  */
 export function streamDataOf<D, K extends keyof D & string>(
   schemas: { readonly [E in keyof D]: Schema.Decoder<D[E]> },

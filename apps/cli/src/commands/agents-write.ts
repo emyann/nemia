@@ -13,7 +13,10 @@ import { namespaceOf, pathArg, placeOf, textArg, writtenLine } from './written.t
 
 const { name: COMMAND, usage: USAGE } = AGENTS_WRITE_WORDS;
 
-/** `nemia agents write`'s runner, on the words parsed against its words. */
+/**
+ * `nemia agents write`'s runner, on the words parsed against its words.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function agentsWrite(args: Args): Promise<number> {
   const place = placeOf(args, COMMAND, USAGE);
   const file = pathArg(args, 'file', COMMAND, USAGE, "the agent's file to write, named <name>.md");

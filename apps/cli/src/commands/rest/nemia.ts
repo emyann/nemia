@@ -42,7 +42,10 @@ const sessionLines = (data: Level): string[] => {
   return [`her session ${data.task}: not filed yet, ${why}`];
 };
 
-/** What `nemia level` prints of where she is. */
+/**
+ * What `nemia level` prints of where she is.
+ * @param data Where she is, as the api answers it: the level, the factories, her session, her trust, spend, reach and allows.
+ */
 export function levelLines(data: Level): string[] {
   const head = `Nemia: the store at ${data.level}${data.since === null ? '' : ` since ${data.since}`}`;
   const factories = ['factories (a raise ends by itself, read as it passes):', ...data.factories.map((row) => `  ${factoryWords(row)}`)];
@@ -75,7 +78,10 @@ const levelSet = (args: Args): typeof NemiaLevelSet.Type => {
   };
 };
 
-/** `nemia level`'s runner: bare, where she is; given a level, a raise or its end, that written, and where she is after. */
+/**
+ * `nemia level`'s runner: bare, where she is; given a level, a raise or its end, that written, and where she is after.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function level(args: Args): Promise<number> {
   const data = await asked(LEVEL_WORDS.name, (c) => (levelWritten(args) ? c.nemia.setLevel({ payload: levelSet(args) }) : c.nemia.level()));
   said(levelLines(data));

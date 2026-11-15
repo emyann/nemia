@@ -128,6 +128,7 @@ function read<T>(config: Config.Config<T>, name: string, env: Env, refusal: (val
 /**
  * `WF_ROOT`, the store's directory: an absolute path, or `~/.agent-workflows` when unset. Refused when relative, since each process would
  * read a store of its own under its working directory, and when empty, which would read the working directory itself.
+ * @param env The environment the variable is read from, as `process.env` holds it.
  */
 export const wfRoot = (env: Env): string =>
   read(
@@ -139,7 +140,10 @@ export const wfRoot = (env: Env): string =>
     true,
   );
 
-/** `WF_MAX_CONCURRENT`, sessions at work per pool at once: a whole number from 1, or 2 when unset, empty or blank. */
+/**
+ * `WF_MAX_CONCURRENT`, sessions at work per pool at once: a whole number from 1, or 2 when unset, empty or blank.
+ * @param env The environment the variable is read from, as `process.env` holds it.
+ */
 export const maxConcurrent = (env: Env): number =>
   read(
     concurrent,
@@ -152,6 +156,7 @@ export const maxConcurrent = (env: Env): number =>
 /**
  * `WF_MAX_RUNS`, the cap on runs in flight: a whole number, or 0 — unset, empty or blank too — for none. Refused when it is anything else:
  * read as no cap, a mistyped value would lift the cap it was set to hold.
+ * @param env The environment the variable is read from, as `process.env` holds it.
  */
 export const maxRuns = (env: Env): number =>
   read(
@@ -166,6 +171,7 @@ export const maxRuns = (env: Env): number =>
  * `WF_KEEP_WORKTREES`, whether the daemon leaves every finished run its worktrees, for a person to prune by hand: `1` keeps them; `0`,
  * unset or empty and a finished run is freed. Refused when it is anything else: read as off, a mistyped value would free what it was
  * set to keep.
+ * @param env The environment the variable is read from, as `process.env` holds it.
  */
 export const keepsWorktrees = (env: Env): boolean =>
   read(
@@ -176,7 +182,10 @@ export const keepsWorktrees = (env: Env): boolean =>
       `WF_KEEP_WORKTREES=${value} is neither 1 nor 0. It keeps the worktrees of every finished run, which the daemon otherwise removes: WF_KEEP_WORKTREES=1 — or 0, or unset, to have them freed.`,
   );
 
-/** `WF_VERIFY_REST`, whether a pass judges in full each run it answers from its memo of runs at rest: `1` on; `0`, unset or empty off. */
+/**
+ * `WF_VERIFY_REST`, whether a pass judges in full each run it answers from its memo of runs at rest: `1` on; `0`, unset or empty off.
+ * @param env The environment the variable is read from, as `process.env` holds it.
+ */
 export const verifiesRest = (env: Env): boolean =>
   read(
     verifyRest,
@@ -186,7 +195,10 @@ export const verifiesRest = (env: Env): boolean =>
       `WF_VERIFY_REST=${value} is neither 1 nor 0. It judges in full each run a pass answers from its memo of runs at rest, which costs all the memo saves: WF_VERIFY_REST=1 — or 0, or unset, for off.`,
   );
 
-/** `WF_METRICS_MINUTE_DAYS`, the days of minute lines the series keep: a whole number from 2, or 30 when unset or empty. */
+/**
+ * `WF_METRICS_MINUTE_DAYS`, the days of minute lines the series keep: a whole number from 2, or 30 when unset or empty.
+ * @param env The environment the variable is read from, as `process.env` holds it.
+ */
 export const metricsMinuteDays = (env: Env): number =>
   read(
     minuteDays,
@@ -196,7 +208,10 @@ export const metricsMinuteDays = (env: Env): number =>
       `WF_METRICS_MINUTE_DAYS=${value} is not a whole number from 2. It is how many days of the series' minute lines are kept, two at least so a day's range has yesterday: WF_METRICS_MINUTE_DAYS=30 — or unset, for 30.`,
   );
 
-/** `WF_METRICS_HOUR_DAYS`, the days of hour lines the series keep: a whole number from 1, or undefined — kept until pruned — when unset. */
+/**
+ * `WF_METRICS_HOUR_DAYS`, the days of hour lines the series keep: a whole number from 1, or undefined — kept until pruned — when unset.
+ * @param env The environment the variable is read from, as `process.env` holds it.
+ */
 export const metricsHourDays = (env: Env): number | undefined =>
   read(
     hourDays,
@@ -210,6 +225,7 @@ export const metricsHourDays = (env: Env): number | undefined =>
  * `WF_MEMORY_LIMIT`, the memory limit every session and check the daemon files runs under when its step names none (the engine's
  * `defaultLimits`): a Kubernetes quantity, `8Gi`, `512Mi`, `4G`, as written, or undefined — no limit — when unset, empty or blank. Refused
  * in the runtime's words when it is anything else: read as no limit, a mistyped value would lift the bound it was set to hold.
+ * @param env The environment the variable is read from, as `process.env` holds it.
  */
 export const memoryLimit = (env: Env): string | undefined =>
   read(
@@ -225,6 +241,7 @@ export const memoryLimit = (env: Env): string | undefined =>
  * default request), which the runtime admits it by: a Kubernetes quantity, as written, or undefined — each asks its limit, as
  * Kubernetes defaults a request — when unset, empty or blank. Refused in the runtime's words when it is anything else, and when it is
  * above `WF_MEMORY_LIMIT`, since no session may ask more than it may hold.
+ * @param env The environment the variable is read from, as `process.env` holds it; its `WF_MEMORY_LIMIT` is read too.
  */
 export const memoryRequest = (env: Env): string | undefined => {
   const value = read(
@@ -249,6 +266,7 @@ export const memoryRequest = (env: Env): string | undefined => {
  * `WF_MEMORY_RESERVED`, the floor of the machine's memory the daemon keeps for itself and the machine, which it admits no session into:
  * a Kubernetes quantity, as written, or undefined — an eighth of the machine, 1 GiB at least (`reservedFor`) — when unset, empty or
  * blank. Refused in the runtime's words when it is anything else: read as the default, a mistyped value would keep a floor nobody set.
+ * @param env The environment the variable is read from, as `process.env` holds it.
  */
 export const memoryReserved = (env: Env): string | undefined =>
   read(
@@ -262,6 +280,7 @@ export const memoryReserved = (env: Env): string | undefined =>
 /**
  * `WF_CGROUP_PARENT`, the systemd slice every limited session's scope is made in, as Docker's `--cgroup-parent`: a unit name ending
  * `.slice`, which an operator caps to bound the sessions together, or undefined — the user manager's root slice — when unset or empty.
+ * @param env The environment the variable is read from, as `process.env` holds it.
  */
 export const cgroupParent = (env: Env): string | undefined =>
   read(
@@ -276,6 +295,7 @@ export const cgroupParent = (env: Env): string | undefined =>
  * `NEMIA_RELEASE_CHECK`, whether the daemon of an archive install asks its download base for the newest release every six hours
  * (`releaseCheck`, `src/release/check.verb.ts`): `off` never; `on`, unset or empty, it does. Refused when it is anything else: read as
  * either, a mistyped value would do what it was not set to.
+ * @param env The environment the variable is read from, as `process.env` holds it.
  */
 export const releaseCheck = (env: Env): boolean =>
   read(
@@ -290,6 +310,7 @@ export const releaseCheck = (env: Env): boolean =>
  * `WF_DEFAULT_FACTORY_STARTS`, whether a start may go to the default factory when it names none and no factory holds its folder, or when
  * it starts a card that names none: only with `1`, which the package's and the api's tests set for the starts they make in scratch
  * folders. Unset, by default, every such start is refused.
+ * @param env The environment the variable is read from, as `process.env` holds it.
  */
 export const defaultFactoryStarts = (env: Env): boolean => env.WF_DEFAULT_FACTORY_STARTS === '1';
 
@@ -297,12 +318,14 @@ export const defaultFactoryStarts = (env: Env): boolean => env.WF_DEFAULT_FACTOR
  * `WF_EXPOSED`, whether the store is marked exposed — reached from beyond this machine, through a bind, a proxy or a tunnel — so that the
  * api may listen on an address beyond the loopback (`bindOf`): only with `1`, which whoever exposes the store sets. Every store, exposed
  * or not, refuses a request to the api that presents no token (`callerGate`).
+ * @param env The environment the variable is read from, as `process.env` holds it.
  */
 export const exposedStore = (env: Env): boolean => env.WF_EXPOSED === '1';
 
 /**
  * `WF_SESSION_TOKEN`, the token of the session a command runs in, which says who calls a verb that proposes in its place
  * (`sessionCaller`; `nemia factory resolve`): undefined, the person, where it is unset or empty.
+ * @param env The environment the variable is read from, as `process.env` holds it.
  */
 export const sessionToken = (env: Env): string | undefined => env.WF_SESSION_TOKEN || undefined;
 
@@ -347,6 +370,7 @@ export type Settings = {
 /**
  * `env`'s settings, each read by its reader when it is read, so a value set wrong is refused (`Invalid`, exit 2) by the program that
  * reads it and by no other: a command that never reads `WF_MAX_RUNS` runs whatever it holds, as it did when each read its own.
+ * @param env The environment the settings are read from, as `process.env` holds it, each variable when its setting is read.
  */
 export const settingsOf = (env: Env): Settings => ({
   get maxConcurrent() {
@@ -402,7 +426,10 @@ export class StoreConfig extends Context.Service<StoreConfig, Settings>()('orche
   static readonly layer = (settings: Settings): Layer.Layer<StoreConfig> => Layer.succeed(StoreConfig)(StoreConfig.of(settings));
 }
 
-/** The setting `key` of the configuration the program was given, or the `Invalid` its reader refuses a value set wrong with. */
+/**
+ * The setting `key` of the configuration the program was given, or the `Invalid` its reader refuses a value set wrong with.
+ * @param key The name of the setting to read, a key of `Settings`.
+ */
 export const setting = <K extends keyof Settings>(key: K): Effect.Effect<Settings[K], Invalid, StoreConfig> =>
   Effect.flatMap(StoreConfig, (config) =>
     Effect.try({ try: () => config[key], catch: (error) => (error instanceof Invalid ? error : new Invalid({ message: String(error) })) }),

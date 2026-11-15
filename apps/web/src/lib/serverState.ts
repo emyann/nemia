@@ -31,6 +31,7 @@ const DRAWN: Readonly<Record<string, Drawn>> = STATES;
 /**
  * How the state `state` is drawn: its word, its hue and its title. `null`, and any word this board does not know — a newer harness
  * grew one — are drawn as unread, in rest: a word read as a state it is not would be worse than one read as nothing.
+ * @param state The harness's word for the server's state, or null where none was read.
  */
 export const stateDrawn = (state: string | null): { word: string } & Drawn => {
   const known = state === null ? undefined : DRAWN[state];

@@ -3,6 +3,7 @@
  * or stderr (a pipe holds 64 KiB, a file is written at once), so each stream is asked to call back once everything queued before it
  * is written, and the process exits on the last. A reader gone (`nemia ls | head -1`) ends the wait too, its broken pipe swallowed: there
  * is no one left to tell.
+ * @param code The exit code the process ends with.
  */
 export function exited(code: number): void {
   process.exitCode = code;

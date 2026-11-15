@@ -35,6 +35,8 @@ export type SkillRead = {
  * of the store's library or a team's own folder, and one of a checkout's own skills whose target leaves the checkout, where a
  * link that stays inside is read through. A SKILL.md that cannot be read says why; one the card reader refuses (`skillEntryOf`) has its
  * refusal as `error`, and its cost all the same.
+ * @param name The skill's name.
+ * @param dir The skill's folder.
  */
 export function skillRead(name: string, dir: string): SkillRead {
   const file = path.join(dir, 'SKILL.md');
@@ -61,6 +63,8 @@ export type GivenRead = { name: string; dir: string | null } & SkillRead;
 /**
  * The skills `skills` an agent gives, one each in its order, each found where a start finds it (`found`, the agent's `skillsFor`) and read
  * there (`skillRead`). A name two folders of one place have is the package's refusal; a name no folder has, the refusal its card states.
+ * @param skills The names the agent's `skills:` gives, in its order.
+ * @param found Where a start finds skills (`skillsFor`).
  */
 export function givenSkills(skills: readonly string[], found: SkillsFound): GivenRead[] {
   return skills.map((name) => {
@@ -75,6 +79,7 @@ export function givenSkills(skills: readonly string[], found: SkillsFound): Give
 /**
  * The skill folders of the folder of skills `dir` by name, sorted, each a folder holding a SKILL.md, as `skillsFor` reads one. None for a
  * folder that cannot be read.
+ * @param dir The folder of skills.
  */
 export function skillFolders(dir: string): string[] {
   let names: string[];
@@ -89,6 +94,8 @@ export function skillFolders(dir: string): string[] {
 /**
  * The folder of the skill `name` in the first of the folders of skills `roots` where `<name>/SKILL.md` is there, or null where none has
  * it.
+ * @param roots The folders of skills, looked in in their order.
+ * @param name The skill's name.
  */
 export function skillDirIn(roots: readonly string[], name: string): string | null {
   const dir = roots.map((root) => path.join(root, name)).find((at) => fs.lstatSync(path.join(at, 'SKILL.md'), { throwIfNoEntry: false }));
@@ -98,6 +105,7 @@ export function skillDirIn(roots: readonly string[], name: string): string | nul
 /**
  * The text of the SKILL.md in the skill folder `dir`, or empty where it cannot be read or a link in the skill is refused, unread
  * (`skillLinkRefusal`): `skillRead` says why.
+ * @param dir The skill's folder.
  */
 export function skillText(dir: string): string {
   if (skillLinkRefusal(dir)) return '';
@@ -112,6 +120,7 @@ export function skillText(dir: string): string {
  * The other text files of the skill folder `dir`: each file of it but its SKILL.md, at any depth, by its path in it with `/`, sorted, read
  * as `skillFiles` reads a skill; a file that is not text (`textIn`) — a picture — or does not read is never one. None where a link in the
  * skill is refused (`skillLinkRefusal`, which `skillRead` says) or no folder is there.
+ * @param dir The skill's folder.
  */
 export function skillOthers(dir: string): SkillOther[] {
   if (skillLinkRefusal(dir)) return [];
@@ -217,6 +226,10 @@ export type SkillCopied = { dir: string; name: string; written: string[] };
  * copy would follow it and bring in whatever it points at; and `to` has no skill of that name, which a copy would write over. It is then
  * copied into a hidden folder beside where it goes and renamed into place, so a copy that fails part-way leaves no half a skill to be
  * found.
+ * @param home The store's root, whose workflows' folders are the places a copy may go.
+ * @param from The folder of skills copied from.
+ * @param to The folder of skills copied into.
+ * @param name The skill's name.
  */
 export function copySkill(
   home: string,
@@ -317,6 +330,7 @@ function versionWritten(dir: string, notThere: string): string {
 /**
  * What is at the skill folder `dir` now, as the version judgement reads it (`definitionVersionRefusal`): nothing; something that is no
  * skill — a file, or a folder whose SKILL.md is not a file of its own; or a skill at its version (`skillVersion`).
+ * @param dir The skill's folder.
  */
 export function skillThere(dir: string): DefinitionThere {
   if (!fs.lstatSync(dir, { throwIfNoEntry: false })) return { kind: 'none' };
@@ -344,6 +358,9 @@ const refuseVersion = (refused: VersionRefused | null): void => {
  * the folder (`skillFilesRefusal`), no link on the way to it (`filesPlaceRefusal`), and a file that is not text never touched. A skill
  * made is written in a hidden folder beside where it goes and renamed into place, and a change through a hidden file beside each file
  * it writes, so a write that fails leaves no half a file.
+ * @param home The store's root, whose workflows' folders are the places a write may go.
+ * @param to The folder of skills written in.
+ * @param change The skill as written: its draft, and its other text files where given.
  */
 export function writeSkill(
   home: string,

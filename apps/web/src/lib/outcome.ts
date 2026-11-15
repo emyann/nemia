@@ -5,7 +5,10 @@ import type { Frozen } from './frozen.ts';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** A field's `description` in its schema, when it has one: what a yes or a no means. */
+/**
+ * A field's `description` in its schema, when it has one: what a yes or a no means.
+ * @param schema The field's schema, of any shape.
+ */
 export const descriptionOf = (schema: unknown): string | null =>
   isRecord(schema) && typeof schema.description === 'string' ? schema.description : null;
 
@@ -44,6 +47,8 @@ const CUT_WORDS: Readonly<Partial<Record<AttemptEnd, string>>> = {
  * How a try ended and who said so. `none` is what the inspector says of a try with no statement and no reason on the record, and of any
  * reason `MACHINE_WORDS` does not name but a harness's `failed` or `stopped`: the orchestrator reports a harness's `done` with no statement
  * as `unsigned` (`endWords`).
+ * @param t The try: its closeout, its unreadable statement and its attempts.
+ * @param none What is said of a try nobody said the end of.
  */
 export function outcomeOf(t: Frozen<Pick<StepTry, 'closeout' | 'unreadable' | 'attempts'>>, none: string): Outcome {
   const latest = t.attempts.latest;
@@ -69,6 +74,7 @@ export function outcomeOf(t: Frozen<Pick<StepTry, 'closeout' | 'unreadable' | 'a
 /**
  * An outcome in the word a fold's summary and the head's badge give it: `done`, `blocked`, `unreadable`, the machine's reason, or
  * `no closeout`.
+ * @param o The try's outcome, as `outcomeOf` gives it.
  */
 export const outcomeWord = (o: Outcome): string =>
   o.by === 'agent' ? o.outcome : o.by === 'machine' ? o.reason : o.by === 'unreadable' ? 'unreadable' : 'no closeout';

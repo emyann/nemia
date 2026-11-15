@@ -65,7 +65,11 @@ const asksLines = ({ metadata: { name }, status }: Run): string[] => {
   ];
 };
 
-/** The lines of `run`, its head line ending on the labels `asked` names. */
+/**
+ * The lines of `run`, its head line ending on the labels `asked` names.
+ * @param run The run as the api serves it.
+ * @param asked How the table is asked to print: wide, with its labels, or a column per label.
+ */
 export function runLines(run: Run, asked: TableAsked): string[] {
   const { status } = run;
   const calledOff = `${status.cancelledAt ? '  (cancelled)' : ''}${status.pruned ? '  (pruned)' : ''}`;

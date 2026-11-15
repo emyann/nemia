@@ -5,11 +5,17 @@
  * allocated here: a key list is spread before it is sorted, where the linter would call the spread useless.
  */
 
-/** `value`'s own fields, as a fresh record, where it is an object that is no list; else undefined. */
+/**
+ * `value`'s own fields, as a fresh record, where it is an object that is no list; else undefined.
+ * @param value Any value, read as JSON is.
+ */
 export const fieldsOf = (value: unknown): Record<string, unknown> | undefined =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : undefined;
 
-/** `value`'s items, as a fresh list, where it is a list; else undefined. */
+/**
+ * `value`'s items, as a fresh list, where it is a list; else undefined.
+ * @param value Any value, read as JSON is.
+ */
 export const itemsOf = (value: unknown): unknown[] | undefined => (Array.isArray(value) ? Array.from<unknown>(value) : undefined);
 
 /** A value's JSON with every object's keys sorted, so two schemas compare whatever order their keys were written in. */
@@ -23,7 +29,11 @@ const canonical = (value: unknown): string =>
     return Object.fromEntries(entries);
   });
 
-/** Whether a field's schema is one of `known`, its `description` aside. */
+/**
+ * Whether a field's schema is one of `known`, its `description` aside.
+ * @param schema A field's JSON schema.
+ * @param known The schemas it is compared with.
+ */
 export const sameSchema = (schema: unknown, known: readonly unknown[]): boolean => {
   const fields = fieldsOf(schema);
   if (!fields) return false;

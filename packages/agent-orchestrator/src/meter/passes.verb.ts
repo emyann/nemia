@@ -21,6 +21,7 @@ const textOf = (args: Args, key: string): string | undefined => {
 /**
  * How many of the recent passes `args` asks for: every one kept with no `--last`. Refuses as `Invalid` a `--last` that is not a whole
  * number from 1.
+ * @param args The command's arguments, `last` among them as the text given.
  */
 export const lastOf = (args: Args): number => {
   const last = textOf(args, 'last');
@@ -30,7 +31,11 @@ export const lastOf = (args: Args): number => {
   return n;
 };
 
-/** The recent passes `args` asks for, oldest first, and of them the histogram, the parts and the summary. */
+/**
+ * The recent passes `args` asks for, oldest first, and of them the histogram, the parts and the summary.
+ * @param home The store's root folder, where `tick-recent.json` is.
+ * @param args The command's arguments, `last` among them as the text given.
+ */
 export const passesOf = (home: string, args: Args): PassesRead => {
   const n = lastOf(args);
   const recent = recentPasses(home);

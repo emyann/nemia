@@ -29,7 +29,10 @@ const perTry = (n: number): string => `${n > 0 && n < 0.01 ? Number(n.toPrecisio
 /** Dollars as a person reads them: `$0.42`, and three figures under a cent. */
 const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
 
-/** A span of time in its two largest units: `45s`, `3m05s`, `2h07m`, `1d03h`. */
+/**
+ * A span of time in its two largest units: `45s`, `3m05s`, `2h07m`, `1d03h`.
+ * @param ms The span, in ms; below zero reads as none.
+ */
 export function durationWord(ms: number): string {
   const s = Math.floor(Math.max(0, ms) / 1000);
   const two = (n: number) => String(n).padStart(2, '0');
@@ -180,7 +183,10 @@ function tallyLines(g: StatsGroup): string[] {
 /** A load in words, to two decimals: the share of the cores at work. */
 const loadWord = (n: number): string => (Math.round(n * 100) / 100).toString();
 
-/** The system's health over the days in words, a line each, or none where the series kept nothing over them. */
+/**
+ * The system's health over the days in words, a line each, or none where the series kept nothing over them.
+ * @param h The system's health over the days, as the stats answer it.
+ */
 export function healthLines(h: StatsHealth): string[] {
   const lines = [
     h.pass.p50 === null ? null : `a pass: ${h.pass.p50.toFixed(1)} ms (p50), ${or(h.pass.p95, (n) => n.toFixed(1))} ms (p95)`,
@@ -197,7 +203,10 @@ export function healthLines(h: StatsHealth): string[] {
 /** `lines` after a blank line, or nothing where there are none. */
 const block = (lines: readonly string[]): string[] => (lines.length ? ['', ...lines] : []);
 
-/** What `nemia stats` prints, in the order its help says, the runs left out last. */
+/**
+ * What `nemia stats` prints, in the order its help says, the runs left out last.
+ * @param s The stats as the api answers them.
+ */
 export function statsLines(s: StatsRead): string[] {
   const filtered = Object.entries(s.filters).map(([k, v]) => `${k} ${v}`);
   const groups = s.by ? s.groups.flatMap((g) => ['', `${s.by} ${g.key ?? NONE}`, ...dayLines(g)]) : ['', ...dayLines(s.all)];
@@ -229,7 +238,10 @@ function slowLandingWord(s: StatsRead): string {
     : `, ${n} landing checks over half their deadline: measure again`;
 }
 
-/** The one line the morning recap quotes (`nemia stats --line`): the last 14 days, the 14 before in brackets, and the slow landings. */
+/**
+ * The one line the morning recap quotes (`nemia stats --line`): the last 14 days, the 14 before in brackets, and the slow landings.
+ * @param s The stats as the api answers them, whose tiles hold the last 14 days and the 14 before.
+ */
 export function statsLine(s: StatsRead): string {
   const now = wordsOf(s.all.tiles.last);
   const then = wordsOf(s.all.tiles.before);

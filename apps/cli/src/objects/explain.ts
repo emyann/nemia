@@ -11,7 +11,11 @@ import type { ExplainedOf, FieldRow } from '../../contracts/explain.contract.ts'
 import { discovered, resourceFor } from '../objects.ts';
 import { Refused } from '../refused.ts';
 
-/** The field at `path` and the fields directly under it, or a refusal where the kind has none there (`contracts/explain.contract.ts`). */
+/**
+ * The field at `path` and the fields directly under it, or a refusal where the kind has none there (`contracts/explain.contract.ts`).
+ * @param rows The kind's fields as rows, each with its path and its parent's.
+ * @param path The field's path asked for, dot-separated; empty for the object itself.
+ */
 export const explained: ExplainedOf = (rows, path) => {
   const field = rows.find((r) => r.path === path);
   if (path !== '' && field === undefined) return { refused: 'no-field' };
@@ -92,7 +96,10 @@ function rowsUnder(node: Node, parent: string, schemas: Node, depth: number): Fi
   });
 }
 
-/** The fields of `kind`'s object as rows, flattened from its component in the package's own OpenAPI document. */
+/**
+ * The fields of `kind`'s object as rows, flattened from its component in the package's own OpenAPI document.
+ * @param kind The kind whose component is read.
+ */
 export function fieldRowsOf(kind: Kind): FieldRow[] {
   const schemas = schemasOf();
   const component = schemas[kind];
@@ -111,6 +118,11 @@ const fieldLines = (row: FieldRow): string[] => [
   ...(row.description === null ? [] : indented(row.description, '    ')),
 ];
 
+/**
+ * `nemia explain <resource>[.<field>]...`, on the words after `explain`: the resource, and its field asked for, printed; answers
+ * the exit code, or throws its refusal.
+ * @param args The words typed after `explain`: the resource and its fields' path, or `--help`.
+ */
 export async function explain(args: readonly string[]): Promise<number> {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(EXPLAIN_HELP);

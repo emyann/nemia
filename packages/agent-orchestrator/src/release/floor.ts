@@ -19,6 +19,7 @@ export const STORE_READABLE_FROM: Version = { major: 1, minor: 2, patch: 0 };
  * A release's version as its tag or `release.json` says it, `v1.2.3` or `1.2.3`, read as three whole numbers; null for anything else,
  * a space around it or a pre-release suffix included: a tag names its folder under `releases/`, so it is read exactly, as
  * `tools/release/install.sh` reads one.
+ * @param text The version as a tag or `release.json` writes it.
  */
 export function parseVersion(text: string): Version | null {
   const parts = /^v?(\d{1,9})\.(\d{1,9})\.(\d{1,9})$/.exec(text);
@@ -27,15 +28,30 @@ export function parseVersion(text: string): Version | null {
   return { major: Number(major), minor: Number(minor), patch: Number(patch) };
 }
 
-/** A version as its tag is written: `v1.2.3`. */
+/**
+ * A version as its tag is written: `v1.2.3`.
+ * @param v The version to write.
+ */
 export const versionTag = (v: Version): string => `v${v.major}.${v.minor}.${v.patch}`;
 
-/** Whether `a` is an older release than `b`. */
+/**
+ * Whether `a` is an older release than `b`.
+ * @param a The version asked of.
+ * @param b The version it is compared with.
+ */
 export const olderThan = (a: Version, b: Version): boolean =>
   a.major !== b.major ? a.major < b.major : a.minor !== b.minor ? a.minor < b.minor : a.patch < b.patch;
 
-/** Whether `nemia upgrade <target>` is refused on a store whose floor is `floor`: only below it, and never where the store records none. */
+/**
+ * Whether `nemia upgrade <target>` is refused on a store whose floor is `floor`: only below it, and never where the store records none.
+ * @param target The version the upgrade names.
+ * @param floor The store's floor, or null where the store records none.
+ */
 export const goingBackRefused: GoingBackRefused = (target, floor) => floor !== null && olderThan(target, floor);
 
-/** The floor a daemon whose release writes for `own` leaves on a store that recorded `record`: the newer of the two. */
+/**
+ * The floor a daemon whose release writes for `own` leaves on a store that recorded `record`: the newer of the two.
+ * @param record The floor the store recorded, or null where it recorded none.
+ * @param own The floor this daemon's release writes for.
+ */
 export const floorAfter: FloorAfter = (record, own) => (record !== null && olderThan(own, record) ? record : own);

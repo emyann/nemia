@@ -54,6 +54,8 @@ function givenOf(declared: Readonly<Record<string, Parameter>>, sets: readonly s
  * The value of every parameter `declared`, from `sets` (each `<key>=<value>`, the last of a key winning) or its default. Refused, each by
  * name, every one at once: a `--set` with no `=`, a key not declared, a number or a boolean that does not read as one, and a parameter
  * with no default that no `--set` gives.
+ * @param declared The parameters the template declares, by name.
+ * @param sets The `--set` words given, each `<key>=<value>`.
  */
 export function resolveParams(
   declared: Readonly<Record<string, Parameter>>,
@@ -81,6 +83,9 @@ export function resolveParams(
  * A factory's `held` parameters as `--set` words a template that `declared` its parameters takes, followed by `sets`, so a `--set` of
  * the same key wins (`givenOf`); and the held keys it does not declare, sorted, which the words leave out. A key of `sets` is not
  * filtered: one the template does not declare is refused by `resolveParams`, never dropped.
+ * @param declared The parameters the template declares, by name.
+ * @param held The factory's own parameters, by name.
+ * @param sets The `--set` words given, each `<key>=<value>`, which follow the held ones.
  */
 export function overlaid(
   declared: Readonly<Record<string, Parameter>>,
@@ -94,7 +99,11 @@ export function overlaid(
   return { sets: [...kept.map(([key, value]) => `${key}=${String(value)}`), ...sets], dropped };
 }
 
-/** `text` with each `${{ parameters.<name> }}` in it written with the value `params` gives. Refused: a name `params` lacks. */
+/**
+ * `text` with each `${{ parameters.<name> }}` in it written with the value `params` gives. Refused: a name `params` lacks.
+ * @param text The text to write.
+ * @param params The parameters' values, by name.
+ */
 export function interpolated(text: string, params: Params): string {
   return writeExpressions(text, (name) => {
     if (!Object.hasOwn(params, name))
@@ -108,6 +117,8 @@ export function interpolated(text: string, params: Params): string {
 /**
  * `value` with each `{param: <name>}` in it, at any depth, replaced by the value `params` gives, and each `${{ parameters.<name> }}`
  * inside a string written with it (`interpolated`). Refused: a name `params` lacks.
+ * @param value The value read from a template's file: a string, a list, a map or a scalar.
+ * @param params The parameters' values, by name.
  */
 export function substitute(value: unknown, params: Params): unknown {
   if (typeof value === 'string') return interpolated(value, params);

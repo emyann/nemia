@@ -64,6 +64,12 @@ import type { LandingSaid, Verdict } from '../check/index.ts';
  * `again` files nothing, and a person's ask — at the cap, or below it — is due only with a `--budget` above what each of those steps has
  * cost.
  *
+ * @param steps The workflow the run is judged by: its looping steps, and the steps of each loop.
+ * @param run The run whose loops are read.
+ * @param phaseOf The phase of each of the run's tasks, by its id, as the caller read them on this pass.
+ * @param closeoutOf How each step signed off, or undefined where it has not: a looping step's `again`. Left out, none has.
+ * @param askedCloseout Whether the engine's record of each task, by its id, asked it for a closeout (`CloseoutAsked`). Left out, none was.
+ * @param asks What people asked for with `nemia retry --round`, and the run has not consumed. Left out, none.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget.
  * @param verdictOf What each step's current check exited with (`exitVerdicts`), as the pass reads it: a check that refused holds a step
  *   over its budget (`standing`).
@@ -140,6 +146,10 @@ function askedRound(
  *
  * The target's record keeps what its new try is filed on (`filedOn`): the revisions of its agent and its skills, and the digest of the
  * closeout schema it is given, as every other filing keeps them.
+ * @param steps The workflow the run is judged by: the steps of the round's loop, and its target.
+ * @param run The run the round is filed on.
+ * @param r The round filed: its looping step, its target, on whose word, and a budget a person raised with it.
+ * @param taskId The id of the task just filed for the round's target, which takes the target's place.
  */
 export function roundFiled(steps: readonly StepSpec[], run: Run, r: Round, taskId: string): Run['steps'] {
   const looping = steps.find((s) => s.name === r.step);
@@ -163,7 +173,11 @@ export function roundFiled(steps: readonly StepSpec[], run: Run, r: Round, taskI
   return { ...refiled, [r.target]: { ...(refiled[r.target] ?? { taskId: null }), ...filed } };
 }
 
-/** The pass's line for a round it filed: its round and on whose word, or the merge it files (`mergeNote`). */
+/**
+ * The pass's line for a round it filed: its round and on whose word, or the merge it files (`mergeNote`).
+ * @param r The round filed.
+ * @param looping The round's looping step, whose `rounds:` the line names.
+ */
 export const roundFiledNote = (r: Round, looping: StepSpec): string =>
   r.merge
     ? mergeNote(r)
@@ -172,6 +186,9 @@ export const roundFiledNote = (r: Round, looping: StepSpec): string =>
 /**
  * What a round filed tells its target of itself (`RoundBriefing`): its loop, its number, the loop's `rounds:`, on whose word, and what it
  * merges — with what the ending's check said of the merged tree, where a merge is asked on its refusal (`landing`).
+ * @param r The round filed.
+ * @param looping The round's looping step, whose `rounds:` the briefing names.
+ * @param landing What the ending's check said of the merged tree, where the round is a merge asked on its refusal; undefined otherwise.
  */
 export const roundBriefed = (r: Round, looping: StepSpec, landing?: LandingSaid) => ({
   loop: r.step,
@@ -181,13 +198,19 @@ export const roundBriefed = (r: Round, looping: StepSpec, landing?: LandingSaid)
   ...(r.merge ? { merge: { onto: r.merge.onto, sha: r.merge.sha, ...(landing ? { landing } : {}) } } : {}),
 });
 
-/** The round asks a record already answers — each names a round its loop has reached. The tick consumes these. */
+/**
+ * The round asks a record already answers — each names a round its loop has reached. The tick consumes these.
+ * @param run The run whose loops' rounds the asks are read against.
+ * @param asks The round asks on the run that the tick has not consumed.
+ */
 export const spentRoundAsks = (run: Run, asks: readonly RoundAsk[]): RoundAsk[] =>
   asks.filter((a) => (a.merge ? mergeSpent(run, a) : a.round <= roundOf(run, a.step)));
 
 /**
  * Why a `--budget` cannot ride on `nemia retry <id> --round`, in words that say what to do instead — or null. Pure, and asked before
  * anything about the run, by `roundAsk` and by a caller that answers it apart: an amount that is not dollars above zero.
+ * @param id The run's id, named in the refusal's command.
+ * @param budget The amount given with `--budget`, in dollars, or undefined where none was given.
  */
 export const roundBudgetRefusal = (id: string, budget?: number): string | null =>
   budget !== undefined && !(Number.isFinite(budget) && budget > 0)
@@ -235,6 +258,13 @@ function roundWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[], over
  * offered that approval and the send-back of the work (`sendBackTo`); with an ending that stopped on the base branch (`endingStopped`),
  * the send-back of the looping step, whose `again: true` is the round, or the ending's try to land again.
  *
+ * @param steps The workflow the run is judged by: its loops and their steps.
+ * @param run The run the round is asked of.
+ * @param name The looping step the person named, or undefined where they named none.
+ * @param phaseOf The phase of each of the run's tasks, by its id, as the caller read them.
+ * @param closeoutOf How each step signed off, or undefined where it has not. Left out, none has.
+ * @param askedCloseout Whether the engine's record of each task, by its id, asked it for a closeout. Left out, none was.
+ * @param asks What people asked for with `nemia retry --round`, and the run has not consumed: a round already asked for.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget.
  * @param budget The cap `nemia retry --round --budget` raises the loop's steps over their budget to.
  * @param verdictOf What each step's current check exited with (`exitVerdicts`): a step of the loop is named as `nemia ls` names it.
@@ -382,6 +412,8 @@ const loopingOf = (named: StepSpec | undefined, loops: readonly StepSpec[]): Ste
 /**
  * Why the words given with an acceptance cannot ride on it — or null. Pure, and asked before anything about the run: words that are missing
  * or empty.
+ * @param message The words given with `--message`, or undefined where none were.
+ * @param command The command the refusal tells a person to type again, its `--message` added.
  */
 export const acceptWordsRefusal = (message: string | undefined, command: string): string | null =>
   message === undefined
@@ -476,6 +508,13 @@ function gateNotLoop(
  * files itself, below the cap, and one held on a step's budget below the cap — each named with the `nemia retry --round` that is the way
  * on; a loop that ended `again: false`, which handed on by itself; and a round still running.
  *
+ * @param steps The workflow the run is judged by: its loops, their steps and the gates.
+ * @param run The run the acceptance is asked of.
+ * @param name The looping step the person named, or undefined where they named none.
+ * @param message The words given with `--message`: why the work is good enough as it stands; undefined where none were.
+ * @param phaseOf The phase of each of the run's tasks, by its id, as the caller read them.
+ * @param closeoutOf How each step signed off, or undefined where it has not. Left out, none has.
+ * @param askedCloseout Whether the engine's record of each task, by its id, asked it for a closeout. Left out, none was.
  * @param asks What people asked for with `nemia retry --round`, and the run has not consumed yet: a round already asked for.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget.
  * @param verdictOf What each step's current check exited with (`exitVerdicts`): the loop read as `nemia ls` reads it.
@@ -561,11 +600,18 @@ export function acceptAsk(
 
 /**
  * A loop a person ended as it stands, beside its looping step's line: the round it was on, that it asked again, and when they said enough.
+ * @param step The looping step whose line the note sits beside.
+ * @param run The run the loop is in: the round it was on.
+ * @param a The person's acceptance: when they said enough.
  */
 export const acceptedNote = (step: StepSpec, run: Run, a: Acceptance): string =>
   `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — accepted as it stands at ${a.at}, its findings open`;
 
-/** A round due now, as `nemia ls` and `nemia decide` say it. */
+/**
+ * A round due now, as `nemia ls` and `nemia decide` say it.
+ * @param steps The workflow the run is judged by: the looping step's `rounds:`.
+ * @param r The round due.
+ */
 export function roundDueNote(steps: readonly StepSpec[], r: Round): string {
   const looping = steps.find((s) => s.name === r.step);
   if (r.by === 'merge') return mergeDueNote(r);
@@ -578,6 +624,9 @@ export function roundDueNote(steps: readonly StepSpec[], r: Round): string {
  * A loop out of rounds, beside its looping step's line: where it stands, and the command that takes it once more — with `--budget`, past a
  * step's. On a pruned run, where it stands and why there is no more: `nemia retry --round` is refused there (`prunedRefusal`), and a note
  * never offers a refused verb.
+ * @param step The looping step out of rounds.
+ * @param run The run the loop is in: its round, and whether it is pruned or held.
+ * @param raise Whether a step of the loop is over its budget, so the command offered carries `--budget`.
  */
 export const exhaustedNote = (step: StepSpec, run: Run, raise = false): string =>
   `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round${raise ? ' --budget <amount>' : ''}`}`;
@@ -585,6 +634,8 @@ export const exhaustedNote = (step: StepSpec, run: Run, raise = false): string =
 /**
  * A loop whose round waits on a step's budget, beside its looping step's line: where it stands, and the command that raises the cap for the
  * round — or, pruned, why there is none.
+ * @param step The looping step whose round waits on a budget.
+ * @param run The run the loop is in: its round, and whether it is pruned or held.
  */
 export const heldNote = (step: StepSpec, run: Run): string =>
   `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round --budget <amount>`}`;
@@ -595,6 +646,8 @@ const noMoreRounds = (pruned: Pruned): string => `no round more, since the run w
  * Where a verb would be offered on a held run, what is said instead, with what the person who put the hold said of it: `held until a-1x2y
  * lands (why: merge conflicts; by operator); its approval is asked once the hold lifts`. Every verb that would release work is refused
  * while the hold stands (`heldRefusal`), and a note never offers a refused verb.
+ * @param hold The hold on the run: the runs it waits on, why, and by whom.
+ * @param what What would be offered, said in its place: `once more`, `its approval`.
  */
 export const heldLater = (hold: Hold, what: string): string =>
   `${holdWord(
@@ -614,6 +667,10 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
  * is `retryLines`' to offer. `nemia approve` is offered only out of rounds: below the cap the run goes round itself, and on a round held
  * for a budget raising it is the way on (`acceptAsk`). Each offer is its sentence and the bare command it ends on (`Offer`), the sentence
  * written around the command.
+ * @param steps The workflow the run is judged by: its loops, their steps, and what waits on each.
+ * @param run The run the offers are for.
+ * @param d What the run waits on (`Decision`): only an awaiting one names loops out of rounds or held on a budget.
+ * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget. Left out, nothing has cost.
  */
 export function roundOffers(steps: readonly StepSpec[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): Offer[] {
   if (d.kind !== 'awaiting' || !honoursAsks(run)) return [];
@@ -648,5 +705,8 @@ export function roundOffers(steps: readonly StepSpec[], run: Run, d: Decision, s
     });
 }
 
-/** What `nemia decide` offers for each loop out of rounds, as its lines: each offer's sentence (`roundOffers`). Pure. */
+/**
+ * What `nemia decide` offers for each loop out of rounds, as its lines: each offer's sentence (`roundOffers`). Pure.
+ * @param args What `roundOffers` takes: the workflow, the run, what it waits on and what each task cost.
+ */
 export const roundLines = (...args: Parameters<typeof roundOffers>): string[] => roundOffers(...args).map((o) => o.said);

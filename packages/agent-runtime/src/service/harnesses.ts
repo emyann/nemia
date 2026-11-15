@@ -11,6 +11,8 @@ import { DEFAULT_HARNESSES } from './default-harnesses.ts';
  * then a harness this engine does not have, and what the harness named has no knob for or refuses in its own words (`harnessRefusalOf`) —
  * a mode, an effort or a window it does not take, a background session, a spend cap, a tool list or Claude Code's flags where it has none.
  * A remote agent's entry is `remoteConfigRefusal`'s.
+ * @param harness The name of the harness the task would be filed on.
+ * @param config The task's `config`, the harness's arguments.
  */
 export const configRefusal = (harness: string, config: HarnessArgs): string | undefined =>
   argsRefusalOf({ config }) ?? harnessRefusalOf({ brief: '', cwd: '', harness, config }, DEFAULT_HARNESSES);

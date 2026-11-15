@@ -145,6 +145,7 @@ const notDefaultBy = <A>(name: string, verb: FactoryWrite, act: Effect.Effect<A,
  * The door over `layer`: each method as `doorOf` makes it, each write's name and factory checked before the layer writes; the default
  * factory answered by the door itself — listed first, read as its record, its servers its own, its level none (the store's), and every
  * other write of it, or a read of the rules and instruction it keeps none of, refused `Conflict`.
+ * @param layer The layer of reads and writes the door is over: the store's files, or memory in a test.
  */
 export function factoryDoorOver(layer: FactoryLayer): FactoryDoorShape {
   const door = doorOf<FactoryLayer, FactoryName>(layer);
@@ -206,6 +207,8 @@ export function factoryDoorOver(layer: FactoryLayer): FactoryDoorShape {
 /**
  * The Conflict of a write of the text the store keeps for the factory `name`, whose file keeps its instruction at `file`, in its first
  * folder: the store writes no file there.
+ * @param name The factory's name.
+ * @param file The file in the factory's first folder its instruction is read from.
  */
 export const folderKeptRefusal = (name: string, file: string): Conflict =>
   new Conflict({
@@ -215,6 +218,10 @@ export const folderKeptRefusal = (name: string, file: string): Conflict =>
 /**
  * The instruction of `factory` as it reads, `storeFile` the file the store keeps for it, `words` how the words kept at a place are read,
  * and `stored` whether the store keeps text at a file: where it is kept (`instructionAt`), the path its file names, and what is there.
+ * @param factory The factory whose instruction is read.
+ * @param storeFile The file the store keeps the factory's instruction in.
+ * @param words Reads the words kept where the instruction is, or why they do not read.
+ * @param stored Whether the store keeps text at a file, by its path.
  */
 export function instructionRead(
   factory: Factory,
@@ -250,6 +257,7 @@ const levelHeld = (read: () => FactoryLevelFile | undefined): FactoryLevelFile |
  * rules are its tree's where it is made from a template, so the rules ask the factory first, refused as a read refuses it. Its
  * generation is counted by the file's writes: filed at 1 (`createFactoryAt`), one more by a write back that changes its spec
  * (`rewriteFactoryAt`) and by a level written that changes it, of a factory that has a file.
+ * @param home The store's root.
  */
 export function factoryFiles(home: string): FactoryLayer {
   const rulesOf = (name: string, notDone: string) => rulesAtHome(home, readFactoryAt(home, name, notDone));
@@ -322,6 +330,8 @@ export const FactoryDoor = Context.Reference<FactoryDoorShape>('agent-orchestrat
 /**
  * The factory `name` filed, read through the door: what a verb that changes a factory reads, the default factory, which `nemia factory
  * <verb>` does not take, refused `Conflict` as the door refuses its writes. A write asked it, so a miss says nothing was changed.
+ * @param name The factory's name, as the person typed it.
+ * @param verb The `nemia factory` verb that asks, named in the default factory's refusal.
  */
 export const filedFactory = (name: string, verb: FactoryWrite): Effect.Effect<Factory, Refusal> =>
   Effect.gen(function* () {
@@ -335,7 +345,10 @@ export const filedFactory = (name: string, verb: FactoryWrite): Effect.Effect<Fa
     return isDefaultFactory(record) ? yield* Effect.fail(new Conflict({ message: defaultFactoryRefusal(verb) })) : record;
   });
 
-/** The factory `name` filed, read through the door; none for no name and for the default, which has no spec of its own. */
+/**
+ * The factory `name` filed, read through the door; none for no name and for the default, which has no spec of its own.
+ * @param name The factory's name, or undefined where none is named.
+ */
 export const factoryOrNone = (name: string | undefined): Effect.Effect<Factory | undefined, Refusal> =>
   name === undefined
     ? Effect.succeed(undefined)
@@ -347,6 +360,8 @@ export const factoryOrNone = (name: string | undefined): Effect.Effect<Factory |
 /**
  * `use` of the Factory door the program is given, its default's root `home`: for a program that names its store's root rather than
  * being given `StoreRoot`.
+ * @param home The store's root the door's default is rooted at.
+ * @param use What to do with the door.
  */
 export const doorAt = <A>(home: string, use: (door: FactoryDoorShape) => Effect.Effect<A, Refusal>): Effect.Effect<A, Refusal> =>
   Effect.provideService(
@@ -360,6 +375,8 @@ export const doorAt = <A>(home: string, use: (door: FactoryDoorShape) => Effect.
 /**
  * `use` of the Factory door over the files of the store `home`, run at once, its refusal thrown: for a synchronous caller that names its
  * root and is no program yet, so its reads and writes are the door's, checked as the door checks them.
+ * @param home The store's root.
+ * @param use What to do with the door.
  */
 export const doorAtOnce = <A>(home: string, use: (door: FactoryDoorShape) => Effect.Effect<A, Refusal>): A =>
   Effect.runSync(use(factoryDoorOver(factoryFiles(home))));
@@ -386,12 +403,18 @@ export {
 /**
  * Every factory of the store `home` as its file reads, or why it does not, through the door at once: the default, which is no file, left
  * out.
+ * @param home The store's root.
  */
 export const listedAtOnce = (home: string): readonly FactoryListing[] => doorAtOnce(home, (door) => door.factories.listed());
 
 /**
  * The factory a start in the store `home` goes to, named or found from the folder `at` (`startFactoryAt`), the default factory only where
  * `defaultStarts` lets it.
+ * @param home The store's root.
+ * @param named The factory's name the start gives, or undefined where it names none.
+ * @param at The folder the start is made from, whose repository finds the factory where none is named.
+ * @param fix The start's words for naming a factory, `<name>` in them: `--factory <name>`, or `?factory=<name>`.
+ * @param defaultStarts Whether a start that finds no factory goes to the default one.
  */
 export const startFactoryAtOnce = (
   home: string,
@@ -404,10 +427,17 @@ export const startFactoryAtOnce = (
 /**
  * The factory `name` of the store `home`, as a start or a filing in it reads it: refused as `readFactoryAt` refuses it, `notDone` saying
  * what the caller did not do. For a caller that is no program and names what it did not do.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param notDone What the caller did not do, said at the end of a refusal.
  */
 export const readFactoryAtOnce = (home: string, name: string, notDone: string): Factory => readFactoryAt(home, name, notDone);
 
-/** The factory `name` filed in the store `home`, read through the door at once; none for the default, which has no spec of its own. */
+/**
+ * The factory `name` filed in the store `home`, read through the door at once; none for the default, which has no spec of its own.
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export const filedAtOnce = (home: string, name: string): Factory | undefined =>
   doorAtOnce(home, (door) =>
     Effect.map(door.factories.read(FactoryName.read(name)), (record) => (isDefaultFactory(record) ? undefined : record)),
@@ -416,21 +446,35 @@ export const filedAtOnce = (home: string, name: string): Factory | undefined =>
 /**
  * The templated factory `name` in the store `home`, read through the door, and its tree for `who` to write into: refused as
  * `treeChecked` refuses a factory with no tree, the default among them, or one not rendered yet.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param who The command that writes into the tree, named in a refusal.
  */
 export const templatedAtOnce = (home: string, name: string, who: string): { factory: Factory; tree: string } => {
   const factory = treeChecked(name, filedAtOnce(home, name), who);
   return { factory, tree: factory.tree };
 };
 
-/** The tree of the factory `name` in the store `home`, as `templatedAtOnce` reads it. */
+/**
+ * The tree of the factory `name` in the store `home`, as `templatedAtOnce` reads it.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param who The command that writes into the tree, named in a refusal.
+ */
 export const templatedTreeOf = (home: string, name: string, who: string): string => templatedAtOnce(home, name, who).tree;
 
-/** The Factory door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`. */
+/**
+ * The Factory door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`.
+ * @param root The store's root.
+ */
 export const factoryDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(FactoryDoor)(factoryDoorOver(factoryFiles(root)));
 
 /**
  * The factory `name` filed in the store `home`, read through the door at once, for `verb`: refused as `filedFactory` refuses it, the
  * default factory among it, which has no spec of its own.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param verb The `nemia factory` verb that asks, named in the default factory's refusal.
  */
 export const factoryAtOnce = (home: string, name: string, verb: FactoryWrite): Factory =>
   Effect.runSync(Effect.provide(filedFactory(name, verb), factoryDoorFiles(home)));

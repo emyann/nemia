@@ -65,6 +65,13 @@ const trialOf =
  * (`mergeAsk`, which asks the place last, once nothing else refuses it), on the commit its trial read the base at, in the words of
  * `mergeOffer`.
  * None on any other run.
+ * @param place The run's place, which makes the trial merge.
+ * @param steps The workflow's steps.
+ * @param run The run's record.
+ * @param d What the run waits on; only a run awaiting a person is offered a merge.
+ * @param rounds The asks written on the run.
+ * @param read How the run's tasks and steps are read: each task's phase, each step's closeout, what a closeout asks, the spend and each
+ * step's verdict.
  */
 export function mergeOffers(
   place: Place,

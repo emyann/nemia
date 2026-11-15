@@ -147,7 +147,10 @@ export const DEFAULT_FACTORY_RECORD: DefaultFactory = { kind: 'default', name: D
  */
 export type FactoryRecord = FactoryAsRead | DefaultFactory;
 
-/** Whether `record` is the default factory's. */
+/**
+ * Whether `record` is the default factory's.
+ * @param record What the door read under a factory's name.
+ */
 export const isDefaultFactory = (record: FactoryRecord): record is DefaultFactory => 'kind' in record && record.kind === 'default';
 
 /**

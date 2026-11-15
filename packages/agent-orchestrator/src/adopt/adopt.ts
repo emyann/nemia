@@ -30,6 +30,9 @@ const strandedSchedules = (schedules: Factory['schedules'], offered: readonly st
  * Why `factory` is not taken over as `adoption` says, or null: made from a template already (`Templated`); then a card or a schedule it
  * would strand (`Stranded`, every one named); then a base or tree already there that is not the render (`Leftover`). A base and tree that
  * are the render, as a takeover stopped half way leaves them, are taken.
+ * @param factory The factory as it is in the store.
+ * @param adoption What the takeover is judged against: the render's wiring, the cards filed for the factory, the digests of a base and
+ *   tree already there, and the render's own digest.
  */
 export const adoptRefusal: AdoptRefusal = (factory, adoption) => {
   if (factory.template !== undefined) return { kind: 'Templated', message: templatedAdoptRefusal(factory.name) };
@@ -56,6 +59,10 @@ export const adoptRefusal: AdoptRefusal = (factory, adoption) => {
  * `factory` taken over by `template`, running from `tree`: its name, repositories, schedules, instruction, volumes, harness settings,
  * cost lines, origins and workflows' repositories kept; its workflows, hires and revisions policy the template's `wiring`. A cost line
  * of a workflow the wiring does not offer is refused at the door's write, naming its `nemia factory cost-line rm`.
+ * @param factory The factory as it is in the store, whose own fields are kept.
+ * @param wiring The render's wiring: its workflows, hires and revisions policy.
+ * @param template The template the factory is made from after the takeover.
+ * @param tree The folder the factory runs from after the takeover.
  */
 export const adopted: Adopted = (factory, wiring, template, tree) => ({
   name: factory.name,
@@ -122,6 +129,10 @@ function hireChanges(was: Hires, now: Hires): HireChange[] {
 /**
  * What taking `factory` over as `adoption` says will change (`AdoptPlan`): `runs`, its runs that wait on a person or are in flight, and
  * `rules`, the store's rules file of it where it holds words, which the tree's take the place of.
+ * @param factory The factory as it is in the store.
+ * @param adoption What the takeover is judged against, the render's wiring among it.
+ * @param runs The ids of its runs that wait on a person or are in flight.
+ * @param rules The store's rules file of the factory, or null where it holds no words.
  */
 export function adoptPlan(factory: Factory, adoption: Adoption, runs: readonly string[], rules: string | null): AdoptPlan {
   const was = new Set(factory.workflows);
@@ -167,6 +178,9 @@ const hireLine = (h: HireChange): string =>
  * `plan` as `nemia factory diff` prints it for a hand-made factory: what stays, what the template rewires, the rules no longer read and
  * the line that writes them into the tree, the runs waiting or in flight and the policy they follow after, what it would strand, and
  * the line to type, `adopt`, which carries the plan's `digest`. Nothing is written.
+ * @param plan What the takeover will change.
+ * @param digest The plan's digest, printed and carried by the line that takes it over.
+ * @param adopt The line to type that takes the factory over.
  */
 export function adoptLines(plan: AdoptPlan, digest: string, adopt: string): string[] {
   const { factory, kept, workflows, hires, revisions, rules, runs, stranded } = plan;

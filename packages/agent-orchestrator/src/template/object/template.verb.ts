@@ -93,7 +93,10 @@ const renderStaged = Effect.fn('renderStaged')(function* (root: string, dir: str
   stageFolder(dir, entries, false);
 });
 
-/** The names of a template's documents among its `files`: each workflow, agent and skill whose document is there, each sorted. */
+/**
+ * The names of a template's documents among its `files`: each workflow, agent and skill whose document is there, each sorted.
+ * @param files The paths of the template's files.
+ */
 export function templateDocumentsOf(files: readonly string[]): { workflows: string[]; agents: string[]; skills: string[] } {
   const named = (holder: string, leaf: string): string[] =>
     files

@@ -27,6 +27,8 @@ export { holdsOpen } from './holds-open/holds-open.ts';
 
 /**
  * Why the words given with an approval cannot ride on it — or null. Pure, and asked before anything about the run: words that are empty.
+ * @param message The words given with `--message`, or undefined where none were given.
+ * @param command The command the refusal offers again with words; `nemia approve <runId> <step>` when not given.
  */
 export const approvalWordsRefusal = (message: string | undefined, command = 'nemia approve <runId> <step>'): string | null =>
   message !== undefined && !message.trim()
@@ -92,7 +94,16 @@ function unfiledRefusal(step: StepSpec, run: Run, approved: string, given: Appro
  * (`notHandedOn`, so the refusal and the gate agree, a looping step that asked for another round among them); and at its gate with its
  * result already on the base branch (`resultOnBase`), where nothing is left to merge.
  *
+ * @param steps The workflow's steps.
+ * @param run The run the step is of.
+ * @param name The step to approve.
+ * @param message The words given with the approval, or undefined where none were given.
+ * @param phaseOf The phase of a task, by its id.
+ * @param closeoutOf A step's closeout, by its name, or undefined where it has none; none for any step when not given.
+ * @param askedCloseout How a task's closeout was asked for, by the task's id; never asked when not given.
+ * @param verdictOf A step's check verdict, by its name, or undefined where it has none; none for any step when not given.
  * @param asks What people asked for with `nemia retry`, and the run has not consumed yet: a send-back already asked for.
+ * @param spendOf What a try of a step has cost, by its task's id; nothing known when not given.
  * @param standings Where each result branch stands against the base branch now (`branchStandings` in branches.store.ts). Left out, git is
  *   not asked, and the gate alone speaks.
  */
@@ -224,6 +235,10 @@ export type ApproveForm = 'gate' | 'loop';
  * to a loop where no step is named — a step at its gate is always named — or where the step closes a loop and is gated at no step; at its
  * gate where it is gated and closes no loop, and where it is not there, which the gate's own refusal names. A step both gated and closing
  * a loop is approved at its gate while it waits there, and its loop ended otherwise. Pure.
+ * @param steps The workflow's steps.
+ * @param run The run, by its gates.
+ * @param name The step named, or undefined where none is.
+ * @param atGate Whether that step waits at its gate now, asked only where it decides.
  */
 export function approveFormOf(
   steps: readonly StepSpec[],
@@ -251,6 +266,9 @@ export const takeBackStop: TakeBackStopOf = ({ known, approved, filed }) =>
  * been filed, neither its session nor its check (an ending waiting on the checkout, held, or not yet ticked); else why not, in words that
  * name the fix (`refused`). The stop is `takeBackStop`'s; the words of a step that has handed on are a second approval's
  * (`handedOnWords`). Pure.
+ * @param steps The workflow's steps.
+ * @param run The run the step is of.
+ * @param name The step whose approval is taken back.
  */
 export function takeBackJudged(steps: readonly StepSpec[], run: Run, name: string): { approval: Approval } | { refused: string } {
   const step = steps.find((s) => s.name === name);

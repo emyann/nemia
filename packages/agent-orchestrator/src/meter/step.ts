@@ -41,6 +41,7 @@ export const STEP_ATTRIBUTE_KEYS: readonly string[] = ['factory', 'workflow', 's
 /**
  * `attributes`, as they are, once every key is one of `STEP_ATTRIBUTE_KEYS`. Refuses (`Invalid`) the first key that is not, naming it: a
  * run's id, a task's, or anything else that grows with the store.
+ * @param attributes The attributes a metric or a span is to carry, by key.
  */
 export function boundedAttributes(attributes: Readonly<Record<string, string>>): Record<string, string> {
   const loose = Object.keys(attributes).find((key) => !STEP_ATTRIBUTE_KEYS.includes(key));
@@ -57,7 +58,10 @@ export function boundedAttributes(attributes: Readonly<Record<string, string>>):
 /** The four labels a step is known by, beside a run or an outcome: the factory, the workflow, the step and its agent. */
 export type StepKeys = { factory: string; workflow: string; step: string; agent: string };
 
-/** The two labels a run is known by, whatever the step: its factory or the default, and its workflow's folder. */
+/**
+ * The two labels a run is known by, whatever the step: its factory or the default, and its workflow's folder.
+ * @param run The run, its factory and its workflow's folder.
+ */
 export const runKeys = (run: Pick<Run, 'factory' | 'workflowDir'>): Pick<StepKeys, 'factory' | 'workflow'> => ({
   factory: runNamespace(run.factory),
   workflow: path.basename(run.workflowDir),
@@ -66,6 +70,8 @@ export const runKeys = (run: Pick<Run, 'factory' | 'workflowDir'>): Pick<StepKey
 /**
  * The labels of `step` in `run`, the one source of both its metrics' attributes and its sessions' labels: the run's factory or the
  * default, its workflow's folder, the step, and its agent or `none`.
+ * @param run The run, its factory and its workflow's folder.
+ * @param step The step, with its agent where it has one.
  */
 export const stepKeys = (run: Pick<Run, 'factory' | 'workflowDir'>, step: StepSpec): StepKeys => ({
   ...runKeys(run),
@@ -73,7 +79,12 @@ export const stepKeys = (run: Pick<Run, 'factory' | 'workflowDir'>, step: StepSp
   agent: step.agent?.name ?? 'none',
 });
 
-/** The attributes of `step`'s metric in `run`, for `outcome`: its labels (`stepKeys`) and the outcome. */
+/**
+ * The attributes of `step`'s metric in `run`, for `outcome`: its labels (`stepKeys`) and the outcome.
+ * @param run The run, its factory and its workflow's folder.
+ * @param step The step, with its agent where it has one.
+ * @param outcome How the try, the check, the round or the gate came out.
+ */
 export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: StepSpec, outcome: string): Record<string, string> =>
   boundedAttributes({ ...stepKeys(run, step), outcome });
 
@@ -140,13 +151,21 @@ function tasksOf(record: Run['steps'][string]): Array<{ taskId: string; metric: 
   return all.filter((t) => !seen.has(t.taskId) && seen.add(t.taskId));
 }
 
-/** How a session ended: `done` or `blocked` as it signed, the step's current one read off its closeout, else `failed` or `stopped`. */
+/**
+ * How a session ended: `done` or `blocked` as it signed, the step's current one read off its closeout, else `failed` or `stopped`.
+ * @param view The engine's view of the session's task.
+ * @param current Whether the task is the step's current one, whose closeout says blocked.
+ * @param closeout The step's closeout, or undefined where it has none.
+ */
 export function tryOutcome(view: FactView, current: boolean, closeout: Closeout | undefined): string {
   if (view.state.settled !== 'succeeded') return view.state.settled ?? 'failed';
   return current && closeout?.outcome === 'blocked' ? 'blocked' : 'done';
 }
 
-/** How a check ended: `passed` on exit 0, `refused` on another exit, `unfinished` with none (`attemptVerdict`). */
+/**
+ * How a check ended: `passed` on exit 0, `refused` on another exit, `unfinished` with none (`attemptVerdict`).
+ * @param view The engine's view of the check's task.
+ */
 export function checkOutcome(view: FactView): string {
   const verdict = attemptVerdict(view.state.attempts.at(-1));
   return verdict === 'unfinished' ? verdict : verdict === 0 ? 'passed' : 'refused';
@@ -180,6 +199,10 @@ function tryFact(run: Run, step: StepSpec, taskId: string, view: FactView, reads
  * The facts of `run`'s tasks that settled (`settled`), read before the pass files anything over them: a fact for each session and each
  * check, and a round `exhausted` for each step one of them leaves out of rounds. A task of another run, or one the pass has no view of,
  * is no fact.
+ * @param run The run whose tasks settled.
+ * @param steps The steps of the run's workflow.
+ * @param settled The ids of the tasks that settled and are due.
+ * @param reads What the pass already read of the run's tasks.
  */
 export function settledFacts(run: Run, steps: readonly StepSpec[], settled: ReadonlySet<string>, reads: FactReads): StepFact[] {
   if (!settled.size) return [];
@@ -203,6 +226,9 @@ export function settledFacts(run: Run, steps: readonly StepSpec[], settled: Read
  * that its view says settled and the run's mark (`settlesCounted`) does not hold. Read off the record and the views alone, so a task
  * that settled while no daemon read is due on the first pass that reads it. A task the pass has no view of is not due, nor any
  * task of a record with no mark, written before the tick kept one.
+ * @param run The run, with its mark of the settles counted.
+ * @param steps The steps of the run's workflow.
+ * @param views The engine's views of the run's tasks, by task id.
  */
 export function settlesDue(run: Run, steps: readonly StepSpec[], views: ReadonlyMap<string, FactView>): Set<string> {
   const counted = run.settlesCounted;
@@ -218,6 +244,9 @@ export function settlesDue(run: Run, steps: readonly StepSpec[], views: Readonly
  * What a pass hands the metrics of `run`'s settled tasks, once: their facts (`settledFacts`) and the waits they ended (`settledWaits`),
  * for the tasks due by the run's mark (`settlesDue`), with that mark as it stands once they are handed over (`marks`), for the tick to
  * write. A record with no mark counts none, and no mark is made.
+ * @param run The run, with its mark of the settles counted.
+ * @param steps The steps of the run's workflow.
+ * @param reads What the pass already read of the run's tasks.
  */
 export function settledOnce(
   run: Run,
@@ -229,7 +258,12 @@ export function settledOnce(
   return { facts, marks: due.size ? { settlesCounted: [...(run.settlesCounted ?? []), ...due] } : {} };
 }
 
-/** A round `granted` for each looping step whose loop the pass took round again (`looped`). */
+/**
+ * A round `granted` for each looping step whose loop the pass took round again (`looped`).
+ * @param run The run whose loops were taken round.
+ * @param steps The steps of the run's workflow.
+ * @param looped The names of the steps whose loop the pass took round again.
+ */
 export const roundsGranted = (run: Run, steps: readonly StepSpec[], looped: readonly string[]): StepFact[] =>
   steps.filter((s) => looped.includes(s.name)).map((step) => ({ metric: 'round', attributes: stepAttributes(run, step, 'granted') }));
 
@@ -258,13 +292,17 @@ export type Waited = { from: string; to: string; ms: number };
 const between = (from: string | null | undefined, to: string | null | undefined): Waited | null =>
   from && to ? { from, to, ms: Math.max(0, Date.parse(to) - Date.parse(from)) } : null;
 
-/** A task's wait in the queue: from its filing to its first attempt's spawn, the timeline's `queuedMs`; null where either is not known. */
+/**
+ * A task's wait in the queue: from its filing to its first attempt's spawn, the timeline's `queuedMs`; null where either is not known.
+ * @param view The engine's view of the session's task.
+ */
 export const queueWait = (view: FactView): Waited | null =>
   between(view.state.filedAt, view.state.attempts.find((a) => a.spawnedAt)?.spawnedAt);
 
 /**
  * A check's run: from its first attempt's spawn to its last attempt's end, the timeline's `ranMs` of a check; null where either is not
  * known.
+ * @param view The engine's view of the check's task.
  */
 export const checkWait = (view: FactView): Waited | null =>
   between(view.state.attempts.find((a) => a.spawnedAt)?.spawnedAt, view.state.attempts.at(-1)?.endedAt);
@@ -283,6 +321,10 @@ function triesOf(record: Run['steps'][string]): Array<{ taskId: string; try: num
 /**
  * The queue of each session and the run of each check of `run` that settled (`settled`), off what the pass read of them before it filed
  * anything over them. A task of another run, one the pass has no view of, and one never spawned are no fact.
+ * @param run The run whose tasks settled.
+ * @param steps The steps of the run's workflow.
+ * @param settled The ids of the tasks that settled and are due.
+ * @param reads What the pass already read of the run's tasks.
  */
 export function settledWaits(run: Run, steps: readonly StepSpec[], settled: ReadonlySet<string>, reads: FactReads): WaitFact[] {
   if (!settled.size) return [];
@@ -312,6 +354,9 @@ const answeredLate = (run: Pick<Run, 'runTimed'>, t: TimelineTry): boolean => Bo
  * approval whose try is not on the timeline yet, or whose wait is not known, which a later pass times once it is. And none, ever, for a
  * wait read off the turn of a try that answered an earlier try's session (`answeredLate`) on a run whose timeline is not still to hand
  * over (`runTimed` other than `false`): such a gate of a run already handed over, or started before the mark, is never timed late.
+ * @param run The run, with its approvals and its mark of the gates timed.
+ * @param steps The steps of the run's workflow.
+ * @param views The engine's views of the run's tasks, by task id, that the timeline is read off.
  */
 export function gateWaits(run: Run, steps: readonly StepSpec[], views: ReadonlyMap<string, TaskClock>): WaitFact[] {
   const timed = run.gatesTimed;
@@ -335,6 +380,10 @@ export function gateWaits(run: Run, steps: readonly StepSpec[], views: ReadonlyM
  * counted before (`deniedCalls`), with the run's two marks as they stand once these are handed over (`marks`), for the tick to write:
  * `gatesTimed` with each gate timed, `deniedCounted` with each session's attempts counted through the last one read. A mark the record
  * has not is left out, and its facts are none.
+ * @param run The run, with its marks of the gates timed and the denied calls counted.
+ * @param steps The steps of the run's workflow.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param callOf The call as a permission rule names it, in the runtime's words.
  */
 export function onceFacts(
   run: Run,
@@ -379,6 +428,9 @@ export type DeniedFact = {
  * still running, give none: a later pass counts the running one once it ends. None on a record with no `deniedCounted`, written before
  * the tick counted denials.
  *
+ * @param run The run, with its mark of the denied calls counted.
+ * @param steps The steps of the run's workflow.
+ * @param views The engine's views of the run's tasks, by task id.
  * @param callOf The call as a permission rule names it, in the runtime's words.
  */
 export function deniedCalls(
@@ -435,6 +487,10 @@ export type TimelineFact = {
  * Each number of `run`'s timeline as a fact (`TimelineFact`), off `views`, which must hold every try's task and check, each filed when its
  * view says (`filedAt`): the rows `timelineRows` gives of the `timeline` the run's page reads. `outcome` is how the run ended. Null while
  * a task of the run is in flight, whose numbers are not the run's yet; `[]` for a run nothing was filed of.
+ * @param run The run that is over.
+ * @param steps The steps of the run's workflow.
+ * @param views The engine's views of every try's task and check, by task id.
+ * @param outcome How the run ended.
  */
 export function timelineFacts(
   run: Run,

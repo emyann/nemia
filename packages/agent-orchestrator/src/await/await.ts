@@ -12,6 +12,7 @@ export type { WaitBound } from '../../contracts/wait-bound.contract.ts';
  * How long a wait waits, from the bound it was given in milliseconds (`undefined`: none): four minutes where none was given, the one given
  * where it is above zero and at most four minutes and a half, else refused — never cut to the longest, since its caller asked for what it
  * would not get. Pure; proved by `contracts/wait-bound.contract.ts`.
+ * @param asked The bound asked, in milliseconds; undefined where none was given.
  */
 export const waitBound: WaitBoundOf = (asked) => {
   if (asked === undefined) return { ms: WAIT_DEFAULT_MS };
@@ -29,6 +30,7 @@ const UNIT_MS: Readonly<Record<string, number>> = { ms: 1, s: 1_000, m: 60_000 }
 /**
  * The milliseconds `text` says by its form alone (digits, then `ms`, `s` or `m`: `30s`, `4m`), its bound unread (`waitBound` judges it);
  * undefined where it does not read as one. Pure.
+ * @param text The duration as typed.
  */
 export function waitForOf(text: string): number | undefined {
   const [, digits, unit] = /^(\d+)(ms|s|m)$/.exec(text.trim()) ?? [];
@@ -39,6 +41,7 @@ export function waitForOf(text: string): number | undefined {
 /**
  * The bound `--for` (`text`, none given where undefined) asks of a wait, or why it is refused, in words that say the fix: a duration not
  * in its form, none to wait, or longer than a call lives. Pure.
+ * @param text The duration `--for` was given; undefined where it was given none.
  */
 export function waitForBound(text: string | undefined): { readonly ms: number } | { readonly refusal: string } {
   const asked = text === undefined ? undefined : waitForOf(text);

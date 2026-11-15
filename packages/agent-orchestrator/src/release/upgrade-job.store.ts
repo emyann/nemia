@@ -20,13 +20,24 @@ export const UpgradeRecord = Schema.StructWithRest(
 );
 export type UpgradeRecord = typeof UpgradeRecord.Type;
 
-/** The folder of the upgrades' records of the store at `home`. */
+/**
+ * The folder of the upgrades' records of the store at `home`.
+ * @param home The store's folder.
+ */
 export const upgradesDir = (home: string): string => path.join(home, 'upgrades');
 
-/** The record of the upgrade `id` of the store at `home`. */
+/**
+ * The record of the upgrade `id` of the store at `home`.
+ * @param home The store's folder.
+ * @param id The upgrade's id.
+ */
 export const upgradeFile = (home: string, id: string): string => path.join(upgradesDir(home), `${id}.json`);
 
-/** Writes `record` whole, by a temporary file and a rename, so no reader meets half of one. */
+/**
+ * Writes `record` whole, by a temporary file and a rename, so no reader meets half of one.
+ * @param home The store's folder.
+ * @param record The upgrade's record, its id naming the file.
+ */
 export function writeUpgradeRecord(home: string, record: UpgradeRecord): void {
   fs.mkdirSync(upgradesDir(home), { recursive: true });
   const hidden = path.join(upgradesDir(home), `.${record.id}-${process.pid}`);
@@ -34,7 +45,11 @@ export function writeUpgradeRecord(home: string, record: UpgradeRecord): void {
   fs.renameSync(hidden, upgradeFile(home, record.id));
 }
 
-/** The record of the upgrade `id`, or undefined where the store has none that reads: an id no upgrade was started under is no upgrade. */
+/**
+ * The record of the upgrade `id`, or undefined where the store has none that reads: an id no upgrade was started under is no upgrade.
+ * @param home The store's folder.
+ * @param id The upgrade's id; one that could leave the folder, or a dot name, reads as none.
+ */
 export function readUpgradeRecord(home: string, id: string): UpgradeRecord | undefined {
   if (id === '' || id.includes('/') || id.includes('\\') || id.startsWith('.')) return undefined;
   try {
@@ -47,6 +62,7 @@ export function readUpgradeRecord(home: string, id: string): UpgradeRecord | und
 /**
  * The store's last upgrade: the record of the newest start by `startedAt` (its id breaking a tie), among those that read; undefined where
  * none was started, or none reads.
+ * @param home The store's folder.
  */
 export function lastUpgradeRecord(home: string): UpgradeRecord | undefined {
   let names: string[];

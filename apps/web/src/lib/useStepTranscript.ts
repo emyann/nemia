@@ -20,6 +20,10 @@ export type { Following } from './following.ts';
  *
  * Read afresh for another task: a step tried again is filed as a new one. And read again, keeping what was read, when the step stops or
  * starts waiting on a person (`waiting`).
+ * @param runId The run's id.
+ * @param step The step's name.
+ * @param taskId The task whose conversation is read (`sessionToRead`), or null where the step has none to read.
+ * @param waiting Whether the step waits on a person.
  */
 export function useStepTranscript(runId: string, step: string, taskId: string | null, waiting = false): Following {
   const [state, setState] = useState<Following>(() => unread(taskId !== null));

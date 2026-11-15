@@ -86,7 +86,11 @@ function parsed(args: readonly string[]): GetAsked {
   return { ...out, word, name: slashed ?? second };
 }
 
-/** How long ago `at` was, as `kubectl get`'s AGE says it: `<n>s`, `<n>m`, `<n>h` or `<n>d`. */
+/**
+ * How long ago `at` was, as `kubectl get`'s AGE says it: `<n>s`, `<n>m`, `<n>h` or `<n>d`.
+ * @param at The moment, an ISO date; one that does not parse is `<unknown>`.
+ * @param now The moment the age is counted to, in ms since the epoch: now where it is left out.
+ */
 export const ageOf = (at: string, now: number = Date.now()): string => {
   const ms = now - Date.parse(at);
   if (!Number.isFinite(ms)) return '<unknown>';
@@ -105,7 +109,12 @@ const stateOf = (object: Served): string => {
   return typeof said === 'string' ? said : '<none>';
 };
 
-/** The table of `objects`: NAMESPACE with `all`, NAME, STATE and AGE, each column as wide as its widest cell. */
+/**
+ * The table of `objects`: NAMESPACE with `all`, NAME, STATE and AGE, each column as wide as its widest cell.
+ * @param objects The objects listed, one row each.
+ * @param all Whether the list is across every namespace, which puts NAMESPACE first.
+ * @param now The moment each AGE is counted to, in ms since the epoch: now where it is left out.
+ */
 export function tableOf(objects: readonly Served[], all: boolean, now: number = Date.now()): string[] {
   const rows = [
     [...(all ? ['NAMESPACE'] : []), 'NAME', 'STATE', 'AGE'],
@@ -171,6 +180,11 @@ async function getList(resource: APIResource, typed: GetAsked): Promise<number> 
   return 0;
 }
 
+/**
+ * `nemia get <resource> [<name>]`, on the words after `get`: the object, or the list, printed as asked; answers the exit code,
+ * or throws its refusal.
+ * @param args The words typed after `get`: the resource, a name, and the options `--help` lists.
+ */
 export async function get(args: readonly string[]): Promise<number> {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(GET_HELP);

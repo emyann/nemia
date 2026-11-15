@@ -35,6 +35,10 @@ export type ObjectGraph = { roots: string[]; edges: Array<GraphEdge | InputEdge>
 /** A step as the graph reads it. */
 export type GraphStep = Pick<StepSpec, 'name' | 'after' | 'input' | 'loop' | 'rounds' | 'routes' | 'when' | 'ends' | 'workflow'>;
 
+/**
+ * A step as a node of the graph: its name and kind, its ends where it has any, and the workflow it runs where it runs one. Pure.
+ * @param step The step.
+ */
 export const nodeOf = (step: GraphStep): GraphNode => ({
   name: step.name,
   kind: nodeKind(step),
@@ -65,6 +69,7 @@ const edgesFrom = (from: string, step: GraphStep, conditions: ReadonlySet<string
  * root of the step — which on a workflow `validate` accepts never happens, and on a record edited by hand keeps every step
  * reachable from the card. A loop that does not say how many rounds runs the default (`DEFAULT_ROUNDS`), as `capOf` in
  * status/status.ts reads it. Pure.
+ * @param steps The run's steps, in the workflow's order.
  */
 export function inputGraphOf(steps: readonly GraphStep[]): ObjectGraph {
   const names = new Set(steps.map((s) => s.name));

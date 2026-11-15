@@ -12,6 +12,9 @@ export type { InstalledVersion, UpgradeStartRefusal } from '../../contracts/upgr
  * Why a start of an upgrade to `target` on a store whose floor is `floor` is refused: one is still at work (`in-flight`), whatever it
  * asks for; else the tag goes back past the floor (`below-floor`, `goingBackRefused`); else null. A tag that is no version (`target`
  * null) passes here: `tagRefusal` judges its spelling, and `nemia upgrade` what it names.
+ * @param target The version the upgrade names, or null where its tag is no version.
+ * @param floor The store's floor, or null where the store records none.
+ * @param inFlight Whether an upgrade is still at work.
  */
 export const upgradeStartRefusal: UpgradeStartRefused = (target, floor, inFlight) => {
   if (inFlight) return 'in-flight';
@@ -23,6 +26,8 @@ export const upgradeStartRefusal: UpgradeStartRefused = (target, floor, inFlight
  * The newest of the releases `installed` whose version is older than `running`, its tag and its version's numbers; `found` false where
  * none is, or `running` is null. One pass, keeping the newest older release seen so far, each comparison written number by number so
  * the verifier guesses the loop's invariants from the laws (a call in the loop's condition left them unguessed).
+ * @param installed The releases installed, each its tag and its version, null where its tag is no version.
+ * @param running The version of the release the server runs, or null where it runs none.
  */
 export const newestOlder: NewestOlder = (installed, running) => {
   let best = { found: false, tag: '', major: 0, minor: 0, patch: 0 };
@@ -45,6 +50,8 @@ export const newestOlder: NewestOlder = (installed, running) => {
 /**
  * The tag of the release going back goes to: the newest of the releases `installed` whose version is older than `running`, the one the
  * server runs (`newestOlder`); null where none is installed, or the server runs no versioned release (`running` null).
+ * @param installed The releases installed, each its tag and its version, null where its tag is no version.
+ * @param running The version of the release the server runs, or null where it runs none.
  */
 export const previousRelease: PreviousRelease = (installed, running) => {
   const found = newestOlder(installed, running);

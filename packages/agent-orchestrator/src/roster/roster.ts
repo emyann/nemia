@@ -30,6 +30,10 @@ export type FilledStep = AgentFill & { file: string };
 /**
  * The agents the Agents page lists, the one writer of their `fills` and `factories`: each of `listings` with the steps of `filled` its file
  * fills, and the factories `byFile` names for its file. In a factory, only the agents that fill a step in it; in the default factory, all.
+ * @param listings The agents listed, each by its file.
+ * @param filled The steps filled, each with the agent file that fills it.
+ * @param byFile The factories that name each agent file, by its file.
+ * @param factory The factory the page is of, or undefined for the default factory.
  */
 export function inFactory<L extends { file: string }>(
   listings: readonly L[],
@@ -128,7 +132,15 @@ function harnessPromptOf(source: string): string | null {
   return frontmatterKey(source, 'harnessPrompt') ?? (former === undefined ? null : harnessPromptNamed(former));
 }
 
-/** The reading of the agent `name` at `file`, with nothing read into it: its place, its version and the nodes that name it. */
+/**
+ * The reading of the agent `name` at `file`, with nothing read into it: its place, its version and the nodes that name it.
+ * @param from The place the agent is read from.
+ * @param dir The folder of that place.
+ * @param file The agent's file.
+ * @param name The agent's name.
+ * @param version The agent's version.
+ * @param usedBy The nodes that name the agent.
+ */
 export const emptyReading = (
   from: AgentPlace,
   dir: string,
@@ -178,6 +190,10 @@ function keysWritten(file: string, source: string): Partial<Record<RoleKey, stri
  * The reading of a file that does not read as an agent (`agent`, the package's refusal, or nothing where the load found none): `base` with
  * the lines `source` writes (`keysWritten`), its harness prompt in the word it is now (`harnessPromptNamed`), its instructions as written,
  * and the schema its `output:` names (`sidecarOf`) — so a form shows what to fix, and the refusal says why.
+ * @param base The reading of the file with nothing read into it.
+ * @param source The file's text.
+ * @param agent The package's refusal of the file, or undefined where the load found none.
+ * @param sidecarOf The schema an `output:` names, by its name, undefined where it names none.
  */
 export function unreadReading(
   base: AgentReading,

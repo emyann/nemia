@@ -19,18 +19,23 @@ export { CLAUDE_RULES, type ClaudeRules, type Dated } from 'agent-runtime/vocabu
 /**
  * What harness `harness` declares, `DEFAULT_HARNESS` where it is `undefined`: `undefined` for a name the runtime has no declaration
  * for, a remote agent's among them. Pure.
+ * @param harness The harness's name, or undefined for the default one.
  */
 export const declarationOf = (harness: string | undefined): HarnessDeclaration | undefined => {
   const name = harness ?? DEFAULT_HARNESS;
   return Object.hasOwn(HARNESS_DECLARATIONS, name) ? HARNESS_DECLARATIONS[name] : undefined;
 };
 
-/** How harness `harness` matches its permission rules, and the tool sets measured on it: `undefined` where it declares none. Pure. */
+/**
+ * How harness `harness` matches its permission rules, and the tool sets measured on it: `undefined` where it declares none. Pure.
+ * @param harness The harness's name, or undefined for the default one.
+ */
 export const rulesOf = (harness: string | undefined): HarnessDeclaration['rules'] => declarationOf(harness)?.rules;
 
 /**
  * The key harness `harness`'s fence is named by — its mode, or `sandbox` — `DEFAULT_HARNESS`'s where it is `undefined`, and `undefined`
  * for a harness with no knobs. Pure.
+ * @param harness The harness's name, or undefined for the default one.
  */
 export const fenceKeyOf = (harness: string | undefined): HarnessKnobs['fence']['key'] | undefined =>
   declarationOf(harness)?.knobs?.fence.key;
@@ -38,6 +43,7 @@ export const fenceKeyOf = (harness: string | undefined): HarnessKnobs['fence']['
 /**
  * The tool lists harness `harness`'s fence takes (`tools` and its allow and deny rules), `DEFAULT_HARNESS`'s where it is
  * `undefined`: none where its fence is one word, and `undefined` for a harness with no knobs. Pure.
+ * @param harness The harness's name, or undefined for the default one.
  */
 export const fenceListsOf = (harness: string | undefined): readonly string[] | undefined => declarationOf(harness)?.knobs?.fence.lists;
 
@@ -51,10 +57,16 @@ export const REMOTE_PREFIX = 'a2a:';
 /** A remote agent's name, as `a2a-agents.json` declares it and `harness:` names it after the prefix: lowercase words joined by dashes. */
 export const REMOTE_NAME = /^[a-z][a-z0-9-]*$/;
 
-/** Whether a step's harness is a remote A2A agent (`REMOTE_PREFIX`). Pure. */
+/**
+ * Whether a step's harness is a remote A2A agent (`REMOTE_PREFIX`). Pure.
+ * @param harness The step's harness, or undefined where it names none.
+ */
 export const isRemoteHarness = (harness: string | undefined): boolean => harness?.startsWith(REMOTE_PREFIX) ?? false;
 
-/** The name `harness: a2a:<name>` gives, or `undefined` for a local harness. Pure. */
+/**
+ * The name `harness: a2a:<name>` gives, or `undefined` for a local harness. Pure.
+ * @param harness The step's harness, or undefined where it names none.
+ */
 export const remoteNameOf = (harness: string | undefined): string | undefined =>
   harness !== undefined && isRemoteHarness(harness) ? harness.slice(REMOTE_PREFIX.length) : undefined;
 
@@ -100,6 +112,10 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
  * Why a remote step's try may not be asked for with `nemia retry --<key>` — `--model`, `--budget` — in the words its load refuses the key
  * in, or undefined for a local harness: the tick files a remote try with no harness arguments (`localFields`), so the flag would be
  * dropped.
+ * @param step The step the try is asked of.
+ * @param flag The flag asked with.
+ * @param value The flag's value, as given.
+ * @param command The retry to ask instead, without the flag.
  */
 export function remoteRetryRefusal(step: StepSpec, flag: 'model' | 'budget', value: string | number, command: string): string | undefined {
   if (!isRemoteHarness(step.harness)) return undefined;
@@ -116,6 +132,9 @@ export const REMOTE_REFUSED_KEYS: readonly StepKey[] = STEP_KEYS.filter((key) =>
  * Refused: a key a step on a remote agent may not set (`REMOTE_REFUSED`), from the step or from its agent — and `workspace: base`, or its
  * former spelling `main`, whose checkout the agent never touches. Nothing else is judged against a remote harness: the key's own reading
  * assumes a harness of ours.
+ * @param step The step file, as the refusal names it.
+ * @param meta The step's lines, by key, its agent's given among them.
+ * @param harness The step's harness, a remote agent's.
  */
 export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string>>, harness: string): void {
   const said = (key: string, why: string) =>
@@ -152,7 +171,10 @@ export const HARNESS_FENCE_KEYS: readonly string[] = [
   ...new Set(Object.values(HARNESS_KNOBS).flatMap((knobs) => [knobs.fence.key, ...knobs.fence.lists])),
 ];
 
-/** The fence keys harness `harness`'s block takes, its own key then its tool lists, or `undefined` for a name that is no harness. */
+/**
+ * The fence keys harness `harness`'s block takes, its own key then its tool lists, or `undefined` for a name that is no harness.
+ * @param harness The harness's name.
+ */
 export const fenceKeysOf = (harness: string): readonly string[] | undefined => {
   if (!Object.hasOwn(HARNESS_KNOBS, harness)) return undefined;
   const knobs = HARNESS_KNOBS[harness];

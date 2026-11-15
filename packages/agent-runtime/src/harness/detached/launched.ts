@@ -20,7 +20,11 @@ const LaunchedSchema = Schema.Struct({
 
 const decodeLaunched = Schema.decodeUnknownOption(LaunchedSchema);
 
-/** Writes `file` naming the process `pid`, launched now, by its start and this boot. */
+/**
+ * Writes `file` naming the process `pid`, launched now, by its start and this boot.
+ * @param file The file written, beside the run (`.launched`).
+ * @param pid The worker's pid.
+ */
 export const writeLaunched = (file: string, pid: number): void => {
   const start = processStart(pid);
   const boot = monoNow()?.boot;
@@ -34,6 +38,7 @@ export const writeLaunched = (file: string, pid: number): void => {
  * - `running`: its pid is a process that started when it did, in this boot;
  * - `unknown`: no file, one that does not decode, no pid above 0, or no boot or start to tell it by (no `/proc`), so the clock alone
  *   judges, as it did for a run spawned before this file was written.
+ * @param file The file beside the run that names its worker (`.launched`).
  */
 export const workerSeen = (file: string): WorkerSeen => {
   let text: string;

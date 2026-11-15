@@ -19,6 +19,8 @@ const heard = (at: string | null, now: Date): string => (at ? agoWords(new Date(
  * its kind as the api answers it (`by`); the daemon is started as the api says (`start`: the api's own process, which serves the board
  * as it ticks). One silent past its stale mark, or a file that does not read, is taken over by the
  * next daemon, and the line says so, since a person would otherwise stop to clear it first.
+ * @param d What the api judged of `daemon.json`.
+ * @param now The time an age is told from, the browser's own on the page.
  */
 export function daemonWords(d: Daemon, now: Date): DaemonWords | null {
   if (d.ticking) return null;
@@ -51,5 +53,8 @@ export function daemonWords(d: Daemon, now: Date): DaemonWords | null {
   };
 }
 
-/** The line as one sentence. */
+/**
+ * The line as one sentence.
+ * @param w The line in its three parts.
+ */
 export const daemonSentence = (w: DaemonWords): string => `${w.before}${w.command}${w.after}`;

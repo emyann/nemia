@@ -23,6 +23,7 @@ type AtWork = { runs: number; sessions: number };
  * whose state is `working` or `checking` — a session at work, or the run's check of one — a waiting run's among them. A step that asks a
  * person (`asks-in-session`) waits on them, and is not counted. A held run's step keeps its state (`stepState`), so a session a hold did
  * not stop counts. A run the list could not judge has no step to count.
+ * @param open The light answer of every factory: its counts, and its waiting and in-flight rows.
  */
 export function atWork(open: Pick<OpenRuns, 'counts' | 'waiting' | 'inFlight'>): AtWork {
   let sessions = 0;
@@ -39,7 +40,10 @@ export function atWork(open: Pick<OpenRuns, 'counts' | 'waiting' | 'inFlight'>):
 /** `count` and its noun, singular for one. */
 const counted = (count: number, one: string): string => `${count} ${one}${count === 1 ? '' : 's'}`;
 
-/** What is at work, in short (`2 runs · 3 sessions`) and as a sentence. */
+/**
+ * What is at work, in short (`2 runs · 3 sessions`) and as a sentence.
+ * @param work The runs in flight and the sessions working or checking (`atWork`).
+ */
 export const atWorkWords = (work: AtWork): { text: string; title: string } => ({
   text: `${counted(work.runs, 'run')} · ${counted(work.sessions, 'session')}`,
   title: `${counted(work.runs, 'run')} in flight, and ${counted(work.sessions, 'session')} working or checking, across every factory.`,
@@ -49,6 +53,7 @@ export const atWorkWords = (work: AtWork): { text: string; title: string } => ({
  * The release's version and the code serving the board, in short — `v1.3.0 · install` for an install of its own tag (the tag where an
  * install's tag says another), `v1.3.0 · checkout` for a checkout, the version alone where the api says neither — and as a sentence
  * naming the folder it runs from.
+ * @param version The api's version: the release's, and the code serving it where the api says it.
  */
 export function versionWords(version: Version): { text: string; title: string } {
   const named = `Nemia ${version.version}`;
@@ -93,6 +98,9 @@ const DAEMON_WORDS: Record<Daemon['kind'], string> = {
  * down then, and `unread`, never a daemon that ticks. Its title is the floor's whole sentence when nothing ticks (`daemonWords`), the api's
  * own line while one does, and why the read failed when it did. A daemon that ticks while its last pass could not read a harness
  * (`unobserved`) warns, `ticking, harness unread`, its title the line and then each reason on a line of its own.
+ * @param daemon What the api judged of the store's daemon, or undefined while nothing is read.
+ * @param error Why the read failed, or null where it did not.
+ * @param now The instant the sentence is said at, which the daemon's times are read against.
  */
 export function daemonDot(daemon: Daemon | undefined, error: Error | null, now: Date): DaemonDot {
   if (error) {
@@ -111,7 +119,10 @@ export function daemonDot(daemon: Daemon | undefined, error: Error | null, now: 
   };
 }
 
-/** Whether the board follows the workflow feed, as a word and a sentence. */
+/**
+ * Whether the board follows the workflow feed, as a word and a sentence.
+ * @param feed Where the feed stands: connecting, open, or down.
+ */
 export function feedWords(feed: FeedStatus): { word: string; title: string } {
   switch (feed) {
     case 'open':
@@ -130,6 +141,9 @@ const windowsText = (windows: readonly WindowWords[]): string => windows.map((w)
  * The quota in short: each window's label and percentage — `marked` when one is used past the mark and not reset since — and the hover's
  * sentence (`quotaTitle`). A state with nothing to show now gives the last good reading, `stale` and marked as the gauges mark it, or the
  * api's word for its state when there is none, the api's sentence first in the title. A read that failed is the word `unread`.
+ * @param quota The quota as the api answers it, or undefined while nothing is read.
+ * @param error Why the read failed, or null where it did not.
+ * @param now The instant the windows and the last reading are read against.
  */
 export function quotaShort(
   quota: Quota | undefined,
@@ -160,6 +174,7 @@ export function quotaShort(
  * Each place in `source` that sizes a page as the screen less a header alone, a line break inside or not: the old header
  * (`100svh-3rem`), or the top bar without the frame's lines under it (`100svh-var(--frame-top))`). Under the top bar and the lines (a
  * newer release, the setup banner, a refused link) a page is the screen less both, `100svh-var(--frame-top)-var(--frame-lines)`.
+ * @param source A source file's text.
  */
 export const staleFrameHeights = (source: string): string[] =>
   [...source.matchAll(/h-\[calc\(100svh-\s*(?:3rem|var\(--frame-top\))\)\]/g)].map((m) => m[0]);
@@ -168,6 +183,7 @@ export const staleFrameHeights = (source: string): string[] =>
  * The line that says a newer release is out, where the api read one newer than the release it runs (`latest.newer`): the release, and
  * where to upgrade it — Settings, whose Server release section upgrades the server. None where the api read none, or the one it runs is
  * the newest.
+ * @param version The api's version, with the latest release it read where it read one.
  */
 export function newerReleaseWords(version: Version): string | null {
   const latest = version.latest;

@@ -65,7 +65,10 @@ const RETIRED_KEYS: Record<'maxAttempts' | 'resume', string> = {
 const RETIRED_INSTEAD =
   'To run the task again, file it again: with `resumeFrom: <session id>` to continue its session, or without it to start clean.';
 
-/** Why a key a task no longer takes is refused, and what to do instead. */
+/**
+ * Why a key a task no longer takes is refused, and what to do instead.
+ * @param key The retired key the filing gave.
+ */
 export const retiredKeyRefusal = (key: keyof typeof RETIRED_KEYS) => `\`${key}\` is retired: ${RETIRED_KEYS[key]}. ${RETIRED_INSTEAD}`;
 
 /**
@@ -154,6 +157,7 @@ const resourcesRefusalOf = (resources: unknown): string | undefined => {
  * check (`argsRefusalOf` in `harness/args.ts`), and `file` asks those checks next, then the runner (`Runner.refuses`).
  * The `file` of an engine `Engine.layer` builds asks both, then each harness for its own words (`harnessRefusalOf` in
  * `service/harness-refusal.ts`), which the core never learns.
+ * @param spec The task as it is to be filed.
  */
 export const refusalOf = (spec: Filing): string | undefined => {
   if (typeof spec.brief !== 'string' || !spec.brief.trim()) return '`brief` is empty. Say what the session should do.';
@@ -350,7 +354,13 @@ const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | 
   return `\`${taskId}\`'s attempt ${last.n} ended \`${last.ended}\`, and the task is between attempts, not waiting for an answer. Ask again once \`ae ls\` says \`input-required\`, or \`stop\` it.`;
 };
 
-/** Why `answer` would not journal these words — the words, what the turn gives its configuration, the task's state — or `undefined`. */
+/**
+ * Why `answer` would not journal these words — the words, what the turn gives its configuration, the task's state — or `undefined`.
+ * @param taskId The task's id, named in the words of a refusal.
+ * @param state The task's fold, or undefined where it has no journal.
+ * @param text The words the next turn is to begin with, as the caller gave them.
+ * @param config What the turn gives its configuration, as the caller gave it, or undefined where it gives none.
+ */
 export const answerRefusalOf = (taskId: string, state: State | undefined, text: unknown, config?: unknown): string | undefined => {
   if (typeof text !== 'string' || !text.trim()) return '`text` is empty. Give the words the next turn should begin with.';
   return turnArgsRefusalOf(config) ?? waitRefusalOf('answer', taskId, state);
@@ -359,6 +369,8 @@ export const answerRefusalOf = (taskId: string, state: State | undefined, text: 
 /**
  * Why `close` would not journal a close, or `undefined`.
  * Exported only for the tests that import it.
+ * @param taskId The task's id, named in the words of a refusal.
+ * @param state The task's fold, or undefined where it has no journal.
  */
 export const closeRefusalOf = (taskId: string, state: State | undefined): string | undefined => waitRefusalOf('close', taskId, state);
 
@@ -389,7 +401,11 @@ export const close = Effect.fn('close')(function* (taskId: string) {
   yield* journal.append(TaskId.read(taskId), { kind: 'closed', at: new Date().toISOString() });
 });
 
-/** The task as it was filed, with a turn's own configuration laid over its own: what a harness is asked of an answer's. */
+/**
+ * The task as it was filed, with a turn's own configuration laid over its own: what a harness is asked of an answer's.
+ * @param state The task's fold.
+ * @param turn The turn's own configuration, or undefined where it gives none.
+ */
 export const filingOf = (state: State, turn?: HarnessArgs): Filing => ({
   brief: state.brief,
   cwd: state.cwd,

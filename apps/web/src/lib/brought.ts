@@ -14,6 +14,7 @@ export type { BroughtPart } from '../../contracts/brought.contract.ts';
  * The part the chat draws for a step with the facts `facts`, the one the run's page draws for that state: missing where the run has no
  * such step; its gate where it waits at one on the person, as the inspector draws it before anything else; the banner's Continue for a
  * session the harness blocked; the Decide section's row where it offers one; the note of a try asked already; else its state alone.
+ * @param facts What the run's page reads of the step (`broughtFacts`).
  */
 export const broughtPart: BroughtPartOf = (facts: BroughtFacts): BroughtPart => {
   if (!facts.found) return 'missing';
@@ -23,7 +24,11 @@ export const broughtPart: BroughtPartOf = (facts: BroughtFacts): BroughtPart => 
   return facts.asked ? 'asked' : 'settled';
 };
 
-/** What the run's page reads of the step `step` of `run`, each fact its own read: `gateOfStep`, `offersOf`'s case for it, `askedOf`. */
+/**
+ * What the run's page reads of the step `step` of `run`, each fact its own read: `gateOfStep`, `offersOf`'s case for it, `askedOf`.
+ * @param run The run's detail.
+ * @param step The step's name, as the message's link gives it.
+ */
 export function broughtFacts(run: RunDetail, step: string): BroughtFacts {
   const found = run.steps.find((s) => s.name === step);
   if (!found) return { found: false, atGate: false, offer: null, asked: false };

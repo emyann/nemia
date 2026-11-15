@@ -31,6 +31,9 @@ export type PlanCard = { body: string; workflow?: string; after: string[] };
 /**
  * The plan card `text`, the file `file` holds, opens with: its body and keys; null for a file with no frontmatter block of keys, whose
  * text is the whole brief. Refused, exit 2: a key a plan's card lacks, naming the inbox that reads it, and an `after:` with no `--after`.
+ * @param file The file's path as typed, said in a refusal.
+ * @param text The file's text.
+ * @param after The run ids `--after` gives; an `after:` with none is refused.
  */
 export function planCardOf(file: string, text: string, after: readonly string[]): PlanCard | null {
   const m = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/.exec(text);
@@ -61,7 +64,10 @@ export function planCardOf(file: string, text: string, after: readonly string[])
   return { body: (m[2] ?? '').trim(), ...(workflow ? { workflow } : {}), after: waits };
 }
 
-/** A file handed to the run's steps (`--input`), as the api takes it: its name, and its text where its bytes are UTF-8, else its bytes. */
+/**
+ * A file handed to the run's steps (`--input`), as the api takes it: its name, and its text where its bytes are UTF-8, else its bytes.
+ * @param file The path of the file to hand, as `--input` typed it.
+ */
 export function inputOf(file: string): { name: string; text?: string; base64?: string } {
   let bytes: Buffer;
   try {
@@ -77,7 +83,10 @@ export function inputOf(file: string): { name: string; text?: string; base64?: s
   }
 }
 
-/** `--model <step>=<model>`s as the api takes them, step by step; refused, exit 2, for one that is not a step and a model. */
+/**
+ * `--model <step>=<model>`s as the api takes them, step by step; refused, exit 2, for one that is not a step and a model.
+ * @param typed Each `--model` as typed, `<step>=<model>`; none gives undefined.
+ */
 export function modelsOf(typed: readonly string[]): Record<string, string> | undefined {
   if (!typed.length) return undefined;
   return Object.fromEntries(
@@ -160,7 +169,10 @@ async function cardStart(card: { name: string; namespace: string }, args: Args):
   return 0;
 }
 
-/** `nemia start <brief.md|card|"text"> --workflows <name> [...]`: a run of the workflow, or of the inbox card, started on the daemon. */
+/**
+ * `nemia start <brief.md|card|"text"> --workflows <name> [...]`: a run of the workflow, or of the inbox card, started on the daemon.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function start(args: Args): Promise<number> {
   const arg = textArg(args, 'brief') ?? '';
   const at = fs.statSync(arg, { throwIfNoEntry: false });

@@ -28,21 +28,35 @@ export const SUMS = 'SHA256SUMS';
 /** The file that names the newest release, `{ tag, version }`, published with each release and read through `latest/download/`. */
 export const LATEST = 'latest.json';
 
-/** The archive of `tag` for `platform`. */
+/**
+ * The archive of `tag` for `platform`.
+ * @param tag The release's tag, like `v1.3.0`.
+ * @param platform The platform the archive is built for.
+ */
 export const assetName = (tag: string, platform: ReleasePlatform): string => `nemia-${tag}-${platform}.tar.gz`;
 
 /** A download base without its trailing slashes. */
 const based = (source: string): string => source.replace(/\/+$/, '');
 
-/** Where the asset `name` of `tag` is downloaded from. */
+/**
+ * Where the asset `name` of `tag` is downloaded from.
+ * @param source The download base, as the running release's `release.json` carries it.
+ * @param tag The release's tag.
+ * @param name The asset's file name.
+ */
 export const assetUrl = (source: string, tag: string, name: string): string => `${based(source)}/download/${tag}/${name}`;
 
-/** Where the newest release's `latest.json` is read from. */
+/**
+ * Where the newest release's `latest.json` is read from.
+ * @param source The download base, as the running release's `release.json` carries it.
+ */
 export const latestUrl = (source: string): string => `${based(source)}/latest/download/${LATEST}`;
 
 /**
  * The bytes at `url`: a `file:` URL read from the disk, any other fetched, sending only `CLIENT_NAME`. Refused, led by `by`: nothing
  * there (`Missing`, the URL named); a fetch that fails or answers anything but success (`Conflict`, run it again).
+ * @param url The address to read: a `file:` URL, or one fetched over the network.
+ * @param by The words that lead a refusal: the command or the work that asked.
  */
 export async function fetched(url: string, by: string): Promise<Buffer> {
   if (url.startsWith('file:')) {
@@ -68,6 +82,8 @@ export async function fetched(url: string, by: string): Promise<Buffer> {
  * Where GitHub's API answers the release of `tag` in the repository whose download base is `source`, `<host>/<owner>/<repo>/releases`:
  * `api.github.com` for github.com, and the host's own `/api/v3` for any other (GitHub Enterprise Server's); undefined for a base of
  * another shape, a `file:` one among them.
+ * @param source The download base, `<host>/<owner>/<repo>/releases`.
+ * @param tag The release's tag.
  */
 export function releaseApiUrl(source: string, tag: string): string | undefined {
   let url: URL;
@@ -87,6 +103,8 @@ const ReleaseSchema = Schema.Struct({ assets: Schema.Array(Schema.Struct({ name:
 /**
  * The names of the assets attached to the release of `tag` at `source`, as GitHub's API answers them with no token; undefined where it
  * answers no such release (a draft among them, which it shows to no one without one), cannot be reached, or answers anything else.
+ * @param source The download base, `<host>/<owner>/<repo>/releases`.
+ * @param tag The release's tag.
  */
 export async function releaseAssets(source: string, tag: string): Promise<readonly string[] | undefined> {
   const url = releaseApiUrl(source, tag);
@@ -119,7 +137,11 @@ async function awaitedAsset(source: string, tag: string, name: string, by: strin
   }
 }
 
-/** The checksum `sums` (a `SHA256SUMS` file) gives the asset `name`, in lowercase hex, or undefined where it names none. */
+/**
+ * The checksum `sums` (a `SHA256SUMS` file) gives the asset `name`, in lowercase hex, or undefined where it names none.
+ * @param sums The text of a `SHA256SUMS` file.
+ * @param name The asset's file name.
+ */
 export function sumOf(sums: string, name: string): string | undefined {
   for (const line of sums.split('\n')) {
     const read = /^([0-9a-fA-F]{64}) [ *](.+)$/.exec(line.trim());
@@ -147,7 +169,10 @@ function notesOf(notes: unknown): string | undefined {
   }
 }
 
-/** `text` read as a `latest.json` whose tag is a version, its notes kept where they are an http(s) address (`notesOf`), or undefined. */
+/**
+ * `text` read as a `latest.json` whose tag is a version, its notes kept where they are an http(s) address (`notesOf`), or undefined.
+ * @param text The text of a `latest.json`.
+ */
 export function latestOf(text: string): LatestFile | undefined {
   try {
     const decoded = Schema.decodeUnknownResult(LatestSchema)(JSON.parse(text));
@@ -159,7 +184,11 @@ export function latestOf(text: string): LatestFile | undefined {
   }
 }
 
-/** The newest release published at `source`; refused (`Invalid`) where its `latest.json` does not read as one, and as `fetched` refuses. */
+/**
+ * The newest release published at `source`; refused (`Invalid`) where its `latest.json` does not read as one, and as `fetched` refuses.
+ * @param source The download base, as the running release's `release.json` carries it.
+ * @param by The words that lead a refusal: the command or the work that asked.
+ */
 export async function fetchLatest(source: string, by: string): Promise<LatestFile> {
   const url = latestUrl(source);
   const latest = latestOf((await fetched(url, by)).toString('utf8'));
@@ -175,6 +204,11 @@ export async function fetchLatest(source: string, by: string): Promise<LatestFil
  * unpacked into the build's `tree`. Refused, before anything is unpacked: an asset or a sums file not attached yet to a published
  * release (`Conflict`, `awaitedAsset`) or not there, or one `SHA256SUMS` names
  * no checksum of, or another (`Invalid`); and a `tar` that fails, naming the log.
+ * @param source The download base, as the running release's `release.json` carries it.
+ * @param tag The release's tag.
+ * @param platform The platform of this machine, whose archive is downloaded.
+ * @param building The build's folder, its tree and its log.
+ * @param by The words that lead a refusal: the command or the work that asked.
  */
 export async function unpackedArchive(
   source: string,
@@ -210,12 +244,18 @@ function writtenWhole(file: string, text: string): void {
   fs.renameSync(hidden, file);
 }
 
-/** The store's record of its floor. */
+/**
+ * The store's record of its floor.
+ * @param home The store's folder.
+ */
 export const storeFile = (home: string): string => path.join(home, 'store.json');
 
 const StoreFileSchema = Schema.Struct({ readableFrom: Schema.String });
 
-/** The oldest release that can read the store at `home`, as `store.json` records it; null where it records none, or none that reads. */
+/**
+ * The oldest release that can read the store at `home`, as `store.json` records it; null where it records none, or none that reads.
+ * @param home The store's folder.
+ */
 export function readStoreFloor(home: string): Version | null {
   let text: string;
   try {
@@ -231,13 +271,19 @@ export function readStoreFloor(home: string): Version | null {
   }
 }
 
-/** Records `floor` as the oldest release that can read the store at `home`. */
+/**
+ * Records `floor` as the oldest release that can read the store at `home`.
+ * @param home The store's folder.
+ * @param floor The oldest release that can read the store.
+ */
 export const writeStoreFloor = (home: string, floor: Version): void =>
   writtenWhole(storeFile(home), `${JSON.stringify({ readableFrom: versionTag(floor) }, null, 2)}\n`);
 
 /**
  * The store's floor raised to `own`, what this release writes for (`STORE_READABLE_FROM`), where the record is lower or absent, and never
  * lowered (`floorAfter`); written only where it changes. Answers the floor the store now records.
+ * @param home The store's folder.
+ * @param own The floor this release writes for, `STORE_READABLE_FROM` where absent.
  */
 export function raiseStoreFloor(home: string, own: Version = STORE_READABLE_FROM): Version {
   const record = readStoreFloor(home);
@@ -246,10 +292,16 @@ export function raiseStoreFloor(home: string, own: Version = STORE_READABLE_FROM
   return after;
 }
 
-/** Where the release check keeps the newest release it read. */
+/**
+ * Where the release check keeps the newest release it read.
+ * @param home The store's folder.
+ */
 export const latestFile = (home: string): string => path.join(releasesDir(home), LATEST);
 
-/** The newest release the store's release check last read, or undefined where it read none or the file does not read. */
+/**
+ * The newest release the store's release check last read, or undefined where it read none or the file does not read.
+ * @param home The store's folder.
+ */
 export function readLatest(home: string): LatestFile | undefined {
   try {
     return latestOf(fs.readFileSync(latestFile(home), 'utf8'));
@@ -258,6 +310,10 @@ export function readLatest(home: string): LatestFile | undefined {
   }
 }
 
-/** Keeps `latest`, as fetched, as the newest release the store knows of. */
+/**
+ * Keeps `latest`, as fetched, as the newest release the store knows of.
+ * @param home The store's folder.
+ * @param latest The newest release, as `latest.json` gave it.
+ */
 export const writeLatest = (home: string, latest: LatestFile): void =>
   writtenWhole(latestFile(home), `${JSON.stringify(latest, null, 2)}\n`);

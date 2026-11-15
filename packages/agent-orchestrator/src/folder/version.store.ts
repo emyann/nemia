@@ -86,7 +86,10 @@ export type VersionGathered = { readonly agents: readonly VersionAgent[]; readon
 /** The Agent and Skill doors a version reads through, where given; else those the program is given. */
 export type VersionDefs = { readonly agents: AgentDoorShape; readonly skills: SkillDoorShape };
 
-/** The folder's own files and what they name (`VersionNamed`): no agent or skill is read here. */
+/**
+ * The folder's own files and what they name (`VersionNamed`): no agent or skill is read here.
+ * @param dir The workflow's folder.
+ */
 export function versionNamed(dir: string): VersionNamed {
   const files = filesOf(dir);
   const texts = files.flatMap(([name, text]) => (name.endsWith('.md') && typeof text === 'string' ? [text] : []));
@@ -97,7 +100,11 @@ export function versionNamed(dir: string): VersionNamed {
   };
 }
 
-/** The version of a folder's files and what the doors gathered of what they name, as one word, as the reader before the doors gave it. */
+/**
+ * The version of a folder's files and what the doors gathered of what they name, as one word, as the reader before the doors gave it.
+ * @param files Each file directly in the folder, by name, with what it holds.
+ * @param gathered What the doors answered of the agents and skills the folder names.
+ */
 export const versionDigest = (files: readonly VersionFile[], gathered: VersionGathered): string =>
   createHash('sha256')
     .update(JSON.stringify([...files, ...gathered.agents, ...gathered.added]))
@@ -128,6 +135,10 @@ const agentAt = (
  * run of it looks, only when something is named; each agent at the first root of `lookupRoots` whose door holds it, its version counting
  * the skills found beside the workflow (`AgentAt.skills`), else missing, as is a name the Agent door refuses; and each added skill's
  * folder, its version where a skill is held there, else null, or missing where none is found.
+ * @param dir The workflow's folder.
+ * @param places Where a run of it looks beside its folder: the repository and the store.
+ * @param named The agents and the added skills the folder's files name.
+ * @param defs The Agent and Skill doors to read through, or undefined for the program's.
  */
 export const versionGathered = (
   dir: string,

@@ -117,5 +117,9 @@ const comparable = ({ run, names, steps, views, judged, asked }: Judgement) => {
   return { run: JSON.stringify(run), names, steps, views: runTasks(run).map((id) => views.get(id)), said, asked };
 };
 
-/** Whether a judgement from memory and one made afresh say the same of the run. */
+/**
+ * Whether a judgement from memory and one made afresh say the same of the run.
+ * @param kept The judgement kept in memory.
+ * @param fresh The judgement made afresh.
+ */
 export const sameJudgement = (kept: Judgement, fresh: Judgement): boolean => isDeepStrictEqual(comparable(kept), comparable(fresh));

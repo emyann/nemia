@@ -28,6 +28,7 @@ function slugOf(step: string): string {
 /**
  * The rule that approves the step gated at `site` and no other, needing every condition that can hold there and no dollar line, which
  * is the person's to add; its id `approve-<step>`, the step's name slugged so that `ruleRefusal` takes it. Pure.
+ * @param site The gate the rule is suggested for.
  */
 export const suggestedFor: SuggestedFor = (site) => ({
   id: `approve-${slugOf(site.step)}`,
@@ -36,7 +37,11 @@ export const suggestedFor: SuggestedFor = (site) => ({
   when: CONDITIONS.filter((c) => neverHolds(site, c) === null),
 });
 
-/** What keeps `rule` from letting its answer through in `facts`: each condition it needs that does not hold, and its dollar line. Pure. */
+/**
+ * What keeps `rule` from letting its answer through in `facts`: each condition it needs that does not hold, and its dollar line. Pure.
+ * @param rule The rule in force.
+ * @param facts The run's facts at the gate: which conditions hold, and what it has cost.
+ */
 export const unmetNow: UnmetNow = (rule, facts) => ({
   conditions: CONDITIONS.filter((c) => rule.when.includes(c) && !facts[c]),
   overLine: rule.under !== undefined && facts.spend >= rule.under,
@@ -88,14 +93,22 @@ const listed = (words: readonly string[]): string =>
 /** Dollars as a person reads them: whole where they are, else to the cent. */
 const dollars = (n: number): string => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
-/** Why a rule misses a gate, in a person's words, naming the rule by its id. */
+/**
+ * Why a rule misses a gate, in a person's words, naming the rule by its id.
+ * @param miss The rule's first reason it can never approve at the gate.
+ */
 export function missWords(miss: RuleMiss): string {
   if (miss.why === 'answers-retry') return `${miss.rule}: it only tries a step again, and never approves one`;
   if (miss.why === 'other-steps') return `${miss.rule}: it covers other steps, not this one`;
   return `${miss.rule}: it needs "${CONDITION_WORDS[miss.condition]}", and ${NEVER_WORDS[miss.because]}`;
 }
 
-/** What keeps `rule` from approving now, in a person's words: each condition that does not hold, and the run's cost past its line. */
+/**
+ * What keeps `rule` from approving now, in a person's words: each condition that does not hold, and the run's cost past its line.
+ * @param unmet What keeps the rule now (`unmetNow`).
+ * @param rule The rule, whose dollar line is named.
+ * @param spend What the run has cost, in dollars.
+ */
 export function unmetWords(unmet: Unmet, rule: PolicyRule, spend: number): string {
   const line = unmet.overLine && rule.under !== undefined ? [`it has cost ${dollars(spend)}, past its ${dollars(rule.under)} line`] : [];
   return listed([...unmet.conditions.map((c) => UNMET_WORDS[c]), ...line]);
@@ -137,6 +150,10 @@ function rowOf(inForce: readonly PolicyRule[], proposed: readonly PolicyRule[], 
  * The gates of a factory and what its rules reach: a row for each site, the reach of the whole list (`all` where every row is reached,
  * no row included; `none` where none is), and one suggested rule for each step's name that some site no rule in force reaches gates,
  * asking only what can hold at every site of that name. `factsAt` gives a run's facts at a site, for what keeps a rule now. Pure.
+ * @param inForce The factory's rules in force.
+ * @param proposed The rules proposed, not in force.
+ * @param sites The factory's gates.
+ * @param factsAt A run's facts at a site, for what keeps a rule now; absent, or undefined for a site, where no run's facts are given.
  */
 export function gateRows(
   inForce: readonly PolicyRule[],

@@ -8,6 +8,8 @@ import type { Observation } from '../seam.ts';
  * What a look told `names` found: each one's sighting, a name whose run file is there and gave none unread, why each of those was
  * (`unreadWhy`, its look's warning), and every warning the looks gave, an ended run's included. Takes each name's look: `undefined`
  * where no run file is there, `{}` where one is and could not be read.
+ * @param names The names of the sessions the look was told to read.
+ * @param look Looks one name up: its sighting and its warning, `{}` where its run file could not be read, undefined where there is none.
  */
 export const lookedFor = (
   names: readonly string[],

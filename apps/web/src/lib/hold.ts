@@ -12,6 +12,7 @@ type Candidate = Pick<RunView, 'id' | 'place' | 'repo' | 'cancelledAt' | 'pruned
  * stopped on something, a person or a step that broke; a run that succeeded has nothing left to file. A folder run is offered one too: it
  * has no run to wait on (`holdCandidates` gives none), so it is held until a person lifts it. The rest — a run
  * that has landed, a circle, a run on another base branch — is the package's to refuse (`holdRefusal`), in its words.
+ * @param run The run as the page reads it: its calling off, its pruning, its hold, the runs it waits on and its status.
  */
 export const holdable = (run: Holdable): boolean =>
   run.cancelledAt === null &&
@@ -25,6 +26,8 @@ export const holdable = (run: Holdable): boolean =>
  * The runs a hold of `run` may wait on, as the form offers them: every other repository run of its repository not called off or pruned,
  * that has not finished with nothing left to decide — a run succeeded and merged has landed, and one succeeded with branches nothing
  * merges has not. In the order `runs` gives them.
+ * @param run The run the hold is of: its id and its repository.
+ * @param runs The runs listed, each a candidate to wait on.
  */
 export const holdCandidates = <R extends Candidate>(run: Pick<RunView, 'id' | 'repo'>, runs: readonly R[]): R[] =>
   runs.filter(

@@ -3,7 +3,10 @@
  */
 import { denialText, type Attempt, type Event, type State, type TaskView, type Usage } from '../index.ts';
 
-/** The sessions a pass left running, by harness, as `ae tick` and `ae up` print them: `claude:2 codex:1`, or empty where none runs. */
+/**
+ * The sessions a pass left running, by harness, as `ae tick` and `ae up` print them: `claude:2 codex:1`, or empty where none runs.
+ * @param running How many sessions run, by harness name.
+ */
 export const runningText = (running: Readonly<Record<string, number>>): string =>
   Object.entries(running)
     .map(([h, n]) => `${h}:${n}`)
@@ -15,7 +18,10 @@ const firstLine = (text: string): string => {
   return at === -1 ? text : text.slice(0, at);
 };
 
-/** What `ae show` says of the limits a task was filed with: its spend cap and its context window, each only when it has one. */
+/**
+ * What `ae show` says of the limits a task was filed with: its spend cap and its context window, each only when it has one.
+ * @param state The task's state, whose `config` holds the limits.
+ */
 export const limitLines = (state: Pick<State, 'config'>): string[] => [
   ...(state.config?.budgetUsd !== undefined ? [`budget: $${state.config.budgetUsd} an attempt`] : []),
   ...(state.config?.contextTokens !== undefined
@@ -30,6 +36,7 @@ const count = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ?
  * What an attempt consumed, for a person — and when its runner measured nothing, saying so. A zero
  * would read as "cost nothing"; the truth is "nobody counted".
  * Exported only for the tests that import it.
+ * @param u What the attempt consumed, or null where its runner measured nothing.
  */
 export const usageLine = (u: Usage | null): string => (u ? `${countsLine(u)} · ${costLine(u)}${readLine(u)}` : 'usage not measured');
 
@@ -67,6 +74,7 @@ const readLine = (u: Usage): string => {
 /**
  * Dollars for a person, to the cent: $3.01. Under a cent is `<$0.01` — `$0.00` would read as free.
  * Exported only for the tests that import it.
+ * @param n The amount, in dollars.
  */
 export const usd = (n: number): string => (n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`);
 
@@ -102,6 +110,7 @@ const noStatement = (closedOut: boolean | undefined): string => (closedOut === f
  * One attempt, for `ae show`: how it ended, when it ran, how its process exited if it has one, what it consumed. A session
  * its harness ended at its spend cap says so as `failed (budget)`, the limit beside the end; what the harness denied the
  * session is said as the rules a person would write to allow it: the calls it went on without, a running attempt's so far.
+ * @param a The attempt, as the task's record holds it.
  */
 export const attemptLine = (a: Attempt): string => {
   const when = ranLine(a);
@@ -120,6 +129,7 @@ export const attemptLine = (a: Attempt): string => {
  * — `$3.01 · 12r`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
  * Code writes a session's cost as its process exits. A long-lived attempt's responses are those journalled as it grows, its
  * cost the one recorded at its end. A task held open and answered says which turn it is on — `turn 1`.
+ * @param v The task as the engine lists it: its state, its phase, its admission and its latest usage.
  */
 export const taskLine = (v: TaskView) => {
   const turn = v.state.inputs.length;
@@ -178,6 +188,8 @@ const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => s
 /**
  * One journal entry, for a person. Shared by `feed`, `show` and `watch` so the same event does not
  * read three different ways depending on which verb printed it.
+ * @param taskId The id of the task the entry is journalled under.
+ * @param event The journal entry.
  */
 export const entryLine = (taskId: string, event: Event) => {
   const extra = (EXTRAS[event.kind] as ((e: Event) => string) | undefined)?.(event) ?? '';

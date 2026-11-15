@@ -14,13 +14,19 @@ export type RunAt = { id: string; namespace: string };
 /** The namespace of a run object: its own, `default` where it names none. */
 const namespaceOfRun = (run: Run): string => namespaceOf(run.metadata.namespace);
 
-/** The namespace of the run `id`, off its object in `client`'s cache, read once where it is not. */
+/**
+ * The namespace of the run `id`, off its object in `client`'s cache, read once where it is not.
+ * @param client The board's query client, whose cache holds the run's object or reads it.
+ * @param id The run's id.
+ */
 export const runNamespace = (client: QueryClient, id: string): Promise<string> =>
   client.ensureQueryData(runObjectQuery(id)).then(namespaceOfRun);
 
 /**
  * What a run's action calls for the namespace to send it in: `given` where the caller holds it, else the run's own (`runNamespace`). A
  * function, called as the action is sent, so a draw reads nothing.
+ * @param id The run's id.
+ * @param given The namespace where the caller holds it, or undefined to read the run's own.
  */
 export function useRunNamespace(id: string, given?: string): () => Promise<string> {
   const client = useQueryClient();

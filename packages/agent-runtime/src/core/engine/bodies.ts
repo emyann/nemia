@@ -63,6 +63,7 @@ export type BodyOps = {
 /**
  * The reference of `text`: the sha256 of its UTF-8.
  * Exported only for the tests that import it.
+ * @param text The text to name.
  */
 export const refOf = (text: string): BodyRef => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
@@ -75,6 +76,7 @@ const missing = (cause: unknown) => (cause as NodeJS.ErrnoException | undefined)
 /**
  * Bodies as files, `<root>/bodies/<ref>`: a put writes a file beside it and renames it in, so a body is whole or absent, and a put
  * of one already there only sets its time. A read is counted (`io().reads`).
+ * @param root The store's folder, under which `bodies/` is kept.
  */
 export const filesBodies = (root: string): BodyOps => {
   const dir = path.join(root, 'bodies');
@@ -164,6 +166,9 @@ const swapped = (entry: object, swaps: Record<string, Record<string, unknown>>):
  * join into the brief, else the brief as one part — each part long enough a `{ body }`; its schema an end is held to, as JSON, a
  * `closeoutSchemaBody`; a `starting` nudge a `nudgeBody`; an `input`'s text a `textBody`. A field none of whose text is long enough
  * stays as it is, and an event with none is given back as it came.
+ * @param event The event as appended.
+ * @param parts The parts the brief of a `filed` event was given in, or undefined where it was given whole; parts that do not join
+ *   into the brief are not used.
  */
 export const split = (event: Event, parts?: readonly string[]): { entry: Event | StoredEvent; bodies: Map<BodyRef, string> } => {
   const bodies = new Map<BodyRef, string>();
@@ -192,7 +197,10 @@ export const split = (event: Event, parts?: readonly string[]): { entry: Event |
   return { entry: Object.keys(swaps).length ? (swapped(event, swaps) as StoredEvent) : event, bodies };
 };
 
-/** The bodies `entry` names, as a store holds it, in the order of its keys: anything that is no entry names none. */
+/**
+ * The bodies `entry` names, as a store holds it, in the order of its keys: anything that is no entry names none.
+ * @param entry A line of a journal as the store holds it, read as JSON.
+ */
 export const refsOf = (entry: unknown): BodyRef[] => {
   if (typeof entry !== 'object' || entry === null) return [];
   const fields = entry as Record<string, unknown>;
@@ -221,6 +229,7 @@ const unresolved = (entry: StoredEvent) =>
  *
  * Refuses, with a `BodyError` saying what to do, a body missing or whose text is not the one its reference names, a reference read
  * from a store that keeps no bodies, and a `filed` event with no brief or an `input` with no text.
+ * @param bodies Where the store keeps its bodies, or undefined for a store that keeps none.
  */
 export const resolver = (bodies: BodyOps | undefined) => {
   const texts = new Map<BodyRef, string>();

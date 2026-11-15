@@ -92,7 +92,10 @@ export const ANSWER_HELP = [
   'alone; --message is then the note under your answers',
 ];
 
-/** The `--answer` flag of `nemia <verb>`, given once for each question: the command line's alone, the api taking `answers` as data. */
+/**
+ * The `--answer` flag of `nemia <verb>`, given once for each question: the command line's alone, the api taking `answers` as data.
+ * @param verb The verb the flag is given to, which its words name.
+ */
 export const answerFlag = (verb: 'retry' | 'approve'): Flag => ({
   flag: '--answer',
   kind: 'text',
@@ -102,13 +105,20 @@ export const answerFlag = (verb: 'retry' | 'approve'): Flag => ({
   only: { side: 'cli', why: 'the api takes the answers as data, by question title and option label (`answers`)' },
 });
 
-/** The `--answer` values typed, in the order given: none where none were. */
+/**
+ * The `--answer` values typed, in the order given: none where none were.
+ * @param args The command line's parsed arguments.
+ */
 export const typedOf = (args: Args): readonly string[] => {
   const value = args.answer;
   return Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
 };
 
-/** The refusal of `--answer` beside `--recheck`, which files no session to read the answers, or null. */
+/**
+ * The refusal of `--answer` beside `--recheck`, which files no session to read the answers, or null.
+ * @param args The command line's parsed arguments.
+ * @param command The command as typed, which the refusal's fixes repeat.
+ */
 export const recheckAnswerRefusal = (args: Args, command: string): string | null =>
   args.mode === 'recheck' && typedOf(args).length
     ? `--answer carries your answers into the try's brief, and --recheck files no session to read them — it runs the check again, and nothing else. Recheck without answers (${command} --recheck), or give them to a session: ${command} --answer <n>=<letter>.`

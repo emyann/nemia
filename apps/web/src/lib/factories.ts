@@ -51,6 +51,8 @@ export type UntrustedPlace = { factory: string; trust: string; place: FactoryUnt
  * The untrusted place the run `run` works on, among `factories`: the place of the first factory that lists the run's repository as
  * untrusted. The factory the run names is not asked for: a harness keeps its trust for the folder, whichever factory lists it, so any
  * factory's line that names the folder repairs it. Nothing for a run on no repository, or on a place every harness trusts.
+ * @param factories The factories as the api lists them, with their untrusted places and their commands.
+ * @param run The run, by its repository; null where it works on none.
  */
 export function untrustedFor(
   factories: readonly Pick<Factory, 'name' | 'untrusted' | 'commands'>[],
@@ -67,6 +69,7 @@ export function untrustedFor(
 /**
  * Whether the condition `condition` of a factory's template is amiss: `Applied` that is not true, or another (`ConflictsPending`) that
  * is.
+ * @param condition The condition, by its type and its status.
  */
 export const conditionAmiss = (condition: Pick<FactoryCondition, 'type' | 'status'>): boolean =>
   (condition.type === 'Applied') === (condition.status === 'False');
@@ -75,14 +78,26 @@ export const conditionAmiss = (condition: Pick<FactoryCondition, 'type' | 'statu
 const isIn = (item: { factory: string | null }, factory: FactoryPlace): boolean =>
   factory.default ? item.factory === null : item.factory === factory.name;
 
-/** The runs in `factory`, in their order. */
+/**
+ * The runs in `factory`, in their order.
+ * @param runs The runs to keep from, each by the factory it names (null for none).
+ * @param factory The factory, by its name and whether it is the default.
+ */
 export const runsIn = <T extends { factory: string | null }>(runs: readonly T[], factory: FactoryPlace): T[] =>
   runs.filter((run) => isIn(run, factory));
 
-/** The cards in `factory`, in their order: the queue of its floor keeps these alone. */
+/**
+ * The cards in `factory`, in their order: the queue of its floor keeps these alone.
+ * @param cards The inbox's cards.
+ * @param factory The factory, by its name and whether it is the default.
+ */
 export const queuedIn = (cards: readonly InboxEntry[], factory: FactoryPlace): InboxEntry[] => cards.filter((card) => isIn(card, factory));
 
-/** `factory` as its block and its bar show it, holding those of `runs` that are in it. */
+/**
+ * `factory` as its block and its bar show it, holding those of `runs` that are in it.
+ * @param factory The factory as the api answers it.
+ * @param runs The runs of the machine, every factory's; those in `factory` are counted.
+ */
 export const blockOf = (factory: Factory, runs: readonly FactoryRun[]): FactoryBlock => {
   const mine = runsIn(runs, factory);
   return {
@@ -105,6 +120,8 @@ type OpenBlock = Pick<OpenRuns, 'counts'>;
  * `factory` as its bar shows it, from `open`, the light answer asked for that factory alone: the runs it holds are the three counts
  * together, and those that wait on you and those in flight the api's own counts, a run at its gate that still moves among the waiting
  * alone.
+ * @param factory The factory as the api answers it.
+ * @param open The light answer asked for that factory alone, by its three counts.
  */
 export const openBlockOf = (factory: Factory, open: OpenBlock): FactoryBlock => ({
   ...blockOf(factory, []),
@@ -116,13 +133,19 @@ export const openBlockOf = (factory: Factory, open: OpenBlock): FactoryBlock => 
 /** `n` of `one`, in words: `1 run`, `3 runs`. */
 const count = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
-/** What a block offers, in words: the default factory every workflow and no hire; another its workflows and its hires. */
+/**
+ * What a block offers, in words: the default factory every workflow and no hire; another its workflows and its hires.
+ * @param block The factory's block.
+ */
 export const offerOf = (block: FactoryBlock): string =>
   block.workflows === null
     ? 'every workflow · no hires'
     : `${count(block.workflows, 'workflow')} · ${block.hires === 0 ? 'no hires' : count(block.hires, 'hire')}`;
 
-/** What a block's runs are doing, in words: how many are in flight and wait on you, how many it holds, or that it holds none. */
+/**
+ * What a block's runs are doing, in words: how many are in flight and wait on you, how many it holds, or that it holds none.
+ * @param block The factory's block.
+ */
 export const runsOf = (block: FactoryBlock): string =>
   block.runs === 0
     ? 'No runs yet'
@@ -134,6 +157,8 @@ export const runsOf = (block: FactoryBlock): string =>
  * The factories the machine shows, in the order the api lists them, one whose file does not read among them. The default factory is one
  * only while no factory is filed and it holds a run (`held`): an empty default says nothing a person must act on, and once a factory
  * exists every run is started in one, so the default's runs are read on the Runs page alone.
+ * @param factories The factories, in the order the api lists them.
+ * @param held Whether the default factory holds a run (`holdsRuns`).
  */
 export const factoriesShown = <T extends FactoryPlace>(factories: readonly T[], held: boolean): T[] => {
   const named = factories.filter((f) => !f.default);
@@ -147,6 +172,9 @@ export const holdsRuns = ({ counts }: { counts: { waiting: number; inFlight: num
 /**
  * The blocks of the machine, one for each factory shown (`factoriesShown`), the default one while `held` (its light answer counts a run),
  * each counted off its own light answer (`openBlockOf`) in `opens`, by its name. A factory whose answer is not in `opens` has no block yet.
+ * @param factories The factories, in the order the api lists them.
+ * @param opens Each factory's light answer, by its name.
+ * @param held Whether the default factory's light answer counts a run.
  */
 export const openBlocks = (factories: readonly Factory[], opens: ReadonlyMap<string, OpenBlock>, held: boolean): FactoryBlock[] =>
   factoriesShown(factories, held).flatMap((f) => {
@@ -170,6 +198,8 @@ type Wired = Pick<Factory, 'name' | 'repos' | 'workflowRepos'> & { commands: Pic
  * has several and names none (`unwired`), names one none has (`unknown`), or one two share (`shared`), each `why` naming the factory's
  * attach (`commands.attach`, as the api answers it) with `--repo` and the folder names to pick among. Never a card's `repo:`, which is
  * retired: a card names a factory and a workflow, and the factory alone places its run. A prototype's name names no workflow's repository.
+ * @param factory The factory: its name, its repositories, its wiring and the line that attaches a workflow.
+ * @param workflow The workflow's name.
  */
 export function startRepo(factory: Wired, workflow: string): StartRepo {
   const wired = Object.hasOwn(factory.workflowRepos, workflow) ? factory.workflowRepos[workflow] : undefined;
@@ -195,6 +225,7 @@ const repoOn = (factory: Pick<Factory, 'repos'>, named: string | null): string |
  * Where a factory's floor starts a run: the factory, its repositories and the one it starts on — its only one, else null until a person
  * picks — or why it cannot start, for a factory whose file does not read or one on no repository. Null for the default factory, whose
  * floor starts none: a run started from a floor names its factory, and a run in none is started from the Workflows page.
+ * @param factory The factory as the api answers it.
  */
 export const floorPlace = (factory: Factory): { factory: string; repos: string[]; repo: string | null } | { why: string } | null => {
   if (factory.default) return null;
@@ -207,7 +238,10 @@ export const floorPlace = (factory: Factory): { factory: string; repos: string[]
   return { factory: factory.name, repos: factory.repos, repo: repoOn(factory, null) };
 };
 
-/** Why a workflow the factory lists cannot start: its folder's `error`, else the steps its hires leave `unfilled`; null when it can. */
+/**
+ * Why a workflow the factory lists cannot start: its folder's `error`, else the steps its hires leave `unfilled`; null when it can.
+ * @param workflow The workflow as the list answers it, by its error and its unfilled steps.
+ */
 export const whyNotStarted = (workflow: Pick<WorkflowListing, 'error' | 'unfilled'>): string | null =>
   workflow.error ?? workflow.unfilled ?? null;
 
@@ -217,13 +251,20 @@ export const whyNotStarted = (workflow: Pick<WorkflowListing, 'error' | 'unfille
  */
 export { factoryIn, namespaceOf } from './api/namespace.ts';
 
-/** Whether a run or a card is kept by the filter on the factory `filter` names (`namespaceOf`): every one is when it names none. */
+/**
+ * Whether a run or a card is kept by the filter on the factory `filter` names (`namespaceOf`): every one is when it names none.
+ * @param filter The factory's name the page filters by, or undefined where it filters by none.
+ */
 export const keptBy =
   (filter: string | undefined) =>
   (item: { factory: string | null }): boolean =>
     filter === undefined || namespaceOf(item.factory) === filter;
 
-/** The runs or cards of the factory `filter` names (`keptBy`), in their order; every one when `filter` names none. */
+/**
+ * The runs or cards of the factory `filter` names (`keptBy`), in their order; every one when `filter` names none.
+ * @param items The runs or cards, each by the factory it names (null for the default).
+ * @param filter The factory's name the page filters by, or undefined where it filters by none.
+ */
 export const shownIn = <T extends { factory: string | null }>(items: readonly T[], filter: string | undefined): T[] =>
   items.filter(keptBy(filter));
 
@@ -232,6 +273,8 @@ export const shownIn = <T extends { factory: string | null }>(items: readonly T[
  * factory whose file reads and that attaches it by its folder's name, on a repository it is found on. One of yours is found on every
  * repository; one of the repository's only on the api's, the default factory's. None while `factories` holds no default factory to say
  * which repository that is. A list read in a named factory is the api's answer there, and is tagged with that factory alone.
+ * @param workflow The workflow, by its name and where it was read from.
+ * @param factories The factories as the api lists them.
  */
 export const workflowFactories = (workflow: Pick<WorkflowListing, 'name' | 'from'>, factories: readonly Factory[]): string[] => {
   const here = factories.find((f) => f.default)?.repos[0];
@@ -258,6 +301,8 @@ export type ListPlace =
  * for a name no factory has, a factory whose file does not read and one on no repository, in `floorPlace`'s words; `in` the factory on
  * the repository the address names, else its only one (`repoOn`); `pick` where it has several and the address names none — never a
  * guess among them, nor the default factory's repository.
+ * @param address The address's place: the factory and the repository it names, each where it names one.
+ * @param factories The factories as the api lists them.
  */
 export const listPlace = (address: PagePlace, factories: readonly Factory[]): ListPlace => {
   const { factory: name, repo } = address;
@@ -276,6 +321,8 @@ export const listPlace = (address: PagePlace, factories: readonly Factory[]): Li
  * The word for where a workflow read from `from` comes from, read in `factory`: `yours` for one of yours anywhere; `the factory's` for one
  * of the factory's own tree; `this repository` for one read with no factory or in the default one; `the factory's` in a named factory,
  * whose folder its page prints — the word a route kept on Hono says `repo` for its tree too (`sourceOf`).
+ * @param from Where the workflow was read from, as the list says it.
+ * @param factory The factory's name it is read in, or undefined where it is read with none.
  */
 export const fromWord = (from: WorkflowListing['from'], factory?: string): string => {
   if (from === 'yours') return 'yours';
@@ -293,7 +340,10 @@ export const FACTORY_WAY = "they change the factory's way, its tree written from
 /** The step a new agent is to be hired into once written: a factory, a workflow of yours, and its step. */
 export type HirePlace = { factory: string; workflow: string; step: string };
 
-/** The New agent page's search, the step it hires into: all three parts where the address names each by a string not empty, else none. */
+/**
+ * The New agent page's search, the step it hires into: all three parts where the address names each by a string not empty, else none.
+ * @param search The page's search, as the router parsed it.
+ */
 export const hirePlaceOf = (search: Record<string, unknown>): Partial<HirePlace> => {
   const { factory, workflow, step } = search;
   return typeof factory === 'string' && factory && typeof workflow === 'string' && workflow && typeof step === 'string' && step
@@ -307,6 +357,9 @@ type HiredOnCreate = { hired: true } | { hired: false; why: string };
 /**
  * Hires `agent`, just written, into `place` with `hire`, the board's hire: `hired` once the api takes it, else `why` not, in its words —
  * never a refusal passed over as a hire.
+ * @param place The step to hire into: its factory, its workflow and the step's name.
+ * @param agent The name of the agent just written.
+ * @param hire The board's hire: asks the api to hire an agent into a factory's step, by `<workflow>/<step>`.
  */
 export const hireOnCreate = (
   place: HirePlace,
@@ -321,6 +374,7 @@ export const hireOnCreate = (
 /**
  * The place a workflow's page or a step's is read in, from its address: `?factory=` as `factorySearch` reads it, and `?repo=` where it
  * names a repository by a string that is not empty.
+ * @param search The page's search, as the router parsed it.
  */
 export const pagePlaceOf = (search: Record<string, unknown>): PagePlace => ({
   ...factorySearch(search),
@@ -333,6 +387,9 @@ export const placeOfAddress = ({ factory, repo }: WorkflowPageAddress): PagePlac
   ...(repo ? { repo } : {}),
 });
 
-/** The factory a page's address filters by, `?factory=<name>`: none when it names none, or names it with nothing, or with no string. */
+/**
+ * The factory a page's address filters by, `?factory=<name>`: none when it names none, or names it with nothing, or with no string.
+ * @param search The page's search, as the router parsed it.
+ */
 export const factorySearch = (search: Record<string, unknown>): { factory?: string } =>
   typeof search.factory === 'string' && search.factory ? { factory: search.factory } : {};

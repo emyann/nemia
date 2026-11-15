@@ -25,6 +25,11 @@ export const MODES: Record<RetryMode, string> = {
  * questions the step's closeout asks, which the api checks and writes as the try's message, the `message` beside them their note.
  *
  * Sent in the run's namespace: `namespace` where the caller holds it, as a card on the floor does, else the run's own (`useRunNamespace`).
+ *
+ * @param runId the run the try is asked of
+ * @param step the step the try is asked for, unless a mutation names another
+ * @param onAsked called once the api has taken the ask
+ * @param namespace the run's namespace where the caller holds it, else the run's own is read
  */
 export function useAsk(runId: string, step: string, onAsked: () => void, namespace?: string) {
   const queryClient = useQueryClient();
@@ -51,13 +56,21 @@ export function useAsk(runId: string, step: string, onAsked: () => void, namespa
  * An ask for another round of a run's loop through the api (`askRound`), and the run read again once the api has it, as for a try
  * (`runsMoved`): its own record, and the list the frame reads, since the api drops the step from those waiting on you and marks the round
  * due at once.
+ *
+ * @param runId the run whose loop another round is asked of
  */
 export function useRound(runId: string) {
   const queryClient = useQueryClient();
   return useMutation(roundAsk(queryClient, runId, useRunNamespace(runId)));
 }
 
-/** What `useRound` hands `useMutation`: the ask in the run's namespace, as `namespaceNow` answers it, and the reads it makes again. */
+/**
+ * What `useRound` hands `useMutation`: the ask in the run's namespace, as `namespaceNow` answers it, and the reads it makes again.
+ *
+ * @param queryClient the client whose reads are made again once the ask is taken
+ * @param runId the run whose loop another round is asked of
+ * @param namespaceNow reads the namespace the ask is sent in
+ */
 export const roundAsk = (queryClient: QueryClient, runId: string, namespaceNow: () => Promise<string>) => ({
   mutationFn: ({ step, ...how }: { step: string; budget?: number }) => namespaceNow().then((ns) => askRound(ns, runId, step, how)),
   onSuccess: () => {

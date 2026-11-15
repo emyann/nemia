@@ -8,7 +8,11 @@ import path from 'node:path';
 import type { WorkflowFile } from 'objects';
 import { Refused } from '../refused.ts';
 
-/** The text of `file`, for the command `command` names; refused, naming the file, where it cannot be read. */
+/**
+ * The text of `file`, for the command `command` names; refused, naming the file, where it cannot be read.
+ * @param file The path of the file to read.
+ * @param command The command's name, said in the refusal.
+ */
 export function textOf(file: string, command: string): string {
   try {
     return fs.readFileSync(file, 'utf8');
@@ -22,6 +26,8 @@ export function textOf(file: string, command: string): string {
 /**
  * The files of the draft folder `folder`, by their names and with their text: every regular file directly in it, sorted by name. A
  * subfolder is not read; a link is refused by name, since what it points at is not the draft's own. Refused where `folder` is no folder.
+ * @param folder The path of the draft folder.
+ * @param command The command's name, said in a refusal.
  */
 export function folderFiles(folder: string, command: string): WorkflowFile[] {
   if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory())
@@ -42,6 +48,8 @@ export function folderFiles(folder: string, command: string): WorkflowFile[] {
 /**
  * An agent's files: its file `file` first, by its name, then each `*.json` file beside it, sorted by name, where the result schema its
  * `output:` names is found by the api.
+ * @param file The path of the agent's file.
+ * @param command The command's name, said in a refusal.
  */
 export function agentFiles(file: string, command: string): WorkflowFile[] {
   const text = textOf(file, command);

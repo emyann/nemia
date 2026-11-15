@@ -46,6 +46,9 @@ import { Conflict, Missing } from '../refusal/refusal.ts';
 /**
  * Where `nemia start` renders a step's agent for Claude Code (`agents.ts`): `runs/<id>/agents/<step>`, beside the run's artifacts and
  * inputs, outside every workspace, and removed with them. The tick files the step with the flags that name it (`renderedFlags`).
+ * @param home The store's root.
+ * @param run The run, by its id.
+ * @param step The step's name.
  */
 export const agentFilesDir = (home: string, run: Pick<Run, 'id'>, step: string): string => path.join(runsDir(home), run.id, 'agents', step);
 
@@ -53,6 +56,8 @@ export const agentFilesDir = (home: string, run: Pick<Run, 'id'>, step: string):
  * Whether a step's rendered folder `dir` is there as its flags name it (`renderedFlags`): the folder, and the plugin in it where the flags
  * name one (`namesPlugin`). A folder rendered under another plugin name, as one `nemia start` wrote before the plugin was renamed, is not:
  * its flags would name a plugin that is not there.
+ * @param dir The step's rendered folder.
+ * @param step The step, whose flags name the plugin looked for.
  */
 export const renderedIn = (dir: string, step: StepSpec): boolean =>
   isDirectory(dir) && (!namesPlugin(step) || (step.agent !== undefined && isDirectory(path.join(dir, pluginOf(step.agent.name)))));
@@ -65,6 +70,10 @@ export const renderedIn = (dir: string, step: StepSpec): boolean =>
  * (`followPass`). So in a pinned factory an edit of an agent or a skill after a run has filed reaches it no more than an edit of its
  * workflow does. A skill is copied as its files, never a link, and one holding a link that is not followed is refused
  * (`copySkillFiles`): the folder is the step's own.
+ * @param home The store's root.
+ * @param run The run, by its id.
+ * @param steps The run's steps, each rendered where its agent is.
+ * @param skills The skills the load found, by name, and where it looked for them.
  */
 export function writeAgentFiles(home: string, run: Pick<Run, 'id'>, steps: readonly StepSpec[], skills: SkillsFound): void {
   for (const step of steps.filter(rendersAgent)) {
@@ -101,6 +110,9 @@ export function writeAgentFiles(home: string, run: Pick<Run, 'id'>, steps: reado
  * The version (`skillVersion`) of each skill `nemia start` rendered for a step of `run` (`writeAgentFiles`), by the name its line writes,
  * read off its copy, filed under its bare name, in the step's folder (`agentFilesDir`): a skill whose copy is not there — a step whose
  * agent is not rendered, a folder gone — is left out.
+ * @param home The store's root.
+ * @param run The run, by its id.
+ * @param step The step whose rendered skills are read.
  */
 export function renderedSkillVersions(home: string, run: Pick<Run, 'id'>, step: StepSpec): Map<string, string> {
   const agent = step.agent;
@@ -118,6 +130,9 @@ export function renderedSkillVersions(home: string, run: Pick<Run, 'id'>, step: 
  * The rules (`readSkillRules`) each skill `nemia start` rendered for a step of `run` declares, by the name the skill's line writes, read
  * off its copy in the step's folder (`agentFilesDir`): a skill whose copy is not there, that declares none, or whose `rules.json` does not
  * read is left out.
+ * @param home The store's root.
+ * @param run The run, by its id.
+ * @param step The step whose rendered skills are read.
  */
 export function renderedSkillRules(home: string, run: Pick<Run, 'id'>, step: StepSpec): Map<string, SkillRule[]> {
   const agent = step.agent;
@@ -140,6 +155,9 @@ export function renderedSkillRules(home: string, run: Pick<Run, 'id'>, step: Ste
  * The paths of the work (`appliesOf`) each skill `nemia start` rendered for a step of `run` declares, by the name the skill's line writes,
  * read off its copy's SKILL.md in the step's folder (`agentFilesDir`): a skill whose copy is not there, or that declares none, is left
  * out.
+ * @param home The store's root.
+ * @param run The run, by its id.
+ * @param step The step whose rendered skills are read.
  */
 export function renderedSkillApplies(home: string, run: Pick<Run, 'id'>, step: StepSpec): Map<string, string[]> {
   const agent = step.agent;
@@ -280,6 +298,9 @@ function keptOffer(draft: AgentDraft, version: string | null, at: string): Agent
  * Renamed by case where the filesystem does not tell case apart, the file it is renamed from is removed before the one it is renamed to
  * is written, as in `writeWorkflow`.
  * A write that fails puts each file beside the agent back as it was, so an agent not written leaves nothing of itself behind.
+ * @param home The store's root, whose place the folder must be in and whose skills the version counts.
+ * @param dir The folder of agents the agent is written in.
+ * @param draft The agent as the person wrote it, rendered to its file.
  */
 export function writeAgent(
   home: string,
@@ -414,6 +435,9 @@ export function writeAgent(
  * it still names it, saying which: removed, each of those workflows would stop loading. An agent of the store is refused too while a step
  * of `repo`'s workflows is given it, the repository having none of that name (`repoUsers`); other repositories are not read, since the
  * store does not know them, and one that named the agent refuses to load its workflow until given another.
+ * @param home The store's root, whose place the folder must be in.
+ * @param dir The folder of agents the agent is removed from.
+ * @param name The agent's name.
  */
 export function removeAgent(
   home: string,

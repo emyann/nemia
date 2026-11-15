@@ -138,6 +138,7 @@ const isSet = (key: string, value: unknown): boolean =>
 /**
  * A step as its file writes it, which a save sends (`spec.steps`): a step with an agent, its `agent`, the keys it sets itself (`own.keys`,
  * which leave `agent` out) and its own note; one with none, every key it sets and all of its body.
+ * @param step The step as the builder holds it.
  */
 export const writtenStepOf = (step: StepWritten): WorkflowStep => {
   const entries = Object.entries(step.spec) as Array<[StepKey, unknown]>;
@@ -160,7 +161,10 @@ export const workflowsQuery = queryOptions({
  */
 export type Place = { factory: string; repo: string };
 
-/** The query naming `place`: none for no place and for the default factory, whose answer is the same as naming none. */
+/**
+ * The query naming `place`: none for no place and for the default factory, whose answer is the same as naming none.
+ * @param place The factory and its repository; undefined or null for none.
+ */
 export const placeQuery = (place?: Place | null): string =>
   !place || place.factory === DEFAULT_NAMESPACE
     ? ''
@@ -171,6 +175,7 @@ export const placeQuery = (place?: Place | null): string =>
  * `unfilled`, and each step the agent `hired` into it. Keyed apart from `workflowsQuery`, which the builder drafts from: a builder never
  * reads this one. Read by a factory's start, and by the Workflows page, a workflow's page and a step's bar reached in a factory
  * (`workflowsInQuery`).
+ * @param place The factory and the repository its namespace is read on.
  */
 export const factoryWorkflowsQuery = (place: Place) =>
   queryOptions({
@@ -181,12 +186,15 @@ export const factoryWorkflowsQuery = (place: Place) =>
 /**
  * The list of workflows read in `place`: `workflowsQuery` for none, `factoryWorkflowsQuery` in a factory on one of its repositories, each
  * under its own key, so a page and a factory's start share one read.
+ * @param place The factory and one of its repositories; null for the default namespace.
  */
 export const workflowsInQuery = (place: Place | null) => (place === null ? workflowsQuery : factoryWorkflowsQuery(place));
 
 /**
  * Whether a workflow read from `from` is the one an address naming `named` means: the same origin, or, where the address is a route's kept
  * on Hono, which names the factory's own tree `repo` (`sourceOf`), the same word there.
+ * @param from The origin the workflow was read from.
+ * @param named The origin the address names.
  */
 export const fromMatches = (from: DefinitionOrigin, named: string): boolean => from === named || sourceOf(from) === named;
 
@@ -200,6 +208,10 @@ export type PagePlace = { factory?: string; repo?: string };
  * page is: a person edits the folder, and a factory's hires. `from` is the origin the page's address names, sent as the api's
  * `?origin=` where it is one (a factory's own tree is `factory`, which the api serves apart from the repository's), else as `sourceOf`
  * reads it.
+ * @param from The origin the page's address names.
+ * @param workflow The workflow's name.
+ * @param step The step's name.
+ * @param place The factory and repository it is read in; empty for the default namespace on no repository.
  */
 export const stepQuery = (from: string, workflow: string, step: string, place: PagePlace = {}) =>
   queryOptions({
@@ -211,7 +223,10 @@ export const stepQuery = (from: string, workflow: string, step: string, place: P
       }),
   });
 
-/** A workflow by name, as the Workflows page lists it: the last segment of its folder. */
+/**
+ * A workflow by name, as the Workflows page lists it: the last segment of its folder.
+ * @param workflowDir The workflow's folder, by its path.
+ */
 export const workflowNameOf = (workflowDir: string): string =>
   workflowDir
     .replace(/[\\/]+$/, '')
@@ -235,6 +250,8 @@ export type Started = { id: string };
  * workflow the factory has not attached, a step its hires leave unfilled, or a repository outside it.
  *
  * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
+ * @param start What the run is: its workflow by name and where it is from, its brief, the runs it waits on, the runs it reads as context.
+ * @param place The factory and the repository it starts in; undefined, null or the default factory for the default namespace.
  */
 export const startRun = (
   start: {
@@ -285,6 +302,8 @@ const refused: Refuse = (words, status, answer) =>
  * read back from disk. Rejects with a `BuildRefusal`: the package's sentence and the steps it names, a folder changed since it was read
  * (409), or the api's own about the request; and with an `UnreadAnswer` for an answer the board does not read, saying the folder may be
  * written.
+ * @param name The folder's name, the workflow's.
+ * @param save Its steps, the schemas pasted for them, its README where it changed, and the version it was read at.
  */
 export const saveWorkflow = async (
   name: string,
@@ -306,6 +325,8 @@ export const saveWorkflow = async (
 /**
  * Make a folder of yours with its first step (`POST /api/namespaces/default/workflows`). Rejects with a `BuildRefusal`, as a save does: a
  * name taken, or a step the package refuses.
+ * @param name The folder's name, the workflow's.
+ * @param step Its first step, as the builder holds it.
  */
 export const createWorkflow = async (name: string, step: StepWritten): Promise<WorkflowListing> =>
   workflowViewOf(await served.create(DEFAULT_NAMESPACE, { metadata: { name }, spec: { steps: [writtenStepOf(step)] } }, refused));
@@ -315,6 +336,8 @@ export const createWorkflow = async (name: string, step: StepWritten): Promise<W
  * folder as it was. Rejects with a `WriteRefusal` in the api's words: a folder changed since it was read (409), or one a run, a queued card
  * or a factory still needs, each named with the command that frees it (409); and with an `UnreadAnswer` for an answer the board does not
  * read, saying the folder may be gone.
+ * @param name The folder's name, the workflow's.
+ * @param version The version it was read at (`WorkflowListing.version`).
  */
 export const removeWorkflow = async (name: string, version: string): Promise<WorkflowListing> =>
   workflowViewOf(await served.delete(DEFAULT_NAMESPACE, name, version));

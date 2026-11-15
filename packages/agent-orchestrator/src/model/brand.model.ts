@@ -29,6 +29,8 @@ const forms = <const K extends string, A extends Brand.Brand<K>, S extends Schem
 /**
  * An id this layer mints. `rule` is its writer's own: the pattern constant, or the refusal function that returns what is wrong with
  * a value (and nothing for a good one), imported rather than copied, so the model and the writer cannot disagree.
+ * @param name The id's key, its type's nominal brand and the schema's identifier.
+ * @param rule The writer's pattern, or its refusal function: what is wrong with a value, nothing for a good one.
  */
 export const brandedId = <const K extends string>(name: K, rule: RegExp | ((value: string) => string | null | undefined)) =>
   forms<K, Id<K>, typeof Schema.String>(name, Schema.String, [
@@ -37,14 +39,21 @@ export const brandedId = <const K extends string>(name: K, rule: RegExp | ((valu
       : Schema.makeFilter<string>((value) => rule(value) ?? true, { expected: `a ${name}` }),
   ]);
 
-/** A whole number at least `minimum`. */
+/**
+ * A whole number at least `minimum`.
+ * @param name The count's key, its type's nominal brand and the schema's identifier.
+ * @param minimum The least whole number the count may be.
+ */
 export const brandedCount = <const K extends string>(name: K, minimum: number) =>
   forms<K, Count<K>, typeof Schema.Number>(name, Schema.Number, [
     Schema.isInt({ expected: `a whole ${name}` }),
     Schema.isGreaterThanOrEqualTo(minimum, { expected: `a ${name} of at least ${minimum}` }),
   ]);
 
-/** An id another layer mints: this layer holds it as a relation and never checks its shape, so it has the read form only. */
+/**
+ * An id another layer mints: this layer holds it as a relation and never checks its shape, so it has the read form only.
+ * @param name The id's key, its type's nominal brand and the schema's identifier.
+ */
 export const foreignId = <const K extends string>(name: K) => ({
   name,
   read: Brand.nominal<Id<K>>(),

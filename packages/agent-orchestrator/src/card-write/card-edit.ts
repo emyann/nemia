@@ -8,6 +8,8 @@ import type { CardEditRefusalOf } from '../../contracts/card-edit.contract.ts';
 /**
  * Why a card's edit is refused, the first of started, its `factory:` naming another factory than the card's, and its `labels:` other than
  * the card's, or null where the rest is the Card's whole write to judge.
+ * @param ask What the edit asks and what stands: whether the card has started, its factory and the `factory:` the text names, and the
+ * labels the text names beside the card's.
  */
 export const cardEditRefusal: CardEditRefusalOf = (ask) => {
   if (ask.started) return 'started';

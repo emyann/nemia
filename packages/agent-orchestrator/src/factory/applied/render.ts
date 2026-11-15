@@ -335,6 +335,8 @@ function renderRules(rules: string | undefined, out: Rendered): void {
  * workflow, the manifest's hires and its revisions policy, `NEMIA.md` from the manifest's instruction or the template's own, and
  * `RULES.md` from its rules, as `renderRules` writes them. Refused, each by name, nothing to write: what `renderStep`, `renderAgent` or
  * `renderRules` refuses, a harness block's `options`, and a block of a harness the step or agent does not run on.
+ * @param read The template as read, which passes its check.
+ * @param params The parameters' values to render with, by name.
  */
 export function renderFactory(read: TemplateRead, params: Params): Rendered {
   const manifest = specAt(read, 'nemia.yaml', params);

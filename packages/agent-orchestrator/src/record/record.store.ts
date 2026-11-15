@@ -139,7 +139,11 @@ const fieldOf = (value: unknown, key: PropertyKey): unknown =>
 /** `text` cut to its first 60 characters and marked `…` where it was cut, as the runtime quotes a value it refuses. */
 const shown = (text: string): string => (text.length > 60 ? `${text.slice(0, 60)}…` : text);
 
-/** The first thing `schema` refuses in `value`: the path to it, and what is there in place of what the tick writes. */
+/**
+ * The first thing `schema` refuses in `value`: the path to it, and what is there in place of what the tick writes.
+ * @param value The value the schema was given.
+ * @param error What the schema refused the value with.
+ */
 export function firstRefusal(value: unknown, error: Schema.SchemaError): { path: readonly PropertyKey[]; words: string } {
   const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues;
   const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
@@ -176,6 +180,10 @@ export class UnreadableRecord extends Invalid {
 
 /** Each unreadable record said once a process: a daemon lists the runs every pass. */
 const saidAlready = new Set<string>();
+/**
+ * Say `line` on stderr, once a process: a line said before is not said again.
+ * @param line The line to say.
+ */
 export const sayOnce = (line: string): void => {
   if (!saidAlready.has(line) && saidAlready.add(line)) process.stderr.write(`${line}\n`);
 };
@@ -193,6 +201,7 @@ const jsonOr = (text: string): unknown => Result.getOrUndefined(Schema.decodeUnk
 /**
  * The actor a person's file names (objects' `Actor`), as a key to spread: none where the file names none — one written in-process, or
  * by code older than actors — or names one that does not read as an actor, which is left out rather than refusing what the file asks.
+ * @param value What the file holds under its actor's key; undefined where it holds none.
  */
 export const actorIn = (value: unknown): { actor?: Actor } => {
   const read = Result.getOrUndefined(Schema.decodeUnknownResult(Actor)(value));
@@ -208,7 +217,16 @@ const markerOf = (file: string): { json: unknown } | undefined => {
   }
 };
 
+/**
+ * The folder of every run's record and the files beside it: `runs/` under the store's root.
+ * @param home The store's root folder.
+ */
 export const runsDir = (home: string) => path.join(home, 'runs');
+/**
+ * The file of a run's record: `runs/<id>.json`.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ */
 export const runFile = (home: string, id: string) => path.join(runsDir(home), `${id}.json`);
 
 /**
@@ -223,6 +241,8 @@ export const runFile = (home: string, id: string) => path.join(runsDir(home), `$
  * So the two writers are given two files and never touch each other's. The tick owns the run's
  * steps, a person owns the cancellation, and `runRecord` composes them. No lock, and nothing to get
  * wrong under a crash: the file exists or it does not.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const cancelFile = (home: string, id: string) => path.join(runsDir(home), `${id}.cancelled`);
 
@@ -231,6 +251,8 @@ export const cancelFile = (home: string, id: string) => path.join(runsDir(home),
  * files directory went and what that freed — a person's fact, in a file of its own
  * for the reason `cancelFile` is. Written by `prune` alone, before it removes anything, so a pass that reads the run while the worktrees
  * go files nothing more (`advance`), and composed onto the run on read (`runRecord`) as `pruned`. `nemia rm` removes it with the run.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const pruneFile = (home: string, id: string) => path.join(runsDir(home), `${id}.pruned`);
 
@@ -238,6 +260,8 @@ export const pruneFile = (home: string, id: string) => path.join(runsDir(home), 
  * The prune marker, read: undefined for a run never pruned. A marker that does not read as one still says the run is pruned, and each
  * field that does not read is empty. Its files (`nemia prune --artifacts`) are pruned when the marker names them, at the time it says or
  * none.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export function readPruned(home: string, id: string): Pruned | undefined {
   const marker = markerOf(pruneFile(home, id));
@@ -252,6 +276,8 @@ export function readPruned(home: string, id: string): Pruned | undefined {
 /**
  * The marks the run carries now, read from which of its three files are there (`runMarkOf`): what each writer of one asks the machine
  * with before it writes (`runMarkMove`, run-marks.ts), keeping its own guard against another hand beside it.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const marksAt = (home: string, id: string): RunMark =>
   runMarkOf({
@@ -265,6 +291,8 @@ export const marksAt = (home: string, id: string): RunMark =>
  * the reason `cancelFile` is. Written by `hold` alone, exclusively; removed by `nemia hold --off`, by the tick once every run it names has
  * landed (`removeHold`), and by `nemia rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within
  * its cap.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const holdFile = (home: string, id: string) => path.join(runsDir(home), `${id}.hold`);
 
@@ -291,6 +319,9 @@ function readHold(home: string, id: string): Hold | undefined {
  * Write down that this run is held until `until` land, with the person's `why` and who they are (`by`) when given, and the caller who put
  * it (`actor`) where it is known, and answer with the hold written — or null, when a hold already stands. `wx`, so a hold two people put
  * at once is the first one's, whole, and a hold is never edited: changing what it names or says is `--off` and a new hold.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param until The ids of the runs that must land before the hold lifts.
  */
 export const writeHold = (
   home: string,
@@ -320,6 +351,8 @@ export const writeHold = (
  * Who lifted the run's last hold lifted by hand (`Unheld`): `{ since, actor }`, a file of its own beside the hold's, written by the lift
  * whole before the hold's file is taken away (`removeHold`), so a pass that reads the hold gone reads who took it; overwritten by the next
  * such lift, and removed by `nemia rm` with the run. Composed onto the run on read as `unheld`.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const unheldFile = (home: string, id: string) => path.join(runsDir(home), `${id}.unheld`);
 
@@ -336,6 +369,10 @@ function readUnheld(home: string, id: string): Unheld | undefined {
  * Lift a hold — the one put at `at`, and only while it still stands: false when the file is gone or holds a hold put since. The tick reads
  * the hold, spends seconds asking git and the engine whether its runs landed, and lifts it; a person who lifted it and held the run again
  * in those seconds put a hold the tick never read, and it stays. Given who lifts it (`actor`), that is written first (`unheldFile`).
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param at When the hold to lift was put, as its file says.
+ * @param actor Who lifts it; absent where the tick lifts it, or the caller is not known.
  */
 export const removeHold = (home: string, id: string, at: string, actor?: Actor): boolean => {
   if (runMarkMove(marksAt(home, id), 'lift').kind !== 'edge') return false;
@@ -363,6 +400,8 @@ export const removeHold = (home: string, id: string, at: string, actor?: Actor):
  * (`upgradeTries`), and a step's record written before `declared` was kept is given it where its schema has not moved (`keptDeclared`).
  * Refused: an id with no record, as `no such run` naming
  * `nemia ls` (`Missing`), for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const runRecord = (home: string, id: string): Run => within('records', () => readRecord(home, id));
 
@@ -414,6 +453,8 @@ const readRecord = (home: string, id: string): Run => {
  * fact beside the record for the reason `cancelFile` is, each word a file `<n>.json` of `{ step, at, text }`, numbered from 1 in the
  * order kept. Written by `keepSaid` alone, exclusively; never edited; removed by `nemia rm` with the run. Composed onto the run as
  * `saidBefore` by every read of a record (`runRecord`), and never written into the record.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const saidDir = (home: string, id: string): string => path.join(runsDir(home), `${id}.said`);
 
@@ -438,6 +479,10 @@ function keptNumbers(dir: string): number[] {
 /**
  * Keep words said to `step` before it was filed: the next number's file, written `wx`, so two people saying at once each keep their own
  * word, the later taking the number after; the word kept, with when.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param step The name of the step the words were said to.
+ * @param text The words said.
  */
 export function keepSaid(home: string, id: string, step: string, text: string): SaidBefore {
   const dir = saidDir(home, id);
@@ -487,6 +532,9 @@ function readSaidBefore(home: string, id: string): Record<string, SaidBefore[]> 
  * `wx` so the FIRST cancellation is the one kept, its actor with it: two people calling the same run off should not
  * leave the record saying it happened at whichever moment the second one typed it. A cancellation with no actor is the time alone, as
  * the file always held; one with an actor is JSON of both (`{ at, actor }`), in the one file, so the time and who are written at once.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param actor Who calls the run off; absent where the caller is not known.
  */
 export const markCancelled = (home: string, id: string, actor?: Actor): string => {
   fs.mkdirSync(runsDir(home), { recursive: true });
@@ -503,6 +551,8 @@ export const markCancelled = (home: string, id: string, actor?: Actor): string =
 /**
  * The cancellation, read: when, and who where the file says (`by`) — undefined for a run nobody cancelled. The file holds the time as
  * text, as it always did, or JSON of the time and the actor (`markCancelled`); a file that is neither is its text, read as the time.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export function readCancelled(home: string, id: string): { at: string; by?: Actor } | undefined {
   const file = cancelFile(home, id);
@@ -534,17 +584,50 @@ export function readCancelled(home: string, id: string): { at: string; by?: Acto
  * And `nemia approve`, in `accept-<step>-<n>`: the looping step whose loop a person ended as it stands, and the try they accepted. Read and
  * spent exactly as an approval is (`readAcceptances`, `spentAcceptances`) — every pass reads the file, so the loop stays ended after a
  * restart, and a later try of the step takes it back.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const asksDir = (home: string, id: string) => path.join(runsDir(home), `${id}.asks`);
+/**
+ * The file of a person's `nemia retry` of a step's try: `retry-<step>-<n>` in the run's asks directory (`asksDir`).
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param step The step's name.
+ * @param n The try asked for, from 1.
+ */
 export const askFile = (home: string, id: string, step: string, n: number): string => path.join(asksDir(home, id), `retry-${step}-${n}`);
+/**
+ * The file of a person's `nemia retry --round` of a looping step: `round-<step>-<round>` in the run's asks directory (`asksDir`).
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param step The looping step's name.
+ * @param round The round asked for.
+ */
 export const roundAskFile = (home: string, id: string, step: string, round: number): string =>
   path.join(asksDir(home, id), `round-${step}-${round}`);
+/**
+ * The file of a person's `nemia approve` at a gate: `approve-<step>-<n>` in the run's asks directory (`asksDir`).
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param step The gated step's name.
+ * @param n The try approved, from 1.
+ */
 export const approvalFile = (home: string, id: string, step: string, n: number): string =>
   path.join(asksDir(home, id), `approve-${step}-${n}`);
+/**
+ * The file of a loop a person ended as it stands: `accept-<step>-<n>` in the run's asks directory (`asksDir`).
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param step The looping step's name.
+ * @param n The try accepted, from 1.
+ */
 export const acceptFile = (home: string, id: string, step: string, n: number): string =>
   path.join(asksDir(home, id), `accept-${step}-${n}`);
 
-/** The names of the files in `dir`, sorted; undefined where it cannot be listed, as when it was never made. */
+/**
+ * The names of the files in `dir`, sorted; undefined where it cannot be listed, as when it was never made.
+ * @param dir The folder listed.
+ */
 export const fileNames = (dir: string): string[] | undefined => {
   try {
     return fs
@@ -560,6 +643,8 @@ export const fileNames = (dir: string): string[] | undefined => {
 /**
  * The approvals at a run's gates, waiting in its asks directory — each opens the gate of the try it names — and a line for each file named
  * as one that cannot be read as one.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const readApprovals = (home: string, id: string): { approvals: Approval[]; notes: string[] } =>
   within('asks', () => readApprovalsNow(home, id));
@@ -610,7 +695,10 @@ const RetryAskFileSchema = Kept({
   at: Schema.optionalKey(Schema.Unknown),
 });
 
-/** An ask file's JSON, or why it cannot be read. */
+/**
+ * An ask file's JSON, or why it cannot be read.
+ * @param file The ask file's path.
+ */
 export function heldIn(file: string): { read: unknown } | { unreadable: string } {
   try {
     return { read: JSON.parse(readText(file)) };
@@ -619,7 +707,11 @@ export function heldIn(file: string): { read: unknown } | { unreadable: string }
   }
 }
 
-/** `value` read with `schema`, or the first key it refuses (`''` for the value itself, which holds no object). */
+/**
+ * `value` read with `schema`, or the first key it refuses (`''` for the value itself, which holds no object).
+ * @param schema The schema the value is read with.
+ * @param value The value read.
+ */
 export function readAs<S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): { read: S['Type'] } | { refused: string } {
   const decoded = Schema.decodeUnknownResult(schema)(value);
   if (Result.isSuccess(decoded)) return { read: decoded.success };
@@ -638,7 +730,12 @@ const APPROVAL_WORDS: Record<string, string> = {
 };
 const NO_APPROVAL = 'it is not an approval nemia approve wrote';
 
-/** One approval file, read: the step and the try from its name, when and what was said from what it holds — or why it cannot be read. */
+/**
+ * One approval file, read: the step and the try from its name, when and what was said from what it holds — or why it cannot be read.
+ * @param file The approval file's path.
+ * @param step The gated step, from the file's name.
+ * @param n The try approved, from the file's name.
+ */
 export function approvalIn(file: string, step: string, n: number): Approval | string {
   const held = heldIn(file);
   if ('unreadable' in held) return held.unreadable;
@@ -659,6 +756,8 @@ export function approvalIn(file: string, step: string, n: number): Approval | st
 /**
  * The acceptances of a run's loops, waiting in its asks directory — each ends the loop of the try it names — and a line for each file named
  * as one that cannot be read as one.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export function readAcceptances(home: string, id: string): { acceptances: Acceptance[]; notes: string[] } {
   return within('asks', () => readAcceptancesNow(home, id));
@@ -687,6 +786,9 @@ function readAcceptancesNow(
  * One acceptance file, read: the looping step and the try from its name, when and what was said from what it holds — or why it cannot be
  * read. What `nemia approve` refuses to write is refused here too, so a file written by hand is held to the verb's word: an acceptance with
  * no words ends a loop with findings open and tells the steps after it nothing, which is the whole of what it is for.
+ * @param file The acceptance file's path.
+ * @param step The looping step, from the file's name.
+ * @param n The try accepted, from the file's name.
  */
 export function acceptanceIn(file: string, step: string, n: number): Acceptance | string {
   const held = heldIn(file);
@@ -708,6 +810,8 @@ export function acceptanceIn(file: string, step: string, n: number): Acceptance 
  * for each approval and acceptance that cannot be read (`readApprovals`, `readAcceptances`), said on the pass as an ask's is. A file named
  * otherwise is no ask, the dot-named one a verb writes before linking it into place (`writeAsk`) among them. The directory is listed once,
  * and each file in it read once.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const readAsks = (home: string, id: string): AsksRead => within('asks', () => readAsksNow(home, id));
 
@@ -733,7 +837,12 @@ function readAsksNow(home: string, id: string): AsksRead {
   return read;
 }
 
-/** One round ask file, read: the looping step and the round from its name, when from what it holds — or why it cannot be read. */
+/**
+ * One round ask file, read: the looping step and the round from its name, when from what it holds — or why it cannot be read.
+ * @param file The round ask file's path.
+ * @param step The looping step, from the file's name.
+ * @param round The round asked for, from the file's name.
+ */
 export function roundAskIn(file: string, step: string, round: number): RoundAsk | string {
   const held = heldIn(file);
   if ('unreadable' in held) return held.unreadable;
@@ -757,6 +866,9 @@ function askRefusal(refused: string, held: unknown): string {
  * A file with no message reads as an ask without one. What `nemia retry` refuses to write is refused here too, so a file written by hand is
  * held to the verb's word: a message that is not text or is empty, and a message on a recheck. A file that holds no object, or whose mode
  * is not one of the three, asks for no mode `nemia retry` knows.
+ * @param file The ask file's path.
+ * @param step The step, from the file's name.
+ * @param n The try asked for, from the file's name.
  */
 export function askIn(file: string, step: string, n: number): RetryAsk | string {
   const held = heldIn(file);
@@ -783,6 +895,8 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
  * Every ask that carried a message — still waiting, or consumed into `done/` — for what `nemia ls` and `nemia decide` say of a try that was
  * answered (`answerOf`). Composed on read, as the ask itself is: the run's record keeps no message. A file that cannot be read as an ask
  * is left out; the tick's own read (`readAsks`) says why.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export function readAnswers(home: string, id: string): RetryAsk[] {
   return within('asks', () => readAnswersNow(home, id));
@@ -805,6 +919,8 @@ function readAnswersNow(home: string, id: string): RetryAsk[] {
  * Write a person's ask, whole and exclusively: into a file of its own, then linked to its name. `link` refuses a
  * name that exists, as `wx` does, and unlike `wx` leaves no moment in which the tick can read an ask that has
  * been created and not yet written. False when an ask for that try was already there.
+ * @param file The ask's file, in the run's asks directory.
+ * @param ask What the ask holds.
  */
 export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acceptance | MergeAskHeld): boolean {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -827,6 +943,11 @@ export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acc
  * each acceptance one spent (`spentAcceptances`). The tick's one touch on a person's file, and never an edit. `done/` is made inside the
  * run's asks directory, never the directory itself, which `nemia rm` may remove mid-pass; an ask already moved by a pass beside this one,
  * or removed with its run, is passed over.
+ * @param home The store's root folder.
+ * @param run The run as its record reads now.
+ * @param asks The tries asked for, read off the asks directory.
+ * @param rounds The rounds asked for, read off the asks directory.
+ * @param voided The asks the pass found void; none where absent.
  */
 export function consumeAsks(
   home: string,
@@ -851,6 +972,9 @@ export function consumeAsks(
  * Move each of a run's ask files `spent` into `done/` in its asks directory, passing over one already moved or removed with its run. One
  * spent before at the same name — an ending's approval of a try whose work was sent back, given again and spent again — is kept: the later
  * goes in beside it, at the name with `.2`, `.3`, … after it (`keptName`), and no file in `done/` is ever written over.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param spent The paths of the ask files spent.
  */
 export function doneWith(home: string, id: string, spent: readonly string[]): void {
   for (const file of spent) {
@@ -870,6 +994,11 @@ export function doneWith(home: string, id: string, spent: readonly string[]): vo
  * said, with `takenBack` beside it, written exclusively into `done/` at the first name there no file holds (`keptName`), then its file
  * removed — never deleted unkept, never written over. Answers where it was set aside; null where no approval is at its name, or where it
  * went between the read and the removal (a pass set it aside as spent), whose copy is then removed again.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param step The gated step's name.
+ * @param n The try the approval opened the gate of, from 1.
+ * @param takenBack When, and by whom, the approval was taken back.
  */
 export function takeBackApproval(home: string, id: string, step: string, n: number, takenBack: TakenBack): string | null {
   return within('act', () => {
@@ -907,6 +1036,9 @@ const keptName = (done: string): string => {
  * nor is a record that does not read as a run (`UnreadableRecord`), which is left out and said, once a process, on `said` — stderr unless
  * given — with its fix. `nemia <verb> <that id>` refuses in the same words. A run `kept` answers for an id is listed as given, its record
  * neither read nor counted; an id it answers nothing for is read.
+ * @param home The store's root folder.
+ * @param said Where a record that does not read is said; once a process on stderr where absent.
+ * @param kept The run kept for an id, or undefined where its record is to be read; every record is read where absent.
  */
 export const listRuns = (home: string, said: (line: string) => void = sayOnce, kept?: (id: string) => Run | undefined): Run[] =>
   within('records', () =>
@@ -939,6 +1071,7 @@ export const listRuns = (home: string, said: (line: string) => void = sayOnce, k
  *
  * A stamp is taken before the pass reads the records: a file changed between the two is read as changed by the next pass, never missed.
  * While a run's stamp holds, a pass does not read its record again: the memo hands its run to `listRuns`.
+ * @param home The store's root folder.
  */
 export const restStamps = (home: string): Map<string, string> =>
   within('records', () => {
@@ -981,6 +1114,7 @@ const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hol
  * step was filed, each a person's file
  * (`runs.labels.put` writes the labels, `writeLabels` in files.store.ts). Exclusive (`wx`): a record already at the id is left as it is,
  * and the write throws `EEXIST`, which the Run door answers as `Conflict`.
+ * @param home The store's root folder.
  */
 export const writeRun = (home: string, { pause: _, labels: __, saidBefore: ___, ...run }: Run) => {
   fs.mkdirSync(runsDir(home), { recursive: true });
@@ -998,6 +1132,8 @@ export const writeRun = (home: string, { pause: _, labels: __, saidBefore: ___, 
  * Without the approvals, acceptances, pruning, hold and a person's routes `runRecord` composed onto it (`unrouted`), nor the pause, labels
  * and words said before a step was filed the run store did: they are a person's files, and a copy in the record would outlive the file it
  * was read from.
+ * @param home The store's root folder.
+ * @param run The run the pass read, as it writes it back.
  */
 export const rewriteRun = (home: string, run: Run): boolean => within('act', () => rewriteNow(home, run));
 
@@ -1029,6 +1165,9 @@ const rewriteNow = (
  * into a worktree is committed by the next hand-off and rides the branch, and a gitignored one never
  * reaches the next step's worktree at all. `advance` makes it before it files the step, tells the step in
  * its brief (`artifactsContract`), and hands it to the step's check as `WF_ARTIFACTS`.
+ * @param home The store's root folder.
+ * @param run The run, by its id.
+ * @param step The step's name.
  */
 export const artifactsDir = (home: string, run: Pick<Run, 'id'>, step: string): string =>
   path.join(runsDir(home), run.id, 'artifacts', step);
@@ -1040,14 +1179,28 @@ export const artifactsDir = (home: string, run: Pick<Run, 'id'>, step: string): 
  * Outside every workspace is what a folder run's steps cannot reach: they run in `dontAsk`, fenced to their own folder. So a folder run
  * copies this directory into each folder it makes (`folderPlace.make`), and their briefs name that copy. The path itself is
  * `places.store.ts`'s (`inputsRoot`), as that is where the copy is read from.
+ * @param home The store's root folder.
+ * @param run The run, by its id.
  */
 export const inputsDir = (home: string, run: Pick<Run, 'id'>): string => inputsRoot(runsDir(home), run.id);
 
-/** The directory `nemia start --card` copies each card a run is handed into, as `<name>.md`: `cards/` under its inputs (`inputsDir`). */
+/**
+ * The directory `nemia start --card` copies each card a run is handed into, as `<name>.md`: `cards/` under its inputs (`inputsDir`).
+ * @param home The store's root folder.
+ * @param run The run, by its id.
+ */
 export const cardsDir = (home: string, run: Pick<Run, 'id'>): string => path.join(inputsDir(home, run), CARDS_FOLDER);
 
+/**
+ * What is at a path, its link not followed: undefined where nothing is.
+ * @param p The path.
+ */
 export const lstatOf = (p: string) => fs.lstatSync(p, { throwIfNoEntry: false });
 
+/**
+ * Whether a path is a directory, a link to one followed: false where nothing is there.
+ * @param at The path.
+ */
 export const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
 /**
@@ -1057,6 +1210,7 @@ export const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { th
  * IS what a human sees in `claude agents`. `t-mtxvs3nw-f4763a59` tells them nothing;
  * `add-split-workflow-8imz` tells them which piece of work they are looking at, and the step
  * suffix tells them which part of it. The random tail keeps two runs of the same request apart.
+ * @param brief The run's brief, whose words the id is made of.
  */
 export const runId = (brief: string): string => {
   const slug = brief

@@ -121,6 +121,7 @@ const claudeMcpStatus: McpStatusAsk = async (servers, cwd, executable, stop) => 
  * and finds it again from any session handed the same bytes. False for every other: nothing of Codex's sign-in has been measured — not
  * whether it has one, not where it would file it — and a remote A2A agent loads the servers its own operator configured. A caller that
  * stops a task on `needs-auth` stops it for the harnesses this answers true for and no other.
+ * @param harness The harness's name, or undefined for the default harness.
  */
 export const signsInMcp = (harness: string | undefined): boolean => harness === undefined || harness === 'claude';
 
@@ -143,6 +144,10 @@ const saidOf = (s: McpServerStatus): Omit<McpServerState, 'name' | 'status'> => 
  * The bound ends the ask as well as the wait: losing a `Promise.race` does not stop what lost it, so the ask is handed an
  * `AbortSignal` the bound fires. Without it the session a hanging server made slow would be left running — one more child per tick
  * pass and per page read — which is the thing the bound exists to prevent.
+ * @param servers The remote servers to read, by name, in the record's order.
+ * @param cwd The folder the reading session runs in.
+ * @param how How it is read: `ask`, the read itself (the real one where unset), `executable`, the program it runs, and `withinMs`, its
+ *   bound in milliseconds (`MCP_STATE_MS` where unset).
  */
 export const mcpServersRead = async (
   servers: Record<string, RemoteMcpServer>,

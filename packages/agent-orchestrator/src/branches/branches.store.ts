@@ -14,7 +14,12 @@ import type { BranchStanding } from '../status/status.ts';
 import type { Landed } from '../decide/decide.ts';
 import type { StepSpec } from '../workflow.ts';
 
-/** Where a run's result branches stand, as `branchStandings` says: none for a folder run, which has no branch. */
+/**
+ * Where a run's result branches stand, as `branchStandings` says: none for a folder run, which has no branch.
+ * @param run The run.
+ * @param steps Its steps.
+ * @param git What reads the branches off git.
+ */
 export const standingsOf = (run: Run, steps: readonly StepSpec[], git: BranchReader): BranchStanding[] =>
   isRepositoryRun(run) ? branchStandings(run, resultBranches(run, steps), git) : [];
 
@@ -22,11 +27,19 @@ export const standingsOf = (run: Run, steps: readonly StepSpec[], git: BranchRea
  * Where the result branches a run's reading asks of stand (`branchesAsked`, off `status`, `assess`'s), as `git` says: what the tick's
  * pass, the judgement and `nemia decide` read a run's standings off. None for a folder run, nor for one running, called off, or that worked
  * on its base branch itself.
+ * @param run The run.
+ * @param steps Its steps.
+ * @param status The run's status, as `assess` judged it.
+ * @param git What reads the branches off git.
  */
 export const askedStandings = (run: Run, steps: readonly StepSpec[], status: Assessment['status'], git: BranchReader): BranchStanding[] =>
   isRepositoryRun(run) ? branchStandings(run, branchesAsked(askedOf(run, steps, status)), git) : [];
 
-/** Whether a branch of the run is on its base, as `git` says: never, for a folder run, which has no branch to ask about. */
+/**
+ * Whether a branch of the run is on its base, as `git` says: never, for a folder run, which has no branch to ask about.
+ * @param run The run.
+ * @param git What reads the branches off git.
+ */
 export const landedOf =
   (run: Run, git: BranchReader) =>
   (branch: string): Landed =>
@@ -39,6 +52,9 @@ export const landedOf =
  *
  * Read on the pass that asks and never stored, for the reason `landed` is asked rather than stored: a person merging by hand changes the
  * answer, and nothing tells the run. A branch git cannot count reads as ahead by none rather than as landed.
+ * @param run The repository run.
+ * @param branches Its result branches.
+ * @param git What reads the branches off git.
  */
 export function branchStandings(run: RepositoryRun, branches: readonly string[], git: BranchReader): BranchStanding[] {
   return [...new Set(branches)].map((branch): BranchStanding => {
@@ -81,6 +97,8 @@ export type BranchReader = {
  *
  * A branch, not a directory: the worktree is scaffolding and gets removed, the branch is the result and stays in the repository. A
  * terminal step's branch is named as soon as it has one, so it is useful while the run is still going, not only afterwards.
+ * @param run The run.
+ * @param steps Its steps.
  */
 export function resultBranches(run: Run, steps: readonly StepSpec[]): string[] {
   return resultSteps(steps)

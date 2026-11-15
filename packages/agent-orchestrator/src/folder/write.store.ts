@@ -77,6 +77,10 @@ export type WorkflowWritten = { dir: string; steps: StepSpec[]; written: string[
  * does not know. Its steps are resolved against the agents and skills `found` where a run of it would look (`lookupRoots`): in `places`,
  * or else the factory's repository its folder is in and the store (`placesAroundAt`), which the Workflow door finds through the Agent and
  * Skill doors. A run is not changed by any of it: it froze its folder at `nemia start`.
+ * @param home The store's root folder.
+ * @param dir The workflow folder to write.
+ * @param steps The steps the folder is to hold, as the builder drafted them.
+ * @param readme The README to write, or undefined to leave the folder's README as it is.
  */
 export function writeWorkflowAt(
   home: string,
@@ -242,6 +246,9 @@ export type WorkflowRemoved = { dir: string; removed: string[] };
  * repository's workflow is not removed here (`Invalid`); a folder that is a link, since removing it would leave whatever it points at
  * (`Invalid`); a folder not there, or a file of that name (`Missing`); and a folder something still needs, `users` being one sentence each
  * naming the command that frees it, which the caller gathers (`Conflict`).
+ * @param home The store's root folder.
+ * @param dir The workflow folder to remove.
+ * @param users One sentence for each thing that still needs the workflow; none where not given.
  */
 export function removeWorkflowAt(home: string, dir: string, users: readonly string[] = []): WorkflowRemoved {
   const at = path.resolve(dir);
@@ -287,7 +294,11 @@ function workflowPlaceRefusal(home: string, at: string, repo?: string): string |
 /** The factories of the store `home`, as the Factory door lists each with its file. */
 const listedAt = (home: string) => doorAtOnce(home, (door) => door.factories.listed());
 
-/** The repositories the store knows, each resolved: every factory's `repos` that reads, and `repo` when the caller names one. */
+/**
+ * The repositories the store knows, each resolved: every factory's `repos` that reads, and `repo` when the caller names one.
+ * @param home The store's root folder.
+ * @param repo A repository the caller names besides, or undefined for none.
+ */
 export function knownReposAt(home: string, repo?: string): Set<string> {
   const known = new Set(listedAt(home).flatMap((f) => ('repos' in f ? f.repos.map((r) => path.resolve(r)) : [])));
   if (repo) known.add(path.resolve(repo));
@@ -301,6 +312,9 @@ const factoryTrees = (home: string): Set<string> =>
 /**
  * Whether `dir` holds the workflows the board lists: the store's `workflows/`, or the `workflows/` of a repository the store knows — a
  * factory's, or `repo` when the caller names one, as the api names its own — or of the tree of a factory made from a template.
+ * @param home The store's root folder.
+ * @param dir The folder to judge.
+ * @param repo A repository the caller names besides, or undefined for none.
  */
 export function isWorkflowsHolderAt(home: string, dir: string, repo?: string): boolean {
   const at = path.resolve(dir);
@@ -312,6 +326,8 @@ export function isWorkflowsHolderAt(home: string, dir: string, repo?: string): b
 /**
  * Where a workflow folder's runs would look for its agents and skills beside its own (`Places`): the repository or factory's tree it is in
  * — `<repo>/workflows/<name>`, for a repository a factory names — and the store. A folder of the store's is only the store's.
+ * @param home The store's root folder.
+ * @param workflowDir The workflow's folder.
  */
 export function placesAroundAt(home: string, workflowDir: string): Places {
   const repo = path.dirname(path.dirname(path.resolve(workflowDir)));

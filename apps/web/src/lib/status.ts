@@ -77,16 +77,27 @@ const AT_A_GATE: ReadonlySet<StepState> = new Set(
   [...WAITS_ON_A_PERSON].filter((state) => state !== 'asks-in-session' && state !== 'unsigned' && state !== 'denied'),
 );
 
-/** Whether a step in `state` waits on a person's word (`WAITS_ON_A_PERSON`). On a run somebody called off, nobody waits any more. */
+/**
+ * Whether a step in `state` waits on a person's word (`WAITS_ON_A_PERSON`). On a run somebody called off, nobody waits any more.
+ * @param state The step's state.
+ * @param runCancelled Whether the run was called off.
+ */
 export const waitsOnPerson = (state: StepState, runCancelled: boolean): boolean => WAITS_ON_A_PERSON.has(state) && !runCancelled;
 
-/** Whether a step in `state` waits at a human gate (`AT_A_GATE`), drawn with the gate's badge. Not on a run somebody called off. */
+/**
+ * Whether a step in `state` waits at a human gate (`AT_A_GATE`), drawn with the gate's badge. Not on a run somebody called off.
+ * @param state The step's state.
+ * @param runCancelled Whether the run was called off.
+ */
 export const waitsAtGate = (state: StepState, runCancelled: boolean): boolean => AT_A_GATE.has(state) && !runCancelled;
 
 /**
  * A step's state from its codes, whether the run was called off, and whether a person holds the run: `held` for a state a hold stops
  * (`HELD_BY_A_HOLD`) on a run not called off. `runHeld` has no default, so the compiler names every caller that has to say it: a caller
  * that forgot the hold would draw a held run's gate as asking a person.
+ * @param codes The step's codes: its phase, reason, and what it waits on and via what.
+ * @param runCancelled Whether the run was called off.
+ * @param runHeld Whether a person holds the run.
  */
 export function stepState(codes: StepCodes, runCancelled: boolean, runHeld: boolean): StepState {
   const state = codeState(codes, runCancelled);
@@ -146,10 +157,14 @@ function codeState({ phase, reason, on, via }: StepCodes, runCancelled: boolean)
 /**
  * Final, and a follower may be filed on it — `satisfiesAfter` in agent-orchestrator: verified, done on its own word, or a workflow node
  * that filed its card.
+ * @param state The step's state.
  */
 export const satisfiesAfter = (state: StepState): boolean => state === 'verified' || state === 'unverified' || state === 'sent';
 
-/** Settled with nothing more to come of it: done (`satisfiesAfter`), or a node its route passed by. */
+/**
+ * Settled with nothing more to come of it: done (`satisfiesAfter`), or a node its route passed by.
+ * @param state The step's state.
+ */
 export const settledState = (state: StepState): boolean => satisfiesAfter(state) || state === 'skipped';
 
 /** How a state is drawn: the hue that says its meaning, the form the hue takes, and what marks it beside its colour. */
@@ -206,6 +221,7 @@ export const classOf = ({ hue, form, mark }: Drawn): string =>
  * The states of `table` that break the look's rule, each with why; none for a table that keeps it. A state that waits on a person
  * (`waitsOnPerson`: a gate, a session asking, work to try again) is `yours`; a failure is `failure`, and no other state is; no state is
  * `money`.
+ * @param table How each state is drawn.
  */
 export function brokenMeanings(table: Record<StepState, Drawn>): string[] {
   const states = Object.keys(table) as StepState[];

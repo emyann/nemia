@@ -34,6 +34,7 @@ export type Seen = {
  * budget, the step proposes no cap above a step's own budget, and its caps do not pass the run's cost line, each of which a person sees at
  * the gate and never has applied unasked — a rule's `under` keeps its own amount, of what the run has spent; and nothing waits on you where
  * the step asks no question and needs nothing of the person, and no other step waits on them. Pure.
+ * @param seen What admission read of the run at the call, for the step it answers.
  */
 export const factsOf = (seen: Seen): Facts => ({
   recommends: seen.closeout?.outcome === 'done' && seen.questions.every((q) => q.recommended !== null && q.recommended.length > 0),

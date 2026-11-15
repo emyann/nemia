@@ -100,6 +100,8 @@ const said = (step: StepSpec, found: Unallowed, untrusted: string | undefined): 
  * harness's trust of that directory: the rules were measured to reach a step's session here, and gating on the trust would refuse
  * steps that work.
  *
+ * @param steps The workflow's steps, as resolved.
+ * @param allows The allow rules the run's repository grants a session started there.
  * @param untrusted Asked only once a tool is found: a sentence naming the trust of the run's repository as a second thing to check,
  *   where the harness does not have it (`untrustedNote`), and `undefined` where there is nothing to say. A thunk, so the refusing road
  *   alone reads the harness's own file.

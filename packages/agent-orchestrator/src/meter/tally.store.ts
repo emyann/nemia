@@ -89,6 +89,8 @@ const leave = (m: Meter, frame: Frame) =>
 /**
  * `f`, counted as `kind` while a pass is metered: its time until it returns, or until the promise it returns settles. Throws and rejects as
  * `f` does. Outside a pass, `f` itself.
+ * @param kind The phase the time of `f` is charged to.
+ * @param f The work to count.
  */
 export function within<T>(kind: Kind, f: () => T): T {
   const m = open();
@@ -110,6 +112,8 @@ export function within<T>(kind: Kind, f: () => T): T {
 /**
  * `program`, counted as `kind` while a pass is metered, as `within` counts a Promise: its time until it ends, however it ends,
  * interruption included. Outside a pass, `program` itself.
+ * @param kind The phase the program's time is charged to.
+ * @param program The work to count.
  */
 export const withinEffect = <A, E, R>(kind: Kind, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
   Effect.suspend(() => {
@@ -123,7 +127,10 @@ export const withinEffect = <A, E, R>(kind: Kind, program: Effect.Effect<A, E, R
     );
   });
 
-/** A read of `bytes`, counted to the kind at work — `assess` in none — while a pass is metered. */
+/**
+ * A read of `bytes`, counted to the kind at work — `assess` in none — while a pass is metered.
+ * @param bytes The bytes read.
+ */
 export const countRead = (bytes: number): void => {
   const m = open();
   if (!m) return;
@@ -150,13 +157,19 @@ export const countRested = (): void => {
   if (m) m.rested++;
 };
 
-/** What the pass saw (`Seen`), each figure given taking the place of the one before, while a pass is metered. */
+/**
+ * What the pass saw (`Seen`), each figure given taking the place of the one before, while a pass is metered.
+ * @param seen The figures the pass saw, each one given taking the place of the one before.
+ */
 export const noteSeen = (seen: Partial<Seen>): void => {
   const m = open();
   if (m) m.seen = { ...m.seen, ...seen };
 };
 
-/** A check the pass filed, by what it belongs to (`CheckLabels`), while a pass is metered. */
+/**
+ * A check the pass filed, by what it belongs to (`CheckLabels`), while a pass is metered.
+ * @param labels The factory, workflow, step and agent the check filed belongs to.
+ */
 export const noteFiledCheck = (labels: CheckLabels): void => {
   const m = open();
   if (m) m.checks.push({ factory: labels.factory, workflow: labels.workflow, step: labels.step, agent: labels.agent });
@@ -165,6 +178,9 @@ export const noteFiledCheck = (labels: CheckLabels): void => {
 /**
  * What the runtime reported of a call, added to the kind that made it — its bytes, reads and processes — with the time it spent observing
  * its harnesses and the processes those started moved from that kind to `observe` (`observed`, at most the call's own).
+ * @param kind The phase whose call the runtime reported.
+ * @param io The bytes, reads and processes the runtime reported of the call.
+ * @param observed The time in ms, the processes and the observes of the call's harness observing, moved to `observe`.
  */
 export const addRuntime = (
   kind: Kind,
@@ -189,6 +205,7 @@ export const addRuntime = (
 /**
  * `f`, counting done outside `within` — a runtime's report read, say — its time added to the overhead and charged to no kind: the time
  * before it is charged first, and the mark moved past it after. Outside a pass, `f` itself.
+ * @param f The counting to run outside every phase.
  */
 export function aside<T>(f: () => T): T {
   const m = open();
@@ -198,6 +215,7 @@ export function aside<T>(f: () => T): T {
 /**
  * `program`, counted as `aside` counts a function: its time added to the overhead and charged to no kind, the mark moved past it after.
  * Outside a pass, `program` itself.
+ * @param program The counting to run outside every phase.
  */
 export const asideEffect = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
   Effect.suspend(() => {
@@ -243,6 +261,7 @@ const counted = (m: Meter, t0: number): { ms: number; tallies: Tallies } => {
 /**
  * Run `f` as one metered pass, and answer with what it returned, its time in ms, and its counts: what `f` and the work it starts read.
  * A pass inside a pass is not metered again: it runs as part of the outer one and answers with no counts.
+ * @param f The pass to run and meter.
  */
 export async function metered<T>(f: () => Promise<T>): Promise<{ value: T; ms: number; tallies?: Tallies }> {
   const t0 = performance.now();
@@ -265,6 +284,7 @@ const inPass = <A, E, R>(m: Meter, program: Effect.Effect<A, E, R>): Effect.Effe
 /**
  * `program` as one metered pass, as `metered` runs a Promise: what it succeeded with, its time in ms, and its counts; no counts inside a
  * pass already metered, which counts it as its own. Fails, dies and is interrupted as `program` is, and leaves no meter open in any case.
+ * @param program The pass to run and meter.
  */
 export const meteredPass = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<{ value: A; ms: number; tallies?: Tallies }, E, R> =>
   Effect.suspend(() => {
@@ -274,7 +294,10 @@ export const meteredPass = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Ef
     return Effect.map(inPass(m, program), (value) => ({ value, ...counted(m, t0) }));
   });
 
-/** `fs.readFileSync(file, 'utf8')`, its bytes counted: throws as it does. */
+/**
+ * `fs.readFileSync(file, 'utf8')`, its bytes counted: throws as it does.
+ * @param file The path of the file to read.
+ */
 export const readText = (file: string): string => {
   const buf = fs.readFileSync(file);
   countRead(buf.length);

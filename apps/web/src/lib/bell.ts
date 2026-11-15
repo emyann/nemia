@@ -26,6 +26,7 @@ function waitsForOf(run: RunView): string[] {
  * The runs the api says wait on a person (`waiting`), each as the waiting bar lists it: first each the list could not judge, by its id,
  * its id for its title and nothing said of what it waits for, since nothing of it is judged; then the rest oldest first (`byAge`). Every
  * one of them, and no other: which runs wait is the api's to say, and the board only orders and words them.
+ * @param waiting The runs the api says wait on a person, as it lists them.
  */
 export const bellRows = (waiting: readonly RunRow[]): BellRow[] => [
   ...waiting
@@ -41,5 +42,8 @@ export const bellRows = (waiting: readonly RunRow[]): BellRow[] => [
   })),
 ];
 
-/** Where a row of the waiting bar opens its run's page: at its gate's step section (`stepAnchor`), or at its top for a run at no gate. */
+/**
+ * Where a row of the waiting bar opens its run's page: at its gate's step section (`stepAnchor`), or at its top for a run at no gate.
+ * @param row The row, its gate's step read, null for a run at no gate.
+ */
 export const bellHash = (row: Pick<BellRow, 'gate'>): string | undefined => (row.gate === null ? undefined : stepAnchor(row.gate));

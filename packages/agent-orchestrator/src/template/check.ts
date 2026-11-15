@@ -477,6 +477,11 @@ const sharedFileRefusals = (folder: ReadFolder, held: Held, lines: (file: string
  * skill the folder need not carry; `text`, the words of one of its files, by its path; `lines`, the lines of a file of shared lines, or
  * undefined where it is no YAML list of strings; `placeNeeds`, the names of the needs the builtin places declare, which a workflow's
  * need may fill. None for a template that passes.
+ * @param folder The template's folder as read: its files and documents.
+ * @param packageSkills Nemia's place and builtin skills, each a skill the folder need not carry.
+ * @param text The words of one of the folder's files, by its path.
+ * @param lines The lines of a file of shared lines, by its path, or undefined where it is no YAML list of strings.
+ * @param placeNeeds The names of the needs the builtin places declare, which a workflow's need may fill.
  */
 export function checkTemplate(
   folder: ReadFolder,

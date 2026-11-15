@@ -15,7 +15,10 @@ import { storeRoot } from './where.ts';
 /** The verb as the api is asked under it. */
 const VERB = 'template export';
 
-/** The factory `words` name with `--factory <name>` or `--factory=<name>`, else none. */
+/**
+ * The factory `words` name with `--factory <name>` or `--factory=<name>`, else none.
+ * @param words The words typed after the bin's name.
+ */
 export const factoryNamed = (words: readonly string[]): string | undefined => {
   const at = words.findIndex((word) => word === '--factory' || word.startsWith('--factory='));
   if (at < 0) return undefined;
@@ -23,7 +26,10 @@ export const factoryNamed = (words: readonly string[]): string | undefined => {
   return word.includes('=') ? word.slice(word.indexOf('=') + 1) : words[at + 1];
 };
 
-/** Whether `words` are a `nemia template export` that holds a factory's parts (`--factory`), asking no help. */
+/**
+ * Whether `words` are a `nemia template export` that holds a factory's parts (`--factory`), asking no help.
+ * @param words The words typed after the bin's name.
+ */
 export const exportsAFactory = (words: readonly string[]): boolean =>
   words[0] === 'template' && words[1] === 'export' && !words.includes('--help') && factoryNamed(words) !== undefined;
 
@@ -38,7 +44,13 @@ const keptAt = (name: string, env: NodeJS.ProcessEnv): string => {
     : path.join(storeRoot(env), 'factories', `${name}.json`);
 };
 
-/** The parts the orchestrator's export reads on stdin, made of the api's answers. */
+/**
+ * The parts the orchestrator's export reads on stdin, made of the api's answers.
+ * @param factory The factory as the api answers it.
+ * @param rules The factory's rules as the api answers them.
+ * @param instruction The factory's instruction as the api answers it.
+ * @param file Where the factory is kept: its file in this machine's store, or its address on the context's daemon.
+ */
 export const partsOf = (factory: Factory, rules: FactoryRules, instruction: FactoryInstruction, file: string) => ({
   factory: {
     name: factory.metadata.name,
@@ -55,6 +67,9 @@ export const partsOf = (factory: Factory, rules: FactoryRules, instruction: Fact
 /**
  * `words`, a `template export` that names a factory, run on the orchestrator's CLI with the factory's parts read through the api and
  * handed on stdin; a factory the api does not have is its `Missing`, exit 2.
+ * @param words The words typed after the bin's name, the factory among them.
+ * @param entry Which bin's entry the orchestrator's CLI is spawned by.
+ * @param env The environment read for the context in use, the store and the token, and given the child.
  */
 export async function templateExported(words: readonly string[], entry: Entry, env: NodeJS.ProcessEnv = process.env): Promise<number> {
   const name = factoryNamed(words) ?? '';

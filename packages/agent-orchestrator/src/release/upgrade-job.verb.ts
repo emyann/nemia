@@ -46,6 +46,7 @@ export const RunningCode = Context.Reference<() => Running>('orchestrator/Runnin
 /**
  * The command an upgrade's task runs: this code's own Node on this package's `bin/nemia.ts`, `upgrade <tag>`, its stderr joined to its
  * stdout so a refusal is read in the one stream with the rest.
+ * @param tag The tag the upgrade names.
  */
 export const upgradeCommand = (tag: string): string[] => [
   'sh',
@@ -178,6 +179,8 @@ export type UpgradeFollowed = { readonly kind: 'output'; readonly text: string }
  * its first byte, then its end (`ended`), after which the stream is over. Refused (`Missing`) for an id no upgrade was started under.
  * Read off the runtime's kept stream every time, never remembered past the follow: a reader that comes back after the daemon restarted
  * reads it whole again.
+ * @param id The upgrade's id.
+ * @param everyMs How long to wait between two reads of its output, in ms: `UPGRADE_FOLLOW_MS` where absent.
  */
 export const followUpgrade = (id: string, everyMs: number = UPGRADE_FOLLOW_MS) =>
   Effect.gen(function* () {

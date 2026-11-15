@@ -95,7 +95,11 @@ const everyOf = (env: NodeJS.ProcessEnv): number => {
   return Number.isInteger(asked) && asked > 0 ? asked : PAIR_EVERY_MS;
 };
 
-/** `nemia pair <url> …`, on the words after `pair`: answers its exit code, or throws its refusal. */
+/**
+ * `nemia pair <url> …`, on the words after `pair`: answers its exit code, or throws its refusal.
+ * @param args The words typed after `pair`: the server's url, then `--context` and `--name`.
+ * @param env The environment read for the config file and the interval between claims.
+ */
 export async function pair(args: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(`${USAGE}\n`);

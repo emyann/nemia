@@ -14,6 +14,8 @@ type PickedRuns = { open: ListedRun[]; finished: FinishedRun[] };
  * The runs a picker lists, off the open runs and the finished pages read so far: the runs that wait and those in flight together, each
  * judged, newest created first (a run the list could not judge has nothing to pick it by and is left out); then every finished run of the
  * pages in their order, each once and none already listed as open (a run that finished between the two reads, or a page that slid).
+ * @param open The runs not finished, as the open runs' read answered them: those that wait and those in flight.
+ * @param pages The finished runs' pages read so far, newest first.
  */
 export function pickedOf(open: OpenRuns, pages: readonly FinishedPage[]): PickedRuns {
   const opened = [...open.waiting, ...open.inFlight]

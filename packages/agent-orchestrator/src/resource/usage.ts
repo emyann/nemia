@@ -46,6 +46,9 @@ export type RunRead = { said: string; peak: StepUsed['peak']; rebuilt: number };
  * A usage in `nemia decide`'s words: `usedLines`, each line without the label it starts with — the cost alone, since what the sessions read
  * is `read` — and the peak against `cap`, the `context:` of the step whose peak it is. `read` is the usage the words and the mark are of,
  * where that is not all of `usage`.
+ * @param usage The usage to word, or undefined where none was measured.
+ * @param cap The `context:` of the step whose peak it is, in tokens, or undefined where it names none.
+ * @param read The usage the words of what was read and the peak's mark are of, `usage` where absent.
  */
 export function usedOf(usage: Usage | undefined, cap?: number, read: Usage | undefined = usage): StepUsed {
   const [used = ''] = usedLines(usage);
@@ -66,6 +69,8 @@ export function usedOf(usage: Usage | undefined, cap?: number, read: Usage | und
  * Several steps' usage as one (`sumUsage`), each usage with the name of the step it is of, its peak read against the cap of the step it
  * is the peak of: two steps' caps are not one cap, and the largest peak was reached under its own. So are its compactions: that step's
  * own say whether it reached its cap, and another's, under another cap or none, would say it of a step that did not.
+ * @param steps The run's steps, whose `context:` caps are read.
+ * @param usages Each step's usage by its name, undefined where none was measured.
  */
 export function totalOf(steps: readonly StepSpec[], usages: ReadonlyArray<readonly [name: string, usage: Usage | undefined]>): StepUsed {
   const total = sumUsage(usages.map(([, u]) => u));
@@ -75,4 +80,8 @@ export function totalOf(steps: readonly StepSpec[], usages: ReadonlyArray<readon
   return usedOf(total, steps.find((s) => s.name === peakOf)?.context, total && { ...rest, ...(compactions ? { compactions } : {}) });
 }
 
+/**
+ * What a run's sessions read, off a usage in words: null where it says nothing of what they read.
+ * @param u The usage in words.
+ */
 export const readOf = (u: StepUsed): RunRead | null => (u.read === null ? null : { said: u.read, peak: u.peak, rebuilt: u.rebuilt });

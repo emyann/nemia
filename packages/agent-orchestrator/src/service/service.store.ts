@@ -84,6 +84,7 @@ function workspaceOf(file: string, checkout: string): string {
  * Where the checkout this package runs from keeps its daemon: the first folder above the package whose `package.json` names it
  * (`"nemia": { "daemon": "<path>" }`), the entry it names, and the folder it runs in. Refused (`Missing`): no such folder, or an entry that
  * is not there.
+ * @param from The folder to look above. Left out, this package's own folder.
  */
 export function daemonEntry(from: string = PACKAGE): { checkout: string; entry: string; cwd: string } {
   const found = checkoutAbove(from);
@@ -99,7 +100,10 @@ export function daemonEntry(from: string = PACKAGE): { checkout: string; entry: 
   return { checkout: found.checkout, entry, cwd: workspaceOf(entry, found.checkout) };
 }
 
-/** The checkout a service's entry is of, as `daemonEntry` finds it, or undefined where it is gone. */
+/**
+ * The checkout a service's entry is of, as `daemonEntry` finds it, or undefined where it is gone.
+ * @param entry The path of the service's entry.
+ */
 export const checkoutOf = (entry: string): string | undefined => checkoutAbove(path.dirname(entry))?.checkout;
 
 /** Where a service's files go: the user's home, and the folder of its settings (`XDG_CONFIG_HOME`, else `~/.config`). */
@@ -108,19 +112,32 @@ export const serviceDirs = (): { home: string; configHome: string } => {
   return { home, configHome: process.env.XDG_CONFIG_HOME || path.join(home, '.config') };
 };
 
-/** The store the service is of, and the default one: a store not the default is given a service name of its own. */
+/**
+ * The store the service is of, and the default one: a store not the default is given a service name of its own.
+ * @param root The store's root folder.
+ */
 export const storeRoots = (root: string): { root: string; defaultRoot: string } => ({ root, defaultRoot: wfRoot({}) });
 
-/** The service's file, or null where it is not installed. */
+/**
+ * The service's file, or null where it is not installed.
+ * @param file The path of the service's file.
+ */
 export const readUnit = (file: string): string | null => textOf(file);
 
-/** Writes the service's file whole, through a hidden file renamed over it, so the system never reads half of it. */
+/**
+ * Writes the service's file whole, through a hidden file renamed over it, so the system never reads half of it.
+ * @param file The path of the service's file.
+ * @param text The file's whole text.
+ */
 export function writeUnit(file: string, text: string): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeWhole(file, text);
 }
 
-/** Removes the service's file; answers whether there was one. */
+/**
+ * Removes the service's file; answers whether there was one.
+ * @param file The path of the service's file.
+ */
 export function removeUnit(file: string): boolean {
   try {
     fs.unlinkSync(file);
@@ -131,14 +148,20 @@ export function removeUnit(file: string): boolean {
   }
 }
 
-/** Runs one of the system's own programs (`systemctl`, `launchctl`, `loginctl`) and answers what it printed; throws when it fails. */
+/**
+ * Runs one of the system's own programs (`systemctl`, `launchctl`, `loginctl`) and answers what it printed; throws when it fails.
+ * @param argv The program, then its arguments.
+ */
 export const systemCall = (argv: readonly string[]): string => {
   const [command, ...args] = argv;
   if (command === undefined) throw new Error('systemCall runs a program: give it argv with the program first.');
   return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: CALL_MS });
 };
 
-/** Whether `user`'s services outlive their login sessions (`loginctl show-user -p Linger`), or undefined where loginctl cannot say. */
+/**
+ * Whether `user`'s services outlive their login sessions (`loginctl show-user -p Linger`), or undefined where loginctl cannot say.
+ * @param user The user's name.
+ */
 export function lingerOf(user: string): boolean | undefined {
   try {
     const said = /^Linger=(yes|no)$/m.exec(systemCall(['loginctl', 'show-user', user, '-p', 'Linger']))?.[1];
@@ -157,6 +180,7 @@ export const userOf = (): { name: string; uid: number } => {
 /**
  * The service files of the folder `dir` holds, by name, with their text: `nemia.service` or `nemia.plist` is `nemia`. None where it is
  * not.
+ * @param dir The folder read.
  */
 export function unitsOf(dir: string): { name: string; text: string }[] {
   let names: string[];
@@ -181,6 +205,8 @@ export type Spawned = { pid: number | undefined; ended: Promise<SpawnEnded> };
 /**
  * Starts `node entry` in `cwd` with `env` alone, in a session of its own (`detached`), so a closed terminal does not end it, its stdout and
  * stderr appended to `log`, and lets it go: this process ends without waiting for it.
+ * @param s What is started: the node binary, the entry, the folder it runs in, its whole environment, and the log file its output is
+ *   appended to.
  */
 export function spawnDetached(s: { node: string; entry: string; cwd: string; env: Record<string, string>; log: string }): Spawned {
   fs.mkdirSync(path.dirname(s.log), { recursive: true });

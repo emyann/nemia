@@ -11,6 +11,8 @@ import { listPlace } from './factories.ts';
 /**
  * Loads into `queryClient` what the page at `address` lists its workflows from. Rejects where a read it draws from fails — the factories'
  * for a named factory, the list's in its place — and never for the factories' with no factory, which only tag that list.
+ * @param queryClient The board's query client, loaded.
+ * @param address The place the page's address names: a factory, or none.
  */
 export async function loadWorkflowsIn(queryClient: QueryClient, address: PagePlace): Promise<void> {
   if (listPlace(address, []).kind === 'every') {
@@ -24,6 +26,7 @@ export async function loadWorkflowsIn(queryClient: QueryClient, address: PagePla
 /**
  * Reads again every list of workflows `queryClient` keeps, after a write of a folder of yours: the list read with no factory, alone under
  * its key, and each factory's, which lists the folder where it attaches it. Resolves once they are marked.
+ * @param queryClient The board's query client, whose lists are marked to read again.
  */
 export const rereadWorkflows = (queryClient: QueryClient): Promise<unknown> =>
   Promise.all([

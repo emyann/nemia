@@ -61,7 +61,11 @@ async function oneRun(name: string, how: TableAsked, env: NodeJS.ProcessEnv): Pr
   return 0;
 }
 
-/** Prints the runs `args` asks for, or the one run it names; answers 0. */
+/**
+ * Prints the runs `args` asks for, or the one run it names; answers 0.
+ * @param args The command's words as parsed: a run's id, or the list's selectors and the columns asked.
+ * @param env The environment read for the context in use, the store and the token.
+ */
 export async function ls(args: Args, env: NodeJS.ProcessEnv = process.env): Promise<number> {
   const read = tableAsked(args);
   const run = textArg(args, 'runId');

@@ -55,6 +55,8 @@ export const RENAMED_VALUES: ReadonlyMap<string, ReadonlyMap<string, Readonly<Re
 /**
  * `body`, a request's body for `command`, each key's former value (`RENAMED_VALUES`) put to the value it became; with the hint naming what
  * to send now, or `body` as given and no hint. What is not an object is handed back as it is, for the body's schema to refuse.
+ * @param command The command's name.
+ * @param body The request's body, of any shape.
  */
 export function renamedValues(command: string, body: unknown): { body: unknown; hint?: string } {
   const keys = RENAMED_VALUES.get(command);
@@ -83,6 +85,8 @@ export type CommandSpec = CommandWords;
 /**
  * A command line's arguments after the command's name, read against `spec` (`objects`' `parseArgv`), its refusals `Invalid`, exit 2;
  * undefined where it is given too little to act on, for which the CLI prints its help.
+ * @param spec The command's spec: its positionals and its flags.
+ * @param argv The command line after the command's name.
  */
 export function parseArgv(spec: Spec, argv: readonly string[]): Args | undefined {
   try {
@@ -92,7 +96,13 @@ export function parseArgv(spec: Spec, argv: readonly string[]): Args | undefined
   }
 }
 
-/** An amount flag's value as a number (`objects`' `amountOf`), its refusal `Invalid`, exit 2. */
+/**
+ * An amount flag's value as a number (`objects`' `amountOf`), its refusal `Invalid`, exit 2.
+ * @param text The flag's value as typed, or undefined where it was given none.
+ * @param takes What the flag takes, said in its refusal.
+ * @param form The command's form, which ends the refusal.
+ * @param flag The flag's spelling, as the refusal names it: `--budget` where none is given.
+ */
 export function amountOf(text: string | undefined, takes: string, form: string, flag = '--budget'): number {
   try {
     return amountOfObjects(text, takes, form, flag);
@@ -104,7 +114,11 @@ export function amountOf(text: string | undefined, takes: string, form: string, 
 /** `objects`' refusal of what was typed, as the package's own (`Invalid`); anything else as it is. */
 const asInvalid = (err: unknown): unknown => (err instanceof CommandRefused ? new Invalid({ message: err.message }) : err);
 
-/** The dollars under `key`, or undefined where none were given. */
+/**
+ * The dollars under `key`, or undefined where none were given.
+ * @param args The command line's arguments, as parsed.
+ * @param key The key the dollars are under.
+ */
 export const amountIn = (args: Args, key: string): number | undefined => {
   const value = args[key];
   return typeof value === 'number' ? value : undefined;
@@ -176,6 +190,7 @@ export type LinkedTool = {
 /**
  * The tools of `entry`'s links (`served`), in order: the first named by the verb, each space `_` (`factory ls` is the tool
  * factory_ls), every other by its `as`; a later link with no `as` gives no tool, which `commandBreaks` refuses.
+ * @param entry The entry: its name and its links.
  */
 export const toolsOf = (entry: Pick<CommandSpec, 'name' | 'served'>): LinkedTool[] =>
   (entry.served ?? []).flatMap((link, i) => {
@@ -247,6 +262,10 @@ function toolBreaks(entries: readonly Pick<CommandSpec, 'name' | 'served'>[]): s
  * serves; and a tool name two links give, of the table and of the CLI's own verbs the api
  * serves (`linked`, `CLI_VERBS`), which the port could not tell apart (`toolBreaks`); and, where `kept` is given, a store verb this
  * CLI still serves, which is the client's (`heldBreaks`).
+ * @param table The table's entries.
+ * @param runners The commands the CLI runs by a hand of its own: none where none is given.
+ * @param linked The CLI's own verbs the api serves, by their names and links: none where none is given.
+ * @param kept The store verbs this CLI keeps on purpose, or undefined where none is judged.
  */
 export function commandBreaks(
   table: readonly Entry[],

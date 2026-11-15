@@ -11,6 +11,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ReleaseMet } from '../contracts/release.contract.ts';
 
+/**
+ * Whether this client's release and the daemon's are one: `unsaid` where either says none, else `met` or `differs`.
+ * @param client This client's release, null for a checkout.
+ * @param daemon The release the daemon's health says, null where it says none.
+ */
 export const releaseMet: ReleaseMet = (client, daemon) => {
   if (client === null || daemon === null) return 'unsaid';
   return client === daemon ? 'met' : 'differs';
@@ -36,6 +41,7 @@ const namesTheDaemon = (dir: string): boolean => {
 /**
  * The release of the code at or above `from`: the `tag` of the `release.json` at the first folder whose `package.json` names the
  * daemon; null where that folder has none (a checkout), where its `tag` is not a word, or where no folder names the daemon.
+ * @param from The folder the search starts at, and goes up from.
  */
 export function releaseAt(from: string): string | null {
   let at: string;

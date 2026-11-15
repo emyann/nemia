@@ -14,6 +14,8 @@ type ApprovalBody = { message?: string; answers?: readonly QuestionAnswer[]; bud
  * as the CLI's `approve` does — then `onApproved`, then the run read again once (`runsMoved`): its detail, and the list the Factory's card
  * reads, each by its own key, never a decision, which is keyed by the state it was read for. Sent in the run's namespace: `namespace`
  * where the caller holds it, as a card on the floor does, else the run's own (`useRunNamespace`).
+ * @param runId The run's id.
+ * @param step The name of the step approved.
  */
 export function useApprove(runId: string, step: string, { onApproved, namespace }: { onApproved?: () => void; namespace?: string } = {}) {
   const queryClient = useQueryClient();

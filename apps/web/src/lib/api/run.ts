@@ -17,6 +17,7 @@ export { readGone } from './gone.ts';
 /**
  * The run object, under the run's own key, which every event of the feed about the run reads again, exactly, and which the board polls
  * at `pace` while it does not follow the feed. A 404 is the run gone (`readGone`), not tried again.
+ * @param id The run's id.
  */
 export const runObjectQuery = (id: string) =>
   queryOptions({
@@ -30,6 +31,9 @@ export const runObjectQuery = (id: string) =>
  * Every try of a step, earliest first, the current one last, keyed by the step's state in the object (`stepStamp`): the feed never names
  * this key, so the tries are read again only when the step moves, and by a person's write that changes one (`runsMoved`). A step the api
  * has no tries of — a run gone — reads as none, for the object's read to say the run is gone.
+ * @param id The run's id.
+ * @param step The step's name.
+ * @param stamp The stamp of the step's state in the object: a new one reads the tries again.
  */
 export const stepTriesQuery = (id: string, step: string, stamp: string) =>
   queryOptions({
@@ -46,7 +50,12 @@ export const stepTriesQuery = (id: string, step: string, stamp: string) =>
     retry: retryUnlessGone,
   });
 
-/** What a step was told, keyed as its tries are (`stepTriesQuery`); null for a step the api has no told of. */
+/**
+ * What a step was told, keyed as its tries are (`stepTriesQuery`); null for a step the api has no told of.
+ * @param id The run's id.
+ * @param step The step's name.
+ * @param stamp The stamp of the step's state in the object: a new one reads what it was told again.
+ */
 export const stepToldQuery = (id: string, step: string, stamp: string) =>
   queryOptions({
     queryKey: ['runs', id, 'steps', step, 'told', stamp],
@@ -62,7 +71,10 @@ export const stepToldQuery = (id: string, step: string, stamp: string) =>
     retry: retryUnlessGone,
   });
 
-/** The run's lines (`RunLines`): read once a page, never polled, since nothing a run does changes them. */
+/**
+ * The run's lines (`RunLines`): read once a page, never polled, since nothing a run does changes them.
+ * @param id The run's id.
+ */
 export const runLinesQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id, 'lines'],

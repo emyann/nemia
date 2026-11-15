@@ -97,6 +97,9 @@ function runRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: rea
  * The timeline `tl` of `run` as rows (`TimelineRow`), `steps` being the workflow it was judged by, whose order names the rows: each
  * step's, in that order; the wall time of each round of each loop where it is known; and the run's, where its wall time is. Times are in
  * ms and a cost in dollars. A number nobody measured is no row.
+ * @param run The run's approvals and gates, which say each gate's wait.
+ * @param tl The run's timeline (`timeline`).
+ * @param steps The workflow the run was judged by, whose order names the rows.
  */
 export function timelineRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: readonly StepSpec[]): TimelineRow[] {
   return [

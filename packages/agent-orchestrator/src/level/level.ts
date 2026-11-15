@@ -18,7 +18,11 @@ export { LEVELS };
 /** A level a person sets. */
 export type { Level };
 
-/** Whether `level` is `floor` or above it. Pure. */
+/**
+ * Whether `level` is `floor` or above it. Pure.
+ * @param level The level asked of.
+ * @param floor The level it is held against.
+ */
 export const atLeast = (level: Level, floor: Level): boolean => LEVELS.indexOf(level) >= LEVELS.indexOf(floor);
 
 /** A raise of a factory's level for a stretch: the level it is raised to, until the moment `until` (ISO), and its default after. */
@@ -36,18 +40,31 @@ export type FactoryLevelFile = { level?: Level; since: string; raise?: Raise };
  */
 export type FactoryLevel = { factory: string; level: Level; default: Level; own: Level | null; raise: Raise | null };
 
-/** The raise of `file` still in force at `at` (ms since the epoch): until its end, never at it. Pure. */
+/**
+ * The raise of `file` still in force at `at` (ms since the epoch): until its end, never at it. Pure.
+ * @param file The factory's level file, undefined where none was written.
+ * @param at The time asked of, in ms since the epoch.
+ */
 export const raiseAt = (file: FactoryLevelFile | undefined, at: number): Raise | null =>
   file?.raise !== undefined && Date.parse(file.raise.until) > at ? file.raise : null;
 
 /**
  * The level of a factory whose file is `file` at `at`: its raise while in force, else its own default, else the store's (`store`). A
  * raise past its end reads as gone, with no write. Pure.
+ * @param file The factory's level file, undefined where none was written.
+ * @param store The store's level.
+ * @param at The time asked of, in ms since the epoch.
  */
 export const levelOf = (file: FactoryLevelFile | undefined, store: Level, at: number): Level =>
   raiseAt(file, at)?.level ?? file?.level ?? store;
 
-/** The factory `factory`'s level read at `at`, its file `file` and the store's level `store`. Pure. */
+/**
+ * The factory `factory`'s level read at `at`, its file `file` and the store's level `store`. Pure.
+ * @param factory The factory's name.
+ * @param file The factory's level file, undefined where none was written.
+ * @param store The store's level.
+ * @param at The time asked of, in ms since the epoch.
+ */
 export const factoryLevelOf = (factory: string, file: FactoryLevelFile | undefined, store: Level, at: number): FactoryLevel => ({
   factory,
   level: levelOf(file, store, at),
@@ -59,7 +76,12 @@ export const factoryLevelOf = (factory: string, file: FactoryLevelFile | undefin
 /** The usage the refusals of a factory's level end on. */
 export const FACTORY_LEVEL_FORM = `nemia level [${LEVELS.join('|')}] [--factory <name> [--for <duration> | --end]]`;
 
-/** Why raising a factory whose default is `byDefault` to `level` is refused, or undefined where it raises it. Pure. */
+/**
+ * Why raising a factory whose default is `byDefault` to `level` is refused, or undefined where it raises it. Pure.
+ * @param factory The factory's name, as the refusal names it.
+ * @param level The level the raise asks for.
+ * @param byDefault The factory's default level.
+ */
 export const raiseRefusal = (factory: string, level: Level, byDefault: Level): string | undefined =>
   atLeast(byDefault, level)
     ? `${factory} is at ${byDefault} by default, so a raise to ${level} raises nothing: raise it above its default, or set its default with nemia level ${level} --factory ${factory}.`
@@ -77,6 +99,7 @@ const LONGEST = 7 * DAY;
 /**
  * The milliseconds of a stretch said as digits and a unit (`90m`, `2h`, `1d`), above zero and at most a week; undefined where it does not
  * read as one. Pure.
+ * @param text The stretch as typed, `--for`'s value.
  */
 export function durationOf(text: string): number | undefined {
   const [, digits, unit] = /^(\d+)([mhd])$/.exec(text.trim()) ?? [];
@@ -86,7 +109,10 @@ export function durationOf(text: string): number | undefined {
   return ms > 0 && ms <= LONGEST ? ms : undefined;
 }
 
-/** Why `text` is no stretch a raise is given for, or undefined where it is one. Pure. */
+/**
+ * Why `text` is no stretch a raise is given for, or undefined where it is one. Pure.
+ * @param text The stretch as typed, `--for`'s value.
+ */
 export const durationRefusal = (text: string): string | undefined =>
   durationOf(text) === undefined
     ? `--for takes the stretch a raise lasts, digits and m, h or d, up to 7d, like 90m, 2h or 1d, and ${JSON.stringify(text)} is not one: ${FACTORY_LEVEL_FORM}.`
@@ -99,6 +125,10 @@ export type FactoryAsk = { factory: string; level?: Level; forMs?: number; end?:
  * The factory's file once `ask` is written over `current` at `at`, the store at `store`; or why not: `conflict`, an end with no raise in
  * force; `invalid`, a raise that raises nothing over the factory's default. A default set keeps a raise still above it; any write drops a
  * raise past its end. Pure.
+ * @param ask The factory and what is asked of it: a default, a raise for so many ms, or the end of the raise in force.
+ * @param current The factory's level file, undefined where none was written.
+ * @param store The store's level.
+ * @param at The time of the write, which the file's `since` and a raise's end are counted from.
  */
 export function factoryAsked(
   ask: FactoryAsk,
@@ -127,6 +157,11 @@ export function factoryAsked(
 /**
  * The levels `rows` read at `at` once the store's level is `store` and the factory `changed` names has the file it holds: the default
  * factory follows the store, and each other keeps its own default and its raise in force. Pure.
+ * @param rows The factories' levels as they were read.
+ * @param store The store's level.
+ * @param changed The factory written and the file it now holds; undefined where only the store's level changed.
+ * @param at The time asked of, in ms since the epoch.
+ * @param byDefault The default factory's name, which follows the store.
  */
 export function levelsAfter(
   rows: readonly FactoryLevel[],
@@ -143,7 +178,11 @@ export function levelsAfter(
   return rows.map((r) => factoryLevelOf(r.factory, fileOf(r), store, at));
 }
 
-/** A factory's level as `nemia level` says it: in force, until when and what after, and whose default it is. Pure. */
+/**
+ * A factory's level as `nemia level` says it: in force, until when and what after, and whose default it is. Pure.
+ * @param row The factory's level.
+ * @param byDefault The default factory's name, whose level is the store's.
+ */
 export function factoryLevelWords(row: FactoryLevel, byDefault: string): string {
   const whose = row.factory === byDefault ? "the store's level, for runs in no factory" : row.own === null ? "the store's" : 'its own';
   if (row.raise !== null) return `${row.factory}: ${row.level} until ${row.raise.until}, then ${row.default} (${whose})`;

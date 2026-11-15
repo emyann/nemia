@@ -16,11 +16,16 @@ import { turnOf, type Attempt, type Parked, type Sighting, type State } from './
  * total carries on its parent's (`sdk.d.ts:6343-6346`), so the cap less the spend so far is the right cap for the next process either
  * way. No cap: none. Spend unknown — no result yet, or one whose totals were zeroed or reset and taken off as nothing — counts nothing,
  * an undercount like a killed process's lost spend, never a double count. At or below nothing where the cap is spent (`capSpent`).
+ * @param cap The session's spend cap, in US dollars, or undefined where it has none.
+ * @param spent What the session has spent so far, in US dollars, or undefined where that is not known.
  */
 export const capLeft = (cap: number | undefined, spent: number | undefined): number | undefined =>
   cap === undefined ? undefined : cap - (spent ?? 0);
 
-/** Whether `left`, what `capLeft` answers, is a cap spent whole: at or below nothing. No cap is never spent. */
+/**
+ * Whether `left`, what `capLeft` answers, is a cap spent whole: at or below nothing. No cap is never spent.
+ * @param left What is left of the cap, in US dollars, or undefined where there is no cap.
+ */
 export const capSpent = (left: number | undefined): boolean => left !== undefined && left <= 0;
 
 /** Attempt `attempt`'s turn's cap, and the attempts of that turn before it: what `parkedCapLeft` counts from. */
@@ -41,6 +46,8 @@ const turnBefore = (state: State, attempt: number): { cap: number | undefined; b
  * An attempt is a continuation exactly when the one before it, of the same turn, ended parked: so an attempt not yet started is
  * answered as the next one of the current turn would be.
  * Exported only for the tests that import it.
+ * @param state The task's fold.
+ * @param attempt The number of the attempt whose cap is asked.
  */
 export const parkedCapLeft = (state: State, attempt: number): number | undefined => {
   const { cap, before } = turnBefore(state, attempt);
@@ -61,6 +68,9 @@ const spentParked = (attempts: readonly Attempt[]): number => {
  * The configuration a spawn of attempt `n` of `state` is handed where it continues a parked attempt of its own turn: `config`, the
  * turn's, with its `budgetUsd` what the parked attempts it continues left of it (`parkedCapLeft`); nothing where it continues none, or its
  * turn gives no cap, so the spawn keeps the turn's own.
+ * @param state The task's fold.
+ * @param n The number of the attempt being spawned.
+ * @param config The turn's configuration, or undefined where it gives none.
  */
 export const continuedCap = (state: State, n: number, config: HarnessArgs | undefined): { config?: HarnessArgs } => {
   const at = state.attempts.findIndex((a) => a.n === n);
@@ -75,6 +85,9 @@ export const continuedCap = (state: State, n: number, config: HarnessArgs | unde
  * (`Sighting.parked`), which `decide` continues; but a park that left nothing of its turn's cap — `parkedCapLeft` less the attempt's own
  * cost, an unpriced one counted 0 — is no park, and says `limit: 'budget'` instead, so it settles failed and nothing continues it.
  * Nothing for an end that was no park.
+ * @param state The task's fold.
+ * @param n The number of the attempt that ended.
+ * @param seen What was last seen of the attempt's session: whether it parked and what it spent; undefined where nothing was seen.
  */
 export const parkedEnd = (
   state: State,

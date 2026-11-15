@@ -70,6 +70,8 @@ export const agentSkillsFound = Effect.fn('agentSkillsFound')(function* (dir: st
 /**
  * Where an agent may be, in order: the repository's `workflows/agents`, then the store `home`'s, yours. The board's two places
  * (`sourcesOf`, apps/api); yours alone where there is no repository.
+ * @param repo The repository's folder, or undefined where there is none.
+ * @param home The store's folder.
  */
 export const agentPlaces = (repo: string | undefined, home: string): Array<{ from: AgentPlace; dir: string }> => [
   ...(repo === undefined ? [] : [{ from: 'repo' as const, dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) }]),
@@ -124,7 +126,11 @@ export const findAgent = Effect.fn('findAgent')(function* (name: string, repo: s
 
 const linked = (at: string): boolean => Boolean(fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink());
 
-/** The file of the person's custom instructions for `name` in the store `home`, or null when they wrote none. */
+/**
+ * The file of the person's custom instructions for `name` in the store `home`, or null when they wrote none.
+ * @param home The store's folder.
+ * @param name The agent's name.
+ */
 export function customOf(home: string, name: string): string | null {
   const file = customInstructionsFile(home, name);
   return fs.lstatSync(file, { throwIfNoEntry: false }) ? file : null;

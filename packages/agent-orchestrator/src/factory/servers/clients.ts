@@ -16,6 +16,9 @@ export const SHIPPED_CLIENT_SECRETS: Readonly<Record<string, string>> = {
   [NEMIA_FACTORY]: '0a47eb27047aa44fa4759bfdeece1bc9ee9c773c',
 };
 
-/** The secret of the builtin app `clientId` names, or `undefined` for a client not built into Nemia. Pure. */
+/**
+ * The secret of the builtin app `clientId` names, or `undefined` for a client not built into Nemia. Pure.
+ * @param clientId The OAuth client id of the server signed in to, or undefined where the server names none.
+ */
 export const shippedSecretOf = (clientId: string | undefined): string | undefined =>
   clientId !== undefined && Object.hasOwn(SHIPPED_CLIENT_SECRETS, clientId) ? SHIPPED_CLIENT_SECRETS[clientId] : undefined;

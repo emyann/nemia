@@ -21,6 +21,8 @@ export type FactoryRules = { name: string; file: string; words: string | null; e
  * The rules of the factory `name` in the store `home`, read afresh where they are kept, through the Factory door at once. Refused as the
  * door refuses the read: the default factory, which keeps none (`Conflict`), a name that is no slug or whose file does not read
  * (`Invalid`), a name with no file (`Missing`).
+ * @param home The store's root.
+ * @param name The factory's name, read as a slug.
  */
 export function factoryRules(home: string, name: string): FactoryRules {
   return { name, ...doorAtOnce(home, (door) => door.rules.read(FactoryName.read(name))) };

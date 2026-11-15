@@ -136,6 +136,9 @@ function skillAgainOf(name: string, from: string, text: string, why: string): Sk
  * true` — with the flags its agent rendered to spread over them. A remote control its harness has no word for is filed in the words of
  * the default harness's, which has one, so the runtime refuses it by its line at `nemia start` rather than the run dropping it. Pure but
  * for `repoOf`.
+ * @param step The step, read down to its harness and whether it asks for remote control.
+ * @param rendered The flags its agent rendered, or undefined where it rendered none.
+ * @param repoOf The real path of the run's repository, or undefined where it has none; asked only where the harness takes it.
  */
 export const ownOf = (step: Pick<StepSpec, 'harness' | 'remote'>, rendered: ClaudeFlags | undefined, repoOf: () => string | undefined) => {
   const declaration = declarationOf(step.harness);
@@ -170,12 +173,11 @@ export type StepTold = {
 export type Told = StepTold & PlaceTold;
 
 /**
- * What `step` of `run`, among its `steps`, is told and denied by `place` (`landingWords`, `placeSay`), its branches named off `heads`
- * where given.
- */
-/**
  * For a judge (`route: judge`), what each workflow a node after it routes to says it is for: its README's description, read from the
  * folder beside the run's own workflow, where a team keeps its workflows. Empty for any other step, and for a workflow with no description.
+ * @param run The run, whose workflow folder's siblings are read.
+ * @param steps The steps the run is judged by.
+ * @param step The step asked of.
  */
 export function workflowTargets(run: Run, steps: readonly StepSpec[], step: StepSpec): Record<string, string> {
   if (step.route?.kind !== 'judge') return {};
@@ -188,6 +190,15 @@ export function workflowTargets(run: Run, steps: readonly StepSpec[], step: Step
   );
 }
 
+/**
+ * What `step` of `run`, among its `steps`, is told and denied by `place` (`landingWords`, `placeSay`), its branches named off `heads`
+ * where given, and, for a judge, what each workflow it routes to is for (`workflowTargets`).
+ * @param run The run.
+ * @param steps The steps the run is judged by.
+ * @param step The step told.
+ * @param place The run's place, whose declaration says the words.
+ * @param heads Every branch of the repository and its commit, or undefined where they were not read: the recorded tips alone then.
+ */
 export function placeTold(
   run: Run,
   steps: readonly StepSpec[],
@@ -209,6 +220,8 @@ export function placeTold(
  * each run it is handed (`handedRunsAt`), and the run's copy of its workflow folder (`workflowFilesDir`) and of its carried files
  * (`carriedFilesDir`), each only when its record names one. What a *brief* reads, which asks for no server; `filedAt` is what a filing
  * takes.
+ * @param home The store's root folder.
+ * @param run The run, read down to what names its folders.
  */
 export const filedFoldersAt = (
   home: string,
@@ -248,6 +261,8 @@ const handedRunsAt = (home: string, ids: readonly string[]): HandedRunFolders[] 
  * What a step of `run` is filed with (`filedConfig`): its folders, and the MCP servers the run's factory records, read from the store
  * `home` the caller was given. The root is a parameter and has no default: a caller that passes none does not compile, so no filing
  * reads a store nobody named (`test/root-given.test.ts`).
+ * @param run The run, read down to what names its folders and its factory.
+ * @param home The store's root folder.
  */
 export const filedAt = (
   run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'factory' | 'workflowFiles' | 'carriedFiles'>,
@@ -285,6 +300,10 @@ const recordedServers = (factory: string | undefined, home: string): FactoryServ
 /**
  * What `step` of `run`, not yet filed, would be told now from `steps` (`composeBrief`), with what its place says to it (`placeTold`):
  * what the board shows of a step to come. Where the place gives no words, the brief sends the step to its place's skill.
+ * @param step The step to come.
+ * @param run The run.
+ * @param steps The steps the run is judged by.
+ * @param place The run's place.
  */
 export function briefNow(step: StepSpec, run: Run, steps: readonly StepSpec[], place: Place): string {
   const told = placeTold(run, steps, step, place);
@@ -295,6 +314,10 @@ export function briefNow(step: StepSpec, run: Run, steps: readonly StepSpec[], p
 /**
  * The files the closeout of the try that ended named that the run did not have (`lackedOf`), as its next try is told them: a line each,
  * with a near name off what the step's files directory holds now (`lackLines`). Nothing for a try that lacked none.
+ * @param home The store's root folder.
+ * @param run The run.
+ * @param name The step's name.
+ * @param record The step's record, whose ended try's closeout is read.
  */
 export const lacksTold = (home: string, run: Run, name: string, record: StepRecord): Pick<RetryBriefing, 'lacks'> => {
   const lacked = lackedOf(record);
@@ -307,6 +330,10 @@ export const lacksTold = (home: string, run: Run, name: string, record: StepReco
  * The folders a step is filed with and its brief names (`filedFolders`), those a step before it handed over that hold its
  * `closeout.json` (`holdsCloseout`), which the brief sends the step to, and for each other, which of the files that step's closeout named
  * are there now (`filesHanded`): the brief lists those, and hands on no name with no file.
+ * @param home The store's root folder.
+ * @param run The run.
+ * @param reads The steps the run is judged by, and the closeout each step signed off with, by its name.
+ * @param step The step filed.
  */
 export const foldersTold = (
   home: string,
@@ -338,20 +365,36 @@ type TriedReads = {
   };
 };
 
-/** What a pass read and named (`what`), found: one it does not have is thrown, naming it, as a fault of the pass. */
+/**
+ * What a pass read and named (`what`), found: one it does not have is thrown, naming it, as a fault of the pass.
+ * @param value What the pass read, or undefined where it has none.
+ * @param what What it is, as the thrown words name it.
+ */
 export const found = <T>(value: T | undefined, what: string): T => {
   if (value === undefined) throw new Error(`the pass named ${what}, which it does not have: report it as a defect of the tick`);
   return value;
 };
 
-/** The run's record of the step of this name, which the pass named: one the run has none of is thrown (`found`). */
+/**
+ * The run's record of the step of this name, which the pass named: one the run has none of is thrown (`found`).
+ * @param run The run.
+ * @param name The step's name.
+ */
 export const recordNamed = (run: Run, name: string): StepRecord => found(run.steps[name], `the record of step ${name} of run ${run.id}`);
 
-/** The task of the session a try stops first (`Retry.stopFirst`), which runs: a step with none on the record is thrown (`found`). */
+/**
+ * The task of the session a try stops first (`Retry.stopFirst`), which runs: a step with none on the record is thrown (`found`).
+ * @param run The run.
+ * @param name The step's name.
+ */
 export const taskToStop = (run: Run, name: string): string =>
   found(recordNamed(run, name).taskId ?? undefined, `a task of step ${name} of run ${run.id}`);
 
-/** The step of this name, which the pass's assessment named: one the pass did not read is thrown (`found`). */
+/**
+ * The step of this name, which the pass's assessment named: one the pass did not read is thrown (`found`).
+ * @param f What the pass read: the run and its steps.
+ * @param name The step's name.
+ */
 export const stepNamed = (f: TriedReads, name: string): StepSpec =>
   found(
     f.reads.steps.find((s) => s.name === name),
@@ -374,6 +417,11 @@ const endingSaid = (f: TriedReads, ending: StepSpec): EndingStopped => {
 /**
  * What a local try's brief is told of its try (`RetryBriefing`): how it came and on whose word, the session it continues and what was said
  * to it, how the try before it ended, what its check refused, what was denied it, and the ending it was sent back from.
+ * @param home The store's root folder.
+ * @param f What the pass read: the run, its steps and the engine's views of its tasks.
+ * @param r The try filed.
+ * @param record The step's record before the try.
+ * @param t How the try before it ended (`status`), the session it continues (`resumeFrom`), and what its check refused.
  */
 export const tryTold = (
   home: string,
@@ -410,6 +458,9 @@ const underBudget = (steps: readonly StepSpec[], run: Run): boolean => steps.som
  * The readers a run is judged by, made once of the engine's views of its tasks: each task's phase, how each step signed off, whether a
  * task was asked its closeout, each step's check's exit, whether a session is blocked by its harness, and what each task cost. Pure: the
  * one place they are made, so the pass, the verbs and the screens read a run through the same ones.
+ * @param views The engine's view of each task of the run, by task id.
+ * @param run The run.
+ * @param steps The steps the run is judged by.
  */
 export const readersOf = (views: ReadonlyMap<string, TaskView>, run: Run, steps: readonly StepSpec[]) => ({
   phaseOf: (taskId: string): TaskPhase => phaseOfView(views.get(taskId)),
@@ -467,6 +518,8 @@ export const readRun = Effect.fnUntraced(function* (e: Engine, run: Run, how: Ru
  * `read` with where its result branches stand, as `standing` read them (`askedStandings` over `standingReader`: no process, a branch no
  * pass read is unread): what says a finished run with no gated ending is one nobody has decided. Read only of the branches the judgement
  * and `nemia decide` read too (`branchesAsked`), none of a run still going or called off; none where no standing is given.
+ * @param read The pass's read of the run.
+ * @param standing The pass's reading of the branches, or undefined where none is given.
  */
 export const withStandings = <R extends AssessRead>(read: R, standing: PassStanding | undefined): R => {
   if (!standing) return read;

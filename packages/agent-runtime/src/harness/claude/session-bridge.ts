@@ -55,6 +55,7 @@ export const BRIDGE_ABSENT =
 /**
  * What a run file says where the control request answered something this runtime does not read.
  * Exported only for the tests that import it.
+ * @param why What did not decode in the answer, in the decoder's words.
  */
 export const bridgeUnread = (why: string): string =>
   `the \`enableRemoteControl\` control request answered what this runtime does not read (${why}): the session runs on with no bridge.`;
@@ -62,6 +63,7 @@ export const bridgeUnread = (why: string): string =>
 /**
  * What a run file says where the control request itself failed.
  * Exported only for the tests that import it.
+ * @param why What the control request failed with, in its error's words.
  */
 export const bridgeFailed = (why: string): string => `the claude.ai bridge was not opened (${why}): the session runs on without one.`;
 
@@ -90,12 +92,14 @@ const enableOf = (q: unknown): Enable | undefined => {
 /**
  * Whether the SDK's `query()` object `q` can be bridged at all: the guard a caller asks before it asks for a bridge.
  * Exported only for the tests that import it.
+ * @param q The SDK's `query()` object, unchecked.
  */
 export const bridgeable = (q: unknown): boolean => enableOf(q) !== undefined;
 
 /**
  * Whether the bridge is due on the session's message `m`: its `system`/`init`, the first message a session gives, so a bridge asked
  * for is up before a job's one turn can end. False on any other message, and on what is no message.
+ * @param m A message of the session's stream, unchecked.
  */
 export const bridgeDue = (m: unknown): boolean => {
   const line = m as { type?: unknown; subtype?: unknown } | null | undefined;
@@ -106,6 +110,9 @@ export const bridgeDue = (m: unknown): boolean => {
  * Opens the claude.ai bridge of the session `name` on the `query()` object `q`, as `ask` says (`BridgeAsk`), and answers the facts
  * for its file: the bridge's links and ids, or `why` alone where the SDK has no such control request, where its answer does not
  * decode, or where it failed. Never throws: a session is not failed for want of a bridge.
+ * @param q The session's `query()` object, unchecked.
+ * @param name The session's name, the bridge's name on claude.ai.
+ * @param ask Whether the claude.ai session outlives the process, and the one a resume re-attaches.
  */
 export const enableBridge = async (q: unknown, name: string, ask: BridgeAsk): Promise<AttachedBridge> => {
   const enable = enableOf(q);
@@ -129,6 +136,7 @@ export const enableBridge = async (q: unknown, name: string, ask: BridgeAsk): Pr
 /**
  * The bridge's state a `system` message says, as the stream carries it (`ready`, then `connected`), or `undefined` for any other
  * message: a value a harness gives, read as it is and never trusted to be a string.
+ * @param m A message of the session's stream, unchecked.
  */
 export const bridgeStateOf = (m: unknown): string | undefined => {
   const line = m as { type?: unknown; subtype?: unknown; state?: unknown } | null | undefined;
@@ -136,7 +144,10 @@ export const bridgeStateOf = (m: unknown): string | undefined => {
   return typeof line.state === 'string' ? line.state : undefined;
 };
 
-/** The bridge a session's file kept, as a sighting says it: the link where one was opened, else why there is none, else nothing. */
+/**
+ * The bridge a session's file kept, as a sighting says it: the link where one was opened, else why there is none, else nothing.
+ * @param bridge The bridge facts the file kept; absent where no bridge was asked for.
+ */
 export const bridgeOf = (bridge: AttachedBridge | undefined): Pick<Sighting, 'bridge'> => {
   if (bridge === undefined) return {};
   if (bridge.url !== undefined) return { bridge: { url: bridge.url } };

@@ -355,6 +355,7 @@ function gatherSkills(source: Source, into: Gathered): void {
  * factory's revisions policy where it says one; NEMIA.md from the factory's instruction,
  * and RULES.md from its rules.
  * Refused, each by name, nothing to write: a key the template has no place for, a step filled twice, an agent or a skill not found.
+ * @param source What the draft is made from: the template's name, its workflows and factory, and how each agent and skill named is found.
  */
 export function draftOf(source: Source): Draft {
   const into: Gathered = { files: [], from: [], refusals: [], agents: new Map(), skills: new Map() };

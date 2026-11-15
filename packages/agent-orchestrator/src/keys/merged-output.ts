@@ -18,6 +18,10 @@ const declarer = (o: OutputOwner): string =>
  * step's, each recorded in `owners`, and the shape of each field either marked (`shapes`). `file` is the step's own `output:` line
  * where it has one, else the agent's, as the step's file is written back. Undefined when neither declares one. Refuses a field both
  * declare, naming it and both declarers: a field has one owner.
+ * @param step The step's name, as a refusal names its declarer.
+ * @param agent The name of the step's agent, as a refusal names its declarer.
+ * @param fromAgent The agent's `output:` declaration, undefined where it declares none.
+ * @param own The step's own `output:` declaration, undefined where it declares none.
  */
 export function mergedOutput(
   step: string,

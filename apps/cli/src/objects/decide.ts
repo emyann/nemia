@@ -112,7 +112,11 @@ const questionLines = (d: Decidable): string[] =>
 /** A command as offered: its number, its label, the line, and the sentence it ends with. */
 const offered = (c: DecideCommand, at: number): string => `${at + 1}. ${c.label}: ${c.command}${c.said !== null ? `  — ${c.said}` : ''}`;
 
-/** The screen of `decision`, run `runId`'s: every line, each but the head indented. */
+/**
+ * The screen of `decision`, run `runId`'s: every line, each but the head indented.
+ * @param runId The run's id, the screen's head.
+ * @param decision The run's decision as the api answers it.
+ */
 export function decisionLines(runId: string, decision: RunDecision): string[] {
   const body = (lines: readonly string[]) => [runId, '', ...lines.map((line) => (line === '' ? '' : `  ${line}`))];
   if ('waiting' in decision)
@@ -144,7 +148,10 @@ export function decisionLines(runId: string, decision: RunDecision): string[] {
   return body(sections.flatMap((lines, at) => (at === 0 ? lines : ['', ...lines])));
 }
 
-/** The words of a command line as a shell would read them: split on spaces, a double-quoted stretch one word without its quotes. */
+/**
+ * The words of a command line as a shell would read them: split on spaces, a double-quoted stretch one word without its quotes.
+ * @param line The command line as offered.
+ */
 export const wordsOf = (line: string): string[] => [...line.matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2] ?? '');
 
 /** The placeholders a command line holds, `<objection>` and its like, each once, in order. */
@@ -218,6 +225,10 @@ function sensitiveOf(args: readonly string[]): { rest: string[]; sensitive?: str
 /**
  * `nemia decide <args>`: the screen of a run's decision, asked of the store `env` names, then, at a terminal, the command a person picks
  * run. Answers its exit code.
+ * @param args The words typed after `decide`: the run's id, and `--sensitive <globs>`.
+ * @param run Runs the command a person picks, given its words, and answers its exit code.
+ * @param io Where the screen is written and the pick read, and whether that is a terminal: this process's own where it is left out.
+ * @param env The environment read for the context in use, the store and the token.
  */
 export async function decide(
   args: readonly string[],

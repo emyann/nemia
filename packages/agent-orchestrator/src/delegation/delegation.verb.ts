@@ -12,7 +12,10 @@ import { DelegationDoor, type DelegationRecord } from './delegation.store.ts';
 /** A delegation's `resourceVersion`: a position, not a digest — when it was last written, which a write moves on. */
 const writtenPosition = (record: DelegationRecord): string => record.since;
 
-/** A delegation as the object served: its agent's name in its factory's namespace, its grants, and when it was written. */
+/**
+ * A delegation as the object served: its agent's name in its factory's namespace, its grants, and when it was written.
+ * @param record The delegation as the store holds it: its factory, its agent, when it was written and its grants.
+ */
 export const delegationObject = (record: DelegationRecord): Delegation => ({
   apiVersion: API_VERSION,
   kind: 'Delegation',

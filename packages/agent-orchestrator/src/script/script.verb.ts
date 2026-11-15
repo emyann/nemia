@@ -46,6 +46,7 @@ export type ScriptFiling = {
  * answers one and nothing is there for the try: a person's (`routeFile`) or one copied before. Answers with the conditions written. The
  * pass reads the route afresh either way (`answeredRoute`); the copy, written with the record when the pass writes it — as it does on the
  * pass that files the route's first node — keeps what the run took after the producer's closeout is pruned.
+ * @param f The pass's filing: the run, whose records are written, and its reads of each step's word and closeout.
  */
 export function answerTables(f: Pick<ScriptFiling, 'run' | 'reads'>): string[] {
   const { run, reads } = f;

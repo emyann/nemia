@@ -33,6 +33,9 @@ type SpawnAt = {
  * re-spawn leaves no servers behind; `sessionMcp` is read on either road, since it is what refuses a `projectMcp` name the
  * checkout does not declare, before anything runs. The request is written owner-only: it carries the task's `config`, whose `mcp`
  * may hold an `env` or a header that is a secret.
+ * @param spec The harness the run is spawned on.
+ * @param r The spawn asked for: the schema of its final answer, its servers, its `cwd` and `config`.
+ * @param at Where each of the run's files goes.
  */
 export const spawnFiles = (spec: HarnessSpec, r: SpawnRequest, at: SpawnAt): HarnessIO => {
   for (const f of [at.answer, at.log, at.kept, at.stop, at.launched, at.request, ...Object.values(at.streams)])
@@ -64,6 +67,9 @@ const sizeOf = (p: string) => {
  * What the worker writes on the harness's stdin for the run `r` (`RunInput`): its brief as the spec's own line, and the `inbox`
  * read on from where it stands now, so a run spawned again under a name finds no words said to the one before it. Nothing for a
  * spec whose harness is given no input.
+ * @param spec The harness the run is spawned on, by its `input`.
+ * @param r The spawn asked for, whose brief is the first line.
+ * @param inbox The run's inbox file, read on from its size now.
  */
 export const spawnInput = (spec: HarnessSpec, r: SpawnRequest, inbox: string): RunInput | undefined =>
   spec.input && { first: spec.input.line(r.brief), inbox, from: sizeOf(inbox), closesOn: spec.input.closesOn };

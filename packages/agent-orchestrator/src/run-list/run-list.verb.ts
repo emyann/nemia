@@ -292,6 +292,8 @@ const byState = Effect.fnUntraced(function* <E, R, O>(
 /**
  * Whether `run` is in `namespace`: `Missing` where it is not, in the words of a run no name matches, since a run is in exactly one
  * namespace and a read or an action addressed under another finds none.
+ * @param run The run read: its id, and the factory its record names.
+ * @param namespace The namespace a read or an action addressed the run under.
  */
 export const runIn = (run: Pick<Run, 'id' | 'factory'>, namespace: string): Effect.Effect<void, Missing> =>
   runNamespace(run.factory) === namespace

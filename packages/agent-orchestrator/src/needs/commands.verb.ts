@@ -25,6 +25,7 @@ const MARK = { met: '✓', missing: '✗', unknown: '?', inactive: '·' } as con
 /**
  * The lines `nemia doctor` prints: whether a run waits on a missing piece, and what the missing pieces cost (`readinessSaid`), then each
  * piece, its state, its words, and each fix's command.
+ * @param r The server's readiness: whether it is ready, and each piece with its fixes.
  */
 export const readinessLines = (r: Readiness): string[] => [
   r.ready ? 'ready: every piece is in place' : `${readinessSaid(r)}; each is marked ✗, its fix below it`,
@@ -73,7 +74,10 @@ const answersIn = (given: Args[string]): Record<string, string> => {
   );
 };
 
-/** What `nemia doctor fix` was asked, as `startFix` takes it; refused (`Invalid`) where `--index` is no whole number from 0. */
+/**
+ * What `nemia doctor fix` was asked, as `startFix` takes it; refused (`Invalid`) where `--index` is no whole number from 0.
+ * @param args The command's arguments: the need, its factory and workflow, `--index` and each `--answer`.
+ */
 export const fixStartOf = (args: Args): FixStart => {
   const index = args.index === undefined ? undefined : Number(args.index);
   if (index !== undefined && (!Number.isInteger(index) || index < 0))
@@ -90,7 +94,11 @@ export const fixStartOf = (args: Args): FixStart => {
   };
 };
 
-/** Each code `pattern` finds in `text`, in order: none for a pattern that is no regular expression. */
+/**
+ * Each code `pattern` finds in `text`, in order: none for a pattern that is no regular expression.
+ * @param pattern The code's pattern, as the fix declared it: a regular expression's source.
+ * @param text The fix's output to search.
+ */
 export const codesIn = (pattern: string, text: string): string[] => {
   try {
     return [...text.matchAll(new RegExp(pattern, 'g'))].map((m) => m[0]).filter(Boolean);
@@ -99,7 +107,10 @@ export const codesIn = (pattern: string, text: string): string[] => {
   }
 };
 
-/** A code a fix declared, as the command line shows it: on a line of its own, spaced from what is around it. */
+/**
+ * A code a fix declared, as the command line shows it: on a line of its own, spaced from what is around it.
+ * @param code The code the fix declared.
+ */
 export const codeShown = (code: string): string => `\n\n    ${code}\n\n`;
 
 /**

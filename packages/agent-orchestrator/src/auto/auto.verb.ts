@@ -82,6 +82,9 @@ const proposalRulesOf = (list: readonly PolicyRule[]): ProposalPolicyRule[] => l
 /**
  * `agent`'s rules in the store `home`, composed from the person's list, the agent's proposal and its custom instruction, `instruction`
  * (`instructionOf`).
+ * @param home The store's root.
+ * @param agent The agent's name.
+ * @param instruction Its custom instruction's words; undefined where there are none.
  */
 export function policyListOf(home: string, agent: string, instruction: string | undefined): PolicyList {
   const confirmed = readConfirmed(home, agent);
@@ -135,6 +138,7 @@ const proposalRefusal = (why: string): Invalid =>
 
 /**
  * The proposal in `words`: its rules and its guidance. Refused (`Invalid`): no JSON, a rule that is none, an id twice, guidance not words.
+ * @param words The proposal's text, JSON.
  */
 export function proposalOf(words: string): { rules: PolicyRule[]; guidance: string[] } {
   let raw: unknown;

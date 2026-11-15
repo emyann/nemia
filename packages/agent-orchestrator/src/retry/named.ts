@@ -33,7 +33,11 @@ function howOf(flags: string): RetryHow {
   return how;
 }
 
-/** Each `nemia retry <runId> <step> …` `text` names, in order, with how it asks; another run's commands are left out. */
+/**
+ * Each `nemia retry <runId> <step> …` `text` names, in order, with how it asks; another run's commands are left out.
+ * @param text The text the commands are read from.
+ * @param runId The run whose commands are kept.
+ */
 export function retriesNamed(text: string, runId: string): RetryNamed[] {
   const named: RetryNamed[] = [];
   for (const [, run, step, rest] of text.matchAll(COMMAND)) {

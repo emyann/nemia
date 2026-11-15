@@ -10,6 +10,8 @@ import { filterOf } from './feed.ts';
  * read for, `decisionStamp`), and its steps' tries and told, at every stamp (`['runs', id, 'steps']`, by prefix): a write can change a
  * try without moving its step — its files pruned, an answer given — and a step's reads are keyed by its moves alone. So a write that
  * changes a run makes this one call.
+ * @param queryClient The board's query client, whose reads are marked to read again.
+ * @param id The run the write changed, or undefined for the lists alone.
  */
 export const runsMoved = (queryClient: QueryClient, id?: string): Promise<void> => {
   const keys: QueryKey[] = [

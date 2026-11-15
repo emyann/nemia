@@ -10,7 +10,11 @@ import { fileOf } from './card-lines.ts';
 
 const { name: COMMAND } = INBOX_FROM_WORDS;
 
-/** What `nemia inbox from` prints of the card written, beside the runs it named before (`was`). */
+/**
+ * What `nemia inbox from` prints of the card written, beside the runs it named before (`was`).
+ * @param card The card as the api answers it after the write.
+ * @param was The runs the card named under `from:` before the write.
+ */
 export const fromLines = (card: Card, was: readonly string[]): string[] => {
   const name = card.metadata.name;
   const from = card.spec.from ?? [];
@@ -19,7 +23,10 @@ export const fromLines = (card: Card, was: readonly string[]): string[] => {
     : [`${name}  ${was.length ? `from: taken off (was ${was.join(', ')})` : 'no from: — nothing to take off'}`];
 };
 
-/** `nemia inbox from`'s runner, on the words parsed against its words. */
+/**
+ * `nemia inbox from`'s runner, on the words parsed against its words.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function inboxFrom(args: Args): Promise<number> {
   const name = textArg(args, 'name') ?? '';
   const runs = switchArg(args, 'off') ? [] : runsNamed(args);

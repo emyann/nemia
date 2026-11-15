@@ -107,6 +107,9 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
  * edge back and how many rounds it may run, are rows beside `after` on a looping step only. A codex step's fence is its sandbox, which the
  * engine's task files as its permission mode: the same row, under Codex's name (`fenceLabel`). A step filed bridged has a `reach` row: its
  * session's web link, or why it is not up.
+ *
+ * @param spec the step's spec as the api gives it
+ * @param filed what the step was filed with, none for a step not filed
  */
 export const specRows = (spec: StepSpecView, filed: StepFiledView | null = null): Array<[string, ReactNode]> =>
   isRemote(spec, filed)
@@ -172,7 +175,11 @@ function remoteRows(spec: StepSpecView, filed: StepFiledView | null): Array<[str
   ];
 }
 
-/** What a step's fence is called on its harness: `sandbox` on codex, whose `sandbox:` it is, and `permission mode` on Claude Code. */
+/**
+ * What a step's fence is called on its harness: `sandbox` on codex, whose `sandbox:` it is, and `permission mode` on Claude Code.
+ *
+ * @param spec the step's spec, read for its harness and its sandbox
+ */
 export const fenceLabel = (spec: Pick<StepSpecView, 'harness' | 'sandbox'>): string =>
   spec.harness === 'codex' || spec.sandbox ? 'sandbox' : 'permission mode';
 
@@ -268,12 +275,19 @@ function Marked({ value, mark, word = false, title }: { value: string; mark: str
   );
 }
 
+/**
+ * A `Facts` value in the mono face, or nothing for none.
+ *
+ * @param value the text to draw, null for none
+ */
 export const code = (value: string | null) => (value === null ? null : <span className="font-mono text-body-small">{value}</span>);
 
 /**
  * A path on the machine, as a `Facts` value: the path, and a button that copies it. A folder run's work is somewhere under the store
  * that nobody typed and nobody remembers, and the board is where a person reads the run — so the path is copyable wherever it is shown,
  * rather than selected out of a line that wraps.
+ *
+ * @param at the path, null for none
  */
 export const pathRow = (at: string | null) =>
   at === null ? null : (
@@ -289,6 +303,8 @@ type Priced = Pick<StepView, 'spent' | 'budget' | 'taskId' | 'tries'>;
  * A `spent` row for `Facts`, where one says more than the current try's `cost` does: for a step with a cap, what its tries have cost of it
  * (`$4.25 of $3`), red once they have cost it or more; for one tried more than once, what every try cost together. None otherwise. A filed
  * step nobody priced reads `not measured`, never $0.
+ *
+ * @param step the step, read for its spend, its budget, its task and its tries
  */
 export function spentRows(step: Priced): Array<[string, ReactNode]> {
   if (!step.budget && step.tries.length < 2) return [];
@@ -312,6 +328,8 @@ export function spentRows(step: Priced): Array<[string, ReactNode]> {
 /**
  * A `read` row for `Facts`, beside a step's `cost`: what its sessions read, by price, in the CLI `decide`'s words, where anything measured
  * it. None where nothing did — a runner that counted its input as one number has nothing to say here, which is not 0.
+ *
+ * @param used what the step's sessions used, none where nothing measured it
  */
 export function readRows(used: StepUsed | null | undefined): Array<[string, ReactNode]> {
   return used?.read ? [['read', <Read key="read" said={used.read} peak={used.peak} rebuilt={used.rebuilt} />]] : [];
@@ -320,6 +338,8 @@ export function readRows(used: StepUsed | null | undefined): Array<[string, Reac
 /**
  * The `unread` row of a step's facts: why the runtime could not read its session alone, whole and wrapping, in its words — a long sentence
  * naming a file and a field. None for a step whose session was read.
+ *
+ * @param words why the session could not be read, null where it was
  */
 export const unreadRows = (words: string | null): Array<[string, ReactNode]> =>
   words
@@ -425,5 +445,9 @@ function Stream({ name, log }: { name: string; log: Frozen<StepLog> }) {
   );
 }
 
-/** An ISO instant as a `Facts` value: the page's words, whole on hover (`Instant`). */
+/**
+ * An ISO instant as a `Facts` value: the page's words, whole on hover (`Instant`).
+ *
+ * @param iso the instant, as an ISO string
+ */
 export const when = (iso: string) => <Instant at={iso} />;

@@ -64,6 +64,8 @@ function helpLines(entry: Entry): readonly string[] {
  * is generated with `REGENERATE`, and a section per class, each the commands of that class as `helpOf` prints them, in the table's order
  * and then the CLI's own verbs. Left out: a command out of her reach (`none`), one the api alone serves, and a verb of the CLI with no
  * entry in `table` to class it.
+ * @param table The command table, each entry with its class and help.
+ * @param cliVerbs The command line's own verbs, each with its class and help.
  */
 export function verbsSkillOf(table: readonly Entry[], cliVerbs: readonly CliVerb[]): string {
   const served = table.filter((c) => c.only?.side !== 'api');

@@ -31,6 +31,7 @@ export const JOB_HOLD_POLL_MS = 250;
 /**
  * Whether the call a `PreToolUse` hook was given belongs to a call already in flight: the SDK marks a sub-agent's call with
  * `agent_id`, and absent for the main thread (the SDK's hook input), so such a call is answered however the session's calls are held.
+ * @param input The hook's input, as the SDK handed it.
  */
 export const inside = (input: unknown): boolean => typeof (input as { agent_id?: unknown }).agent_id === 'string';
 
@@ -40,10 +41,18 @@ export type Call = { tool: string; since: string };
 /** A session's calls in flight, by the call's id, as its hooks keep them. */
 export type CallsInFlight = Map<string, Call>;
 
-/** The earliest of `calls`: what a file names as `calling`; nothing where none is in flight. */
+/**
+ * The earliest of `calls`: what a file names as `calling`; nothing where none is in flight.
+ * @param calls The session's calls in flight.
+ */
 export const firstCall = (calls: CallsInFlight): Call | undefined => [...calls.values()].sort((a, b) => a.since.localeCompare(b.since))[0];
 
-/** The call a `PreToolUse` hook was given, written in flight under `id` with its tool, as its hook names it. */
+/**
+ * The call a `PreToolUse` hook was given, written in flight under `id` with its tool, as its hook names it.
+ * @param calls The session's calls in flight, written into.
+ * @param id The call's id as the hook names it; absent, the call is not kept.
+ * @param input The hook's input, read for its tool's name.
+ */
 export const callStarted = (calls: CallsInFlight, id: string | undefined, input: unknown): void => {
   const tool = (input as { tool_name?: unknown }).tool_name;
   if (id) calls.set(id, { tool: typeof tool === 'string' ? tool : 'a tool', since: new Date().toISOString() });
@@ -63,8 +72,15 @@ export type JobHold = typeof JobHoldSchema.Type;
 
 const decodeHold = Schema.decodeUnknownOption(JobHoldSchema);
 
-/** The job's hold file `file`; `null` where it is absent or does not decode. */
+/**
+ * The job's hold file `file`; `null` where it is absent or does not decode.
+ * @param file The path of the job's hold file.
+ */
 export const readJobHold = (file: string): JobHold | null => decodedFile(file, decodeHold);
 
-/** Writes `hold` whole on the job's hold file `file`. */
+/**
+ * Writes `hold` whole on the job's hold file `file`.
+ * @param file The path of the job's hold file.
+ * @param hold What the job is doing about the drain, written in place of what the file held.
+ */
 export const writeJobHold = (file: string, hold: JobHold): void => writeWhole(file, hold);

@@ -13,7 +13,10 @@ const FIELD = 'status.inPlay';
 /** `word` as a boolean, or null where it is neither. */
 const valueOf = (word: string): boolean | null => (word === 'true' ? true : word === 'false' ? false : null);
 
-/** The selector `text` spells: `status.inPlay`, then `==`, `!=` or `=`, then `true` or `false`; null for anything else. */
+/**
+ * The selector `text` spells: `status.inPlay`, then `==`, `!=` or `=`, then `true` or `false`; null for anything else.
+ * @param text The field selector a list of cards is asked with, as given.
+ */
 export const cardPlaySelector: CardPlaySelectorOf = (text) => {
   if (!text.startsWith(FIELD)) return null;
   const rest = text.slice(FIELD.length);

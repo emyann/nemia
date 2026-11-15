@@ -15,6 +15,8 @@ export const sameVersionChange: SameVersionChange = ({ base, recorded, wanted })
 /**
  * Whether choices recorded for `recorded` answer the merge `merge`: made for its version and its template (or one never named), and
  * against its base; a file that recorded no base answers a version's upgrade alone.
+ * @param recorded The person's kept choices, with the version, template and base they were made for.
+ * @param merge The merge under way: its template, the versions it goes from and to, and its base.
  */
 export const choicesApply: ChoicesApply = (recorded, merge) =>
   recorded.to === merge.to &&

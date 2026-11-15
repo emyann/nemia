@@ -47,6 +47,8 @@ function bashMatches(pattern: string, command: string): boolean {
  * so where `outer` matches that text, each `*` of `inner` falls inside a wildcard of `outer`, which matches whatever it stands for. And the
  * bare command a trailing ` *` of `inner` matches, `outer` must match too.
  * Exported only for the tests that import it.
+ * @param outer The scope of the rule that may cover, as its parentheses write it.
+ * @param inner The scope of the rule that may be covered, as its parentheses write it.
  */
 export function bashCovers(outer: string, inner: string): boolean {
   const [o, i] = [bashPattern(outer), bashPattern(inner)];
@@ -67,6 +69,9 @@ function mcpRuleOf(rule: string): { server: string; tool: string | null } | null
  * The rule in `deny` that refuses the tool `mcp__<server>__<tool>`, if one does: one naming the tool, the whole
  * server (`mcp__<server>`), or every tool of it (`mcp__<server>__*`). A rule naming a prefix of either refuses nothing.
  * Exported only for the tests that import it.
+ * @param deny The deny rules, as the settings write them.
+ * @param server The MCP server's name.
+ * @param tool The server's tool's name.
  */
 export function denyingRule(deny: readonly string[], server: string, tool: string): string | null {
   const prefix = `mcp__${server}`;
@@ -80,6 +85,8 @@ export function denyingRule(deny: readonly string[], server: string, tool: strin
  * (`bashCovers`); a deny of the whole of an MCP server, over an allow of one of its tools or of all of them — a server's tool read as
  * `denyingRule` reads it, so a tool's row and the allow rules say the same.
  * Exported only for the tests that import it.
+ * @param allow The allow rule, as the settings write it.
+ * @param over The deny rules, or the ask rules, each carrying its rule as written.
  */
 export function takenBackBy<R extends { readonly rule: string }>(allow: string, over: readonly R[]): R | undefined {
   const server = mcpRuleOf(allow);
@@ -102,6 +109,8 @@ export function takenBackBy<R extends { readonly rule: string }>(allow: string, 
  * that still make some of it ask: a Bash deny among a Bash allow's commands (`bashCovers`), and a deny of one tool of a server an allow
  * names whole.
  * Exported only for the tests that import it.
+ * @param allow The allow rule that stands, as the settings write it.
+ * @param over The deny rules, or the ask rules, each carrying its rule as written.
  */
 export function narrowerRules(allow: string, over: readonly { readonly rule: string }[]): string[] {
   const server = mcpRuleOf(allow);
@@ -128,6 +137,7 @@ const JOB_MEASURED: ReadonlySet<string | null> = new Set([null, 'auto', 'dontAsk
  * Whether a job of Claude Code — every session of it run on the Agent SDK, which answers a call that would ask by denying it, as no
  * person is there — was measured denying what asks in `permissionMode` (`JOB_MEASURED`), none given being null.
  * Exported only for the tests that import it.
+ * @param permissionMode The job's permission mode; null where none is given.
  */
 export const jobDeniesAsksIn = (permissionMode: string | null): boolean => JOB_MEASURED.has(permissionMode);
 
@@ -143,6 +153,8 @@ export type Dated = { harness: string; version: string; measuredAt: string; sour
  * them reads as a claim about today, which nothing here can check: a reader says which day and which version, and those are all that
  * hold it to what was measured.
  * Exported only for the tests that import it.
+ * @param name The measurement's name, as a refusal names it.
+ * @param measurement The measurement, returned as it is when it says what it was taken on and when.
  */
 export function dated<T extends Dated>(name: string, measurement: T): T {
   const { harness, version, measuredAt, source } = measurement as Partial<Dated>;
@@ -170,6 +182,8 @@ export function dated<T extends Dated>(name: string, measurement: T): T {
  * The read-only commands as `dated` holds a measurement, and more: `measured` and `documented` each a list of commands, one word each, with
  * none listed twice and none both measured and documented, and `docs` saying when the docs were read.
  * Exported only for the tests that import it.
+ * @param name The list's name, as a refusal names it.
+ * @param commands The measured and documented commands, with their date, version and source, returned as they are when they hold.
  */
 export function readOnlyCommands<T extends Dated & { measured: readonly string[]; documented: readonly string[]; docs: string }>(
   name: string,

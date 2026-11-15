@@ -31,6 +31,9 @@ export type WaitRead = { readonly cursor: number; readonly lines: readonly Waite
  * `read` once one chunk more of the feed is read: its cursor after the chunk's last line, and the lines of it `selectors` take. Once a
  * chunk has given lines, nothing after it is read: the cursor stays after the chunk whose lines are answered, so a line after them is the
  * next wait's. Pure.
+ * @param read What the wait has read so far: its cursor and the lines it took.
+ * @param chunk The next chunk of the feed, each line with where it starts and the cursor after it.
+ * @param selectors What the wait takes a line by.
  */
 export function readChunk(read: WaitRead, chunk: Iterable<Followed>, selectors: Selectors): WaitRead {
   if (read.lines.length > 0) return read;
@@ -48,6 +51,7 @@ export function readChunk(read: WaitRead, chunk: Iterable<Followed>, selectors: 
  * What a wait answers of what it read: `matched` with the lines it took, or `bound` with none, and its cursor. Read off the one record
  * the lines and the cursor move in together, never off the follow's own result, so a bound that falls after a chunk is taken and before
  * the follow returns still answers the lines the cursor went past. Pure.
+ * @param read What the wait has read: its cursor and the lines it took.
  */
 export const answerOf = (read: WaitRead): WaitAnswer =>
   read.lines.length > 0 ? { ended: 'matched', lines: read.lines, cursor: read.cursor } : { ended: 'bound', lines: [], cursor: read.cursor };

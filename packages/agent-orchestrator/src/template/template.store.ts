@@ -39,6 +39,7 @@ export type { Problem } from './door/templates.ts';
 /**
  * The lines a file of shared lines holds, read from its text: a YAML list of strings, a comment beside a line saying why it is there.
  * Undefined for a text that does not parse, or parses to anything else, which the lint refuses at the file (`checkTemplate`).
+ * @param text The file's text.
  */
 export const sharedLinesOf = (text: string): string[] | undefined => {
   let read: unknown;
@@ -103,7 +104,10 @@ function readTemplateFolder(
 /** The names of Nemia's own skills, the place's and the builtin ones (`packageSkillFolders`), each present to a template that names it. */
 export const packageSkillNames = (): string[] => packageSkillFolders().map(([name]) => name);
 
-/** A problem as a person reads it: `<file>:<line>:<col>: <words>`, or `<file>: <words>` where it has no line. */
+/**
+ * A problem as a person reads it: `<file>:<line>:<col>: <words>`, or `<file>: <words>` where it has no line.
+ * @param p The problem.
+ */
 export const problemLine = (p: Problem): string => `${p.file}${p.line === undefined ? '' : `:${p.line}:${p.col ?? 1}`}: ${p.message}`;
 
 /** A template as read and checked: every problem, sorted, its documents read (`folder`), and the version its manifest gives. */
@@ -113,6 +117,8 @@ export type CheckedTemplate = TemplateTree & { folder: ReadFolder; version: unkn
  * The tree `tree` checked: every problem at once, sorted by file then line — what its read found (a link, a path longer than an archive
  * holds), a document that does not parse, and each that `checkTemplate` refuses, at the line its value stands on. `packageSkills` names
  * Nemia's own skills, the place's and the builtin ones, a template may name (`packageSkillNames`). Pure.
+ * @param tree The template's tree as read: its files and the problems the read found.
+ * @param packageSkills Nemia's own skills, the place's and the builtin ones, a template may name.
  */
 export function checkedTree(tree: TemplateTree, packageSkills: readonly string[]): CheckedTemplate {
   const problems = [...tree.problems];
@@ -145,6 +151,9 @@ export type OpenTemplate = CheckedTemplate & {
 /**
  * The tree read from `source`, checked (`checkedTree`), each of its files then read off the tree. Refused: a file asked for that is no
  * file of the template (Invalid), so a `{path}` cannot reach out. Pure.
+ * @param source The template's place the tree was read from.
+ * @param tree The template's tree as read.
+ * @param packageSkills Nemia's own skills, the place's and the builtin ones, a template may name.
  */
 export function openedTree(source: string, tree: TemplateTree, packageSkills: readonly string[]): OpenTemplate {
   const checked = checkedTree(tree, packageSkills);
@@ -159,7 +168,11 @@ export function openedTree(source: string, tree: TemplateTree, packageSkills: re
   return { ...checked, file, text, lines: (at) => sharedLinesOf(text(at)) };
 }
 
-/** The tree `name` of `files` as a read of a folder answers it: each path longer than an archive holds a problem, else its digest. */
+/**
+ * The tree `name` of `files` as a read of a folder answers it: each path longer than an archive holds a problem, else its digest.
+ * @param name The template's name.
+ * @param files The folder's files as read.
+ */
 export function folderTreeOf(name: string, files: TreeFile[]): TemplateTree {
   const problems = pathRefusals(name, files);
   return { name, files, problems, digest: problems.length ? undefined : contentDigest(name, files) };
@@ -207,6 +220,8 @@ function workflowSources(root: string, names: readonly string[], factory: string
 /**
  * Where an export of the repository `from` looks for the agents and skills its workflows name, as a workflow of its `workflows/` looks:
  * a workflow folder of it (`workflowDir`, a name no workflow has), its places, and each folder of agents, first root first.
+ * @param home The store's root folder.
+ * @param from The repository's folder exported from.
  */
 export function lookupsOf(home: string, from: string): { workflowDir: string; places: Places; agentDirs: string[] } {
   const workflowDir = path.join(path.resolve(from), 'workflows', '_');
@@ -305,6 +320,7 @@ const PLAIN = 0o644;
 /**
  * The draft's files as a tree: a document as YAML on lines of any length, a text as it is, a copy with its modes, and a skill as its
  * real files (`skillFiles`); a path given twice holds what was given last. Reads the copies and skills the draft names.
+ * @param draft The draft, as `draftOf` made it.
  */
 export function treeOfDraft(draft: Draft): TreeFile[] {
   const files = new Map<string, TreeFile>();
@@ -350,6 +366,9 @@ export type ExportAsk = { dir: string; from: string; factory?: FactoryParts };
  * Template door writes it. Refused, nothing written: a folder that is no name, a factory whose repositories are not `from`, a workflow it
  * attaches that `from` lacks, what `draftOf` refuses, and a draft that does not pass its own check (Invalid), each problem by name; a
  * `from` with no workflows/ (Missing).
+ * @param ask Where the template is written (`dir`), the repository it is exported from (`from`), and the factory, where one is given.
+ * @param packageSkills Nemia's own skills, the place's and the builtin ones, a template may name.
+ * @param found The agents and skills the Agent and Skill doors found over `lookupsOf`'s roots.
  */
 export function exportTree(
   ask: ExportAsk,
@@ -392,14 +411,20 @@ function defaultOut(dir: string, name: string, version: unknown): string {
   return `${name}-${text}.tgz`;
 }
 
-/** The folder `dir`, as a template's place, or refused where it is no folder (Missing): what pack packs. */
+/**
+ * The folder `dir`, as a template's place, or refused where it is no folder (Missing): what pack packs.
+ * @param dir The folder's path.
+ */
 export function folderAsked(dir: string): string {
   if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory())
     throw new Missing({ message: `${dir} is no folder: name a template's folder, the one that holds its nemia.yaml.` });
   return path.resolve(dir);
 }
 
-/** The archive `archive`, as a template's place, or refused where it is no file (Missing): what unpack reads. */
+/**
+ * The archive `archive`, as a template's place, or refused where it is no file (Missing): what unpack reads.
+ * @param archive The archive's path.
+ */
 export function archiveAsked(archive: string): string {
   if (!fs.statSync(archive, { throwIfNoEntry: false })?.isFile())
     throw new Missing({ message: `${archive} is no file: name an archive nemia template pack wrote.` });
@@ -413,6 +438,8 @@ export type PackAsk = { dir: string; out?: string; cwd: string };
  * Where pack writes the archive of the checked folder `read`: `ask.out` resolved from `ask.cwd`, by default `<name>-<version>.tgz` there.
  * Refused: a folder that does not pass its check, every problem at its line, and a version that names no file where no `out` is given
  * (Invalid).
+ * @param ask The folder packed, the archive's path where one is given (`out`), and the working folder it resolves from (`cwd`).
+ * @param read The folder, read and checked.
  */
 export function packOut(ask: PackAsk, read: CheckedTemplate): string {
   if (read.problems.length)

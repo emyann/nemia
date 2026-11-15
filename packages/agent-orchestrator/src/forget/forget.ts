@@ -42,6 +42,9 @@ export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
  * starting with a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives — names `runs/r-xyz.json` as a run's directory, which
  * is another run's record, and a run with no record of its own is swept of it with nothing asked. `..` or a path would name a directory
  * that is not the run's. One that is an id with a file's suffix on it is told the id.
+ * @param id The id given.
+ * @param verb The verb the id was given to, `rm` where not given.
+ * @param command The command a fix names, `nemia <verb>` where not given.
  */
 export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' | 'read' = 'rm', command = `nemia ${verb}`): string | null {
   if (/^[a-z0-9][a-z0-9-]*$/.test(id)) return null;
@@ -94,7 +97,16 @@ export type AskName = { of: 'try' | 'round' | 'base'; step: string; n: number };
  * no pass can file anything of it — every pass reads that folder, and dies on it. Its tasks in flight, its asks and the runs that wait on
  * it are judged as any run's.
  *
+ * @param steps The run's steps, or undefined for a record that froze no workflow and whose folder does not read.
+ * @param run The run's record, every task a pass filed and never wrote down adopted onto it.
+ * @param phaseOf The engine's phase of a task by its id.
  * @param others Every other run in the store: whether one waits on this run, and has not started, or is held until it lands.
+ * @param closeoutOf How a step signed off, by its name, or undefined where it has not.
+ * @param askedCloseout Whether the engine's record of a task by its id says a closeout was asked of it (`CloseoutAsked`).
+ * @param verdictOf The verdict of a step's check, by the step's name, or undefined where it has none.
+ * @param asks The asks for a try in the run's directory.
+ * @param roundAsks The asks for a round in the run's directory.
+ * @param spendOf What a task's sessions cost, by its id, or undefined for a task nobody read.
  * @param askAt Where an ask's file is, for the command that takes it back.
  * @param standings Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.store.ts): an
  *   ending whose result git already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
@@ -105,6 +117,7 @@ export type AskName = { of: 'try' | 'round' | 'base'; step: string; n: number };
  *   what the record and the engine say holds it.
  * @param command The command its fixes name, when it is more than `nemia <verb> <id>`: a prune's, with the flags it was given
  * (`pruneAgain`).
+ * @param checkKillOf What the kernel's OOM killer did to a step's current check, by the step's name, or undefined where it killed nothing.
  */
 export function forgetRefusal(
   steps: readonly StepSpec[] | undefined,
@@ -461,6 +474,10 @@ const FIXES = [cancelFix, unheardFix, unlandedFix, strandedFix, holdersFix];
 /**
  * Why `nemia <verb>` touches nothing of the run `id`: its place did not read what the run left in `repo` — it refused, in its words, or
  * was not heard. Never read as nothing left to remove. Pure.
+ * @param verb The command the person typed, `rm` or `prune`.
+ * @param id The run's id.
+ * @param repo The repository the place was asked to read.
+ * @param outcome The place's refusal in its words, or why it was not heard.
  */
 export function inventoryUnread(
   verb: 'rm' | 'prune',
@@ -481,6 +498,10 @@ export function inventoryUnread(
  * every step after the first in a line of work inherits its directory — or, where the record puts none, its directory's name: the step a
  * fork or a merge was cut for, and `run` for the run's own line of work, which is named for the run and not for whichever step cut it
  * (`cutName`). A worktree a pass cut and died before filing is the case the fallback is for, and the commit is made either way.
+ * @param run The run's record, whose steps name their workspaces.
+ * @param names The names of the run's steps, in the order they run.
+ * @param dir The run's own directory of worktrees.
+ * @param listed The worktrees the place's inventory lists.
  */
 export function runWorktrees(
   run: Run,
@@ -513,6 +534,7 @@ export function runWorktrees(
  * Off its branch (`onBranch` false, as a rebase, a bisect or a checkout of a commit leaves it, and a session stopped in the middle of
  * one): a hand-off there commits onto no branch, and removing it leaves that commit, and any the session made, on none; it is named by
  * its tip.
+ * @param w What the place's inventory read of the worktree.
  */
 export function heldWorktree(w: Held): { heldBy: string } | { offBranch: string } | null {
   if (w.removable === 'held') return { heldBy: w.heldBy ?? '' };
@@ -534,6 +556,10 @@ export type BranchFate = {
  * What becomes of each branch the place lists for the run (its `inventory`, which lists that run's alone). Pure. Never the run's base
  * branch, which a `--no-worktree` run worked on. Kept unless `deleteBranches`; deleted when merged into the run's base branch (`merged`),
  * or with `forceUnmerged`; otherwise kept.
+ * @param run The run's base branch.
+ * @param listed The branches the place lists for the run.
+ * @param merged Whether a branch is merged into the run's base branch.
+ * @param how Whether to delete branches, and whether unmerged ones too; neither where not given.
  */
 export function branchFates(
   run: Pick<RepositoryRun, 'branch'>,
@@ -556,6 +582,10 @@ export function branchFates(
  * beside them, for each step the record names: the files checks wrote before the runtime kept their streams. Pure. With no record
  * to name the steps, any `<id>-…-check.stderr` or `.stdout` — but none that could be another stored run's: one whose id starts with this
  * one's, or whose id this one starts with — `r-xyz-implement` is no run, and `r-xyz-implement-check.stderr` is `r-xyz`'s.
+ * @param id The run's id.
+ * @param names The names of the steps the record names, or undefined where there is no record.
+ * @param listing The files in `checks/`.
+ * @param otherIds The ids of the store's other runs; none where not given.
  */
 export function checkLogsOf(
   id: string,
@@ -638,6 +668,7 @@ export type NotForgotten = Forgot & { kind: Exclude<Forgot['kind'], 'forgotten'>
 /**
  * The line of a run `nemia rm` did not forget, which its refusal says (`forgetRefusal`): why, and what to do, and what the engine did with
  * its tasks (`engineWords`). A run forgotten is said by the client off what the api answers of it (`apps/cli`, `forgottenLine`). Pure.
+ * @param f What `nemia rm` did with the run it did not forget.
  */
 export function notForgottenLine(f: NotForgotten): string {
   const engine = f.engine ? engineWords(f.engine, { id: f.id }) : '';
@@ -684,6 +715,9 @@ function leftWord(id: string, l: Forgot['left'][number]): string {
  * Why a read or a removal of a path under the store failed, where it failed for more than the path's being gone or not empty — `codes`,
  * what the caller expects, `ENOENT` among them — in words naming the path; null for an expected one. What `nemia rm` and `nemia prune`
  * say of what they leave behind, rather than nothing. Pure.
+ * @param at The path under the store that was read or removed.
+ * @param err What the read or the removal threw.
+ * @param codes The error codes the caller expects, which say nothing.
  */
 export const leftWhy = (at: string, err: unknown, codes: readonly string[]): string | null => {
   const code = typeof err === 'object' && err !== null && 'code' in err ? String(err.code) : undefined;

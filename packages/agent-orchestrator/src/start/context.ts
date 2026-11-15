@@ -10,6 +10,10 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
  * twice, one also in `after` (whose section `--after` hands already), the run `self` itself, and one the store does not have (`exists`).
  * A run in flight is taken: what it has when the roots are filed is handed. Null when each can be.
  *
+ * @param context The runs to be handed, by id, in the order named.
+ * @param after The runs the run waits on (`--after`), by id.
+ * @param exists Whether the store has the run of that id.
+ * @param self The run itself, by id, or undefined where there is none to name.
  * @param flag How the caller names one, in its refusal: `--from` at a start, `from:` on a card.
  */
 export function contextRefusal(

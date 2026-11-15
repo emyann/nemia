@@ -16,6 +16,8 @@ export type LifecycleTransition = { state: LifecycleState; event: Event['kind'];
  * The path of task `taskId` over its journal `events`, in order: one step per entry, the state read off the fold of the journal up to
  * and with it. An empty journal is an empty path. Folds every prefix, so it costs the square of the journal's length: a reader's verb,
  * never a pass's.
+ * @param taskId The task's id.
+ * @param events The task's journal, in the order it was written.
  */
 export function pathOf(taskId: string, events: readonly Event[]): LifecycleTransition[] {
   return events.map((event, i) => ({ state: lifecycleOf(fold(taskId, events.slice(0, i + 1))), event: event.kind, at: event.at }));

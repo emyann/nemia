@@ -3,6 +3,8 @@ import { useCallback, useSyncExternalStore } from 'react';
 /**
  * Whether the media query `query` matches this window, read as an outside store: the first render already has it, and a change of the
  * window, the pointer or the person's setting renders again. `fallback` where there is no browser to ask, as when a server renders.
+ * @param query The CSS media query.
+ * @param fallback The answer where there is no browser to ask.
  */
 export function useMedia(query: string, fallback: boolean): boolean {
   const subscribe = useCallback(

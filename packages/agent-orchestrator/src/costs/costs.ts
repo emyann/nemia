@@ -37,7 +37,10 @@ export type WorkflowCosts = {
 /** The values sorted, low to high. */
 const sorted = (values: readonly number[]): number[] => [...values].sort((a, b) => a - b);
 
-/** The median of `values`: the middle one, or the mean of the two middle ones; null for none. */
+/**
+ * The median of `values`: the middle one, or the mean of the two middle ones; null for none.
+ * @param values The numbers to take the median of, in any order: costs in USD, or counts of tries or rounds.
+ */
 export function medianOf(values: readonly number[]): number | null {
   if (!values.length) return null;
   const s = sorted(values);
@@ -48,7 +51,10 @@ export function medianOf(values: readonly number[]): number | null {
   return low === undefined ? null : (low + high) / 2;
 }
 
-/** The 90th percentile of `values`, nearest rank: the smallest value at or above nine tenths of them; null for none. */
+/**
+ * The 90th percentile of `values`, nearest rank: the smallest value at or above nine tenths of them; null for none.
+ * @param values The numbers to take the percentile of, in any order: costs in USD.
+ */
 export function p90Of(values: readonly number[]): number | null {
   const s = sorted(values);
   return s[Math.ceil(0.9 * s.length) - 1] ?? null;
@@ -81,6 +87,8 @@ function stepCostOf(step: string, runs: PerRun): StepCost[] {
 /**
  * What the newest finished runs of `of`'s workflow in `of`'s factory cost (`WorkflowCosts`), off a store's facts, its runs newest first:
  * the first `RECENT_RUNS` finished runs with `of`'s factory and workflow, and never `of`'s own run; the tries of no such run are left out.
+ * @param facts The store's facts: every try, and every run newest first.
+ * @param of The run asking: its factory and workflow choose the runs read, and its own run is left out.
  */
 export function costsOf(facts: { tries: readonly TryFact[]; runs: readonly RunFact[] }, of: RunKeys): WorkflowCosts {
   const window = facts.runs.filter((r) => r.factory === of.factory && r.workflow === of.workflow && r.run !== of.run).slice(0, RECENT_RUNS);

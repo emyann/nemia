@@ -20,7 +20,10 @@ import { Invalid } from '../refusal/refusal.ts';
 /** The file, in the store's root (`$WF_ROOT`). */
 export const A2A_AGENTS_FILE = 'a2a-agents.json';
 
-/** Where the file is, in the store at `home`. */
+/**
+ * Where the file is, in the store at `home`.
+ * @param home The store's home folder.
+ */
 export const remoteAgentsFile = (home: string): string => path.join(home, A2A_AGENTS_FILE);
 
 /** One agent as the file gives it: the runtime's `RemoteAgent`, whose keys the runtime judges (`remoteConfigRefusal`). */
@@ -36,6 +39,8 @@ const envWord = (word: string): string => word.toUpperCase().replace(/[^A-Z0-9]/
  * The environment variable that holds the secret for the scheme `scheme` of the agent the file declares as `name`:
  * `WF_A2A_<NAME>_<SCHEME>`, each upper case with anything but a letter or a digit made `_` — `reviewer`'s `bearer` is
  * `WF_A2A_REVIEWER_BEARER`. The scheme is the name the agent's card gives it.
+ * @param name The agent's name, as the file declares it.
+ * @param scheme The security scheme's name, as the agent's card gives it.
  */
 export const envNameOf = (name: string, scheme: string): string => `WF_A2A_${envWord(name)}_${envWord(scheme)}`;
 
@@ -48,6 +53,7 @@ function refuse(file: string, why: string): never {
  * The agents the file at `file` declares, or none when there is no file. Refused, naming the file and the fix: text that is not JSON, JSON
  * that is not an object of objects, a name that is not lowercase words joined by dashes (`REMOTE_NAME`), and two names whose variables can
  * meet (`meetingOf`). What each entry holds is the runtime's to judge, once the client has it (`readRemote` in runtime-client.ts).
+ * @param file The path of the file.
  */
 export function readRemoteAgents(file: string): RemoteAgents {
   let text: string;

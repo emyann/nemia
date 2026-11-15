@@ -287,20 +287,30 @@ export type EngineIo = IoCounts & { observed: Record<string, ObserveCount> };
 /**
  * The session an attempt ended as, as its harness named it then (the `ended` entry's `sessionId`, the sighting's): what an
  * observe would have listed it by. Undefined for an attempt no harness ever named, whose end says so in parentheses.
+ * @param events The task's journal.
+ * @param attempt The number of the attempt.
  */
 export const handleOf = (events: readonly Event[], attempt: number): string | undefined => {
   const end = [...events].reverse().find((e) => e.kind === 'ended' && e.attempt === attempt);
   return end?.kind === 'ended' && !['(never seen)', '(never started)'].includes(end.sessionId) ? end.sessionId : undefined;
 };
 
+/**
+ * A harness given as a spec: an object that names its `command`.
+ * @param h The harness as configured.
+ */
 export const isSpec = (h: HarnessConfig): h is HarnessSpec => typeof h === 'object' && 'command' in h;
-/** A remote A2A agent: an object that is neither a spec (`command`) nor a runner (`spawn`). */
+/**
+ * A remote A2A agent: an object that is neither a spec (`command`) nor a runner (`spawn`).
+ * @param h The harness as configured.
+ */
 export const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'object' && h !== null && !('command' in h) && !('spawn' in h);
 
 /**
  * What the harness `h` declares it can do: Claude Code's declaration for the literal `'claude'`, a spec's own `can` (with its range of
  * windows), a remote agent's (`REMOTE_DECLARATION`, which takes no task's config of ours) — and `undefined` for a `RunnerOps` brought as
  * its own, the consumer's, which is asked nothing. Every check of what a harness takes reads this, never the harness's kind or name.
+ * @param h The harness as configured.
  */
 export const declarationOf = (h: HarnessConfig): HarnessDeclaration | undefined =>
   h === 'claude'
@@ -333,6 +343,8 @@ type RunnersGiven = {
 /**
  * Each configured harness as the seam's value, by name: composed into one `Runner`, and asked directly for a task's logs. With
  * `telemetry`, each spawn is told where to export (`telemetered`).
+ * @param harnesses The engine's harnesses, each by its name.
+ * @param given What every runner is made with: the store's root, the credentials, the telemetry and where programs are found.
  */
 export const runnersOf = (harnesses: Record<string, HarnessConfig>, given: RunnersGiven): Record<string, RunnerOps> =>
   Object.fromEntries(
@@ -375,6 +387,7 @@ const claudeOf = ({ root, attached, claudeExecutable, harnessBin, cgroupParent }
  * the files both engines share — a remote agent's are the other party's, a detached one's and a command's are on the store. One rule,
  * read by what a holder serves (`servingOf` in `engine.ts`), by what `holder` may name (`holdersRefusalOf`), and by a layer above that
  * configures a viewer off the runtime's door: a copy of it elsewhere drifts the day the rule changes.
+ * @param harnesses The engine's harnesses, each by its name.
  */
 export const heldHarnessesOf = (harnesses: Record<string, HarnessConfig>): string[] =>
   Object.entries(harnesses)
@@ -507,6 +520,7 @@ const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefi
  * cannot be read, or that carries a boolean `can` replaced (`specRefusalOf`); a remote agent's entry `remoteConfigRefusal` refuses, its
  * `pool` aside; a `holder` entry `holderRefusal` refuses; an `unschedulable`, a `credentials` or a `missingCredential` that is not a
  * function; and a `telemetry` that names no collector.
+ * @param options The engine's options as handed in, its `root` aside.
  */
 export const optionsRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefined => {
   if (Object.hasOwn(options, 'sayTimeoutMs')) {
@@ -554,6 +568,8 @@ const machineOf = (options: EngineOptions): AdmissionRule['machine'] => {
  * no harness counts in `default` — and the defaults a task with no resources of its own runs under (`defaultsOf`): `defaultLimits`
  * and `defaultRequests`, for a harness of `harnesses` that runs a process here, never a remote agent's, whose process the other
  * party's and no cgroup of ours holds.
+ * @param options The engine's options.
+ * @param harnesses The engine's harnesses, each by its name.
  */
 export const admissionOf = (options: EngineOptions, harnesses: Record<string, HarnessConfig>) => {
   const machine = machineOf(options);
@@ -584,7 +600,10 @@ export const admissionOf = (options: EngineOptions, harnesses: Record<string, Ha
   });
 };
 
-/** Why a record is no record of remote servers to read the state of, as a sentence that says what to do, or `undefined`. */
+/**
+ * Why a record is no record of remote servers to read the state of, as a sentence that says what to do, or `undefined`.
+ * @param servers What `mcpState` was handed: the remote servers, by name.
+ */
 export const mcpStateRefusal = (servers: unknown): string | undefined => {
   if (typeof servers !== 'object' || servers === null || Array.isArray(servers)) {
     return `takes a map of remote MCP servers by name, as a record holds them; it was handed ${JSON.stringify(servers)}. Give { "<name>": { "type": "http", "url": "https://..." } }.`;

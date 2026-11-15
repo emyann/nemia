@@ -9,6 +9,7 @@ export type { Viewer } from '../../contracts/artifact-viewer.contract.ts';
 /**
  * The viewer of `file`: a picture for an image; for text, markdown for `.md` and `.markdown`, JSON for `.json`, and text for any other;
  * none for a file the api does not serve or serves as no kind the board draws.
+ * @param file The file: the kind the api serves it as and its name's extension.
  */
 export const viewerOf: ViewerOf = (file) => {
   if (file.kind === 'image') return 'picture';
@@ -20,6 +21,7 @@ export const viewerOf: ViewerOf = (file) => {
 /**
  * The extension of a file's name or path, lower case and without its dot: what follows the last dot of its last segment, '' where it
  * has none, or where its only dot starts it (`.env`).
+ * @param name The file's name or path.
  */
 export function extensionOf(name: string): string {
   const base = name.slice(name.lastIndexOf('/') + 1);

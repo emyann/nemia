@@ -135,6 +135,8 @@ export class QuotaRefused extends Schema.TaggedError<QuotaRefused>()('QuotaRefus
 /**
  * Why a transcript read refuses the attempt it names, or `undefined` where it names none or one the task has: `attempt` a whole number
  * among `attempts`' `n`.
+ * @param attempts The task's attempts, each by its number `n`.
+ * @param attempt The attempt the read names, or undefined where it names none (the latest).
  */
 export const attemptRefusal = (attempts: readonly { readonly n: number }[], attempt: unknown): string | undefined => {
   if (attempt === undefined || attempts.some((a) => a.n === attempt)) return undefined;
@@ -165,7 +167,10 @@ const attemptAsked = <A extends { readonly n: number }>(attempts: readonly A[], 
   return Effect.succeed(attempt === undefined ? attempts.at(-1) : attempts.find((a) => a.n === attempt));
 };
 
-/** Why `list` refuses what it was handed, or `undefined` for nothing or one list of task ids. */
+/**
+ * Why `list` refuses what it was handed, or `undefined` for nothing or one list of task ids.
+ * @param args Every argument `list` was handed.
+ */
 export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
   const [taskIds] = args;
   return args.length > 1 || (taskIds !== undefined && (!Array.isArray(taskIds) || !taskIds.every((id) => typeof id === 'string')))
@@ -659,6 +664,9 @@ const logsOf = <E, R>(view: Effect.Effect<TaskView, E, R>, harnessOf: (state: St
 /**
  * Why `quota` refuses the harness `name` of those `declared`, by the reason `verbHarnessOf` gives: a name this engine does not have,
  * naming the ones it has; or one that does not declare `quota`, or none that does, naming the ones that do.
+ * @param reason Why `verbHarnessOf` found no harness: a name unknown, or none that declares `quota`.
+ * @param name The name of the harness asked.
+ * @param declared The engine's harnesses, each with what it declares.
  */
 export const quotaRefusalOf = (reason: VerbRefusal, name: string, declared: readonly HarnessDeclared[]): string => {
   if (reason === 'unknown')

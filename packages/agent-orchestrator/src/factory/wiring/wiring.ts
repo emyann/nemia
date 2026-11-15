@@ -45,7 +45,11 @@ const DONE = { attach: 'attached', detach: 'detached', schedule: 'scheduled', un
 const invalid = (message: string): WiringRefused => ({ kind: 'Invalid', message });
 const missing = (message: string): WiringRefused => ({ kind: 'Missing', message });
 
-/** Why `factory` cannot take `change`, or null where it can, each in the words its verb has always said. */
+/**
+ * Why `factory` cannot take `change`, or null where it can, each in the words its verb has always said.
+ * @param factory The factory as it is: its name, workflows, hires, schedules and cost lines.
+ * @param change The change the person's verb asks: attach, detach, hire, fire, schedule or unschedule, and what it names.
+ */
 export const wiringRefusal: WiringRefusal = (factory, change) => {
   if (change.verb === 'hire') return hireRefused(factory, change.step, change.agent);
   if (change.verb === 'fire')
@@ -92,6 +96,8 @@ function detachRefusal(factory: Parameters<WiringRefusal>[0], workflow: string):
 /**
  * A factory's workflows' repositories (`workflowRepos`) after `change`: an attach that names a repository wires the workflow to it, a
  * detach takes the workflow's off, and any other change keeps them; none where none is left.
+ * @param wired Each workflow's repository by its name, or undefined where none is wired.
+ * @param change The change the person's verb asks: attach, detach, hire, fire, schedule or unschedule, and what it names.
  */
 export const reposRewired: ReposRewired = (wired, change) => {
   if (change.verb !== 'detach' && (change.verb !== 'attach' || change.repo === undefined)) return wired;
@@ -106,6 +112,8 @@ export const reposRewired: ReposRewired = (wired, change) => {
  * `factory` after `change`, which `wiringRefusal` accepted: its workflows kept sorted and each named once, an attach that names a
  * repository wiring the workflow to it, a detach taking its repository off, a hire replacing the step's earlier one, a schedule the
  * workflow's earlier one; everything else as it was.
+ * @param factory The factory as it is.
+ * @param change The change the person's verb asks: attach, detach, hire, fire, schedule or unschedule, and what it names.
  */
 export const rewired: Rewired = (factory, change) => {
   if (change.verb === 'attach' && change.repo !== undefined)

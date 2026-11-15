@@ -48,7 +48,10 @@ export type McpCli = (args: readonly string[], how: { readonly cwd: string; read
 /** How long one `claude mcp` child may take before it is killed and its ask failed. */
 const CLI_MS = 60_000;
 
-/** The real CLI: `executable` spawned with no shell, its output gathered, killed at `CLI_MS`. */
+/**
+ * The real CLI: `executable` spawned with no shell, its output gathered, killed at `CLI_MS`.
+ * @param executable The path of the CLI's program.
+ */
 export const claudeCli =
   (executable: string): McpCli =>
   (args, { cwd, env }) =>
@@ -70,6 +73,9 @@ export const claudeCli =
  *    resolves it from the file `sdkFrom` (this one, unless a test plants another tree): a checkout's, never a release's;
  * 4. `claude` on PATH (`programOnPath`), last, so a checkout never silently runs a person's own Claude Code over the pinned one.
  * `undefined` where none is there: each caller says what that means.
+ * @param executable The program named by the engine or the caller, or undefined (or empty) to look further.
+ * @param harnessBin The folder the engine keeps harness programs in, or undefined to skip it.
+ * @param sdkFrom The file the bundled program is resolved from, this module unless a test plants another tree.
  */
 export const claudeExecutableOf = (
   executable: string | undefined,
@@ -97,6 +103,9 @@ const withoutSecret = (text: string, secret: string): string => (secret ? text.s
  * before the other options, never last: `--header` takes many values, and would read the name as one more header (measured). With
  * `secret` false, `--client-secret` is left out: the add a sign-out makes stores no secret.
  * Exported only for the tests that import it.
+ * @param name The name the server is added under.
+ * @param server The remote server, its URL, headers and OAuth app.
+ * @param secret Whether `--client-secret` is given; false for the add a sign-out makes.
  */
 export const mcpAddArgs = (name: string, server: RemoteMcpServer, secret = true): string[] => {
   const s = mcpServerOf(server);
@@ -120,6 +129,11 @@ export const mcpAddArgs = (name: string, server: RemoteMcpServer, secret = true)
  * `claude mcp remove --scope local` first (an earlier add under the name is refused by the CLI, and its exit is no failure), then
  * `claude mcp add --scope local … --client-secret` with the secret in `MCP_CLIENT_SECRET` alone. Answers why it failed, with the
  * secret taken out of the CLI's words, or `undefined`.
+ * @param cli Runs the CLI with an argv, in a folder, with an environment.
+ * @param name The name the server is added under.
+ * @param server The remote server, whose OAuth app the secret is of.
+ * @param secret The OAuth app's client secret.
+ * @param cwd The folder the CLI runs in, whose local scope the server is added to.
  */
 export const storeClientSecret = async (
   cli: McpCli,
@@ -140,6 +154,10 @@ export const storeClientSecret = async (
  * then `claude mcp remove --scope local <name>`, which deletes the token and any secret under its key (measured). The add comes first
  * because a remove finds the key only through a server added under the name, and a sign-in handed no secret added none; where one is
  * already added the CLI refuses the second add, which is no failure. Answers why the remove failed, or `undefined`.
+ * @param cli Runs the CLI with an argv, in a folder, with an environment.
+ * @param name The name the server was added under.
+ * @param server The remote server, added again first so that the remove finds its key.
+ * @param cwd The folder the sign-in added it in, whose local scope it is cleared from.
  */
 export const clearSignIn = async (cli: McpCli, name: string, server: RemoteMcpServer, cwd: string): Promise<string | undefined> => {
   const env = withoutTelemetry(process.env);
@@ -193,6 +211,8 @@ type Authenticating = {
  * The real ask: one `query()` configured as a state read's (`claudeMcpStatus`: the server inline and nothing else, no setting source,
  * no turn ever begun), `mcpAuthenticate` asked for the address, then `mcpServerStatus()` (`sdk.d.ts`) read every `SIGN_IN_POLL_MS`
  * until the server reads `connected` or `failed`, or the session is ended. The Claude Code child listens on the callback port itself.
+ * @param name The name the server is handed under.
+ * @param server The remote server to sign in to.
  */
 export const claudeMcpSignIn: McpSignInAsk = async (name, server, { cwd, executable, redirectUri }) => {
   const abort = new AbortController();

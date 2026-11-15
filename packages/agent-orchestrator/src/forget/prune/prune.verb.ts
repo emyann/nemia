@@ -35,6 +35,9 @@ import { StoreRoot } from '../../config/root.store.ts';
  * named at `open` is not there (`stagedHere`), or, for a record that names none, where no such ending is filed and not landed; else as its
  * place's `status` reads it (`checkoutStatus`), through `memo`. Refuses (`Conflict`) a checkout the place did not read, in its words:
  * nothing is removed on a guess.
+ * @param run The run whose checkout is asked of.
+ * @param steps Its workflow's steps, or undefined where its workflow does not read.
+ * @param memo The place's answers already read, so one checkout is asked once.
  */
 export function merging(run: Run, steps: readonly StepSpec[] | undefined, memo: StatusMemo): MergeState['merging'] {
   if (!readsCheckout(run, steps)) return 'none';
@@ -227,7 +230,10 @@ function nothingLeft(run: RepositoryRun, artifacts: boolean): Pruning {
 const forgetGone = ({ run, place, within }: Left): Effect.Effect<void> =>
   place.place.ask('remove', { repo: run.repo, workspaces: [], branches: [] }).pipe(Effect.andThen(Effect.sync(() => dropEmpty(within))));
 
-/** What a removal left behind and why (`leftWhy`), said on stderr; nothing for none. */
+/**
+ * What a removal left behind and why (`leftWhy`), said on stderr; nothing for none.
+ * @param why Why a removal left something behind, or null where it left nothing.
+ */
 export const sayLeft = (why: string | null): void => {
   if (why !== null) process.stderr.write(`${why}\n`);
 };
@@ -235,6 +241,7 @@ export const sayLeft = (why: string | null): void => {
 /**
  * Remove the folder `within` when nothing is in it; one that holds anything, or is gone, is left as it is, and one that cannot be removed
  * for another reason is left too, its reason said on stderr (`leftWhy`).
+ * @param within The folder to remove.
  */
 export function dropEmpty(within: string): void {
   try {
@@ -591,6 +598,7 @@ export const freeingMany = Effect.fn('prune.freeingMany')(function* (
 /**
  * A path as git names a worktree: every link on the way followed, as far as the path exists, and the rest as written. A store under a
  * link — a home directory on another disk, or macOS's `/var` in `/private/var` — would otherwise hold no worktree git lists.
+ * @param p The path, absolute or relative to the working folder.
  */
 export function resolved(p: string): string {
   try {

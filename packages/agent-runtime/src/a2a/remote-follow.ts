@@ -60,7 +60,10 @@ export type FollowDeps = {
   readEveryMs: number;
 };
 
-/** The paces of a follow: each one given, or its default (`QUIET_MS`, `RESUBSCRIBE_MS`, `READ_EVERY_MS`). */
+/**
+ * The paces of a follow: each one given, or its default (`QUIET_MS`, `RESUBSCRIBE_MS`, `READ_EVERY_MS`).
+ * @param o The paces given, each absent one taken at its default.
+ */
 export const pacesOf = (o: Partial<Pick<FollowDeps, 'quietMs' | 'resubscribeMs' | 'readEveryMs'>>) => ({
   quietMs: o.quietMs ?? QUIET_MS,
   resubscribeMs: o.resubscribeMs ?? RESUBSCRIBE_MS,
@@ -79,6 +82,8 @@ const inDoubt = (d: FollowDeps, name: string) =>
 /**
  * `answers` whose `return` aborts `stop` before it asks the stream to end: an async generator's `return` waits behind the `next`
  * still pending, which a silent subscription never settles until its request is aborted.
+ * @param answers The subscription's answers.
+ * @param stop The controller of the subscription's request, aborted as the stream is asked to end.
  */
 export const abortedOnReturn = (answers: AsyncIterable<StreamResponse>, stop: AbortController): AsyncIterable<StreamResponse> => ({
   [Symbol.asyncIterator]: () => {
@@ -244,6 +249,7 @@ const answered = (d: FollowDeps, name: string): Effect.Effect<Entry | undefined,
  * streams and read every `readEveryMs` where it does not. Refused, in this order, where no session goes by the name, where the
  * agent's card cannot be read, and where the send is in doubt, at once or once it falls into it. A session that has ended gives its
  * state alone; one still being sent is `submitted` until the agent answers, then given its answer (`followAnswered`).
+ * @param d What the follow needs of the remote harness: its name, its entries, its connection and its paces.
  */
 export const remoteFollowOf =
   (d: FollowDeps) =>
@@ -288,6 +294,7 @@ const transcriptOfEntry = async (
 /**
  * The remote harness's `transcript`: the conversation of the session `sessionId` from `after` on (`transcriptOfTask`). A reply is
  * one event, the agent's words; a session with no Task — sent, refused or in doubt — and a Task the agent no longer has say nothing.
+ * @param d What the read needs of the remote harness: its entries by session id and its connection.
  */
 export const remoteTranscriptOf =
   (d: FollowDeps) =>
@@ -296,7 +303,10 @@ export const remoteTranscriptOf =
     return transcriptOfEntry(d, e, e ? e.taskId : sessionId, after);
   };
 
-/** The remote harness's `transcriptOf`: `remoteTranscriptOf`'s read of the session `name`; `null` when no session goes by it. */
+/**
+ * The remote harness's `transcriptOf`: `remoteTranscriptOf`'s read of the session `name`; `null` when no session goes by it.
+ * @param d What the read needs of the remote harness: its entries by name and its connection.
+ */
 export const remoteTranscriptByName =
   (d: FollowDeps) =>
   async (name: string, after?: TranscriptCursor): Promise<Transcript | null> => {

@@ -34,6 +34,11 @@ type OnBranch = (rel: string) => 'file' | 'directory' | 'absent' | { readonly un
  * on disk: present when it is a file inside the directory once every link on the way is followed, so a link that leads out is as missing
  * as where it leads. Any other absolute path, and a path that climbs out of the workspace as written, are reported without being looked
  * at (`artifactPlace`), as is a path through a folder a harness reads as its own configuration, which is never collected.
+ * @param home The store's root.
+ * @param place The run's place, asked what is at a path on the step's branch.
+ * @param run The run.
+ * @param stepName The step's name.
+ * @param closeout The step's closeout, or the error it read with; undefined where it has none, and nothing is missing.
  */
 export function missingArtifacts(
   home: string,
@@ -77,6 +82,10 @@ function placedWhy(file: string, dir: string): 'outside' | 'escapes' | 'configur
  * root is had where its copy is in the step's files directory or its file is in the workspace, whatever became of the copy, and is not
  * judged where the record names no workspace or the workspace is not on disk. In a workspace that is there, a path with nothing at it is
  * `not there`, a directory is `directory`, and a link that leads out is `escapes`.
+ * @param home The store's root.
+ * @param run The run.
+ * @param stepName The step's name.
+ * @param closeout The step's closeout; undefined where it has none, and nothing lacks.
  */
 export function filesLacked(home: string, run: Run, stepName: string, closeout: Closeout | undefined): LackedFile[] {
   if (!closeout) return [];
@@ -104,6 +113,10 @@ function workspaceLacks(workspace: string | undefined, rel: string, dir: string)
  * (`handedCloseout`), with each file it named that is there now (`filesHanded`): what the steps after it read there. The tick's alone,
  * on the pass that hands the step off, after it collected what the closeout named, so it holds the current try's closeout. A link a step
  * left at that name is taken away first, and never written through. Answers a note when the write failed; it never throws.
+ * @param home The store's root.
+ * @param run The run.
+ * @param step The step.
+ * @param said Its closeout; undefined where it has none, and nothing is written.
  */
 export function handCloseout(home: string, run: Run, step: StepSpec, said: Closeout | undefined): string[] {
   if (!said) return [];
@@ -119,7 +132,12 @@ export function handCloseout(home: string, run: Run, step: StepSpec, said: Close
   }
 }
 
-/** Whether step `stepName`'s files directory holds the closeout the tick writes there (`handCloseout`): a file, never a link. */
+/**
+ * Whether step `stepName`'s files directory holds the closeout the tick writes there (`handCloseout`): a file, never a link.
+ * @param home The store's root.
+ * @param run The run, by its id.
+ * @param stepName The step's name.
+ */
 export const holdsCloseout = (home: string, run: Pick<Run, 'id'>, stepName: string): boolean =>
   lstatOf(path.join(artifactsDir(home, run, stepName), HANDED_CLOSEOUT))?.isFile() ?? false;
 
@@ -127,6 +145,10 @@ export const holdsCloseout = (home: string, run: Pick<Run, 'id'>, stepName: stri
  * Which of the files a step's closeout named are in its files directory now, each by its absolute path there, and how many are not: what
  * the brief of a step filed after it lists (`mountsLine`), so it is handed no name with no file behind it. A path from the workspace
  * root is looked for where the run collected it.
+ * @param home The store's root.
+ * @param run The run, by its id.
+ * @param stepName The step's name.
+ * @param closeout The step's closeout; undefined where it has none, and it handed nothing.
  */
 export function filesHanded(home: string, run: Pick<Run, 'id'>, stepName: string, closeout: Closeout | undefined): HandedFiles {
   const dir = artifactsDir(home, run, stepName);
@@ -219,6 +241,10 @@ function inWorkspace(
  * (`artifactPlace`), a link that leads out of it (not followed), a directory, a file that is not there, and a copy that fails. Nothing
  * is written through a link in the files directory, which a step may have made. It never throws, as a hand-off does not. The pass's note
  * names what was copied.
+ * @param home The store's root.
+ * @param run The run, whose record names the step's workspace.
+ * @param stepName The step's name.
+ * @param closeout The step's closeout; undefined where it has none, and nothing is copied.
  */
 export function collectArtifacts(home: string, run: Run, stepName: string, closeout: Closeout | undefined): string[] {
   const workspace = run.steps[stepName]?.workspace;
@@ -284,6 +310,9 @@ function isFileIn(file: string, dir: string): boolean {
  * the step's closeout. Regular files only, and no link is followed, so nothing outside the directory is
  * listed because something inside it points there. Not the closeout the run wrote there (`HANDED_CLOSEOUT`), which is no file the step
  * handed over.
+ * @param home The store's root.
+ * @param run The run, by its id.
+ * @param stepName The step's name.
  */
 export function artifactFiles(home: string, run: Pick<Run, 'id'>, stepName: string): ArtifactFile[] {
   const found: ArtifactFile[] = [];
@@ -321,6 +350,11 @@ export const LANDED_PICTURES = 'e2e-pictures.txt';
  * `e2e-pictures.txt`, says what was removed and where what the check said is kept — written before anything is removed, and left as it is
  * on a later pass, so a pass that dies halfway, or a picture that cannot be removed, leaves the whole list and the next pass that lands
  * removes the rest. Nothing to remove writes nothing.
+ * @param home The store's root.
+ * @param run The run, by its id.
+ * @param stepName The ending step's name.
+ * @param closeout The ending's closeout, whose files are kept; undefined where it has none.
+ * @param said What landed: the commit, and the task of the check, whose logs the note names where it is given.
  */
 export function dropLandedPictures(
   home: string,
@@ -381,12 +415,17 @@ function landedPicturesNote(
   ].join('\n');
 }
 
-/** Whether `name` names a file directly in a folder: a name with a separator of either kind, `..` or a NUL is a path, and names none. */
+/**
+ * Whether `name` names a file directly in a folder: a name with a separator of either kind, `..` or a NUL is a path, and names none.
+ * @param name The name asked for.
+ */
 export const isFileName = (name: string): boolean => Boolean(name) && !/[/\\\0]/.test(name) && !name.includes('..');
 
 /**
  * The bytes of the regular file `name` directly in `dir`, or null where there is none: a name that is a path (`isFileName`), a file not
  * there, a folder, or a link, which is opened without being followed, so what is read is what was looked at.
+ * @param dir The folder.
+ * @param name The file's name in it.
  */
 export function fileIn(dir: string, name: string): Buffer | null {
   if (!isFileName(name)) return null;
@@ -403,6 +442,12 @@ export function fileIn(dir: string, name: string): Buffer | null {
   }
 }
 
-/** The file `name` of the files directory of `step` in `run` (`artifactsDir`), read as `fileIn` reads it. */
+/**
+ * The file `name` of the files directory of `step` in `run` (`artifactsDir`), read as `fileIn` reads it.
+ * @param home The store's root.
+ * @param run The run, by its id.
+ * @param step The step's name.
+ * @param name The file's name in its files directory.
+ */
 export const artifactFile = (home: string, run: Pick<Run, 'id'>, step: string, name: string): Buffer | null =>
   fileIn(artifactsDir(home, run, step), name);

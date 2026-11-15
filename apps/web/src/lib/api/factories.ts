@@ -115,6 +115,9 @@ const scheduleViewOf = (schedule: Schedule, unschedule: string): FactorySchedule
 /**
  * The view of `factory` the pages draw, from the object, the lines a person types for it (`commands`) and its schedules: a key the
  * object leaves out is the view's null, a volume's line that takes it back is the one `commands` keeps under its name.
+ * @param factory The Factory object as the api serves it.
+ * @param commands The lines a person types for it, a schedule's and a volume's line that takes it back by name among them.
+ * @param scheduled Its schedules; none for the default factory, which keeps none.
  */
 export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands, scheduled: readonly Schedule[] = []): Factory => {
   const { spec, status } = factory;
@@ -165,20 +168,31 @@ export const factoriesQuery = queryOptions({
   queryFn: async (): Promise<Factory[]> => Promise.all((await factories.listAll()).items.map(viewRead)),
 });
 
-/** The rules of the factory `name`, read from its file on each request. */
+/**
+ * The rules of the factory `name`, read from its file on each request.
+ * @param name The factory's name.
+ */
 export const factoryRulesQuery = (name: string) =>
   queryOptions({ queryKey: ['factory-rules', name], queryFn: () => factories.rules(name) });
 
 /**
  * Write `words` as the rules of the factory `name`: the rules as they then read. Rejects with a `WriteRefusal` in the package's words: no
  * such factory (404), the default factory (409), blank words or words that open with a frontmatter block (422).
+ * @param name The factory's name.
+ * @param words The rules to write.
  */
 export const writeRules = (name: string, words: string): Promise<FactoryRules> => factories.putRules(name, words);
 
-/** Remove the rules of the factory `name`: the rules as they then read, none. */
+/**
+ * Remove the rules of the factory `name`: the rules as they then read, none.
+ * @param name The factory's name.
+ */
 export const clearRules = (name: string): Promise<FactoryRules> => factories.deleteRules(name);
 
-/** The instruction of the factory `name`, read where its file says it is kept, on each request. */
+/**
+ * The instruction of the factory `name`, read where its file says it is kept, on each request.
+ * @param name The factory's name.
+ */
 export const factoryInstructionQuery = (name: string) =>
   queryOptions({ queryKey: ['factory-instruction', name], queryFn: () => factories.instruction(name) });
 
@@ -188,26 +202,39 @@ type InstructionPlace = FactoryInstructionWrite;
 /**
  * Keep the instruction of the factory `name` at `place`: the instruction as it then reads. Rejects with a `WriteRefusal` in the package's
  * words: no such factory (404), the default factory (409), a path that is not a file inside the folder (422).
+ * @param name The factory's name.
+ * @param place Where the instruction is to be kept: a file in its first folder, by its path from it, or the store.
  */
 export const placeInstruction = (name: string, place: InstructionPlace): Promise<FactoryInstruction> =>
   factories.putInstruction(name, place);
 
-/** Read the instruction of the factory `name` from `NEMIA.md` in its first folder again: the instruction as it then reads. */
+/**
+ * Read the instruction of the factory `name` from `NEMIA.md` in its first folder again: the instruction as it then reads.
+ * @param name The factory's name.
+ */
 export const resetInstructionPlace = (name: string): Promise<FactoryInstruction> => factories.deleteInstruction(name);
 
 /**
  * Write `words` as the instruction the store keeps for the factory `name`: the instruction as it then reads. Rejects with a `WriteRefusal`
  * in the package's words: an instruction read from the factory's folder (409), blank words (422).
+ * @param name The factory's name.
+ * @param words The instruction to keep.
  */
 export const writeInstruction = (name: string, words: string): Promise<FactoryInstruction> => factories.putInstructionWords(name, words);
 
-/** Remove the instruction the store keeps for the factory `name`: the instruction as it then reads. */
+/**
+ * Remove the instruction the store keeps for the factory `name`: the instruction as it then reads.
+ * @param name The factory's name.
+ */
 export const clearInstruction = (name: string): Promise<FactoryInstruction> => factories.deleteInstructionWords(name);
 
 /**
  * Set the cost line of `workflow` in the factory `name` to `usd` dollars: the factory as it then reads. A run started from then on keeps
  * it, and its gates say when their caps' bound passes it. Rejects with a `WriteRefusal` in the package's words: no such factory, an
  * amount not above zero, a workflow it does not offer, the default factory.
+ * @param name The factory's name.
+ * @param workflow The workflow whose cost line is set.
+ * @param usd The cost line, in dollars.
  */
 export const setCostLine = (name: string, workflow: string, usd: number): Promise<FactoryObject> =>
   factories.putCostLine(name, workflow, usd);
@@ -215,6 +242,8 @@ export const setCostLine = (name: string, workflow: string, usd: number): Promis
 /**
  * Take the cost line of `workflow` off the factory `name`: the factory as it then reads. Rejects with a `WriteRefusal` where it sets
  * none.
+ * @param name The factory's name.
+ * @param workflow The workflow whose cost line is taken off.
  */
 export const clearCostLine = (name: string, workflow: string): Promise<FactoryObject> => factories.deleteCostLine(name, workflow);
 
@@ -228,10 +257,17 @@ const hireNamed = (step: string): string => {
  * Hire the agent `agent` into `step`, `<workflow>/<step>`, in the factory `name`: replacing the one hired there, if any, and answering
  * the Hire as it then reads. Rejects with a `WriteRefusal` in the package's words: no such factory or step (404), the default factory or
  * a name two steps join to (409), a workflow the factory does not offer (422).
+ * @param name The factory's name.
+ * @param step The step hired into, as `<workflow>/<step>`.
+ * @param agent The name of the agent hired.
  */
 export const hireAgent = (name: string, step: string, agent: string): Promise<Hire> => hires.put(name, hireNamed(step), agent);
 
-/** Fire the agent the factory `name` hires into `step`, `<workflow>/<step>`. Rejects with a `WriteRefusal` where it hires none. */
+/**
+ * Fire the agent the factory `name` hires into `step`, `<workflow>/<step>`. Rejects with a `WriteRefusal` where it hires none.
+ * @param name The factory's name.
+ * @param step The step whose hire is fired, as `<workflow>/<step>`.
+ */
 export const fireAgent = (name: string, step: string): Promise<Hire> => hires.delete(name, hireNamed(step));
 
 /**
@@ -274,6 +310,7 @@ const builtinViewOf = (server: McpServer): BuiltinServer => ({ name: server.meta
  * never on the board's minute poll — a chip may be a few minutes old, and a press is how it is refreshed. Its answer never goes stale, so
  * neither a mount after the loader's read nor a window's focus reads it again: the settings route's loader reads it once per visit
  * (`OPENED`).
+ * @param name The factory's name.
  */
 export const factoryServersQuery = (name: string) =>
   queryOptions({
@@ -290,21 +327,32 @@ export const factoryServersQuery = (name: string) =>
  * the value stored. Rejects with a `WriteRefusal` in the package's words: no such factory (404), a name that is no factory's or no
  * server's (400), and a server it refuses (422) — a local one, an `Authorization` header, a `url` that is no address, a transport the
  * harness loads nothing from, a mask sent for a header it does not store.
+ * @param name The factory's name.
+ * @param server The server's name.
+ * @param body What is recorded of it: its transport, address, headers and OAuth client.
  */
 export const recordServer = (name: string, server: string, body: McpServerWrite): Promise<McpServer> => mcpServers.put(name, server, body);
 
-/** Take the server `server` off the factory `name`'s record. Rejects as `recordServer` does, and 404 for a server it does not record. */
+/**
+ * Take the server `server` off the factory `name`'s record. Rejects as `recordServer` does, and 404 for a server it does not record.
+ * @param name The factory's name.
+ * @param server The server's name.
+ */
 export const removeServer = (name: string, server: string): Promise<McpServer> => mcpServers.delete(name, server);
 
 /**
  * Start a sign-in to the factory `name`'s server `server`: resolves with the address the person opens. Rejects with a `WriteRefusal`:
  * no such server (404), another sign-in waiting on its callback port (409), a server with no OAuth client (422).
+ * @param name The factory's name.
+ * @param server The server's name.
  */
 export const signInServer = (name: string, server: string): Promise<SignInStarted> => mcpServers.signIn(name, server);
 
 /**
  * The state of `server`'s last sign-in, from the engine's memory: it spawns nothing, so the board polls it while a sign-in waits,
  * every 2 seconds, and stops once it settles.
+ * @param name The factory's name.
+ * @param server The server's name.
  */
 export const signInStateQuery = (name: string, server: string) =>
   queryOptions({
@@ -319,9 +367,16 @@ export const signInStateQuery = (name: string, server: string) =>
  * resolves with the sign-in's state, which reads `connected` once the harness took it. Rejects with a `WriteRefusal`: no such server
  * (404), no sign-in waiting (409), an address that is not the sign-in's redirect with a code and a state (422), a body with no `url`
  * (400).
+ * @param name The factory's name.
+ * @param server The server's name.
+ * @param url The address the person's browser landed on once they approved.
  */
 export const completeSignIn = (name: string, server: string, url: string): Promise<SignInState> =>
   mcpServers.signInCallback(name, server, url);
 
-/** Sign the factory `name` out of `server`: its sign-in cleared, so its state reads needs-auth on the next read. 409 while one waits. */
+/**
+ * Sign the factory `name` out of `server`: its sign-in cleared, so its state reads needs-auth on the next read. 409 while one waits.
+ * @param name The factory's name.
+ * @param server The server's name.
+ */
 export const signOutServer = (name: string, server: string): Promise<SignedOut> => mcpServers.signOut(name, server);

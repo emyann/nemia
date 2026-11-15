@@ -38,7 +38,11 @@ const fenceRead = (keys: Record<string, unknown>): Record<string, unknown> =>
     }),
   );
 
-/** The frontmatter of a file's text as a record, and its body. */
+/**
+ * The frontmatter of a file's text as a record, and its body.
+ * @param name The name a refusal of the frontmatter calls the file by: a step's or a skill's.
+ * @param text The file's text.
+ */
 export const fileParts = (name: string, text: string): { keys: Record<string, unknown>; body: string } => {
   const { block, body } = splitFrontmatter(name, text);
   const keys: unknown = block === null ? {} : frontmatterValues(block);
@@ -81,7 +85,10 @@ const servedKeys = (keys: Readonly<Record<string, unknown>>): Record<string, unk
     }),
   );
 
-/** The spec `files`, the text files of a workflow's folder, say: its steps, its README where it has one, and its other files. */
+/**
+ * The spec `files`, the text files of a workflow's folder, say: its steps, its README where it has one, and its other files.
+ * @param files The text files directly in the workflow's folder, in any order.
+ */
 export function workflowSpecOf(files: readonly FolderText[]): WorkflowSpecRead {
   const byName = [...files].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   const readme = byName.find((f) => isReadme(f.name));

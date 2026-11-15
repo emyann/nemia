@@ -120,6 +120,7 @@ export type HarnessPrompt = (typeof HARNESS_PROMPTS)[number];
 
 /**
  * Why `name` cannot be a skill's folder, or `undefined`: what a skill is copied or written under is refused as `skills:` refuses a name.
+ * @param name The name asked for, of any type as it was sent.
  */
 export function skillNameRefusal(name: unknown): string | undefined {
   if (typeof name === 'string' && SKILL_NAME.test(name) && name.length <= 64) return undefined;
@@ -136,12 +137,17 @@ export function skillNameRefusal(name: unknown): string | undefined {
  */
 export type SkillCost = { preload: boolean; listed: number; body: number; perTurn: number };
 
-/** Tokens, about: four characters to a token, rounded up. */
+/**
+ * Tokens, about: four characters to a token, rounded up.
+ * @param text The text whose tokens are counted.
+ */
 export const tokensAbout = (text: string): number => Math.ceil(text.length / 4);
 
 /**
  * `SkillCost` of the skill `id`, from its SKILL.md's `text`: one whose frontmatter never closes is read as all body, and one whose
  * frontmatter does not read (`frontmatterOrNull`) as having no description and no preload.
+ * @param id The skill's id, its name.
+ * @param text Its SKILL.md's text.
  */
 export function skillTurnCost(id: string, text: string): SkillCost {
   let block: string | null = null;
@@ -215,6 +221,8 @@ export const CUSTOM_INSTRUCTIONS_FOLDER = 'custom-instructions';
 /**
  * Why `text`, the custom instructions of `file`, cannot be taken, or `undefined` when it can: a frontmatter block, since custom
  * instructions only add words and never set a key — a fence, a tool, a model, a mode or a skill is the agent's file's or a step's.
+ * @param file The file of the custom instructions, named in the refusal.
+ * @param text Its text.
  */
 export function customInstructionsRefusal(file: string, text: string): string | undefined {
   if (!/^\uFEFF?---[ \t]*(\r?\n|$)/.test(text)) return undefined;
@@ -273,6 +281,10 @@ function agentKeyRefusal(file: string, key: string): string | undefined {
  * empty: an agent that only sets how its steps run. `color` (`CLAUDE_CODE_IGNORED`) is read and dropped, a `skills:` line that names a
  * card file is refused (`cardRetired`), an `mcp:` line is read as the server names it lists (`serverNamesOf`), and the former
  * `systemPrompt:` line is read as `harnessPrompt:` (`harnessPromptOf`).
+ * @param name The agent's name, its file's minus `.md`.
+ * @param text The file's text.
+ * @param read Reads a file beside the agent by its name, as the result schema its `output:` names, undefined where it is not there;
+ *   absent where the agent was read from no folder.
  */
 export function parseAgent(name: string, text: string, read?: (file: string) => string | undefined): Agent {
   const file = `${AGENTS_FOLDER}/${name}.md`;
@@ -347,13 +359,19 @@ function overridableOf(file: string, written: string | undefined): { overridable
   return { overridable: [...new Set(words)] as Overridable[] };
 }
 
-/** Whether a `skills:` value is a card's file, as the line's former use named one: one `.json` file. No skill's name ends so. */
+/**
+ * Whether a `skills:` value is a card's file, as the line's former use named one: one `.json` file. No skill's name ends so.
+ * @param value The `skills:` line's value.
+ */
 export const isCardFile = (value: string): boolean => !value.includes(',') && /\.json$/i.test(value.trim());
 
 /**
  * The refusal of a card file an agent names — by `card:`, or by a `skills:` line that names one (`isCardFile`) — since an agent's card is
  * generated from its skills (`cardSkills` in `skills/read.store.ts`). Refused rather than read and dropped: a line the run
  * reads and ignores is a constraint nobody enforces, and a person editing that file would see no change on the card.
+ * @param file The agent's file, named in the refusal.
+ * @param key The line that names the card: `card`, or `skills`.
+ * @param named The card file the line names, where it is known; undefined says the file it names.
  */
 export function cardRetired(file: string, key: 'card' | 'skills', named?: string): string {
   const line = named === undefined ? `\`${key}\`` : `\`${key}: ${named}\``;
@@ -435,6 +453,7 @@ function refuseStale(file: string, draft: AgentDraft): void {
  * among the keys, where it would be written twice; a card file (`cardRetired`), which a stale page sends as `card` or as a `skills:` naming
  * one, and which is written nowhere. Each value is written trimmed, through `renderFrontmatter`: quoted where plain would read otherwise
  * (`: `, ` #`), and a value with a line break as a literal block.
+ * @param draft The agent as the person wrote it: its own lines, its role keys and its instructions.
  */
 export function renderAgent(draft: AgentDraft): string {
   const file = `${AGENTS_FOLDER}/${draft.name}.md`;
@@ -471,6 +490,9 @@ export function renderAgent(draft: AgentDraft): string {
  * The draft of the agent `name` whose file holds `text`, as `renderAgent` takes it back: read by `parseAgent`, with `read` the file a
  * result schema names beside it where it was read from a folder, so what it refuses is refused here in its words, the former
  * `systemPrompt:` read as `harnessPrompt:` and `color` dropped. Pure.
+ * @param name The agent's name.
+ * @param text Its file's text.
+ * @param read Reads a file beside the agent by its name, undefined where it is not there; absent where it was read from no folder.
  */
 export function agentDraftOf(name: string, text: string, read?: (file: string) => string | undefined): AgentDraft {
   const agent = parseAgent(name, text, read);
@@ -523,6 +545,9 @@ export type AgentCardShape = {
  * `skills` are the card's entries, generated from the skills the agent is given (`cardSkills` in `skills/read.store.ts`, which reads their
  * SKILL.md files). Refused, rather than printed hollow: an agent with no `description:`, and a card with no entry, both of which the
  * protocol marks REQUIRED.
+ * @param agent The agent the card describes.
+ * @param version The agent's version, the card's.
+ * @param skills The card's entries, generated from the skills the agent is given.
  */
 export function agentCard(agent: Agent, version: string, skills: readonly AgentSkill[]): AgentCardShape {
   const named = `${AGENTS_FOLDER}/${agent.name}.md`;
@@ -550,6 +575,7 @@ const noDescription = (name: string): string =>
 /**
  * The one card entry of an agent given no skills, made from its own description: its id and name the agent's, its tags the agent's name, as
  * a skill with no tags is tagged with its own. Refused for an agent with no `description:`, which the entry and the card both need.
+ * @param agent The agent, by its name and description.
  */
 export function ownSkill(agent: Pick<Agent, 'name' | 'description'>): AgentSkill {
   const description = agent.description?.trim();
@@ -560,6 +586,7 @@ export function ownSkill(agent: Pick<Agent, 'name' | 'description'>): AgentSkill
 /**
  * Why `name` cannot be an agent's name, or `undefined` when it can. An agent is its file, `agents/<name>.md`, and a step names it with
  * `agent: <name>`: so a name is one file's in that folder, not hidden, not the README's, and one a line of frontmatter can hold.
+ * @param name The name asked for, of any type as it was sent.
  */
 export function agentNameRefusal(name: unknown): string | undefined {
   const fix = 'Name it as its file is named, without .md — reviewer, say.';
@@ -587,7 +614,10 @@ export const PROMPT_FILE = 'prompt.md';
 /** The output style `harnessPrompt: no-coding` chooses, in the step's plugin. */
 export const NO_CODING_STYLE = 'no-coding';
 
-/** The plugin an agent's skills are served from, and so their namespace: `nemia-<agent>`. */
+/**
+ * The plugin an agent's skills are served from, and so their namespace: `nemia-<agent>`.
+ * @param agent The agent's name.
+ */
 export const pluginOf = (agent: string): string => `nemia-${agent}`;
 
 /** Whether the frozen `agent` carries words of a layer above its step's note: its instructions, custom instructions or factory's rules. */
@@ -600,6 +630,7 @@ const toldWords = (agent: StepAgent): boolean => Boolean(agent.instructions || a
  * `customInstructions`, `factoryRules`, `skills`, `harnessPrompt`; a record without them renders nothing), and which starts a
  * session of its own. A step that continues another's session keeps that session's prompt, so it is told its agent's instructions in its
  * brief (and may give no skills, nor a harness prompt: `composedRefusal`).
+ * @param step The step, from its frozen record.
  */
 export const rendersAgent = (step: StepSpec): boolean => {
   const agent = step.agent;
@@ -607,13 +638,17 @@ export const rendersAgent = (step: StepSpec): boolean => {
   return Boolean(toldWords(agent) || agent.skills?.length || (agent.harnessPrompt ?? 'keep') !== 'keep');
 };
 
-/** What a step's brief opens with: its own note alone when its agent is rendered, its agent's instructions and its note otherwise. */
+/**
+ * What a step's brief opens with: its own note alone when its agent is rendered, its agent's instructions and its note otherwise.
+ * @param step The step, from its frozen record.
+ */
 export const briefBody = (step: StepSpec): string => (rendersAgent(step) && step.agent ? step.agent.body : step.body);
 
 /**
  * The skills of a step's session by layer, from its frozen record: its agent's own, and those its `skills:` line added (`addedSkills`),
  * each in the session's order. A record frozen before the added skills were kept apart counts every skill the step's line names as the
  * step's, one its agent names too among them. A step with no agent has neither.
+ * @param step The step, from its frozen record.
  */
 export function skillLayers(step: StepSpec): { agent: string[]; added: string[] } {
   if (!step.agent) return { agent: [], added: [] };
@@ -634,6 +669,8 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
  * name its `skills:` line writes, with no plugin before it — or why it could not be read (`skills`, read again by the tick: an edit
  * made since `nemia start` reaches it). Its session is given no skill to load (`enabledSkillsOf` answers `[]` for a step it no longer
  * renders): what its skills say is in its brief, and every other skill stays hidden from it, as from a rendered step.
+ * @param step The step, from its frozen record.
+ * @param skills Each skill its `skills:` line names, read again: its SKILL.md's body, or why it cannot be read; none where absent.
  */
 export const unrendered = (step: StepSpec, skills: readonly SkillAgain[] = []): StepSpec => {
   if (!step.agent) return step;
@@ -666,6 +703,8 @@ export type RenderedSkill = { name: string; whole?: string };
  * heading of its name. Claude Code lists a plugin's skills to the session by name and description all the same; naming them here says they
  * are this agent's. A bare skill of the same name is hidden from the session (`sessionSettings`), so the name it is told is the only one it
  * sees.
+ * @param step The step, from its frozen record.
+ * @param skills The skills it is given, each by its bare name, and whole where it asks to be.
  */
 export function renderedPrompt(step: StepSpec, skills: readonly RenderedSkill[]): string {
   const agent = step.agent;
@@ -694,7 +733,10 @@ export function renderedPrompt(step: StepSpec, skills: readonly RenderedSkill[])
   );
 }
 
-/** The output style `harnessPrompt: no-coding` writes into the step's plugin: Claude Code's prompt less `# Doing tasks`. */
+/**
+ * The output style `harnessPrompt: no-coding` writes into the step's plugin: Claude Code's prompt less `# Doing tasks`.
+ * @param agent The agent's name, whose plugin the style is written into.
+ */
 export const noCodingStyle = (agent: string): string =>
   [
     '---',
@@ -708,7 +750,10 @@ export const noCodingStyle = (agent: string): string =>
     '',
   ].join('\n');
 
-/** The manifest of a step's plugin, naming its namespace on purpose. */
+/**
+ * The manifest of a step's plugin, naming its namespace on purpose.
+ * @param agent The agent's name, which the plugin is named for.
+ */
 export const pluginManifest = (agent: string): string =>
   JSON.stringify(
     { name: pluginOf(agent), version: '0.0.0', description: `The skills of the ${agent} agent, for one step of one run.` },
@@ -716,7 +761,10 @@ export const pluginManifest = (agent: string): string =>
     2,
   ) + '\n';
 
-/** Whether a rendered step is filed with its plugin (`pluginOf`): when its agent has skills, or a style in it (`no-coding`). */
+/**
+ * Whether a rendered step is filed with its plugin (`pluginOf`): when its agent has skills, or a style in it (`no-coding`).
+ * @param step The step, from its frozen record.
+ */
 export const namesPlugin = (step: StepSpec): boolean => Boolean(step.agent?.skills?.length || step.agent?.harnessPrompt === 'no-coding');
 
 /**
@@ -734,6 +782,7 @@ function sessionSettings(agent: StepAgent): string | undefined {
  * rendered (`rendersAgent`): one with no agent or no skill, one that continues another's session, and one whose rendered folder is gone
  * and is told its skills whole in its brief (`unrendered`). A session on a harness that declares no closed list (`enabledSkills`) holds
  * none, and is given the harness's own skills (`'default'`), with no list of names turned off. Pure.
+ * @param step The step, from its frozen record.
  */
 export const enabledSkillsOf = (step: StepSpec): string[] | 'default' => {
   if (declarationOf(step.harness)?.can.includes('enabledSkills') !== true) return 'default';
@@ -748,6 +797,8 @@ export const enabledSkillsOf = (step: StepSpec): string[] | 'default' => {
  * in place of Claude Code's (`replace`); the plugin, when there are skills or a style in it; and its session's settings
  * (`sessionSettings`): the style chosen (`no-coding`).
  * Undefined for a step not rendered (`rendersAgent`), which is filed with none.
+ * @param step The step, from its frozen record.
+ * @param dir Its rendered folder (`agentFilesDir`).
  */
 export function renderedFlags(
   step: StepSpec,
@@ -774,6 +825,11 @@ export type { DefinitionThere } from '../../contracts/definition-version.contrac
  * now is `Missing`; a new write over what is there a `Conflict`; a removal of a held one with no version `Invalid`; and an act given a
  * version it is no longer at a `Conflict`. A removal where none is held goes on, to the remover's own refusal. Pure, the one judgement of
  * the Agent and Skill doors' layers, and proved by `contracts/definition-version.contract.ts`.
+ * @param what What the definition is: an agent or a skill.
+ * @param name Its name.
+ * @param does The act asked: a write or a removal.
+ * @param there What is at its name now: nothing, something that is none, or one held at a version.
+ * @param given The version the writer read it at; undefined for a new write, or a removal given none.
  */
 export const definitionVersionRefusal: DefinitionVersionRefusal = (what, name, does, there, given) => {
   const named = what === 'agent' ? `${AGENTS_FOLDER}/${name}.md` : `${SKILLS_FOLDER}/${name}`;

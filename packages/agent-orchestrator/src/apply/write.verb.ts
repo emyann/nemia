@@ -42,7 +42,10 @@ import { AGENTS_FOLDER } from '../step/step.ts';
 import type { Entry } from '../factory/applied/applied.store.ts';
 import { verbOf } from '../propose/propose.verb.ts';
 
-/** A step as the object says it, as the Workflow door takes it: its keys, `output` as the file it names, and its body. */
+/**
+ * A step as the object says it, as the Workflow door takes it: its keys, `output` as the file it names, and its body.
+ * @param step The step as the Workflow object says it.
+ */
 export const stepDraftOf = (step: WorkflowStep): StepDraft => {
   const draft: Record<string, unknown> = { after: [] };
   for (const [key, value] of Object.entries(step.keys)) {
@@ -224,6 +227,10 @@ const factoryWritten = (factory: string, object: ProposedObject) =>
 /**
  * `object` written into the factory `factory`: the revision it made. Refused as the door or the verb that writes it refuses. A Workflow
  * is judged against the agents of `against`, where it is given: the tree the upgrade a resolution resolves composes.
+ * @param place Where the proposal is read and applied: the store's root.
+ * @param factory The factory's name.
+ * @param object The object the proposal names, written by its kind: a workflow, an agent, a skill, a hire, a server or the factory.
+ * @param against The tree whose agents a Workflow is judged against; absent, the factory's tree.
  */
 export const objectWritten = (
   place: ProposalPlace,

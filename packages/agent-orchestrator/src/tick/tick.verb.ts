@@ -124,6 +124,8 @@ export type Pass = {
  * is not said again, one that cleared is forgotten, so it is said again if it comes back. `said` holds the refusals of the last pass alone,
  * by task, state and event: a daemon that restarts says every refusal still standing once more, since what it printed before is on a
  * terminal that may be gone. Nothing is decided on it: this is only what has been printed, as `nemia up`'s queue and feed failures are.
+ * @param refused The moves the pass refused.
+ * @param said The refusals the last pass said, by task, state and event.
  */
 export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<string>): { lines: string[]; said: Set<string> } {
   const now = new Set<string>();

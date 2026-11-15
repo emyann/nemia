@@ -13,6 +13,8 @@ export class FollowRefused extends Schema.TaggedError<FollowRefused>()('FollowRe
  * `follow` over the engine's journal and runners: refuses, in this order, a task the journal has no record of and a harness without
  * `follow`. Then the session of the task's latest attempt, by the name the engine chose for it, followed by its harness: its state
  * first, then each moment once and in order, until it is over; `undefined` before an attempt. Observes nothing.
+ * @param read Reads a task's journal, by its id.
+ * @param harnessOf The harness that answers for a task in a given state.
  */
 export const followVerbOf = (
   read: (taskId: string) => Effect.Effect<readonly Event[], JournalError>,

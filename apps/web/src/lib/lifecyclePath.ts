@@ -16,6 +16,9 @@ export const PATH_POLL_MS = 2_000;
  * How often a path is read again, as a query's `refetchInterval`: every `PATH_POLL_MS` for the current try while its task is filed and
  * not in one of the machine's `final` states, and never for an earlier try, a step not filed, a path not read yet, or a machine whose
  * final states are not known.
+ * @param read The step's path as last read, or undefined while it is not read.
+ * @param final The machine's final states, empty where they are not known.
+ * @param current Whether the path is of the step's current try.
  */
 export function pathPoll(read: StepPath | undefined, final: readonly string[], current: boolean): number | false {
   if (!current || !read || read.taskId === null || final.length === 0) return false;
@@ -28,6 +31,7 @@ export function pathPoll(read: StepPath | undefined, final: readonly string[], c
  * and its current try's path: its task, how many attempts it has had, and its current try, by number, round, phase, reason, outcome and
  * verdict. The feed's events read the object again, and a step that moved reads them again under a key of its own; what it cost, and
  * what a person said to it, move none of it.
+ * @param step The step's status in the run object: its task, its attempts and its current try.
  */
 export const stepStamp = <S extends Pick<RunStepStatus, 'taskId' | 'attempts' | 'current'>>(step: S): string => {
   const c = step.current;
@@ -37,13 +41,20 @@ export const stepStamp = <S extends Pick<RunStepStatus, 'taskId' | 'attempts' | 
   return `${step.taskId ?? '-'}|${step.attempts.count}|${now}`;
 };
 
-/** The state lit at step `at` of `path`: the state its journal said once that entry was on it; undefined for an empty path. */
+/**
+ * The state lit at step `at` of `path`: the state its journal said once that entry was on it; undefined for an empty path.
+ * @param path The task's path, each entry a state its journal said.
+ * @param at The index of the entry on the timeline; past the end, the last.
+ */
 export const litAt = (path: readonly LifecycleTransition[], at: number): string | undefined => path[Math.min(at, path.length - 1)]?.state;
 
 /**
  * The routes of the graph the path took up to step `at`, as the drawing names them (`from->to`): each move from one state to another
  * that an edge of the graph joins, or a verb a person takes from the one to the other — a stop, an answer or a close. A step that keeps
  * its state takes no route, and neither does a move nothing joins, which the timeline shows all the same.
+ * @param path The task's path, each entry a state its journal said.
+ * @param at The index of the entry on the timeline the routes are taken up to.
+ * @param graph The machine's graph: its edges and the verbs a person takes.
  */
 export function takenRoutes(path: readonly LifecycleTransition[], at: number, graph: Pick<MachineGraph, 'edges' | 'verbs'>): string[] {
   const routes = new Set([
@@ -61,6 +72,9 @@ export function takenRoutes(path: readonly LifecycleTransition[], at: number, gr
 /**
  * The verb a person wrote that moved the path at step `i`: the one that journals the step's entry and is taken from the state before to
  * the state after. Undefined for the first step, a step that keeps its state, and a move no verb makes so.
+ * @param path The task's path, each entry a state its journal said.
+ * @param i The index of the entry asked about.
+ * @param verbs The verbs a person takes on the machine.
  */
 export function byPerson(path: readonly LifecycleTransition[], i: number, verbs: readonly MachineVerb[]): string | undefined {
   const [before, step] = [path[i - 1], path[i]];
@@ -74,6 +88,9 @@ type Box = { readonly top: number; readonly height: number };
 /**
  * Where a scrolling `view` scrolled `scrollTop` down must scroll to show `box` centred: `null` when the box already lies whole inside the
  * view, and `undefined` when the box is not laid out yet (no height), so there is nothing to scroll to.
+ * @param view The scrolling view's box on the page.
+ * @param box The box to show, on the page.
+ * @param scrollTop How far the view is scrolled down now, in pixels.
  */
 export function centredScroll(view: Box, box: Box, scrollTop: number): number | null | undefined {
   if (box.height === 0) return undefined;

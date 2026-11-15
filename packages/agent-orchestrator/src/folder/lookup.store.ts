@@ -10,6 +10,8 @@ import type { Places } from '../skills/read.store.ts';
 /**
  * Where a run on `repo` looks for its steps' agents and skills beside its folder's own (`lookupRoots`): the repository, then the store at
  * `home`.
+ * @param home The store's root folder.
+ * @param repo The repository the run is on, or undefined for a run on none.
  */
 export const placesOf = (home: string, repo: string | undefined): Places => ({ ...(repo ? { repo } : {}), home });
 
@@ -17,6 +19,7 @@ export const placesOf = (home: string, repo: string | undefined): Places => ({ .
  * The folders directly in `dir`, sorted, a link to one included. None when `dir` is not there. A hidden folder is not a
  * workflow — `.git`, where a person keeps their workflows in git, or an editor's `.vscode` — so it is not listed, and no start
  * can name it; nor is `agents/`, whose files are the agents the workflows beside it name, nor `skills/`, the skills those agents give.
+ * @param dir The folder to list.
  */
 export function foldersIn(dir: string): string[] {
   let names: string[];

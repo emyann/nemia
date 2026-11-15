@@ -85,6 +85,11 @@ const stepViewOf = (step: RunStep, lines: RunLines, tries: readonly StepTry[], t
 /**
  * The detail of a run (`RunDetail`): its view (`runViewOf`), its lines, and each step with its tries and what it was told — none and
  * nothing for a step whose sub-resources were not read — showing the try `chosen` names for it (the address's `?try=`), else its current.
+ * @param object The run's object, as the api serves it.
+ * @param lines The run's lines, as the api words them.
+ * @param tries Each step's tries, by its name; undefined for a step whose tries were not read.
+ * @param told What each step was told, by its name; null or undefined for a step with none read.
+ * @param chosen The try the address names for each step, by its name; none by default, each step showing its current.
  */
 export const runDetailOf = (
   object: Run,
@@ -191,6 +196,7 @@ const detailOf = (
  * The detail of the run `id`, and the error of its object's last read — a run gone (`readGone`) is said by the page, which keeps what it
  * last read. Its object and lines are suspense reads, which the route's loader has read (`loadRun`); each step's tries and told are read
  * under its stamp (`useStepReads`).
+ * @param id The run's id.
  */
 export function useRunView(id: string): { view: RunDetail; error: unknown } {
   const { data: object, error } = useSuspenseQuery(runObjectQuery(id));
@@ -205,6 +211,7 @@ export function useRunView(id: string): { view: RunDetail; error: unknown } {
  * The detail of the run `id` where no loader has read it — a bar, a preview, a try — and the error of its object's or its lines' last
  * read. Undefined until the object, the lines and every step's tries and told are read, so it is drawn whole or not at all; once drawn it
  * stays, through a failed read (a run gone keeps what it last read) and while a step that moved is read again.
+ * @param id The run's id.
  */
 export function useRunRead(id: string): { view: RunDetail | undefined; error: unknown } {
   const object = useQuery(runObjectQuery(id));
@@ -227,6 +234,8 @@ export function useRunRead(id: string): { view: RunDetail | undefined; error: un
  * What a run's page loads before it draws: the run object into `client`'s cache (`runObjectQuery`), then its lines and every step's tries
  * and told at once, so the page draws whole on its first paint; and `gone` when the store has no such run (`readGone`), so the page says so
  * in place of a failure. Any other failure is thrown, for the route's error to say.
+ * @param client The board's query client, loaded.
+ * @param id The run's id.
  */
 export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolean }> =>
   client.ensureQueryData(runObjectQuery(id)).then(

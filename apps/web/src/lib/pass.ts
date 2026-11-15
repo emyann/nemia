@@ -19,22 +19,34 @@ export const PASS_PHASES: readonly PassPhase[] = [
   'act',
 ];
 
-/** A time in ms as the package says it: whole from 100, one place from 10, two below. */
+/**
+ * A time in ms as the package says it: whole from 100, one place from 10, two below.
+ * @param ms The time, in milliseconds.
+ */
 export const msWord = (ms: number): string => (ms >= 100 ? `${Math.round(ms)}` : ms >= 10 ? ms.toFixed(1) : ms.toFixed(2));
 
-/** Bytes as a person reads them: `812 B`, `14.2 kB`, `3.1 MB`. */
+/**
+ * Bytes as a person reads them: `812 B`, `14.2 kB`, `3.1 MB`.
+ * @param n The size, in bytes.
+ */
 export const bytesWord = (n: number): string =>
   n < 1000 ? `${n} B` : n < 1_000_000 ? `${(n / 1000).toFixed(1)} kB` : `${(n / 1_000_000).toFixed(1)} MB`;
 
 const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
-/** The line over the floor: `a pass takes 212 ms`. */
+/**
+ * The line over the floor: `a pass takes 212 ms`.
+ * @param pass The last pass's cost: its time in ms.
+ */
 export const passLine = (pass: Pick<PassCost, 'ms'>): string => `a pass takes ${msWord(pass.ms)} ms`;
 
 /**
  * The last pass whole, a line each: when it ran and its totals, each phase with its time, calls, bytes and processes, each harness
  * observed, what it saw where the pass says (`runs`, from the tick that keeps it), and what measuring it took — the breakdown the CLI's
  * `up --stats` prints.
+ * @param pass The last pass's cost, whole.
+ * @param now The instant it is now, against which the pass's time is said.
+ * @param timeZone The IANA time zone to say the time in, or undefined for the person's own.
  */
 export function passTitle(pass: PassCost, now: Date, timeZone?: string): string {
   const phases = PASS_PHASES.map((p) => {
@@ -58,6 +70,9 @@ export function passTitle(pass: PassCost, now: Date, timeZone?: string): string 
   ].join('\n');
 }
 
-/** What a pass saw, in words: `43 runs in the store, 3 tasks not settled, 1 queued and 2 admitted`. */
+/**
+ * What a pass saw, in words: `43 runs in the store, 3 tasks not settled, 1 queued and 2 admitted`.
+ * @param seen What the pass saw: the runs in the store, the tasks not settled, and those queued and admitted.
+ */
 export const seenWords = (seen: { runs: number; tasks: number; queued: number; admitted: number }): string =>
   `${plural(seen.runs, 'run')} in the store, ${plural(seen.tasks, 'task')} not settled, ${seen.queued} queued and ${seen.admitted} admitted`;

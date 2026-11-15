@@ -72,6 +72,9 @@ export const statesOf = Effect.fn('statesOf')(function* (record: FactoryServers)
 /**
  * One recorded server with the state read of it: `state: null` where none was, never a word invented for it; its headers masked
  * (`maskedHeaders`), so a read carries no header's value out of the store.
+ * @param name The server's name in the record.
+ * @param server The server as the record holds it.
+ * @param state The state the harness reported of it, or undefined where none was read.
  */
 export const listedOf = (name: string, server: FactoryServers[string], state: McpServerState | undefined): ServerListed => ({
   name,
@@ -134,6 +137,8 @@ const writeRefusal = (write: McpServerWrite): string | undefined => {
  * Refused (`Missing`), through the Factory door: a factory the store has no file for, and one whose file does not read. The default
  * factory passes — the door answers it as its record, and gives it servers of its own, since every run and card that names no factory
  * runs in it.
+ * @param name The factory's name.
+ * @param verb What the refused verb would have done, as a past participle (`listed`, `recorded`, `removed`), said in the refusal.
  */
 export const factoryThere = (name: string, verb: string): Effect.Effect<void, Refusal> =>
   Effect.gen(function* () {
@@ -317,6 +322,9 @@ export const serversFiling = Effect.fn('serversFiling')(function* (
  * Whether `step` is held back for want of a sign-in, read off that one look, noting on `notes` which server and what to do where it
  * is: its session would start, reach no tool of that server, and spend a try finding out. A step whose harness files no sign-in of its
  * own, a step naming no server, and a look that failed each hold back nothing.
+ * @param servers The pass's one look at the factory's servers (`ServersBefore`), or undefined where none was taken.
+ * @param step The step: its name, its harness and the servers its agent names.
+ * @param notes The pass's notes, onto which the server and what to do are pushed where the step is held back.
  */
 export const unsignedStep = (
   servers: ServersBefore | undefined,

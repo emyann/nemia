@@ -17,6 +17,7 @@ const lineOf = (text: string, name: string): number | undefined => {
 /**
  * The machine's total and available memory off the text of `/proc/meminfo`, or `undefined` where either line is missing: a kernel
  * older than 3.14 writes no `MemAvailable`, and a guess at it from free and cached memory is no reading.
+ * @param text The text of `/proc/meminfo`.
  */
 export const meminfoOf = (text: string): MachineReading | undefined => {
   const totalBytes = lineOf(text, 'MemTotal');

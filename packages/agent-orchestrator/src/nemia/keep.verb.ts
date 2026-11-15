@@ -1,12 +1,14 @@
 /**
  * The keeper of Nemia: each beat, the levels read again (`levelsNow`), her task read off the engine and her subscription off the store, and
- * what is owed done (`nemiaDue`) — her task filed long-lived while any factory is above `manual`, her subscription put once it is open with
- * her floor (`NEMIA_FLOOR`), both taken away once none is, whether a level set or a raise's end made it so; and while she is kept, the
- * person's custom words said to her open task (`sayCustom`) once they are not those she was last filed or told with (`customChanged`),
- * which are recorded, and her instruction written, only after she was told: a change to her builtin instruction alone tells her nothing;
- * and while she is kept and her session live, the person's chat words said to her (`sayOutbox`), the questions her session holds open
- * written down (`recordAsks`) and the person's answers to them carried to her (`answersDue`). Level-triggered: it carries nothing between
- * beats, so a restart owes what the files and the engine say. A task stopped from outside is never filed again.
+ * what is owed done (`nemiaDue`) — her harness's trust given to her own folder where it is not, before she is filed in the same beat
+ * (`trustHer`), the folder being Nemia's own, and why where that write is refused recorded for the person (`writeUntrusted`); her task
+ * filed long-lived while any factory is above `manual`, her subscription put once it is open with her floor (`NEMIA_FLOOR`), both taken
+ * away once none is, whether a level set or a raise's end made it so; and while she is kept, the person's custom words said to her open
+ * task (`sayCustom`) once they are not those she was last filed or told with (`customChanged`), which are recorded, and her instruction
+ * written, only after she was told: a change to her builtin instruction alone tells her nothing; and while she is kept and her session
+ * live, the person's chat words said to her (`sayOutbox`), the questions her session holds open written down (`recordAsks`) and the
+ * person's answers to them carried to her (`answersDue`). Level-triggered: it carries nothing between beats, so a restart owes what the
+ * files and the engine say. A task stopped from outside is never filed again.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer, and
  * her subscription through the Subscription door (`SubscriptionDoor`) and the person's custom words for her through the Agent door
@@ -27,7 +29,7 @@ import { SubscriptionName } from '../feed/feed.model.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { AgentName } from '../agents/agents.model.ts';
 import type { Refusal } from '../refusal/refusal.ts';
-import { EngineService, asked, over, trustedFolder, type Engine } from '../runtime-client.ts';
+import { EngineService, asked, folderTrust, over, trustedFolder, trustFolder, type Engine } from '../runtime-client.ts';
 import { answersDue, answersOwed, closesOwed, sayOutbox, outboxOwed, recordAsks } from '../chat/say.verb.ts';
 import { upOf } from '../chat/index.ts';
 import {
@@ -44,6 +46,7 @@ import {
   storeDenies,
   writePrompt,
   writeTold,
+  writeUntrusted,
 } from './level.store.ts';
 import { nemiaFence, widened } from '../admission/index.ts';
 import { TABLE } from '../command/commands.verb.ts';
@@ -62,6 +65,7 @@ import {
   nemiaSettings,
   nemiaState,
   toldCustom,
+  trustRefused,
   type HerSubscription,
   type HerTask,
   type NemiaAct,
@@ -69,7 +73,8 @@ import {
 
 /** What the keeper did, each act counted once done. */
 export const NEMIA_ACTS = Metric.counter('nemia.acts', {
-  description: "the keeper's acts on Nemia's session: filed, subscribed, stopped, dropped, her custom words said, the outbox said",
+  description:
+    "the keeper's acts on Nemia's session: her folder trusted, filed, subscribed, stopped, dropped, her custom words said, the outbox said",
 });
 
 /** How often the keeper reads the level, her task and her subscription again. */
@@ -204,8 +209,11 @@ const sayCustom = (e: Engine, id: string) =>
     writeTold(home, custom);
   });
 
-/** Each act the keeper owes on her task `id`: a stop or a drop already done by another is no failure. */
-const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void, Refusal, StoreRoot>> = {
+/**
+ * Each act the keeper owes on her task `id`, but the trust of her folder (`trustHer`): a stop or a drop already done by another is no
+ * failure.
+ */
+const ACTS: Record<Exclude<NemiaAct, 'trust'>, (e: Engine, id: string) => Effect.Effect<void, Refusal, StoreRoot>> = {
   file: fileHer,
   stop: (e, id) => asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void))),
   subscribe: (_e, id) =>
@@ -230,7 +238,34 @@ const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void, Refu
 };
 
 /** One act owed on her task `id`, counted once done. */
-const act = (e: Engine, id: string, owed: NemiaAct) => ACTS[owed](e, id).pipe(Effect.andThen(Metric.update(NEMIA_ACTS, 1)));
+const act = (e: Engine, id: string, owed: Exclude<NemiaAct, 'trust'>) =>
+  ACTS[owed](e, id).pipe(Effect.andThen(Metric.update(NEMIA_ACTS, 1)));
+
+/** The words of what the write of her folder's trust threw. */
+const threwWords = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
+/**
+ * Her folder made, where it is not yet, and her harness's trust given to it (`trustFolder`), which is safe since the folder is Nemia's
+ * own: the store makes it and only Nemia writes it. Why it is not given, where the write left it so or threw, recorded for the person
+ * (`writeUntrusted`, `trustRefused`), and the record taken away once it is. Answers whether her folder is trusted now, counted where so.
+ */
+const trustHer = (home: string) =>
+  Effect.gen(function* () {
+    const dir = nemiaDir(home);
+    const refused = ((): string | undefined => {
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        const given = trustFolder(DEFAULT_HARNESS, dir);
+        return given === undefined || given.trusted ? undefined : trustRefused(given);
+      } catch (err) {
+        const asked = folderTrust(DEFAULT_HARNESS, dir);
+        return trustRefused(asked ?? { harness: DEFAULT_HARNESS, folder: dir, file: '', never: null }, threwWords(err));
+      }
+    })();
+    writeUntrusted(home, refused);
+    if (refused === undefined) yield* Metric.update(NEMIA_ACTS, 1);
+    return refused === undefined;
+  });
 
 /**
  * Her task's record off the engine, undefined where none is filed under `id`, whether her session is live (`upOf`), whether it
@@ -271,9 +306,11 @@ const herSubscription = Effect.fn('herSubscription')(function* () {
 });
 
 /**
- * One beat: the levels, her task, her subscription and her folder's trust read (`trustedFolder`, so no task is filed where her harness
- * would refuse its start), and, while she is kept, the person's custom words against those she was last
- * filed or told with (`customChanged`); each act owed done in order. Answers the acts done.
+ * One beat: the levels, her task, her subscription and her folder's trust read (`trustedFolder`), her folder trusted by the keeper before
+ * she is filed where it is not (`trustHer`, so no task is filed where her harness would refuse its start, and the filing left undone where
+ * the trust was refused), the keeper's record of a refusal taken away on a beat that owes no trust, and, while she is kept, the person's
+ * custom words against those she was last filed or told with (`customChanged`); each act owed done in order. Answers the acts done: those
+ * owed, but past a trust refused.
  */
 export const keepOnce = Effect.fn('keepOnce')(function* () {
   const home = yield* StoreRoot;
@@ -291,8 +328,14 @@ export const keepOnce = Effect.fn('keepOnce')(function* () {
     task,
     subscribed,
   );
-  for (const one of owed) if (id !== undefined || one === 'drop') yield* act(e, id ?? '', one);
-  return owed;
+  if (!owed.includes('trust')) writeUntrusted(home, undefined);
+  const done: NemiaAct[] = [];
+  for (const one of owed) {
+    if (one === 'trust' && !(yield* trustHer(home))) break;
+    if (one !== 'trust' && (id !== undefined || one === 'drop')) yield* act(e, id ?? '', one);
+    done.push(one);
+  }
+  return done;
 });
 
 /**

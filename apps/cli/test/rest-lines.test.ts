@@ -340,11 +340,11 @@ const where = (more: Partial<typeof NemiaLevel.Type> = {}): typeof NemiaLevel.Ty
   spend: null,
   allows: [],
   factories: [{ factory: 'default', level: 'manual', default: 'manual', own: null, raise: null }],
-  trust: null,
+  untrusted: null,
   ...more,
 });
 
-test("`nemia level`'s lines: the store, each factory and its raise, her session, her trust, her spend and how to reach her", () => {
+test("`nemia level`'s lines: the store, each factory and its raise, her session, why her folder could not be trusted, her spend and how to reach her", () => {
   assert.deepEqual(levelLines(where()), [
     'Nemia: the store at manual',
     'factories (a raise ends by itself, read as it passes):',
@@ -359,14 +359,15 @@ test("`nemia level`'s lines: the store, each factory and its raise, her session,
       phase: 'working',
       reach: ['nemia chat'],
       spend: { usd: 0.004, measured: 1, unmeasured: 2 },
-      trust: 'claude',
+      untrusted: 'the file did not read: fix it',
       factories: [{ factory: 'mill', level: 'semi-auto', default: 'manual', own: null, raise }],
     }),
   );
   hasLine(words, /^Nemia: the store at semi-auto since 2026-11-12T10:00:00\.000Z$/);
   hasLine(words, /^ {2}mill: semi-auto until 2026-11-12T12:00:00\.000Z, then manual \(the store's\)$/);
   hasLine(words, /^her session nemia: working$/);
-  hasLine(words, /^her folder is not trusted yet.*run once in a terminal claude,/);
+  hasLine(words, /^her folder could not be trusted.*the file did not read: fix it$/);
+  assert.ok(!levelLines(where({ level: 'semi-auto' })).some((line) => line.includes('trusted')), 'no refusal: nothing said of her trust');
   hasLine(words, /^spent \$0\.004 over 1 session ended, 2 not measured;/);
   assert.deepEqual(words.slice(words.indexOf('reach her:')), ['reach her:', '  nemia chat']);
 });

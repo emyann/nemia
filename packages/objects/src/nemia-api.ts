@@ -52,7 +52,7 @@ const NemiaInstructionsObject = NemiaInstructions.annotate({ identifier: 'NemiaI
  * - `GET /api/level` — where she is (`NemiaLevel`); 422 for a level file that does not read. `PUT /api/level` sets the store's level, or a
  *   factory's, raised for a stretch or its raise ended (`NemiaLevelSet`), and answers where she is after: 404 for no such factory, 409
  *   for an end with no raise in force, 422 for arguments that ask no write or a raise that raises nothing. Never refused for her folder's
- *   trust: `trust` names the command that gives it.
+ *   trust: the keeper gives it, and `untrusted` says why where its write was refused.
  * - `GET /api/nemia/memory` and `GET /api/nemia/memory/:fact` — the facts she keeps, and one's words; 404 for a fact she does not keep.
  * - `GET /api/policy/:name` — an agent's rules for auto; 422 for a name that is no agent's or a file of rules that does not read.
  *   `PUT /api/policy/:name/rules/:id` confirms a proposed rule as the person read it (`{ words }`): 404 for a rule not proposed, 409 for

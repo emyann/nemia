@@ -83,7 +83,8 @@ export type HerTask = { settled: boolean; stopRequested: boolean };
 
 /**
  * Where she is: `off`, no factory above `manual` and nothing to stop; `due`, some factory above it and no task filed; `untrusted`, as
- * `due` but her folder not trusted by her harness, so her session waits for the person to trust it once; `filed`, her task
+ * `due` but her folder not trusted by her harness, which the keeper trusts itself before it files her, the folder being Nemia's own, and
+ * where that write was refused, its refusal said to the person; `filed`, her task
  * open and not yet subscribed with her floor; `kept`, open and subscribed with it; `stopped`, her task stopped or ended from outside while
  * some factory is above `manual`, never filed again until the person sets a level again; `leaving`, none above `manual` with her task
  * open or her subscription still there.
@@ -91,11 +92,11 @@ export type HerTask = { settled: boolean; stopRequested: boolean };
 export type NemiaState = 'off' | 'due' | 'untrusted' | 'filed' | 'kept' | 'stopped' | 'leaving';
 
 /**
- * What the keeper does on a beat: file her task, subscribe it, stop it, drop her subscription, say her custom words to her open task
- * (`sayCustom`), say the person's chat words to her session (`sayOutbox`), write down the questions of hers that wait on the person
- * (`record`), and carry their answers to them (`answer`).
+ * What the keeper does on a beat: give her harness's trust to her own folder (`trust`), file her task, subscribe it, stop it, drop her
+ * subscription, say her custom words to her open task (`sayCustom`), say the person's chat words to her session (`sayOutbox`), write down
+ * the questions of hers that wait on the person (`record`), and carry their answers to them (`answer`).
  */
-export type NemiaAct = 'file' | 'subscribe' | 'stop' | 'drop' | 'sayCustom' | 'sayOutbox' | 'record' | 'answer';
+export type NemiaAct = 'trust' | 'file' | 'subscribe' | 'stop' | 'drop' | 'sayCustom' | 'sayOutbox' | 'record' | 'answer';
 
 /**
  * What the keeper reads of the levels and her folder: whether any factory, the default one included, is above `manual` now; her task's
@@ -124,6 +125,9 @@ export type Keeping = {
  */
 export type HerSubscription = { task: string; scoped: boolean; selected: boolean };
 
+/** What the keeper owes where no task of hers is filed yet: her filing, after her folder's trust where it is not given. */
+const OPENING: Partial<Record<NemiaState, readonly NemiaAct[]>> = { due: ['file'], untrusted: ['trust', 'file'] };
+
 /** Whether her task is open: filed, not settled, and no stop asked. */
 const isOpen = (task: HerTask | undefined): boolean => task !== undefined && !task.settled && !task.stopRequested;
 
@@ -142,14 +146,34 @@ export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscrib
   return subscribed !== undefined && subscribed.task === keeping.task && subscribed.scoped && subscribed.selected ? 'kept' : 'filed';
 }
 
+/** What the keeper reads of a trust its write left not given: the harness, the folder, the harness's file, and why it is never kept. */
+export type TrustNotGiven = { harness: string; folder: string; file: string; never: string | null };
+
 /**
- * What the keeper owes on a beat, in order: at `due`, file; at `filed`, subscribe, dropping first a subscription left for another task or
+ * Why the keeper's write of her harness's trust left her folder not trusted, and what a person does so the next beat gives it, in words
+ * that offer no command to run the harness by hand: a folder the harness never keeps a trust of (`never`), or a file of the harness's
+ * that did not take the trust (`not`) or that the write threw on (`threw`, its words). Pure.
+ * @param not The trust as it reads after the write.
+ * @param threw The words of the error the write threw, or undefined where it answered.
+ */
+export function trustRefused(not: TrustNotGiven, threw?: string): string {
+  const next = 'the keeper gives the trust at its next beat, and files her session';
+  if (threw !== undefined)
+    return `${not.harness}'s trust of her folder ${not.folder} could not be written in ${not.file} (${threw}): make that file readable and writable by the user the store runs as; ${next}`;
+  if (not.never !== null)
+    return `her folder ${not.folder} is the home directory, and ${not.never}: run the store (WF_ROOT) where its nemia folder is not the home directory; ${next}`;
+  return `${not.harness}'s file ${not.file} did not take the trust of her folder ${not.folder} and was left as it is: make it read as a JSON object again, or move it aside; ${next}`;
+}
+
+/**
+ * What the keeper owes on a beat, in order: at `due`, file; at `untrusted`, trust her folder, then file, in the same beat, the filing
+ * left undone where the trust was refused; at `filed`, subscribe, dropping first a subscription left for another task or
  * without her floor or her selectors; at `kept`, say the person's custom words to her where they are not those her task was filed with
  * (`stale`), then say the person's chat words where some are owed and her session is live (`owed`, `up`), write down the questions her
  * live session holds open and mark what became of a question it no longer holds (`record`, where her task's view says one waits,
  * `asking`, or the chat holds one whose mark does not say what became of its call, `closing`), and carry the person's answers where one
  * is owed (`answered`); at `leaving`, stop the open task and drop the subscription; at `stopped`, drop a subscription left; else
- * nothing, at `untrusted` too: a session filed in a folder her harness does not trust would be refused at its start. A task settled
+ * nothing. A task settled
  * from outside is never filed again: the person said so by stopping it. Pure.
  * @param keeping What the keeper reads of the levels, her folder, her session and the chat.
  * @param task Her task's record, or undefined where none is filed under her id.
@@ -158,7 +182,8 @@ export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscrib
 export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaAct[] {
   const state = nemiaState(keeping, task, subscribed);
   const dropped: NemiaAct[] = subscribed === undefined ? [] : ['drop'];
-  if (state === 'due') return ['file'];
+  const opening = OPENING[state];
+  if (opening !== undefined) return [...opening];
   if (state === 'filed') return [...dropped, 'subscribe'];
   if (state === 'stopped') return dropped;
   if (state === 'leaving') return [...(isOpen(task) ? (['stop'] as const) : []), ...dropped];
@@ -216,13 +241,14 @@ export type NemiaGraph = { initial: NemiaState; states: NemiaState[]; final: Nem
 const STATES: NemiaState[] = ['off', 'due', 'untrusted', 'filed', 'kept', 'stopped', 'leaving'];
 
 /**
- * The keeper's moves, her folder's trust read each beat, a change of her custom words said, the person's chat words said, a stop or
- * end from outside, which it never undoes, and the end of the last raise above `manual` as it passes.
+ * The keeper's moves, her folder's trust read each beat and given by the keeper where it is not, a change of her custom words said, the
+ * person's chat words said, a stop or end from outside, which it never undoes, and the end of the last raise above `manual` as it passes.
  */
 const EDGES: NemiaEdge[] = [
   { from: 'due', to: 'filed', event: 'NO_TASK', action: 'file' },
   { from: 'due', to: 'untrusted', event: 'FOLDER_UNTRUSTED', action: 'nothing' },
-  { from: 'untrusted', to: 'due', event: 'FOLDER_TRUSTED', action: 'nothing' },
+  { from: 'untrusted', to: 'filed', event: 'TRUST_WRITTEN', action: 'trust, file' },
+  { from: 'untrusted', to: 'untrusted', event: 'TRUST_REFUSED', action: 'trust' },
   { from: 'filed', to: 'kept', event: 'NOT_SUBSCRIBED', action: 'subscribe' },
   { from: 'filed', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'nothing' },
   { from: 'kept', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'nothing' },

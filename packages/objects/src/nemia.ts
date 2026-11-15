@@ -47,7 +47,7 @@ export const FactoryLevel = Schema.Struct({
  * Where Nemia is, as `nemia level --json` prints it: the store's level and since when, her task, its phase and its session where one is
  * filed, how a person reaches her session (`reach`), its web link (`bridge`, null where not bridged), whether it was stopped from
  * outside, what her ended sessions cost (`spend`), what a person allowed her at a prompt (`allows`), each factory's level, the default
- * factory first, and the command a person runs once to trust her folder (`trust`, null where it is trusted).
+ * factory first, and why the keeper could not trust her folder (`untrusted`, null where it is trusted or the write was not refused).
  */
 export const NemiaLevel = Schema.Struct({
   level: LevelWord.annotate({ description: "The store's level (`nemia level <level>`): manual, semi-auto or auto." }),
@@ -82,8 +82,9 @@ export const NemiaLevel = Schema.Struct({
   }),
   allows: Schema.Array(Schema.String).annotate({ description: 'The allow rules a person gave her at a prompt.' }),
   factories: Schema.Array(FactoryLevel).annotate({ description: "Each factory's level, the default factory first." }),
-  trust: Schema.NullOr(Schema.String).annotate({
-    description: 'The command a person runs once to trust her folder, which her session waits for; null where it is trusted.',
+  untrusted: Schema.NullOr(Schema.String).annotate({
+    description:
+      "Why the keeper could not give her harness's trust to her folder, naming the fix, while her session is not filed for it; null where her folder is trusted, or the keeper's write was not refused: the keeper trusts her folder itself.",
   }),
 });
 

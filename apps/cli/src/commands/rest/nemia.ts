@@ -27,16 +27,15 @@ const factoryWords = (row: FactoryRow): string => {
 const spendLine = ({ usd, measured, unmeasured }: NonNullable<Level['spend']>): string =>
   `spent ${dollars(usd)} over ${measured} session${measured === 1 ? '' : 's'} ended${unmeasured ? `, ${unmeasured} not measured` : ''}; her open one counts once it ends`;
 
-/** What `nemia level` prints of her folder not trusted: the command `trust` to run once, and what then follows. */
-const trustLine = (trust: string): string =>
-  `her folder is not trusted yet, and her session starts only once it is: run once in a terminal ${trust}, accept the prompt, then /exit; the keeper files her at its next beat`;
+/** What `nemia level` prints of the keeper's trust of her folder refused: its words, which name the fix. */
+const untrustedLine = (untrusted: string): string => `her folder could not be trusted, so her session is not filed: ${untrusted}`;
 
 /** Her session's line: none for no task, else its phase, or why it is not filed yet. */
 const sessionLines = (data: Level): string[] => {
   if (data.task === null) return [];
   if (data.phase !== null) return [`her session ${data.task}: ${data.phase}`];
   const why =
-    data.trust === null
+    data.untrusted === null
       ? 'the keeper files it at its next beat (nemia up, or the api, keeps her)'
       : 'it waits for her folder to be trusted';
   return [`her session ${data.task}: not filed yet, ${why}`];
@@ -44,14 +43,15 @@ const sessionLines = (data: Level): string[] => {
 
 /**
  * What `nemia level` prints of where she is.
- * @param data Where she is, as the api answers it: the level, the factories, her session, her trust, spend, reach and allows.
+ * @param data Where she is, as the api answers it: the level, the factories, her session, why her folder could not be trusted, spend,
+ * reach and allows.
  */
 export function levelLines(data: Level): string[] {
   const head = `Nemia: the store at ${data.level}${data.since === null ? '' : ` since ${data.since}`}`;
   const factories = ['factories (a raise ends by itself, read as it passes):', ...data.factories.map((row) => `  ${factoryWords(row)}`)];
   const spent = data.spend === null ? [] : [spendLine(data.spend)];
   const stopped = data.stopped ? ['it was stopped from outside and is not filed again: a level set above manual starts a fresh one'] : [];
-  const trust = data.trust === null ? [] : [trustLine(data.trust)];
+  const trust = data.untrusted === null ? [] : [untrustedLine(data.untrusted)];
   const reach = data.reach.length ? ['reach her:', ...data.reach.map((line) => `  ${line}`)] : [];
   const allows = data.allows.length
     ? ['allowed at a prompt, beyond what is built in (her folder’s local settings):', ...data.allows.map((rule) => `  ${rule}`)]

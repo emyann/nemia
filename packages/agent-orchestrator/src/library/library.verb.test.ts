@@ -9,7 +9,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { TEAM } from '../../test/team.ts';
 import { addedServers, factoryAdds, libraryAddObject, libraryUsers, writeLibraryAdd } from './library.verb.ts';
-import { libraryAddsFile, readLibraryAdds, writeLibraryAdds, writeLibraryServers } from './library.store.ts';
+import { addedOf, libraryAddsFile, readLibraryAdds, writeLibraryAdds, writeLibraryServers } from './library.store.ts';
 
 /** A store whose library is a copy of the tests' team. */
 const store = (): string => {
@@ -58,7 +58,7 @@ test('who uses a library item: each factory whose adds hold it, recorded or deri
   assert.deepEqual(libraryUsers(home, { kind: 'Agent', name: 'implementer' }), [], 'a record without it');
 });
 
-test("library.json reads as undefined where absent, keeps a newer tick's keys, and refuses a broken file naming it", () => {
+test("library.json reads as undefined where absent, keeps a newer tick's keys, refuses a broken file naming it, and a broken one gates every name", () => {
   const home = scratch('wf-library-file-');
   assert.equal(readLibraryAdds(home, 'default'), undefined);
   const file = libraryAddsFile(home, 'acme');
@@ -68,6 +68,11 @@ test("library.json reads as undefined where absent, keeps a newer tick's keys, a
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { later: 1, adds: [{ kind: 'Agent', name: 'scribe' }] });
   fs.writeFileSync(file, JSON.stringify({ adds: [{ kind: 'Workflow', name: 'x' }] }));
   assert.throws(() => readLibraryAdds(home, 'acme'), { _tag: 'Invalid' });
+  assert.deepEqual(
+    addedOf(home, 'acme'),
+    { agents: new Set(), skills: new Set() },
+    "the lookup reads a broken record as no adds, never as an unrecorded factory's open library",
+  );
 });
 
 test("a factory's added library servers: the person's record of each, else Nemia's builtin, and none while it is unrecorded", () => {

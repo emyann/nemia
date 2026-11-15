@@ -155,7 +155,8 @@ export function recordBuiltinCopy(home: string, key: string, digest: string): vo
 
 /**
  * The names the factory `name`'s lookup reads the library for, by kind; undefined where it has no record, so its lookup reads the library
- * for every name its workflows give, which resolves what its derived adds hold (`LibraryAdded`).
+ * for every name its workflows give, which resolves what its derived adds hold (`LibraryAdded`). A record that does not read gives no adds:
+ * the lookup fails closed, resolving nothing of the library, while the factory's adds (`factoryAdds`) refuse the file naming its fix.
  * @param home The store's root.
  * @param name The factory's name, `default` among them; undefined for a read in no factory.
  */
@@ -165,7 +166,7 @@ export function addedOf(home: string, name: string | undefined): LibraryAdded | 
   try {
     recorded = readLibraryAdds(home, name);
   } catch {
-    return undefined;
+    recorded = [];
   }
   if (recorded === undefined) return undefined;
   const of = (kind: LibraryKind) => new Set(recorded.filter((a) => a.kind === kind).map((a) => a.name));

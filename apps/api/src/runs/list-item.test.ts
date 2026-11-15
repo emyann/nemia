@@ -59,14 +59,10 @@ test("the run's own read carries each step's artifacts folder, and no list item 
   const run = await read<Run>(`/api/runs/${R}`);
   const write = run.status.steps.find((step) => step.name === 'write');
   assert.deepEqual(
-    write?.artifactsFolder?.files.map((file) => file.name),
+    write?.artifactsFolder?.files.map((file) => ('name' in file ? file.name : file.path)),
     ['shot.png'],
   );
-  for (const address of [
-    '/api/runs',
-    '/api/namespaces/default/runs',
-    '/api/runs?fieldSelector=status.state%3Dfinished',
-  ]) {
+  for (const address of ['/api/runs', '/api/namespaces/default/runs', '/api/runs?fieldSelector=status.state%3Dfinished']) {
     const item = (await read<RunList>(address)).items.find((one) => one.metadata.name === R);
     assert.ok(item, `${address} lists ${R}`);
     assert.ok(item.status.steps.length > 0, `${address}: ${R}'s item has its steps`);

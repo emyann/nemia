@@ -180,12 +180,7 @@ function roundSpend(clock: Timeline, steps: readonly StepSpec[], total: Timeline
  * under the artifacts route: absent where the step has no such folder, as one not filed yet has none, and on a list's item, which reads
  * no artifacts folder: the run's own read carries it.
  */
-function filesOf(
-  run: Run,
-  home: string,
-  step: string,
-  listed: boolean,
-): Pick<RunStepStatus, 'files' | 'filesError' | 'artifactsFolder'> {
+function filesOf(run: Run, home: string, step: string, listed: boolean): Pick<RunStepStatus, 'files' | 'filesError' | 'artifactsFolder'> {
   const dir = workFolderOf(run, step);
   const { files, error } = dir ? folderFiles(run, step, dir, 'files') : { files: [], error: null };
   if (listed) return { files, filesError: error };

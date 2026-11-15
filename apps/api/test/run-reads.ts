@@ -8,9 +8,8 @@
  *
  * `runListOf` is the RunList (`GET /api/runs`), plain and its first page (`LIST_PAGE`) unless a query says otherwise: its items are
  * `Run` objects, a run read by `metadata.name`, `spec.*` and `status.*`, and beside them the runs it leaves unjudged (`unjudged`, each
- * with why). `listedRuns` is every run of the plain list, on a page of the most a list answers where the query asks no `limit`, `listedOf` one run
- * of it, `unjudgedOf` why the list leaves one unjudged, and `framedOf` one run as a list
- * asked by state has it, with the board's frame parts (`status.state`, `wallMs`, `clock`, …).
+ * with why). `listedRuns` is every run of the plain list, on a page of the most a list answers where the query asks no `limit`,
+ * `listedOf` one run of it, `unjudgedOf` why the list leaves one unjudged, and `framedOf` one run as a list asked by state has it, with the board's frame parts (`status.state`, `wallMs`, `clock`, …).
  */
 import type { RunObject } from 'agent-orchestrator';
 import { LIST_PAGE, type Run, type RunList } from 'objects';

@@ -45,8 +45,8 @@
  *   reads and the same answer as the old stream's beat, the whole re-projection it paid every 2 s per open stream. `chatFoldStep` is
  *   what a follower pays now for one moment of her session (`chatFold`): `followChat`'s `rest`, after a listing not timed, run until the
  *   first thing it sends, its follow handing one `events` moment of one new event; null where no session of hers is filed, or where
- *   the task her level file names has no journal in the copy (pruned), since a follow of a task the engine lacks sends nothing. Its time holds
- *   the rest's start too (the follow of the feed, the look at the files), so it bounds the fold from above.
+ *   the task her level file names has no journal in the copy (pruned), since a follow of a task the engine lacks sends nothing. Its
+ *   time holds the rest's start too (the follow of the feed, the look at the files), so it bounds the fold from above.
  *
  * - `factoryList`, `factoryGet`, `factoryCommands`, `scheduleList`, `hireList`, `volumeList`, `mcpServerList`: `GET /api/factories`,
  *   and of the copy's first factory but the default by name, `GET /api/factories/:name`, `…/commands` and

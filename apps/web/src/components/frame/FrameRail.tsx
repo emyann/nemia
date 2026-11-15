@@ -57,11 +57,14 @@ export function HerFace({ path }: { path: string }) {
   return <NemiaRailFace presence={presence} open={fold.shows === 'her'} ownsChat={ownsChat} onToggle={sheet.toggle} />;
 }
 
-/** The account, drawn as the canvas draws it and not built yet: the kit's avatar with an initial, which takes no focus and no press. */
+/**
+ * The account, drawn as the canvas draws it and not built yet: the kit's avatar with an initial, which takes no focus and no press, on a
+ * neutral tier, since the kit's primary container is the board's `yours` and nothing here waits on the person.
+ */
 function AccountToCome() {
   return (
     <span data-account-to-come title="Account · to come" className="inline-flex shrink-0 cursor-default">
-      <Avatar alt="Account, not built yet" fallback="Y" size={32} />
+      <Avatar alt="Account, not built yet" fallback="Y" size={32} className="bg-surface-container-highest text-on-surface" />
     </span>
   );
 }

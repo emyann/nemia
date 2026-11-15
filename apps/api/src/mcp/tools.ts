@@ -1,13 +1,15 @@
 /**
  * The tools of the MCP port, generated, never listed by hand: one for each endpoint a verb of the command table links (`served`, read by
- * the package's `toolsOf`, which names it), described by the verb's help and its CLI usage, its input the JSON Schema of the endpoint's
+ * the package's `toolsOf`, which names it), described by the verb's help, its endpoint's own description and its CLI usage, its input the JSON Schema of the endpoint's
  * path, query and payload joined into one object (`objects`' `Api`, read by reflection), its hints its verb's class and its endpoint's
  * method (`toolHints`), and what the port needs to call it: the endpoint's method and path, which keys of the input fill the path
  * and the query, whether the endpoint answers a `Table` (`objects`' server-side printing, which the port asks for and answers as its
  * lines), and the query values its link sends where a call gives none (`defaults`, the link's `query`). A link to a stream, a method that
- * is not a call, a key two of the three say, or a default for a key the query has not is thrown as the tools are built.
+ * is not a call, a key two of the three say, a default for a key the query has not, or an endpoint that says nothing of what it does is
+ * thrown as the tools are built.
  */
-import { Schema } from 'effect';
+import { Context, Option, Schema } from 'effect';
+import { OpenApi } from 'effect/http-api';
 import { type CommandSpec, toolsOf } from 'agent-orchestrator';
 import { type ApiEndpointName, Table, keysOfEndpoint, streamsOf } from 'objects';
 import type { ToolHints, ToolMethod } from '../../contracts/tool-hints.contract.ts';
@@ -17,9 +19,10 @@ import { classWordOf, toolHints } from './hints.ts';
 /** A verb of a table as the port reads it: its name, its usage and help, its class, and the endpoints it links. */
 export type PortVerb = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served'>;
 
-/** An endpoint of an `Api`, as the port reads it off by reflection. */
+/** An endpoint of an `Api`, as the port reads it off by reflection: its annotations carry what it does (`OpenApi.Description`). */
 type EndpointRead = {
   readonly identifier: string;
+  readonly annotations: Context.Context<never>;
   readonly method: string;
   readonly path: string;
   readonly params: Schema.Top | undefined;
@@ -210,14 +213,25 @@ const keysSaid = (input: ToolInput): string[] => {
   return [...said].map(([key, words]) => `${key}: ${words}`);
 };
 
+/** What `endpoint` says it does (`OpenApi.Description`, as `objects` annotates it), thrown where it says nothing: a tool is chosen by it. */
+const endpointSaid = (name: string, endpoint: EndpointRead): string => {
+  const said = Context.getOption(endpoint.annotations, OpenApi.Description).pipe(Option.filter((words) => words.trim().length > 0));
+  if (Option.isNone(said))
+    throw new Error(
+      `${name} says nothing of what it does: describe it in objects, \`.annotate(OpenApi.Description, '…')\` where its group defines it`,
+    );
+  return said.value;
+};
+
 /**
- * A tool's description: its verb's help, how the CLI says it, and the endpoint it calls; then what each key of its input says it takes
+ * A tool's description: its verb's help, then what its endpoint says it does (`endpointSaid`) as a paragraph of its own, how the CLI says it, and the endpoint it calls; then what each key of its input says it takes
  * where its schema says so (`keysSaid`), since the help is the command line's and its forms are not the input's; then how the port answers
  * it — a `Table` as its lines, a page of `PORT_PAGE` where a call gives no `limit`, and each default its link sends where the call gives
  * none.
  */
 const describe = (
   verb: PortVerb,
+  said: string,
   method: string,
   path: string,
   how: Pick<PortTool, 'table' | 'defaults' | 'queryKeys' | 'inputSchema'>,
@@ -225,6 +239,8 @@ const describe = (
   const usage = `nemia ${[verb.name, verb.usage].filter(Boolean).join(' ')}`;
   return [
     ...verb.help,
+    '',
+    said,
     '',
     usage,
     `${method} ${path}`,
@@ -249,7 +265,8 @@ const defaultsOf = (tool: string, query: Readonly<Record<string, string>>, query
 
 /**
  * The port's tools: one per link of `table`'s verbs then of `verbs`' (the verbs the CLI runs by hand, `CLI_VERBS`), in their order, each
- * its endpoint of `api` read by reflection. Thrown where a link names no endpoint of `api`, or one that streams.
+ * its endpoint of `api` read by reflection. Thrown where a link names no endpoint of `api`, one that streams, or one
+ * that says nothing of what it does.
  * @param table The command table's verbs, each with its links.
  * @param verbs The verbs the CLI runs by hand, listed after the table's.
  * @param api The Api whose endpoints the links name.
@@ -277,7 +294,7 @@ export function portTools(table: readonly PortVerb[], verbs: readonly PortVerb[]
       return {
         name: link.tool,
         entry: verb.name,
-        description: describe(verb, method, endpoint.path, how),
+        description: describe(verb, endpointSaid(link.endpoint, endpoint), method, endpoint.path, how),
         annotations: toolHints(classWordOf(verb.class), method),
         endpoint: link.endpoint,
         method,

@@ -7,8 +7,8 @@
 import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Schema } from 'effect';
-import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
+import { Context, Option, Schema } from 'effect';
+import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { CLI_VERBS, TABLE, toolsOf } from 'agent-orchestrator';
 import { Api, type ApiEndpointName } from 'objects';
 import { classWordOf, toolHints } from './hints.ts';
@@ -116,7 +116,7 @@ const TWICE = HttpApi.make('twice').add(
       params: Schema.Struct({ name: Schema.String }),
       payload: Schema.Struct({ name: Schema.String }),
       success: Schema.Struct({}),
-    }),
+    }).annotate(OpenApi.Description, 'A probe.'),
   ),
 );
 
@@ -191,14 +191,14 @@ const PLANTED = HttpApi.make('planted').add(
     HttpApiEndpoint.post('weigh', '/api/probe/weigh', {
       payload: Schema.Struct({ weight: Weight }),
       success: Schema.Struct({}),
-    }),
+    }).annotate(OpenApi.Description, 'A probe.'),
     HttpApiEndpoint.post('either', '/api/probe/either', {
       payload: Schema.Union([
         Schema.Struct({ left: Schema.String.annotate({ description: 'The left way.' }) }),
         Schema.Struct({ right: Schema.String.annotate({ description: 'The right way.' }) }),
       ]),
       success: Schema.Struct({}),
-    }),
+    }).annotate(OpenApi.Description, 'A probe.'),
   ),
 );
 
@@ -215,4 +215,52 @@ test('a key that is an identified schema whole is said by its words, and each me
   assert.ok(weigh && either, 'both planted tools are served');
   assert.deepEqual([...keysSaidBy(weigh.description, ['weight'])], ['weight']);
   assert.deepEqual([...keysSaidBy(either.description, ['left', 'right'])].sort(), ['left', 'right']);
+});
+
+/** The description `name` carries on its endpoint (`OpenApi.Description`), read off the `Api` as the API page reads it. */
+const saidOfEndpoint = (name: string): string => {
+  const endpoint = ENDPOINTS.get(name);
+  assert.ok(endpoint, `${name} is an endpoint of the Api`);
+  const said = Context.getOption(endpoint.annotations, OpenApi.Description);
+  assert.ok(Option.isSome(said), `${name} says what it does`);
+  return said.value;
+};
+
+test("every tool says its endpoint's description as a paragraph of its own, after its verb's help and before its usage line", () => {
+  const entries = new Map([...TABLE, ...CLI_VERBS].map((e) => [e.name, e] as const));
+  for (const t of TOOLS) {
+    const entry = entries.get(t.entry);
+    assert.ok(entry, t.name);
+    const lines = t.description.split('\n');
+    const at = entry.help.length;
+    assert.deepEqual(lines.slice(0, at), [...entry.help], `${t.name} opens with its verb's help`);
+    assert.deepEqual(
+      lines.slice(at, at + 3),
+      ['', saidOfEndpoint(t.endpoint), ''],
+      `${t.name} says ${t.endpoint}'s description between blank lines after the help`,
+    );
+    assert.ok(lines[at + 3]?.startsWith('nemia '), `${t.name}'s usage line follows the description`);
+  }
+});
+
+test('a tool of an endpoint two tools link carries the sentence of its own endpoint', () => {
+  assert.equal(tool('hold').endpoint, 'runs.hold');
+  assert.equal(tool('unhold').endpoint, 'runs.unhold');
+  assert.ok(tool('hold').description.includes(`\n\n${saidOfEndpoint('runs.hold')}\n\n`), "hold says runs.hold's sentence");
+  assert.ok(tool('unhold').description.includes(`\n\n${saidOfEndpoint('runs.unhold')}\n\n`), "unhold says runs.unhold's sentence");
+  assert.ok(!tool('hold').description.includes(saidOfEndpoint('runs.unhold')), "hold says not runs.unhold's sentence");
+  for (const name of ['factory', 'factory_ls']) {
+    assert.equal(tool(name).endpoint, 'factories.listAll', name);
+    assert.ok(tool(name).description.includes(`\n\n${saidOfEndpoint('factories.listAll')}\n\n`), `${name} says factories.listAll's`);
+  }
+});
+
+/** An api of one endpoint that says nothing of what it does. */
+const UNSAID = HttpApi.make('unsaid').add(
+  HttpApiGroup.make('probe').add(HttpApiEndpoint.get('mute', '/api/probe/mute', { success: Schema.Struct({}) })),
+);
+
+test('REFUSED: a link to an endpoint with no description, naming the endpoint', () => {
+  const entry = { name: 'mute', usage: '', help: ['a probe'], class: 'read' as const };
+  assert.throws(() => portTools([], [{ ...entry, served: [{ endpoint: 'probe.mute' as ApiEndpointName }] }], UNSAID), /probe\.mute/);
 });

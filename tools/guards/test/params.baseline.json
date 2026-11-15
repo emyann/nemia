@@ -435,7 +435,7 @@
   "packages/agent-orchestrator/src/object/listed.verb.ts": 6,
   "packages/agent-orchestrator/src/object/page.ts": 6,
   "packages/agent-orchestrator/src/object/read.verb.ts": 4,
-  "packages/agent-orchestrator/src/object/run.verb.ts": 3,
+  "packages/agent-orchestrator/src/object/run.verb.ts": 2,
   "packages/agent-orchestrator/src/out-of-memory/out-of-memory.ts": 3,
   "packages/agent-orchestrator/src/pairing/commands.verb.ts": 3,
   "packages/agent-orchestrator/src/pairing/pairing.store.ts": 9,

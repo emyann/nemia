@@ -10,8 +10,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { barOf } from '@/lib/bar';
 import { stepFileQuery } from '@/lib/api/steps';
 import type { StepArtifact } from '@/lib/api/tries';
-import { useRunRead, type StepView } from '@/lib/runView';
-import { fileKey, stepFilesOf } from '@/lib/stepPart';
+import { useRunRead } from '@/lib/runView';
+import { fileKey, viewedFilesOf } from '@/lib/stepPart';
 import { viewClosed, viewOf, viewOpened } from '@/lib/viewAddress';
 import { extensionOf, viewerOf, type Viewer } from '@/lib/viewers';
 import { cn, focusRing } from '@/components/ui/ds/utils';
@@ -22,12 +22,6 @@ import { bytesWord } from '../run/Artifacts';
 
 /** A file the api serves: its name, its link and its kind. */
 type Served = Extract<StepArtifact, { url: string }>;
-
-/** Every file of a step the sheet steps through, each once: those its shown try named, then those its folders hold (`stepFilesOf`). */
-const filesOf = (step: StepView): StepArtifact[] => {
-  const { named, unnamed } = stepFilesOf(step);
-  return [...named, ...unnamed];
-};
 
 /** The viewer of a file: by the kind the api serves it as and its name's extension; none for one it does not serve. */
 const viewerOfFile = (file: StepArtifact): Viewer =>
@@ -62,7 +56,7 @@ export function ViewerSheet() {
 function Viewed({ run, step: name, path }: { run: string; step: string; path: string }) {
   const { view } = useRunRead(run);
   const step = view?.steps.find((s) => s.name === name);
-  const files = step ? filesOf(step) : [];
+  const files = step ? viewedFilesOf(step) : [];
   const at = files.findIndex((f) => fileKey(f) === path);
   const file = files[at];
   return (

@@ -510,6 +510,17 @@ export function stepFilesOf(step: StepView): { named: StepArtifact[]; unnamed: S
   return { named, unnamed: [...unnamed.values()] };
 }
 
+/**
+ * Every file of a step the viewer's sheet steps through, each once: those its shown try named, then those its folders hold
+ * (`stepFilesOf`), but a file outside every folder of its step, which has neither a path from a folder nor a name and is addressed by
+ * nothing.
+ * @param step The step, as the run's view has it.
+ */
+export function viewedFilesOf(step: StepView): StepArtifact[] {
+  const { named, unnamed } = stepFilesOf(step);
+  return [...named, ...unnamed].filter((file) => file.relativePath !== undefined || 'name' in file);
+}
+
 /** How many files the step's artifacts folder and its folder hold that its closeout did not name, each counted once. */
 const unnamedOf = (step: StepView): number => stepFilesOf(step).unnamed.length;
 

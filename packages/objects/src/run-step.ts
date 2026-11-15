@@ -284,7 +284,7 @@ export const StepFiled = Schema.Struct({
 const relativePath = Schema.optionalKey(
   Schema.String.annotate({
     description:
-      "The file's path from its step's folder that holds it: its artifacts folder, or a folder run's own folder; absent for a file in neither.",
+      "The path the file has, or would have, under its step's folder (its artifacts folder, or a folder run's own folder); absent only for a file outside the step's folders.",
   }),
 );
 

@@ -6,7 +6,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunDetail } from '../src/lib/runView.ts';
-import { GOT_ORDER, PART_SLOTS, packetsOfView, slotsOf, stepFilesOf, stepPartOf, type PartSize } from '../src/lib/stepPart.ts';
+import {
+  GOT_ORDER,
+  PART_SLOTS,
+  fileKey,
+  packetsOfView,
+  slotsOf,
+  stepFilesOf,
+  stepPartOf,
+  viewedFilesOf,
+  type PartSize,
+} from '../src/lib/stepPart.ts';
 import { coded, detail, step } from './run-fixtures.ts';
 
 type Step = RunDetail['steps'][number];
@@ -296,4 +306,20 @@ test("a named file is matched by its path from the step's folder alone, never by
     ['/api/runs/r-1/steps/design/artifacts/shot.png'],
     'an equal path from the folder matches, whatever the server calls it',
   );
+});
+
+test("the viewer steps through a step's files by their path from its folder, and a file outside every folder is neither stepped to nor addressed", () => {
+  const named = design();
+  const step = {
+    ...named,
+    closeout: { ...named.closeout!, artifacts: [{ path: '/elsewhere/x.png' }, { path: 'spec.md', relativePath: 'spec.md' }] },
+  };
+  assert.deepEqual(
+    stepFilesOf(step).named.map(fileKey),
+    ['/elsewhere/x.png', 'spec.md'],
+    'its part still shows the path the closeout gave',
+  );
+  const viewed = viewedFilesOf(step).map(fileKey);
+  assert.deepEqual(viewed, ['spec.md', 'notes.txt', 'shot.png'], 'the sheet holds only files with a path from a folder or a name');
+  assert.ok(!viewed.some((key) => key.startsWith('/')), 'so no Previous or Next carries a path from the disk');
 });

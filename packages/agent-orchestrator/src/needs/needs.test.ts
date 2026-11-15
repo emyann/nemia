@@ -3,7 +3,8 @@
  * shortened bound and a shell that is not there); a workflow's needs read off its README's frontmatter, which its instruction no longer
  * shows (`workflowNeeds`, `workflowReadme`); a workflow need that fills a place's goes before it (`needsOfRun`); and the sweep reads the
  * places' needs, every declared harness's, every trusted factory's workflows' and the places' repository needs in each trusted factory's
- * repository (`needsOnce`). The laws of `needStateOf`, `needsHolding` and `fixRefusal` are proved by
+ * repository (`needsOnce`), a workflow's own need of `scope: repository` read in its factory's first repository and never where it has
+ * none (`ownCheckOf`, `workflowCheckOf`). The laws of `needStateOf`, `needsHolding` and `fixRefusal` are proved by
  * `contracts/needs.contract.ts`.
  */
 import { test } from 'node:test';
@@ -13,7 +14,17 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import type { Need } from 'objects';
-import { checkRan, checkKey, harnessCheckOf, needsMemo, needsOnce, needsEnv, repositoryCheckOf } from './needs.verb.ts';
+import {
+  checkRan,
+  checkKey,
+  harnessCheckOf,
+  needsMemo,
+  needsOnce,
+  needsEnv,
+  ownCheckOf,
+  repositoryCheckOf,
+  workflowCheckOf,
+} from './needs.verb.ts';
 import { needsHolding, needsOfRun, needStateOf } from './needs.ts';
 import { workflowNeeds, workflowNeedsRead, workflowReadme } from '../folder/folder.store.ts';
 import { toolsDir } from '../config/root.store.ts';
@@ -151,4 +162,58 @@ test("a sweep reads the places', the harnesses' and every trusted factory's work
   assert.equal(fs.existsSync(path.join(home, 'ran')), false, 'and never ran');
   assert.equal(fs.existsSync(path.join(untrusted.repo, 'ran-here')), false, 'nor its repository need');
   assert.equal(memo.version, read.size);
+});
+
+test("a workflow's need of scope repository is swept in its factory's repository, where the same check unscoped reads the store's folder", async () => {
+  const home = scratch('wf-needs-scoped-');
+  const repo = fs.mkdtempSync(path.join(home, 'repo-'));
+  const dir = path.join(repo, 'workflows', 'dev');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, 'README.md'),
+    [
+      '---',
+      'needs:',
+      '  - name: inside',
+      '    message: met inside the repository',
+      '    check: test -f only-here && test -n "$WF_CARRIED_FILES"',
+      '    scope: repository',
+      '  - name: outside',
+      '    message: the same check, unscoped',
+      '    check: test -f only-here',
+      '---',
+      '',
+    ].join('\n'),
+  );
+  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(repo, 'only-here'), '');
+  createFactoryAt(home, { name: 'acme', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  const placed = PlaceService.layer(testPlace().place);
+  await Effect.runPromise(trustPlaces([repo]).pipe(Effect.provide(placed)));
+  const memo = needsMemo(home, 2_000);
+  memo.placeNeeds = [];
+  const read = await Effect.runPromise(needsOnce(memo).pipe(Effect.provide(placed)));
+  const w = { factory: 'acme', workflow: 'dev', dir, repository: repo };
+  const [inside, outside] = workflowNeedsRead(dir).needs;
+  assert.ok(inside !== undefined && outside !== undefined);
+  const scoped = workflowCheckOf(w, inside);
+  assert.equal(scoped?.cwd, repo, "it runs in the factory's repository");
+  assert.equal(read.get(checkKey(scoped ?? { check: 'none' })), 'met', 'told the carried files, as an unscoped check is');
+  const unscoped = workflowCheckOf(w, outside);
+  assert.equal(unscoped?.cwd, undefined, 'a need that says no scope runs where it always has');
+  assert.equal(read.get(checkKey(unscoped ?? { check: 'none' })), 'missing');
+});
+
+test("a workflow's need of scope repository is never checked where there is no repository; one with no scope is checked without one", () => {
+  const folders = { workflowFiles: '/w', carriedFiles: '/c' };
+  const scoped: Need = { name: 'n', message: 'm', check: 'true', scope: 'repository' };
+  const unscoped: Need = { name: 'n', message: 'm', check: 'true' };
+  const rows: Array<[string, Need, string | undefined, ReturnType<typeof ownCheckOf>]> = [
+    ['scoped, in a repository', scoped, '/r', { check: 'true', ...folders, cwd: '/r' }],
+    ['scoped, with no repository', scoped, undefined, undefined],
+    ['unscoped, in a repository', unscoped, '/r', { check: 'true', ...folders }],
+    ['unscoped, with no repository', unscoped, undefined, { check: 'true', ...folders }],
+  ];
+  for (const [row, need, repository, want] of rows) assert.deepEqual(ownCheckOf(need, folders, repository), want, row);
+  assert.equal(workflowCheckOf({ factory: 'f', workflow: 'w', dir: '/w' }, scoped), undefined, 'a factory with no repository');
 });

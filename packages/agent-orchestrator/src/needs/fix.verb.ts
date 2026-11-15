@@ -37,6 +37,7 @@ import {
   NeedsMemory,
   needsOnce,
   runNeedNames,
+  type FactoryWorkflow,
 } from './needs.verb.ts';
 import { readFixRecord, writeFixRecord, type FixRecord } from './fix.store.ts';
 import { runEnded } from '../run-ending/run-ending.ts';
@@ -115,11 +116,24 @@ function workflowDeclaring(home: string, placeNeeds: readonly Need[], start: Fix
   const own = workflowNeedsRead(workflow.dir).needs;
   const ofWorkflow = (fixes: readonly NeedFix[] | undefined): Declared[] => (fixes ?? []).map((fix) => ({ fix, origin: 'workflow' }));
   const mine = own.find((n) => n.name === start.need && (n.fills === undefined || !placeNeeds.some((p) => p.name === n.fills)));
-  if (mine !== undefined) return { need: mine, declared: ofWorkflow(mine.fixes), listing, folders };
+  if (mine !== undefined) return { need: mine, declared: ofWorkflow(mine.fixes), listing, folders, ...ownRepository(mine, workflow) };
   const placed = placeNeeds.find((p) => p.name === start.need);
   const fillers = own.filter((n) => placed !== undefined && n.fills === placed.name).flatMap((n) => ofWorkflow(n.fixes));
   const places = (placed?.fixes ?? []).map((fix): Declared => ({ fix, origin: 'place' }));
   return { need: placed, declared: [...fillers, ...places], listing, folders };
+}
+
+/**
+ * The repository a workflow's own `need` is fixed in: its factory's first (`FactoryWorkflow.repository`) where it says `scope:
+ * repository`, none where it says no scope; refused (`Invalid`) for a repository need of a factory with no repository.
+ */
+function ownRepository(need: Need, workflow: FactoryWorkflow): { repository?: string } {
+  if (!isRepositoryNeed(need)) return {};
+  if (workflow.repository === undefined)
+    throw new Invalid({
+      message: `${need.name} is fixed in the factory ${workflow.factory}'s repository, and it has none: file the factory on a repository, then start the fix again.`,
+    });
+  return { repository: workflow.repository };
 }
 
 /**
@@ -215,7 +229,8 @@ function answersOf(found: FixFound, start: FixStart): Record<string, string> {
  * workflow or a repository of a factory whose places are not trusted declares it (`fixRefusal`); refused (`Conflict`, naming `nemia cancel
  * <run>` for each) where it takes a need away (`removes`) that an unfinished run needs (`runsHoldingRemoval`); and refused where an answer
  * it asks is left out (`answersOf`); then filed on the runtime as a command task (`harness: 'command'`, as a script condition is), its
- * stdout and stderr one stream, under `FIX_DEADLINE_SECONDS`, in the store's folder (a repository need's in the factory's repository), with
+ * stdout and stderr one stream, under `FIX_DEADLINE_SECONDS`, in the store's folder (a place's or a workflow's need of `scope:
+ * repository` in the factory's first repository), with
  * the tools folder first on its PATH and as `NEMIA_TOOLS`, each answer as `NEMIA_ANSWER_<NAME>`, and a workflow's fix its factory's live
  * folders as a step is told them (`WF_WORKFLOW_FILES`, `WF_CARRIED_FILES`); its record kept under `<home>/fixes/<id>.json`. The runtime
  * runs it on the daemon's next pass.
@@ -245,7 +260,7 @@ export const startFix = Effect.fn('startFix')(function* (start: FixStart) {
       harness: 'command',
       priority: MOMENTUM,
       brief: `fix ${found.need.name}: ${found.fix.message}`,
-      cwd: found.origin === 'repository' && found.repository !== undefined ? found.repository : home,
+      cwd: found.repository ?? home,
       deadlineSeconds: FIX_DEADLINE_SECONDS,
       config: { command: ['sh', '-c', `exec 2>&1\n${found.fix.command}`], env },
     }),

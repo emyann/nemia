@@ -6,6 +6,8 @@
  * `nemia cancel` for it, and let through once that run is cancelled; and a sign-in a person types is refused (`Invalid`). A workflow's:
  * a fresh run of a workflow whose README declares a need its check reads missing waits before its first session — nothing filed, no slot
  * held — and the pass after its check reads met files its first step; a run that has filed a step is never held when the need lapses.
+ * A workflow's need of `scope: repository` is checked in the run's repository: met there, it holds nothing, where the same check with
+ * no scope, read in the store's folder, holds the run.
  * The sweep's memory (`NeedsMemory`) is this file's own, given to each pass as the daemon gives its own, and read again by `needsOnce`
  * as the daemon's sweep does. The test's store is its own, at `ROOT`, given as `ENV`; the PATH its checks inherit holds no harness's
  * program of the machine's, so only what a checkpoint plants is found.
@@ -204,5 +206,41 @@ test('a fresh run waits on a missing need of its workflow, starts once it is met
     const { read } = await stage.runWith(b.e, readRun(b.e, runRecord(ROOT, id)).pipe(Effect.provideService(NeedsMemory, memo)));
     assert.equal(assess(read).waitingOnNeeds, undefined);
     assert.ok(!(await listed(id)).some((w) => w.includes('waiting on tool')));
+  });
+});
+
+test("a run's workflow need of scope repository is checked in the run's repository, where the same check unscoped holds it", async (t) => {
+  const s = story(t);
+  const memo = needsMemo(ROOT, 2_000);
+  const b = stage.board();
+  const tick = (id: string) => stage.runWith(b.e, advanceRun(runRecord(ROOT, id)).pipe(Effect.provideService(NeedsMemory, memo)));
+  const marked = (): string => {
+    const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+    stage.place().world.repository(repo, { 'README.md': 'readme\n', 'only-here': '' });
+    return repo;
+  };
+  const scoped = (scope: string[]): string =>
+    workflow(
+      ['---', 'needs:', '  - name: inside', '    message: met inside the repository', '    check: test -f only-here', ...scope, '---', ''].join(
+        '\n',
+      ),
+    );
+
+  await s.test('scoped to the repository, the need reads met in the run\'s repository and the first step is filed', async () => {
+    const id = (await stage.runPlaced(startRun({ brief: 'build it', repo: marked(), workflowDir: scoped(['    scope: repository']) }))).id;
+    await tick(id);
+    assert.deepEqual(b.filings, [`${id}-implement`]);
+  });
+
+  await s.test('with no scope, the same check reads the store\'s folder, and the run waits on it', async () => {
+    const before = b.filings.length;
+    const id = (await stage.runPlaced(startRun({ brief: 'build it', repo: marked(), workflowDir: scoped([]) }))).id;
+    await tick(id);
+    assert.equal(b.filings.length, before, 'nothing is filed');
+    const { read } = await stage.runWith(b.e, readRun(b.e, runRecord(ROOT, id)).pipe(Effect.provideService(NeedsMemory, memo)));
+    assert.deepEqual(
+      assess(read).waitingOnNeeds?.map((w) => w.name),
+      ['inside'],
+    );
   });
 });

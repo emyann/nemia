@@ -15,6 +15,8 @@ import { names } from '../../test/assessed.ts';
 import { WorkflowError } from '../step/step.ts';
 import { skillEntryOf } from './skills.ts';
 import { LOOKUP } from '../definition/served.ts';
+import { placesOf } from '../folder/lookup.store.ts';
+import { writeLibraryAdds } from '../library/library.store.ts';
 import {
   BUILTIN_SKILLS,
   copySkillFiles,
@@ -405,11 +407,42 @@ test("the folders a workflow's definitions are looked for in follow the one look
   const origins = {
     factory: path.join(at, 'tree', 'workflows'),
     repo: path.join(at, 'repo', '.claude'),
-    yours: path.join(at, 'home', 'workflows'),
+    user: path.join(at, 'home', 'workflows'),
   };
   assert.deepEqual(
     roots,
     LOOKUP.flatMap((origin) => (origin === 'builtin' ? [] : [origins[origin]])),
   );
   assert.deepEqual(lookupRoots(workflow), [origins.factory], 'with no repository and no store, only its own');
+});
+
+test("a factory finds a library skill and a builtin one once it has added it, and every one while it has no record of its adds", async (t) => {
+  const home = scratch('wf-library-gate-');
+  written(home, { 'workflows/skills/tidy/SKILL.md': SKILL });
+  const repo = checkout();
+  const lookup = (factory?: string) => skillsFor(path.join(repo, 'workflows', 'dev'), placesOf(home, repo, factory)).at;
+  const record = (adds: ReadonlyArray<{ kind: 'Agent' | 'Skill' | 'McpServer'; name: string }>) =>
+    writeLibraryAdds(home, 'acme', adds);
+  await t.test('unrecorded: the library skill and the builtin are found, as before the library had adds', () => {
+    assert.equal(lookup('acme').get('tidy'), path.join(home, 'workflows', 'skills', 'tidy'));
+    assert.equal(lookup('acme').get('create-an-agent'), path.join(BUILTIN_SKILLS, 'create-an-agent'));
+  });
+  await t.test('recorded without the add: neither the library skill nor the builtin is found', () => {
+    record([]);
+    assert.equal(lookup('acme').get('tidy'), undefined);
+    assert.equal(lookup('acme').get('create-an-agent'), undefined);
+  });
+  await t.test('recorded with the adds: both are found', () => {
+    record([
+      { kind: 'Skill', name: 'tidy' },
+      { kind: 'Skill', name: 'create-an-agent' },
+    ]);
+    assert.equal(lookup('acme').get('tidy'), path.join(home, 'workflows', 'skills', 'tidy'));
+    assert.equal(lookup('acme').get('create-an-agent'), path.join(BUILTIN_SKILLS, 'create-an-agent'));
+  });
+  await t.test("a read in no factory reads the library whole, and the repository's own skill is never gated", () => {
+    assert.equal(lookup(undefined).get('tidy'), path.join(home, 'workflows', 'skills', 'tidy'));
+    record([]);
+    assert.equal(lookup('acme').get('x'), undefined, 'checkout() keeps x in skills/, not .claude/skills/');
+  });
 });

@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { definitionsServed, type DefinitionFound, type DefinitionListed, type DefinitionOrigin } from './served.ts';
 
-const LOOKUP: readonly DefinitionOrigin[] = ['factory', 'repo', 'yours', 'builtin'];
+const LOOKUP: readonly DefinitionOrigin[] = ['factory', 'repo', 'user', 'builtin'];
 const NAMES = ['a', 'b'];
 const ITEMS: DefinitionFound[] = NAMES.flatMap((name) => LOOKUP.map((origin) => ({ name, origin })));
 const MOST = 4;
@@ -63,13 +63,13 @@ test('a namespace lists each name found once, in the order found, its first orig
 test('REFUSED: a list that serves a name twice, or one not found, breaks its law', () => {
   const found: DefinitionFound[] = [
     { name: 'a', origin: 'repo' },
-    { name: 'a', origin: 'yours' },
+    { name: 'a', origin: 'user' },
   ];
   const twice: DefinitionListed[] = [
     { name: 'a', origin: 'repo', shadowedBy: null },
-    { name: 'a', origin: 'yours', shadowedBy: 'repo' },
+    { name: 'a', origin: 'user', shadowedBy: 'repo' },
   ];
   assert.equal(LAWS.eachNameOnce?.(found, undefined, twice), false, 'a name served twice');
   assert.equal(LAWS.servedWereFound?.(found, undefined, [{ name: 'a', origin: 'builtin', shadowedBy: 'repo' }]), false, 'one not found');
-  assert.equal(LAWS.firstOriginWins?.(found, undefined, [{ name: 'a', origin: 'yours', shadowedBy: 'repo' }]), false, 'not the first');
+  assert.equal(LAWS.firstOriginWins?.(found, undefined, [{ name: 'a', origin: 'user', shadowedBy: 'repo' }]), false, 'not the first');
 });

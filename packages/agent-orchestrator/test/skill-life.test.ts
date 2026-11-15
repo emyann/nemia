@@ -103,7 +103,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
   await s.test(
     "a skill written from the board's form is written as Nemia ships its own, and read back by the card reader and YAML",
     async () => {
-      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'yours', change: DRAFT }));
+      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'user', change: DRAFT }));
       assert.ok('version' in made, JSON.stringify(made));
       version = made.version;
       const text = read('tidy-notes');
@@ -201,7 +201,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
   await s.test(
     "a skill of another place is copied whole into the library, byte for byte, and the store's agents are given it",
     async () => {
-      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'yours', copy: copied, builtin: SHIPPED }));
+      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'user', copy: copied, builtin: SHIPPED }));
       assert.deepEqual(made, { dir: path.join(LIBRARY, copied), name: copied, written: ['SKILL.md'] });
       assert.deepEqual(snapshot(path.join(LIBRARY, copied)), snapshot(path.join(SHIPPED, copied)), 'byte for byte');
       assert.equal(skillsFor(path.join(ROOT, 'workflows', '_'), { home: ROOT }).at.get(copied), path.join(LIBRARY, copied));
@@ -216,7 +216,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
 
   await s.test('REFUSED: a copy over a skill the library has, naming the folder, and nothing written', async () => {
     const before = snapshot(LIBRARY);
-    await assert.rejects(stage.runWith(e, SKILLS_WRITE.handler({ from: 'yours', copy: copied, builtin: SHIPPED })), (err: unknown) => {
+    await assert.rejects(stage.runWith(e, SKILLS_WRITE.handler({ from: 'user', copy: copied, builtin: SHIPPED })), (err: unknown) => {
       assert.ok(isRefusal(err), String(err));
       names(err.message, `skills/${copied}`, LIBRARY);
       return true;

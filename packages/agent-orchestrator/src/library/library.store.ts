@@ -4,7 +4,7 @@
  *
  * - `$WF_ROOT/factories/<name>/library.json`, a factory's adds: a per-factory folder file, as `servers.json` is, legal for `default` too,
  *   whose record is no file. Absent, the factory is *unrecorded*: its adds are those its workflows resolve today, and nothing is migrated.
- * - `$WF_ROOT/workflows/servers.json`, the person's library servers, in the shape of a factory's `servers.json`.
+ * - `$WF_ROOT/workflows/mcpservers.json`, the person's library servers, in the shape of a factory's `servers.json`.
  * - `$WF_ROOT/workflows/copies.json`, the digest of each builtin the person copied, at the copy, by `<kind>/<name>`.
  *
  * Every function takes the store's root first, as a required `home: string`, as `servers.store.ts` does.
@@ -114,7 +114,7 @@ export const libraryDir = (home: string): string => path.join(home, 'workflows')
  * @param home The store's root.
  */
 export const libraryServers = (home: string): FactoryServers =>
-  readServersAt(path.join(libraryDir(home), 'servers.json'), 'record the server again with nemia mcp add <server> --url <address>')
+  readServersAt(path.join(libraryDir(home), 'mcpservers.json'), 'record the server again with nemia mcp add <server> --url <address>')
     ?.servers ?? {};
 
 /**
@@ -123,7 +123,7 @@ export const libraryServers = (home: string): FactoryServers =>
  * @param servers Every library server, by name.
  */
 export const writeLibraryServers = (home: string, servers: FactoryServers): void =>
-  writeServersAt(path.join(libraryDir(home), 'servers.json'), servers);
+  writeServersAt(path.join(libraryDir(home), 'mcpservers.json'), servers);
 
 /**
  * The digest of each builtin the person copied, at the copy, by `<kind>/<name>`; `{}` where none was recorded.

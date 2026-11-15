@@ -51,7 +51,7 @@ export const libraryRootOf = (places: Places): string | undefined =>
   places.home ? path.join(path.resolve(places.home), 'workflows') : undefined;
 
 /** The folder of a repository that holds its own `agents/` and `skills/`, which a session there reads too. */
-const REPOSITORY_HOLDER = '.claude';
+export const REPOSITORY_HOLDER = '.claude';
 
 /**
  * The folders a workflow's agents and skills are looked for in, each holding an `agents/` and a `skills/`, in the one order a name is

@@ -12,8 +12,8 @@ import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { DEFAULT_NAMESPACE, type Factory } from '../factory/factory.ts';
 import { readFactoriesAt } from '../factory/factory.store.ts';
 import { stepsFilled } from '../roster/fills.store.ts';
-import { loadAgents } from '../agents/read.store.ts';
-import { BUILTIN_SKILLS } from '../skills/read.store.ts';
+import { frontmatterKey } from '../former/former.ts';
+import { BUILTIN_SKILLS, REPOSITORY_HOLDER } from '../skills/read.store.ts';
 import { builtinServers, BUILTIN_SERVERS } from '../factory/servers/servers.store.ts';
 import { Missing } from '../refusal/refusal.ts';
 import { addName, libraryAddRefusal, libraryAddState, libraryAddsOf, sameAdd, type LibraryKind, type LibraryRef } from './library.ts';
@@ -42,6 +42,21 @@ const librarySkill = (home: string, name: string): DefinitionOrigin | undefined 
   return holds(BUILTIN_SKILLS) ? 'builtin' : undefined;
 };
 
+/** The skills the agent file `file` gives, as its `skills:` line lists them; none for a file that cannot be read. */
+const givenSkills = (file: string): string[] => {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return [];
+  }
+  return (frontmatterKey(text, 'skills') ?? '')
+    .replace(/^\[|\]$/g, '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
+
 /**
  * The library items the factory `name` resolves today, from the steps it fills: each library agent a step is credited to (`stepsFilled`,
  * the file a start would run), and each skill an agent that fills a step gives that the library holds.
@@ -66,16 +81,9 @@ export function derivedAdds(home: string, name: string): LibraryRef[] {
   const add = (ref: LibraryRef) => {
     if (!adds.some((a) => sameAdd(a, ref))) adds.push(ref);
   };
-  const folders = new Map<string, ReturnType<typeof loadAgents>>();
   for (const file of [...files].sort()) {
-    const agent = path.basename(file, '.md');
-    if (inFolder(file, agentsDir)) add({ kind: 'Agent', name: agent });
-    const dir = path.dirname(file);
-    const loaded = folders.get(dir) ?? loadAgents(dir);
-    folders.set(dir, loaded);
-    const read = loaded.get(agent);
-    if (read === undefined || read instanceof Error) continue;
-    for (const skill of read.skills ?? []) if (!skill.includes(':') && librarySkill(home, skill)) add({ kind: 'Skill', name: skill });
+    if (inFolder(file, agentsDir)) add({ kind: 'Agent', name: path.basename(file, '.md') });
+    for (const skill of givenSkills(file)) if (!skill.includes(':') && librarySkill(home, skill)) add({ kind: 'Skill', name: skill });
   }
   return adds;
 }
@@ -123,7 +131,7 @@ function ownOrigins(home: string, name: string, ref: LibraryRef): DefinitionOrig
       : fs.existsSync(path.join(root, SKILLS_FOLDER, ref.name, 'SKILL.md'));
   const out: DefinitionOrigin[] = [];
   if (factory.tree !== undefined && at(path.join(factory.tree, 'workflows'))) out.push('factory');
-  if (factory.repos.some((repo) => at(path.join(path.resolve(repo), '.claude')))) out.push('repo');
+  if (factory.repos.some((repo) => at(path.join(path.resolve(repo), REPOSITORY_HOLDER)))) out.push('repo');
   return out;
 }
 

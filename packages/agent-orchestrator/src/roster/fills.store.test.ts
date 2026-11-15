@@ -43,7 +43,7 @@ test("every step of both places, credited to the file a start runs: the workflow
   assert.deepEqual(stepsFilled(repo, home), [
     { from: 'repo', workflow: 'alpha', step: 'review', hired: false, file: theirs('iris') },
     { from: 'repo', workflow: 'gamma', step: 'plan', hired: false, file: theirs('ada') },
-    { from: 'yours', workflow: 'omega', step: 'step', hired: false, file: yours('zed') },
+    { from: 'user', workflow: 'omega', step: 'step', hired: false, file: yours('zed') },
   ]);
 });
 
@@ -83,7 +83,7 @@ test("a factory made from a template fills the steps of its tree's workflows wit
   const own = path.resolve(tree, 'workflows', 'agents', 'proof.md');
   assert.deepEqual(stepsFilled(repo, home, treed), [
     { from: 'factory', workflow: 'alpha', step: 'review', hired: true, file: own },
-    { from: 'yours', workflow: 'omega', step: 'step', hired: false, file: yours('zed') },
+    { from: 'user', workflow: 'omega', step: 'step', hired: false, file: yours('zed') },
   ]);
   assert.deepEqual(factoriesFilling([{ ...treed, file: 'treed.json' }], home).get(own), ['treed']);
   assert.deepEqual(factoriesFilling([{ ...treed, repos: [], file: 'treed.json' }], home).get(own), ['treed'], 'on its tree alone');

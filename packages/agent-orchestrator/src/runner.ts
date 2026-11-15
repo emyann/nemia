@@ -184,6 +184,7 @@ export {
   workflowNeeds,
   workflowReadme,
   workflowReadmeWith,
+  workflowSpecReadme,
   workflowsIn,
 } from './folder/folder.store.ts';
 export { cardSkills, isBuiltinPlace, lookupRoots, oneFolder, preloads, skillsFor, skillVersion } from './skills/read.store.ts';

@@ -22,6 +22,7 @@ import {
   type ChangeVerb,
   type Proposal,
   type ProposalChange,
+  type Need,
   type ProposedObject,
   DEFAULT_NAMESPACE,
 } from 'objects';
@@ -29,6 +30,7 @@ import { Conflict, Forbidden, Invalid, Missing, type Refusal } from '../refusal/
 import { brokenBy } from '../door/door.store.ts';
 import { mayPropose } from '../approval/index.ts';
 import { accessChange, accessOf } from './access.ts';
+import { readmeComposed } from '../folder/folder.ts';
 import { currentOf, type ProposalNeeds, type ProposalPlace } from './current.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { proposerOf, type ProposalCaller } from '../caller/index.ts';
@@ -205,15 +207,38 @@ const changeOf = (place: ProposalPlace, factory: string, object: ProposedObject)
     return change;
   });
 
+/** `value` as a record, or none where it is not an object. */
+const recordOf = (value: unknown): Readonly<Record<string, unknown>> | undefined =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+
 /**
- * The spec an object will hold once written: a Factory's parts it names over what it holds; any other kind's spec whole.
+ * A Workflow's `spec` as its apply writes it over `now`, the spec its folder holds (`currentOf`), in `now`'s shape: its `readme` the
+ * README the write composes (`readmeComposed`), its `readme` under a frontmatter of its `needs`, each `now`'s where left out, and no
+ * `needs` apart, since that README declares them. A proposal that leaves its needs out so shows `now`'s frontmatter as it is, and one that
+ * gives others shows them in it.
+ */
+const workflowAsWritten = (spec: Readonly<Record<string, unknown>>, now: Readonly<Record<string, unknown>> | undefined): unknown => {
+  const was = typeof now?.readme === 'string' ? now.readme : undefined;
+  const body = typeof spec.readme === 'string' ? spec.readme : undefined;
+  const needs = Array.isArray(spec.needs) ? (spec.needs as readonly Need[]) : undefined;
+  const readme = readmeComposed(was ?? '', body, needs) ?? was;
+  const { needs: _given, readme: _readme, ...rest } = spec;
+  return readme === undefined ? rest : { ...rest, readme };
+};
+
+/**
+ * The spec an object will hold once written: a Factory's parts it names over what it holds; a Workflow's README and needs as its apply
+ * writes them (`workflowAsWritten`); any other kind's spec whole.
  * @param object The object proposed.
  * @param now The spec the object holds now; undefined where nothing is there.
  */
-export const mergedSpec = (object: ProposedObject, now: unknown): unknown =>
-  object.kind === 'Factory' && typeof now === 'object' && now !== null && typeof object.spec === 'object' && object.spec !== null
-    ? { ...now, ...object.spec }
-    : object.spec;
+export const mergedSpec = (object: ProposedObject, now: unknown): unknown => {
+  const spec = recordOf(object.spec);
+  const was = recordOf(now);
+  if (spec === undefined) return object.spec;
+  if (object.kind === 'Workflow') return workflowAsWritten(spec, was);
+  return object.kind === 'Factory' && was !== undefined ? { ...was, ...spec } : object.spec;
+};
 
 /** A spec read for a proposal, refused (`Invalid`) where it is no proposal's: the body as `ProposalSpec` decodes it. */
 const specRead = (body: unknown): Effect.Effect<ProposalSpec, Invalid> => {

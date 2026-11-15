@@ -3,6 +3,8 @@
  * step and the folders beside it may take, and `parseFolder`, which reads every step and checks them together.
  */
 import path from 'node:path';
+import type { Need } from 'objects';
+import { frontmatterOfValues, frontmatterValues } from '../frontmatter/frontmatter.ts';
 import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, isReadme, SKILLS_FOLDER, type StepSpec } from '../step/step.ts';
 import { orderSteps, parseWorkflow, validate, type Hire } from '../workflow/index.ts';
 import type { Agents, SkillsFound } from '../agents/agents.ts';
@@ -321,4 +323,39 @@ export function textIn(bytes: Uint8Array): string | null {
   } catch {
     return null;
   }
+}
+
+/** The keys of a frontmatter `block` other than its needs, none where it does not read as a map. */
+function frontmatterKeysBeside(block: string | undefined): Record<string, unknown> {
+  let read: unknown;
+  try {
+    read = block === undefined ? undefined : frontmatterValues(block);
+  } catch {
+    read = undefined;
+  }
+  if (typeof read !== 'object' || read === null || Array.isArray(read)) return {};
+  const { needs: _needs, ...rest } = read as Record<string, unknown>;
+  return rest;
+}
+
+/**
+ * The README a write of a workflow writes over `onDisk`, the README it has: `body`, the instruction (`onDisk`'s own where none is given),
+ * under a frontmatter whose `needs:` is `needs` (`onDisk`'s own where none are given) beside the frontmatter's other keys. A `body` that
+ * carries a frontmatter of its own is read as the whole README, its frontmatter in place of `onDisk`'s. No frontmatter where it would hold
+ * nothing, and undefined where neither is given: the README is then left as it is. Pure: one rule for a write (`workflowSpecReadme`) and
+ * for the spec a proposal will hold once written (`mergedSpec`).
+ * @param onDisk The README the folder has now, frontmatter and all; empty where it has none.
+ * @param body The instruction to write, or undefined to keep `onDisk`'s.
+ * @param needs The needs to declare, or undefined to keep `onDisk`'s.
+ */
+export function readmeComposed(onDisk: string, body: string | undefined, needs: readonly Need[] | undefined): string | undefined {
+  if (body === undefined && needs === undefined) return undefined;
+  const given = body?.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+  const own = given === undefined ? undefined : FRONTMATTER.exec(given);
+  const was = onDisk.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+  const block = own ?? FRONTMATTER.exec(was);
+  const instruction = given === undefined ? was.slice(block?.[0].length ?? 0) : given.slice(own?.[0].length ?? 0);
+  if (needs === undefined) return `${block?.[0] ?? ''}${instruction}`;
+  const keys = { ...frontmatterKeysBeside(block?.[1]), ...(needs.length > 0 && { needs }) };
+  return Object.keys(keys).length === 0 ? instruction : `---\n${frontmatterOfValues(keys)}---\n${instruction}`;
 }

@@ -77,7 +77,8 @@ const orNone = <A, R>(read: Effect.Effect<A, Refusal, R>, current: (a: A) => Cur
   );
 
 /**
- * A workflow folder's spec as its files write it: each step's keys and body, by file name, its README, and its other text files. A file
+ * A workflow folder's spec as its files write it: each step's keys and body, by file name, its README, frontmatter and all — so its needs
+ * are said there and not apart, and an undo that writes this spec back writes the README byte for byte — and its other text files. A file
  * that is not text, or not directly in it, a Workflow's spec does not carry.
  */
 function workflowSpecAt(dir: string): unknown {

@@ -26,7 +26,8 @@ import { PlaceService } from '../place/place.store.ts';
 import { StoreRoot, toolsBinDir } from '../config/root.store.ts';
 import { claudeTokenFile, TOKEN_MAKER, TOKEN_NAME, TOKEN_VARIABLE, writeClaudeToken } from '../sign-in/sign-in.store.ts';
 import { signInNeedOf } from './harness.ts';
-import { readinessOf, type CommandRead, type ReadinessFacts } from './readiness.verb.ts';
+import { readinessOf, workflowNeedPiece, type CommandRead, type ReadinessFacts } from './readiness.verb.ts';
+import { needsMemo } from './needs.verb.ts';
 import { sweptFacts } from './sweep.verb.ts';
 import { RunDoor, type RunDoorShape } from '../runs/runs.store.ts';
 import type { Run } from '../record/record.ts';
@@ -558,4 +559,20 @@ test("a workflow's need of scope repository is read in its factory's repository,
     ['workflow', 'met', 'scoped', 'dev'],
   );
   assert.equal(of('unscoped-tool')?.state, 'missing');
+});
+
+test("a workflow's need of scope repository of a factory with no repository is missing, saying so, never read, with no fix offered", () => {
+  const memo = needsMemo(ROOT);
+  const need: Need = {
+    name: 'bare-tool',
+    message: 'the tool',
+    check: 'true',
+    scope: 'repository',
+    fixes: [{ command: 'install', message: 'install it' }],
+  };
+  const piece = workflowNeedPiece(memo, { factory: 'bare', workflow: 'dev', dir: '/w' }, need);
+  assert.deepEqual([piece.area, piece.state, piece.factory, piece.workflow, piece.fixes], ['workflow', 'missing', 'bare', 'dev', []]);
+  assert.notEqual(piece.message, need.message, 'it says why');
+  const placed = workflowNeedPiece(memo, { factory: 'bare', workflow: 'dev', dir: '/w', repository: '/r' }, need);
+  assert.equal(placed.state, 'unknown', 'with a repository, it is as the memory read it: here, not yet');
 });

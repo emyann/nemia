@@ -660,16 +660,26 @@ function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[], untr
         );
         continue;
       }
-      const checked = workflowCheckOf(w, need);
-      if (checked === undefined) {
-        out.push(needPiece(need, 'workflow', 'missing', at, [], {}, noRepositoryMessage(need)));
-        continue;
-      }
-      out.push(needPiece(need, 'workflow', memo.readings.get(checkKey(checked)), at));
+      out.push(workflowNeedPiece(memo, w, need));
     }
   }
   return out;
 }
+
+/**
+ * The piece of a factory's workflow's own `need`, as `memo` read it where it is checked (`workflowCheckOf`): in the store's folder, or in
+ * the factory's repository for a need of `scope: repository`; where the factory has none, which the store's files never hold (a factory's
+ * file names one at least) and a factory's type allows, missing, saying why (`noRepositoryMessage`), with no fix offered.
+ * @param memo The process's memory of its needs' readings.
+ * @param w The factory's workflow, with its live folder and its factory's repository.
+ * @param need The need the workflow declares.
+ */
+export const workflowNeedPiece = (memo: NeedsMemo, w: FactoryWorkflow, need: Need): ReadinessPiece => {
+  const at = { factory: w.factory, workflow: w.workflow };
+  const checked = workflowCheckOf(w, need);
+  if (checked === undefined) return needPiece(need, 'workflow', 'missing', at, [], {}, noRepositoryMessage(need));
+  return needPiece(need, 'workflow', memo.readings.get(checkKey(checked)), at);
+};
 
 /**
  * The places' repository needs (`scope: repository`), one piece each per factory, area `repository`, read in the factory's repository

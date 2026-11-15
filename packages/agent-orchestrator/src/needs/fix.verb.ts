@@ -125,9 +125,12 @@ function workflowDeclaring(home: string, placeNeeds: readonly Need[], start: Fix
 
 /**
  * The repository a workflow's own `need` is fixed in: its factory's first (`FactoryWorkflow.repository`) where it says `scope:
- * repository`, none where it says no scope; refused (`Invalid`) for a repository need of a factory with no repository.
+ * repository`, none where it says no scope; refused (`Invalid`) for a repository need of a factory with no repository, which the store's
+ * files never hold (a factory's file names one at least) and a factory's type allows.
+ * @param need The workflow's own need, with its scope.
+ * @param workflow The factory's workflow, with its factory's repository where it has one.
  */
-function ownRepository(need: Need, workflow: FactoryWorkflow): { repository?: string } {
+export function ownRepository(need: Need, workflow: FactoryWorkflow): { repository?: string } {
   if (!isRepositoryNeed(need)) return {};
   if (workflow.repository === undefined)
     throw new Invalid({

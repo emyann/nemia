@@ -1031,7 +1031,7 @@
     },
     {
       "term": "Repository need",
-      "meaning": "a need of `scope: repository` (`NeedScope`): checked and fixed in each factory's repository rather than once on the machine, one piece per factory in the read's `repository` area; swept only in a trusted factory's repository, and its fix, named by the factory alone (`nemia doctor fix <need> --factory <factory>`), refused for an untrusted one, naming `nemia factory trust <factory>`."
+      "meaning": "a need of `scope: repository` (`NeedScope`): checked and fixed in a factory's repository rather than once on the machine; swept only in a trusted factory's repository, and its fix refused for an untrusted one, naming `nemia factory trust <factory>`. A place's is checked in each factory's repository, one piece per factory in the read's `repository` area, its fix named by the factory alone (`nemia doctor fix <need> --factory <factory>`); a workflow's own in its factory's first repository, and a run's in the run's repository, still told the workflow's folders, read under its workflow in the `workflow` area and fixed with `--factory <factory> --workflow <workflow>` (`ownCheckOf`), unmet, saying why, where there is no repository."
     },
     {
       "term": "Readiness",

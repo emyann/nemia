@@ -7,7 +7,7 @@
  * a fresh run of a workflow whose README declares a need its check reads missing waits before its first session — nothing filed, no slot
  * held — and the pass after its check reads met files its first step; a run that has filed a step is never held when the need lapses.
  * A workflow's need of `scope: repository` is checked in the run's repository: met there, it holds nothing, where the same check with
- * no scope, read in the store's folder, holds the run.
+ * no scope, read in the store's folder, holds the run; and a run in a folder, which has no repository, is held by it, never checked.
  * The sweep's memory (`NeedsMemory`) is this file's own, given to each pass as the daemon gives its own, and read again by `needsOnce`
  * as the daemon's sweep does. The test's store is its own, at `ROOT`, given as `ENV`; the PATH its checks inherit holds no harness's
  * program of the machine's, so only what a checkpoint plants is found.
@@ -248,6 +248,33 @@ test("a run's workflow need of scope repository is checked in the run's reposito
     assert.deepEqual(
       assess(read).waitingOnNeeds?.map((w) => w.name),
       ['inside'],
+    );
+  });
+
+  await s.test('scoped to the repository, a run in a folder, which has no repository, waits on it, never checked', async () => {
+    const before = b.filings.length;
+    const dir = workflow(
+      [
+        '---',
+        'needs:',
+        '  - name: inside',
+        '    message: met wherever it runs',
+        '    check: "true"',
+        '    scope: repository',
+        '---',
+        '',
+      ].join('\n'),
+      'place: folder',
+    );
+    const id = (await stage.runPlaced(startRun({ brief: 'write it', repo: fs.mkdtempSync(path.join(ROOT, 'plain-')), workflowDir: dir })))
+      .id;
+    await tick(id);
+    assert.equal(b.filings.length, before, 'nothing is filed');
+    const { read } = await stage.runWith(b.e, readRun(b.e, runRecord(ROOT, id)).pipe(Effect.provideService(NeedsMemory, memo)));
+    assert.deepEqual(
+      assess(read).waitingOnNeeds?.map((w) => w.name),
+      ['inside'],
+      'a check met wherever it runs, yet missing: it was never run, there being no repository',
     );
   });
 });

@@ -20,7 +20,7 @@ import { factoryWriteOf } from '../workflows/workflows.verb.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
-import { workflowDirAt } from '../folder/folder.store.ts';
+import { workflowDirAt, workflowNeedsRead } from '../folder/folder.store.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { workflowSpecOf } from './workflow-spec.ts';
 import { agentSpecOf } from './agent-spec.ts';
@@ -77,8 +77,10 @@ const orNone = <A, R>(read: Effect.Effect<A, Refusal, R>, current: (a: A) => Cur
   );
 
 /**
- * A workflow folder's spec as its files write it: each step's keys and body, by file name, its README, and its other text files. A file
- * that is not text, or not directly in it, a Workflow's spec does not carry.
+ * A workflow folder's spec as its files write it: each step's keys and body, by file name, its README, frontmatter and all, the needs that
+ * frontmatter declares (`needs`, none where it declares none, and left out where they do not read), and its other text files. A file
+ * that is not text, or not directly in it, a Workflow's spec does not carry. The needs are said apart, as the api serves them, so a
+ * proposal's spec once written (`mergedSpec`) is compared with them, and an undo that writes this spec back writes them as they were.
  */
 function workflowSpecAt(dir: string): unknown {
   const texts = fs
@@ -88,7 +90,8 @@ function workflowSpecAt(dir: string): unknown {
       const text = textIn(fs.readFileSync(path.join(dir, e.name)));
       return text === null ? [] : [{ name: e.name, text }];
     });
-  return workflowSpecOf(texts);
+  const { needs, error } = workflowNeedsRead(dir);
+  return { ...workflowSpecOf(texts), ...(error === undefined && { needs }) };
 }
 
 /**

@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { frontmatterOfValues, frontmatterValues } from '../frontmatter/frontmatter.ts';
+import { frontmatterValues } from '../frontmatter/frontmatter.ts';
 import { FIELD_SHAPES, Need } from 'objects';
 import { firstPiece } from '../piece/piece.ts';
 import {
@@ -45,6 +45,7 @@ import {
   agentsDir,
   agentsFolderRefusal,
   parseFolder,
+  readmeComposed,
   readmeDescription,
   stepFiles,
   workflowDirRefusal,
@@ -319,6 +320,21 @@ function readmeText(dir: string): string | null {
 const NeedsDeclared = Schema.Struct({ needs: Schema.optionalKey(Schema.Array(Need)) });
 
 /**
+ * The machine needs a README's `text` declares in its frontmatter (`needs:`), none where it has no frontmatter or names none; and why they
+ * do not read (`why`, the decoder's words), none then. Pure.
+ * @param text The README's text, frontmatter and all.
+ */
+export function needsDeclaredIn(text: string): { readonly needs: readonly Need[]; readonly why?: string } {
+  const block = FRONTMATTER.exec(text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n'))?.[1];
+  if (block === undefined) return { needs: [] };
+  try {
+    return { needs: Schema.decodeUnknownSync(NeedsDeclared)(frontmatterValues(block) ?? {}).needs ?? [] };
+  } catch (err) {
+    return { needs: [], why: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
  * The machine needs the workflow of the folder `dir` declares, read off its README's frontmatter (`needs:`, each a `Need`: its name, what
  * it is, the shell command whose exit 0 says it is in place, its fixes and the place need it `fills`), and why they could not be read
  * (`error`, naming the file and what to mend), none then. None for a folder with no README, one with no frontmatter, and one whose
@@ -328,18 +344,12 @@ const NeedsDeclared = Schema.Struct({ needs: Schema.optionalKey(Schema.Array(Nee
 export function workflowNeedsRead(dir: string): { readonly needs: readonly Need[]; readonly error?: string } {
   const text = readmeText(dir);
   if (text === null) return { needs: [] };
-  const block = FRONTMATTER.exec(text.replace(/\r\n/g, '\n'))?.[1];
-  if (block === undefined) return { needs: [] };
-  try {
-    const declared = Schema.decodeUnknownSync(NeedsDeclared)(frontmatterValues(block) ?? {});
-    return { needs: declared.needs ?? [] };
-  } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    return {
-      needs: [],
-      error: `${path.join(dir, 'README.md')}'s frontmatter declares no needs that read (${firstPiece(why, '\n')}): mend its \`needs:\` list — each a name, a message and a check.`,
-    };
-  }
+  const { needs, why } = needsDeclaredIn(text);
+  if (why === undefined) return { needs };
+  return {
+    needs: [],
+    error: `${path.join(dir, 'README.md')}'s frontmatter declares no needs that read (${firstPiece(why, '\n')}): mend its \`needs:\` list — each a name, a message and a check.`,
+  };
 }
 
 /**
@@ -348,40 +358,29 @@ export function workflowNeedsRead(dir: string): { readonly needs: readonly Need[
  */
 export const workflowNeeds = (dir: string): readonly Need[] => workflowNeedsRead(dir).needs;
 
-/** The keys of a frontmatter `block` other than its needs, none where it does not read as a map. */
-function frontmatterKeysBeside(block: string | undefined): Record<string, unknown> {
-  let read: unknown;
-  try {
-    read = block === undefined ? undefined : frontmatterValues(block);
-  } catch {
-    read = undefined;
-  }
-  if (typeof read !== 'object' || read === null || Array.isArray(read)) return {};
-  const { needs: _needs, ...rest } = read as Record<string, unknown>;
-  return rest;
-}
-
 /**
  * The README a writer of the workflow of the folder `dir` hands `writeWorkflow` as `readme` (`write.store.ts`), so that what a read gave
- * — the instruction (`workflowReadme`) and the needs (`workflowNeeds`), apart — is written back whole: `body`, the instruction (the
- * README's own where none is given), under a frontmatter whose `needs:` is `needs` (the README's own where none are given) beside the
- * frontmatter's other keys. A `body` that carries a frontmatter of its own is read as the whole README, its frontmatter in place of the
- * folder's. No frontmatter where it would hold nothing, and undefined where neither is given: the README is then left as it is.
+ * — the instruction (`workflowReadme`) and the needs (`workflowNeeds`), apart — is written back whole: `body` under a frontmatter of
+ * `needs`, each the README's own where it is left out (`readmeComposed`). Undefined where neither is given: the README is left as it is.
  * @param dir The workflow's folder, whose README on disk fills what is not given.
  * @param body The instruction to write, or undefined to keep the README's own.
  * @param needs The needs to declare, or undefined to keep the README's own.
  */
 export function workflowReadmeWith(dir: string, body: string | undefined, needs: readonly Need[] | undefined): string | undefined {
-  if (body === undefined && needs === undefined) return undefined;
-  const given = body?.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
-  const own = given === undefined ? undefined : FRONTMATTER.exec(given);
-  const onDisk = (readmeText(dir) ?? '').replace(/\r\n/g, '\n');
-  const block = own ?? FRONTMATTER.exec(onDisk);
-  const instruction = given === undefined ? onDisk.slice(block?.[0].length ?? 0) : given.slice(own?.[0].length ?? 0);
-  if (needs === undefined) return `${block?.[0] ?? ''}${instruction}`;
-  const keys = { ...frontmatterKeysBeside(block?.[1]), ...(needs.length > 0 && { needs }) };
-  return Object.keys(keys).length === 0 ? instruction : `---\n${frontmatterOfValues(keys)}---\n${instruction}`;
+  return readmeComposed(readmeText(dir) ?? '', body, needs);
 }
+
+/**
+ * The README a Workflow's `spec` writes into the folder `dir`, whichever writer writes it — the api's `PUT` and a proposal's apply alike:
+ * its `readme` (null or left out, the README's own) under a frontmatter of its `needs` (left out, the README's own), as
+ * `workflowReadmeWith` composes it; undefined where it gives neither, the README left as it is.
+ * @param dir The workflow's folder.
+ * @param spec The Workflow's spec, of which its `readme` and `needs` are read.
+ */
+export const workflowSpecReadme = (
+  dir: string,
+  spec: { readonly readme?: string | null; readonly needs?: readonly Need[] },
+): string | undefined => workflowReadmeWith(dir, spec.readme ?? undefined, spec.needs);
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 

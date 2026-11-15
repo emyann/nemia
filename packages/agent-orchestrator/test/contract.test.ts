@@ -370,6 +370,7 @@ const READERS = [
   'workflowNeeds',
   'workflowReadme',
   'workflowReadmeWith',
+  'workflowSpecReadme',
   'workflowFolder',
   'workflowsIn',
 ];

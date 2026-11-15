@@ -30,7 +30,7 @@ import { AgentDoor, type AgentDoorShape } from '../agents/agent-door.store.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
 import type { AgentDraft } from '../agents/agents.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
-import { workflowDirAt } from '../folder/folder.store.ts';
+import { workflowDirAt, workflowSpecReadme } from '../folder/folder.store.ts';
 import type { StepDraft } from '../workflow/index.ts';
 import { definitionRevision } from '../revisions/revisions.store.ts';
 import type { RevisionKind } from '../revisions/revisions.ts';
@@ -117,7 +117,9 @@ const agentsFoundIn = <A, E, R>(against: readonly Entry[] | undefined, program: 
       );
 
 /**
- * A Workflow of the factory's tree written or removed. A spec that gives `files` gives the whole set of the folder's other text files,
+ * A Workflow of the factory's tree written or removed. Its README is written as the api's write writes it (`workflowSpecReadme`): its
+ * `readme` under a frontmatter of its `needs`, each the folder's own where it is left out, so a Workflow read as served, its needs apart,
+ * and proposed back keeps them. A spec that gives `files` gives the whole set of the folder's other text files,
  * so one it leaves out is removed (`whole`); one that gives none leaves them as they are. Its steps are judged against the agents of
  * `against` where it is given (`agentsFoundIn`), the tree an upgrade composes, else against the factory's tree.
  */
@@ -132,13 +134,14 @@ const workflowWritten = (place: ProposalPlace, factory: string, object: Proposed
       return uncounted(object);
     }
     const spec = object.spec as WorkflowSpec;
+    const readme = workflowSpecReadme(dir, spec);
     const saved = yield* agentsFoundIn(
       against,
       door.write(
         dir,
         {
           steps: spec.steps.map(stepDraftOf),
-          ...(typeof spec.readme === 'string' && { readme: spec.readme }),
+          ...(readme !== undefined && { readme }),
           ...(spec.files !== undefined && { files: spec.files, whole: true }),
         },
         object.metadata.resourceVersion,

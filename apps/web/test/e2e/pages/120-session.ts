@@ -7,11 +7,11 @@ export default {
   /**
    * A settled step's session, read once, drawn by the one conversation family: its name and a link back to the run at the top, its part
    * whole under it (its chip in the part's head), then the band that says nothing more arrives here, and the talk, the part and the talk
-   * scrolling together down to the machine bar at the window's foot — the brief folded to a line that opens, the calls and the thoughts among them folded into
-   * one turn, the session's words from their markdown in the agent's bubble, a line the harness wrote on its own as a quiet marker, and the
-   * closeout's one line, which points up to what the step said in its part. The session has ended, so no composer is drawn at all: the band
-   * carries why, and where to go instead. Read back, the talk says so and a pill offers the way to the latest, with no count: nothing of a
-   * step's session is counted unread. It is photographed from its start, scrolled up as a reader scrolls to it.
+   * scrolling together down to the machine bar at the window's foot — the brief folded to a line that opens, the calls and the thoughts
+   * among them folded into one turn, the session's words from their markdown in the agent's bubble, a line the harness wrote on its own as
+   * a quiet marker, and the closeout's one line, which points up to what the step said in its part. The session has ended, so no composer
+   * is drawn at all: the band carries why, and where to go instead. Read back, the talk says so and a pill offers the way to the latest,
+   * with no count: nothing of a step's session is counted unread. It is photographed from its start, scrolled up as a reader scrolls to it.
    */
   name: 'session',
   route: `/runs/${FAKE.id}/steps/${SESSION.step}`,

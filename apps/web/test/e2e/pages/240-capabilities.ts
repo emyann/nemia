@@ -88,12 +88,12 @@ async function unread(page: Page): Promise<void> {
 
 export default {
   /**
-   * The Capabilities page, a tab of Settings, and a factory's Skills, which its old address `?factory=` reaches: the checkout's skills, agents, MCP servers, deny rules and ask rules, each
-   * with where it was read from, and what each step gets — the checkout's dev, review fenced to its tools in dontAsk and implement on the
-   * harness's own set, and yours, on Codex, which claims nothing it was not measured to have. Read in FACTORIES' `hiring`, the factory on
-   * the checkout, made to offer `dev` and yours with no hire and taken back after; in the default factory, which works on no repository,
-   * it reads none, drawing no section of this repository's; with All picked, on the seed's several factories, it reads none and says why
-   * (`unread`).
+   * The Capabilities page, a tab of Settings, and a factory's Skills, which its old address `?factory=` reaches: the checkout's skills,
+   * agents, MCP servers, deny rules and ask rules, each with where it was read from, and what each step gets — the checkout's dev, review
+   * fenced to its tools in dontAsk and implement on the harness's own set, and yours, on Codex, which claims nothing it was not measured to
+   * have. Read in FACTORIES' `hiring`, the factory on the checkout, made to offer `dev` and yours with no hire and taken back after; in the
+   * default factory, which works on no repository, it reads none, drawing no section of this repository's; with All picked, on the seed's
+   * several factories, it reads none and says why (`unread`).
    */
   name: 'capabilities',
   route: '/capabilities',

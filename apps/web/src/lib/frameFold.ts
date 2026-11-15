@@ -1,26 +1,34 @@
 /**
- * How the frame stands around its one side sheet (`frameFold`, proved by `contracts/frame-fold.contract.ts`): the rail's form, the sheet's
- * form, what the sheet shows (what the address's `?bar=` names, or Nemia's chat), and whether the rail is narrow only for the sheet. Pure
- * and level-triggered: the rail folded for the sheet is read from what holds now, never written as the person's fold, so it comes back as
- * it was the moment the sheet closes.
+ * How the frame stands around its one side sheet and its factory pane (`frameFold`, proved by `contracts/frame-fold.contract.ts`): the
+ * store rail's form, the factory pane's form, the sheet's form and what the sheet shows (what the address's `?bar=` names, or Nemia's
+ * chat). Pure and level-triggered: the pane covered by the docked sheet under 1600 is read from what holds now, never written as the
+ * person's fold, so it comes back as it was the moment the sheet closes.
  */
 import type { FrameAt, FrameFold, FrameFoldOf } from '../../contracts/frame-fold.contract.ts';
 
-export type { FrameFold } from '../../contracts/frame-fold.contract.ts';
+export type { FrameFold, PaneForm } from '../../contracts/frame-fold.contract.ts';
 
 /**
  * The sheet shows what the address's `?bar=` names wherever it names one, else her chat where her face opened it off her own page, else
- * nothing; it is modal on a narrow screen and docked wider. The rail is the drawer on a narrow screen; wider it is narrow where the person
- * closed it, or where it makes room for the docked sheet under 1600 and they have not asked for it back; and it is said folded for the
- * sheet exactly where they keep it open and it is narrow.
- * @param at What holds now: the screen's width, the rail as the person left it, what the address's `?bar=` names and her sheet.
+ * nothing; it is modal on a narrow screen and docked wider. The rail is the drawer on a narrow screen and docked otherwise. The pane is
+ * drawn only on a factory's page: a section of the drawer on a narrow screen, folded where the person folded it, covered by the docked
+ * sheet under 1600, and docked otherwise.
+ * @param at What holds now: the screen's width, whether the page has a factory pane and the person keeps it open, what the address's
+ * `?bar=` names and her sheet.
  */
 export const frameFold: FrameFoldOf = (at: FrameAt): FrameFold => {
   const shows = at.barOpen ? 'bar' : at.sheetOpen && !at.ownsChat ? 'her' : 'none';
   const wanted = shows !== 'none';
-  const sheet = !wanted ? 'none' : at.width === 'narrow' ? 'modal' : 'docked';
-  if (at.width === 'narrow') return { rail: 'drawer', sheet, shows, foldedForSheet: false };
-  const makesRoom = at.width === 'medium' && wanted && !at.railAsked;
-  const rail = at.railOpen && !makesRoom ? 'expanded' : 'collapsed';
-  return { rail, sheet, shows, foldedForSheet: at.railOpen && rail === 'collapsed' };
+  if (at.width === 'narrow') {
+    return { rail: 'drawer', pane: at.hasPane ? 'drawer' : 'none', sheet: wanted ? 'modal' : 'none', shows };
+  }
+  const sheet = wanted ? 'docked' : 'none';
+  const pane = !at.hasPane
+    ? 'none'
+    : !at.paneOpen
+      ? 'folded'
+      : at.width === 'medium' && wanted
+        ? 'covered'
+        : 'docked';
+  return { rail: 'docked', pane, sheet, shows };
 };

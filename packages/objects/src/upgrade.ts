@@ -28,7 +28,10 @@ export const Upgrade = Schema.Struct({
   from: Schema.optionalKey(
     Schema.String.annotate({ description: 'The release the server ran when it started; left out on code run from a repository.' }),
   ),
-  phase: Schema.Literals(UPGRADE_PHASES).annotate({ description: 'Its phase.' }),
+  phase: Schema.Literals(UPGRADE_PHASES).annotate({
+    description:
+      'Where the upgrade stands, as the task that runs it says: pending until it starts, running, then succeeded on exit 0 or failed.',
+  }),
   output: Schema.String.annotate({ description: 'The tail of what it printed.' }),
   exitCode: Schema.optionalKey(describedNumber('Its exit code once it ended; absent while it runs.')),
   startedAt: Schema.String.annotate({ description: 'When it started, as an ISO 8601 time.' }),

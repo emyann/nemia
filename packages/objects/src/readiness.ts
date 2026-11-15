@@ -54,7 +54,10 @@ export type ReadinessFix = typeof ReadinessFix.Type;
  */
 export const ReadinessPiece = Schema.Struct({
   name: Schema.String.annotate({ description: "The piece's name; a need's name for a declared need." }),
-  area: Schema.Literals(READINESS_AREAS).annotate({ description: 'The area it belongs to.' }),
+  area: Schema.Literals(READINESS_AREAS).annotate({
+    description:
+      'The area of the readiness read it belongs to: a harness, the service, the bind, the machine, a place, a workflow, a repository, the factories, the release or the client.',
+  }),
   state: Schema.Literals(READINESS_STATES).annotate({ description: 'Whether it is in place, missing or not activated.' }),
   message: Schema.String.annotate({ description: 'A sentence of what it is or why it is not in place.' }),
   fixes: Schema.Array(ReadinessFix).annotate({ description: 'The ways to put it in place.' }),
@@ -175,7 +178,10 @@ export const Fix = Schema.Struct({
   workflow: Schema.optionalKey(
     Schema.String.annotate({ description: 'The workflow it fixes the need of; absent where the need has none.' }),
   ),
-  phase: Schema.Literals(FIX_PHASES).annotate({ description: 'Its phase.' }),
+  phase: Schema.Literals(FIX_PHASES).annotate({
+    description:
+      'Where the fix stands, as the task that runs it says: pending until it starts, running, then succeeded on exit 0 or failed.',
+  }),
   output: Schema.String.annotate({ description: 'The tail of what it printed.' }),
   code: Schema.optionalKey(Schema.String.annotate({ description: 'The pattern of the code its output shows, as declared.' })),
   exitCode: Schema.optionalKey(describedNumber('Its exit code once it ended; absent while it runs.')),

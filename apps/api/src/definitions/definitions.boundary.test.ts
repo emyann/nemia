@@ -71,6 +71,8 @@ const send = async (method: string, url: string, body?: unknown, headers: Record
 };
 const byName = (list: List) => Object.fromEntries(list.items.map((o) => [o.metadata.name, o]));
 const W = '/api/namespaces/default/workflows';
+/** The library's workflows, where a write of the user library is sent. */
+const L = '/api/workflows';
 
 test("default's WorkflowList: each name once, the repository's first, each with its typed graph and its revision", async () => {
   const { status, body } = await get<List>(W);
@@ -153,7 +155,7 @@ test("a factory's own workflow, a make in a factory and yours outside default ar
   assert.deepEqual([made.status, made.body.way], [422, 'factory']);
   assert.equal(fs.existsSync(path.join(STORE, 'fresh')), false);
   const away = await send('PUT', '/api/namespaces/works/workflows/mine', { metadata: { resourceVersion: 'x' }, spec: { steps: [] } });
-  assert.deepEqual([away.status, away.body.way], [422, 'default']);
+  assert.deepEqual([away.status, away.body.way], [422, 'library']);
   const rex = await send('PUT', '/api/namespaces/default/agents/rex', { metadata: { resourceVersion: 'x' }, spec: {} });
   assert.equal(rex.status, 422, "the repository's agent is no write of the api's");
 });
@@ -168,36 +170,36 @@ test("a builder's save round-trips its spec, the step files keep only their own 
       ['make', { after: ['plan'], place: 'git', agent: 'implementer' }],
     ],
   );
-  const saved = await send('PUT', `${W}/mine`, { metadata: { resourceVersion: read.metadata.resourceVersion }, spec: { steps } });
+  const saved = await send('PUT', `${L}/mine`, { metadata: { resourceVersion: read.metadata.resourceVersion }, spec: { steps } });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   assert.equal(saved.body.kind, 'Workflow');
   assert.deepEqual(saved.body.spec.steps, steps);
   assert.doesNotMatch(fs.readFileSync(path.join(STORE, 'mine', 'make.md'), 'utf8'), /model:/, "the agent's keys stay its own");
-  const stale = await send('PUT', `${W}/mine`, { metadata: { resourceVersion: read.metadata.resourceVersion + 'x' }, spec: { steps } });
+  const stale = await send('PUT', `${L}/mine`, { metadata: { resourceVersion: read.metadata.resourceVersion + 'x' }, spec: { steps } });
   assert.equal(stale.status, 409);
   const now = (await get<Obj>(`${W}/mine?origin=user`)).body.metadata.resourceVersion;
   const cycle = steps.map((s) => (s.name === 'plan' ? { ...s, keys: { ...s.keys, after: ['make'] } } : s));
-  const refused = await send('PUT', `${W}/mine`, { metadata: { resourceVersion: now }, spec: { steps: cycle } });
+  const refused = await send('PUT', `${L}/mine`, { metadata: { resourceVersion: now }, spec: { steps: cycle } });
   assert.equal(refused.status, 422);
   assert.deepEqual(refused.body.steps, ['make', 'plan']);
 });
 
 test('a workflow of yours made with its first step (201), then removed at the version read', async () => {
-  const made = await send('POST', W, {
+  const made = await send('POST', L, {
     metadata: { name: 'fresh' },
     spec: { steps: [{ name: 'only', keys: { place: 'git' }, body: 'Do it.' }] },
   });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   assert.equal(made.body.status.origin, 'user');
-  const missing = await send('DELETE', `${W}/fresh`);
+  const missing = await send('DELETE', `${L}/fresh`);
   assert.equal(missing.status, 422, 'a removal says the version it read');
-  const gone = await send('DELETE', `${W}/fresh?resourceVersion=${made.body.metadata.resourceVersion}`);
+  const gone = await send('DELETE', `${L}/fresh?resourceVersion=${made.body.metadata.resourceVersion}`);
   assert.equal(gone.status, 200, JSON.stringify(gone.body));
   assert.equal(fs.existsSync(path.join(STORE, 'fresh')), false);
 });
 
 test('an agent of yours made (201), tried (201), and its removal refused while a step names it (409, with its users)', async () => {
-  const made = await send('POST', '/api/namespaces/default/agents', {
+  const made = await send('POST', '/api/agents', {
     metadata: { name: 'tess' },
     spec: { keys: { harness: 'claude' }, instructions: 'You test.' },
   });
@@ -207,7 +209,7 @@ test('an agent of yours made (201), tried (201), and its removal refused while a
   assert.equal(tried.status, 201, JSON.stringify(tried.body));
   assert.equal(typeof tried.body.id, 'string');
   const implementer = (await get<Obj>('/api/namespaces/default/agents/implementer?origin=user')).body;
-  const kept = await send('DELETE', `/api/namespaces/default/agents/implementer?resourceVersion=${implementer.metadata.resourceVersion}`);
+  const kept = await send('DELETE', `/api/agents/implementer?resourceVersion=${implementer.metadata.resourceVersion}`);
   assert.equal(kept.status, 409, JSON.stringify(kept.body));
   assert.ok(Array.isArray(kept.body.users));
   const repos = (await get<List>('/api/namespaces/default/agents?origin=repo')).body;
@@ -255,18 +257,15 @@ test("a workflow's revision is read and never written: the same on a second read
 
 test('each retired path answers 404', async () => {
   const retired: Array<[string, string]> = [
-    ['GET', '/api/workflows'],
     ['POST', '/api/workflows/yours'],
     ['PUT', '/api/workflows/yours/mine'],
     ['DELETE', '/api/workflows/yours/mine'],
-    ['GET', '/api/agents'],
     ['GET', '/api/agents/yours/implementer'],
     ['PUT', '/api/agents/yours/implementer'],
     ['DELETE', '/api/agents/yours/implementer'],
     ['POST', '/api/agents/yours'],
     ['GET', '/api/agents/yours/implementer/card'],
     ['POST', '/api/agents/yours/implementer/try'],
-    ['GET', '/api/skills'],
     ['GET', '/api/skills/yours/x'],
     ['PUT', '/api/skills/yours/x'],
     ['POST', '/api/skills/yours'],

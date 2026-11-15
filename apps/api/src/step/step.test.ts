@@ -159,7 +159,7 @@ test("a step's hiring: the agents beside its workflow that read, by name — the
   });
   assert.deepEqual(await hiringOf(mill, 'build', {}, null, 'user', read), {
     refused: null,
-    agents: [{ name: 'ada', description: 'ada, of yours' }],
+    agents: [{ name: 'ada', description: 'ada, of user' }],
   });
 });
 

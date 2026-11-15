@@ -132,6 +132,6 @@ export async function agentsCopy(args: Args): Promise<number> {
   const as = textArg(args, 'as');
   const keep = listArg(args, 'keep');
   const payload = { file, ...(as !== undefined && { as }), ...(keep.length > 0 && { keep: [...keep] }) };
-  said(copiedLines(await asked(AGENTS_COPY_WORDS.name, (c) => c.agents.copy({ params: { namespace: DEFAULT_NAMESPACE }, payload }))));
+  said(copiedLines(await asked(AGENTS_COPY_WORDS.name, (c) => c.agents.copyLibrary({ payload }))));
   return 0;
 }

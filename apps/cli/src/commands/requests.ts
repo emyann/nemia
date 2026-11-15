@@ -70,7 +70,7 @@ export const namespaceOfCard = async (command: string, name: string): Promise<st
  * @param factory The factory `--factory` names, or undefined (or empty) where none is named.
  */
 export const namespaceOfPlace = (from: string | undefined, factory: string | undefined): string =>
-  from !== undefined && from !== 'yours' && from !== 'repo' ? from : factory !== undefined && factory !== '' ? factory : DEFAULT_NAMESPACE;
+  from !== undefined && from !== 'user' && from !== 'repo' ? from : factory !== undefined && factory !== '' ? factory : DEFAULT_NAMESPACE;
 
 /**
  * The `-l` selectors a command line took one by one, as the one label selector a query takes: joined by commas; none where none given.

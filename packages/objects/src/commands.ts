@@ -11,10 +11,20 @@ import { INBOX_WORDS } from './commands-inbox.ts';
 import { READ_WORDS } from './commands-reads.ts';
 import { REST_WORDS } from './commands-rest.ts';
 import { RUN_WORDS } from './commands-runs.ts';
+import { LIBRARY_WORDS_ALL } from './commands-library.ts';
 import { WRITER_WORDS } from './commands-writers.ts';
 
 /** The words of every command the client holds, group by group. */
-const WORDS = [...RUN_WORDS, ...INBOX_WORDS, ...FACTORY_WORDS, ...WRITER_WORDS, ...DEFINITION_WORDS, ...READ_WORDS, ...REST_WORDS] as const;
+const WORDS = [
+  ...RUN_WORDS,
+  ...INBOX_WORDS,
+  ...FACTORY_WORDS,
+  ...WRITER_WORDS,
+  ...DEFINITION_WORDS,
+  ...LIBRARY_WORDS_ALL,
+  ...READ_WORDS,
+  ...REST_WORDS,
+] as const;
 
 /** The name of a command the client holds. */
 export type MovedCommand = (typeof WORDS)[number]['name'];
@@ -31,5 +41,7 @@ export type InboxCommand = (typeof INBOX_WORDS)[number]['name'];
 export type FactoryCommand = (typeof FACTORY_WORDS)[number]['name'];
 export type WriterCommand = (typeof WRITER_WORDS)[number]['name'];
 export type DefinitionCommand = (typeof DEFINITION_WORDS)[number]['name'];
+/** A command of the library's. */
+export type LibraryCommand = (typeof LIBRARY_WORDS_ALL)[number]['name'];
 export type ReadCommand = (typeof READ_WORDS)[number]['name'];
 export type RestCommand = (typeof REST_WORDS)[number]['name'];

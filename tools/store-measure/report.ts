@@ -53,8 +53,9 @@
  *   `GET /api/namespaces/:name/schedules`, `hires`, `volumes` and `mcpservers`, over apps as `runList` is; null where the copy has no
  *   factory of its own. `libraryAddList`: `GET /api/namespaces/:name/libraryadds` of that factory, the same way: its adds, recorded or
  *   derived from what its workflows resolve. `libraryAgents`, `librarySkills`: `GET /api/agents` and `/api/skills` at the store's level,
- *   over apps as `runList` is, each item with the factories that use it, the library's reverse lookup over every factory. `ceilings`: `GET /api/ceilings`, the same way, and `ceilingsAfterPass` the same asked after a pass has filled the
- *   app's informer, as `runListAfterPass` is.
+ *   over apps as `runList` is, each item with the factories that use it, the library's reverse lookup over every factory.
+ *   `ceilings`: `GET /api/ceilings`, the same way, and `ceilingsAfterPass` the same asked after a pass has filled the app's informer, as
+ *   `runListAfterPass` is.
  *
  * Each read over apps carries the run records (`runs/<id>.json`) one call read, cold and warm (`records`), counted on a call of its own,
  * and the length of that call's answer as JSON (`bytes`). The runs the reads pick, the cards and the factories are listed at the most a

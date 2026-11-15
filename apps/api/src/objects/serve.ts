@@ -48,11 +48,11 @@ import { type Listed, watchable } from '../watch/watch.ts';
 import { discoveryHandlers } from '../discovery/discovery.ts';
 import { eventsFollowed, eventsHandlers, subscriptionsHandlers } from '../feed-objects/index.ts';
 import { templatesHandlers } from '../template-objects/templates.ts';
-import { serverHandlers } from '../server/index.ts';
+import { serverHandlers, sessionHandlers } from '../server/index.ts';
 import { nemiaHandlers } from '../nemia/index.ts';
 import { readinessHandlers } from '../readiness/readiness.ts';
 import { upgradesHandlers } from '../upgrades/index.ts';
-import { pairHandlers, pairingsHandlers } from '../pairing/pairing.ts';
+import { linksHandlers, pairingsHandlers } from '../pairing/pairing.ts';
 import { tokensHandlers } from '../tokens/tokens.ts';
 
 /** Where every path the api serves is listed, with what each takes. */
@@ -197,9 +197,10 @@ export const objectsHandler = (runtime: ApiRuntime) =>
         nemiaHandlers,
         readinessHandlers,
         upgradesHandlers,
-        pairHandlers,
         pairingsHandlers,
+        linksHandlers,
         tokensHandlers,
+        sessionHandlers,
       ]),
       Layer.provide(decodeRefused),
       Layer.provide(answerRefused),

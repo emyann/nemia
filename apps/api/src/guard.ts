@@ -27,10 +27,11 @@
  * the same host is sent the cookie too (`SameSite=Strict` is by site, and a cookie is scoped by host, not port), so only the board's
  * own page, `same-origin`, or no browser, writes by it.
  *
- * A write that presents no token at all reaches the guard on a pairing route alone (`PAIR_PATH`, src/caller/caller.ts), which judges its
- * own secret: every other route under `/api/` needs a token on every store, loopback included, and the gate refuses one with none 401
- * `token-required` before the guard reads it (`needOf`, `callerGate`). No write is the person's for presenting none, on loopback or not;
- * the host and the site are still read for it, so a page on another site, or a site whose name points here, asks no pairing.
+ * A write that presents no token at all reaches the guard on an open route alone (a pairing asked or claimed, a first-visit link claimed:
+ * `needOf`, src/caller/caller.ts), which judges its own secret: every other route under `/api/` needs a token on every store, loopback
+ * included, and the gate refuses one with none 401 `token-required` before the guard reads it (`needOf`, `callerGate`). No write is the
+ * person's for presenting none, on loopback or not; the host and the site are still read for it, so a page on another site, or a site whose
+ * name points here, asks no pairing.
  *
  * Not `Origin` against `Host`: vite's proxy rewrites `Host` to the api's (`changeOrigin`), so the board's own write would read as another
  * site's.

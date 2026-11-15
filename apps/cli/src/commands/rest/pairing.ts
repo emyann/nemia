@@ -1,7 +1,7 @@
 /**
  * Pairing and first-visit links, the person's side: `nemia pairings ls` (`pairings.list`), the pairings the store keeps, never a code;
  * `nemia pairings approve <code>` (`pairings.approve`), the pairing a client shows approved; and `nemia board link [--base <url>]`
- * (`pairings.link`), a first-visit link printed once, on stdout. The api judges the caller a person before it approves or mints; no
+ * (`links.mint`), a first-visit link printed once, on stdout. The api judges the caller a person before it approves or mints; no
  * answer carries a token.
  */
 import { type Args, BOARD_LINK_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from 'objects';
@@ -25,7 +25,7 @@ export async function pairingsLs(): Promise<number> {
  */
 export async function pairingsApprove(args: Args): Promise<number> {
   const code = textArg(args, 'code') ?? '';
-  const p = await asked(PAIRINGS_APPROVE_WORDS.name, (c) => c.pairings.approve({ params: { code } }));
+  const p = await asked(PAIRINGS_APPROVE_WORDS.name, (c) => c.pairings.approve({ payload: { code } }));
   said([
     `approved ${p.client}'s pairing: it claims its token on its next ask, until ${p.expiresAt}`,
     'the token is named after it: nemia token ls lists it once claimed, nemia token rm revokes it',
@@ -39,7 +39,7 @@ export async function pairingsApprove(args: Args): Promise<number> {
  */
 export async function boardLink(args: Args): Promise<number> {
   const base = textArg(args, 'base');
-  const { url, expiresAt } = await asked(BOARD_LINK_WORDS.name, (c) => c.pairings.link({ payload: base === undefined ? {} : { base } }));
+  const { url, expiresAt } = await asked(BOARD_LINK_WORDS.name, (c) => c.links.mint({ payload: base === undefined ? {} : { base } }));
   said([url, `open it once, until ${expiresAt}: it signs that browser in, and no other`]);
   return 0;
 }

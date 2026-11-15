@@ -465,9 +465,9 @@ export {
   Unsubscribed,
   VersionAnswer,
   LatestRelease,
-  SessionAnswer,
   YourStore,
 } from './server-api.ts';
+export { SessionAnswer, SessionGroup } from './session.ts';
 export {
   FINISHING_KINDS,
   type FinishingKind,
@@ -606,11 +606,12 @@ export {
   LinkMinted,
   LinkRequest,
   Pairing,
+  LinksGroup,
+  PairingApproval,
   PairingAsked,
   PairingClaimed,
   PairingList,
   PairingRequest,
-  PairGroup,
   PairingsGroup,
   TicketClaim,
 } from './pairing.ts';

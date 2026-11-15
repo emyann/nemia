@@ -61,7 +61,7 @@ const send = (method: 'GET' | 'POST', url: string, body?: unknown, bearer?: stri
 
 /** A pairing asked for `client`, with no token. */
 const asked = async (client: string): Promise<PairingAsked> => {
-  const res = await send('POST', '/api/pair', { client });
+  const res = await send('POST', '/api/pairings', { client });
   assert.equal(res.status, 200, await res.clone().text());
   return (await res.json()) as PairingAsked;
 };
@@ -82,11 +82,11 @@ test('an exposed store: a pairing is asked with no token, and the pairings are l
 
 test('a full pairing: asked, waiting, approved by the person, claimed once, and its token taken by the api', async () => {
   const pairing = await asked('desk');
-  const claim = (secret = pairing.secret) => send('POST', `/api/pair/${pairing.id}/claim`, { secret });
+  const claim = (secret = pairing.secret) => send('POST', `/api/pairings/${pairing.id}/claim`, { secret });
   assert.deepEqual((await (await claim()).json()) as PairingClaimed, { phase: 'waiting' }, 'waiting until the person approves');
   assert.equal((await claim('not-the-secret')).status, 404, 'a wrong secret');
 
-  const approve = (bearer?: string) => send('POST', `/api/pairings/${pairing.code.toLowerCase()}/approve`, {}, bearer);
+  const approve = (bearer?: string) => send('POST', '/api/pairings/approve', { code: pairing.code.toLowerCase() }, bearer);
   assert.equal((await approve()).status, 401, 'no token: refused at the gate');
   sessionRunning();
   const bySession = await approve(sessionToken);
@@ -112,7 +112,7 @@ test('a first-visit link: made by the person alone, claimed with no token into t
   const secret = new URL(((await made.json()) as { url: string }).url).searchParams.get('link');
   assert.ok(secret);
 
-  const res = await send('POST', '/api/pair/link', { secret });
+  const res = await send('POST', '/api/links/claim', { secret });
   assert.equal(res.status, 200, await res.clone().text());
   const body = (await res.json()) as LinkClaimed;
   assert.equal(body.cookie, 'set');
@@ -123,7 +123,7 @@ test('a first-visit link: made by the person alone, claimed with no token into t
   for (const part of ['httponly', 'samesite=strict', 'path=/']) assert.ok(cookie.includes(part), part);
   const byCookie = await exposed().request('/api/runs', { headers: { cookie: `${TOKEN_COOKIE}=${token}` } });
   assert.equal(byCookie.status, 200, 'the cookie reads the store');
-  assert.equal((await send('POST', '/api/pair/link', { secret })).status, 409, 'a second claim is refused');
+  assert.equal((await send('POST', '/api/links/claim', { secret })).status, 409, 'a second claim is refused');
 });
 
 test("a first-visit link made with no base is printed under the board's own address, no api ticking the store", async () => {

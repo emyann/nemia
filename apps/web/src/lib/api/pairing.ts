@@ -1,8 +1,8 @@
 /**
- * Pairing and first-visit links, as `objects` says them (`PairGroup`, `PairingsGroup`): a browser with no token asks for a pairing
- * (`POST /api/pair`), shows its code and claims it with its secret until the person approves it (`POST /api/pair/:id/claim`); a browser
- * opened on a first-visit link claims it (`POST /api/pair/link`), which sets the board's cookie; a signed-in board lists the pairings
- * (`GET /api/pairings`) and approves one by the code the client shows (`POST /api/pairings/:code/approve`).
+ * Pairing and first-visit links, as `objects` says them (`PairingsGroup`, `LinksGroup`): a browser with no token asks for a pairing
+ * (`POST /api/pairings`), shows its code and claims it with its secret until the person approves it (`POST /api/pairings/:id/claim`); a
+ * browser opened on a first-visit link claims it (`POST /api/links/claim`), which sets the board's cookie; a signed-in board lists the
+ * pairings (`GET /api/pairings`) and approves one by the code the client shows (`POST /api/pairings/approve`, the code in its body).
  */
 import { queryOptions } from '@tanstack/react-query';
 import { LinkClaimed, Pairing, PairingAsked, PairingClaimed, PairingList } from 'objects';
@@ -24,7 +24,7 @@ export const pairingsQuery = queryOptions({
  */
 export const askPairing = (client: string): Promise<PairingAsked> =>
   call(
-    (c) => c.pair.ask({ payload: { client } }),
+    (c) => c.pairings.ask({ payload: { client } }),
     write(PairingAsked, 'A pairing may have been asked for: it lapses by itself, so ask again.'),
   );
 
@@ -35,7 +35,7 @@ export const askPairing = (client: string): Promise<PairingAsked> =>
  */
 export const claimPairing = (id: string, secret: string): Promise<PairingClaimed> =>
   call(
-    (c) => c.pair.claim({ params: { id }, payload: { secret } }),
+    (c) => c.pairings.claim({ params: { id }, payload: { secret } }),
     write(PairingClaimed, 'The pairing may be used already: ask for another one if this browser still asks for a token.'),
   );
 
@@ -45,7 +45,7 @@ export const claimPairing = (id: string, secret: string): Promise<PairingClaimed
  */
 export const claimLink = (secret: string): Promise<LinkClaimed> =>
   call(
-    (c) => c.pair.claimLink({ payload: { secret } }),
+    (c) => c.links.claim({ payload: { secret } }),
     write(LinkClaimed, 'The link may be used: reload the page to see whether this browser is signed in.'),
   );
 
@@ -55,6 +55,6 @@ export const claimLink = (secret: string): Promise<LinkClaimed> =>
  */
 export const approvePairing = (code: string): Promise<Pairing> =>
   call(
-    (c) => c.pairings.approve({ params: { code } }),
+    (c) => c.pairings.approve({ payload: { code } }),
     write(Pairing, 'The pairing may be approved: read the pairings again before approving it again.'),
   );

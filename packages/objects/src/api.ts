@@ -46,7 +46,8 @@ import { APIResourceList } from './discovery.ts';
 import { ServerGroup, Subscribed, SubscriptionWrite, Unsubscribed } from './server-api.ts';
 import { ReadinessGroup } from './readiness.ts';
 import { UpgradesGroup } from './upgrade.ts';
-import { PairGroup, PairingsGroup } from './pairing.ts';
+import { LinksGroup, PairingsGroup } from './pairing.ts';
+import { SessionGroup } from './session.ts';
 import { TokensGroup } from './token.ts';
 import { CardsGroup } from './card-api.ts';
 import { FactoriesGroup, HiresGroup, LibraryAddsGroup, McpServersGroup, SchedulesGroup, VolumesGroup } from './factory-api.ts';
@@ -276,9 +277,10 @@ export const Api = HttpApi.make('nemia')
   .add(NemiaGroup)
   .add(ReadinessGroup)
   .add(UpgradesGroup)
-  .add(PairGroup)
   .add(PairingsGroup)
-  .add(TokensGroup);
+  .add(LinksGroup)
+  .add(TokensGroup)
+  .add(SessionGroup);
 
 /** The groups `Api` holds. */
 type GroupsOf<A> = A extends HttpApi.HttpApi<string, infer G> ? G : never;

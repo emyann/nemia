@@ -156,3 +156,10 @@ test('the Run is listed across namespaces and in one, read in one and across all
     'no action of a run is served under /api/runs: each is in its namespace',
   );
 });
+
+test('the ways in are grouped by what each does: pairings, links, tokens and session, side by side in that order, and no pair group', () => {
+  const groups: string[] = Object.values(Api.groups).map((group) => group.identifier);
+  const at = groups.indexOf('pairings');
+  assert.deepEqual(groups.slice(at, at + 4), ['pairings', 'links', 'tokens', 'session']);
+  assert.equal(groups.includes('pair'), false);
+});

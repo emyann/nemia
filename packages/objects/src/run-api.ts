@@ -276,6 +276,6 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
     error: [Missing, Unjudged],
   }).annotate(
     OpenApi.Description,
-    'Reads what there is to decide of the run: what it changed, its checks, its reviews, its cost and the questions waiting on you, or why there is nothing yet (waiting, holding, running). Answers RunDecision, the files sensitive names shown in full and the diffs diffs names whole.',
+    'Reads what there is to decide of the run: what it changed, its checks, its reviews, its cost and the questions waiting on you, or why there is nothing yet (waiting, holding, running). Answers RunDecision, the files ?sensitive= names shown in full and the diffs ?diffs= names whole.',
   ),
 ) {}

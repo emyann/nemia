@@ -11,9 +11,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
+import { REAL_HOME } from './ambient.ts';
 import { anAgent } from './agent-walks.ts';
 import { aSkill } from './skill-walks.ts';
 import { teamCopy } from './team.ts';
@@ -223,6 +225,19 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
       await assert.rejects(sourcesAt({ at: path.join(home, 'none'), home }), refusedWith('Missing', 'none is not a folder'));
     },
   );
+
+  await s.test("nemia agents sources --path ~/.claude/agents reads Claude Code's own agents under the api's machine's home", async () => {
+    assert.notEqual(os.homedir(), REAL_HOME, "the test's home is a throwaway, never the person's");
+    const home = scratch('wf-agents-copy-tilde-');
+    const claude = path.join(os.homedir(), '.claude', 'agents');
+    fs.mkdirSync(claude, { recursive: true });
+    fs.cpSync(path.join(teamCopy(), 'agents', 'implementer.md'), path.join(claude, 'drafter.md'));
+    const { sources } = await sourcesAt({ at: '~/.claude/agents', home });
+    assert.deepEqual(
+      sources.filter((s) => s.place === 'path').map((s) => [s.name, s.dir]),
+      [['drafter', claude]],
+    );
+  });
 
   await s.test('nemia agents sources reads each folder through the Agent door: an agent only its memory holds is listed', async () => {
     const home = scratch('wf-agents-copy-home-');

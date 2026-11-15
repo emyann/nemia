@@ -15,7 +15,7 @@ import { describedNumber, describedOne } from './meta.ts';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Invalid, Missing } from './api-errors.ts';
 import { Ceilings, Daemon, Metrics, PassesRead, Quota, SeriesRead } from './server-machine.ts';
-import { FEED_STREAM_EVENTS, FINISHING_KINDS, SESSION_COOKIE_STATES, INTERRUPT_KINDS, STATS_BY } from './words.ts';
+import { FEED_STREAM_EVENTS, FINISHING_KINDS, INTERRUPT_KINDS, STATS_BY } from './words.ts';
 import { SubscriptionScope } from './subscription.ts';
 import { SessionReleaseSchema } from './run.ts';
 import { Event } from './event.ts';
@@ -87,19 +87,6 @@ export const VersionAnswer = Schema.Struct({
   latest: Schema.optionalKey(LatestRelease),
 });
 export type VersionAnswer = typeof VersionAnswer.Type;
-
-/**
- * `POST /api/session` and `DELETE /api/session`: the browser's session on this daemon. A post presents one of the person's tokens as a
- * bearer, which the caller gate judges before any route; the answer sets it as the board's HttpOnly cookie (`TOKEN_COOKIE`), which the
- * browser then sends on every read, stream and write of the board's, and which no script of the page can read. A delete clears the
- * cookie. Either answers that it did, and never the token.
- */
-export const SessionAnswer = Schema.Struct({
-  cookie: Schema.Literals(SESSION_COOKIE_STATES).annotate({
-    description: "What the call did to the board's cookie: set it, or cleared it.",
-  }),
-});
-export type SessionAnswer = typeof SessionAnswer.Type;
 
 /** `GET /api/repository`: the repository a start runs in, as the request's `?factory=` and `?repo=` resolve it. */
 export const RepositoryAnswer = Schema.Struct({
@@ -468,14 +455,6 @@ export class ServerGroup extends HttpApiGroup.make('server').add(
   HttpApiEndpoint.get('version', '/api/version', { success: VersionAnswer, error: readErrors }).annotate(
     OpenApi.Description,
     'Reads the release the api runs, the code it was built from, and the newest release the daemon knows of. Answers VersionAnswer.',
-  ),
-  HttpApiEndpoint.post('signIn', '/api/session', { success: SessionAnswer, error: [BadRequest] }).annotate(
-    OpenApi.Description,
-    "Signs the board in with the bearer the request carries, setting it as the board's HttpOnly cookie, which no script of the page can read. Answers SessionAnswer, that it did, never the token.",
-  ),
-  HttpApiEndpoint.delete('signOut', '/api/session', { success: SessionAnswer }).annotate(
-    OpenApi.Description,
-    'Signs the board out, clearing its cookie. Answers SessionAnswer, that it did.',
   ),
   HttpApiEndpoint.get('capabilities', '/api/capabilities', {
     query: placeQuery,

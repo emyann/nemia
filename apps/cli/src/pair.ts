@@ -1,8 +1,8 @@
 /**
  * `nemia pair <url> [--context <name>] [--name <client>]`: this laptop paired with the server at `url`, no token copied by hand. It asks
- * a pairing with no token (`POST /api/pair`, under the client's name, this machine's host name by default), prints the short code and
+ * a pairing with no token (`POST /api/pairings`, under the client's name, this machine's host name by default), prints the short code and
  * how the person approves it on the server (`nemia pairings approve <code>`, or the board's Setup page), and claims it with the secret
- * it was answered (`POST /api/pair/:id/claim`) every `PAIR_EVERY_MS` until the claim answers the token minted for it. The token goes
+ * it was answered (`POST /api/pairings/:id/claim`) every `PAIR_EVERY_MS` until the claim answers the token minted for it. The token goes
  * straight into the client's config (`configWritten`, mode 0600) as the context `--context` names, the url's host by default, which is
  * then the one in use; it is printed nowhere. A pairing that lapsed or that the server does not hold ends it, exit 1, naming `nemia
  * pair` again. Last it prints the line that points Claude Code's nemia plugin at the server, `NEMIA_URL=<url>`, for a shell profile:
@@ -72,7 +72,7 @@ type Claimed =
 /** The pairing `id` claimed once with `secret` at `server`. */
 async function claimOnce(server: string, id: string, secret: string): Promise<Claimed> {
   return askedBare('pair', server, (client) =>
-    client.pair.claim({ params: { id }, payload: { secret } }).pipe(
+    client.pairings.claim({ params: { id }, payload: { secret } }).pipe(
       Effect.map((answer): Claimed => {
         if (answer.phase === 'claimed' && answer.token !== undefined) return { kind: 'token', token: answer.token };
         if (answer.phase === 'expired') return { kind: 'ended', why: 'lapsed' };
@@ -110,7 +110,7 @@ export async function pair(args: readonly string[], env: NodeJS.ProcessEnv = pro
   const name = flagOf(args, '--context') ?? url.hostname;
   const client = flagOf(args, '--name') ?? os.hostname();
   if (name === 'local') throw misused('the context `local` is always this machine’s store: give --context another name');
-  const asked = await askedBare('pair', server, (c) => c.pair.ask({ payload: { client } }));
+  const asked = await askedBare('pair', server, (c) => c.pairings.ask({ payload: { client } }));
   process.stdout.write(
     `pairing ${client} with ${server}: approve the code ${asked.code} on the server, \`nemia pairings approve ${asked.code}\`, ` +
       `or on its board's Setup page, before ${asked.expiresAt}. Waiting…\n`,

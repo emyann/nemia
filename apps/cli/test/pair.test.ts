@@ -28,12 +28,12 @@ const took: Array<{ method: string; path: string; authorization: string | undefi
 
 /** The stand-in's answer to one request. */
 function answer(method: string, url: string, body: unknown): [number, unknown] {
-  if (method === 'POST' && url === '/api/pair') {
+  if (method === 'POST' && url === '/api/pairings') {
     const client = (body as { client: string }).client;
     const id = client === 'gone' ? 'p-gone' : client === 'lapsed' ? 'p-lapsed' : 'p-ok';
     return [200, { id, code: 'ABCD-EFGH', secret: `secret-${id}`, expiresAt: new Date(Date.now() + 600_000).toISOString() }];
   }
-  const claim = /^\/api\/pair\/([^/]+)\/claim$/.exec(url);
+  const claim = /^\/api\/pairings\/([^/]+)\/claim$/.exec(url);
   if (method === 'POST' && claim) {
     const queue = claims.get(claim[1] ?? '') ?? [[404, { error: 'no such pairing' }]];
     return queue.length > 1 ? (queue.shift() ?? [500, {}]) : (queue[0] ?? [500, {}]);
@@ -104,7 +104,7 @@ test('`nemia pair <url>` claims through a waiting answer, writes the context 060
   assert.ok(said.out.includes(`NEMIA_URL=${server}`), "the profile's line for the plugin");
   const requests = took.slice(from);
   assert.deepEqual(requests[0]?.body, { client: 'laptop' });
-  assert.equal(requests.filter((r) => r.path === '/api/pair/p-ok/claim').length, 3, 'asked again while it waited');
+  assert.equal(requests.filter((r) => r.path === '/api/pairings/p-ok/claim').length, 3, 'asked again while it waited');
   assert.ok(
     requests.every((r) => r.authorization === undefined),
     "no token is sent to the server paired, the other context's least of all",

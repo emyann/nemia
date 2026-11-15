@@ -20,7 +20,7 @@ import { Hono } from 'hono';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { storeConfigLayer, tokenDigest, TokenDoor, tokenDoorFiles, type ProposalCaller, type TokenHolder } from 'agent-orchestrator';
-import { TOKEN_COOKIE } from 'objects';
+import { Api, TOKEN_COOKIE } from 'objects';
 import { answerError, appOf, liveOf } from '../app.ts';
 import { Engine } from '../store.ts';
 import type { ApiEnv } from '../layer.ts';
@@ -177,21 +177,67 @@ test("REFUSED 401 on the MCP port, exposed or not: no token, and a session's, ea
   }
 });
 
-test('needOf: the MCP port needs a standing token, every api route a token on any store but the pairing routes, the board’s pages none', () => {
-  for (const path of ['/mcp', '/mcp/x']) assert.equal(needOf(path), 'standing', path);
-  for (const path of [
-    '/api',
-    '/api/runs',
-    '/openapi',
-    '/openapi/v3/nemia/v1',
-    '/api/pairings',
-    '/api/pairings/ABCD-EFGH/approve',
-    '/api/pairx',
+/** The routes a client with no token yet reaches, each by its method and path: a pairing asked, a pairing claimed, a link claimed. */
+const OPEN_ROUTES = ['POST /api/pairings', 'POST /api/pairings/:id/claim', 'POST /api/links/claim'];
+
+/** Every endpoint of the `Api`, as `<method> <path>`. */
+const ROUTES = Object.values(Api.groups).flatMap((group) => Object.values(group.endpoints).map((e) => `${e.method} ${e.path}`));
+
+/** `path` with every name filled in by one no object has. */
+const filled = (path: string): string => path.replace(/:[A-Za-z]+/g, 'nothing-here');
+
+test('needOf: exactly three routes of the Api need no token, each named by its method and path; every other one needs a token', () => {
+  const none = ROUTES.filter((route) => {
+    const [method = '', path = ''] = route.split(' ');
+    return needOf(method, filled(path)) !== 'token';
+  });
+  assert.deepEqual([...none].sort(), [...OPEN_ROUTES].sort());
+});
+
+test('needOf: the MCP port needs a standing token, every api route a token on any store but the three open ones, the board’s pages none', () => {
+  for (const path of ['/mcp', '/mcp/x']) assert.equal(needOf('GET', path), 'standing', path);
+  for (const [method, path] of [
+    ['GET', '/api'],
+    ['GET', '/api/runs'],
+    ['GET', '/openapi'],
+    ['GET', '/openapi/v3/nemia/v1'],
+    ['GET', '/api/pairings'],
+    ['POST', '/api/pairings/approve'],
+    ['POST', '/api/pairings/approve/'],
+    ['GET', '/api/pairings/abc/claim'],
+    ['POST', '/api/pairings/'],
+    ['POST', '/api/pairings/claim'],
+    ['POST', '/api/pairings//claim'],
+    ['POST', '/api/pairings/a/b/claim'],
+    ['POST', '/api/links'],
+    ['GET', '/api/links/claim'],
+    ['POST', '/api/links/claim/x'],
+    ['POST', '/api/pair'],
+    ['POST', '/api/pair/link'],
   ])
-    assert.equal(needOf(path), 'token', `${path}: no request to the api is the person for presenting none`);
-  for (const path of ['/api/pair', '/api/pair/abc/claim', '/api/pair/link'])
-    assert.equal(needOf(path), 'none', `${path}: a pairing route judges its own secret`);
-  for (const path of ['/', '/assets/x.js', '/runs/x', '/apifoo', '/mcpx']) assert.equal(needOf(path), 'none', path);
+    assert.equal(needOf(method, path), 'token', `${method} ${path}: no request to the api is the person for presenting none`);
+  for (const [method, path] of [
+    ['POST', '/api/pairings'],
+    ['POST', '/api/pairings/abc/claim'],
+    ['POST', '/api/links/claim'],
+  ])
+    assert.equal(needOf(method, path), 'none', `${method} ${path}: it judges its own secret`);
+  for (const path of ['/', '/assets/x.js', '/runs/x', '/apifoo', '/mcpx']) assert.equal(needOf('GET', path), 'none', path);
+});
+
+test('REFUSED 401 token-required: the pairings listed and a pairing approved, with no token, on a store marked exposed or not', async () => {
+  for (const on of [app, exposed]) {
+    const list = await get(on, '/api/pairings');
+    assert.equal(list.status, 401, 'GET /api/pairings');
+    assert.equal(await reasonOf(list), 'token-required');
+    const approve = await on().request('/api/pairings/approve', {
+      method: 'POST',
+      headers: { ...NO_TOKEN, 'content-type': 'application/json' },
+      body: JSON.stringify({ code: 'ABCD-EFGH' }),
+    });
+    assert.equal(approve.status, 401, 'POST /api/pairings/approve');
+    assert.equal(await reasonOf(approve), 'token-required');
+  }
 });
 
 /** A GET of `url` on `on`, presenting `token` by the board's cookie alone. */

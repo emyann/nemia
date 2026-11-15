@@ -1,11 +1,12 @@
 /**
  * Nemia kept and let go, told as a person's stories on the stage (`story.ts`): `nemia level` written while her folder is not trusted and
- * her session filed only once it is; the keeper's shipped five-second rest, on a steered clock; her task filed long-lived in her folder
- * in auto, by her shipped definition and the person's custom words, with the daemon's own bin first on her path, her fence derived from
- * the table, her admission and a deny on the store but her folder, subscribed once with her floor and owed nothing on the next beat; a
- * stop from outside never filed again, and manual stopping and unsubscribing her. A factory raised for a stretch keeps her until the
- * raise's end passes, and then she is stopped with no write. Kept, she is told the person's changed custom words once, and their chat
- * words once she is live. And the table of what `nemia level` refuses.
+ * the keeper trusting it and filing her in one beat, and a harness's file that does not read leaving her unfiled, in words naming the
+ * fix; the keeper's shipped five-second rest, on a steered clock; her task filed long-lived in her folder in auto, by her shipped
+ * definition and the person's custom words, with the daemon's own bin first on her path, her fence derived from the table, her admission
+ * and a deny on the store but her folder, subscribed once with her floor and owed nothing on the next beat; a stop from outside never filed
+ * again, and manual stopping and unsubscribing her. A factory raised for a stretch keeps her until the raise's end passes, and then she is
+ * stopped with no write. Kept, she is told the person's changed custom words once, and their chat words once she is live. And the table of
+ * what `nemia level` refuses.
  *
  * Over the engine's stand-in, its `view` laid over to say each task's spend, and a scratch store of its own, at `ROOT`, given as `ENV`,
  * and a config folder of its own for the harness. Each story mocks `Date` at a moment written as a literal, so her task's id,
@@ -29,7 +30,17 @@ import { typed } from './typed.ts';
 import { MEMORY } from '../src/nemia/memory.verb.ts';
 import { appendOutbox, chatDir, stopsFile } from '../src/chat/chat.store.ts';
 import { framedFor } from '../src/chat/chat.ts';
-import { levelFile, memoryDir, nemiaDir, ownBin, promptFile, readLevel, readNemia, toldFile } from '../src/nemia/level.store.ts';
+import {
+  levelFile,
+  memoryDir,
+  nemiaDir,
+  ownBin,
+  promptFile,
+  readLevel,
+  readNemia,
+  toldFile,
+  untrustedFile,
+} from '../src/nemia/level.store.ts';
 import { listSubscriptions } from '../src/subscription/subscription.store.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { customInstructionsFile } from '../src/agents/read.store.ts';
@@ -137,24 +148,58 @@ test("Nemia kept and let go: trusted late, filed long-lived in auto with the dae
     }
   });
   await s.test(
-    'semi-auto while her folder is not trusted is written, naming the command that trusts it; her session is filed only once it is',
+    'semi-auto while her folder is not trusted: the keeper trusts it and files her in the same beat, no person asked',
     async () => {
-      fs.rmSync(path.join(CONFIG, `.${DEFAULT_HARNESS}.json`));
-      const words = `mkdir -p ${nemiaDir(ROOT)} && cd ${nemiaDir(ROOT)} && ${DEFAULT_HARNESS}`;
+      const config = path.join(CONFIG, `.${DEFAULT_HARNESS}.json`);
+      fs.rmSync(config);
+      fs.rmSync(nemiaDir(ROOT), { recursive: true, force: true });
       const set = await level({ level: 'semi-auto' });
       assert.equal(set.level, 'semi-auto');
       assert.ok(set.task !== null && readLevel(ROOT)?.task === set.task, 'her task named, for the keeper');
-      assert.equal(set.trust, words, 'nemia level says the command');
+      assert.equal(set.untrusted, null, 'nothing refused, nothing for a person to do');
+      assert.ok(!('trust' in set), 'no command is answered');
       const b = stage.board();
       const filings = b.filings.length;
-      assert.deepEqual(await beat(), [], 'her session waits for her folder to be trusted');
-      trust(false);
-      assert.deepEqual(await beat(), []);
-      assert.equal(b.filings.length, filings, 'nothing filed where her harness would refuse its start');
-      trust(true);
-      assert.equal((await level({})).trust, null, 'trusted: no command to run');
-      assert.deepEqual(await beat(), ['file'], 'filed at the next beat, with no second level set');
+      assert.deepEqual(await beat(), ['trust', 'file'], 'her folder trusted, then her session filed, in one beat');
       assert.deepEqual(b.filings.slice(filings), [set.task]);
+      assert.equal(fs.statSync(nemiaDir(ROOT)).isDirectory(), true, 'her folder made');
+      assert.equal(
+        (JSON.parse(fs.readFileSync(config, 'utf8')) as { projects: Record<string, { hasTrustDialogAccepted?: boolean }> }).projects[
+          nemiaDir(ROOT)
+        ]?.hasTrustDialogAccepted,
+        true,
+        "the trust written in the harness's own file",
+      );
+      assert.equal((await level({})).untrusted, null);
+      await level({ level: 'manual' });
+      assert.deepEqual(await beat(), ['stop']);
+      fs.rmSync(levelFile(ROOT));
+    },
+  );
+  await s.test(
+    "REFUSED: a harness's file that does not read leaves her untrusted and unfiled, in words naming the fix and no command; mended, the next beat trusts and files her",
+    async () => {
+      const config = path.join(CONFIG, `.${DEFAULT_HARNESS}.json`);
+      fs.writeFileSync(config, '{ not json');
+      t.mock.timers.tick(1);
+      const set = await level({ level: 'semi-auto' });
+      const b = stage.board();
+      const filings = b.filings.length;
+      assert.deepEqual(await beat(), [], 'the trust refused: nothing done, nothing filed');
+      assert.deepEqual(await beat(), [], 'asked again each beat, and refused again');
+      assert.equal(b.filings.length, filings, 'nothing filed where her harness would refuse its start');
+      assert.equal(fs.readFileSync(config, 'utf8'), '{ not json', "the harness's file left as it was");
+      const words = (await level({})).untrusted;
+      assert.ok(words !== null && words.includes(config), `the refusal names the file to mend: ${String(words)}`);
+      assert.match(words, /not JSON/, "and the runtime's reason");
+      assert.doesNotMatch(words, /&&|\bcd |mkdir|accept its prompt/, 'no command to run the harness by hand');
+      fs.rmSync(config);
+      assert.deepEqual(await beat(), ['trust', 'file'], 'mended: trusted and filed at the next beat, with no second level set');
+      assert.deepEqual(b.filings.slice(filings), [set.task]);
+      assert.equal((await level({})).untrusted, null, 'trusted: nothing said');
+      trust(false);
+      assert.equal((await level({})).untrusted, null, 'a trust taken back by hand, with nothing refused, is no refusal');
+      trust(true);
       await level({ level: 'manual' });
       assert.deepEqual(await beat(), ['stop']);
       fs.rmSync(levelFile(ROOT));
@@ -253,12 +298,18 @@ test("Nemia kept and let go: trusted late, filed long-lived in auto with the dae
       assert.ok(denies.includes(`Edit(/${path.join(ROOT, 'brand-new')}/**)`), 'a folder the store gained is denied');
       assert.ok(denies.includes(`Edit(/${path.join(ROOT, 'daemon.json')})`), 'a file at the store top is denied');
       assert.ok(
-        [levelFile(ROOT), promptFile(ROOT), toldFile(ROOT)].every((file) => denies.includes(`Edit(/${file})`)),
-        'her level, her instruction and the record of the words she was told are denied',
+        [levelFile(ROOT), promptFile(ROOT), toldFile(ROOT), untrustedFile(ROOT)].every((file) => denies.includes(`Edit(/${file})`)),
+        "her level, her instruction and the keeper's records of the words she was told and of a trust refused are denied",
       );
       assert.deepEqual(
         [...settings.permissions.ask, ...denies].filter((rule) => rule.startsWith(`Edit(/${nemiaDir(ROOT)}`)),
-        [`Edit(/${levelFile(ROOT)})`, `Edit(/${promptFile(ROOT)})`, `Edit(/${toldFile(ROOT)})`, `Edit(/${chatDir(nemiaDir(ROOT))}/**)`],
+        [
+          `Edit(/${levelFile(ROOT)})`,
+          `Edit(/${promptFile(ROOT)})`,
+          `Edit(/${toldFile(ROOT)})`,
+          `Edit(/${untrustedFile(ROOT)})`,
+          `Edit(/${chatDir(nemiaDir(ROOT))}/**)`,
+        ],
         "her memory is denied and asked by no rule, and the person's chat files are denied",
       );
       assert.ok(
@@ -384,31 +435,31 @@ test('A factory raised for a stretch keeps her, the store at manual; its end pas
     assert.deepEqual(await beat(), ['stop']);
   });
   await s.test(
-    "a factory's raise or default above manual while her folder is not trusted is written, and files her only once it is",
+    "a factory's raise or default above manual while her folder is not trusted is written, and the keeper trusts it and files her at once",
     async () => {
       fs.rmSync(levelFile(ROOT), { force: true });
       fs.rmSync(factoryLevelFile(ROOT, 'pipao'), { force: true });
-      trust(false);
       const b = stage.board();
       const asks: Record<string, string>[] = [
         { factory: 'pipao', level: 'semi-auto', for: '1h' },
         { factory: 'pipao', level: 'semi-auto' },
       ];
       for (const ask of asks) {
+        trust(false);
         t.mock.timers.tick(1);
         const set = await level(ask);
         assert.equal(set.factories.find((row) => row.factory === 'pipao')?.level, 'semi-auto', JSON.stringify(ask));
         assert.ok(fs.existsSync(factoryLevelFile(ROOT, 'pipao')), `${JSON.stringify(ask)} writes the factory's file`);
         assert.equal(readLevel(ROOT)?.task, set.task, `${JSON.stringify(ask)} names her task`);
-        assert.equal(set.trust, `mkdir -p ${nemiaDir(ROOT)} && cd ${nemiaDir(ROOT)} && ${DEFAULT_HARNESS}`);
+        assert.equal(set.untrusted, null, `${JSON.stringify(ask)}: nothing refused`);
         const filings = b.filings.length;
-        assert.deepEqual(await beat(), [], `${JSON.stringify(ask)}: her session waits`);
-        assert.equal(b.filings.length, filings);
+        assert.deepEqual(await beat(), ['trust', 'file'], `${JSON.stringify(ask)}: trusted and filed in one beat`);
+        assert.deepEqual(b.filings.slice(filings), [set.task]);
+        const factory = String(ask.factory);
+        await level(ask.for === undefined ? { factory, level: 'manual' } : { factory, end: true });
+        assert.deepEqual(await beat(), ['stop']);
+        fs.rmSync(factoryLevelFile(ROOT, factory), { force: true });
       }
-      trust(true);
-      assert.deepEqual(await beat(), ['file']);
-      await level({ factory: 'pipao', level: 'manual' });
-      assert.deepEqual(await beat(), ['stop']);
     },
   );
 });

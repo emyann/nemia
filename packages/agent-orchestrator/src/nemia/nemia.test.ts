@@ -23,6 +23,8 @@ import {
   nemiaState,
   nemiaTaskId,
   toldCustom,
+  folderUnmade,
+  trustRefused,
   type HerSubscription,
   type HerTask,
   type Keeping,
@@ -63,7 +65,7 @@ test('`nemiaDue` and `nemiaState`: what the keeper owes, and where she stands, a
     assert.deepEqual(nemiaDue({ ...OWED, up: false }, OPEN, HERS), [], 'kept but down: kept for later');
     assert.deepEqual(nemiaDue({ ...OWED, owed: false }, OPEN, HERS), [], 'nothing owed');
     assert.deepEqual(nemiaDue(OWED, OPEN, undefined), ['subscribe'], 'filed: not yet kept');
-    assert.deepEqual(nemiaDue({ ...OWED, trusted: false }, undefined, undefined), [], 'untrusted');
+    assert.deepEqual(nemiaDue({ ...OWED, trusted: false }, undefined, undefined), ['trust', 'file'], 'untrusted: trusted, then filed');
     assert.deepEqual(nemiaDue({ ...MANUAL, owed: true, up: true }, OPEN, HERS), ['stop', 'drop'], 'leaving');
   });
   await t.test('REFUSED: a question of hers is written down and its answer carried only while she is kept and her session is live', () => {
@@ -108,17 +110,23 @@ test('`nemiaDue` and `nemiaState`: what the keeper owes, and where she stands, a
     assert.equal(nemiaState({ above: false }, undefined, undefined), 'off');
   });
   await t.test(
-    'REFUSED: no task is filed while her folder is not trusted; once it is, or for a harness that keeps no trust, she is filed',
+    'her folder not trusted owes its trust, then her filing, in the same beat; a harness that keeps no trust is filed; a running session is never touched',
     () => {
       const UNTRUSTED: Keeping = { ...SEMI, trusted: false };
       assert.equal(nemiaState(UNTRUSTED, undefined, undefined), 'untrusted');
-      assert.deepEqual(nemiaDue(UNTRUSTED, undefined, undefined), [], 'her session waits for the person to trust her folder');
-      assert.deepEqual(nemiaDue(UNTRUSTED, undefined, OLDER), [], 'nothing owed while she waits');
+      assert.deepEqual(nemiaDue(UNTRUSTED, undefined, undefined), ['trust', 'file'], 'the keeper trusts her own folder, then files her');
+      assert.deepEqual(nemiaDue(UNTRUSTED, undefined, OLDER), ['trust', 'file'], 'a subscription left is put again once she is filed');
       assert.deepEqual(nemiaDue({ ...SEMI, trusted: true }, undefined, undefined), ['file']);
       assert.deepEqual(nemiaDue(SEMI, undefined, undefined), ['file'], 'a harness that keeps no trust');
       assert.equal(nemiaState(UNTRUSTED, OPEN, undefined), 'filed', 'trust lost later never stops a running session');
+      assert.deepEqual(
+        nemiaDue(UNTRUSTED, OPEN, undefined),
+        ['subscribe'],
+        'and owes no trust: her folder is trusted again only to file her',
+      );
       assert.equal(nemiaState(UNTRUSTED, OPEN, HERS), 'kept');
       assert.equal(nemiaState({ above: false, trusted: false }, undefined, undefined), 'off', 'manual: nothing waits');
+      assert.deepEqual(nemiaDue({ above: false, trusted: false }, undefined, undefined), [], 'manual: nothing is trusted');
     },
   );
 });
@@ -175,7 +183,8 @@ test('her diagram draws every edge and each verb from every state it is taken fr
     graph.verbs.map((v) => v.verb),
     ['level (a factory above manual)', 'level (none above manual)', 'agents custom nemia (set or clear)'],
   );
-  assert.ok(drawn.includes('  untrusted --> due: FOLDER_TRUSTED / nothing'));
+  assert.ok(drawn.includes('  untrusted --> filed: TRUST_WRITTEN / trust, file'), 'the keeper trusts her folder and files her in one beat');
+  assert.ok(drawn.includes('  untrusted --> untrusted: TRUST_REFUSED / trust'), 'a refused write is tried again each beat');
   assert.ok(
     graph.verbs.every((v) => v.guard === 'always'),
     'no verb of the person asks her folder trusted',
@@ -253,4 +262,45 @@ test('a nemia she types starts no daemon beside the one that keeps her, with a b
     [DEMAND_OFF]: 'off',
     PATH: '/srv/nemia/bin:/usr/bin',
   });
+});
+
+test("`trustRefused` and `folderUnmade`: each refusal of her folder's trust names what to mend, and offers no command to run the harness by hand", async (t) => {
+  const not = { harness: 'Claude Code', folder: '/store/nemia', file: '/home/me/.claude.json', never: null, refused: null };
+  const hand = 'run Claude Code in /store/nemia once and accept its prompt';
+  const rows: [string, string][] = [
+    [
+      'a file that did not read',
+      trustRefused({ ...not, refused: `/home/me/.claude.json was left as it is, since it is not JSON: ${hand}` }),
+    ],
+    [
+      'a file whose projects entry is no object',
+      trustRefused({ ...not, refused: `/home/me/.claude.json was left as it is, since its \`projects\` is no object: ${hand}` }),
+    ],
+    [
+      'a file that changed under every write',
+      trustRefused({
+        ...not,
+        refused: `/home/me/.claude.json changed under each of 5 writes and was left as it is: ask again, or ${hand}`,
+      }),
+    ],
+    ['a file that did not take the trust, the runtime saying nothing', trustRefused(not)],
+    ['a write that threw', trustRefused(not, 'EACCES: permission denied')],
+    ['a folder the harness never keeps a trust of', trustRefused({ ...not, never: 'Claude Code keeps no trust of a home directory' })],
+    ['her folder that could not be made', folderUnmade('/store/nemia', 'EACCES: permission denied, mkdir')],
+  ];
+  for (const [row, words] of rows)
+    await t.test(row, () => {
+      assert.ok(words.includes('/store/nemia'), 'her folder named');
+      assert.doesNotMatch(words, /&&|\bcd |mkdir -p|accept its prompt|in a terminal/, 'no command to run by hand');
+    });
+  assert.ok(rows[0]?.[1].includes('it is not JSON'), "the runtime's reason carried");
+  assert.ok(rows[1]?.[1].includes('`projects` is no object'), 'a file that parses but whose entry is no object says so');
+  assert.ok(rows[2]?.[1].includes('changed under each of 5 writes'), 'a file that changed under every write says so');
+  assert.ok(
+    rows.slice(0, 5).every(([, words]) => words.includes(not.file)),
+    "the harness's file named where it is what to mend",
+  );
+  assert.ok(rows[4]?.[1].includes('EACCES'), 'what the write threw said');
+  assert.ok(rows[5]?.[1].includes('WF_ROOT'), 'the store moved, where her folder is the home directory');
+  assert.ok(!rows[6]?.[1].includes(not.file), "her folder unmade sends no one to the harness's file");
 });

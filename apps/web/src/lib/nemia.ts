@@ -11,7 +11,7 @@ import { clockWord } from './quota.ts';
 
 /**
  * Her session's state, as the board says it: off, none kept; leaving, no factory left above Manual with a session still reached, which
- * the keeper stops; waiting on the person to trust her folder, not filed until they do; not filed yet; filed and starting, not yet
+ * the keeper stops; not filed since the keeper could not trust her folder; not filed yet; filed and starting, not yet
  * reachable; up, reached; and stopped from outside, not filed again.
  */
 type SessionKind = 'off' | 'leaving' | 'untrusted' | 'not-filed' | 'starting' | 'up' | 'stopped';
@@ -20,7 +20,7 @@ type SessionKind = 'off' | 'leaving' | 'untrusted' | 'not-filed' | 'starting' | 
 const SESSION_WORDS: Record<SessionKind, string> = {
   off: 'Off: no session of hers runs.',
   leaving: 'Stopping: the keeper ends her session at its next beat.',
-  untrusted: 'Waiting on your trust: the keeper files her session at its next beat once her folder is trusted.',
+  untrusted: 'Not filed: the keeper could not trust her folder.',
   'not-filed': 'Not filed yet: the keeper files her session at its next beat.',
   starting: 'Filed: her session is starting.',
   up: 'Up: her session runs.',
@@ -29,7 +29,8 @@ const SESSION_WORDS: Record<SessionKind, string> = {
 
 /**
  * Her session's state (`SessionKind`) and its sentence. A stop from outside is said first, whatever still reaches her session.
- * @param nemia What the api answers of her: her level, her task, the lines that reach it, whether it was stopped, her trust.
+ * @param nemia What the api answers of her: her level, her task, the lines that reach it, whether it was stopped, why her folder could
+ * not be trusted.
  */
 export function sessionOf(nemia: NemiaLevel): { kind: SessionKind; words: string } {
   const kind = kindOf(nemia);
@@ -38,11 +39,11 @@ export function sessionOf(nemia: NemiaLevel): { kind: SessionKind; words: string
 
 /** The state alone, in the order `sessionOf` judges it. */
 function kindOf(nemia: NemiaLevel): SessionKind {
-  const { task, phase, reach, stopped, trust } = nemia;
+  const { task, phase, reach, stopped, untrusted } = nemia;
   if (stopped) return 'stopped';
   if (task === null) return 'off';
   if (!anyAbove(nemia)) return reach.length ? 'leaving' : 'off';
-  if (phase === null) return trust === null ? 'not-filed' : 'untrusted';
+  if (phase === null) return untrusted === null ? 'not-filed' : 'untrusted';
   return reach.length ? 'up' : 'starting';
 }
 

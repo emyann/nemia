@@ -117,7 +117,7 @@ export function importablesOf(sources: readonly AgentSource[], items: readonly L
     .map((one) => ({ name: one.name, file: one.file, description: one.description, error: one.error, held: held.has(one.name) }));
 }
 
-/** Claude Code's own agents on the api's machine (`CLAUDE_AGENTS`), as the store lists them to copy; refused where there is no such folder. */
+/** Claude Code's own agents on the api's machine (`CLAUDE_AGENTS`), as the store lists them; refused where there is no such folder. */
 export const claudeAgentsQuery = () =>
   queryOptions({
     queryKey: ['library', 'claude-agents'],

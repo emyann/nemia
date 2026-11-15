@@ -19,9 +19,9 @@ import type { FactoryServers } from './servers.ts';
 
 /**
  * The server `server` of `factory`'s record, read through the Factory door at the store `home`, else the server of that name the factory
- * has added from the library (`addedServers`), as its sign-in is handed it; refused (`Missing`) for a factory or a server neither holds, and
- * (`Invalid`, naming the file and its fix) where the factory's `library.json` does not read.
- * The engine holds a sign-in by the server's name, so one sign-in to a library server serves every factory that adds it.
+ * has added from the library (`addedServers`), as its sign-in is handed it; refused (`Missing`) for a factory or a server neither holds,
+ * and (`Invalid`, naming the file and its fix) where the factory's `library.json` does not read. The engine holds a sign-in by the server's
+ * name, so one sign-in to a library server serves every factory that adds it.
  */
 const recorded = (factory: string, server: string, home: string, verb: string) =>
   doorAt(home, (door) =>

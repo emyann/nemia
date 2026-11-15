@@ -98,7 +98,8 @@ export type RailGroup = { readonly id: 'across' | 'yours' | 'you'; readonly labe
 
 /**
  * The store rail's groups, under Nemia's face: what spans factories (Factories, the canvas of them all, and Waiting, what waits on the
- * person in every factory); the person's own library (their agents, their skills, and the store's Library of every kind with the factories that add each); and at the foot the person's (Stats and Settings).
+ * person in every factory); the person's own library (their agents, their skills, and the store's Library of every kind with the factories
+ * that add each); and at the foot the person's (Stats and Settings).
  */
 export const RAIL_GROUPS: readonly RailGroup[] = [
   {

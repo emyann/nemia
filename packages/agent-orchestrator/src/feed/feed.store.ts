@@ -288,8 +288,8 @@ export const feedDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed
  * `levels` is each factory's level in force as the pass read it (`levelsNow`), whose changes the feed says (`levelLines`); none given,
  * none said. `conflicts` is each factory's `ConflictsPending` condition as the pass read it (`conflictsNow`), whose turns the feed says
  * (`conflictLines`); none given, none said. `missing` is each recorded factory's library adds as the pass read them
- * (`addsMissingNow`), whose missing adds the feed says (`addsLines`); none given, none said. `readiness` is the store's readiness as the daemon last read it, whose moves the feed says
- * (`readinessLines`); none given, none said.
+ * (`addsMissingNow`), whose missing adds the feed says (`addsLines`); none given, none said. `readiness` is the store's readiness as the
+ * daemon last read it, whose moves the feed says (`readinessLines`); none given, none said.
  *
  * `memo` is the fold its caller has read so far, which this moves: it is read on to the end of the feed first — the lines the caller wrote
  * last pass, and any another wrote — and read again from the start when it does not fit the feed: another generation (a file cut and put

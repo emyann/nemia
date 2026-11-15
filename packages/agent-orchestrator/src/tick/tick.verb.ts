@@ -265,8 +265,10 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  * - where the process keeps an informer (`Informer`, the api's daemon), the pass begins its number first (`passStarted`), and once every
  *   run is advanced, judges each as the api serves it and keeps it there (`informed`), so a request reads what the pass judged.
  * - then the tasks of runs `nemia rm` removed that had not settled are forgotten (`finishForgetting`), and what it says is the pass's.
- * - last, and apart, the feed is written where it changed, each factory's level in force, its conflicts pending and its library adds missing among it, read beside
- *   the pause (`levelsNow`, `conflictsNow`, `addsMissingNow`), and the store's readiness as the daemon's sweep last read it (`readiness`): a feed that
+ * - last, and apart, the feed is written where it changed, each factory's level in force, its conflicts pending and its library adds
+ * missing among it, read beside
+ * the pause (`levelsNow`, `conflictsNow`, `addsMissingNow`), and the store's readiness as the daemon's sweep last read it (`readiness`): a
+ * feed that
  *   cannot be written costs the report (`feedError`), never the pass, and levels or conflicts that do not read cost their lines alone.
  *
  * A run a read of whose task journal is refused (`unreadableJournal`), or that froze no workflow and whose folder does not load

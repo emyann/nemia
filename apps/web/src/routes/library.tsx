@@ -21,7 +21,8 @@ const HEADINGS: Record<LibraryKind, string> = { Skill: 'Skills', Agent: 'Agents'
 
 /**
  * The store's library, in no factory: each kind's items, the user library's and Nemia's builtins, each with the factories that use it,
- * a link to each, and a copy of a builtin that has changed since it was made said so; and Claude Code's own agents, to import. A factory adds an item on its settings page.
+ * a link to each, and a copy of a builtin that has changed since it was made said so; and Claude Code's own agents, to import. A factory
+ * adds an item on its settings page.
  */
 function LibraryPage() {
   const { data } = useSuspenseQuery(libraryQuery());

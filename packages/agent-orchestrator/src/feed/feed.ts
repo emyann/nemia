@@ -888,6 +888,7 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): R
  * @param conflicts Each factory's `ConflictsPending` condition, or undefined where the pass read none.
  * @param readiness The store's readiness as the daemon last read it, or undefined where none was handed.
  * @param resumed Who last lifted the store's pause by hand, and the pause it lifted; undefined where none was left.
+ * @param missing Each recorded factory's library adds, or undefined where the pass read none.
  */
 export function feedChanges(
   fold: FeedFold,
@@ -927,13 +928,19 @@ export function feedChanges(
     const id = key.startsWith('Run/') ? key.slice('Run/'.length) : undefined;
     if (id !== undefined && !now.has(id) && !unjudged.has(id)) out.push(line(id, undefined, { word: REMOVED }, { run: id }));
   }
-  return [
-    ...out,
-    ...storeChanges(fold, at, pause, levels, readiness, resumed),
-    ...(conflicts === undefined ? [] : conflictLines(fold, at, conflicts)),
-    ...(missing === undefined ? [] : addsLines(fold, at, missing)),
-  ];
+  return [...out, ...storeChanges(fold, at, pause, levels, readiness, resumed), ...factoryChanges(fold, at, conflicts, missing)];
 }
+
+/** The factories' lines a pass owes: their conflicts' where it read them (`conflictLines`), their adds' where it read them. Pure. */
+const factoryChanges = (
+  fold: FeedFold,
+  at: string,
+  conflicts: FeedConflicts | undefined,
+  missing: FeedMissing | undefined,
+): FactoryLine[] => [
+  ...(conflicts === undefined ? [] : conflictLines(fold, at, conflicts)),
+  ...(missing === undefined ? [] : addsLines(fold, at, missing)),
+];
 
 /**
  * The store's lines a pass owes: its pause's where the pass read it (`storeLines`), its factories' levels' where it read them, and its

@@ -46,8 +46,8 @@ const homeOf = (at: string): string => (at === '~' || at.startsWith('~/') ? path
 
 /**
  * Every agent file the store knows of, read through the Agent door: each repository's a factory names, sorted, in its two places for
- * agents in the order a start looks (`repositoryRoots`); then the library of the store `home`; then the folder `at`, when named, `~` its machine's home (`~/.claude/agents`, Claude Code's own). A
- * folder named that is not there is refused as `Missing`.
+ * agents in the order a start looks (`repositoryRoots`); then the library of the store `home`; then the folder `at`, when named, `~` its
+ * machine's home (`~/.claude/agents`, Claude Code's own). A folder named that is not there is refused as `Missing`.
  */
 export const agentSources = Effect.fn('agentSources')(function* ({ at, home }: { at?: string; home: string }) {
   const named = at === undefined ? undefined : path.resolve(homeOf(at));

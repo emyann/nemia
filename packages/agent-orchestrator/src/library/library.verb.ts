@@ -7,15 +7,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  API_VERSION,
-  type DefinitionOrigin,
-  type LibraryAdd,
-  type LibraryAddList,
-  type McpServer,
-  type McpServerList,
-  type McpServerWrite,
-} from 'objects';
+import { API_VERSION, type DefinitionOrigin, type LibraryAdd, type LibraryAddList } from 'objects';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { DEFAULT_NAMESPACE, type Factory } from '../factory/factory.ts';
 import { readFactoriesAt } from '../factory/factory.store.ts';

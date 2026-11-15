@@ -1,6 +1,7 @@
 /**
  * The one surface as a page to browse and to try, with no daemon of its own and no store: the api's own reference (`referenceOf`,
- * Scalar's) over its own document (`openapiDocument`, which names each operation a command links by its `nemia` line), served alone on
+ * Scalar's) over its own document (`openapiDocument`, which names each operation by its id, the api's verb, and says under its own words
+ * the command and the MCP tool that call it), served alone on
  * this machine's loopback under a title of its own, its request client on. The document names one server, an address a person sets on
  * the page — the api the page was started against until they give another — and says the api takes a bearer token: a request tried on
  * the page is sent to the page with the address it is for (`REFERENCE_PROXY_PATH`), and `bin/page.ts`, which alone touches the machine,
@@ -28,8 +29,9 @@ function titled(browsed: Browsed): unknown {
   document.info.title = 'Nemia: one surface';
   document.info.description = [
     'Every store verb of Nemia is one entry of one table: a `nemia` command, a tool of the MCP port, and the endpoint of this api',
-    'that serves both. An operation named `nemia …` here is that command, with its tool and who answers for it when an agent calls',
-    'it under its name; one named `<group>.<endpoint>` is read by a client directly — the board, a sub-resource, a stream.',
+    'that serves both. Each operation here is named by its id, `<group>.<endpoint>`, and says what it does; under it, *CLI and MCP*',
+    'names the command and the tool that call it and who answers for it when an agent calls it, or says that none does: a client',
+    'reads that endpoint directly — the board, a sub-resource, a stream.',
     '',
     '**Try it.** A request sent from this page goes to the address under Server, through the page: set it to the api you mean, a',
     "server's or this machine's. Give it a token under Authentication (`nemia token add <name>` mints one on that store): it is",

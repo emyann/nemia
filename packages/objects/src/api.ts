@@ -1,127 +1,57 @@
 /**
  * The one definition of what the api serves of the objects (`Api`): the handlers the api builds from it, the clients that read through
- * it and the OpenAPI document it writes (`OpenApi.fromApi(Api)`) are all made from this, so no layer keeps a shape of its own.
+ * it and the OpenAPI document it writes (`OpenApi.fromApi(Api)`) are all made from this, so no layer keeps a shape of its own. Each
+ * endpoint says what it does on itself (`OpenApi.Description`), in the api's words.
  *
- * Group `runs`: the run object, listed across namespaces and in one (a run's namespace is its factory, `default` for one that names none),
- * read in its namespace and across all by its id, its four sub-resources at the paths the api has always answered them on, and its named
- * actions, each in its namespace alone: started, removed, refreshed, pruned, labelled, held and lifted, and a step of it tried again,
- * approved and said words to. Group `cards`: the inbox's
- * cards as objects, listed across namespaces or in one (a card's namespace is its factory, `default` for one that names none), read in
- * its namespace and across all by its name (each read of one carrying the card's file as written), filed, written whole, dropped,
- * started, queued and taken off the queue, and their labels edited. Every refusal is an object with one key, `error`, the
- * sentence that says what to do next, as the api's other routes answer one; a Conflict carries the `users` that hold the thing too.
+ * Its groups each live in the file of their concept: `runs` (`run-api.ts`), `steps` (`step-api.ts`), `cards` (`card-api.ts`), the
+ * factory and its parts (`factory-api.ts`), the definitions (`definition-api.ts`), `proposals` and `delegations`
+ * (`proposal-api.ts`), and the machine's (`server-api.ts`, `nemia-api.ts`, `readiness.ts`, `upgrade.ts`, `pairing.ts`, `token.ts`).
+ * Every refusal is an object with one key, `error`, the sentence that says what to do next; a Conflict carries the `users` that hold
+ * the thing too.
  *
- * Group `factories`: the factories, which no namespace holds, listed, read, removed, exported whole and filed from another store's export,
- * and each one's sub-resources — its rules and its instruction, read, written and cleared, the lines a person types for it (`commands`),
- * its cost line per workflow, its revisions policy, its places trusted again, a workflow attached and detached, and a harness setting set
- * and taken off; and the writes that name a template or a folder: a factory filed, a volume mounted and taken off, a factory made from a
- * template, a hand-made one taken over by one, either previewed, an upgrade filed and a conflict's choice, a template in the body as
- * `TemplateGiven`. The factory's parts are each in the factory's namespace: group `mcpservers`, its MCP servers, read, recorded and taken
- * off, and signed in to; group `builtin`, the servers Nemia offers, in no namespace; groups `schedules` and `hires`, read, written and
- * taken back; and group `volumes`, read alone.
- *
- * The definitions, each in a factory's namespace as the factory resolves it: groups `workflows`, `agents` and `skills`, each listed with
- * `?origin=` for one origin's, shadowed or not, read, and yours written in `default` alone; an agent tried and read as a card, a builtin
- * skill copied to yours and a skill's files listed by path; and, in no namespace, each kind's files as a person keeps them read into its
- * spec (`read`), which writes nothing — a Kubernetes `*Review`'s way: the client reads a person's files, the api reads them by the
- * orchestrator's readers, and the client writes the spec through `create` or `replace`, the board's one write path.
- *
- * Cluster-scoped, beside the factories: group `templates`, the templates Nemia builds in, and each one's documents as the definitions'
- * Schemas; group `subscriptions`, the feed's subscriptions, read alone here. Group `events`, the feed's lines, each in the namespace of
- * the factory it names, a daemon's and the store's that name none in no namespace. Group `discovery`, `GET /api`: every resource the
- * groups above serve, its scope and verbs.
- *
- * In each factory's namespace, groups `proposals` and `delegations` (`proposal-api.ts`): a change of the factory's definitions proposed,
- * approved, declined and listed, and what the person lets an agent approve unasked.
+ * Here, cluster-scoped beside the factories: group `templates`, the templates Nemia builds in, and each one's documents as the
+ * definitions' Schemas; group `subscriptions`, the feed's subscriptions; group `events`, the feed's lines, each in the namespace of the
+ * factory it names, a daemon's and the store's that name none in no namespace; and group `discovery`, `GET /api`: every resource the
+ * groups serve, its scope and verbs.
  *
  * The runs, the cards, the factories, a factory's MCP servers, the agents and the skills are each listed as their `<Kind>List`, or as
  * the same page's `Table` where the request asks for one (`TABLE_ACCEPT`): two successes of one status. A watch answers no Table.
  */
 import { Schema } from 'effect';
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
-import { Card, CardFile, CardList, CardQueue, CardStart, CardWrite, CardEdit } from './card.ts';
-import { Table } from './table.ts';
-import {
-  Factory,
-  FactoryAdopted,
-  FactoryAdoptWrite,
-  FactoryApplied,
-  FactoryApplyWrite,
-  FactoryCommands,
-  FactoryCreate,
-  FactoryCreated,
-  FactoryDiffWrite,
-  FactoryPlan,
-  FactoryResolved,
-  FactoryResolveWrite,
-  FactoryUpgraded,
-  FactoryUpgradeWrite,
-  VolumeAdded,
-  VolumeRemoved,
-  VolumeWrite,
-  FactoryCostLineWrite,
-  FactoryInstruction,
-  FactoryInstructionWords,
-  FactoryInstructionWrite,
-  FactoryList,
-  FactoryRemoved,
-  FactoryRevisionsWrite,
-  FactoryRules,
-  FactoryRulesWrite,
-  FactoryAttachWrite,
-  FactorySettingWrite,
-  FactoryTrusted,
-} from './factory.ts';
-import { FactoryExport, FactoryImported, FactoryImportWrite, MOVE_CARDS } from './factory-move.ts';
-import { Hire, HireList, HireWrite } from './hire.ts';
-import { McpServer, McpServerList, McpServerWrite, SignInCallback, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
-import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
-import { Volume, VolumeList } from './volume.ts';
-import { DefinitionFiles, KeyForm, Workflow, WorkflowCreate, WorkflowList, WorkflowStepPage, WorkflowWrite } from './workflow.ts';
-import {
-  Agent,
-  AgentCard,
-  AgentCopied,
-  AgentCopy,
-  AgentDrafted,
-  AgentInstructions,
-  AgentInstructionsCleared,
-  AgentInstructionsWrite,
-  AgentList,
-  AgentSources,
-  AgentTried,
-  AgentTry,
-  AgentWrite,
-} from './agent.ts';
-import { Skill, SkillDrafted, SkillFiles, SkillList, SkillWrite } from './skill.ts';
-import { LabelEdit, Labelled } from './labels.ts';
+import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
 import { Template, TemplateList } from './template.ts';
-import { BadRequest, Conflict, Failed, Forbidden, Invalid, listQuery, Missing, Unauthorized, Unjudged, WriteFailed } from './api-errors.ts';
 import {
-  stepName,
-  cardParams,
-  cardNameParams,
-  namespaceParams,
-  factoryParams,
-  factoryWorkflowParams,
-  factorySettingParams,
-  factoryOwnParams,
-  cardListQuery,
-  originQuery,
-  instructionsQuery,
-  removeQuery,
-  repoQuery,
-  draftReadQuery,
-  templateParams,
-  documentParams,
-  subscriptionParams,
-  eventNameParams,
-} from './api-params.ts';
+  BadRequest,
+  Conflict,
+  definitionErrors,
+  Failed,
+  Forbidden,
+  Invalid,
+  listQuery,
+  Missing,
+  objectErrors,
+  Unauthorized,
+  Unjudged,
+  WriteFailed,
+} from './api-errors.ts';
+import { namespaceParams, cardParams, templateParams, documentParams, subscriptionParams, eventNameParams } from './api-params.ts';
 import { DelegationsGroup, ProposalsGroup } from './proposal-api.ts';
 import { RunsGroup } from './run-api.ts';
-import { CardStarted } from './run-actions.ts';
 import { StepsGroup } from './step-api.ts';
 import { NemiaGroup } from './nemia-api.ts';
+import { CardsGroup } from './card-api.ts';
+import { BuiltinGroup, FactoriesGroup, HiresGroup, McpServersGroup, SchedulesGroup, VolumesGroup } from './factory-api.ts';
+import {
+  AgentListObject,
+  AgentObject,
+  AgentsGroup,
+  SkillListObject,
+  SkillObject,
+  SkillsGroup,
+  WorkflowListObject,
+  WorkflowObject,
+  WorkflowsGroup,
+} from './definition-api.ts';
 import { Subscription, SubscriptionList } from './subscription.ts';
 import { Event, EventList } from './event.ts';
 import { KINDS, type Kind } from './words.ts';
@@ -149,44 +79,6 @@ export {
 
 export { KINDS, type Kind };
 
-/** The Card and a page of them, named so that the document holds each as a component, as it holds the Run. */
-const CardObject = Card.annotate({ identifier: 'Card' });
-const CardListObject = CardList.annotate({ identifier: 'CardList' });
-/**
- * A page of cards, or the same page as a `Table` where the request's `Accept` asks for one (`TABLE_ACCEPT`): two answers of one status,
- * each its own success, so each is read off the endpoint by its kind.
- */
-const CardListOrTable = [CardListObject, Table] as const;
-
-/** The factory's kinds and a page of each, named so that the document holds each as a component. */
-const FactoryObject = Factory.annotate({ identifier: 'Factory' });
-const FactoryListObject = FactoryList.annotate({ identifier: 'FactoryList' });
-const FactoryCommandsObject = FactoryCommands.annotate({ identifier: 'FactoryCommands' });
-const FactoryTrustedObject = FactoryTrusted.annotate({ identifier: 'FactoryTrusted' });
-const FactoryRemovedObject = FactoryRemoved.annotate({ identifier: 'FactoryRemoved' });
-const McpServerObject = McpServer.annotate({ identifier: 'McpServer' });
-const McpServerListObject = McpServerList.annotate({ identifier: 'McpServerList' });
-const ScheduleObject = Schedule.annotate({ identifier: 'Schedule' });
-const ScheduleListObject = ScheduleList.annotate({ identifier: 'ScheduleList' });
-const HireObject = Hire.annotate({ identifier: 'Hire' });
-const HireListObject = HireList.annotate({ identifier: 'HireList' });
-const VolumeObject = Volume.annotate({ identifier: 'Volume' });
-const VolumeListObject = VolumeList.annotate({ identifier: 'VolumeList' });
-/** The factories and a factory's MCP servers, each a page or the same page as a `Table` where the request asks for one, as the cards. */
-const FactoryListOrTable = [FactoryListObject, Table] as const;
-const McpServerListOrTable = [McpServerListObject, Table] as const;
-
-/** The definitions and a page of each, named so that the document holds each as a component. */
-const WorkflowObject = Workflow.annotate({ identifier: 'Workflow' });
-const WorkflowListObject = WorkflowList.annotate({ identifier: 'WorkflowList' });
-const AgentObject = Agent.annotate({ identifier: 'Agent' });
-const AgentListObject = AgentList.annotate({ identifier: 'AgentList' });
-const SkillObject = Skill.annotate({ identifier: 'Skill' });
-const SkillListObject = SkillList.annotate({ identifier: 'SkillList' });
-/** A namespace's agents and skills, each a page or the same page as a `Table` where the request asks for one, as the cards. */
-const AgentListOrTable = [AgentListObject, Table] as const;
-const SkillListOrTable = [SkillListObject, Table] as const;
-
 /** The cluster's templates, subscriptions and the feed's events, and a page of each, named so that the document holds each. */
 const TemplateObject = Template.annotate({ identifier: 'Template' });
 const TemplateListObject = TemplateList.annotate({ identifier: 'TemplateList' });
@@ -195,575 +87,64 @@ const SubscriptionListObject = SubscriptionList.annotate({ identifier: 'Subscrip
 const EventObject = Event.annotate({ identifier: 'Event' });
 const EventListObject = EventList.annotate({ identifier: 'EventList' });
 
-/** What a card's verbs refuse with: a request its reader refuses before the package is asked (400) among them. */
-const cardErrors = [BadRequest, Missing, Conflict, Invalid];
-
-/** The inbox's cards as objects. */
-export class CardsGroup extends HttpApiGroup.make('cards').add(
-  HttpApiEndpoint.get('listAll', '/api/cards', { query: cardListQuery, success: CardListOrTable, error: cardErrors }),
-  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/cards', {
-    params: namespaceParams,
-    query: cardListQuery,
-    success: CardListOrTable,
-    error: cardErrors,
-  }),
-  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/cards/:name', { params: cardParams, success: CardObject, error: cardErrors }),
-  HttpApiEndpoint.get('getAll', '/api/cards/:name', { params: cardNameParams, success: CardObject, error: cardErrors }),
-  HttpApiEndpoint.put('update', '/api/namespaces/:namespace/cards/:name', {
-    params: cardParams,
-    payload: CardWrite,
-    success: CardObject,
-    error: cardErrors,
-  }),
-  HttpApiEndpoint.put('edit', '/api/namespaces/:namespace/cards/:name/source', {
-    params: cardParams,
-    payload: CardEdit,
-    success: CardObject,
-    error: cardErrors,
-  }),
-  HttpApiEndpoint.post('create', '/api/namespaces/:namespace/cards', {
-    params: namespaceParams,
-    payload: CardFile,
-    success: CardObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: cardErrors,
-  }),
-  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/cards/:name', {
-    params: cardParams,
-    success: CardObject,
-    error: cardErrors,
-  }),
-  HttpApiEndpoint.post('start', '/api/namespaces/:namespace/cards/:name/start', {
-    params: cardParams,
-    payload: CardStart,
-    success: CardStarted.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: cardErrors,
-  }),
-  HttpApiEndpoint.post('queue', '/api/namespaces/:namespace/cards/:name/queue', {
-    params: cardParams,
-    query: CardQueue,
-    success: CardObject,
-    error: cardErrors,
-  }),
-  HttpApiEndpoint.post('unqueue', '/api/namespaces/:namespace/cards/:name/unqueue', {
-    params: cardParams,
-    success: CardObject,
-    error: cardErrors,
-  }),
-  HttpApiEndpoint.post('labels', '/api/namespaces/:namespace/cards/:name/labels', {
-    params: cardParams,
-    payload: LabelEdit,
-    success: Labelled,
-    error: cardErrors,
-  }),
-) {}
-
-/** What every verb of a factory and of its parts refuses with, as a card's do. */
-const objectErrors = cardErrors;
-
-/** What a definition's verbs refuse with: a part's refusals, and a write the disk failed. */
-const definitionErrors = [...cardErrors, Failed];
-
-/**
- * The factories, which no namespace holds, and each one's rules, instruction, command lines and cost lines; filed, made from a template,
- * taken over by one, previewed, upgraded and resolved, and its volumes mounted and taken off.
- */
-export class FactoriesGroup extends HttpApiGroup.make('factories').add(
-  HttpApiEndpoint.get('listAll', '/api/factories', { query: listQuery, success: FactoryListOrTable, error: objectErrors }),
-  HttpApiEndpoint.get('get', '/api/factories/:name', { params: factoryParams, success: FactoryObject, error: objectErrors }),
-  HttpApiEndpoint.get('rules', '/api/factories/:name/rules', { params: factoryParams, success: FactoryRules, error: objectErrors }),
-  HttpApiEndpoint.put('putRules', '/api/factories/:name/rules', {
-    params: factoryParams,
-    payload: FactoryRulesWrite,
-    success: FactoryRules,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('deleteRules', '/api/factories/:name/rules', {
-    params: factoryParams,
-    success: FactoryRules,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.get('instruction', '/api/factories/:name/instruction', {
-    params: factoryParams,
-    success: FactoryInstruction,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.put('putInstruction', '/api/factories/:name/instruction', {
-    params: factoryParams,
-    payload: FactoryInstructionWrite,
-    success: FactoryInstruction,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('deleteInstruction', '/api/factories/:name/instruction', {
-    params: factoryParams,
-    success: FactoryInstruction,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.put('putInstructionWords', '/api/factories/:name/instruction/words', {
-    params: factoryParams,
-    payload: FactoryInstructionWords,
-    success: FactoryInstruction,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('deleteInstructionWords', '/api/factories/:name/instruction/words', {
-    params: factoryParams,
-    success: FactoryInstruction,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.get('commands', '/api/factories/:name/commands', {
-    params: factoryParams,
-    success: FactoryCommandsObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.put('putCostLine', '/api/factories/:name/costlines/:workflow', {
-    params: factoryWorkflowParams,
-    payload: FactoryCostLineWrite,
-    success: FactoryObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('deleteCostLine', '/api/factories/:name/costlines/:workflow', {
-    params: factoryWorkflowParams,
-    success: FactoryObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('delete', '/api/factories/:name', {
-    params: factoryParams,
-    success: FactoryRemovedObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.put('setRevisions', '/api/factories/:name/revisions', {
-    params: factoryParams,
-    payload: FactoryRevisionsWrite,
-    success: FactoryObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.post('trust', '/api/factories/:name/trust', {
-    params: factoryParams,
-    success: FactoryTrustedObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.put('attach', '/api/factories/:name/workflows/:workflow', {
-    params: factoryWorkflowParams,
-    payload: FactoryAttachWrite,
-    success: FactoryObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('detach', '/api/factories/:name/workflows/:workflow', {
-    params: factoryWorkflowParams,
-    success: FactoryObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.put('putSetting', '/api/factories/:name/settings/:setting', {
-    params: factorySettingParams,
-    payload: FactorySettingWrite,
-    success: FactoryObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('deleteSetting', '/api/factories/:name/settings/:setting', {
-    params: factorySettingParams,
-    success: FactoryObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.post('create', '/api/factories', { payload: FactoryCreate, success: FactoryCreated, error: objectErrors }),
-  HttpApiEndpoint.post('addVolume', '/api/factories/:factory/volumes', {
-    params: factoryOwnParams,
-    payload: VolumeWrite,
-    success: VolumeAdded,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('removeVolume', '/api/factories/:factory/volumes', {
-    params: factoryOwnParams,
-    query: {
-      path: Schema.String.annotate({
-        description: 'The folder of the machine the api runs on whose volume is taken off, as it was mounted.',
-      }),
-    },
-    success: VolumeRemoved,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.post('apply', '/api/factories/:name/apply', {
-    params: factoryParams,
-    payload: FactoryApplyWrite,
-    success: FactoryApplied,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.get('export', '/api/factories/:name/export', {
-    params: factoryParams,
-    query: {
-      cards: Schema.optionalKey(
-        Schema.Literals(MOVE_CARDS).annotate({
-          description: "Whether the factory's cards follow it to another store (follow, the default) or stay on the source (stay).",
-        }),
-      ),
-    },
-    success: FactoryExport,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.post('import', '/api/factories/:name/import', {
-    params: factoryParams,
-    payload: FactoryImportWrite,
-    success: FactoryImported,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.post('adopt', '/api/factories/:factory/adopt', {
-    params: factoryOwnParams,
-    payload: FactoryAdoptWrite,
-    success: FactoryAdopted,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.post('diff', '/api/factories/:factory/diff', {
-    params: factoryOwnParams,
-    payload: FactoryDiffWrite,
-    success: FactoryPlan,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.post('upgrade', '/api/factories/:factory/upgrade', {
-    params: factoryOwnParams,
-    payload: FactoryUpgradeWrite,
-    success: FactoryUpgraded,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.post('resolve', '/api/factories/:factory/resolve', {
-    params: factoryOwnParams,
-    payload: FactoryResolveWrite,
-    success: FactoryResolved,
-    error: objectErrors,
-  }),
-) {}
-
-/** A factory's MCP servers, in its namespace, and their sign-in. */
-export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
-  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/mcpservers', {
-    params: namespaceParams,
-    query: listQuery,
-    success: McpServerListOrTable,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/mcpservers/:name', {
-    params: cardParams,
-    success: McpServerObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.put('put', '/api/namespaces/:namespace/mcpservers/:name', {
-    params: cardParams,
-    payload: McpServerWrite,
-    success: McpServerObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/mcpservers/:name', {
-    params: cardParams,
-    success: McpServerObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.post('signIn', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
-    params: cardParams,
-    success: SignInStarted,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.get('signInState', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
-    params: cardParams,
-    success: SignInState,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.post('signInCallback', '/api/namespaces/:namespace/mcpservers/:name/sign-in/callback', {
-    params: cardParams,
-    payload: SignInCallback,
-    success: SignInState,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('signOut', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
-    params: cardParams,
-    success: SignedOut,
-    error: objectErrors,
-  }),
-) {}
-
-/** The MCP servers Nemia offers a factory: a page whose items carry their spec alone, in no namespace. */
-export class BuiltinGroup extends HttpApiGroup.make('builtin').add(
-  HttpApiEndpoint.get('mcpservers', '/api/builtin/mcpservers', { query: listQuery, success: McpServerListObject, error: objectErrors }),
-) {}
-
-/** A factory's schedules, in its namespace, each named by its workflow. */
-export class SchedulesGroup extends HttpApiGroup.make('schedules').add(
-  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/schedules', {
-    params: namespaceParams,
-    query: listQuery,
-    success: ScheduleListObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/schedules/:name', {
-    params: cardParams,
-    success: ScheduleObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.put('put', '/api/namespaces/:namespace/schedules/:name', {
-    params: cardParams,
-    payload: ScheduleWrite,
-    success: ScheduleObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/schedules/:name', {
-    params: cardParams,
-    success: ScheduleObject,
-    error: objectErrors,
-  }),
-) {}
-
-/** A factory's hires, in its namespace, one per step it offers, each named `<workflow>.<step>`. */
-export class HiresGroup extends HttpApiGroup.make('hires').add(
-  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/hires', {
-    params: namespaceParams,
-    query: listQuery,
-    success: HireListObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/hires/:name', { params: cardParams, success: HireObject, error: objectErrors }),
-  HttpApiEndpoint.put('put', '/api/namespaces/:namespace/hires/:name', {
-    params: cardParams,
-    payload: HireWrite,
-    success: HireObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/hires/:name', {
-    params: cardParams,
-    success: HireObject,
-    error: objectErrors,
-  }),
-) {}
-
-/** A factory's volumes, in its namespace, by their stored names: read alone over the api. */
-export class VolumesGroup extends HttpApiGroup.make('volumes').add(
-  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/volumes', {
-    params: namespaceParams,
-    query: listQuery,
-    success: VolumeListObject,
-    error: objectErrors,
-  }),
-  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/volumes/:name', {
-    params: cardParams,
-    success: VolumeObject,
-    error: objectErrors,
-  }),
-) {}
-
-/**
- * A namespace's workflows: the factory's resolved view of each name (`default`: the api's repository and your library), listed, read,
- * and — yours, in `default` alone — made, written whole and removed; a step of one read for its page, in the namespace's factory. And
- * the builder's form (`keys`), in no namespace: under one, `keys` would read as a workflow's name.
- */
-export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
-  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/workflows', {
-    params: namespaceParams,
-    query: { ...listQuery, ...originQuery },
-    success: WorkflowListObject,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/workflows/:name', {
-    params: cardParams,
-    query: originQuery,
-    success: WorkflowObject,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.post('create', '/api/namespaces/:namespace/workflows', {
-    params: namespaceParams,
-    payload: WorkflowCreate,
-    success: WorkflowObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/workflows/:name', {
-    params: cardParams,
-    payload: WorkflowWrite,
-    success: WorkflowObject,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/workflows/:name', {
-    params: cardParams,
-    query: { ...removeQuery, ...repoQuery },
-    success: WorkflowObject,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.get('step', '/api/namespaces/:namespace/workflows/:name/steps/:step', {
-    params: { ...cardParams, step: stepName },
-    query: originQuery,
-    success: WorkflowStepPage,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.get('keys', '/api/workflows/keys', { success: KeyForm, error: definitionErrors }),
-  HttpApiEndpoint.post('read', '/api/workflows/read', {
-    query: draftReadQuery,
-    payload: DefinitionFiles,
-    success: WorkflowCreate,
-    error: definitionErrors,
-  }),
-) {}
-
-/**
- * A namespace's agents, as the workflows: listed, read, yours made, written and removed in `default`, tried, and read as a card; an agent
- * file copied into yours, in `default` alone; and an agent's custom instructions, one record per agent's name, read in any namespace and
- * written and cleared in `default` alone. And where agent files are looked for (`sources`), in no namespace: under one, `sources` would
- * read as an agent's name.
- */
-export class AgentsGroup extends HttpApiGroup.make('agents').add(
-  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/agents', {
-    params: namespaceParams,
-    query: { ...listQuery, ...originQuery, ...repoQuery },
-    success: AgentListOrTable,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/agents/:name', {
-    params: cardParams,
-    query: originQuery,
-    success: AgentObject,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.post('create', '/api/namespaces/:namespace/agents', {
-    params: namespaceParams,
-    payload: AgentWrite,
-    success: AgentObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/agents/:name', {
-    params: cardParams,
-    payload: AgentWrite,
-    success: AgentObject,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/agents/:name', {
-    params: cardParams,
-    query: { ...removeQuery, ...repoQuery },
-    success: AgentObject,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.post('try', '/api/namespaces/:namespace/agents/:name/try', {
-    params: cardParams,
-    payload: AgentTry,
-    success: AgentTried.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.get('card', '/api/namespaces/:namespace/agents/:name/card', {
-    params: cardParams,
-    query: { ...originQuery, ...repoQuery },
-    success: AgentCard,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.get('sources', '/api/agents/sources', {
-    query: {
-      path: Schema.optionalKey(
-        Schema.String.annotate({
-          description: "A folder of agent files on the api's machine, listed besides those the store knows of; absent, the store's alone.",
-        }),
-      ),
-    },
-    success: AgentSources,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.post('copy', '/api/namespaces/:namespace/agents/copy', {
-    params: namespaceParams,
-    payload: AgentCopy,
-    success: AgentCopied,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.get('instructions', '/api/namespaces/:namespace/agents/:name/instructions', {
-    params: cardParams,
-    query: instructionsQuery,
-    success: AgentInstructions,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.put('putInstructions', '/api/namespaces/:namespace/agents/:name/instructions', {
-    params: cardParams,
-    query: instructionsQuery,
-    payload: AgentInstructionsWrite,
-    success: AgentInstructions,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.delete('deleteInstructions', '/api/namespaces/:namespace/agents/:name/instructions', {
-    params: cardParams,
-    query: instructionsQuery,
-    success: AgentInstructionsCleared,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.post('read', '/api/agents/read', { payload: DefinitionFiles, success: AgentDrafted, error: definitionErrors }),
-) {}
-
-/** A namespace's skills: listed, read, yours made and written in `default`, a builtin one copied to yours, and a folder's files by path. */
-export class SkillsGroup extends HttpApiGroup.make('skills').add(
-  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/skills', {
-    params: namespaceParams,
-    query: { ...listQuery, ...originQuery },
-    success: SkillListOrTable,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/skills/:name', {
-    params: cardParams,
-    query: originQuery,
-    success: SkillObject,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.post('create', '/api/namespaces/:namespace/skills', {
-    params: namespaceParams,
-    payload: SkillWrite,
-    success: SkillObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/skills/:name', {
-    params: cardParams,
-    payload: SkillWrite,
-    success: SkillObject,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.post('copy', '/api/namespaces/:namespace/skills/:name/copy', {
-    params: cardParams,
-    success: SkillObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.get('files', '/api/namespaces/:namespace/skills/:name/files', {
-    params: cardParams,
-    query: originQuery,
-    success: SkillFiles,
-    error: definitionErrors,
-  }),
-  HttpApiEndpoint.post('read', '/api/skills/read', { payload: DefinitionFiles, success: SkillDrafted, error: definitionErrors }),
-) {}
-
 /**
  * The templates Nemia builds in, which no namespace holds, listed and read; and each one's documents, its workflows, agents and skills,
  * rendered with its parameters' defaults and served in the Schemas a namespace serves them in, with origin `builtin`.
  */
 export class TemplatesGroup extends HttpApiGroup.make('templates').add(
-  HttpApiEndpoint.get('listAll', '/api/templates', { query: listQuery, success: TemplateListObject, error: objectErrors }),
-  HttpApiEndpoint.get('get', '/api/templates/:name', { params: templateParams, success: TemplateObject, error: objectErrors }),
+  HttpApiEndpoint.get('listAll', '/api/templates', { query: listQuery, success: TemplateListObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    'Lists the templates Nemia builds in, which no namespace holds, a page at a time. Answers a TemplateList.',
+  ),
+  HttpApiEndpoint.get('get', '/api/templates/:name', { params: templateParams, success: TemplateObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Reads one of Nemia's templates by its name: its version, the instruction and rules it gives a factory, its parameters and the agent it hires into each step. Answers the Template.",
+  ),
   HttpApiEndpoint.get('workflows', '/api/templates/:name/workflows', {
     params: templateParams,
     query: listQuery,
     success: WorkflowListObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a template's workflows, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers a WorkflowList.",
+  ),
   HttpApiEndpoint.get('workflow', '/api/templates/:name/workflows/:doc', {
     params: documentParams,
     success: WorkflowObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one workflow of a template, rendered with its parameters' defaults, its steps filled by the template's hires as in a factory applied from it. Answers the Workflow.",
+  ),
   HttpApiEndpoint.get('agents', '/api/templates/:name/agents', {
     params: templateParams,
     query: listQuery,
     success: AgentListObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a template's agents, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers an AgentList.",
+  ),
   HttpApiEndpoint.get('agent', '/api/templates/:name/agents/:doc', {
     params: documentParams,
     success: AgentObject,
     error: definitionErrors,
-  }),
+  }).annotate(OpenApi.Description, "Reads one agent of a template, rendered with its parameters' defaults. Answers the Agent."),
   HttpApiEndpoint.get('skills', '/api/templates/:name/skills', {
     params: templateParams,
     query: listQuery,
     success: SkillListObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a template's skills, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers a SkillList.",
+  ),
   HttpApiEndpoint.get('skill', '/api/templates/:name/skills/:doc', {
     params: documentParams,
     success: SkillObject,
     error: definitionErrors,
-  }),
+  }).annotate(OpenApi.Description, "Reads one skill of a template, rendered with its parameters' defaults. Answers the Skill."),
 ) {}
 
 /**
@@ -771,23 +152,32 @@ export class TemplatesGroup extends HttpApiGroup.make('templates').add(
  * away (`nemia unsubscribe`).
  */
 export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
-  HttpApiEndpoint.get('listAll', '/api/subscriptions', { query: listQuery, success: SubscriptionListObject, error: objectErrors }),
+  HttpApiEndpoint.get('listAll', '/api/subscriptions', { query: listQuery, success: SubscriptionListObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Lists the feed's subscriptions, which no namespace holds, a page at a time. Answers a SubscriptionList.",
+  ),
   HttpApiEndpoint.get('get', '/api/subscriptions/:name', {
     params: subscriptionParams,
     success: SubscriptionObject,
     error: objectErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of the feed's subscriptions by its name: the long-lived task it feeds and what of the feed it carries. Answers the Subscription.",
+  ),
   HttpApiEndpoint.post('subscribe', '/api/subscriptions/:name', {
     params: subscriptionParams,
     payload: SubscriptionWrite,
     success: Subscribed.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: [...objectErrors, Failed],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Gives a long-lived task a subscription to the feed under the name in the path: the lines its selectors and level keep, said to it from the feed's end, in digests where asked. Answers Subscribed with a 201, the subscription as written.",
+  ),
   HttpApiEndpoint.delete('unsubscribe', '/api/subscriptions/:name', {
     params: subscriptionParams,
     success: Unsubscribed,
     error: [...objectErrors, Failed],
-  }),
+  }).annotate(OpenApi.Description, 'Takes a subscription away, removing its file. Answers Unsubscribed, its name.'),
 ) {}
 
 /**
@@ -795,24 +185,39 @@ export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
  * its name, the byte its line starts at — a daemon's or the store's that names no factory in no namespace.
  */
 export class EventsGroup extends HttpApiGroup.make('events').add(
-  HttpApiEndpoint.get('listAll', '/api/events', { query: listQuery, success: EventListObject, error: objectErrors }),
+  HttpApiEndpoint.get('listAll', '/api/events', { query: listQuery, success: EventListObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Lists the feed's lines as events, every one, in the order they were written, a page at a time; with watch=true and a resourceVersion, a stream from that byte. Answers an EventList.",
+  ),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/events', {
     params: namespaceParams,
     query: listQuery,
     success: EventListObject,
     error: objectErrors,
-  }),
-  HttpApiEndpoint.get('getAll', '/api/events/:name', { params: eventNameParams, success: EventObject, error: objectErrors }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists the feed's lines as events in one namespace, those naming its factory, in the order they were written, a page at a time. Answers an EventList.",
+  ),
+  HttpApiEndpoint.get('getAll', '/api/events/:name', { params: eventNameParams, success: EventObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Reads one of the feed's lines as an event by its name, the byte its line starts at, a daemon's or the store's that names no factory among them. Answers the Event.",
+  ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/events/:name', {
     params: cardParams,
     success: EventObject,
     error: objectErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of the feed's lines as an event by its name, the byte its line starts at, in the namespace of the factory it names. Answers the Event.",
+  ),
 ) {}
 
 /** The api's discovery: every resource it serves, read off this definition (Kubernetes' `/api`, for Nemia's one group version). */
 export class DiscoveryGroup extends HttpApiGroup.make('discovery').add(
-  HttpApiEndpoint.get('resources', '/api', { success: APIResourceList.annotate({ identifier: 'APIResourceList' }) }),
+  HttpApiEndpoint.get('resources', '/api', { success: APIResourceList.annotate({ identifier: 'APIResourceList' }) }).annotate(
+    OpenApi.Description,
+    "Reads every resource the api serves, read off its own definition: each one's name, singular, kind, scope and verbs, as Kubernetes' /api says them. Answers APIResourceList.",
+  ),
 ) {}
 
 /**

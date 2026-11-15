@@ -57,7 +57,10 @@ test('a person adds a skill of the library to a factory: listed with it, served 
     const skill = await answered<Skill>(app.request('/api/skills/tidy'));
     assert.deepEqual(skill.status.factories, ['shop']);
     const served = await answered<SkillList>(app.request('/api/namespaces/shop/skills'));
-    assert.ok(served.items.some((one) => one.metadata.name === 'tidy'), 'the factory serves what it added');
+    assert.ok(
+      served.items.some((one) => one.metadata.name === 'tidy'),
+      'the factory serves what it added',
+    );
   });
   await s.test('REFUSED: the removal of a skill a factory adds is a 409 naming each factory, and the skill is kept', async () => {
     const skill = await answered<Skill>(app.request('/api/skills/tidy'));

@@ -30,7 +30,10 @@ test('a LibraryAdd proposal applied writes the add, then its removal takes it of
   };
   assert.equal((await ran(currentOf(place, 'default', 'LibraryAdd', add.metadata.name))).version, null, 'not added yet');
   await ran(objectWritten(place, 'default', add));
-  assert.ok(readLibraryAdds(home, 'default')?.some((a) => a.kind === 'Skill' && a.name === 'create-an-agent'), 'the record holds it');
+  assert.ok(
+    readLibraryAdds(home, 'default')?.some((a) => a.kind === 'Skill' && a.name === 'create-an-agent'),
+    'the record holds it',
+  );
   assert.notEqual((await ran(currentOf(place, 'default', 'LibraryAdd', add.metadata.name))).version, null, 'read as there now');
   await ran(objectWritten(place, 'default', { kind: 'LibraryAdd', metadata: { name: add.metadata.name }, verb: 'delete' }));
   assert.equal(

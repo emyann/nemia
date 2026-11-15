@@ -219,13 +219,16 @@ test('under a remote context pointed at the served store: the same verbs land th
   assert.equal(fs.existsSync(env.WF_ROOT ?? ''), false, "nothing read or made on this machine's store");
 });
 
-test('`nemia library` lists the library with who adds each item, and a factory\'s adds with --factory; `library add` adds one to a factory, `library rm` takes it off, a kind the library holds not refused exit 2', async () => {
+test("`nemia library` lists the library with who adds each item, and a factory's adds with --factory; `library add` adds one to a factory, `library rm` takes it off, a kind the library holds not refused exit 2", async () => {
   const listed = ok(await store.nemia(['library', 'agents']), 'library');
   assert.match(listed, /^agents\/archivist {2}user {2}added by/m);
   const added = ok(await store.nemia(['library', 'add', 'Agent', 'archivist', '--factory', 'elsewhere']), 'library add');
   assert.match(added, /^Agent\.archivist added in elsewhere: resolved/);
   assert.match(ok(await store.nemia(['library', 'agents']), 'library'), /^agents\/archivist {2}user {2}added by .*elsewhere/m);
-  assert.match(ok(await store.nemia(['library', '--factory', 'elsewhere']), 'library --factory'), /^Agent\.archivist added in elsewhere: resolved/m);
+  assert.match(
+    ok(await store.nemia(['library', '--factory', 'elsewhere']), 'library --factory'),
+    /^Agent\.archivist added in elsewhere: resolved/m,
+  );
   assert.match(
     ok(await store.nemia(['library', 'rm', 'Agent', 'archivist', '--factory', 'elsewhere']), 'library rm'),
     /taken off in elsewhere/,

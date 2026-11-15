@@ -98,9 +98,15 @@ test("an unrecorded factory's adds hold a library skill a step names on its own 
   fs.mkdirSync(path.join(home, 'workflows', 'notes'), { recursive: true });
   fs.writeFileSync(path.join(home, 'workflows', 'notes', 'write.md'), '---\nplace: git\nskills: tidy\n---\nWrite the notes.\n');
   const tidy = { kind: 'Skill', name: 'tidy' } as const;
-  assert.ok(factoryAdds(home, 'default').adds.some((a) => a.kind === tidy.kind && a.name === tidy.name), 'derived from the step');
+  assert.ok(
+    factoryAdds(home, 'default').adds.some((a) => a.kind === tidy.kind && a.name === tidy.name),
+    'derived from the step',
+  );
   writeLibraryAdd(home, 'default', 'add', { kind: 'Skill', name: 'create-an-agent' });
-  assert.ok(readLibraryAdds(home, 'default')?.some((a) => a.kind === tidy.kind && a.name === tidy.name), 'kept by the first add');
+  assert.ok(
+    readLibraryAdds(home, 'default')?.some((a) => a.kind === tidy.kind && a.name === tidy.name),
+    'kept by the first add',
+  );
 });
 
 test("a template's tree whose agent names a builtin skill: added to a recorded factory's adds, once; an unrecorded factory left unwritten", () => {

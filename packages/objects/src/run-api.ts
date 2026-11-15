@@ -5,7 +5,7 @@
  * (`apps/api/src/objects/runs.ts`).
  */
 import { Schema } from 'effect';
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
+import { HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
 import { BadRequest, Conflict, Invalid, listQuery, Missing, Unjudged, WriteFailed } from './api-errors.ts';
 import { Table } from './table.ts';
 import { Concluded, RunLines, RunRecord } from './run-reads.ts';
@@ -109,14 +109,23 @@ const takenLater = <S extends Schema.Top>(answer: S) => answer.pipe(Schema.annot
  * holds the folder `?repo=` names; with none it is refused, naming `?factory=`.
  */
 export class RunsGroup extends HttpApiGroup.make('runs').add(
-  HttpApiEndpoint.get('listAll', '/api/runs', { query: runListQuery, success: runListed, error: runReadErrors }),
+  HttpApiEndpoint.get('listAll', '/api/runs', { query: runListQuery, success: runListed, error: runReadErrors }).annotate(
+    OpenApi.Description,
+    'Lists the runs of every namespace, a page at a time, each judged into its run object; a label or field selector keeps those that match. Answers a RunList, or the same page as a Table where the request asks for one.',
+  ),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/runs', {
     params: namespaceParams,
     query: runListQuery,
     success: runListed,
     error: runReadErrors,
-  }),
-  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/runs/:name', { params: runParams, success: Run, error: runReadErrors }),
+  }).annotate(
+    OpenApi.Description,
+    'Lists the runs of one namespace (a factory, default for runs that name none), a page at a time, each judged into its run object; a label or field selector keeps those that match. Answers a RunList, or the same page as a Table where the request asks for one.',
+  ),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/runs/:name', { params: runParams, success: Run, error: runReadErrors }).annotate(
+    OpenApi.Description,
+    'Reads one run by its name in its namespace, judged into the run object. Answers the Run; a run in another namespace is Missing, and one a task of which does not read is Unjudged.',
+  ),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/runs', {
     params: namespaceParams,
     query: {
@@ -129,79 +138,124 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
     payload: RunStart,
     success: RunStarted.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: runActionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Starts a run of a workflow in the namespace's factory, from the RunStart body; in default, the factory whose repository holds the folder ?repo= names places it. Answers RunStarted with a 201, the new run's address in Location.",
+  ),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/runs/:name', {
     params: runParams,
     query: removeQuery,
     success: RunRemoved,
     error: runActionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Removes a try, a run started from an agent's page; with whole=true, any run as a whole: its worktrees removed through git, its branches kept unless deleteBranches asks. Answers RunRemoved: what the engine forgot of it and what became of its worktrees, branches and files.",
+  ),
   HttpApiEndpoint.post('refresh', '/api/namespaces/:namespace/runs/:name/refresh', {
     params: runParams,
     payload: RunRefresh,
     success: takenLater(RunRefreshed),
     error: runActionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Brings the run onto its workflow's newest revision, or merges its base into its branch, as the RunRefresh body asks. Answers RunRefreshed with a 202: the drift it found, or the merge it asked of the looping step.",
+  ),
   HttpApiEndpoint.post('prune', '/api/namespaces/:namespace/runs/:name/prune', {
     params: runParams,
     payload: RunPrune,
     success: RunPruned,
     error: runActionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Lets go of what a run no longer needs: its lines, its worktrees and its files, keeping what cannot go yet with why; with preview, lists what it would free and removes nothing. Answers RunPruned.',
+  ),
   HttpApiEndpoint.post('labels', '/api/namespaces/:namespace/runs/:name/labels', {
     params: runParams,
     payload: LabelEdit,
     success: Labelled,
     error: runActionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Edits the run's labels: sets and removes the keys the LabelEdit body names. Answers Labelled, the labels the run holds after it.",
+  ),
   HttpApiEndpoint.post('hold', '/api/namespaces/:namespace/runs/:name/hold', {
     params: runParams,
     payload: RunHold,
     success: RunHeld,
     error: runActionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Puts a hold on the run, until the runs the body names land or, naming none, until a person lifts it, recording who put it. Answers RunHeld.',
+  ),
   HttpApiEndpoint.delete('unhold', '/api/namespaces/:namespace/runs/:name/hold', {
     params: runParams,
     success: RunHeld,
     error: runActionErrors,
-  }),
+  }).annotate(OpenApi.Description, "Lifts the run's hold now, recording who lifted it. Answers RunHeld, lifted."),
   HttpApiEndpoint.post('cancel', '/api/namespaces/:namespace/runs/:name/cancel', {
     params: runParams,
     success: RunCancelled,
     error: runActionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Calls the run off: asks every task it has in flight to stop, and files nothing more of it. Answers RunCancelled, the plan it followed, a run already over included.',
+  ),
   HttpApiEndpoint.post('retry', '/api/namespaces/:namespace/runs/:name/steps/:step/retry', {
     params: runStepParams,
     payload: RunRetry,
     success: takenLater(RunAsked),
     error: runActionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Asks for another try or round of the step, written as a file the next pass acts on. Answers RunAsked with a 202: the ask's file and what it asked for.",
+  ),
   HttpApiEndpoint.post('approve', '/api/namespaces/:namespace/runs/:name/steps/:step/approve', {
     params: runStepParams,
     payload: RunApprove,
     success: takenLater(RunApproved),
     error: runActionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Approves the step at its gate, recording who gave the approval; with off, takes the approval back. Answers RunApproved with a 202: the approval written, its file and what follows it.',
+  ),
   HttpApiEndpoint.post('route', '/api/namespaces/:namespace/runs/:name/steps/:step/route', {
     params: runStepParams,
     payload: RunRoute,
     success: RunRouted,
     error: runActionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Gives a condition step's route by hand, for its try that stands. Answers RunRouted: the condition, its try, the route and its file; the next pass files the steps whose when: names the route.",
+  ),
   HttpApiEndpoint.post('say', '/api/namespaces/:namespace/runs/:name/steps/:step/say', {
     params: runStepParams,
     payload: RunSay,
     success: takenLater(RunSaid),
     error: runActionErrors,
-  }),
-  HttpApiEndpoint.get('show', '/api/runs/:name', { params: nameParams, success: Run, error: runReadErrors }),
-  HttpApiEndpoint.get('lines', '/api/runs/:name/lines', { params: nameParams, success: RunLines, error: [Missing] }),
+  }).annotate(
+    OpenApi.Description,
+    "Says words to the step's session, from the caller and who the body says they are from; words for a step not filed yet are kept for it. Answers RunSaid with a 202: when they were taken, by which attempt, and what follows them.",
+  ),
+  HttpApiEndpoint.get('show', '/api/runs/:name', { params: nameParams, success: Run, error: runReadErrors }).annotate(
+    OpenApi.Description,
+    'Reads one run by its name in any namespace, judged into the run object. Answers the Run; one a task of which does not read is Unjudged.',
+  ),
+  HttpApiEndpoint.get('lines', '/api/runs/:name/lines', { params: nameParams, success: RunLines, error: [Missing] }).annotate(
+    OpenApi.Description,
+    "Reads the lines kept beside the run object: its decide and refresh lines, each step's, the card it came from and its workflow's page address. Answers RunLines, constant for a run.",
+  ),
   HttpApiEndpoint.get('concluded', '/api/runs/:name/concluded', {
     params: nameParams,
     success: Concluded,
     error: [Missing, Invalid],
-  }),
-  HttpApiEndpoint.get('record', '/api/runs/:name/record', { params: nameParams, success: RunRecord, error: [Missing, Invalid] }),
+  }).annotate(
+    OpenApi.Description,
+    'Reads what a run started now with this run as context would be handed: whether it has landed, and its ## From run section. Answers Concluded.',
+  ),
+  HttpApiEndpoint.get('record', '/api/runs/:name/record', { params: nameParams, success: RunRecord, error: [Missing, Invalid] }).annotate(
+    OpenApi.Description,
+    "Reads the run's record as the store keeps it, its brief and each frozen step's body cut short. Answers RunRecord.",
+  ),
   HttpApiEndpoint.get('decision', '/api/runs/:runId/decision', {
     params: { runId: Schema.String.annotate({ description: "The run's id." }) },
     query: {
@@ -220,5 +274,8 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
     },
     success: RunDecision,
     error: [Missing, Unjudged],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Reads what there is to decide of the run: what it changed, its checks, its reviews, its cost and the questions waiting on you, or why there is nothing yet (waiting, holding, running). Answers RunDecision, the files sensitive names shown in full and the diffs diffs names whole.',
+  ),
 ) {}

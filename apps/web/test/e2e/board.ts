@@ -30,71 +30,81 @@ import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
 import { measure } from './contrast.ts';
 import { API, measuring, photographing, store } from './world.ts';
 
-/** The rail's lists, whose destinations carry the `?factory=` the address picks: the Inbox, Runs and Workflows. */
-export const SECTIONS = ['Inbox', 'Runs', 'Workflows'] as const;
+/** The factory a page sits in, read from its path as the board reads it (`seatOf`, src/components/nav/nav.ts): none at the store's level. */
+export const pickedIn = (url: URL): string | null => {
+  const name = /^\/factories\/([^/]+)/.exec(url.pathname)?.[1];
+  return name === undefined ? null : decodeURIComponent(name);
+};
 
-/** The pages whose `?factory=` picks a factory; on any other page only the path of a factory's floor or settings does. */
-const LISTINGS = ['/inbox', '/runs', '/workflows', '/capabilities'];
-
-/** A workflow's or a step's page, and a factory's own agent's or skill's, whose `?factory=` picks a factory as a listing's does. */
-const PICKING = /^\/workflows\/[^/]+\/[^/]+(?:\/[^/]+)?$|^\/agents\/(?:skills\/)?factory\/[^/]+$/;
-
-/**
- * The factory `url` picks, as the board reads it (`pickedOf`, src/components/nav/nav.ts): the name of a factory's floor or settings, else
- * the `?factory=` of a listing or of a page that picks (`PICKING`), else none.
- */
-export const pickedIn = (url: URL): string | null =>
-  /^\/factories\/([^/]+)(?:\/settings)?$/.exec(url.pathname)?.[1] ??
-  (LISTINGS.includes(url.pathname) || PICKING.test(url.pathname) ? url.searchParams.get('factory') || null : null);
+/** The store rail's groups, in their order, each with its destinations in theirs. */
+export const RAIL_GROUPS = [
+  ['Across factories', ['Factories', 'Waiting']],
+  ['Yours', ['Agents', 'Skills']],
+  ['You', ['Stats', 'Settings']],
+] as const;
 
 /** The rail's destinations, in its order, one column from the top. */
-export const RAIL_PLACES = ['Overview', 'Runs', 'Inbox', 'Factories', 'Agents', 'Workflows', 'Stats', 'Nemia', 'Settings'];
+export const RAIL_PLACES: readonly string[] = RAIL_GROUPS.flatMap(([, places]) => places);
 
-/** The frame's rail at the left of a wide window: the menu button and the FAB above the kit's navigation rail. */
+/** The factory pane's places, in their order. */
+export const PANE_PLACES = ['Floor', 'Runs', 'Inbox', 'Workflows', 'Agents', 'Skills', 'Settings'] as const;
+
+/** The store's rail at the left of a window not narrow: her face, the menu button on a factory's page, and the groups. */
 export const railColumnOf = (page: Page): Locator => page.locator('[data-frame-rail]');
 
 /** The destinations of the frame, the rail's on a wide window and the drawer's on a narrow one. */
-export const railOf = (page: Page): Locator => page.locator('nav[aria-label="Places"]');
+export const railOf = (page: Page): Locator => page.locator('[data-frame-rail], [aria-label="Places"]');
 
-/** The rail's destination named `name`, by its label, whatever its badge adds to its name. */
+/** The rail's destination named `name`, by its label, whatever its badge adds to its name; never a place of the pane in the drawer. */
 export const railPlace = (page: Page, name: string): Locator =>
   railOf(page)
     .getByRole('link')
+    .and(page.locator(':not([data-pane-place])'))
     .filter({ has: page.getByText(name, { exact: true }) });
 
-/** The destinations the rail lights: the page's own, one on every page of the board. */
-export const litOf = (page: Page): Locator => railOf(page).locator('a[aria-current="page"]');
+/** The destinations the rail lights: the page's own, one at most on every page of the board. */
+export const litOf = (page: Page): Locator => railOf(page).locator('a[aria-current="page"]:not([data-pane-place])');
 
-/** The frame's strip of Settings' tabs, under the top bar and above the page. */
+/** The factory pane, docked beside the rail or in the narrow screen's drawer. */
+export const paneOf = (page: Page): Locator => page.locator('[data-factory-pane]');
+
+/** The pane's place named `name`. */
+export const placeOf = (page: Page, name: (typeof PANE_PLACES)[number]): Locator =>
+  paneOf(page).locator(`a[data-pane-place="${name.toLowerCase()}"]`);
+
+/** The pane's place lit: the one the page sits at. */
+export const placeLitOf = (page: Page): Locator => paneOf(page).locator('a[data-pane-place][aria-current="page"]');
+
+/** The frame's strip of Settings' tabs, under the page's head and above the page. */
 export const frameTabsOf = (page: Page): Locator => page.locator('[data-slot="tabs-list"][role="tablist"]');
 
-/** The frame's top bar. */
+/** The page's head, one line over the page's column. */
 export const topBarOf = (page: Page): Locator => page.locator('header[data-frame-header]');
 
-/** The top bar's factory switcher. */
+/** The machine bar at the window's foot. */
+export const machineBarOf = (page: Page): Locator => page.locator('footer[data-machine-bar]');
+
+/** The factory pane's switcher. */
 export const pickerOf = (page: Page): Locator => page.locator('[data-factory-picker]');
 
-/** The rail's lists that carry the factory picked, each a link. */
-export const sectionsOf = (page: Page): Locator =>
-  railOf(page)
-    .getByRole('link')
-    .filter({ hasText: /^(Inbox|Runs|Workflows)/ });
+/** The pane's lists, each a link: the Runs, the Inbox and the Workflows of its factory. */
+export const sectionsOf = (page: Page): Locator => paneOf(page).locator('a[data-pane-place="runs"], a[data-pane-place="inbox"], a[data-pane-place="workflows"]');
 
-/** The rail's FAB, Start a run, which opens the start of a run in the frame's side sheet. */
-export const startOf = (page: Page): Locator => railColumnOf(page).getByRole('button', { name: 'Start a run' });
+/** The pane's Start a run, which opens the start of a run in the frame's side sheet. */
+export const startOf = (page: Page): Locator => paneOf(page).getByRole('button', { name: 'Start a run' });
 
-/** The top bar's gauges button, which opens the machine's gauges in the frame's side sheet. */
-export const gaugesButtonOf = (page: Page): Locator => topBarOf(page).locator('[data-gauges-button] button');
+/** The machine bar's line, which opens the machine's gauges in the frame's side sheet. */
+export const gaugesButtonOf = (page: Page): Locator => machineBarOf(page).locator('button[data-gauges-button]');
 
 /** Opens the machine's gauges in the frame's side sheet, unless they are open, and returns the bar. */
 export async function gaugesOf(page: Page): Promise<Locator> {
   const bar = page.locator('aside[data-bar="gauges"]');
   if (!(await bar.isVisible())) await gaugesButtonOf(page).click();
-  await expectVisible(bar, 'the gauges button opens the gauges in the side sheet');
+  await expectVisible(bar, 'the machine bar opens the gauges in the side sheet');
   return bar;
 }
 
-/** Picks `choice` in the top bar's factory switcher, a factory's name or All factories. */
+/** Picks the factory `choice` in the pane's switcher. */
 export async function pick(page: Page, choice: string): Promise<void> {
   await pickerOf(page).locator('button').first().click();
   await page
@@ -110,26 +120,27 @@ export async function pickLevel(page: Page, trigger: Locator, word: 'Manual' | '
 }
 
 /**
- * On every page of a wide window: the top bar with the factory switcher, reading the factory the address picks or All factories, the
- * pause and the gauges button, and the rail with its destinations in their order, one lit or none on an address no route has.
+ * On every page of a window not narrow: the machine bar with its gauges, the store's rail with its groups and their destinations in
+ * their order, one lit at most; and on a factory's page whose pane is docked, the pane's switcher reading that factory.
  */
 export async function sidebar(page: Page): Promise<void> {
-  const header = topBarOf(page);
-  await expectVisible(header.locator('[data-gauges-button]'), 'the top bar has the gauges button');
+  await expectVisible(gaugesButtonOf(page), 'the machine bar has its gauges');
   for (const place of RAIL_PLACES) await expectVisible(railPlace(page, place), `the rail has ${place}`);
-  await expectCount(railOf(page).getByRole('link'), RAIL_PLACES.length, `the rail holds its ${RAIL_PLACES.length} destinations alone`);
+  await expectCount(railColumnOf(page).getByRole('link'), RAIL_PLACES.length, `the rail holds its ${RAIL_PLACES.length} destinations alone`);
   const order = await Promise.all(RAIL_PLACES.map(async (place) => (await railPlace(page, place).boundingBox())?.y ?? -1));
   if (order.some((y, at) => at > 0 && y <= order[at - 1]))
     throw new Refused(`the rail lists its places in order, ${RAIL_PLACES.join(', ')}`);
   if ((await litOf(page).count()) > 1) throw new Refused('the rail lights one destination at most');
-  await expectPicked(page, pickedIn(new URL(page.url())) ?? 'All factories');
+  const factory = pickedIn(new URL(page.url()));
+  if (factory === null) await expectCount(paneOf(page), 0, "a page of the store's level has no factory pane");
+  else if (await paneOf(page).isVisible()) await expectPicked(page, factory);
 }
 
-/** That the top bar's switcher reads `name`, the factory picked or All factories, over its runs in flight. */
+/** That the pane's switcher reads `name`, the factory the page sits in. */
 export async function expectPicked(page: Page, name: string): Promise<void> {
   await expectVisible(
     pickerOf(page).locator('[data-slot="select-value"]').getByText(name, { exact: true }),
-    `the switcher reads ${name}, the factory the address picks`,
+    `the switcher reads ${name}, the factory the page sits in`,
   );
 }
 

@@ -10,13 +10,23 @@ import { pace } from '../feed.ts';
 import { retryUnlessGone } from './gone.ts';
 import { agents, delegations, proposals } from './objects.ts';
 
-/** The key of the factory `factory`'s proposals, which a judgement invalidates exactly. */
+/**
+ * The key of the factory `factory`'s proposals, which a judgement invalidates exactly.
+ * @param factory The factory's name.
+ */
 export const proposalsKey = (factory: string) => ['proposals', factory] as const;
 
-/** The key of the proposal `name` of `factory`, which a judgement sets from its answer. */
+/**
+ * The key of the proposal `name` of `factory`, which a judgement sets from its answer.
+ * @param factory The factory's name.
+ * @param name The proposal's name.
+ */
 export const proposalKey = (factory: string, name: string) => ['proposal', factory, name] as const;
 
-/** The proposals of the factory `factory`, in the api's order: polled, since an agent proposes and a run's end applies. */
+/**
+ * The proposals of the factory `factory`, in the api's order: polled, since an agent proposes and a run's end applies.
+ * @param factory The factory's name.
+ */
 export const proposalsQuery = (factory: string) =>
   queryOptions({
     queryKey: proposalsKey(factory),
@@ -27,6 +37,8 @@ export const proposalsQuery = (factory: string) =>
 /**
  * The proposal `name` of `factory`: polled, and not asked again where the api answers it is not there (`retryUnlessGone`), whose retry is
  * typed by an `Error` here so the query's error stays one.
+ * @param factory The factory's name.
+ * @param name The proposal's name.
  */
 export const proposalQuery = (factory: string, name: string) =>
   queryOptions({
@@ -36,30 +48,56 @@ export const proposalQuery = (factory: string, name: string) =>
     retry: (failures: number, error: Error) => retryUnlessGone(failures, error),
   });
 
-/** Approve the proposal `name` of `factory`, the person's: the proposal as it then reads. Rejects with a `WriteRefusal`. */
+/**
+ * Approve the proposal `name` of `factory`, the person's: the proposal as it then reads. Rejects with a `WriteRefusal`.
+ * @param factory The factory's name.
+ * @param name The proposal's name.
+ */
 export const approveProposal = (factory: string, name: string): Promise<Proposal> => proposals.approve(factory, name);
 
-/** Decline the proposal `name` of `factory`, the person's: the proposal as it then reads. Rejects with a `WriteRefusal`. */
+/**
+ * Decline the proposal `name` of `factory`, the person's: the proposal as it then reads. Rejects with a `WriteRefusal`.
+ * @param factory The factory's name.
+ * @param name The proposal's name.
+ */
 export const declineProposal = (factory: string, name: string): Promise<Proposal> => proposals.decline(factory, name);
 
-/** The key of the factory `factory`'s delegations, which a write invalidates. */
+/**
+ * The key of the factory `factory`'s delegations, which a write invalidates.
+ * @param factory The factory's name.
+ */
 export const delegationsKey = (factory: string) => ['delegations', factory] as const;
 
-/** The delegations of the factory `factory`, one per agent it lets approve proposals. */
+/**
+ * The delegations of the factory `factory`, one per agent it lets approve proposals.
+ * @param factory The factory's name.
+ */
 export const delegationsQuery = (factory: string) =>
   queryOptions({
     queryKey: delegationsKey(factory),
     queryFn: async (): Promise<readonly Delegation[]> => (await delegations.list(factory)).items,
   });
 
-/** Write the delegation of `agent` in `factory` whole as `spec`, the person's. Rejects with a `WriteRefusal` in the api's words. */
+/**
+ * Write the delegation of `agent` in `factory` whole as `spec`, the person's. Rejects with a `WriteRefusal` in the api's words.
+ * @param factory The factory's name.
+ * @param agent The name of the agent the delegation lets approve proposals.
+ * @param spec The delegation, written whole.
+ */
 export const putDelegation = (factory: string, agent: string, spec: DelegationWrite): Promise<Delegation> =>
   delegations.put(factory, agent, spec);
 
-/** Remove the delegation of `agent` in `factory`, the person's. Rejects with a `WriteRefusal` in the api's words. */
+/**
+ * Remove the delegation of `agent` in `factory`, the person's. Rejects with a `WriteRefusal` in the api's words.
+ * @param factory The factory's name.
+ * @param agent The name of the agent the delegation lets approve proposals.
+ */
 export const removeDelegation = (factory: string, agent: string): Promise<Delegation> => delegations.delete(factory, agent);
 
-/** The names of the agents the factory `factory` serves, which its delegations may name: read on the settings page's visit. */
+/**
+ * The names of the agents the factory `factory` serves, which its delegations may name: read on the settings page's visit.
+ * @param factory The factory's name.
+ */
 export const delegableAgentsQuery = (factory: string) =>
   queryOptions({
     queryKey: ['delegable-agents', factory],

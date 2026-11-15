@@ -11,6 +11,10 @@ import { StoreRoot } from '../config/root.store.ts';
  * Whether each of `branches` merges onto the base branch of the run `runId` (`StandingMerge`), keyed by branch, by `place`'s trial
  * merges (`trialMerges`); none for a run that is not a repository run, which has no base to merge onto. Throws `Missing` for a run the
  * store does not have.
+ * @param home The store's root.
+ * @param place The run's place, which tries the merges.
+ * @param runId The run's id.
+ * @param branches The branches tried.
  */
 export function mergesOf(home: string, place: Place, runId: string, branches: readonly string[]): Record<string, StandingMerge> {
   const run = runsAtOnce(home).runs.read(runId);

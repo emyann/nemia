@@ -10,7 +10,10 @@ import { factoryOf, repoFactory, workflowNamed } from './card-lines.ts';
 
 const { name: COMMAND } = INBOX_QUEUE_WORDS;
 
-/** What `nemia inbox queue` prints of the card queued: when and where in the queue, on what, and how the tick starts it. */
+/**
+ * What `nemia inbox queue` prints of the card queued: when and where in the queue, on what, and how the tick starts it.
+ * @param card The card as the api answers it after it is queued.
+ */
 export const queuedLines = (card: Card): string[] => {
   const name = card.metadata.name;
   const { place, queueLength, factoryRepo } = card.status;
@@ -32,7 +35,10 @@ const takenBackLines = (name: string, was: boolean): string[] =>
     ? [`${name}  taken back: it no longer starts on its own — start it with nemia start ${name}`]
     : [`${name}  not queued — nothing to take back`];
 
-/** `nemia inbox queue`'s runner, on the words parsed against its words. */
+/**
+ * `nemia inbox queue`'s runner, on the words parsed against its words.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function inboxQueue(args: Args): Promise<number> {
   const name = textArg(args, 'name') ?? '';
   const workflow = workflowNamed(textArg(args, 'workflow'), COMMAND, `nemia inbox queue ${name}`);

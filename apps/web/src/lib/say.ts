@@ -20,6 +20,8 @@ export type Sayable = { open: true } | { open: false; why: string };
  * or stopped — which is the run page's to answer or try again. A held run stays open: a hold stops what is filed next and the answers to a
  * gate, never a session at work, and the CLI's `say` is not refused on it. What the page cannot see coming, the api refuses in the
  * package's words or the engine's, and the composer shows that refusal as it is.
+ * @param run The run: when it was called off, null where it was not.
+ * @param step The step the composer sends to: its name, its task, and the codes its state is read from.
  */
 export function sayable(
   run: Pick<RunDetail, 'cancelledAt'>,
@@ -52,6 +54,8 @@ export function sayable(
 /**
  * What was said to a step as the api last read it, with what this page has said since that the read does not have yet: once each, in the
  * order said.
+ * @param read What was said to the step, as the api last read it.
+ * @param sent What this page has said to it since.
  */
 export function mergeSaid(read: readonly Said[], sent: readonly Said[]): Said[] {
   const key = (s: Said) => `${s.attempt}:${s.at}`;

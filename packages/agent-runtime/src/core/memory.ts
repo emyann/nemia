@@ -42,6 +42,8 @@ const mostOf = (unit: MemoryUnit): number => MOST_OF[unit];
 /**
  * The whole bytes `amount` of `unit` is, a whole amount; `undefined` for an amount not above nothing, or past what a
  * number holds exactly.
+ * @param amount How many of `unit`.
+ * @param unit The unit the amount is written in, none for bytes.
  */
 export const quantityBytes: QuantityBytes = (amount, unit) => {
   if (!(amount > 0) || amount > mostOf(unit)) return undefined;
@@ -69,13 +71,17 @@ const split = (quantity: string): { amount: number; unit: MemoryUnit; fraction: 
 /**
  * The bytes a memory limit names, as a container's `resources.limits.memory` writes it: whole digits and a unit of `MemoryUnit`
  * (`8Gi`, `512Mi`, `4G`, `1073741824`). `undefined` for anything else: words for it are `memoryQuantityRefusal`'s.
+ * @param quantity The memory quantity as written.
  */
 export const memoryBytesOf = (quantity: string): number | undefined => {
   const q = split(quantity);
   return q === undefined || q.fraction ? undefined : quantityBytes(q.amount, q.unit);
 };
 
-/** Why `quantity` is no memory limit the runtime reads, naming the form to write; `undefined` for one it reads. */
+/**
+ * Why `quantity` is no memory limit the runtime reads, naming the form to write; `undefined` for one it reads.
+ * @param quantity The memory quantity as written.
+ */
 export const memoryQuantityRefusal = (quantity: string): string | undefined => {
   if (memoryBytesOf(quantity) !== undefined) return undefined;
   const form =

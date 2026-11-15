@@ -22,6 +22,9 @@ export type HandedCloseout = {
  * What step `step`'s closeout `said` hands on, in v1's shape whatever version it was given in: its summary cut and its body as every
  * reader reads them (`parseCloseout`), each file it named that is `there`, by its absolute path in its files directory, then each value,
  * and the fields its `output:` declares that it gave, its `replies` with them where it gave some.
+ * @param step The step, whose `output:` declares the fields handed on.
+ * @param said The step's closeout.
+ * @param there The absolute paths, in the step's files directory, of the files it named that are there.
  */
 export function handedCloseout(step: StepSpec, said: Closeout, there: readonly string[]): HandedCloseout {
   const replies = said.output && Object.hasOwn(said.output, LOOP_REPLIES) ? [LOOP_REPLIES] : [];

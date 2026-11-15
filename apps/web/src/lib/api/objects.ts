@@ -145,6 +145,10 @@ const Said = Schema.Struct({ error: Schema.String });
  * with an `UnreadAnswer` where its answer does not decode, and with `fetch`'s own failure where nothing answered. `signal` aborts it.
  * A refusal that asks this browser for a token (`tokenAskOf`) is told to the token page besides (`askToken`), whichever read it was:
  * never one of a call that sends its own bearer (`signIn`), whose refusal is of the token it sends, not of what this browser keeps.
+ * @param use The call of the client to run.
+ * @param how How its answer is read: the schema it decodes with, what a refusal is built as, what a write may have done, and the
+ *   query and headers sent besides.
+ * @param signal Aborts the call; none for a call that runs to the bound.
  */
 export async function call<A>(use: (client: Client) => Effect.Effect<A, unknown>, how: How<A>, signal?: AbortSignal): Promise<A> {
   let seen: Seen | undefined;
@@ -176,7 +180,11 @@ export async function call<A>(use: (client: Client) => Effect.Effect<A, unknown>
   throw how.refuse(said ?? `${seen.route} answered ${seen.status} ${seen.statusText}`, seen.status, body);
 }
 
-/** How a read is refused: a `ReadRefusal`, whose 404 on a run is the run gone. */
+/**
+ * How a read is refused: a `ReadRefusal`, whose 404 on a run is the run gone.
+ * @param schema The schema the answer decodes with.
+ * @param query Keys the request is sent with beyond the ones the Api declares; none for none.
+ */
 export const read = <A>(schema: Schema.Decoder<A>, query?: Record<string, string>): How<A> => ({
   schema,
   refuse: (words, status) => new ReadRefusal(words, status),
@@ -186,7 +194,13 @@ export const read = <A>(schema: Schema.Decoder<A>, query?: Record<string, string
 /** What a refusal of a write is built as: the api's words, its status, and its answer whole, which a refusal may read more of. */
 export type Refuse = (words: string, status: number, answer: unknown) => Error;
 
-/** How a write is refused: a `WriteRefusal`; `may` says what it may have done, which an answer the board does not read says. */
+/**
+ * How a write is refused: a `WriteRefusal`; `may` says what it may have done, which an answer the board does not read says.
+ * @param schema The schema the answer decodes with.
+ * @param may What the write may have done, said where its answer does not read.
+ * @param query Keys the request is sent with beyond the ones the Api declares; none for none.
+ * @param refuse What a refusal is built as; none for a `WriteRefusal`.
+ */
 export const write = <A>(schema: Schema.Decoder<A>, may: string, query?: Record<string, string>, refuse?: Refuse): How<A> => ({
   schema,
   refuse: refuse ?? ((words, status) => new WriteRefusal(words, status)),
@@ -214,6 +228,7 @@ type Paged = { metadata: { continue?: string }; items: readonly unknown[]; unjud
  * Every page of a list read as one: `page` asked for a page of `LIST_PAGE.most`, and again with each `continue` its answer gives, until
  * one gives none; the first page's shape, every page's items (and runs not judged) in order, the last page's metadata. A page that gives
  * back the `continue` it was asked with is an api that would be asked forever, refused naming the restart.
+ * @param page Reads one page of the list, given its limit and the `continue` of the page before.
  */
 export async function everyPage<L extends Paged>(page: (asked: PageAsked) => Promise<L>): Promise<L> {
   const limit = String(LIST_PAGE.most);
@@ -525,7 +540,11 @@ export const schedules = {
     ),
 };
 
-/** The name of the hire into `step` of `workflow`: the two joined by a dot. */
+/**
+ * The name of the hire into `step` of `workflow`: the two joined by a dot.
+ * @param workflow The workflow's name.
+ * @param step The step's name in it.
+ */
 export const hireName = (workflow: string, step: string): string => `${workflow}.${step}`;
 
 /** What a hire or a fire may have done, and what to look at before sending it again. */

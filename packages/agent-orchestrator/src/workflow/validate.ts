@@ -13,6 +13,7 @@ import { fencedItself, writesNothing } from './fence.ts';
 /**
  * Whether a team works in folders the run makes, with no git repository (`place: folder`): every step says it, or none does
  * (`validate`).
+ * @param steps The workflow's steps.
  */
 export const isFolderTeam = (steps: readonly Pick<StepSpec, 'place'>[]): boolean =>
   steps.length > 0 && steps.every((s) => stepPlace(s) === 'folder');
@@ -32,6 +33,7 @@ const waitRefusal = (s: Waits, names: ReadonlySet<string>): string | undefined =
 /**
  * Why the steps do not wait as their `after:` lines say: the first step that waits on a name no step has, or on itself, or undefined
  * where each waits on others of them. One rule, read by `validate` and by the model's `Workflow` (`folder/folder.model.ts`).
+ * @param steps Each step's name and the names it waits on.
  */
 export function afterRefusal(steps: readonly Waits[]): string | undefined {
   const names = new Set(steps.map((s) => s.name));
@@ -45,6 +47,7 @@ export function afterRefusal(steps: readonly Waits[]): string | undefined {
 /**
  * Why the steps wait on each other, naming them, or undefined where none does: some are left once every step that waits on nothing left
  * is taken away. One rule, read by `validate` and by the model's `Workflow`.
+ * @param steps Each step's name and the names it waits on.
  */
 export function cycleRefusal(steps: readonly Waits[]): string | undefined {
   const pending = new Map(steps.map((s) => [s.name, new Set(s.after)]));
@@ -69,6 +72,7 @@ export function cycleRefusal(steps: readonly Waits[]): string | undefined {
  * A step reads an `input:` it waits on through `after:` or through `resume:`, which the parser adds to `after`. A step resumes a session
  * on the harness that made it, never another, and in the one window of its session's whole chain (`sessionContext`). The steps wait on
  * each other when some are left once every step that waits on nothing left is taken away.
+ * @param steps The workflow's steps.
  */
 export function validate(steps: readonly StepSpec[]): void {
   const names = new Set(steps.map((s) => s.name));
@@ -214,6 +218,7 @@ function validateSlot(steps: readonly StepSpec[]): void {
  * order that already runs forward reads as it was frozen: the board lists a run's steps in its record's order, and holds that to `list`'s.
  * It ends on any input, because a record read back is not validated again: an `after` naming a step that is not here orders nothing, and
  * steps that wait on each other go last, as given, rather than nowhere.
+ * @param steps The steps, in the order given.
  */
 export function orderSteps<S extends Pick<StepSpec, 'name' | 'after'>>(steps: readonly S[]): S[] {
   const names = new Set(steps.map((s) => s.name));
@@ -230,7 +235,11 @@ export function orderSteps<S extends Pick<StepSpec, 'name' | 'after'>>(steps: re
   return [...order, ...pending];
 }
 
-/** Every step `name` waits on, directly or through another. */
+/**
+ * Every step `name` waits on, directly or through another.
+ * @param steps The workflow's steps.
+ * @param name The step whose upstream is read.
+ */
 export function upstreamOf(steps: readonly StepSpec[], name: string): Set<string> {
   const found = new Set<string>();
   const queue = [name];
@@ -250,6 +259,8 @@ export function upstreamOf(steps: readonly StepSpec[], name: string): Set<string
 /**
  * The steps a round of `looping`'s loop files again, in the workflow's order: its target, every step between
  * the target and it, and itself. `[]` for a step with no `loop:`.
+ * @param steps The workflow's steps, in its order.
+ * @param looping The step whose `loop:` sends the work back.
  */
 export function loopSpan(steps: readonly StepSpec[], looping: StepSpec): string[] {
   const target = looping.loop;
@@ -366,6 +377,7 @@ function validateRoutes(steps: readonly StepSpec[]): void {
  * True when there is more than one starting point, or when any step is followed by more than one.
  * `nemia start` refuses `--no-worktree` on a workflow that fans out: without isolation those steps would
  * share a directory, which is the arrangement the whole worktree design exists to prevent.
+ * @param steps The workflow's steps.
  */
 export function fansOut(steps: readonly StepSpec[]): boolean {
   const roots = steps.filter((s) => s.after.length === 0);
@@ -378,6 +390,7 @@ export function fansOut(steps: readonly StepSpec[]): boolean {
  *
  * A run that succeeded is useless if nobody can find what it produced, so this is what `nemia ls`
  * reports as the result. Usually one step; several when a workflow deliberately ends wide.
+ * @param steps The workflow's steps.
  */
 export function terminalSteps(steps: readonly StepSpec[]): StepSpec[] {
   return steps.filter((s) => !steps.some((other) => other.after.includes(s.name)));
@@ -398,6 +411,8 @@ export function terminalSteps(steps: readonly StepSpec[]): StepSpec[] {
  * filed nothing takes again on a pass (`stepsNow`), which keeps the set it froze and says so. What is left to `nemia start` alone reads
  * more than the set — the place a skill resolves to, the engine's remote agents, the store's path, a harness's config — and refuses the
  * filing itself where a pass takes it.
+ * @param steps The workflow's steps.
+ * @param isolate Whether each step works in a worktree of its own; false where the run works in place (`--no-worktree`).
  */
 export function stepSetRefusal(steps: readonly StepSpec[], isolate: boolean): string | undefined {
   if (!isolate && isFolderTeam(steps))

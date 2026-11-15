@@ -9,12 +9,17 @@ import type { Attempt, Event, Now, Sighting, State } from './domain.ts';
 import { turnOf } from './turn.ts';
 import { startedWhen } from './restart.ts';
 
-/** Whether `a` is held back at its hook now: seen held (`held`), and not seen going on since (`released`). */
+/**
+ * Whether `a` is held back at its hook now: seen held (`held`), and not seen going on since (`released`).
+ * @param a The attempt's fold.
+ */
 export const heldNow = (a: Attempt): boolean => a.heldSince !== undefined && a.releasedAt === undefined;
 
 /**
  * A hold or a release written into the fold of its attempt `a`: a hold opens one, its moment kept and the last release cleared; a
  * release closes the open one. A hold already open, or a release of none, changes nothing.
+ * @param a The attempt's fold, written in place.
+ * @param e The `held` or `released` entry.
  */
 export const holdInto = (a: Attempt, e: Extract<Event, { kind: 'held' | 'released' }>): void => {
   if (heldNow(a) === (e.kind === 'held')) return;
@@ -57,6 +62,8 @@ const deadlineFrom = (state: State): Instant | undefined => {
 /**
  * How long the task's current turn has run since it last went on (`deadlineFrom`), in milliseconds, at `now`, and whether that is past
  * the task's deadline: neither before the turn has an attempt, as a turn queued for admission has not started burning its time.
+ * @param state The task's fold.
+ * @param now The moment of the pass, on the wall clock and the monotonic one when read.
  */
 export const deadlineOf = (state: State, now: Now): { ranFor: number; overdue: boolean } => {
   const from = turnOf(state).attempts[0] === undefined ? undefined : deadlineFrom(state);
@@ -68,6 +75,10 @@ export const deadlineOf = (state: State, now: Now): { ranFor: number; overdue: b
 /**
  * What the engine journals of the hold of an attempt in flight, `last`, off its sighting: `held` the first time it is seen held back
  * at its hook (`Sighting.heldBack`), `released` the first time one held is seen without it. Stamped `at`, and `mono` when read.
+ * @param last The fold of the attempt in flight.
+ * @param sighting What the pass saw of the attempt's session.
+ * @param at The moment the entry is stamped, an ISO time.
+ * @param mono The monotonic reading of that moment, or undefined where none was read.
  */
 export const holdFacts = (last: Attempt, sighting: Sighting, at: string, mono?: Monotonic): Event[] => {
   const held = heldNow(last);

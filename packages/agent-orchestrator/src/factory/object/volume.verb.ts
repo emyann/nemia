@@ -25,7 +25,12 @@ export type VolumeWorld = {
   readonly runs: readonly MountingRun[];
 };
 
-/** The volumes of the factory `listing` as objects, filed at `filedAt`, read against `world`. */
+/**
+ * The volumes of the factory `listing` as objects, filed at `filedAt`, read against `world`.
+ * @param listing The factory's listing, read without error, whose volumes are named.
+ * @param filedAt When the factory was filed, each volume's creation timestamp.
+ * @param world What each volume's status is read against: the store's root, whether a path is a folder, and the runs that mount one.
+ */
 export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, filedAt: string, world: VolumeWorld): Volume[] =>
   factoryVolumesNamed(listing).map((v) => {
     const spec = { path: v.path, readOnly: v.readOnly };

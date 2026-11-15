@@ -106,6 +106,7 @@ const slotWaits = (run: Run, tl: Timeline): Ran[] => {
 /**
  * A run's clock (`RunClock`) from its creation to `until`, never before it.
  *
+ * @param run The run whose clock is read.
  * @param views The engine's view of every task of the run (`runTasks`), each saying when it was filed (`State.filedAt`); a task it does
  *   not hold ran nothing, and one whose view says no filing waited for no slot that is known.
  * @param steps The workflow the run is judged by: whose gates and whose `after` the waits on a person read.
@@ -148,6 +149,7 @@ export function clockOf(
  * `waiting`, dated as the open part of `personMs` dates it (`openWaits`), and `held`. Null where none is dated: nothing waits, or the
  * record dates none of what does.
  *
+ * @param run The run asked of.
  * @param views The engine's view of every task of the run, as `clockOf` takes them.
  * @param steps The workflow the run is judged by.
  * @param waiting The steps that wait on a person now (`waitingOnYou`).

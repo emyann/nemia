@@ -65,13 +65,22 @@ export const PAD_Y = 10;
 /** A state's box is never narrower than its name and its kind need. */
 const MIN_WIDTH = 128;
 
-/** An edge's event, with its guard in brackets when it has one. */
+/**
+ * An edge's event, with its guard in brackets when it has one.
+ * @param edge The machine's edge: its event and its guard, if any.
+ */
 export const eventOf = (edge: MachineEdge): string => `${edge.event}${edge.guard ? ` [${edge.guard}]` : ''}`;
 
-/** A verb as its route lists it: the verb, with the guard its refusal asks first in brackets. */
+/**
+ * A verb as its route lists it: the verb, with the guard its refusal asks first in brackets.
+ * @param verb The person's verb: its name and the guard its refusal asks first.
+ */
 export const verbOf = (verb: Pick<MachineVerb, 'verb' | 'guard'>): string => `${verb.verb} [${verb.guard}]`;
 
-/** `edges` gathered by action, each action once in the order its first edge comes, its events in the table's order. */
+/**
+ * `edges` gathered by action, each action once in the order its first edge comes, its events in the table's order.
+ * @param edges The machine's edges, in the table's order.
+ */
 export function byAction(edges: readonly MachineEdge[]): ByAction[] {
   const groups = new Map<string, ByAction>();
   for (const edge of edges) {
@@ -89,13 +98,20 @@ const linesOf = (list: readonly ByAction[]): number => list.reduce((n, g) => n +
 const widthOf = (list: readonly ByAction[]) =>
   Math.max(0, ...list.flatMap((g) => [...g.events.map((e) => e.length), g.action.length + 2])) * CHAR_WIDTH + PAD_X;
 
-/** A state's box size: its head, and under it the edges back to it. */
+/**
+ * A state's box size: its head, and under it the edges back to it.
+ * @param stays The edges back to the state itself, by action.
+ */
 export const stateSize = (stays: readonly ByAction[]): { width: number; height: number } => ({
   width: Math.ceil(Math.max(MIN_WIDTH, widthOf(stays))),
   height: HEAD_HEIGHT + (stays.length ? LINE_HEIGHT * linesOf(stays) + PAD_Y : 0),
 });
 
-/** A route's label size: its edges' lines, and a line per verb (`verbOf`). */
+/**
+ * A route's label size: its edges' lines, and a line per verb (`verbOf`).
+ * @param edges The route's edges, by action.
+ * @param verbs The route's verbs, each as `verbOf` lists it; none by default.
+ */
 export const labelSize = (edges: readonly ByAction[], verbs: readonly string[] = []): { width: number; height: number } => ({
   width: Math.ceil(Math.max(widthOf(edges), Math.max(0, ...verbs.map((v) => v.length)) * CHAR_WIDTH + PAD_X)),
   height: LINE_HEIGHT * (linesOf(edges) + verbs.length) + PAD_Y,
@@ -173,6 +189,7 @@ const staysOf = (edges: readonly MachineEdge[], state: string): ByAction[] =>
  * The machine laid out top to bottom by dagre: each state a box sized for its lines, each route with its label where dagre makes room
  * for it and its line drawn down through the ranks it crosses (`legsOf`, `pathOf`), the routes edges take weighing more (`EDGE_WEIGHT`).
  * A state an edge or a verb names that the graph does not list is drawn too, so no edge and no verb is lost.
+ * @param graph The machine's graph: its first state, its states, its final states, its edges and its verbs.
  */
 export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'final' | 'edges' | 'verbs'>): Drawing {
   const names = namesOf(graph);
@@ -209,6 +226,7 @@ export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'fi
 /**
  * An SVG path along a route's legs: straight along each, and from where one leaves its band to where the next enters its own a curve
  * that leaves and arrives upright, so it bends only in the empty gap between two bands. A leg of no length draws no line.
+ * @param legs The route's legs, one per rank it crosses, in the order it travels them.
  */
 export function pathOf(legs: readonly Leg[]): string {
   const [first, ...rest] = legs;

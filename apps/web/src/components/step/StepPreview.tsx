@@ -134,7 +134,12 @@ function BarPreview(props: { run: RailRun; step: RailStep; asOf: Date; children:
   return useSheetPreview() ? <SheetPreview {...props} /> : <HoverPreview {...props} />;
 }
 
-/** What wraps each bar of `run`'s rail (`RunSteps`' `wrap`): a button that opens its step's card, its times said at `asOf`. */
+/**
+ * What wraps each bar of `run`'s rail (`RunSteps`' `wrap`): a button that opens its step's card, its times said at `asOf`.
+ *
+ * @param run the run whose rail it is
+ * @param asOf the instant its times are said at
+ */
 export const previewBar =
   (run: RailRun, asOf: Date) =>
   (bar: ReactNode, step: RailStep): ReactNode => (

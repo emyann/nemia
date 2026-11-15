@@ -25,6 +25,9 @@ const amountOf = (text: string): number | null => {
  * What a person gave at the gate of its step's proposal (`budgets` while `from: 'proposed'`; nothing else gives anything), off what they
  * typed (`amounts`): the rows whose amount they changed to another amount above zero (`given`), in the proposal's order — a field put back
  * to the proposal's amount gives nothing — and the rows whose field holds no such amount (`unread`), which Approve waits on.
+ *
+ * @param budgets the budgets of the gate, none where it has none
+ * @param amounts what the person typed for each later step, by its name
  */
 export const budgetsGiven = (
   budgets: Frozen<GateBudgets> | null | undefined,

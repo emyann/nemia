@@ -26,6 +26,7 @@ const scalar = (types: readonly JsonType[]): boolean =>
  * The widget of `field`: its shape's where its schema names one; else, by its one type but null, prose for a string (a tag for one that
  * lists its words), a number, a yes or no, a list of scalars or a table of objects for an array, the rows of an object; and its JSON for
  * any other, a schema naming no one type among them.
+ * @param field The field as `fieldReadOf` reads it: its shape, its types, whether it lists its words, and an array's items' types.
  */
 export const widgetOf: WidgetOf = (field) => {
   const { shape, types, items } = field;
@@ -50,6 +51,8 @@ function typesOf(schema: unknown): JsonType[] {
 /**
  * A field of a step's output as `widgetOf` reads it, from its JSON Schema (`schema`, the closeout's for the field) and the shape its
  * `x-shape` named (null for none): its types, whether it lists its words (`enum`), and an array's items' types.
+ * @param schema The field's JSON Schema, the closeout's for the field; anything not an object reads as no types.
+ * @param shape The shape the field's `x-shape` named, or null for none.
  */
 export function fieldReadOf(schema: unknown, shape: FieldShape | null): FieldRead {
   const object = typeof schema === 'object' && schema !== null ? (schema as { enum?: unknown; items?: unknown }) : {};

@@ -17,6 +17,9 @@ export type Breakdown = { head: string; rows: BreakdownRow[]; foot: string };
 /**
  * `parts` in whole `unit`s that add up to `total` units: each part floored, then the units still owed handed one each to the parts
  * that lost the most by it, the earliest first among equals, to a millionth of a unit.
+ * @param parts The amounts to share out, each in the caller's own unit (ms, dollars).
+ * @param unit How much of that unit one whole unit is: 60000 for a minute of ms, 0.01 for a cent.
+ * @param total How many whole units the shares add up to.
  */
 export function shared(parts: readonly number[], unit: number, total: number): number[] {
   const floors = parts.map((part) => Math.floor(part / unit));
@@ -40,6 +43,9 @@ export const CLOCK_REST = 'Everything else';
  *
  * `head` is verbatim what the tile or the cell this hangs under shows — the time at work — so the two can never disagree by a rounded
  * minute. The wall time is the foot and not the head: the rows are the wall's parts, and the figure above them is a part of it.
+ * @param clock The run's clock: its wall time and each part of it, in ms.
+ * @param head What the tile or the cell this hangs under shows, verbatim.
+ * @param from When the run was created, as the page says a time.
  */
 export function clockBreakdown(clock: RunClock, head: string, from: string): Breakdown {
   const parts: Array<[string, number]> = [
@@ -67,6 +73,8 @@ export const COST_REST = 'Outside its steps';
 /**
  * What each step cost, in the answer's order, `none measured` for a step no cost was measured of, and a last line for what the run cost
  * beyond its steps, absent under half a cent. The rows' dollars add up to the run's, and their cents to the tile's.
+ * @param cost What the run cost, in the api's words and dollars.
+ * @param steps What each step cost, in the answer's order, a step with no cost measured carrying null.
  */
 export function costBreakdown(cost: Spent, steps: readonly StepCost[]): Breakdown {
   const rest = cost.usd - steps.reduce((sum, step) => sum + (step.cost?.usd ?? 0), 0);
@@ -92,7 +100,10 @@ export function costBreakdown(cost: Spent, steps: readonly StepCost[]): Breakdow
 const restOf = (usd: number): Array<{ what: string; usd: number; run: boolean }> =>
   Math.abs(usd) < 0.005 ? [] : [{ what: COST_REST, usd, run: true }];
 
-/** A count of tokens in three figures: `86`, `73.9k`, `4.10M`. */
+/**
+ * A count of tokens in three figures: `86`, `73.9k`, `4.10M`.
+ * @param count The number of tokens.
+ */
 export function tokensSaid(count: number): string {
   if (count < 1_000) return String(count);
   if (count < 999_500) return `${(count / 1_000).toPrecision(3)}k`;
@@ -130,6 +141,8 @@ function kindsOf(tokens: TokenCounts): Array<[string, number]> {
  * `tokens.total`, which the head says: after `cost`, the words of the dollars they are (`$5.63 for 4.10M tokens, …`), where the
  * breakdown hangs under a cost; else as counted (`4.10M counted, …`). Where a session measured none, the head's counts are the least
  * they were, said with `≥` as a cost is, and the foot says why. No dollars per kind: the harness prices a session whole.
+ * @param tokens The counts to break down.
+ * @param cost The words of the dollars the tokens are, or undefined where the breakdown hangs under no cost.
  */
 export function tokensBreakdown(tokens: TokenCounts, cost?: string): Breakdown {
   const kinds = kindsOf(tokens);
@@ -155,6 +168,8 @@ type RoundTotal = Pick<RunView['timeline']['run'], 'loop' | 'round' | 'ranMs' | 
 /**
  * How many rounds the run went: the furthest round any loop of it reached (`timeline.rounds`), one for a run started with no loop, none
  * before it started.
+ * @param rounds The run's timeline's rounds, each loop's round with its total.
+ * @param started Whether the run has started.
  */
 export const roundsOf = (rounds: readonly RoundTotal[], started: boolean): number =>
   rounds.reduce((most, r) => Math.max(most, r.round ?? 1), started ? 1 : 0);
@@ -162,6 +177,9 @@ export const roundsOf = (rounds: readonly RoundTotal[], started: boolean): numbe
 /**
  * The rounds tile's breakdown: each round of each loop and how long its sessions and checks ran, the wall time of the run its foot; none
  * for a run with no loop, whose one round is the run.
+ * @param rounds The run's timeline's rounds, each loop's round with its total.
+ * @param run The run's whole time, whose wall time the foot says.
+ * @param head The breakdown's headline, what the rounds tile shows.
  */
 export function roundsBreakdown(rounds: readonly RoundTotal[], run: RoundTotal, head: string): Breakdown | null {
   if (!rounds.length) return null;

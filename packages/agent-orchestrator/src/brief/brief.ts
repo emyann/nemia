@@ -173,6 +173,9 @@ const resumedLook = (tree: readonly string[]): string => (tree.length ? ['', '',
  *
  * A judge (`route: judge`) is told its routes, each with what it reaches or that it ends the run, and the `route` it owes (`judgeSection`).
  *
+ * @param step The step told.
+ * @param run The run.
+ * @param steps The run's steps.
  * @param closeoutOf How each step signed off. Read only for the steps this one names in `input:`.
  * @param artifactsDir The directory the run made for this step's files (`artifactsDir` in record.store.ts).
  * @param deps What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in worktree.store.ts), or before this
@@ -415,6 +418,13 @@ function givenSections(
  * never located. Nor a contract: it has no `check:`, no `output:` and no closing statement's schema (`remoteRefusal` in
  * harness/harness.ts), and it is done when its Task completes. A try is a new Task, never a turn of the last one, so it is told what any
  * first try is, and then which try it is.
+ * @param step The step told.
+ * @param run The run.
+ * @param steps The run's steps.
+ * @param closeoutOf How a step signed off, by its name; undefined where it has not, and for every step where absent.
+ * @param retry For a step tried again: the try, and what became of the one before it; absent for a first try.
+ * @param parents For a root of a run that waited on runs or was handed them as context: what each concluded; absent for any other.
+ * @param answers Every answer a person gave with `nemia retry --message` on the run; none where absent.
  */
 export function remoteBrief(
   step: StepSpec,
@@ -520,6 +530,8 @@ function fenceLines(step: StepSpec): ToldLayers['fence'] {
  * harness or on `resume:`, or one filed with its rendered folder gone. A brief filed before either the precedence or the headings was
  * written opens with the same layers plainly joined, and cuts on them too. A brief that opens with none of them, then a blank line — a
  * resumed try's, or one of a record frozen without its instructions — is the task whole, never cut at a guess; a null brief is no task.
+ * @param step The frozen step.
+ * @param brief The brief it was filed with or would be; null where there is none, and no task.
  */
 export function toldLayers(step: StepSpec, brief: string | null): ToldLayers {
   const agent = step.agent;

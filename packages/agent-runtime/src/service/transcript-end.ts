@@ -7,6 +7,11 @@ import { Effect } from 'effect';
 import type { TranscriptMark } from '../harness/index.ts';
 import type { SeamOps } from '../a2a/index.ts';
 
+/**
+ * The last event `runner` reads of the session `name`, as a mark; null where none could be read. Never fails.
+ * @param runner The harness's runner, asked for the session's transcript.
+ * @param name The session's name.
+ */
 export const transcriptEndOf = (runner: SeamOps, name: string): Effect.Effect<TranscriptMark | null> => {
   const read = runner.transcriptOf;
   if (!read) return Effect.succeed(null);

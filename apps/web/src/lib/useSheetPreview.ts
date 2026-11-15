@@ -19,6 +19,8 @@ export type PreviewSide = 'end top' | 'bottom start';
 /**
  * Where the card of a bar opens, clear of every bar of its rail: beside the rail where the window has room for the card on one side of
  * it, and under it, or over it where the window has no room under, where it has none on either.
+ * @param rail Where the rail stands across the window: its left and right edges, in pixels.
+ * @param width The window's width, in pixels.
  */
 export const previewSide = (rail: { left: number; right: number }, width: number): PreviewSide =>
   rail.left >= CARD_REACH || width - rail.right >= CARD_REACH ? 'end top' : 'bottom start';
@@ -30,6 +32,8 @@ const openListeners = new Set<() => void>();
 /**
  * Says that the card of the bar `id` opened or closed: a card opened makes it the open one, and a close counts only from the open
  * one, since the card a pointer slid away from closes after the next one opened.
+ * @param id The bar's id.
+ * @param open Whether its card opened, rather than closed.
  */
 export function cardOpened(id: string, open: boolean): void {
   const next = open ? id : openBar === id ? null : openBar;

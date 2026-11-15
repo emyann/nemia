@@ -114,11 +114,13 @@ const machineKilled = (checkKillOf: CheckKillOf, step: string): boolean => check
  * settled for the run, and a new answer would leave a branch that ran beside one a new route takes. A node never filed — skipped on a
  * route not taken among them — has no try to take.
  *
- * @param harnessBlocked Whether the harness marked a task's session blocked while its attempt runs: the engine's `needs-human`
- *   (`harnessBlocked` in views.verb.ts).
- * @param spendOf What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and none carries `raise`.
- * @param verdictOf What each step's current check exited with (`stepStatus`): a check that refused holds a step over its budget, one that
- *   did not finish does not.
+ * Its arguments are `triedOn`'s. `harnessBlocked`: whether the harness marked a task's session blocked while its attempt runs, the
+ * engine's `needs-human` (`harnessBlocked` in views.verb.ts). `spendOf`: what each task's sessions cost (`taskSpend`); left out, no step
+ * is over budget, and none carries `raise`. `verdictOf`: what each step's current check exited with (`stepStatus`); a check that refused
+ * holds a step over its budget, one that did not finish does not.
+ *
+ * @param args The step, the run, each task's phase, each step's closeout, whether a task was asked for one, the run's steps,
+ *   `harnessBlocked`, `spendOf`, `verdictOf` and where each branch of the run is now, in `triedOn`'s order.
  */
 export function retryable(...args: Parameters<typeof triedOn>): ReturnType<typeof triedOn> {
   const [step, run, , , , steps = []] = args;
@@ -218,6 +220,7 @@ const landingAborted = (step: StepSpec, run: Run): boolean => {
  * A step's raise of its cap, judged from what its gatherer read (`stepRaise`): a try's, where its try carries one and may be taken, else a
  * round's, for a looping step over its budget or out of rounds whose loop has a step over its cap — above the most any of them has cost,
  * as `roundAsk` refuses less. None on a run called off. Pure; its laws are `contracts/raise.contract.ts`'s.
+ * @param i What the step's gatherer read (`stepRaise`).
  */
 export const raiseVerdict: RaiseVerdictOf = (i) => {
   if (i.called) return null;
@@ -226,7 +229,10 @@ export const raiseVerdict: RaiseVerdictOf = (i) => {
   return { by: 'round', above: mostSpent(i.over), modes: [], own: null };
 };
 
-/** The most any step of a loop over its cap has cost (`loopOver`), or 0 where none is: `Math.max(0, ...over)`, which the verifier reads. */
+/**
+ * The most any step of a loop over its cap has cost (`loopOver`), or 0 where none is: `Math.max(0, ...over)`, which the verifier reads.
+ * @param over What each step of the loop over its cap has cost, in dollars.
+ */
 export const mostSpent: MostSpent = (over) => {
   let most = 0;
   for (const spent of over) if (spent > most) most = spent;
@@ -267,7 +273,13 @@ export type StepRaise = { by: RaiseBy; above: number; said: string; modes: Retry
  */
 export type RaiseGrounds = { raise: StepRaise | null; retry: Raise | undefined; round: ReturnType<typeof loopOver> };
 
-/** The steps of a looping step's loop over their cap (`loopOver`), which hold its round; none for a step that does not loop. Pure. */
+/**
+ * The steps of a looping step's loop over their cap (`loopOver`), which hold its round; none for a step that does not loop. Pure.
+ * @param steps The run's steps.
+ * @param step The step, its loop read.
+ * @param run The run's record.
+ * @param spendOf What each task's sessions cost (`taskSpend`).
+ */
 export const roundOver = (steps: readonly StepSpec[], step: StepSpec, run: Run, spendOf: SpendOf): ReturnType<typeof loopOver> =>
   step.loop ? loopOver(steps, step, run, spendOf) : [];
 
@@ -275,6 +287,11 @@ export const roundOver = (steps: readonly StepSpec[], step: StepSpec, run: Run, 
  * The raise of a step's cap the package takes, gathered once for the run page and `nemia decide`: `retryable`, `ownStatus` and
  * `roundOver` read, and `raiseVerdict` judges — none on a run cancelled, pruned or held, where a raise is refused (`heldRefusal`). Pure.
  *
+ * @param step The step.
+ * @param run The run's record.
+ * @param steps The run's steps.
+ * @param reads Each task's phase, each step's closeout and check verdict, and whether a task was asked for a closeout.
+ * @param spendOf What each task's sessions cost (`taskSpend`).
  * @param tried What `retryable` says of the step, read with `reads`: given where a caller has read it already.
  */
 export function raiseGrounds(
@@ -318,6 +335,11 @@ export function raiseGrounds(
 /**
  * A step's raise of its cap (`StepRaise`), or null: the one the run page's `raise` shows and `nemia decide`'s offers word (`raiseGrounds`).
  * Pure.
+ * @param step The step.
+ * @param run The run's record.
+ * @param steps The run's steps.
+ * @param reads Each task's phase, each step's closeout and check verdict, and whether a task was asked for a closeout.
+ * @param spendOf What each task's sessions cost (`taskSpend`).
  */
 export const stepRaise = (step: StepSpec, run: Run, steps: readonly StepSpec[], reads: RaiseReads, spendOf: SpendOf): StepRaise | null =>
   raiseGrounds(step, run, steps, reads, spendOf).raise;
@@ -331,6 +353,7 @@ const codesOf = (status: StepStatus, harnessAsks: boolean): QualifiedStep =>
  * with no `--budget` carries unless the step is past its budget (`raise`). An ask with one carries only on a step with a cap, and only
  * above its floor (`raiseOf`): what its tries have cost, and the cap in force.
  *
+ * @param a The ask, its mode and its `--budget` read.
  * @param raise The raise a session of the step must carry: set on a step over its budget, or ended at it (`retryable`).
  * @param floor What any `--budget` on the step must pass (`raiseOf`): undefined for a step with no `budget:`.
  */
@@ -345,6 +368,8 @@ const raisedBy = (ask: RetryAsk, raise: Raise | undefined): Pick<Retry, 'budget'
  * Whether a person's ask says what a send-back from a gate needs (`sendsBack`): words. One with none — written while the step's harness
  * blocked its session, which takes a wordless try, or by hand — tells a session it was sent back and gives it nothing to change, so no tick
  * files it for a step at its gate, as `nemia retry` refuses to write one.
+ * @param a The ask, its message read.
+ * @param sendsBack Set where a try of the step sends the work back from a gate.
  */
 export const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined): boolean => !sendsBack || a.message !== undefined;
 
@@ -367,6 +392,10 @@ const pauseAskDue = (run: Run, a: RetryAsk, phaseOf: (taskId: string) => TaskPha
  * the ask, written with no `--budget`, does not carry (`carries`). Not void while the task has not settled: its stop may still be taken.
  * An ask of a person's own is never void here. Pure.
  *
+ * @param step The step the ask names.
+ * @param run The run's record.
+ * @param a The ask.
+ * @param phaseOf The phase of a task by its id.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its budget.
  */
 export function pauseAskVoid(
@@ -386,6 +415,11 @@ export function pauseAskVoid(
 
 /**
  * The asks among `asks` that `nemia pause --now` wrote and that are void on this pass (`pauseAskVoid`), each of a step of `steps`. Pure.
+ * @param steps The run's steps.
+ * @param run The run's record.
+ * @param asks The asks of the run, waiting.
+ * @param phaseOf The phase of a task by its id.
+ * @param spendOf What each task's sessions cost (`taskSpend`): left out, no step is over budget.
  */
 export const pauseAsksVoid = (
   steps: readonly StepSpec[],
@@ -446,6 +480,13 @@ export const pauseAsksVoid = (
  * An ending the work is sent back from is not also tried: its own ask, written by hand beside the send-back, names the try the send-back
  * takes, and is spent by it (`spentAsks`).
  *
+ * @param steps The run's steps.
+ * @param run The run's record.
+ * @param phaseOf The phase of a task by its id.
+ * @param closeoutOf The closeout of a step by its name: left out, none has one.
+ * @param askedCloseout What the engine says of the closeout a task was asked for: left out, none was asked.
+ * @param verdictOf What each step's current check exited with (`stepStatus`): left out, none has one.
+ * @param asks The asks of the run, waiting: left out, none.
  * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due,
  *   to stop it first.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its budget.
@@ -549,6 +590,10 @@ const STOPPED_FIRST: readonly RetryMode[] = ['continue', 'fresh'];
  * A try a person asked for with a message says so, last: `try 2, continued on your word, answered` — `answered` is the caller's
  * reading of the ask files (`answerOf`), since the record keeps no message. A cap a person raised is said beside the try it was raised
  * for: `budget $5`.
+ * @param step The step.
+ * @param record The step's record, or undefined where the run has none of it.
+ * @param steps The run's steps, its loop read from them: none where absent.
+ * @param answered Whether a person's ask with a message answered the try, false where absent.
  */
 export function tryNote(step: StepSpec, record: StepRecord | undefined, steps: readonly StepSpec[] = [], answered = false): string {
   const tries = record?.tries ?? [];
@@ -655,6 +700,12 @@ const abortedWords = (
  * a step over budget, the raise, with why it stopped beside the cap, since a person pays for a broken session differently; and a remote
  * agent's try, a new Task, never its session continued, with no `--model` (`remoteRetryRefusal`).
  *
+ * @param steps The run's steps.
+ * @param run The run's record.
+ * @param d The run's decision: offers are made only while it is awaiting a person.
+ * @param phaseOf The phase of a task by its id.
+ * @param closeoutOf The closeout of a step by its name: left out, none has one.
+ * @param askedCloseout What the engine says of the closeout a task was asked for: left out, none was asked.
  * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is offered its try with `--budget`.
  * @param verdictOf What each step's current check exited with (`stepStatus`): a check that refused past a budget is offered `--budget`,
  *   one that did not finish the recheck.
@@ -662,6 +713,7 @@ const abortedWords = (
  *   is said to be the step's own fence at work, and offered no rule.
  * @param checkKillOf What the kernel's OOM killer did to each step's current check (`checkKills`): a check the machine killed is offered
  *   `--recheck` first, since it is no verdict on the work.
+ * @param tipOf Where each branch of the run is now (`blockedRecheck`): left out, unread.
  */
 export function retryOffers(
   steps: readonly StepSpec[],
@@ -807,7 +859,10 @@ function recheckFirst(
   ];
 }
 
-/** What `nemia decide` offers for each step a person may try again, as its lines: each offer's sentence (`retryOffers`). Pure. */
+/**
+ * What `nemia decide` offers for each step a person may try again, as its lines: each offer's sentence (`retryOffers`). Pure.
+ * @param args The arguments `retryOffers` takes, in its order.
+ */
 export const retryLines = (...args: Parameters<typeof retryOffers>): string[] => retryOffers(...args).map((o) => o.said);
 
 /** What the current task of a step's record was denied (`TaskSpend.denied`): none for a record with no task, or a task with no denial. */
@@ -827,6 +882,9 @@ const RULE_CAP = 240;
  * call the step's own `disallowedTools:` may have denied (`disallowedBy`) is offered no rule: a deny beats every allow, so the rule would
  * allow nothing, and the offer says which of its rules is at work instead. Each rule one line (`oneLine`), since the harness's words are
  * free text; at most `DENIED_SHOWN`, then how many more, as `deniedWords` names the calls themselves. Pure.
+ * @param denied The calls the harness denied the step's try.
+ * @param step The step's deny rules, none where absent.
+ * @param at The step's working folder and the run's id, which a path written from it is read against: none where absent.
  */
 export function deniedOffer(denied: readonly string[], step: Pick<StepSpec, 'disallowedTools'> = {}, at: DeniedAt = {}): string {
   const calls = [...new Set(denied)];
@@ -859,6 +917,10 @@ function shownList(words: readonly string[]): string {
  * says the run was pruned where it would say so: the raise it waits for, a try or a round, is refused (`prunedRefusal`), as `listing`
  * waits on nobody for it. On a held run it waits on nobody either: the raise is refused while the hold stands (`heldRefusal`), and asked
  * for once it lifts.
+ * @param steps The run's steps.
+ * @param run The run's record.
+ * @param d The run's decision.
+ * @param spendOf What each task's sessions cost (`taskSpend`).
  */
 export function overBudgetLine(steps: readonly StepSpec[], run: Run, d: Decision, spendOf: SpendOf): string | undefined {
   if (d.kind !== 'awaiting' || !d.overBudget.length) return undefined;
@@ -885,6 +947,12 @@ export function overBudgetLine(steps: readonly StepSpec[], run: Run, d: Decision
  *
  * A closeout that asks questions is answered with an `--answer` for each (`answersOr`), one that asks none with `--message`.
  *
+ * @param steps The run's steps.
+ * @param run The run's record.
+ * @param d The run's decision: answers are given only while it is awaiting a person.
+ * @param phaseOf The phase of a task by its id.
+ * @param closeoutOf The closeout of a step by its name: left out, none has one.
+ * @param askedCloseout What the engine says of the closeout a task was asked for: left out, none was asked.
  * @param spendOf What each task's sessions cost (`taskSpend`): a blocked step over its budget is answered with `--budget` too.
  * @param needsRefused The refusal of a `nemia retry` a blocked step's `needs` names (`retriesNamed`, judged by `retryRefusal`), said
  *   beside its answer, so a command the store refuses is not left standing as the way on.

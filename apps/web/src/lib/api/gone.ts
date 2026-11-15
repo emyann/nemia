@@ -9,11 +9,14 @@ import { ReadRefusal } from './read.ts';
  * fact she no longer keeps, a proposal no longer there. A page open on a run keeps what it last read when a read again fails — a
  * suspense query throws only while it has nothing — so the run's pages read the query's `error` beside its `data`, and say the run is
  * gone rather than draw it as it was.
+ * @param error What a read failed with.
  */
 export const readGone = (error: unknown): boolean => error instanceof ReadRefusal && error.status === 404;
 
 /**
  * Every failure is tried again three times, as react-query does by default, but a read that found nothing (`readGone`): said at once, not
  * seconds later.
+ * @param failures How many times the read has failed so far.
+ * @param error What the last try failed with.
  */
 export const retryUnlessGone = (failures: number, error: unknown): boolean => !readGone(error) && failures < 3;

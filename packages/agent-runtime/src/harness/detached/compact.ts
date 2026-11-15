@@ -89,6 +89,8 @@ const compactOne = (
  * whose worker is at work, or has no pid yet; one no run file names; one its reader refuses, or reads otherwise once kept; one that
  * changed while it was read. A spec with no `keepOutput` keeps every capture whole, and finds none.
  * Exported only for the tests that import it.
+ * @param spec The harness whose captures are compacted, by its `readOutput` and `keepOutput`.
+ * @param dir The folder of the harness's runs, its run files and their captures.
  */
 export const compactRuns = (
   spec: HarnessSpec,
@@ -116,7 +118,11 @@ export const compactRuns = (
   return report;
 };
 
-/** A detached runner's `compact`, for a spec that keeps less of an ended capture (`keepOutput`): its runs' captures (`compactRuns`). */
+/**
+ * A detached runner's `compact`, for a spec that keeps less of an ended capture (`keepOutput`): its runs' captures (`compactRuns`).
+ * @param spec The harness whose captures are compacted.
+ * @param dir The folder of the harness's runs, its run files and their captures.
+ */
 export const compactOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'compact'> =>
   spec.keepOutput
     ? {

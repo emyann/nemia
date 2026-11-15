@@ -44,6 +44,10 @@ const hireOfKey = (key: string | null): string | null => {
  * result schema by that Agent; a file of a skill's folder at any depth by that Skill; a step's hire of the wiring by that Hire; the rules
  * and the instruction by the Factory. Null, the person's choice, for a file that is not text, a carried file, the wiring's other keys or
  * the wiring whole, a file nested deeper in a workflow's folder, and any other.
+ * @param segments The segments of the conflict's path in the tree.
+ * @param key The key after the address's `#`, or null where it has none.
+ * @param text Whether every side of the conflict's file is text.
+ * @param factory The factory's name, the Factory owner's.
  */
 export const resolvedBy: ResolvedBy = (segments, key, text, factory) => {
   if (!text) return null;
@@ -76,6 +80,7 @@ const workflowsOwner = (segments: readonly string[]): ResolutionOwner | null => 
 /**
  * What an owner's conflicts are to the pass, by the proposal recorded for it as it is now: `taken` once it applied; `proposed` while it
  * waits or, approved, is still to apply; `refused` once it ended without applying, or is gone; `unresolved` where none is named.
+ * @param proposal The proposal recorded for the owner, by its phase now, or undefined where none is named.
  */
 export const resolutionOf: ResolutionOf = (proposal) => {
   if (proposal === undefined) return 'unresolved';
@@ -87,12 +92,16 @@ export const resolutionOf: ResolutionOf = (proposal) => {
 /** The kinds an owner is, as a key names them. */
 const KINDS: readonly ResolutionKind[] = ['Workflow', 'Agent', 'Skill', 'Hire', 'Factory'];
 
-/** An owner as one string, `<Kind>/<name>`: the key `resolutions.json` names its proposal by, and the pass's maps key it by. */
+/**
+ * An owner as one string, `<Kind>/<name>`: the key `resolutions.json` names its proposal by, and the pass's maps key it by.
+ * @param owner The owner: its kind and its name.
+ */
 export const ownerKey = (owner: ResolutionOwner): string => `${owner.kind}/${owner.name}`;
 
 /**
  * The owner a key names: `<Kind>/<name>`; a bare name, as `resolutions.json` named a workflow's before any other kind had one, a
  * Workflow.
+ * @param key The key, `<Kind>/<name>` or a bare workflow's name.
  */
 export const ownerOfKey = (key: string): ResolutionOwner => {
   const cut = key.indexOf('/');
@@ -100,16 +109,25 @@ export const ownerOfKey = (key: string): ResolutionOwner => {
   return cut > 0 && kind !== undefined ? { kind, name: key.slice(cut + 1) } : { kind: 'Workflow', name: key };
 };
 
-/** The segments of the path a conflict's address names: its `#<key>` or `:<a>-<b>` cut off, split at each `/`. */
+/**
+ * The segments of the path a conflict's address names: its `#<key>` or `:<a>-<b>` cut off, split at each `/`.
+ * @param at The conflict's address.
+ */
 export const segmentsOf = (at: string): string[] => at.replace(/(#.*|:\d+-\d+)$/, '').split('/');
 
-/** The key a conflict's address names after its `#`, null where it names none. */
+/**
+ * The key a conflict's address names after its `#`, null where it names none.
+ * @param at The conflict's address.
+ */
 export const keyOf = (at: string): string | null => {
   const cut = at.indexOf('#');
   return cut < 0 ? null : at.slice(cut + 1);
 };
 
-/** Whether every side of a file that is there holds text (`textIn`). */
+/**
+ * Whether every side of a file that is there holds text (`textIn`).
+ * @param sides Each side's file, undefined where that side has none.
+ */
 export const allText = (...sides: readonly (TreeFile | undefined)[]): boolean =>
   sides.every((side) => side === undefined || textIn(side.bytes) !== null);
 
@@ -166,6 +184,10 @@ function hiresTaken(theirs: TreeFile, ours: TreeFile | undefined, hires: readonl
  * folder, an Agent's `.md` and `.schema.json`, a Skill's folder at any depth, the Factory's rules and instruction — and a Hire's one key
  * of the wiring given the tree's value (`hiresTaken`). A file of another owner, a carried file, or one that is not text on either side,
  * is left as the render has it. For the merge alone: the base is still replaced by the true render.
+ * @param theirs The files of the template's render.
+ * @param ours The files of the factory's tree now.
+ * @param owners The keys of the owners whose resolution applied (`ownerKey`).
+ * @param factory The factory's name, the Factory owner's.
  */
 export function takenFromTree(
   theirs: readonly TreeFile[],
@@ -196,6 +218,9 @@ export function takenFromTree(
  * The owner whose proposal resolves each of `conflicts` (`resolvedBy`), by its address, as its key (`ownerKey`), read against the three
  * trees its merge was made of, a side being text where every one of them that holds its file holds text, in the factory `factory`; a
  * conflict the person's choice resolves is left out.
+ * @param conflicts The merge's conflicts.
+ * @param factory The factory's name, the Factory owner's.
+ * @param trees The files of each tree the merge was made of: the base, ours and theirs.
  */
 export function conflictOwners(
   conflicts: readonly Conflict[],
@@ -221,6 +246,10 @@ export type ResolvedAgain = { readonly owner: string; readonly lines: readonly s
  * The lines that resolve again, in the factory `factory`, the conflicts the proposal `proposal` resolves, where `proposals` (by owner key,
  * as `resolutions.json` records them) names it as an owner's: each conflict of that owner the person chose for (`choices`), as
  * `resolveLine` says it. None where no owner's resolution is that proposal.
+ * @param factory The factory's name.
+ * @param proposal The name of the proposal that cannot apply.
+ * @param proposals The proposal recorded for each owner, by owner key.
+ * @param choices The person's choice for each conflict, by its address.
  */
 export function resolvedAgain(
   factory: string,

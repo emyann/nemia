@@ -18,6 +18,7 @@ export { MCP_TRANSPORTS } from './mcp-transports.ts';
 /**
  * A server's written `type` as its transport: itself where `MCP_TRANSPORTS` names it, `unknown` otherwise
  * (`contracts/transport.contract.ts`).
+ * @param written The server's `type` as the task wrote it, of any value.
  */
 export const transportOf: TransportOf = (written) => MCP_TRANSPORTS.find((transport) => transport === written) ?? 'unknown';
 
@@ -74,6 +75,7 @@ const remoteRefuses = (name: string, server: Record<string, unknown>, at: string
  * Why a task's `mcp` is not a map of MCP servers, as a sentence that says what to write — or
  * `undefined`. Closed, like a brief's keys, because Claude Code does not refuse an entry it cannot
  * use: a `url` with no `type` loads no server and says nothing.
+ * @param mcp The task's `config.mcp` as filed, of any shape.
  */
 export const mcpRefuses = (mcp: unknown): string | undefined => {
   const shape =
@@ -111,6 +113,7 @@ export const mcpRefuses = (mcp: unknown): string | undefined => {
  *
  * `oauth` sits outside the hash, which is why it may be edited without asking for a new sign-in; a header may not (measured,
  * finding 6). Pure.
+ * @param server The recorded remote server.
  */
 export const mcpServerOf = (server: RemoteMcpServer): RemoteMcpServer => ({
   type: server.type,
@@ -135,6 +138,7 @@ export const mcpServerOf = (server: RemoteMcpServer): RemoteMcpServer => ({
  * `--strict-mcp-config` keeps them. Absolute because Claude Code resolves the flag's path from inside the cwd, so a
  * relative `repo` would name `repo/repo`. One that is not JSON is refused here, before anything runs — named, it stops
  * the CLI before a session exists ("MCP config is not a valid JSON").
+ * @param cwd The task's working folder, the checkout whose `.mcp.json` is looked for.
  */
 export const projectMcpConfig = (cwd: string): string | undefined => {
   const file = path.resolve(cwd, '.mcp.json');
@@ -160,6 +164,8 @@ export const projectMcpConfig = (cwd: string): string | undefined => {
  * The entries of the checkout's `.mcp.json` under `names`, as the file gives them, none changed: what a task's `projectMcp`
  * loads of it. No name reads no file. Refused, saying what to change: a checkout with no `.mcp.json`, one that is not JSON or
  * has no `mcpServers` map, and a name the file does not declare.
+ * @param cwd The task's working folder, the checkout whose `.mcp.json` is read.
+ * @param names The servers the task's `projectMcp` names; none reads no file.
  */
 export const pickedProjectMcp = (cwd: string, names: readonly string[]): Record<string, unknown> => {
   if (!names.length) return {};
@@ -198,6 +204,8 @@ export const pickedProjectMcp = (cwd: string, names: readonly string[]): Record<
 /**
  * The servers a session's config file holds: the entries a task's `projectMcp` picks from its checkout's `.mcp.json`
  * (`pickedProjectMcp`), then the task's own `mcp`. `undefined` when the task gives neither.
+ * @param cwd The task's working folder, the checkout whose `.mcp.json` its `projectMcp` picks from.
+ * @param config The task's configuration, by its `projectMcp` and `mcp`; undefined where it has none.
  */
 export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> | undefined =>
   config?.projectMcp ? { ...pickedProjectMcp(cwd, config.projectMcp), ...config.mcp } : config?.mcp;
@@ -210,6 +218,8 @@ export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record
  * What `writeMcpConfig` writes to a file, for the caller that hands the map over as a value instead: an attached session's
  * `Options.mcpServers` (`sdk.d.ts:2088`). The values are a `.mcp.json`'s and a task's, read as they were written and never checked
  * here, so the type says `unknown` and the caller that hands them to the SDK is the one that names the SDK's shape.
+ * @param cwd The task's working folder, the checkout whose `.mcp.json` is read.
+ * @param config The task's configuration, by its `projectMcp` and `mcp`; undefined where it has none.
  */
 export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> => {
   const checkout = config?.projectMcp ? undefined : projectMcpConfig(cwd);
@@ -225,6 +235,8 @@ export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined): Re
  * spells onto the child's argv, so the owner-only file is no part of that path and this warning is not its cover. Returns
  * the file's absolute path, as `projectMcpConfig` does: a `file` given relative is relative to the engine, not to the
  * session's cwd.
+ * @param file The config file's path, relative to the engine's folder where not absolute.
+ * @param mcp The session's servers by name; undefined or empty to clear the file.
  */
 export const writeMcpConfig = (file: string, mcp: Record<string, unknown> | undefined): string | undefined => {
   if (!mcp || !Object.keys(mcp).length) {
@@ -240,6 +252,7 @@ export const writeMcpConfig = (file: string, mcp: Record<string, unknown> | unde
  * The MCP server names a Codex config gives, as `codex mcp add` writes them: `[mcp_servers.<name>]`
  * tables and the tables under them. Not TOML in general — an inline `mcp_servers = {…}` is not read —
  * so a name it misses is left to Codex's own merge.
+ * @param toml The text of the harness's config file.
  */
 export const codexMcpServerNames = (toml: string): Set<string> => {
   const names = new Set<string>();
@@ -270,6 +283,7 @@ const tomlStrings = (m: Record<string, string> | undefined) =>
  * Codex has been measured — not whether it reads such a table, not what it would call the fields, not where it would file a
  * credential — so writing one would be a guess spelled as configuration. A Codex task is shown its servers rather than refused
  * them, and the state a page reads of one is unread, never a false `connected`; Codex's sign-in is measured before it is built.
+ * @param mcp The task's servers by name.
  */
 export const codexMcpServers = (mcp: Record<string, McpServer>): string =>
   tomlTable(

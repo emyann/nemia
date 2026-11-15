@@ -112,7 +112,10 @@ const ownLines = (id: string, { models, labels, labelsLeftOut = [] }: RunStarted
   ),
 ];
 
-/** A card's own `repo:`, which is retired and was not read. */
+/**
+ * A card's own `repo:`, which is retired and was not read.
+ * @param repo The `repo:` the card names.
+ */
 export const ignoredRepoLine = (repo: string): string =>
   `the card's repo: ${repo} is retired and was not read — its factory places the run (nemia factory attach <factory> <workflow> --repo <name>); delete the line`;
 
@@ -120,7 +123,11 @@ export const ignoredRepoLine = (repo: string): string =>
 const bareLine = (id: string): string =>
   `${id}  started on the daemon — nemia show ${id} reads it, and the daemon's next pass files its first step`;
 
-/** What `nemia start` prints of the run `answer` says was started: its facts in words, then what stands beside it. */
+/**
+ * What `nemia start` prints of the run `answer` says was started: its facts in words, then what stands beside it.
+ * @param answer The api's answer to the start: the run's id, its facts, and what stands beside it.
+ * @param now The time the pause that stands is measured from; the present by default.
+ */
 export function startedLines(answer: RunStarted, now: Date = new Date()): string[] {
   const { id, run } = answer;
   if (run === undefined) return [bareLine(id)];

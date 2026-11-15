@@ -43,6 +43,9 @@ async function packed(folder: string, command: string, env: NodeJS.ProcessEnv): 
 /**
  * The template `given` as the request sends it: a builtin's name as it is; under this machine's context, its whole path; under a remote
  * one, a file's bytes or a folder packed, in base64. Refused, under a remote context, where `given` is neither a file nor a folder.
+ * @param given The template as typed: a builtin's name, a template's folder or an archive.
+ * @param command The command's name, said in a refusal.
+ * @param env The environment whose chosen context says whether the daemon is this machine's; this process's by default.
  */
 export async function templateSent(given: string, command: string, env: NodeJS.ProcessEnv = process.env): Promise<TemplateGiven> {
   if (TEMPLATE_NAME.test(given)) return { name: given };
@@ -67,7 +70,10 @@ const setsOf = (args: Args): { sets?: readonly string[] } => {
   return sets.length ? { sets } : {};
 };
 
-/** `nemia factory apply`: a factory made from a template, its repositories trusted unless `--no-trust`. */
+/**
+ * `nemia factory apply`: a factory made from a template, its repositories trusted unless `--no-trust`.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryApply(args: Args): Promise<number> {
   const name = textOf(args, 'name');
   const repos = listArg(args, 'repos').map((r) => repoSent(r));
@@ -88,7 +94,10 @@ export async function factoryApply(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory diff`: the preview of a templated factory's upgrade, or of a hand-made one's takeover; nothing written. */
+/**
+ * `nemia factory diff`: the preview of a templated factory's upgrade, or of a hand-made one's takeover; nothing written.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryDiff(args: Args): Promise<number> {
   const factory = textOf(args, 'factory');
   const to = textArg(args, 'to');
@@ -98,7 +107,10 @@ export async function factoryDiff(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory adopt`: a hand-made factory taken over by a template, by the plan's digest its preview printed. */
+/**
+ * `nemia factory adopt`: a hand-made factory taken over by a template, by the plan's digest its preview printed.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryAdopt(args: Args): Promise<number> {
   const factory = textOf(args, 'factory');
   const plan = textArg(args, 'plan');
@@ -112,7 +124,10 @@ export async function factoryAdopt(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory upgrade`: an upgrade filed, by the plan's digest where its preview printed one. */
+/**
+ * `nemia factory upgrade`: an upgrade filed, by the plan's digest where its preview printed one.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryUpgrade(args: Args): Promise<number> {
   const factory = textOf(args, 'factory');
   const [to, plan] = [textArg(args, 'to'), textArg(args, 'plan')];
@@ -144,7 +159,10 @@ const choiceOf = (args: Args): { ours: true } | { theirs: true } | { text: strin
       ? { theirs: true }
       : { text: fileText(textOf(args, 'file'), 'factory resolve') };
 
-/** `nemia factory resolve`: one conflict of the upgrade under way given its choice, and what still waits. */
+/**
+ * `nemia factory resolve`: one conflict of the upgrade under way given its choice, and what still waits.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryResolve(args: Args): Promise<number> {
   const factory = textOf(args, 'factory');
   const conflict = textOf(args, 'conflict');

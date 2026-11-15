@@ -66,7 +66,11 @@ function header(path: { prefix: string; name: string }, mode: number, size: numb
   return block;
 }
 
-/** The files of `files` whose path under the folder `name` no ustar header holds: a part over 100 bytes, or a path that splits nowhere. */
+/**
+ * The files of `files` whose path under the folder `name` no ustar header holds: a part over 100 bytes, or a path that splits nowhere.
+ * @param name The template's top folder, every path's first part.
+ * @param files The files, each by its path from that folder.
+ */
 export function pathRefusals(name: string, files: readonly TreeFile[]): Array<{ file: string; message: string }> {
   return files
     .filter((file) => splitPath(`${name}/${file.path}`) === null)
@@ -93,12 +97,19 @@ function tarOf(name: string, files: readonly TreeFile[]): Buffer {
 /** The digest of a tar: `sha256:` and its hex. */
 const digestOfTar = (tar: Uint8Array): string => `sha256:${createHash('sha256').update(tar).digest('hex')}`;
 
-/** The digest of the content of `files` under the folder `name`: of the tar `packArchive` gzips. Refused as `packArchive` refuses. */
+/**
+ * The digest of the content of `files` under the folder `name`: of the tar `packArchive` gzips. Refused as `packArchive` refuses.
+ * @param name The template's top folder.
+ * @param files The files, each by its path from that folder.
+ */
 export const contentDigest = (name: string, files: readonly TreeFile[]): string => digestOfTar(tarOf(name, files));
 
 /**
  * The archive of `files` under the folder `name`, gzipped, and the digest of its content; the same files, in any order, give the same
  * bytes. Refused (Invalid): a path no ustar header holds, each by name, and a tar larger than `limit`.
+ * @param name The template's top folder.
+ * @param files The files, each by its path from that folder.
+ * @param limit The largest tar, in bytes; `ARCHIVE_LIMIT` where absent.
  */
 export function packArchive(name: string, files: readonly TreeFile[], limit = ARCHIVE_LIMIT): { archive: Buffer; digest: string } {
   const tar = tarOf(name, files);
@@ -225,6 +236,9 @@ function gunzipped(bytes: Uint8Array, limit: number, source: string): Buffer {
  * unpack to more than `limit`, a header that does not read, a body cut short, an entry of a type but a file or a folder, a path that is
  * absolute, holds a backslash or a part empty, `.` or `..`, a second top folder or one that is no name, a path given twice, and a file
  * another entry stands under.
+ * @param bytes The archive's bytes, gzipped.
+ * @param limit The largest tar, in bytes, it may unpack to; `ARCHIVE_LIMIT` where absent.
+ * @param source How the refusal names the archive; `the archive` where absent.
  */
 export function unpackArchive(
   bytes: Uint8Array,

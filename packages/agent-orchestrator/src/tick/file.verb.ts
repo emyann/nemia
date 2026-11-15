@@ -191,6 +191,11 @@ const heldAnswered = (f: Filing, r: Retry, step: StepSpec, record: StepRecord): 
  * filed try's record, for the pass that files it and the pass that adopts one a pass filed and died before writing down (`adoptTries`),
  * so the two cannot drift: a try adopted with the record of the try before it would be judged by that try's fields, resume by its
  * schema and read as run on its revisions. A recheck is the same try, and keeps what it was filed on: `nextTry` alone. Pure.
+ * @param f What the pass read that the filing is pinned on: the run's pins of its agents and skills, and its steps.
+ * @param step The step filed, or undefined where the run's steps do not hold it.
+ * @param record The step's record before the filing.
+ * @param retry The try filed.
+ * @param taskId The task the try is filed on.
  */
 export const tryFiled = (
   f: Parameters<typeof filedOn>[0],

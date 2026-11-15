@@ -70,6 +70,7 @@ type Filed = { readonly state: { readonly filedAt?: string } };
  * A task held open whose turn signed, with nothing more to come of it but by a person's word: waiting for that word (the engine's
  * `input-required`), or closed, which the engine settles as it signed on its next pass. Nothing runs, as nothing runs of a settled task:
  * `phaseOfView` reads it as the session it signed, and the timeline as a session that ended. Pure, and here because this file is.
+ * @param v The engine's view of the task.
  */
 export const signedAndHeld = (v: TaskClock): boolean =>
   !v.state.settled && (v.phase === 'input-required' || (v.state.closed === true && v.state.attempts.at(-1)?.ended === 'succeeded'));
@@ -78,6 +79,7 @@ export const signedAndHeld = (v: TaskClock): boolean =>
  * What one task's session consumed, summed over its attempts (`sumUsage`): a settled attempt's usage off the engine's record, the one in
  * flight off the view, and an attempt that never started left out. Undefined where nobody measured it. An attempt that continued a session
  * and rebuilt its cache is counted in `rebuiltCaches` (`rebuiltCache`): only the attempt knows it was resumed.
+ * @param view The engine's view of the task; undefined where the engine has no record of it.
  */
 export const taskUsage = (view: TaskClock | undefined): Consumed | undefined =>
   view
@@ -183,6 +185,9 @@ export type Timeline = { steps: Record<string, TimelineTry[]>; rounds: TimelineT
  * totalled. A round counts the steps its loop files again (`loopSpan`), and a step before the loop or after it is in no round. The rounds
  * go by loop, in the workflow's order, then by round: the rounds of two loops are not the same rounds. A session a recheck's try shares is
  * counted once, on the try that ran it.
+ * @param run The run whose time is read.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param steps The workflow the run is judged by; the one it froze where left out.
  */
 export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, steps: readonly StepSpec[] = run.workflow ?? []): Timeline {
   const loops = steps.filter((s) => s.loop);
@@ -262,6 +267,8 @@ function slotWaitOf(run: Run, views: ReadonlyMap<string, Filed>): SlotWait | nul
  *
  * Not the record's `createdAt`: a run started `--after` runs, or held for a run slot, is created long before anything of it is filed. And
  * not when its parents landed, which nothing writes down: the tick files the roots on the pass that reads them landed.
+ * @param run The run whose tries' tasks are read.
+ * @param views What the engine knows of when each task was filed, by task id.
  */
 export function firstFiledAt(run: Run, views: ReadonlyMap<string, Filed>): string | null {
   const tasks = Object.values(run.steps).flatMap((record) => [
@@ -282,6 +289,8 @@ export function firstFiledAt(run: Run, views: ReadonlyMap<string, Filed>): strin
 /**
  * When a run started, as a person is told it: its first filing (`firstFiledAt`); for a run that has started and none of whose tasks'
  * views says when it was filed (`views` held none of them), its `createdAt`, the best there is; null while nothing of it is filed. Pure.
+ * @param run The run asked about.
+ * @param views What the engine knows of when each task was filed, by task id.
  */
 export const runStartedAt = (run: Run, views: ReadonlyMap<string, Filed>): string | null =>
   firstFiledAt(run, views) ?? (hasStarted(run) ? run.createdAt : null);
@@ -415,6 +424,7 @@ function totalOf(loop: string | null, round: number | null, spans: readonly Task
  * A step's timeline as `nemia decide` prints it, under its `used`: a row per try's session and per try's check, in the order they ran. Each
  * says when it was filed, spawned and ended — UTC, with the day where it is not the first row's — then its queue and run time, and beside a
  * session what it used and, where the engine measured it, what it cost. Empty for a step not filed.
+ * @param tries The step's tries on the timeline, in the order they ran.
  */
 export function timelineLines(tries: readonly TimelineTry[]): string[] {
   const instants = tries
@@ -452,6 +462,7 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
  * A run's totals as `nemia decide` prints them, after its steps: each round of each loop that went round — named by its looping step where
  * more than one did — then, on a run the cap on runs in flight held, its wait for a run slot, then the run's, every step's, that wait among
  * its queue.
+ * @param t The run's timeline (`timeline`).
  */
 export function timelineTotalLines(t: Timeline): string[] {
   if (!t.run.tasks) return [];

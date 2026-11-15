@@ -16,7 +16,10 @@ import { nameOf, sightingOfTask } from './map.ts';
 /** The id an artifact's event, and the pieces of its text, go by. */
 const artifactKey = (artifactId: string): string => `artifact:${artifactId}`;
 
-/** Whether a session in `state` has ended its turn: it no longer works, whether it ended or waits on its caller. */
+/**
+ * Whether a session in `state` has ended its turn: it no longer works, whether it ended or waits on its caller.
+ * @param state The session's state.
+ */
 export const turnOver = (state: SessionState): boolean => !atWorkState(state);
 
 /** A part's words: its text, or its data as JSON; a file part says none. */
@@ -66,6 +69,8 @@ const CURSOR = /^remote\.(\d+)\.([\w-]*)$/;
 /**
  * Where a remote transcript read stopped: after the message `messageId` (none before the first), and the first `artifacts` whole
  * artifacts.
+ * @param messageId The id of the last message read, or empty before the first.
+ * @param artifacts How many whole artifacts were read.
  */
 export const remoteCursorOf = (messageId: string, artifacts: number): TranscriptCursor =>
   `remote.${artifacts}.${Buffer.from(messageId).toString('base64url')}`;
@@ -82,6 +87,10 @@ const cursorRead = (after: TranscriptCursor | undefined): { messageId: string; a
  * The Task `t`'s conversation as events after the cursor `after`, and the cursor after them: its messages in order, then its whole
  * artifacts, `whole` of which an earlier turn wrote. A cursor this does not know, or past a message the Task no longer holds, reads
  * from the start: an event given twice is dropped by its id, one never given is lost.
+ * @param t The remote Task.
+ * @param sentAt When the session was sent, the time its events say where the Task's status gives none.
+ * @param whole How many of the Task's artifacts an earlier turn wrote.
+ * @param after The cursor a read stopped at, or undefined to read from the start.
  */
 export const transcriptOfTask = (t: Task, sentAt: string, whole: number, after?: TranscriptCursor): Transcript => {
   const at = atOf(t.status, sentAt);
@@ -115,7 +124,11 @@ export type Relay = {
   whole: number;
 };
 
-/** A follow that has given nothing, of a session sent at `sentAt` whose Task's first `whole` artifacts an earlier turn wrote. */
+/**
+ * A follow that has given nothing, of a session sent at `sentAt` whose Task's first `whole` artifacts an earlier turn wrote.
+ * @param sentAt When the session was sent, the time its events say while no status gives one.
+ * @param whole How many of the Task's artifacts an earlier turn wrote; none where it is not given.
+ */
 export const relayOf = (sentAt: string, whole = 0): Relay => ({
   said: new Set(),
   open: new Map(),
@@ -210,6 +223,9 @@ const chunkGiven = (r: Relay, a: Artifact, append: boolean, last: boolean): Foll
 /**
  * What one answer of a subscription to a remote Task says that the relay `r` has not given, in order, `r` then holding it given: the
  * Task as it stands (`taskGiven`, `first` for the first a follow reads), a status, a chunk of an artifact, or a message.
+ * @param r What the follow has given, updated with what this answer gives.
+ * @param answer One answer of the subscription.
+ * @param first Whether it is the first answer the follow reads; false where not given.
  */
 export const followedOfRemote = (r: Relay, answer: StreamResponse, first = false): Followed[] => {
   const p = answer.payload;
@@ -220,5 +236,8 @@ export const followedOfRemote = (r: Relay, answer: StreamResponse, first = false
   return [];
 };
 
-/** Whether the relay has given a state that ends the turn: a follow has nothing more to give. */
+/**
+ * Whether the relay has given a state that ends the turn: a follow has nothing more to give.
+ * @param r What the follow has given.
+ */
 export const relayOver = (r: Relay): boolean => r.state !== undefined && turnOver(r.state);

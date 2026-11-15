@@ -248,6 +248,11 @@ function namedIn(argv: readonly string[]): { name: string; rest: string[] } | un
  * the engine they talk to, which a test hands; else the board under `WF_ROOT`, built once the guard passed. `demand` is the machine a
  * command that ticks starts the daemon on (`ensureDaemon`), which a test hands; else the live one. Refused (`Conflict`) before any command
  * but `version` and a help: a checkout on a store that runs an install (`trialRefusal`).
+ * @param argv The command line after the program's name.
+ * @param given The engine the commands talk to, or undefined for the board under `WF_ROOT`.
+ * @param demand The machine a command that ticks starts the daemon on, by the store's root: the live one where none is given.
+ * @param place The place the commands are given: the built-in git place where none is given.
+ * @param env The environment the store's root and settings are read from: the process's where none is given.
  */
 export async function main(
   argv: string[],
@@ -269,7 +274,11 @@ export async function main(
   return commanded(env, command, named.rest, e, demand, place);
 }
 
-/** Runs `argv` as `main` does, for the `wf` alias: its one-line hint first, on stderr, so what a script reads off stdout stays the same. */
+/**
+ * Runs `argv` as `main` does, for the `wf` alias: its one-line hint first, on stderr, so what a script reads off stdout stays the same.
+ * @param argv The command line after the program's name.
+ * @param e The engine the commands talk to, or undefined for the board under `WF_ROOT`.
+ */
 export function aliased(argv: string[], e?: Engine): Promise<void> {
   process.stderr.write(`${WF_HINT}\n`);
   return main(argv, e);

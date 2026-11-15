@@ -247,6 +247,8 @@ function runIds(home: string): string[] {
  * file of its own for the reason `cancelFile` is. Written whole by `writeLabels`, which removes it for an empty map, and removed by
  * `nemia rm` with the run. Composed onto the run as `labels` by every read of the store (`labelled`), and never written into the record
  * (`rewriteRun`, `writeRun`). Every write moves the run's stamp, as every `<id>.<anything>` does (`restStamps`).
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const labelsFile = (home: string, id: string): string => path.join(runsDir(home), `${id}.labels`);
 
@@ -273,6 +275,9 @@ function readLabels(home: string, id: string): Labels | undefined {
 /**
  * Write a person's labels on the run whole, through a hidden file renamed over the one there, so a reader never reads half a map; an
  * empty map removes the file, there or not.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param labels The run's labels, whole; an empty map removes them.
  */
 export function writeLabels(home: string, id: string, labels: Labels): void {
   if (!Object.keys(labels).length) {
@@ -365,6 +370,7 @@ const writePruned = (home: string, id: string, marker: Pruned | undefined): void
 /**
  * The inbox: cards before they are started, one `<name>.md` per card (`parseInboxCard` in inbox.ts), in the store beside `runs/` — not in a
  * repository, since a card's `repo:` says which one the idea is about.
+ * @param home The store's root folder.
  */
 export const inboxDir = (home: string): string => path.join(home, 'inbox');
 
@@ -470,6 +476,9 @@ const isClaim = Schema.is(Schema.Struct({ run: Schema.String }));
  * stale — a run forgotten, a crash between the writes — and is taken over: renamed aside, which only one taker can do; put back if what
  * was renamed is not what was judged stale, since another taker came between; else made again, once. Answers whom the card is the run
  * of when it is not `id`.
+ * @param home The store's root folder.
+ * @param card The card's name.
+ * @param id The id of the run that claims it.
  */
 export function claimCard(home: string, card: string, id: string): { taken: true } | { by: string } {
   const file = path.join(startedDir(home), `${card}.json`);
@@ -510,6 +519,7 @@ export function claimCard(home: string, card: string, id: string): { taken: true
  * The run store at the store's root `home`: a run's record and a person's files beside it, each a file of its own under `runs/`, with the
  * run's labels and the store's pause composed onto each run read (`labelled`, `paused`); the markers of the runs `nemia rm` forgets, under
  * `forgetting/`.
+ * @param home The store's root folder.
  */
 export const filesStoreAt = (home: string): RunStore => ({
   runs: {
@@ -572,6 +582,10 @@ export const filesStoreAt = (home: string): RunStore => ({
  *
  * The store is listed once and its pause read once for the whole read, as `runs.list` lists and reads them once: `runs.find` does both
  * for its one run, and a read that went through it per run would list the store once per run.
+ * @param home The store's root folder.
+ * @param memo The projections kept from the reads before; undefined where nothing is kept.
+ * @param project What each run is read as.
+ * @param verify Whether each kept projection is judged afresh too.
  */
 export const keptRuns = <P>(home: string, memo: RecordMemo<P> | undefined, project: (run: Run) => P, verify: boolean): P[] => {
   const listed = new Set(runIds(home));

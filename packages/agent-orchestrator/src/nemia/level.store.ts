@@ -19,19 +19,34 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import { LEVELS, nemiaPrompt, type LevelFile, type ToldCustom } from './nemia.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
-/** Her folder in the store: her session's working folder. */
+/**
+ * Her folder in the store: her session's working folder.
+ * @param home The store's root folder.
+ */
 export const nemiaDir = (home: string): string => path.join(home, 'nemia');
 
-/** Her memory: the facts she alone writes, one file each. */
+/**
+ * Her memory: the facts she alone writes, one file each.
+ * @param home The store's root folder.
+ */
 export const memoryDir = (home: string): string => path.join(nemiaDir(home), 'memory');
 
-/** The person's level, written by `nemia level`. */
+/**
+ * The person's level, written by `nemia level`.
+ * @param home The store's root folder.
+ */
 export const levelFile = (home: string): string => path.join(nemiaDir(home), 'level.json');
 
-/** The instruction her session is filed with: what is built in, then the person's custom words. */
+/**
+ * The instruction her session is filed with: what is built in, then the person's custom words.
+ * @param home The store's root folder.
+ */
 export const promptFile = (home: string): string => path.join(nemiaDir(home), 'prompt.md');
 
-/** The keeper's record of the person's custom words her session was last filed or told with (`ToldCustom`). */
+/**
+ * The keeper's record of the person's custom words her session was last filed or told with (`ToldCustom`).
+ * @param home The store's root folder.
+ */
 export const toldFile = (home: string): string => path.join(nemiaDir(home), 'told.json');
 
 /**
@@ -53,6 +68,7 @@ const LevelSchema = Schema.Struct({
 /**
  * The person's level, or undefined where they never set one. Refused (`Invalid`), naming the file and its first wrong field, where it
  * does not read as one.
+ * @param home The store's root folder.
  */
 export function readLevel(home: string): LevelFile | undefined {
   let text: string;
@@ -76,7 +92,11 @@ export function readLevel(home: string): LevelFile | undefined {
   });
 }
 
-/** Writes the person's level whole, through a hidden file renamed over it, so the keeper never reads half of it. */
+/**
+ * Writes the person's level whole, through a hidden file renamed over it, so the keeper never reads half of it.
+ * @param home The store's root folder.
+ * @param level The level to write: the level, since when, and her task where she has one.
+ */
 export function writeLevel(home: string, level: LevelFile): void {
   fs.mkdirSync(nemiaDir(home), { recursive: true });
   writeWhole(levelFile(home), `${JSON.stringify(level)}\n`);
@@ -86,6 +106,7 @@ export function writeLevel(home: string, level: LevelFile): void {
  * Her definition as a step is read, frontmatter judged as an agent's: her fence, mode and model, and her instruction (`body`). Refused
  * (`Invalid`): a mode but `auto`, in which she reads unasked while her derived fence asks; and an `askTools:` line or a rule on `nemia` in
  * her `allowedTools:`, which her fence derives from the command table (`nemiaFence`): a hand list there would drift from it.
+ * @param file The path of her definition, the plugin's agent file (nemiaDefinition) when absent.
  */
 export function readNemia(file: string = nemiaDefinition()): StepSpec {
   const text = fs.readFileSync(file, 'utf8');
@@ -137,6 +158,7 @@ const declaredNemia = (file: string): boolean => {
  * folder its `node_modules/.bin` (a checkout, a local install), then its `bin` (a global prefix), the first whose `nemia` resolves to a
  * bin its package declares and lies under that same folder — the client in `apps/cli` of this checkout, the one npm linked beside this
  * package. Undefined where none does: a `nemia` that is another tree's is passed over.
+ * @param root The package's folder to search up from, this package's when absent.
  */
 export function ownBin(root: string = PACKAGE): string | undefined {
   let at = realOf(root);
@@ -157,6 +179,7 @@ export function ownBin(root: string = PACKAGE): string | undefined {
  * rules for auto among them whether or not their folder is there yet (`POLICY_FOLDER`), and on her level, her instruction and the record
  * of the custom words she was told (`toldFile`), the three files of her folder she does not own. Read at each filing, so a folder the
  * store gains is denied at the next.
+ * @param home The store's root folder, whose entries are denied.
  */
 export function storeDenies(home: string): string[] {
   let names: string[];
@@ -180,20 +203,31 @@ export function storeDenies(home: string): string[] {
   ];
 }
 
-/** Her chat as the chat's verbs and its delivery are given it: the task her session is filed under, if any, and her folder. */
+/**
+ * Her chat as the chat's verbs and its delivery are given it: the task her session is filed under, if any, and her folder.
+ * @param home The store's root folder.
+ */
 export const nemiaChatPlace = (home: string): { task: string | undefined; dir: string } => ({
   task: readLevel(home)?.task,
   dir: nemiaDir(home),
 });
 
-/** Writes `text` as the instruction her session is filed with (`promptFile`), and answers the file. */
+/**
+ * Writes `text` as the instruction her session is filed with (`promptFile`), and answers the file.
+ * @param home The store's root folder.
+ * @param text The instruction to write.
+ */
 export function writePrompt(home: string, text: string): string {
   fs.mkdirSync(nemiaDir(home), { recursive: true });
   fs.writeFileSync(promptFile(home), text);
   return promptFile(home);
 }
 
-/** Records `custom` as the words her session was last filed or told with (`toldFile`): none where undefined. */
+/**
+ * Records `custom` as the words her session was last filed or told with (`toldFile`): none where undefined.
+ * @param home The store's root folder.
+ * @param custom The person's custom words for her, or undefined where there are none.
+ */
 export function writeTold(home: string, custom: string | undefined): void {
   fs.mkdirSync(nemiaDir(home), { recursive: true });
   fs.writeFileSync(toldFile(home), `${JSON.stringify(custom === undefined ? {} : { words: custom })}\n`);
@@ -205,6 +239,7 @@ const ToldSchema = Schema.Struct({ words: Schema.optionalKey(Schema.String) });
 /**
  * The custom words her session was last filed or told with (`toldFile`), or undefined where the keeper kept no record, or one that does
  * not read as one: a session filed before the keeper kept them, read off her instruction instead (`customChanged`).
+ * @param home The store's root folder.
  */
 export function readTold(home: string): ToldCustom | undefined {
   let text: string;
@@ -225,6 +260,9 @@ export function readTold(home: string): ToldCustom | undefined {
 /**
  * Writes the instruction her session is filed with (`promptFile`): her builtin instruction, then the person's custom words for her,
  * `custom`, where there are any (read through the Agent door, `keep.verb.ts`), and records those words (`writeTold`). Answers the file.
+ * @param home The store's root folder.
+ * @param body Her builtin instruction, her definition's body.
+ * @param custom The person's custom words for her, or undefined where there are none.
  */
 export function composePrompt(home: string, body: string, custom: string | undefined): string {
   const file = writePrompt(home, nemiaPrompt(body, custom));
@@ -232,7 +270,10 @@ export function composePrompt(home: string, body: string, custom: string | undef
   return file;
 }
 
-/** The instruction her task was last filed or told with (`promptFile`), or undefined where none was ever written. */
+/**
+ * The instruction her task was last filed or told with (`promptFile`), or undefined where none was ever written.
+ * @param home The store's root folder.
+ */
 export function filedPrompt(home: string): string | undefined {
   try {
     return fs.readFileSync(promptFile(home), 'utf8');
@@ -245,7 +286,10 @@ export function filedPrompt(home: string): string | undefined {
 /** A fact's name: a file of her memory, a letter or a digit first, and no folder. */
 const FACT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
-/** Her facts, by file name, in name order; none where she has written none. */
+/**
+ * Her facts, by file name, in name order; none where she has written none.
+ * @param home The store's root folder.
+ */
 export function listFacts(home: string): string[] {
   try {
     return fs
@@ -259,7 +303,11 @@ export function listFacts(home: string): string[] {
   }
 }
 
-/** One fact's words. Refused (`Missing`) where she keeps no fact by that name, naming the ones she keeps. */
+/**
+ * One fact's words. Refused (`Missing`) where she keeps no fact by that name, naming the ones she keeps.
+ * @param home The store's root folder.
+ * @param name The fact's name, a file of her memory.
+ */
 export function readFact(home: string, name: string): string {
   if (!listFacts(home).includes(name)) {
     const kept = listFacts(home);
@@ -273,6 +321,7 @@ export function readFact(home: string, name: string): string {
 /**
  * The allow rules a person gave her session at a prompt ("don't ask again"), written in her folder's local settings: what widens her
  * level beyond what is built in. None where the file is not there or holds none.
+ * @param home The store's root folder.
  */
 export function promptAllows(home: string): string[] {
   let raw: unknown;

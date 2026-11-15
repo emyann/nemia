@@ -12,6 +12,8 @@ export const FACTORY_RULES_FILE = 'RULES.md';
 /**
  * Where the rules of `factory` are kept: `RULES.md` in its tree when it was made from a template, else in `storeFolder`, the folder the
  * store keeps for it (`$WF_ROOT/factories/<name>`).
+ * @param factory The factory: its tree, undefined where it was not made from a template.
+ * @param storeFolder The folder the store keeps for the factory, taken where it has no tree.
  */
 export const rulesFile = (factory: Pick<Factory, 'tree'>, storeFolder: string): string =>
   path.join(factory.tree ?? storeFolder, FACTORY_RULES_FILE);
@@ -20,6 +22,8 @@ export const rulesFile = (factory: Pick<Factory, 'tree'>, storeFolder: string): 
  * Why `text`, the rules of `file`, cannot be taken, or `undefined` when it can: a frontmatter block, a first line of `---` (after a byte
  * order mark too), since a factory's rules only add words and never set a key — a fence, a tool, a model, a mode or a skill is an agent's
  * file's or a step's.
+ * @param file The path the rules are kept at, said in the refusal.
+ * @param text The rules' words as they read or are to be written.
  */
 export function factoryRulesRefusal(file: string, text: string): string | undefined {
   if (!/^\uFEFF?---[ \t]*(\r?\n|$)/.test(text)) return undefined;

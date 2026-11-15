@@ -21,6 +21,7 @@ import { quote, WORDS_QUOTE } from '../../core/quote.ts';
  * Reads only `[projects."<path>"]` tables holding `trust_level = "trusted"` — the shape Codex writes
  * itself — not TOML in general. A config it cannot read trusts nothing.
  * Exported only for the tests that import it.
+ * @param toml The text of the harness's config file.
  */
 export const trustedProjects = (toml: string): Set<string> => {
   const trusted = new Set<string>();
@@ -120,10 +121,17 @@ export type CodexSignIn =
 /**
  * The Codex a session runs and its sign-in asks: `<harnessBin>/codex` where it exists, read at every call (`programIn`), else the
  * `codex` on PATH.
+ * @param harnessBin The folder the engine keeps harness programs in, or undefined for the program on PATH.
  */
 export const codexProgramOf = (harnessBin?: string): string => programIn(harnessBin, 'codex') ?? 'codex';
 
-/** Asks `<program> login status` (`CodexSignIn`): the `codex` on PATH unless a caller names the one it runs (`codexProgramOf`). */
+/**
+ * Asks `<program> login status` (`CodexSignIn`): the `codex` on PATH unless a caller names the one it runs (`codexProgramOf`).
+ * @param env The environment the command runs with.
+ * @param ms How long the command may run, in milliseconds, before it is read as unknown.
+ * @param cwd The folder the command runs in, or undefined for the runtime's own.
+ * @param program The program to run, the one on PATH unless a caller names another.
+ */
 export const codexSignIn = (env: NodeJS.ProcessEnv, ms: number, cwd?: string, program: string = 'codex'): CodexSignIn => {
   const ran = spawnSync(program, ['login', 'status'], { ...(cwd === undefined ? {} : { cwd }), encoding: 'utf8', timeout: ms, env });
   if (ran.error !== undefined || ran.status === null) return { state: 'unknown' };
@@ -258,6 +266,8 @@ const codexPrepare = (r: SpawnRequest, signInMs: number, program: string): Parti
  * `CODEX_SIGN_IN_MS` unless a test shortens it. Its program, spawned and asked, is `<harnessBin>/codex` where it exists at that spawn,
  * else the `codex` on PATH (`codexProgramOf`), found by its `prepare` and run by its `command` as `io.program`; the engine gives its
  * `harnessBin` through `inHarnessBin`.
+ * @param o The harness's options: `signInMs`, how long its sign-in is asked for, in milliseconds (`CODEX_SIGN_IN_MS` where unset),
+ *   and `harnessBin`, the folder its program is looked for in first (PATH alone where unset).
  */
 export const codexHarness = (o: { signInMs?: number; harnessBin?: string } = {}): HarnessSpec => ({
   name: 'codex',

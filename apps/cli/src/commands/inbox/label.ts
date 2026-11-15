@@ -10,6 +10,7 @@ import { namespaceOfCard, namespaceOfRun, said, switchArg, textArg } from '../re
 /**
  * What an edit did, a line per key `edits` named, as `kubectl label` says it: set, changed from its value, removed, already so, or already
  * absent — then the labels as they stand.
+ * @param edits Each edit as typed: `key=value` to set, `key-` to remove.
  */
 export function labelledLines({ kind, name, labels, was }: Labelled, edits: readonly string[]): string[] {
   const what = kind === 'Run' ? `run ${name}` : `card ${name}`;
@@ -30,7 +31,10 @@ export function labelledLines({ kind, name, labels, was }: Labelled, edits: read
 /** The edit as the api is sent it: the edits, and `overwrite` where it was typed. */
 const editOf = (args: Args) => ({ labels: [...labelEdits(args)], ...(switchArg(args, 'overwrite') ? { overwrite: true } : {}) });
 
-/** `nemia label run`'s runner, on the words parsed against its words. */
+/**
+ * `nemia label run`'s runner, on the words parsed against its words.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function labelRun(args: Args): Promise<number> {
   const command = LABEL_RUN_WORDS.name;
   const name = textArg(args, 'runId') ?? '';
@@ -40,7 +44,10 @@ export async function labelRun(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia label inbox`'s runner, on the words parsed against its words. */
+/**
+ * `nemia label inbox`'s runner, on the words parsed against its words.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function labelInbox(args: Args): Promise<number> {
   const command = LABEL_INBOX_WORDS.name;
   const name = textArg(args, 'name') ?? '';

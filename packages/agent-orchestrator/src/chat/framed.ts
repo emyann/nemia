@@ -6,6 +6,8 @@ import { AGENT_OPENS, AGENT_WRITES } from '../say/agent-frame/agent-frame.ts';
 /**
  * The words `text` from `speaker` are said to the task in, so it knows who wrote them: the person's as they always were
  * (`PERSON_FRAME`), an agent's under its name and never as the person's. Pure.
+ * @param speaker Who the words are from: the person, or an agent by its name.
+ * @param text The words as they were sent.
  */
 export const framedFor: FramedFor = (speaker, text) =>
   speaker.kind === 'person' ? PERSON_FRAME + text : AGENT_OPENS + speaker.name + AGENT_WRITES + text;

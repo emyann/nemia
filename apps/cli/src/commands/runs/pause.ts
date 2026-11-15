@@ -39,7 +39,11 @@ const pauseDoes = ({ timeoutMs }: Pause): string =>
 const interruptWords = ({ run, step, kind }: Interrupt): string =>
   `${run}'s ${step}: ${kind === 'session' ? 'its session, its call cut, going on as the same try' : 'its check, run again'}`;
 
-/** What `nemia pause` prints of what it did: the pause put; or, at once, what it cut, left at work, and what that costs. */
+/**
+ * What `nemia pause` prints of what it did: the pause put; or, at once, what it cut, left at work, and what that costs.
+ * @param answer The api's answer to the pause: the pause put; or, at once, what it kept, cut and left.
+ * @param cost What cutting the work costs, in words, said where something was cut; empty for a pause not at once.
+ */
 export const pauseLines = (answer: PauseAnswer, cost: string): string[] => {
   if (!('kept' in answer))
     return [`the store is paused ${sinceWords(answer.pause)} — ${pauseDoes(answer.pause)}; ${RESUME_LINE} resumes it`];
@@ -57,7 +61,12 @@ export const pauseLines = (answer: PauseAnswer, cost: string): string[] => {
   ];
 };
 
-/** What `nemia pause --now` says before it acts: that it would pause or keep the pause that stands, what it would cut, and the cost. */
+/**
+ * What `nemia pause --now` says before it acts: that it would pause or keep the pause that stands, what it would cut, and the cost.
+ * @param interrupts The tasks a pause at once would cut.
+ * @param standing Whether a pause stands already.
+ * @param cost What cutting them costs, in words.
+ */
 export const nowLines = (interrupts: readonly Interrupt[], standing: boolean, cost: string): string[] => {
   const pausing = standing ? "would keep the store's pause as it stands" : 'would pause the store';
   return [
@@ -73,6 +82,7 @@ export const nowLines = (interrupts: readonly Interrupt[], standing: boolean, co
 /**
  * `nemia pause [--why] [--by] [--timeout <d> | --now [--yes]]`: the store paused; `--now` without `--yes` says what it would cut, and
  * writes nothing.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function pause(args: Args): Promise<number> {
   const command = PAUSE_WORDS.name;
@@ -113,7 +123,10 @@ export const timeoutLines = ({ timeout, wrote }: PauseTimeoutAnswer): string[] =
     : `the store's pause timeout is ${timeoutWords(timeout.ms)}${timeout.set ? (timeout.at ? `, set ${timeout.at}` : '') : ' (the default)'}`,
 ];
 
-/** `nemia pause-timeout [<d>]`: the store's pause timeout, read bare, written given one. */
+/**
+ * `nemia pause-timeout [<d>]`: the store's pause timeout, read bare, written given one.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function pauseTimeout(args: Args): Promise<number> {
   const timeout = textArg(args, 'timeout');
   const answer = await asked(PAUSE_TIMEOUT_WORDS.name, (c) =>

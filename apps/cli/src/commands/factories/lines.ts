@@ -8,19 +8,29 @@ import type { Args, FactoryPlaceTrust, FactoryWritten } from 'objects';
 import { Refused } from '../../refused.ts';
 import { pathSent, textArg } from '../requests.ts';
 
-/** The text `args` holds under `key`, or `''` where none was given: a required positional, which the parse refuses left out. */
+/**
+ * The text `args` holds under `key`, or `''` where none was given: a required positional, which the parse refuses left out.
+ * @param args The words parsed against the command's words.
+ * @param key The name of the positional or flag to read.
+ */
 export const textOf = (args: Args, key: string): string => textArg(args, key) ?? '';
 
 /** A git URL, `scheme://…` or `user@host:…`, which the daemon clones: sent as typed, never resolved as a path. */
 const GIT_URL = /^(?:[a-z][a-z0-9+.-]*:\/\/|[^/\s@]+@[^/\s:]+:)/i;
 
-/** A repository a command line names, as it is sent: a git URL as typed, a folder through `pathSent`. */
+/**
+ * A repository a command line names, as it is sent: a git URL as typed, a folder through `pathSent`.
+ * @param typed The repository as typed: a git URL or a folder.
+ * @param env The environment whose chosen context says how a folder is sent; this process's by default.
+ */
 export const repoSent = (typed: string, env: NodeJS.ProcessEnv = process.env): string =>
   GIT_URL.test(typed) ? typed : pathSent(typed, env);
 
 /**
  * What a write's answer says it wrote (`written`); refused, naming the restart, where the daemon answers none, being older than this
  * client.
+ * @param answer The api's answer to the write, whose `written` says what it wrote.
+ * @param command The command's name, said in the refusal.
  */
 export function writtenOf(answer: { readonly written?: FactoryWritten }, command: string): FactoryWritten {
   if (answer.written !== undefined) return answer.written;
@@ -39,6 +49,8 @@ const keptUnder = (place: string, folder: string): string => (folder === place ?
  * The lines `nemia factory add`, `apply` and `trust` print of the trust asked for `factory`'s places: for each one written, the place,
  * the harness, what it grants and how to take it back; for each one not given, why and what repairs it. None for a place already
  * trusted, nor for a harness that keeps no trust.
+ * @param factory The factory's name, said in the command that asks the trust again.
+ * @param asked The trust asked for each of the factory's places, as the api answers it.
  */
 export const trustedLines = (factory: string, asked: readonly FactoryPlaceTrust[]): string[] =>
   asked.flatMap((one) => {
@@ -52,7 +64,10 @@ export const trustedLines = (factory: string, asked: readonly FactoryPlaceTrust[
     return one.refused === null ? [] : [`not trusted for ${one.harness}: ${keptUnder(one.place, one.folder)} — ${one.refused}`];
   });
 
-/** Dollars as a person reads them: `$80.00`, and a fraction of a cent to three digits. */
+/**
+ * Dollars as a person reads them: `$80.00`, and a fraction of a cent to three digits.
+ * @param usd The amount, in dollars.
+ */
 export const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
 
 /** A duration for a person: `58s`, `19m42s`, `1h05m`, `2d03h`. */
@@ -67,7 +82,11 @@ function durationWord(ms: number): string {
   return `${Math.floor(h / 24)}d${two(h % 24)}h`;
 }
 
-/** When a schedule fires or fired, and how far that is from `now`. */
+/**
+ * When a schedule fires or fired, and how far that is from `now`.
+ * @param iso The time the schedule fires or fired, as an ISO 8601 text.
+ * @param now The time to measure from, in ms since the epoch.
+ */
 export const fireWord = (iso: string, now: number): string => {
   const ms = Date.parse(iso) - now;
   return `${iso}, ${ms >= 0 ? `in ${durationWord(ms)}` : `${durationWord(-ms)} ago`}`;

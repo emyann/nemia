@@ -20,6 +20,7 @@ const decoded = (part: string): string | undefined => {
 /**
  * The run and the step a link of hers names, where it is a step's address on the board (`/runs/<run>?step=<step>`, both parts
  * URI-decoded and neither empty); undefined for every other address, a run's page without a step among them. Pure.
+ * @param href The link's address, as the message names it.
  */
 export function broughtOf(href: string): { run: string; step: string } | undefined {
   const parts = STEP_LINK.exec(href);

@@ -66,13 +66,23 @@ export type ProposalPolicyRule = {
 /** A rule the person confirms for auto: at a gate, or over a factory's proposals. */
 export type PolicyRule = GateRule | ProposalPolicyRule;
 
-/** Whether `rule` approves proposals rather than answering at a gate. Pure. */
+/**
+ * Whether `rule` approves proposals rather than answering at a gate. Pure.
+ * @param rule A rule of the person's list.
+ */
 export const isProposalRule = (rule: PolicyRule): rule is ProposalPolicyRule => rule.answer === APPROVE_PROPOSAL;
 
-/** The rules of `list` that answer at a gate. Pure. */
+/**
+ * The rules of `list` that answer at a gate. Pure.
+ * @param list The person's list.
+ */
 export const gateRules = (list: readonly PolicyRule[]): GateRule[] => list.filter((rule): rule is GateRule => !isProposalRule(rule));
 
-/** The rules of `list` that approve the proposals of `factory`. Pure. */
+/**
+ * The rules of `list` that approve the proposals of `factory`. Pure.
+ * @param list The person's list.
+ * @param factory The factory's name.
+ */
 export const proposalRulesIn = (list: readonly PolicyRule[], factory: string): ProposalPolicyRule[] =>
   list.filter((rule): rule is ProposalPolicyRule => isProposalRule(rule) && rule.factory === factory);
 
@@ -101,7 +111,10 @@ export const DEFAULT_ID = 'default';
 /** The builtin rule, decide when all agree: approve any step unasked when every condition holds. */
 export const DEFAULT_POLICY: GateRule = { id: DEFAULT_ID, answer: 'approve', when: [...CONDITIONS], from: 'default' };
 
-/** The list in force: the builtin rule while the person has confirmed none, else their confirmed list, which replaces it. Pure. */
+/**
+ * The list in force: the builtin rule while the person has confirmed none, else their confirmed list, which replaces it. Pure.
+ * @param confirmed The person's confirmed list; undefined where they confirmed none.
+ */
 export const listInForce = (confirmed: readonly PolicyRule[] | undefined): PolicyRule[] =>
   confirmed === undefined ? [DEFAULT_POLICY] : [...confirmed];
 
@@ -113,7 +126,11 @@ const allows = (rule: PolicyRule, answer: string, step: string, facts: Facts): b
   rule.when.every((c) => facts[c]) &&
   (rule.under === undefined || facts.spend < rule.under);
 
-/** The first rule of `list` that allows `answer` at `step` in `facts`, or undefined where none does. Pure. */
+/**
+ * The first rule of `list` that allows `answer` at `step` in `facts`, or undefined where none does. Pure.
+ * @param list The list in force.
+ * @param facts The facts of the run at the call, for the step.
+ */
 export const allowedBy = (
   list: readonly PolicyRule[],
   { answer, step }: { answer: string; step: string },
@@ -144,6 +161,7 @@ const listed = (words: readonly string[]): string =>
  * is approved or tried again, then the conditions as a person says them — `Approve land on its own once its agent recommends it, its
  * review passed, it stayed within budget and nothing waits on you.`, `Try any step again on its own once it has cost under $5.`,
  * `Approve design and land on their own, whatever their state.` Pure.
+ * @param rule The rule.
  */
 export function ruleWords(rule: PolicyRule): string {
   if (isProposalRule(rule)) return proposalRuleWords(rule);
@@ -186,6 +204,8 @@ function shapeRefusal(rule: Record<string, unknown>, at: string): string | undef
  * Why `rule` is no rule an agent may propose, or undefined where it is one: an id that is no name or is the default's, an answer that is
  * none of `RULE_ANSWERS`, steps that are no list of names, a condition that is none of `CONDITIONS` or named twice, and a line that is no
  * dollars above 0. `at` names it in the refusal. Pure.
+ * @param rule The rule as proposed, of any shape.
+ * @param at How the refusal names it.
  */
 export function ruleRefusal(rule: unknown, at: string): string | undefined {
   if (typeof rule !== 'object' || rule === null || Array.isArray(rule))

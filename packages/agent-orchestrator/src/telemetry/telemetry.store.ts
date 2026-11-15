@@ -26,6 +26,7 @@ export const lineLogger = Logger.make<unknown, void>(({ message, logLevel, date 
  * signal's interval the one the environment's standard variable gives, `EXPORT_INTERVALS`, where it gives one). A
  * collector that does not answer costs a post, never the program. A process provides it once, around its program, never a verb; an
  * export gives the exporter's `Flusher` besides.
+ * @param env The process's environment.
  */
 export function telemetryLayer(env: Readonly<Record<string, string | undefined>>): Layer.Layer<never> | Layer.Layer<OtlpExporter.Flusher> {
   const lines = Logger.layer([lineLogger]);
@@ -73,6 +74,8 @@ export const seriesBorn = Effect.fnUntraced(function* (series: ReadonlyArray<Met
 /**
  * `filing`, a pass's work on the step `step` of the run `run`, with its spans and its logs annotated with their labels (`stepLabels`):
  * the runtime's spans under it, and the journal it writes, say which they were for, beside the runtime's own task.
+ * @param run The run the step is of.
+ * @param step The step.
  */
 export const forStep =
   (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, step: StepSpec) =>

@@ -125,6 +125,8 @@ const safe = (name: string): string => name.replace(/[^A-Za-z0-9._-]/g, '_');
  * The files of the session under `name`: its run file, its stop, the interrupt another process asks its turn's end with, the words said
  * to it, its capture, and its MCP config — which nothing writes any more, an attached session's servers riding `Options.mcpServers`
  * (`session-options.ts`), and which the spawn clears so a session started by an older runtime leaves none behind unread.
+ * @param root The engine's store root, under which the attached sessions' folder is.
+ * @param name The session's name, the engine's `ae/<task>/<n>`.
  */
 export const filesOf = (root: string, name: string) => {
   const base = path.join(attachedDir(root), safe(name));
@@ -237,6 +239,8 @@ const jsonLines = <A>(file: string, schema: Schema.Decoder<A>): DecodedLines<A> 
 /**
  * The lines of the asks file of the session `name`, decoded (`AskLineSchema`), and how many did not decode.
  * Exported only for the tests that import it.
+ * @param root The engine's store root.
+ * @param name The session's name.
  */
 export const askLinesOf = (root: string, name: string): DecodedLines<AskLine> => {
   const read = jsonLines(filesOf(root, name).asks, AskLineSchema);
@@ -252,19 +256,35 @@ const append = (file: string, line: unknown): void => {
   fs.appendFileSync(file, `${JSON.stringify(line)}\n`);
 };
 
-/** Appends `line` to the asks file of the session `name`. Its holder is the one writer. */
+/**
+ * Appends `line` to the asks file of the session `name`. Its holder is the one writer.
+ * @param root The engine's store root.
+ * @param name The session's name.
+ * @param line The ask opened or closed.
+ */
 export const appendAsk = (root: string, name: string, line: AskLine): void => append(filesOf(root, name).asks, line);
 
-/** Appends `line` to the answers file of the session `name`. The answer verb is the one writer. */
+/**
+ * Appends `line` to the answers file of the session `name`. The answer verb is the one writer.
+ * @param root The engine's store root.
+ * @param name The session's name.
+ * @param line The person's answer to one ask.
+ */
 export const appendAnswer = (root: string, name: string, line: AnswerLine): void => append(filesOf(root, name).answers, line);
 
-/** Every answer written for the session `name`, oldest first. */
+/**
+ * Every answer written for the session `name`, oldest first.
+ * @param root The engine's store root.
+ * @param name The session's name.
+ */
 export const readAnswers = (root: string, name: string): AnswerLine[] => jsonLines(filesOf(root, name).answers, AnswerLineSchema).lines;
 
 /**
  * The asks of the session `name` still waiting on a person: each opened and not closed, oldest first, in the order they were asked.
  * Composed on read, so a holder that was cut before it could write a close leaves the ask open, which is what tells the layer above
  * the answer is owed as words rather than through the call.
+ * @param root The engine's store root.
+ * @param name The session's name.
  */
 export const openAsks = (root: string, name: string): SessionAsk[] => {
   const { lines } = askLinesOf(root, name);
@@ -275,6 +295,8 @@ export const openAsks = (root: string, name: string): SessionAsk[] => {
 /**
  * The asks of the session `name` whose held call took the person's answer, by their ids: what tells an answer that reached the session
  * through its own call from one whose call was cut, which is owed to the session as words instead.
+ * @param root The engine's store root.
+ * @param name The session's name.
  */
 export const asksTaken = (root: string, name: string): string[] =>
   askLinesOf(root, name)
@@ -284,6 +306,8 @@ export const asksTaken = (root: string, name: string): string[] =>
 /**
  * Every ask of the session `name` still open closed as cut: no answer reached its call, and the layer above owes the answer as words.
  * Written where a call can no longer be waiting — a turn that ended, a session parked, a session taken up by a new holder.
+ * @param root The engine's store root.
+ * @param name The session's name.
  */
 export const cutAsks = (root: string, name: string): void => {
   for (const ask of openAsks(root, name)) {
@@ -292,7 +316,10 @@ export const cutAsks = (root: string, name: string): void => {
   }
 };
 
-/** The run file at `file`, or undefined when there is none, or it is not one a holder writes (a holder caught mid-write is not). */
+/**
+ * The run file at `file`, or undefined when there is none, or it is not one a holder writes (a holder caught mid-write is not).
+ * @param file The path of the session's run file (`filesOf`).
+ */
 export const readRun = (file: string): AttachedRun | undefined => {
   let text: string;
   try {
@@ -308,10 +335,17 @@ export const readRun = (file: string): AttachedRun | undefined => {
   }
 };
 
-/** Writes `run` whole (`writeWhole`, `replaceFile`), so no reader sees half of it. */
+/**
+ * Writes `run` whole (`writeWhole`, `replaceFile`), so no reader sees half of it.
+ * @param root The engine's store root.
+ * @param run The run file to write, under its session's name.
+ */
 export const writeRun = (root: string, run: AttachedRun): void => writeWhole(filesOf(root, run.name).run, run);
 
-/** Every attached run file under `root`, by its session's name: neither drain's file (`DRAIN_FILE`, `SESSION_DRAIN_FILE`) is one. */
+/**
+ * Every attached run file under `root`, by its session's name: neither drain's file (`DRAIN_FILE`, `SESSION_DRAIN_FILE`) is one.
+ * @param root The engine's store root.
+ */
 export const everyRun = (root: string): Map<string, AttachedRun> => {
   const dir = attachedDir(root);
   let names: string[];
@@ -337,11 +371,15 @@ export const thisHolder = (): { owner: number; ownerStart?: string; image: strin
 /**
  * Whether the process that holds `run` is gone: no process has its pid, or the one that has it started at another time than its
  * holder did, its pid taken since.
+ * @param run The session's run file, read for its holder's pid and start.
  */
 export const holderGone = (run: AttachedRun): boolean =>
   !alive(run.owner) || (run.ownerStart !== undefined && processStart(run.owner) !== run.ownerStart);
 
-/** Whether `run` is held by this very process: its pid, started when this one did. */
+/**
+ * Whether `run` is held by this very process: its pid, started when this one did.
+ * @param run The session's run file, read for its holder's pid and start.
+ */
 export const heldHere = (run: AttachedRun): boolean => run.owner === process.pid && !holderGone(run);
 
 /**
@@ -349,6 +387,7 @@ export const heldHere = (run: AttachedRun): boolean => run.owner === process.pid
  * gone or its holder let it go (`parked`), is `working`: a holder resumes it on its next look. A long-lived session between two turns
  * (`idle`) is `input-required`, the word a session waiting on a person already has, so `decide` reads it as idle (`idleOf`) with no
  * branch of its own.
+ * @param run The session's run file, read for its state.
  */
 export const attachedStateOf = (run: AttachedRun): SessionState =>
   run.state === 'parked' ? 'working' : run.state === 'idle' ? 'input-required' : run.state;
@@ -356,13 +395,18 @@ export const attachedStateOf = (run: AttachedRun): SessionState =>
 /** The states a holder still runs a session in: one it works, one it waits in with its input open, and one it was let go in. */
 const OPEN_STATES: readonly AttachedState[] = ['working', 'idle', 'parked'];
 
-/** Whether `state` is one a holder still runs the session in (`OPEN_STATES`). */
+/**
+ * Whether `state` is one a holder still runs the session in (`OPEN_STATES`).
+ * @param state The state a run file says.
+ */
 export const isOpen = (state: AttachedState): boolean => OPEN_STATES.includes(state);
 
 /**
  * The drain put for the holder `pid`: its new calls wait until it is lifted, or until the process that put it ends. Written by that
  * process, with when `pid` started, so a later process given the same pid is not held, and with who put it (`by`: its pid and start),
  * so a drain whose putter was killed before it lifted it holds nothing.
+ * @param root The engine's store root, where the drain's file is.
+ * @param pid The pid of the holder whose new calls are to wait.
  */
 export const putDrain = (root: string, pid: number): void => {
   const start = processStart(pid);
@@ -378,6 +422,7 @@ const putterGone = (by: HolderDrain['by']): boolean =>
  * Whether the drain put names this very process: its pid, and, where the drain says it, when it started; and its putter still runs
  * (`putterGone`), so a take-over killed before it lifted its drain leaves nothing held. A drain that names no putter, written before it
  * did, is never read as one whose putter is gone; one whose file does not decode drains nothing.
+ * @param root The engine's store root, where the drain's file is.
  */
 export const drainsThis = (root: string): boolean => {
   const drain = holderDrainOf(root);
@@ -393,6 +438,7 @@ export const drainsThis = (root: string): boolean => {
  * The process group `run`'s Claude Code led, to kill and wait for, unless its pid is another process's now: alive, and started at
  * another time than the recorded one. A leader gone leaves its group's number to its members, never to a new process, so a group
  * whose leader died is still the session's.
+ * @param run The session's run file, read for its Claude Code's pid and start.
  */
 export const childOf = (run: AttachedRun): number | undefined => {
   const pid = run.childPid;
@@ -401,7 +447,10 @@ export const childOf = (run: AttachedRun): number | undefined => {
   return taken ? undefined : pid;
 };
 
-/** `pid` as a run file names a session's Claude Code: the pid, and when it started. */
+/**
+ * `pid` as a run file names a session's Claude Code: the pid, and when it started.
+ * @param pid The pid of the session's Claude Code.
+ */
 export const childFacts = (pid: number): { childPid: number; childStart?: string } => {
   const start = processStart(pid);
   return { childPid: pid, ...(start ? { childStart: start } : {}) };
@@ -413,5 +462,6 @@ export const CARRY_ON = 'The session was paused between two tool calls and is re
 /**
  * What a resumed session is told first, when its call to `tool` did not finish: its holder ended during it, or let go and cut it
  * rather than wait longer for it.
+ * @param tool The name of the tool whose call did not finish.
  */
 export const crashNote = (tool: string): string => `the daemon stopped during its call to ${tool} and the call did not finish`;

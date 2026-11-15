@@ -25,6 +25,7 @@ export type InputFile = { given: string; resolved: string; kind: 'file' | 'direc
  * Why `nemia start --input` will not copy these files into the run, in words that name the fix — or null. Pure, and asked before anything
  * is written: a file that is not there, a directory, anything else that is not a regular file, and two inputs that would take one name in
  * the run's `inputs/` — one file given twice, or two files of the same name.
+ * @param inputs Each file `--input` gives, as found on disk.
  */
 export function inputRefusal(inputs: readonly InputFile[]): string | null {
   for (const f of inputs) {
@@ -54,6 +55,10 @@ export function inputRefusal(inputs: readonly InputFile[]): string | null {
  * whose name (`inputs`, each file's name in the run's `inputs/`) would take the cards' folder, and a name with no card in the inbox (none
  * of `found`, the names the inbox holds a card of), asked last, so a caller that asks again with every card found learns whether it was
  * only that.
+ * @param cards The cards `--card` names, in their order.
+ * @param unnamed The names among them the inbox refuses as a card's.
+ * @param found The names the inbox holds a card of.
+ * @param inputs Each `--input` file's name in the run's `inputs/`.
  */
 export const cardsRefusal: CardsRefusal = (cards, unnamed, found, inputs) => {
   const notName = cards.find((c) => unnamed.includes(c));
@@ -70,7 +75,10 @@ export const cardsRefusal: CardsRefusal = (cards, unnamed, found, inputs) => {
   return null;
 };
 
-/** The first of `names` given before it in `names`, or undefined where each is given once. Pure. */
+/**
+ * The first of `names` given before it in `names`, or undefined where each is given once. Pure.
+ * @param names The names given, in their order.
+ */
 export const namedTwice: NamedTwice = (names) => names.find((name, at) => names.slice(0, at).includes(name));
 
 const PICTURES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif']);
@@ -96,6 +104,11 @@ const inputKind = (name: string): 'a picture' | 'a text file' | 'a file' => {
  * `folders`, the folders the step is filed with (`filedFolders` in filed.ts): where they hold the run's inputs folder, mounted read-only
  * (`inputsMounts`), the line names it by the mount's path, to read and never write. Without it, the folder is named as it is on disk: a
  * harness fenced by a sandbox reads it there, and the board's preview composes without folders.
+ * @param dir The run's inputs folder, or undefined where there is none to name.
+ * @param names The files given, by name in that folder, or undefined where none was given.
+ * @param inFolder Whether the step is of a folder run, which gets a copy of the inputs in its folder.
+ * @param folders The folders the step is filed with, whose inputs mount is named where there is one; undefined where it is filed none.
+ * @param cards The inbox cards handed, by name; none where not given.
  */
 export const inputsLine = (
   dir: string | undefined,
@@ -168,6 +181,9 @@ function namedWords(step: string, files: HandedFiles | undefined): string {
  * its path and its variable (`WF_WORKFLOW_FILES`, `WF_CARRIED_FILES`); a blank line
  * before them. Nothing for a run
  * that mounts none and a step given no other folder, and for a step on a remote agent, which is filed none.
+ * @param step The step: its harness, its `writable:` and its fence.
+ * @param run The run's mounts and volumes.
+ * @param folders The folders the step is filed with beyond its mounts; none where not given.
  */
 export const mountsLine = (
   step: Pick<StepSpec, 'harness' | 'writable'> & Fenced,
@@ -282,12 +298,16 @@ const carriedLines = (local: boolean, carried: readonly Mount[] | undefined): st
 /**
  * What `nemia decide` says under a run's line of where the run came from: the inbox card it was started from. Undefined for a run typed at
  * `nemia start`.
+ * @param run The run, whose inbox card it was started from is read where it has one.
  */
 export const fromNote = (run: Pick<Run, 'from'>): string | undefined => (run.from ? `from inbox card ${run.from.inbox}` : undefined);
 
 /**
  * What `nemia decide` says under a run's line when `nemia start --input` gave it files or `--card` handed it cards: each by name, and
  * where they are. Undefined for a run given neither.
+ * @param dir The run's inputs folder.
+ * @param names The files given, by name, or undefined where none was.
+ * @param cards The inbox cards handed, by name; none where not given.
  */
 export const inputsNote = (dir: string, names: readonly string[] | undefined, cards: readonly string[] = []): string | undefined => {
   const all = [...(names ?? []), ...cards.map((c) => `${CARDS_FOLDER}/${c}.md`)];

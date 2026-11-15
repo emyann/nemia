@@ -26,7 +26,10 @@ import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 export type { RevisionOf } from './revisions.model.ts';
 
-/** Where the ledger lives: `$WF_ROOT/revisions`, beside `runs/`. */
+/**
+ * Where the ledger lives: `$WF_ROOT/revisions`, beside `runs/`.
+ * @param home The store's folder.
+ */
 export const revisionsDir = (home: string): string => path.join(home, 'revisions');
 
 /**
@@ -71,7 +74,10 @@ const appendChecked = checked(
   (a: { kind: string; name: string }) => `a revision of the ${String(a.kind)} ${JSON.stringify(a.name)}`,
 );
 
-/** The door over `layer`: each method as `doorOf` makes it, an append checked before the layer writes. */
+/**
+ * The door over `layer`: each method as `doorOf` makes it, an append checked before the layer writes.
+ * @param layer The ledger's layer the door is over.
+ */
 export function ledgerDoorOver(layer: LedgerLayer): LedgerDoorShape {
   const door = doorOf<LedgerLayer, string>(layer);
   return {
@@ -142,7 +148,10 @@ function ledgerIn(dir: string): LedgerLayer {
   };
 }
 
-/** The ledger's files of the store `root`, as a layer of the door. */
+/**
+ * The ledger's files of the store `root`, as a layer of the door.
+ * @param root The store's folder.
+ */
 export const ledgerFiles = (root: string): LedgerLayer => ledgerIn(path.join(root, 'revisions'));
 
 /**
@@ -153,20 +162,33 @@ export const LedgerDoor = Context.Reference<LedgerDoorShape>('agent-orchestrator
   defaultValue: () => rootedDoor((root) => ledgerDoorOver(ledgerFiles(root)), 'Ledger door'),
 });
 
-/** The Ledger door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`. */
+/**
+ * The Ledger door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`.
+ * @param root The store's folder.
+ */
 export const ledgerDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(LedgerDoor)(ledgerDoorOver(ledgerFiles(root)));
 
 /** An act of the door over the ledger at the root `home`, run now: what it answers, or the refusal thrown. */
 const atRoot = <A>(home: string, act: (door: LedgerDoorShape) => Effect.Effect<A, unknown>): A =>
   Effect.runSync(act(ledgerDoorOver(ledgerIn(revisionsDir(home)))));
 
-/** The entries kept for `kind` and `name` at the root `home` (`LedgerLayer['entries']['of']`): the door's synchronous spelling. */
+/**
+ * The entries kept for `kind` and `name` at the root `home` (`LedgerLayer['entries']['of']`): the door's synchronous spelling.
+ * @param home The store's folder.
+ * @param kind The kind of definition.
+ * @param name The definition's name.
+ */
 export const ledgerOf = (home: string, kind: RevisionKind, name: string): Revision[] =>
   atRoot(home, (door) => door.entries.of({ kind, name }));
 
 /**
  * The revision `hash` stands at for `kind` and `name` at the root `home`, appended when new (`LedgerLayer['entries']['append']`): the
  * door's synchronous spelling, refused as the door refuses.
+ * @param home The store's folder.
+ * @param kind The kind of definition.
+ * @param name The definition's name.
+ * @param hash The digest of what the definition holds now.
+ * @param at When the revision is appended, written on a new entry.
  */
 export const appendRevision = (home: string, kind: RevisionKind, name: string, hash: string, at: string): Revision =>
   atRoot(home, (door) => door.entries.append({ kind, name }, hash, at));

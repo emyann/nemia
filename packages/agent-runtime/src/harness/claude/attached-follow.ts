@@ -86,6 +86,7 @@ const momentsOf = (
  * it joins leaves no follower behind to be pushed to for the life of the holder. `joined` takes the place and reads the block open
  * then in one go, with nothing between: a piece pushed while a follower joins is either in the block it is handed, whole, or in its
  * `pending`, never dropped between the two.
+ * @param source The engine's store root, where a session's files are read, and whether the holder holds a session by its name.
  */
 export const pushesOf = (source: PushSource): Pushes => {
   const sessions = new Map<string, Fanned>();

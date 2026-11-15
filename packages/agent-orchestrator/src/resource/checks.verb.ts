@@ -50,7 +50,11 @@ export type StepLog = {
   truncated: boolean;
 };
 
-/** The last `max` lines of a session's output, and whether there were more. Output that ends in a newline has not begun another line. */
+/**
+ * The last `max` lines of a session's output, and whether there were more. Output that ends in a newline has not begun another line.
+ * @param output The session's output.
+ * @param max The most lines kept.
+ */
 export function tailOf(output: string, max: number): StepLog {
   const lines = output.split(/\r?\n/);
   if (lines.at(-1) === '') lines.pop();
@@ -80,6 +84,9 @@ const refusedIn =
  * The stderr of every refused check of the run, every try's — the current one's and each one its record keeps behind it — read through
  * the engine's `output`, which observes no harness. A check that kept no stderr, or never started, has none; one the engine could not
  * give its stream of is said why, with the command that reads it from the command line.
+ * @param e The engine the streams are read through.
+ * @param run The run whose checks are read.
+ * @param views The engine's views of the run's tasks, by task id.
  */
 export async function refusedStderr(e: Engine, run: Run, views: Views): Promise<CheckStderr> {
   const ids = Object.values(run.steps)
@@ -107,6 +114,10 @@ const unreadableOutput = (run: Run, taskId: string, err: unknown): string =>
  * codes (`checkVerdictOf`), off the phase of its task and the package's `attemptVerdict` on the last attempt of the try's own check,
  * whichever try: its exit code, or `unfinished` for one that recorded none or that its deadline or an operator ended, as the tick,
  * `nemia ls` and `nemia decide` read it. `refused.exit` is that verdict in a person's words (`verdictWord`).
+ * @param command The check's command.
+ * @param taskId The task of the check, or undefined where it never started.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param stderr What each refused check printed on stderr, by its task (`refusedStderr`).
  */
 export function checkIn(command: string, taskId: string | undefined, views: Views, stderr: CheckStderr): StepCheck {
   if (!taskId) return { command, taskId: null, verdict: null, refused: null };
@@ -136,6 +147,11 @@ export function checkIn(command: string, taskId: string | undefined, views: View
  * is read through the engine's `output`, which observes no harness. A check that kept no stdout — filed before the runtime kept its
  * streams, or stopped before its process wrote one — is read off its log, as `nemia decide` reads it: a `logs` call that observes its
  * harness again, on one run's page and never on the list.
+ * @param e The engine the streams are read through.
+ * @param run The run whose checks are read.
+ * @param steps The run's steps, each one with a check judged.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param stderr What each refused check printed on stderr, by its task (`refusedStderr`).
  */
 export async function checksOf(
   e: Engine,
@@ -183,6 +199,10 @@ export type LastSaid = Map<string, { cursor: string; line: string | null }>;
  * Read from where the last read of the same attempt stopped, so a page polled every five seconds reads what the session wrote since,
  * not its whole conversation again (`said`); a cursor the engine refuses, of a transcript replaced since, is read again from the start. A
  * read's cache, and nothing is decided by it: a fresh app reads from the start.
+ * @param e The engine the conversation is read through.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param taskId The session's task, or null where there is none.
+ * @param said Where the last read of each attempt stopped, updated by this read.
  */
 export async function lastLineOf(e: Engine, views: Views, taskId: string | null, said: LastSaid): Promise<string | null> {
   const view = taskId === null ? undefined : views.get(taskId);

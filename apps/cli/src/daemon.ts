@@ -60,6 +60,8 @@ const releaseIn = (body: string): string | null => {
  * release it says there: answers (any status; its release where a 2xx body reads as `Health` and says one, else null); takes the
  * connection and says nothing within `PROBE_MS` (`silent`: one holds the port, and a read is to be bounded rather than start
  * another); or takes none (`refused`).
+ * @param base The daemon's url to ask.
+ * @param env The environment whose token the probe presents (`sessionHeaders`).
  */
 export async function probed(
   base: string,
@@ -77,12 +79,20 @@ export async function probed(
   }
 }
 
-/** What a daemon at `base` does when asked `READY_PATH` (`probed`), its release left aside. */
+/**
+ * What a daemon at `base` does when asked `READY_PATH` (`probed`), its release left aside.
+ * @param base The daemon's url to ask.
+ * @param env The environment whose token the probe presents (`sessionHeaders`).
+ */
 export const probe = async (base: string, env: NodeJS.ProcessEnv = process.env): Promise<Probe> => (await probed(base, env)).probe;
 
 /**
  * `base`, where the daemon there says a release this client's meets or says none (`releaseMet`); refused, exit 2, where the two differ,
  * naming `nemia version` on both machines: a client and a daemon of two releases have no layer between them.
+ * @param verb The verb the person typed, named in the refusal.
+ * @param base The daemon's url, answered where the releases meet.
+ * @param daemon The release the daemon's health says, null where it says none.
+ * @param client This client's release, null for a checkout.
  */
 export function releaseHeld(verb: string, base: string, daemon: string | null, client: string | null): string {
   if (releaseMet(client, daemon) !== 'differs') return base;
@@ -112,7 +122,12 @@ const unserved = (verb: string, off: boolean): Refused =>
       (off ? `; or unset ${START_OFF} to have one started.` : '; what the start said is in daemon.log, in the store.'),
   );
 
-/** The first url `urlNow` names whose daemon answers `READY_PATH`, polled every `POLL_EVERY` for `withinMs`; none where none answered. */
+/**
+ * The first url `urlNow` names whose daemon answers `READY_PATH`, polled every `POLL_EVERY` for `withinMs`; none where none answered.
+ * @param urlNow Asked on each poll for the url to probe, undefined where none is known.
+ * @param withinMs How long the polls go on before none is answered, in ms.
+ * @param env The environment whose token each probe presents (`sessionHeaders`).
+ */
 export const readyAt = (
   urlNow: () => string | undefined,
   withinMs: number,
@@ -131,6 +146,9 @@ export const readyAt = (
  * The url of a daemon started for the read `verb` names, once it is ready: `nemia daemon --json` run once in process, then the url it
  * answered, else the one the lease names, polled until its daemon answers. Refused where none answers within `withinMs`, or the start
  * is off.
+ * @param verb The verb the person typed, named in the refusal.
+ * @param env The environment the start runs with and the lease is read by: `NEMIA_DAEMON_START`, the store, the token.
+ * @param withinMs How long the started daemon has to answer, in ms: `READY_WITHIN_MS` where it is left out.
  */
 export async function daemonStarted(
   verb: string,
@@ -159,6 +177,9 @@ export type Served = { readonly base: string; readonly release: string | null };
  * here; else this store's lease's, where something listens there — answering, or holding the connection silent, which the read's own
  * bound then says — else one started now and waited for (`daemonStarted`). Refused where the daemon says a release other than `client`,
  * this client's own (`releaseHeld`).
+ * @param verb The verb the person typed, named in a refusal.
+ * @param env The environment read for the context in use, the store and the token.
+ * @param client This client's release, null for a checkout: `clientRelease()` where it is left out.
  */
 export async function servedWith(
   verb: string,
@@ -182,7 +203,12 @@ export async function servedWith(
   return held(started, (await probed(started, env)).release);
 }
 
-/** The base url of the daemon a read asks, ready, as `servedWith` finds it. */
+/**
+ * The base url of the daemon a read asks, ready, as `servedWith` finds it.
+ * @param verb The verb the person typed, named in a refusal.
+ * @param env The environment read for the context in use, the store and the token.
+ * @param client This client's release, null for a checkout: `clientRelease()` where it is left out.
+ */
 export const served = async (
   verb: string,
   env: NodeJS.ProcessEnv = process.env,

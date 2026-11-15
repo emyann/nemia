@@ -67,7 +67,10 @@ const RAIL = { box: 110, height: 20, gap: 16, lane: 6, over: 12, under: 14 };
 /** The open card's tiles (`w-44`), the arrow's room between columns and between lanes, and the room over and under for arcs. */
 export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under: 22 };
 
-/** A run's steps as its flow reads them, off the list's record of it: each one's name, its state, its note and whether its round is due. */
+/**
+ * A run's steps as its flow reads them, off the list's record of it: each one's name, its state, its note and whether its round is due.
+ * @param run The run: its steps, when it was called off, and its hold where it has one.
+ */
 export const flowSteps = (run: Pick<RunView, 'steps' | 'cancelledAt'> & { holding?: RunView['holding'] }): EdgeStep[] =>
   run.steps.map((step) => ({
     name: step.name,
@@ -110,6 +113,9 @@ function liveColumn(columns: readonly string[][], stateOf: (name: string) => Ste
  * The columns the rail shows, `start` to `end`, of `n` around `live`: the one before it and as many after as fit, then as many
  * more before; a fold pill takes a slot of the `slots` for the columns before `start`, and one for those after `end`. A fold
  * never holds a single column: a column takes the slot the fold would.
+ * @param n How many columns the layering has.
+ * @param live The index of the column the rail is centred on.
+ * @param slots How many slots the rail has, fold pills counted: `RAIL_SLOTS` by default.
  */
 export function windowOf(n: number, live: number, slots = RAIL_SLOTS): { start: number; end: number } {
   if (n <= slots) return { start: 0, end: n - 1 };
@@ -124,7 +130,13 @@ export function windowOf(n: number, live: number, slots = RAIL_SLOTS): { start: 
 type Box = Omit<Pill, 'x' | 'y' | 'width' | 'height'>;
 type Sizes = { width: number; height: number; gap: number; lane: number; over: number; under: number };
 
-/** The rail a card holds at rest: the columns around where the run is, each of at most `RAIL_LANES` pills. */
+/**
+ * The rail a card holds at rest: the columns around where the run is, each of at most `RAIL_LANES` pills.
+ * @param names The run's steps by name, in the run's order.
+ * @param graph The run's graph of steps, whose edges lay them out; a run listed without one has each step a column.
+ * @param steps Each step's state as the flow reads it (`flowSteps`).
+ * @param cancelled Whether somebody called the run off: no step is live then.
+ */
 export function railOf(names: readonly string[], graph: Frozen<RunGraph>, steps: readonly EdgeStep[], cancelled: boolean): Flow {
   const { columns, error } = columnsOf(names, graph);
   const stateOf = stateReader(steps);
@@ -138,7 +150,13 @@ export function railOf(names: readonly string[], graph: Frozen<RunGraph>, steps:
   return arrange(slots, { ...RAIL, width }, graph, steps, error);
 }
 
-/** The tiles an open card holds: every step, on the layering, nothing folded. */
+/**
+ * The tiles an open card holds: every step, on the layering, nothing folded.
+ * @param names The run's steps by name, in the run's order.
+ * @param graph The run's graph of steps, whose edges lay them out; a run listed without one has each step a column.
+ * @param steps Each step's state as the flow reads it (`flowSteps`).
+ * @param cancelled Whether somebody called the run off: no step is live then.
+ */
 export function tilesOf(names: readonly string[], graph: Frozen<RunGraph>, steps: readonly EdgeStep[], cancelled: boolean): Flow {
   const { columns, error } = columnsOf(names, graph);
   const boxOf = boxer(stateReader(steps), cancelled);

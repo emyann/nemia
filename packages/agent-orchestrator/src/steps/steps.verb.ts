@@ -26,6 +26,7 @@ import type { ParentRun } from '../wait/wait.ts';
  * after `nemia start` reaches it: through the Workflow door, with the run's places, its repository's and the store's root the program was
  * given (`StoreRoot`), with no hires, since such a record names no factory. Given no root, it fails `Invalid` naming how to give one; a
  * folder that does not load — any failure or defect of the read but an interruption — fails `UnloadedFolder`.
+ * @param run The run's record.
  */
 export const stepsOf = (run: Run): Effect.Effect<StepSpec[], Refusal> => {
   const frozen = frozenStepsOf(run);
@@ -55,6 +56,7 @@ const wordsOf = (err: unknown): string => (err instanceof Error ? err.message : 
 /**
  * Why the tick leaves `run` out of its pass, read now: the words of its unfrozen folder that does not load (`unloadedFolder`); undefined
  * for a run whose steps read. Fails any other refusal.
+ * @param run The run's record.
  */
 export const unloadedOf = (run: Run): Effect.Effect<string | undefined, Refusal> =>
   stepsOf(run).pipe(
@@ -68,6 +70,7 @@ export const unloadedOf = (run: Run): Effect.Effect<string | undefined, Refusal>
 /**
  * The run's steps (`stepsOf`), or why its unfrozen folder does not load (`unloaded`, `UnloadedFolder`'s own words): for a reader that
  * goes on without the steps and says why. Fails any other refusal, so a read given no store root is refused, never read as no steps.
+ * @param run The run's record.
  */
 export const stepsOrWhy = (run: Run): Effect.Effect<{ steps: StepSpec[] } | { unloaded: string }, Refusal> =>
   stepsOf(run).pipe(
@@ -81,6 +84,7 @@ export const stepsOrWhy = (run: Run): Effect.Effect<{ steps: StepSpec[] } | { un
 /**
  * The run's steps (`stepsOf`), or none for a run whose folder does not load (`UnloadedFolder`): for a read that judges nothing of the
  * run, as a pause's finishing tasks and held checks are. Fails any other refusal.
+ * @param run The run's record.
  */
 export const stepsOrNone = (run: Run): Effect.Effect<StepSpec[], Refusal> =>
   stepsOf(run).pipe(
@@ -93,6 +97,7 @@ export const stepsOrNone = (run: Run): Effect.Effect<StepSpec[], Refusal> =>
 /**
  * Each run's steps (`stepsOrNone`), read once, by its id: for the synchronous reads of a pass or a list, which are handed a lookup
  * (`(run) => among.get(run.id) ?? []`) rather than reading the folder once per helper.
+ * @param runs The runs' records.
  */
 export const stepsAmong = (runs: readonly Run[]): Effect.Effect<ReadonlyMap<string, readonly StepSpec[]>, Refusal> =>
   Effect.map(
@@ -106,6 +111,8 @@ export const stepsAmong = (runs: readonly Run[]): Effect.Effect<ReadonlyMap<stri
  * `nemia start --after` refuses an edge by (`afterRefusal`), and where `parentOf` starts. A record whose unfrozen folder does not load
  * names no result branch, and says why (`unread`, `UnloadedFolder`'s own words, as `stepsOrWhy` keeps them); one whose branches were not
  * read names none gone. Fails with a refusal `git` threw, and any refusal of its steps' read but a folder that does not load.
+ * @param id The waited-on run's id, as given.
+ * @param git The reader that says which result branches are gone.
  */
 export const parentRecord = (id: string, git: BranchReader): Effect.Effect<Pick<ParentRun, 'record' | 'gone' | 'unread'>, Refusal> =>
   Effect.gen(function* () {

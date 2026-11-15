@@ -35,15 +35,28 @@ import {
   type Tier,
 } from './series.ts';
 
-/** The folder of a tier's files. */
+/**
+ * The folder of a tier's files.
+ * @param home The store's root folder.
+ * @param tier The tier: `minute` or `hour`.
+ */
 export const tierDir = (home: string, tier: Tier): string => path.join(home, 'metrics', tier);
 
-/** The file of a tier's day. */
+/**
+ * The file of a tier's day.
+ * @param home The store's root folder.
+ * @param tier The tier: `minute` or `hour`.
+ * @param day The UTC day, `YYYY-MM-DD`.
+ */
 export const dayFile = (home: string, tier: Tier, day: string): string => path.join(tierDir(home, tier), `${day}.jsonl`);
 
 const DAY_FILE = /^(\d{4}-\d{2}-\d{2})\.jsonl$/;
 
-/** The days a tier holds a file of, oldest first: none before any is written. */
+/**
+ * The days a tier holds a file of, oldest first: none before any is written.
+ * @param home The store's root folder.
+ * @param tier The tier: `minute` or `hour`.
+ */
 export const days = (home: string, tier: Tier): string[] => {
   let names: string[];
   try {
@@ -57,6 +70,9 @@ export const days = (home: string, tier: Tier): string[] => {
 /**
  * Lines appended to their days' files of `tier`. Refuses as `Invalid` a line labelled by a key outside `SERIES_LABEL_KEYS`, writing
  * none.
+ * @param home The store's root folder.
+ * @param tier The tier the lines are appended to.
+ * @param lines The rolled lines, each appended to its day's file.
  */
 export const appendLines = (home: string, tier: Tier, lines: readonly RollupLine[]): void => {
   for (const line of lines) {
@@ -130,7 +146,11 @@ const linesIn = (text: string): { lines: RollupLine[]; unread: number } => {
 /** The bytes the tail read takes: many lines longer than a histogram's. */
 const TAIL = 16_384;
 
-/** The last line of `tier`'s latest day, read off the file's tail alone; undefined where none reads. */
+/**
+ * The last line of `tier`'s latest day, read off the file's tail alone; undefined where none reads.
+ * @param home The store's root folder.
+ * @param tier The tier read.
+ */
 export const lastLine = (home: string, tier: Tier): RollupLine | undefined => {
   const day = days(home, tier).at(-1);
   if (!day) return undefined;
@@ -156,7 +176,12 @@ export const lastLine = (home: string, tier: Tier): RollupLine | undefined => {
   }
 };
 
-/** A tier's day as it reads: its lines, a line that does not read as one left out and the file said once on stderr; none for no file. */
+/**
+ * A tier's day as it reads: its lines, a line that does not read as one left out and the file said once on stderr; none for no file.
+ * @param home The store's root folder.
+ * @param tier The tier read.
+ * @param day The UTC day, `YYYY-MM-DD`.
+ */
 export const readDay = (home: string, tier: Tier, day: string): RollupLine[] => {
   let text: string;
   try {
@@ -171,7 +196,12 @@ export const readDay = (home: string, tier: Tier, day: string): RollupLine[] => 
   return lines;
 };
 
-/** What a day's file is now, its size and time of change, to tell a memo it moved; undefined for no file. */
+/**
+ * What a day's file is now, its size and time of change, to tell a memo it moved; undefined for no file.
+ * @param home The store's root folder.
+ * @param tier The tier read.
+ * @param day The UTC day, `YYYY-MM-DD`.
+ */
 export const dayStamp = (home: string, tier: Tier, day: string): string | undefined => {
   try {
     const st = fs.statSync(dayFile(home, tier, day));
@@ -181,13 +211,22 @@ export const dayStamp = (home: string, tier: Tier, day: string): string | undefi
   }
 };
 
-/** A tier's day deleted; nothing for one that is gone. */
+/**
+ * A tier's day deleted; nothing for one that is gone.
+ * @param home The store's root folder.
+ * @param tier The tier the day is deleted from.
+ * @param day The UTC day, `YYYY-MM-DD`.
+ */
 export const dropDay = (home: string, tier: Tier, day: string): void => fs.rmSync(dayFile(home, tier, day), { force: true });
 
 /**
  * The series kept on a pass at `now`, from the passes the ring holds after it (`ring`, oldest first): the minutes due rolled and appended,
  * then the hours due rolled from the minute files, then each tier's days past its retention deleted (`WF_METRICS_MINUTE_DAYS`,
  * `WF_METRICS_HOUR_DAYS`). Throws what a read or a write threw, a retention refused among them: the tick's to say, never to stop on.
+ * @param home The store's root folder.
+ * @param ring The passes the ring holds, oldest first.
+ * @param config The store's settings: each tier's retention, in days.
+ * @param now The pass's instant, in epoch ms. Left out, the clock's.
  */
 export const keepSeries = (home: string, ring: readonly RecentPass[], config: Settings, now: number = Date.now()): void => {
   const lastMinute = lastLine(home, 'minute')?.t;
@@ -240,14 +279,23 @@ const linesOf = (
 /** What `--range` takes, as its refusal says it. */
 export const RANGE_TAKES = `--range takes ${Object.keys(RANGES).join(', ')}: nemia series --range 7d`;
 
-/** The range `text` names, `24h` when none is given. Refuses as `Invalid` a range that is not one of `RANGES`. */
+/**
+ * The range `text` names, `24h` when none is given. Refuses as `Invalid` a range that is not one of `RANGES`.
+ * @param text The range asked, or undefined where none is given.
+ */
 export const rangeOf = (text: string | undefined): keyof typeof RANGES => {
   if (text === undefined) return '24h';
   if (!isRange(text)) throw new Invalid({ message: `${RANGE_TAKES}, not ${JSON.stringify(text)}.` });
   return text;
 };
 
-/** The series over `range` (`rangeOf`) at `now`, read off its tier's days, from `memo` where one is handed (`linesOf`). Writes nothing. */
+/**
+ * The series over `range` (`rangeOf`) at `now`, read off its tier's days, from `memo` where one is handed (`linesOf`). Writes nothing.
+ * @param home The store's root folder.
+ * @param range The range asked, or undefined for `24h`.
+ * @param memo The days already read, kept between reads, or undefined to read every day off its file.
+ * @param now The read's instant, in epoch ms. Left out, the clock's.
+ */
 export const seriesRead = (home: string, range: string | undefined, memo?: SeriesMemo, now: number = Date.now()): SeriesRead => {
   const r = rangeOf(range);
   const tier = RANGES[r].tier;
@@ -258,6 +306,11 @@ export const seriesRead = (home: string, range: string | undefined, memo?: Serie
 /**
  * The system's health over the UTC days from `from` (every day kept, for null) to `to`, both included, read off the hour lines at `now`,
  * from `memo` where one is handed (`linesOf`): each figure null where nothing was kept.
+ * @param home The store's root folder.
+ * @param from The first UTC day of the period, `YYYY-MM-DD`, or null for every day kept.
+ * @param to The last UTC day of the period, `YYYY-MM-DD`.
+ * @param memo The days already read, kept between reads, or undefined to read every day off its file.
+ * @param now The read's instant, in epoch ms. Left out, the clock's.
  */
 export const seriesHealth = (home: string, from: string | null, to: string, memo?: SeriesMemo, now: number = Date.now()): Health => {
   const onDisk = days(home, 'hour');

@@ -83,6 +83,10 @@ function unreadWords(route: string, value: unknown, issue: SchemaIssue.Issue, ma
 /**
  * `value` decoded with `schema`; throws an `UnreadAnswer` for `route` where it does not decode, with `may`'s words before the fix. Shared
  * with the objects' client (`objects.ts`), whose answers are read as these are.
+ * @param route The read or write, by its method and path (`GET /api/runs`), which the message names.
+ * @param schema The schema the value decodes with.
+ * @param value The answer as the api sent it.
+ * @param may What a write may have done, said before the fix; none for a read.
  */
 export function decoded<T>(route: string, schema: Schema.Decoder<T>, value: unknown, may?: string): T {
   const result = Schema.decodeUnknownResult(schema)(value);
@@ -109,7 +113,11 @@ const stringAt = (answer: unknown, key: string): string | undefined => {
   return typeof value === 'string' ? value : undefined;
 };
 
-/** The token the api asks for where it answered `status` with `answer`: a 401 whose reason is a `TokenAsk`, with its words; else none. */
+/**
+ * The token the api asks for where it answered `status` with `answer`: a 401 whose reason is a `TokenAsk`, with its words; else none.
+ * @param status The status the api answered.
+ * @param answer The answer's JSON, undefined for one that is not JSON.
+ */
 export function tokenAskOf(status: number, answer: unknown): TokenAsked | null {
   const reason = stringAt(answer, 'reason');
   if (status !== 401 || reason === undefined || !TOKEN_ASKS.has(reason)) return null;
@@ -125,6 +133,7 @@ const askedListeners = new Set<() => void>();
 /**
  * Notes that the api asked for a token, as `ask` says, and tells every listener where its reason is new: the objects' client calls it on
  * each answer that asks, and the first words of a reason are kept.
+ * @param ask The api's ask for a token: its reason and its words.
  */
 export function askToken(ask: TokenAsked): void {
   if (asked?.reason === ask.reason) return;
@@ -132,7 +141,10 @@ export function askToken(ask: TokenAsked): void {
   for (const listener of askedListeners) listener();
 }
 
-/** `listener` told each time the api asks for a token; the answer stops telling it. Shaped for React's `useSyncExternalStore`. */
+/**
+ * `listener` told each time the api asks for a token; the answer stops telling it. Shaped for React's `useSyncExternalStore`.
+ * @param listener Called each time the api asks for a token anew.
+ */
 export function onTokenAsked(listener: () => void): () => void {
   askedListeners.add(listener);
   return () => void askedListeners.delete(listener);

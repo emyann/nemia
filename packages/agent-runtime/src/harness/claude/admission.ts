@@ -30,6 +30,7 @@ const admissionHookCommand = (admission: Admission): string => [...AE, 'admissio
 /**
  * A task's Claude Code flags with its admission merged into `settings`: a `PreToolUse` hook matched to admission's tools alone, after
  * any the caller's settings already hold. The flags as given where the task has no admission.
+ * @param config The task's spawn config: its Claude Code flags and its admission, either absent.
  */
 export const admittedFlags = (config: SpawnRequest['config']): ClaudeFlags | undefined => {
   const admission = config?.callAdmission;
@@ -96,6 +97,10 @@ const askFor = (why: string): string => hookOutput({ decision: 'ask', message: `
  * the hook's decision; nothing where admission printed nothing, for no opinion. Asks the person where the input is no call, and where
  * admission did not start, ran past its bound, exited but 0, or printed what is no answer. An answer that says its sentence as
  * `reason` is read as its `message`, and `warn` is handed the fix.
+ * @param hookInput The hook's input as Claude Code wrote it on stdin, JSON naming the tool, its input and the working folder.
+ * @param command Admission's command and its arguments, run with the call on its stdin.
+ * @param run What runs the command, bounded; the real spawn unless a test hands its own.
+ * @param warn Where the line naming the fix goes when the answer says its sentence as `reason`; stderr unless given.
  */
 export const admitCall = (
   hookInput: string,
@@ -126,6 +131,7 @@ export const admitCall = (
 /**
  * `ae admission -- <command…>`: reads the hook's input on stdin, hands the call to admission's command (`admitCall`), and prints the
  * hook's output. Refused, exit 2, where no command follows `--`.
+ * @param argv The words after `ae admission`, admission's command after `--`.
  */
 export function admissionHook(argv: string[]): void {
   const command = argv.indexOf('--') === -1 ? [] : argv.slice(argv.indexOf('--') + 1);

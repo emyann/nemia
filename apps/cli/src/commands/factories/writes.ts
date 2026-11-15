@@ -9,7 +9,10 @@ import { Refused } from '../../refused.ts';
 import { listArg, said, switchArg, textArg } from '../requests.ts';
 import { repoSent, textOf, trustedLines, writtenOf } from './lines.ts';
 
-/** `nemia factory add`: the factory filed on its repositories, then the trust asked for each place unless `--no-trust`. */
+/**
+ * `nemia factory add`: the factory filed on its repositories, then the trust asked for each place unless `--no-trust`.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryAdd(args: Args): Promise<number> {
   const name = textOf(args, 'name');
   const repos = listArg(args, 'repos').map((r) => repoSent(r));
@@ -23,6 +26,7 @@ export async function factoryAdd(args: Args): Promise<number> {
 /**
  * `nemia factory attach`: one workflow given to one factory, on the repository `--repo` names where it names one, or that it had it
  * already.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function factoryAttach(args: Args): Promise<number> {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
@@ -38,7 +42,10 @@ export async function factoryAttach(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory detach`: one workflow taken from one factory. */
+/**
+ * `nemia factory detach`: one workflow taken from one factory.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryDetach(args: Args): Promise<number> {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const answer = await asked('factory detach', (c) => c.factories.detach({ params: { name: factory, workflow } }));
@@ -49,7 +56,10 @@ export async function factoryDetach(args: Args): Promise<number> {
 /** The Hire's name of the step `<workflow>/<step>`: `<workflow>.<step>`. */
 const hireName = (step: string): string => step.replace('/', '.');
 
-/** `nemia factory hire`: an agent hired into a workflow's step, and the one it replaced. */
+/**
+ * `nemia factory hire`: an agent hired into a workflow's step, and the one it replaced.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryHire(args: Args): Promise<number> {
   const [factory, agent, step] = [textOf(args, 'factory'), textOf(args, 'agent'), textOf(args, 'step')];
   const answer = await asked('factory hire', (c) =>
@@ -60,7 +70,10 @@ export async function factoryHire(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory fire`: a step's hire taken back, and the agent fired. */
+/**
+ * `nemia factory fire`: a step's hire taken back, and the agent fired.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryFire(args: Args): Promise<number> {
   const [factory, step] = [textOf(args, 'factory'), textOf(args, 'step')];
   const answer = await asked('factory fire', (c) => c.hires.delete({ params: { namespace: factory, name: hireName(step) } }));
@@ -69,7 +82,10 @@ export async function factoryFire(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory revisions`: whether a factory's runs follow merged revisions, and what it said before. */
+/**
+ * `nemia factory revisions`: whether a factory's runs follow merged revisions, and what it said before.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryRevisions(args: Args): Promise<number> {
   const factory = textOf(args, 'factory');
   const revisions = REVISIONS_POLICIES.find((p) => p === textOf(args, 'revisions'));
@@ -86,7 +102,10 @@ export async function factoryRevisions(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory trust`: the trust of each of a factory's places asked again, and what was done of it. */
+/**
+ * `nemia factory trust`: the trust of each of a factory's places asked again, and what was done of it.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryTrust(args: Args): Promise<number> {
   const factory = textOf(args, 'factory');
   const { name, trusts } = await asked('factory trust', (c) => c.factories.trust({ params: { name: factory } }));
@@ -95,7 +114,10 @@ export async function factoryTrust(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory rm`: a factory's file removed, and the instruction and rules the store kept for it. */
+/**
+ * `nemia factory rm`: a factory's file removed, and the instruction and rules the store kept for it.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryRm(args: Args): Promise<number> {
   const factory = textOf(args, 'factory');
   const { file, instruction } = await asked('factory rm', (c) => c.factories.delete({ params: { name: factory } }));

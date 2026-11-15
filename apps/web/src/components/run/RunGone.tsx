@@ -6,6 +6,8 @@ import { titleOf } from '@/lib/factory';
  * In place of a run's page, or of one of its steps', when the store has no such run (`readGone`). Given the `run` last read, it was removed
  * while the page was open, and what was read is not drawn under it, so nothing on the page looks live, or offers a button for a run that
  * is not there. Given only its `id`, the address was visited with no read of it: removed, or never a run of the store.
+ *
+ * @param props the props: the run last read, or only the id of the run the address names
  */
 export function RunGone(props: { run: RunDetail } | { id: string }) {
   const id = 'run' in props ? props.run.id : props.id;

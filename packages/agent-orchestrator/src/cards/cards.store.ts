@@ -72,13 +72,20 @@ export type CardLayer = {
 /** The Card door's shape: each method of `CardLayer` answering an Effect, a card's name taken as `CardName`. */
 export type CardDoorShape = DoorOf<CardLayer, CardName>;
 
-/** A card already at a new card's name, as a refusal: the files say so by `EEXIST`, the memory by its own. */
+/**
+ * A card already at a new card's name, as a refusal: the files say so by `EEXIST`, the memory by its own.
+ * @param name The new card's name, which the fix's command names.
+ * @param file The path of the card filed already.
+ */
 export const cardTaken = (name: string, file: string): Conflict =>
   new Conflict({
     message: `a card is filed already at ${file}: file the new one under another name, or drop that one with nemia inbox rm ${name}`,
   });
 
-/** No card at the name a write back names, as a refusal. */
+/**
+ * No card at the name a write back names, as a refusal.
+ * @param name The card's name the write back names.
+ */
 export const noCardToRewrite = (name: string): Missing =>
   new Missing({
     message: `there is no card ${name} to write back: file it with nemia inbox add, or name a card nemia inbox lists. Nothing was written.`,
@@ -97,7 +104,10 @@ const textChecked = (name: string, text: string) => fromThrow(() => void parseIn
 /** A try written: what the model's `MissedStart` refuses of it. */
 const tryChecked = (name: string) => checked(MissedStartModel, () => `the try of the card ${name}`);
 
-/** The door over `layer`: each method as `doorOf` makes it, each write's name and text checked before the layer writes. */
+/**
+ * The door over `layer`: each method as `doorOf` makes it, each write's name and text checked before the layer writes.
+ * @param layer The files or the memory the door reads and writes through.
+ */
 export function cardDoorOver(layer: CardLayer): CardDoorShape {
   const door = doorOf<CardLayer, CardName>(layer);
   return {
@@ -124,7 +134,10 @@ export function cardDoorOver(layer: CardLayer): CardDoorShape {
   };
 }
 
-/** The inbox of the store `home`: where its cards are filed. */
+/**
+ * The inbox of the store `home`: where its cards are filed.
+ * @param home The store's root folder.
+ */
 export const inboxAt = (home: string): string => path.join(home, 'inbox');
 
 /** The tick's tries of the store `home`: outside the inbox, which is a person's. */
@@ -136,6 +149,8 @@ const isMissedStart = Schema.is(MissedStartModel);
 /**
  * The name of the card `given` is a path to, in the store `home` — any path under its inbox, `<inbox>/<name>.md` or `<inbox>/<name>`,
  * links resolved on the way to both — or null for a path outside it, and for text: the inverse of `where`.
+ * @param home The store's root folder.
+ * @param given The path, relative to the working folder or absolute.
  */
 export function cardNameAt(home: string, given: string): string | null {
   const real = (at: string): string => {
@@ -177,7 +192,10 @@ function triesAt(queue: string): CardLayer['tries'] {
   };
 }
 
-/** The files of the store `home`, as a layer of the door: the inbox's cards and the queue's tries. */
+/**
+ * The files of the store `home`, as a layer of the door: the inbox's cards and the queue's tries.
+ * @param home The store's root folder.
+ */
 export function cardFiles(home: string): CardLayer {
   const inbox = inboxAt(home);
   const fileOf = (name: string) => path.join(inbox, `${name}.md`);
@@ -256,5 +274,8 @@ export const CardDoor = Context.Reference<CardDoorShape>('agent-orchestrator/Car
   defaultValue: () => rootedDoor((root) => cardDoorOver(cardFiles(root)), 'Card door'),
 });
 
-/** The Card door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`. */
+/**
+ * The Card door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`.
+ * @param root The store's root folder.
+ */
 export const cardDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(CardDoor)(cardDoorOver(cardFiles(root)));

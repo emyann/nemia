@@ -40,6 +40,7 @@ const widestOf = (reach: FenceReach): string =>
 /**
  * Whether a session in permission mode `mode` — the runtime's default when `undefined` — writes in its directory unasked: the narrowest
  * mode that does and every wider one. Such a mode grants what an `allowedTools:` rule `Edit(…)` on a path inside the directory would.
+ * @param mode The permission mode; undefined for the runtime's default.
  */
 export const editsUnasked = (mode: string | undefined): boolean => {
   const modes = reachOf();
@@ -51,6 +52,7 @@ export const editsUnasked = (mode: string | undefined): boolean => {
  * allows it: every mode up to the narrowest that edits unasked (`editsUnasked`), which edits in its directory alone. Wider ones — a
  * classifier's, or the mode that asks about nothing — may write anywhere, so a deny of a folder takes from them a write they had. False
  * for a word the harness does not take, which the runtime refuses itself.
+ * @param mode The permission mode; undefined for the runtime's default.
  */
 export const writesOutsideByRule = (mode: string | undefined): boolean => {
   const modes = reachOf();
@@ -67,6 +69,8 @@ const IN_DIRECTORY = ['Edit(**)', 'Read(**)'];
  * mode that edits unasked (`editsUnasked`), else those of the agent's allow rules `allows`, as written, that a rule inside the directory
  * covers. Undefined when the agent has allow rules and none is inside its directory: a step's allow list replaces its agent's and
  * cannot be empty, so the agent's own would run.
+ * @param mode The agent's permission mode; undefined for the runtime's default.
+ * @param allows The agent's allow line as written; undefined for none.
  */
 export function directoryFence(
   mode: string | undefined,
@@ -85,7 +89,10 @@ export function directoryFence(
   return rules.length && !allowedTools.length ? undefined : { permissionMode, allowedTools };
 }
 
-/** Whether a harness fences a session with a sandbox rather than a permission mode and rule lists, as the runtime answers. */
+/**
+ * Whether a harness fences a session with a sandbox rather than a permission mode and rule lists, as the runtime answers.
+ * @param harness The harness's name.
+ */
 export const sandboxed = (harness: string): boolean => fenceReach(harness)?.by === 'sandbox';
 
 /** The keys of a step's fence, either harness's: a sandboxed step's `permissionMode:` is read as its `sandbox:` before this sees it. */
@@ -116,6 +123,7 @@ const overriddenBy = (key: string): Overridable | undefined =>
 /**
  * What step `step`'s own keys `own` override of its agent (`overriddenBy`), each once, in `OVERRIDABLE`'s order: the step's side of the
  * agent on a step, whatever brought the agent — its `agent:` line or a hire.
+ * @param own The keys the step writes itself, each by its key; an undefined value is a key not written.
  */
 export const overridesOf = (own: Partial<Record<string, string>>): Overridable[] => {
   const keys = Object.keys(own).flatMap((key) => (own[key] === undefined ? [] : [overriddenBy(key)]));
@@ -127,6 +135,9 @@ export const overridesOf = (own: Partial<Record<string, string>>): Overridable[]
  * first that the agent's `overridable:` leaves out. An agent with no line offers everything. Judged on every load, from the files, the
  * same for a step that names its agent and one a factory hires it into. The refusal names the step, the key, the agent and its file,
  * and both fixes.
+ * @param step The step's name, said in the refusal.
+ * @param agent The agent the step names or is hired.
+ * @param own The keys the step writes itself, each by its key.
  */
 export function offerRefusal(step: string, agent: Agent, own: Partial<Record<string, string>>): string | undefined {
   if (agent.overridable === undefined) return undefined;
@@ -160,6 +171,10 @@ function narrowerThan(reach: FenceReach, asked: string, own: string): string[] |
  * under its own name (`codexSandboxNamed`), and `resolved` the step they were read into, with the agent's. A key the step does not write is
  * its agent's and widens nothing, nor does its `disallowedTools:`, which adds to its agent's (`deniesWith`). A remote step is left to
  * `remoteRefusal` in harness.ts, which refuses every fence key there. The refusal names the step, the key, what it would add, and the fix.
+ * @param step The step's name, said in the refusal.
+ * @param agent The agent the step names or is hired.
+ * @param own The keys the step writes itself, the sandbox under its own name.
+ * @param resolved The step as read with its agent's keys.
  */
 export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<StepKey, string>>, resolved: StepSpec): string | undefined {
   const harness = resolved.harness ?? DEFAULT_HARNESS;
@@ -188,6 +203,11 @@ export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<Ste
  * the skill by its bare name (`bareSkillOf`), as a session calls it.
  * Loading a skill is a call of `Skill`, so adding one past the agent's fence would widen it. A step on a sandboxed harness or a remote
  * agent is left to `composedRefusal`, which refuses skills there. The refusal names the step, the skill, the agent's file and both fixes.
+ * @param step The step's name, said in the refusal.
+ * @param agent The agent the step names or is hired.
+ * @param line The step's skills line as written, quoted in the refusal.
+ * @param added The skills the step names.
+ * @param resolved The step as read with its agent's keys, whose harness is read.
  */
 export function addedSkillsRefusal(
   step: string,
@@ -212,7 +232,10 @@ export function addedSkillsRefusal(
   return undefined;
 }
 
-/** The rules agent `agent`'s own `disallowedTools:` denies, `[]` for none. */
+/**
+ * The rules agent `agent`'s own `disallowedTools:` denies, `[]` for none.
+ * @param agent The agent.
+ */
 export const agentDeniesOf = (agent: Agent): string[] => agentRules(agent, `${AGENTS_FOLDER}/${agent.name}.md`, 'disallowedTools');
 
 /**
@@ -220,6 +243,8 @@ export const agentDeniesOf = (agent: Agent): string[] => agentRules(agent, `${AG
  * denies `agents` that no rule of its own already covers (`covers`). A step's line adds to its agent's, so a deny the team adds to an
  * agent reaches every step that hires it, and a line copied before it still reads; a line that repeats every one of its agent's denies,
  * as every step's had to before, resolves to itself.
+ * @param own The step's own deny rules, in their written order.
+ * @param agents Its agent's denies.
  */
 export const deniesWith = (own: readonly string[], agents: readonly string[]): string[] => [
   ...own,
@@ -230,6 +255,7 @@ export const deniesWith = (own: readonly string[], agents: readonly string[]): s
  * The denies step `step`'s own file writes, read back from the resolved step: its `disallowedTools` but those its agent gave it
  * (`StepAgent.agentDenies`), what `renderStep` writes and the brief tells as the step's own fence. The resolved list where the step's
  * provenance names none.
+ * @param step The resolved step: its deny rules and its agent, which says the denies the agent gave it.
  */
 export function ownDenies(step: { disallowedTools?: readonly string[] | null; agent?: string | StepAgent | null }): string[] {
   const given = typeof step.agent === 'object' && step.agent !== null ? step.agent.agentDenies : undefined;
@@ -322,6 +348,7 @@ function modeGrants(mode: string | undefined, rule: string): boolean {
  * The tool permission rule `rule` names, whether the rule is the bare tool or names what it reaches in parentheses: `Bash(git log:*)`
  * names `Bash`. Over `ruleParts`, so one parser reads a rule for what covers what (`covers`) and for whether any rule names a tool at
  * all (`unallowedRefusal`).
+ * @param rule The permission rule.
  */
 export const toolOf = (rule: string): string => ruleParts(rule).tool;
 
@@ -336,6 +363,8 @@ function ruleParts(rule: string): { tool: string; inner?: string } {
  * rule covering a command it begins (`Bash(npm:*)` covers `Bash(npm test)` and `Bash(npm run:*)`, never `Bash(npmx)`); or a path rule
  * ending in `**` covering a path under it (`pathCovers`). Nothing else is read as covered, so a narrower rule written another way is
  * refused rather than a wider one let through.
+ * @param by The rule that may cover.
+ * @param rule The rule that may be covered.
  */
 export function covers(by: string, rule: string): boolean {
   if (by === rule) return true;
@@ -404,15 +433,21 @@ export type Fenced = Partial<StepSpec>;
  * Whether `step`'s fence, as resolved with its agent's, writes nothing (`unwrittenBy`): the one judgement `refuseUnwritable` refuses
  * `writable:` by, and the filing holds a factory's writable volume read-only by (`volumeMounts`), so a volume gives no write to a step
  * that has none.
+ * @param step The step, as resolved with its agent's.
  */
 export const writesNothing = (step: Fenced): boolean => unwrittenBy(step) !== undefined;
 
-/** Whether `step`'s own file sets a fence key (`FENCE_KEYS`): on a step with no agent, a fence no hire's agent would replace. */
+/**
+ * Whether `step`'s own file sets a fence key (`FENCE_KEYS`): on a step with no agent, a fence no hire's agent would replace.
+ * @param step The step as its own file writes it.
+ */
 export const fencedItself = (step: Fenced): boolean => FENCE_KEYS.some((key) => step[key] !== undefined);
 
 /**
  * Refuses `writable:` on a step whose fence, as resolved with its agent's (`agent`, by name), writes nothing (`unwrittenBy`). The key
  * widens where a step's writes reach, and gives no write to a step that has none.
+ * @param step The step, as resolved with its agent's.
+ * @param agent The agent's name, said in the refusal; undefined for a step with none.
  */
 export function refuseUnwritable(step: StepSpec, agent: string | undefined): void {
   if (!step.writable) return;

@@ -14,6 +14,8 @@ const markOf = (readOnly: boolean): ':ro' | ':rw' => (readOnly ? ':ro' : ':rw');
 /**
  * A volume as it is sent: its folder through `pathSent` and its mark as typed; one with no mark the api reads (`:ro`, `:rw`) sent whole
  * through `pathSent`, for the api to refuse in its words.
+ * @param spelled The volume as typed: a folder, then `:ro` or `:rw`.
+ * @param env The environment whose chosen context says how the folder is sent; this process's by default.
  */
 export function volumeSent(spelled: string, env: NodeJS.ProcessEnv = process.env): string {
   const at = spelled.lastIndexOf(':');
@@ -22,7 +24,10 @@ export function volumeSent(spelled: string, env: NodeJS.ProcessEnv = process.env
   return (mark === 'ro' || mark === 'rw') && folder.trim() !== '' ? `${pathSent(folder, env)}:${mark}` : pathSent(spelled, env);
 }
 
-/** `nemia factory volume add`: a folder mounted for every local step of a factory's runs, and how it was marked before. */
+/**
+ * `nemia factory volume add`: a folder mounted for every local step of a factory's runs, and how it was marked before.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryVolumeAdd(args: Args): Promise<number> {
   const factory = textOf(args, 'factory');
   const added = await asked('factory volume add', (c) =>
@@ -37,7 +42,10 @@ export async function factoryVolumeAdd(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory volume rm`: a volume taken off a factory, by its path. */
+/**
+ * `nemia factory volume rm`: a volume taken off a factory, by its path.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryVolumeRm(args: Args): Promise<number> {
   const factory = textOf(args, 'factory');
   const { file, removed } = await asked('factory volume rm', (c) =>
@@ -47,7 +55,10 @@ export async function factoryVolumeRm(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory setting set`: a harness setting given to a factory's runs, printed as its file now holds it. */
+/**
+ * `nemia factory setting set`: a harness setting given to a factory's runs, printed as its file now holds it.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factorySettingSet(args: Args): Promise<number> {
   const [factory, setting] = [textOf(args, 'factory'), textOf(args, 'setting')];
   const answer = await asked('factory setting set', (c) =>
@@ -62,7 +73,10 @@ export async function factorySettingSet(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory setting rm`: a harness setting taken off a factory, by its key. */
+/**
+ * `nemia factory setting rm`: a harness setting taken off a factory, by its key.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factorySettingRm(args: Args): Promise<number> {
   const [factory, setting] = [textOf(args, 'factory'), textOf(args, 'setting')];
   const answer = await asked('factory setting rm', (c) => c.factories.deleteSetting({ params: { name: factory, setting } }));
@@ -70,7 +84,10 @@ export async function factorySettingRm(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory cost-line set`: the cost line of a workflow in a factory, and the line it replaced. */
+/**
+ * `nemia factory cost-line set`: the cost line of a workflow in a factory, and the line it replaced.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryCostLineSet(args: Args): Promise<number> {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const usd = Number(textOf(args, 'usd'));
@@ -85,7 +102,10 @@ export async function factoryCostLineSet(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory cost-line rm`: the cost line of a workflow taken off a factory. */
+/**
+ * `nemia factory cost-line rm`: the cost line of a workflow taken off a factory.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function factoryCostLineRm(args: Args): Promise<number> {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const answer = await asked('factory cost-line rm', (c) => c.factories.deleteCostLine({ params: { name: factory, workflow } }));

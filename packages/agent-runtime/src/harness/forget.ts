@@ -10,6 +10,10 @@ import type { SessionForgotten, SessionKept } from './seam.ts';
 /**
  * The answer of the harness `harness`'s `forget`: each of `files` that is there, removed unless `dry`, and what `left` names,
  * asked as the files are. A file already gone is no error, and not in the answer; one that cannot be removed fails the verb.
+ * @param harness The harness's name, which a failure is worded by.
+ * @param files The session's files to remove.
+ * @param left Names what is left of the session that is not removed, asked once the files are.
+ * @param dry Whether only to say what would be removed, removing nothing.
  */
 export const forgetFiles = (
   harness: string,
@@ -29,6 +33,9 @@ export const forgetFiles = (
 /**
  * The answer of the harness `harness`'s `kept`: for each of `sessions`, the paths `of` names for it that are there, its `output`
  * apart where `of` names one, and no key for a session with none. `of` is asked once a session; a throw fails the verb.
+ * @param harness The harness's name, which a failure is worded by.
+ * @param sessions The sessions asked about.
+ * @param of Names a session's files, its records and its output, asked once a session.
  */
 export const keptOf = <S extends { name: string }>(
   harness: string,

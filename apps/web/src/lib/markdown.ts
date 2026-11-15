@@ -30,6 +30,7 @@ const FENCES: Readonly<Record<string, Exclude<CodeLanguage, 'text'>>> = {
 /**
  * The language a fenced block is highlighted in, from its `language-*` class as the markdown pipeline writes it: ```` ```bash ```` gives
  * `language-bash`. A fence the code block has no grammar for, and a block with no fence word, are `text`: shown as written.
+ * @param className The code element's class, as the pipeline gives it: a string, a list of them, or anything else for none.
  */
 export function languageOf(className: unknown): CodeLanguage {
   const classes = Array.isArray(className) ? className.map(String) : typeof className === 'string' ? className.split(/\s+/) : [];
@@ -56,6 +57,7 @@ const textOf = (node: TextNode | undefined): string =>
 /**
  * The code of a fenced block, from its `pre`: the text of the `code` inside it, less the one newline the pipeline ends a block with.
  * And the fence's class, for `languageOf`.
+ * @param pre The block's `pre` node, or undefined where there is none.
  */
 export function fencedCode(pre: TextNode | undefined): { code: string; className: unknown } {
   const code = pre?.children?.find((child) => child.type === 'element' && child.tagName === 'code');
@@ -71,6 +73,7 @@ const FOOTNOTE_LABEL = 'footnote-label';
 /**
  * The footnotes' heading named with `prefix`, as the notes and their references already are (`clobberPrefix`), and each reference
  * described by that one: without it, two texts with footnotes on one page share the id `footnote-label`. A rehype plugin's transform.
+ * @param prefix The prefix the text's notes and their references are given.
  */
 export const labelFootnotes =
   (prefix: string) =>

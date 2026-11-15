@@ -44,6 +44,7 @@ export type Rewritten = {
 /**
  * The folders a rewrite covers given none, under the store `home`: its workflows and inbox, and each factory's tree and applied base, as
  * `factory/applied/applied.store.ts` lays them out (`treeDir`, `appliedDir`). Only those there.
+ * @param home The store's home folder.
  */
 export function storeFolders(home: string): string[] {
   const factories = path.join(home, 'factories');
@@ -61,7 +62,10 @@ export function storeFolders(home: string): string[] {
   ].filter((dir) => fs.existsSync(dir) && fs.statSync(dir).isDirectory());
 }
 
-/** Every `*.md` file under `dir`, in order, `.git`, `node_modules` and links passed over. */
+/**
+ * Every `*.md` file under `dir`, in order, `.git`, `node_modules` and links passed over.
+ * @param dir The folder to walk.
+ */
 export function markdownIn(dir: string): string[] {
   return fs
     .readdirSync(dir, { withFileTypes: true })
@@ -126,7 +130,11 @@ function harnessOfFile(file: string, text: string): string | undefined {
   return frontmatterKey(fs.readFileSync(at, 'utf8'), 'harness') ?? DEFAULT_HARNESS;
 }
 
-/** Each markdown file under `folders` rewritten where its frontmatter is former — or only found, under `check` — and read for tails. */
+/**
+ * Each markdown file under `folders` rewritten where its frontmatter is former — or only found, under `check` — and read for tails.
+ * @param folders The folders whose markdown files are read.
+ * @param check Whether only to find the files to rewrite, writing none.
+ */
 export function rewriteFolders(folders: readonly string[], check: boolean): Rewritten {
   const files = [...new Set(folders.flatMap(markdownIn))];
   const rewritten: string[] = [];

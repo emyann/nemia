@@ -17,16 +17,23 @@ export const DRAIN_FILE = 'drain.json';
 /** The sessions' drain's file name, in the store's drain folder (`drainFolder`). */
 export const SESSION_DRAIN_FILE = 'sessions-drain.json';
 
-/** The folder of the store at `root` both drains are kept in: the attached sessions' folder, beside their run files. */
+/**
+ * The folder of the store at `root` both drains are kept in: the attached sessions' folder, beside their run files.
+ * @param root The store's folder.
+ */
 export const drainFolder = (root: string): string => path.join(root, 'runs', 'attached');
 
 /**
  * The holder's drain file of the store at `root`.
  * Exported only for the tests that import it.
+ * @param root The store's folder.
  */
 export const holderDrainFile = (root: string): string => path.join(drainFolder(root), DRAIN_FILE);
 
-/** The sessions' drain file of the store at `root`, apart from the holder's. */
+/**
+ * The sessions' drain file of the store at `root`, apart from the holder's.
+ * @param root The store's folder.
+ */
 export const sessionDrainFile = (root: string): string => path.join(drainFolder(root), SESSION_DRAIN_FILE);
 
 const SessionDrainSchema = Schema.Struct({
@@ -48,7 +55,11 @@ const HolderDrainSchema = Schema.Struct({ ...ProcessSchema.fields, by: Schema.op
 /** The holder's drain, as its file holds it. */
 export type HolderDrain = typeof HolderDrainSchema.Type;
 
-/** What `file` holds as JSON, through `decode`; `null` where it is absent, no JSON, or does not decode. */
+/**
+ * What `file` holds as JSON, through `decode`; `null` where it is absent, no JSON, or does not decode.
+ * @param file The path of the file to read.
+ * @param decode The schema's decoder of the parsed JSON, answering none for a value it refuses.
+ */
 export const decodedFile = <A>(file: string, decode: (u: unknown) => Option.Option<A>): A | null => {
   let text: string;
   try {
@@ -63,7 +74,11 @@ export const decodedFile = <A>(file: string, decode: (u: unknown) => Option.Opti
   }
 };
 
-/** Writes `value` whole on `file` as JSON (`replaceFile`), its folder made first, so a reader never reads half of it. */
+/**
+ * Writes `value` whole on `file` as JSON (`replaceFile`), its folder made first, so a reader never reads half of it.
+ * @param file The path of the file to write.
+ * @param value What the file is to hold, written as JSON.
+ */
 export const writeWhole = (file: string, value: unknown): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   replaceFile(file, JSON.stringify(value));
@@ -76,23 +91,40 @@ const decodeHolderDrain = Schema.decodeUnknownOption(HolderDrainSchema);
  * The sessions' drain put on the store at `root`: every session's next call waits, and a call in flight has `graceMs`. A drain standing
  * with the same grace is kept as it is, so a pass that puts it again on every tick never moves the `at` its grace counts from; one with
  * another grace is stamped now, which is how a grace of 0 cuts a standing drain's calls at once.
+ * @param root The store's folder.
  */
 export const putSessionDrain = (root: string, { graceMs }: { graceMs: number }): void => {
   if (sessionDrainOf(sessionDrainFile(root))?.graceMs === graceMs) return;
   writeWhole(sessionDrainFile(root), { at: new Date(instantNow().at).toISOString(), graceMs } satisfies SessionDrain);
 };
 
-/** The sessions' drain lifted: no session waits. */
+/**
+ * The sessions' drain lifted: no session waits.
+ * @param root The store's folder.
+ */
 export const liftSessionDrain = (root: string): void => fs.rmSync(sessionDrainFile(root), { force: true });
 
-/** The sessions' drain `file` says stands; `null` where none does, or the file does not decode. */
+/**
+ * The sessions' drain `file` says stands; `null` where none does, or the file does not decode.
+ * @param file The path of the sessions' drain file (`sessionDrainFile`).
+ */
 export const sessionDrainOf = (file: string): SessionDrain | null => decodedFile(file, decodeSessionDrain);
 
-/** The holder's drain `drain` put on the store at `root`, written whole. */
+/**
+ * The holder's drain `drain` put on the store at `root`, written whole.
+ * @param root The store's folder.
+ * @param drain The process whose attached sessions' new calls wait, and who put the drain.
+ */
 export const putHolderDrain = (root: string, drain: HolderDrain): void => writeWhole(holderDrainFile(root), drain);
 
-/** The holder's drain lifted: none waits. */
+/**
+ * The holder's drain lifted: none waits.
+ * @param root The store's folder.
+ */
 export const liftHolderDrain = (root: string): void => fs.rmSync(holderDrainFile(root), { force: true });
 
-/** The holder's drain the store at `root` holds; `null` where none does, or its file does not decode. */
+/**
+ * The holder's drain the store at `root` holds; `null` where none does, or its file does not decode.
+ * @param root The store's folder.
+ */
 export const holderDrainOf = (root: string): HolderDrain | null => decodedFile(holderDrainFile(root), decodeHolderDrain);

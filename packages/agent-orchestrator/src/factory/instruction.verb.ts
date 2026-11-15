@@ -21,6 +21,8 @@ export type { FactoryInstruction };
  * The instruction of the factory `name` in the store `home`, read afresh where its file says it is kept (`instructionAt`), through the
  * Factory door at once: the plain spelling the package's entry exports, for a caller that is no program. Refused as the door refuses its
  * read.
+ * @param home The store's root.
+ * @param name The factory's name.
  */
 export function factoryInstruction(home: string, name: string): FactoryInstruction {
   if (name === DEFAULT_NAMESPACE) throw new Conflict({ message: defaultFactoryRefusal('instruction') });

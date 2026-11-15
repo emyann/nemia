@@ -9,6 +9,8 @@ import type { ComponentType } from 'react';
  * lets that click through to the provider, which navigates. On keyup React Aria calls the link's `onClick`, with a click it makes
  * itself, which TanStack's handler would take as a second navigation to the same place. An `onClick` given to the link is dropped with
  * TanStack's: run something on a press with `onPress`.
+ *
+ * @param Link the component that draws the link, taking the props a link takes
  */
 export function routeLink<P extends object>(Link: ComponentType<P>) {
   return createLink(({ onClick: _router, ...props }: P & { onClick?: never }) => <Link {...(props as P)} />);

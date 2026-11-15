@@ -57,6 +57,7 @@ export type NemiaLevel = {
 /**
  * The command a person runs once to trust her folder, which her session's harness refuses to start in until they do: accepted at its
  * prompt and exited, it is the one approval her harness asks; it offers no program a way to give it.
+ * @param home The store's root folder, whose folder of hers is trusted.
  */
 export const trustCommand = (home: string): string => `mkdir -p ${nemiaDir(home)} && cd ${nemiaDir(home)} && ${DEFAULT_HARNESS}`;
 

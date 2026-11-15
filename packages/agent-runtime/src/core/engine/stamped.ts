@@ -11,7 +11,11 @@ export const stamped = (): { at: string; mono?: Monotonic } => {
   return { at: new Date(now.at).toISOString(), ...(now.mono ? { mono: now.mono } : {}) };
 };
 
-/** The `spawned` entry of `attempt`, stamped now, with the error its spawn call returned when it returned one. */
+/**
+ * The `spawned` entry of `attempt`, stamped now, with the error its spawn call returned when it returned one.
+ * @param attempt The number of the attempt spawned.
+ * @param error The error the spawn call returned, or undefined where it returned none.
+ */
 export const spawnedEntry = (attempt: number, error: string | undefined): Event => ({
   kind: 'spawned',
   ...stamped(),

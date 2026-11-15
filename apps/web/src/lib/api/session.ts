@@ -6,7 +6,10 @@
 import { SessionAnswer } from 'objects';
 import { call, write } from './objects.ts';
 
-/** Sends `token` as the bearer of `POST /api/session`, which sets it as this browser's cookie; rejects where the api refuses it. */
+/**
+ * Sends `token` as the bearer of `POST /api/session`, which sets it as this browser's cookie; rejects where the api refuses it.
+ * @param token The token the person pasted.
+ */
 export const signIn = (token: string): Promise<SessionAnswer> =>
   call((c) => c.server.signIn(), {
     ...write(SessionAnswer, 'The token may be kept: reload the page before pasting it again.'),

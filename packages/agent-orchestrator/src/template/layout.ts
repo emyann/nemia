@@ -131,7 +131,11 @@ export type TemplateRoute = { from: string; table: Readonly<Record<string, strin
 /** What each of a template's YAML files is, and the name its document must carry: its folder's, or the template's for the manifest. */
 export type DocumentFile = { kind: 'FactoryTemplate' | 'Workflow' | 'Agent' | 'Skill' | 'Lock'; name: string | undefined };
 
-/** The kind of document `file` holds and the name it must carry, or undefined for a file that is not one of the layout's documents. */
+/**
+ * The kind of document `file` holds and the name it must carry, or undefined for a file that is not one of the layout's documents.
+ * @param file The file's path in the template's folder.
+ * @param template The template's name, the name its `nemia.yaml` must carry.
+ */
 export function documentFile(file: string, template: string): DocumentFile | undefined {
   const parts = file.split('/');
   if (file === 'nemia.yaml') return { kind: 'FactoryTemplate', name: template };
@@ -179,6 +183,8 @@ const pastFolder = (inHolder: string): string | undefined => {
 /**
  * Whether the layout gives `file` a place (the contract `template-layout.contract.ts`); `named` are the files a `{ path }` of a document
  * names. Read by the holder's prefix rather than by splitting the path, which the verifier does not model.
+ * @param file The file's path in the template's folder.
+ * @param named The files a `{ path }` of a document names.
  */
 export const inLayout: InLayout = (file, named) => {
   if (named.has(file) || ROOT_FILES.includes(file)) return true;
@@ -226,6 +232,8 @@ function folderRefusals(files: readonly string[]): Refusal[] {
 /**
  * What the layout refuses of `folder`'s files: one outside it, a folder of workflows/, agents/ or skills/ without its file or not a name,
  * and a template with no nemia.yaml. `named` are the files a `{ path }` names, each in the layout.
+ * @param folder The template's folder, read down to its files.
+ * @param named The files a `{ path }` of a document names.
  */
 export function layoutRefusals(folder: Pick<ReadFolder, 'files'>, named: ReadonlySet<string>): Refusal[] {
   const outside = folder.files
@@ -393,11 +401,17 @@ const documentShape = (kind: DocumentFile['kind']): Shape =>
         required: ['apiVersion', 'kind', 'metadata', 'spec'],
       };
 
-/** Whether `value` is a map, as YAML's data model has one: an object that is no list. */
+/**
+ * Whether `value` is a map, as YAML's data model has one: an object that is no list.
+ * @param value The value asked of.
+ */
 export const isMap = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** Whether `value` is a `{ param }` and nothing more. */
+/**
+ * Whether `value` is a `{ param }` and nothing more.
+ * @param value The value asked of.
+ */
 export const isParam = (value: unknown): value is ParamRef =>
   isMap(value) && Object.keys(value).length === 1 && typeof value.param === 'string';
 
@@ -407,15 +421,25 @@ export const isParam = (value: unknown): value is ParamRef =>
  */
 const PARAMETER_EXPRESSION = /\$\{\{\s*parameters\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
 
-/** The name of each `${{ parameters.<name> }}` in `text`, with the offset it stands at, in order. */
+/**
+ * The name of each `${{ parameters.<name> }}` in `text`, with the offset it stands at, in order.
+ * @param text The text looked in.
+ */
 export const expressionsIn = (text: string): Array<{ name: string; index: number }> =>
   [...text.matchAll(PARAMETER_EXPRESSION)].flatMap((match) => (match[1] === undefined ? [] : [{ name: match[1], index: match.index }]));
 
-/** `text` with each `${{ parameters.<name> }}` in it replaced by what `write` gives its name. */
+/**
+ * `text` with each `${{ parameters.<name> }}` in it replaced by what `write` gives its name.
+ * @param text The text whose expressions are replaced.
+ * @param write What an expression is replaced by, given its parameter's name.
+ */
 export const writeExpressions = (text: string, write: (name: string) => string): string =>
   text.replace(PARAMETER_EXPRESSION, (_, name: string) => write(name));
 
-/** A key path as a person reads it: `spec.steps[1].budget`. */
+/**
+ * A key path as a person reads it: `spec.steps[1].budget`.
+ * @param at The key path, each part a key or a list's index.
+ */
 export const spelled = (at: ReadonlyArray<string | number>): string =>
   at.map((part, i) => (typeof part === 'number' ? `[${part}]` : i === 0 ? part : `.${part}`)).join('') || 'the document';
 
@@ -434,7 +458,10 @@ function textRefusal(value: unknown, at: ReadonlyArray<string | number>): string
 /** Whether `value` is a list of strings. */
 const isStrings = (value: unknown): boolean => Array.isArray(value) && value.every((item) => typeof item === 'string');
 
-/** Whether `value` is a `{ path }` and nothing more: a file of the template named in a list. */
+/**
+ * Whether `value` is a `{ path }` and nothing more: a file of the template named in a list.
+ * @param value The value asked of.
+ */
 export const isPathItem = (value: unknown): value is { path: string } =>
   isMap(value) && Object.keys(value).length === 1 && typeof value.path === 'string';
 
@@ -553,6 +580,9 @@ function envelopeRefusals(file: string, expected: DocumentFile, doc: Record<stri
 /**
  * What the document `doc` of `file` breaks, in a template named `template`: a wrong apiVersion or kind, a name not its folder's or not a
  * name, a key the kind has no place for at any level, a value of the wrong type, and a git or url source, refused as not yet.
+ * @param file The document's path in the template's folder.
+ * @param doc The document as YAML parsed it.
+ * @param template The template's name.
  */
 export function documentRefusals(file: string, doc: unknown, template: string): Refusal[] {
   const expected = documentFile(file, template);

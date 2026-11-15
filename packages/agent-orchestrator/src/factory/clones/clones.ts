@@ -98,6 +98,7 @@ const plain = (text: string): boolean =>
  * of its host and path, its user, port, scheme and `.git` dropped, so one repository named two ways is one clone. Refused: a URL that
  * carries a password (the machine holds the credential, never Nemia), a scheme a clone is not made over, and a URL that names no plain
  * host and path.
+ * @param given The factory's `--repo` as the person typed it.
  */
 export const cloneTarget: CloneTargetOf = (given) => {
   if (isPath(given)) return { kind: 'path' };
@@ -122,6 +123,8 @@ export const cloneTarget: CloneTargetOf = (given) => {
 /**
  * The folder of the store `home` a clone whose folder is `folder` (`cloneTarget`) is kept in: `<home>/clones/<folder>`, its host
  * lower-cased, as hosts are matched, so one host written in two cases is one clone.
+ * @param home The store's root.
+ * @param folder The clone's folder of its host and path, as `cloneTarget` answers it.
  */
 export const cloneFolder = (home: string, folder: string): string => {
   const slash = folder.indexOf('/');
@@ -131,6 +134,8 @@ export const cloneFolder = (home: string, folder: string): string => {
 /**
  * Whether `repo` is a clone the store `home` keeps: a folder strictly inside `<home>/clones`, where `cloneFolder` alone puts one. Read by
  * the path as given, resolved, never through a link.
+ * @param home The store's root.
+ * @param repo The repository's path, as given.
  */
 export const isCloneFolder = (home: string, repo: string): boolean => {
   const rel = path.relative(path.join(home, 'clones'), path.resolve(repo));

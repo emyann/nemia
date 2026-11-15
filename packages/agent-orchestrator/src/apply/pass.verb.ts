@@ -13,7 +13,11 @@ import { applyProgram } from './apply.verb.ts';
 import type { ProposalPlace } from '../propose/current.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 
-/** Each listed run's state as the pass read it: its judged status where it was judged, else unread; a run not listed is gone. */
+/**
+ * Each listed run's state as the pass read it: its judged status where it was judged, else unread; a run not listed is gone.
+ * @param runs The runs the tick listed, by id.
+ * @param judged Each judged run's status, by its id.
+ */
 export const runStatesOf = (runs: readonly Pick<Run, 'id'>[], judged: ReadonlyMap<string, { readonly status: RunState }>) => {
   const listed = new Set(runs.map((r) => r.id));
   return (run: string): RunState | undefined => judged.get(run)?.status ?? (listed.has(run) ? undefined : 'gone');
@@ -39,6 +43,8 @@ export const proposalsPass = Effect.fn('proposalsPass')(function* (place: Propos
 /**
  * The proposals pass as the tick runs it (`ProposalsAct`): at the store's root the pass was given, its runs' states as it judged them; a
  * refusal of the whole pass is said in the log and costs no other part of the tick. Each proposal's factory says its own repositories.
+ * @param runs The runs the tick listed, by id.
+ * @param judged Each judged run's status, by its id.
  */
 export const proposalsActed: ProposalsActed = (runs, judged) =>
   Effect.gen(function* () {
@@ -50,6 +56,7 @@ export const proposalsActed: ProposalsActed = (runs, judged) =>
 /**
  * `program` (a tick's pass) with the proposals pass given to it: what every program that runs the pass is composed with — `nemia tick`
  * (`cli/main.ts`), the daemon's loop (`up`), and a test's — so every tick acts on proposals.
+ * @param program A tick's pass, given the proposals pass.
  */
 export const withProposalsPass = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, ProposalsAct>> =>
   Effect.provideService(program, ProposalsAct, proposalsActed);

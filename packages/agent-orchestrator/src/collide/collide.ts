@@ -45,6 +45,8 @@ export type Collisions = {
 /**
  * The other runs whose branches may collide with `run`'s: repository runs on the same repository and the same base branch, each step in a
  * worktree of its own, neither called off nor pruned. A held run is kept: its branches still land on the same base.
+ * @param run The repository run whose ending reads the collisions.
+ * @param runs The store's runs.
  */
 export const othersInFlight = (run: RepositoryRun, runs: readonly Run[]): RepositoryRun[] =>
   runs.filter(
@@ -58,7 +60,12 @@ export const othersInFlight = (run: RepositoryRun, runs: readonly Run[]): Reposi
       path.resolve(o.repo) === path.resolve(run.repo),
   );
 
-/** The trials to ask, in the order `collisionsOf` reads them: each of `ours` onto `onto`, then each of `ours` onto each of `theirs`. */
+/**
+ * The trials to ask, in the order `collisionsOf` reads them: each of `ours` onto `onto`, then each of `ours` onto each of `theirs`.
+ * @param onto The base branch.
+ * @param ours This run's branches ahead of the base.
+ * @param theirs The branches ahead of the base of the other runs in flight.
+ */
 export const trialsOf = (onto: string, ours: readonly string[], theirs: readonly Theirs[]): TrialAsked[] => [
   ...ours.map((branch) => ({ onto, branch })),
   ...theirs.flatMap((t) => ours.map((branch) => ({ onto: t.branch, branch }))),
@@ -71,6 +78,9 @@ export const trialsOf = (onto: string, ours: readonly string[], theirs: readonly
  *
  * The refused landing is read over `landsOnCheck` rather than over the gated endings (`endingSteps`): an ending with no gate, filed by its
  * workflow once its review passed, lands on its check in the same way, and its refused merge owes the same trials.
+ * @param steps The run's steps as it froze them.
+ * @param run The run's record.
+ * @param decide What the run waits on a person to decide, or undefined where nothing.
  */
 export function collisionsDue(steps: readonly StepSpec[], run: Run, decide: ToDecide | undefined): string | undefined {
   if (decide?.kind === 'approve') return decide.step;
@@ -115,6 +125,11 @@ function semanticOf(
  * What the trials asked by `trialsOf(run.branch, ours, theirs)` say (`answer`), at the ending `ending` (`collisionsDue`): each of `ours`
  * onto the base, each branch of theirs one of ours does not merge onto cleanly, and the semantic conflict, read off the base's commit the
  * place names now.
+ * @param run The repository run, whose `branch` is the base.
+ * @param ending The ending's name, or undefined where none is due, which reads no semantic conflict.
+ * @param ours This run's branches ahead of the base.
+ * @param theirs The branches ahead of the base of the other runs in flight.
+ * @param answer What the place's trial merges answered, in the order `trialsOf` asked them, and the commit each branch is at.
  */
 export function collisionsOf(
   run: RepositoryRun,

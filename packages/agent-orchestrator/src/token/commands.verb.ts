@@ -16,7 +16,10 @@ import { TokenDoor, holderOf, type PersonTokenFiled } from './token.store.ts';
 /** A text argument, or undefined where it was not given. */
 const textOf = (args: Args, key: string): string | undefined => (typeof args[key] === 'string' ? args[key] : undefined);
 
-/** The token `record` is, as the api lists it: its name, its holder and when it was minted; never the token, nor its digest. */
+/**
+ * The token `record` is, as the api lists it: its name, its holder and when it was minted; never the token, nor its digest.
+ * @param record The person's token as the store files it.
+ */
 export function tokenOf(record: PersonTokenFiled): Token {
   const holder = holderOf(record);
   if (holder.kind === 'person') return { name: record.name, holder: 'person', createdAt: record.createdAt };
@@ -34,6 +37,7 @@ export function tokenOf(record: PersonTokenFiled): Token {
  * The holder `args` say: an agent's where `--agent` names one, bound to `--factory` (store-wide where left out) and narrowed by
  * `--narrow`; else the person's. Refused `Invalid`: a factory or a narrowing with no agent, and a narrowing that is neither `read` nor
  * `act` — a token is never widened, so none is above the agent's own floor.
+ * @param args The command's parsed arguments.
  */
 export function holderAsked(args: Args): TokenHolder {
   const agent = textOf(args, 'agent');

@@ -8,6 +8,7 @@ import { shownIn, startRepo, type StartRepo } from './factories.ts';
 /**
  * The inbox as the page lists it: the newest card first, by when its file was written (`filedAt`) — a card carries no time of its own —
  * then by name, so two filed in the same millisecond keep one order. An entry whose time is not known goes last.
+ * @param entries The inbox's entries, as the api lists them.
  */
 export const newestCardsFirst = (entries: readonly InboxEntry[]): InboxEntry[] =>
   [...entries].sort((a, b) => (b.filedAt ?? '').localeCompare(a.filedAt ?? '') || a.name.localeCompare(b.name));
@@ -30,19 +31,34 @@ export const CARD_KIND: Readonly<Record<CardState, 'unstarted' | 'in flight' | '
   cancelled: 'ended',
 };
 
-/** Whether a card was started: its state is a run's phase (`CARD_KIND`), whether that run is in flight or ended. */
+/**
+ * Whether a card was started: its state is a run's phase (`CARD_KIND`), whether that run is in flight or ended.
+ * @param entry The inbox's entry: its state.
+ */
 export const startedCard = (entry: Pick<InboxEntry, 'state'>): boolean => CARD_KIND[entry.state] !== 'unstarted';
 
-/** Whether a card is still in play: not started, or its run is in flight — what `GET /api/inbox` lists by default. */
+/**
+ * Whether a card is still in play: not started, or its run is in flight — what `GET /api/inbox` lists by default.
+ * @param entry The inbox's entry: its state.
+ */
 export const inPlay = (entry: Pick<InboxEntry, 'state'>): boolean => CARD_KIND[entry.state] !== 'ended';
 
-/** The cards still in play (`inPlay`), in their order: the Inbox page's In play, an entry that does not read as a card among them. */
+/**
+ * The cards still in play (`inPlay`), in their order: the Inbox page's In play, an entry that does not read as a card among them.
+ * @param entries The inbox's entries, each with its state.
+ */
 export const cardsInPlay = <T extends Pick<InboxEntry, 'state'>>(entries: readonly T[]): T[] => entries.filter(inPlay);
 
-/** The cards whose run ended (`CARD_KIND` `ended`), in their order: the Inbox page's Ended. */
+/**
+ * The cards whose run ended (`CARD_KIND` `ended`), in their order: the Inbox page's Ended.
+ * @param entries The inbox's entries, each with its state.
+ */
 export const cardsEnded = <T extends Pick<InboxEntry, 'state'>>(entries: readonly T[]): T[] => entries.filter((entry) => !inPlay(entry));
 
-/** The Inbox page's `?cards=`: `ended` lists the cards whose run ended; absent, or any other value, the cards in play. */
+/**
+ * The Inbox page's `?cards=`: `ended` lists the cards whose run ended; absent, or any other value, the cards in play.
+ * @param search The page's search, as the router parsed it.
+ */
 export const cardsSearch = (search: Record<string, unknown>): { cards?: 'ended' } => (search.cards === 'ended' ? { cards: 'ended' } : {});
 
 /** Whether an entry of the inbox is a card's file, `<name>.md`, and not a stray file the listing shows with why it is not a card. */
@@ -56,6 +72,8 @@ const isCard = (entry: Pick<InboxEntry, 'file'>): boolean => entry.file.endsWith
  *
  * And not a stray file's where a card of that name is listed beside it: `/inbox/notes` is `notes.md`, which the api's card page reads
  * before a stray `notes`, so the stray's link would open the card's page — another file's — under its own name.
+ * @param entry The entry asked about: its name and its file.
+ * @param entries Every entry listed with it, the entry among them.
  */
 export const hasPage = (entry: Pick<InboxEntry, 'name' | 'file'>, entries: readonly Pick<InboxEntry, 'name' | 'file'>[]): boolean =>
   entry.name.trim() !== '' &&
@@ -82,6 +100,8 @@ type CardLine = { entry: InboxEntry; refusal: CardRefusal | null; gone: boolean 
  * By the file, not the name: two entries may answer to one name — a card and a stray file beside it, `notes.md` and `notes` (`hasPage`) —
  * and a refusal is of the one the page asked about. Matched by name, a refused Remove of the card would draw its sentence under the stray
  * file too, which has no Remove to be refused.
+ * @param entries The cards the inbox lists now.
+ * @param refusals The refusals the page was given, each with the card as it was listed.
  */
 export function cardLines(entries: readonly InboxEntry[], refusals: readonly CardRefusal[]): CardLine[] {
   const listed = new Set(entries.map((entry) => entry.file));
@@ -92,7 +112,10 @@ export function cardLines(entries: readonly InboxEntry[], refusals: readonly Car
   });
 }
 
-/** A workflow as a pick is keyed: its source and its name, since the repository and yours may each have one of a name. */
+/**
+ * A workflow as a pick is keyed: its source and its name, since the repository and yours may each have one of a name.
+ * @param workflow The workflow: its source and its name.
+ */
 export const workflowKey = (workflow: Pick<WorkflowListing, 'from' | 'name'>): string => `${workflow.from}:${workflow.name}`;
 
 /**
@@ -101,16 +124,24 @@ export const workflowKey = (workflow: Pick<WorkflowListing, 'from' | 'name'>): s
  */
 const isName = (workflow: string): boolean => !/[\\/]/.test(workflow) && workflow !== '.' && workflow !== '..';
 
-/** Whether a card names no factory: it has no `factory:` line, or writes `default`, which is no factory to start in. */
+/**
+ * Whether a card names no factory: it has no `factory:` line, or writes `default`, which is no factory to start in.
+ * @param entry The card: its `factory:` line, null where it has none.
+ */
 export const unassigned = (entry: Pick<InboxEntry, 'factory'>): boolean => entry.factory === null || entry.factory === DEFAULT_NAMESPACE;
 
-/** The factories a card can be filed or started in, in the api's order: each named one whose file reads, never the default factory. */
+/**
+ * The factories a card can be filed or started in, in the api's order: each named one whose file reads, never the default factory.
+ * @param factories The factories the api lists.
+ */
 export const factoriesOffered = <T extends Pick<Factory, 'default' | 'error'>>(factories: readonly T[]): T[] =>
   factories.filter((f) => !f.default && f.error === null);
 
 /**
  * The factory the box that files a card starts on: `shown`, the one the address names, when it is among `offered`; else `''`, no
  * factory.
+ * @param shown The factory the address names, or undefined where it names none.
+ * @param offered The factories a card can be filed in.
  */
 export const factoryPreset = (shown: string | undefined, offered: readonly Pick<Factory, 'name'>[]): string =>
   shown !== undefined && offered.some((f) => f.name === shown) ? shown : '';
@@ -146,7 +177,12 @@ export type CardPlace = { factory: Factory; workflow: string | null; on: StartRe
 const offeredName = (workflow: string | null, factory: Pick<Factory, 'workflows'>): string | null =>
   workflow !== null && isName(workflow) && (factory.workflows ?? []).includes(workflow) ? workflow : null;
 
-/** `entry`'s place among `factories`, as the api lists them (`CardPlace`); `fileFactory` is the line that files a factory (`YourStore`). */
+/**
+ * `entry`'s place among `factories`, as the api lists them (`CardPlace`); `fileFactory` is the line that files a factory (`YourStore`).
+ * @param entry The card: its `factory:` and its `workflow:`.
+ * @param factories The factories the api lists.
+ * @param fileFactory The command that files a factory, said in the refusal of a factory the store does not have.
+ */
 export function cardPlace(
   entry: Pick<InboxEntry, 'factory' | 'workflow'>,
   factories: readonly Factory[],
@@ -167,6 +203,10 @@ export function cardPlace(
 /**
  * Where a card that names no factory starts once a person picks `picked` among `factories`: null until one is picked (`''`); then the
  * picked factory's place, as a card naming it has (`cardPlace`). A card's `repo:` is retired, and plays no part.
+ * @param entry The card: its `workflow:`.
+ * @param picked The factory's name a person picked, `''` while none is.
+ * @param factories The factories the api lists.
+ * @param fileFactory The command that files a factory (`cardPlace`).
  */
 export function startPlace(
   entry: Pick<InboxEntry, 'workflow'>,
@@ -185,24 +225,33 @@ export function startPlace(
  * Hiding a control does not forget what was chosen in it: the picker is on the card's form under the workflow it picks, and a person who
  * picked runs under a git workflow and then picked a folder team would have sent them still, to be shown a refusal about a control no
  * longer on the page. What is not offered is not sent.
+ * @param workflow The workflow the start picks: whether every step of its team works in a folder.
+ * @param after The runs picked to wait on.
  */
 export const afterFor = (workflow: Pick<WorkflowListing, 'folderTeam'>, after: readonly string[]): string[] =>
   workflow.folderTeam ? [] : [...after];
 
-/** A place in a queue as a person says it: `1st`, `2nd`, `3rd`, `4th`, `11th`, `21st`. */
+/**
+ * A place in a queue as a person says it: `1st`, `2nd`, `3rd`, `4th`, `11th`, `21st`.
+ * @param n The place, counted from 1.
+ */
 export function ordinal(n: number): string {
   const tens = n % 100;
   const suffix = tens >= 11 && tens <= 13 ? 'th' : (({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th');
   return `${n}${suffix}`;
 }
 
-/** What a queued card says of its place: `queued · 2nd` — or `queued` alone for one a record says was started, which has no place. */
+/**
+ * What a queued card says of its place: `queued · 2nd` — or `queued` alone for one a record says was started, which has no place.
+ * @param queued The card's queue record, with its place where it has one.
+ */
 export const queuedWord = (queued: NonNullable<InboxEntry['queued']>): string =>
   queued.place ? `queued · ${ordinal(queued.place)}` : 'queued';
 
 /**
  * The queue, as the tick starts it: every card with a place, in its order (the package's `queueOrder`, whose places the listing carries) —
  * a card whose start was refused among them, where it keeps its place; a card a record says was started, which has none, not.
+ * @param entries The inbox's entries.
  */
 export const queueOf = (entries: readonly InboxEntry[]): InboxEntry[] =>
   entries.filter((e) => e.queued?.place).sort((a, b) => a.queued!.place! - b.queued!.place!);
@@ -216,20 +265,28 @@ const queueableButFactory = (entry: InboxEntry): boolean => entry.state === 'fil
  * Whether the page offers Queue on a card: it names a factory (`unassigned`) and a workflow — a queued card starts on its own, in the
  * factory and on the workflow it names — it reads, it is not queued, and no record says it was started. What the api would refuse
  * otherwise, in the package's words.
+ * @param entry The inbox's entry.
  */
 export const queueable = (entry: InboxEntry): boolean => !unassigned(entry) && queueableButFactory(entry);
 
-/** Whether a card has no Queue for its factory alone: it names none (`unassigned`), and would be `queueable` with one. */
+/**
+ * Whether a card has no Queue for its factory alone: it names none (`unassigned`), and would be `queueable` with one.
+ * @param entry The inbox's entry.
+ */
 export const queueNeedsFactory = (entry: InboxEntry): boolean => unassigned(entry) && queueableButFactory(entry);
 
 /**
  * Whether a card shows the tick's last try of its start (`triedLine`): it is `queued` or `refused` and carries the try — never a started
  * card, whatever try it still carries.
+ * @param entry The inbox's entry.
  */
 export const triedShown = (entry: InboxEntry): entry is InboxEntry & { tried: NonNullable<InboxEntry['tried']> } =>
   (entry.state === 'queued' || entry.state === 'refused') && entry.tried !== undefined;
 
-/** The workflows a list of options leaves out: those that do not read, each with why (`error`). */
+/**
+ * The workflows a list of options leaves out: those that do not read, each with why (`error`).
+ * @param workflows The workflows listed, each with its error, null where it reads.
+ */
 export const unreadWorkflows = <T extends Pick<WorkflowListing, 'error'>>(workflows: readonly T[]): Array<T & { error: string }> =>
   workflows.filter((w): w is T & { error: string } => w.error !== null);
 
@@ -238,6 +295,8 @@ export const unreadWorkflows = <T extends Pick<WorkflowListing, 'error'>>(workfl
  * card's workflow by its name), or why the factory gives it none: the factory's only one for a card that names no workflow by name;
  * null for a card of no factory or the default (which the daemon places), one whose factory is not listed or does not read, a card that
  * names no workflow in a factory of several, and while the factories are unread. Never the card's `repo:`, which is retired.
+ * @param entry The card: its `factory:` and its `workflow:`.
+ * @param factories The factories the api lists, or undefined while they are unread.
  */
 export function cardRepo(entry: Pick<InboxEntry, 'factory' | 'workflow'>, factories: readonly Factory[] | undefined): StartRepo | null {
   if (unassigned(entry)) return null;
@@ -251,6 +310,8 @@ export function cardRepo(entry: Pick<InboxEntry, 'factory' | 'workflow'>, factor
 /**
  * The repository a card's factory places its run on (`cardRepo`), as the tick's last try says it: null where it gives none. The Card does
  * not carry it, so the page reads it off the factories it lists (`entryOf`).
+ * @param entry The card: its `factory:` and its `workflow:`.
+ * @param factories The factories the api lists, or undefined while they are unread.
  */
 export function factoryRepoOf(entry: Pick<InboxEntry, 'factory' | 'workflow'>, factories: readonly Factory[] | undefined): string | null {
   const on = cardRepo(entry, factories);
@@ -262,6 +323,8 @@ export function factoryRepoOf(entry: Pick<InboxEntry, 'factory' | 'workflow'>, f
  * for a slot; failed otherwise, the tick tries it again. The repository it was tried on is said for a card that names its factory —
  * never for a card that names no factory, refused wherever a daemon runs — and said as the one its factory places it on where it is
  * (`factoryRepo`). `why` is left out where the card's own refusal already says it. `at` is the try's time as the page shows one.
+ * @param entry The card, with the tick's last try of its start, its factory, its error and its factory's repository.
+ * @param at The try's time, in the words the page shows a time in.
  */
 export function triedLine(
   entry: Pick<InboxEntry, 'factory' | 'error' | 'factoryRepo'> & { tried: NonNullable<InboxEntry['tried']> },
@@ -282,6 +345,8 @@ export function triedLine(
  * and it says so; the count is the cap's, not the floor's, and said in the package's word for what the cap holds, a run slot (`slotWord`):
  * beside the floor's `4 in flight`, which counts a run waiting on runs too, `3 of 4 runs in flight` would read as a full floor with a slot
  * free.
+ * @param ceilings The machine's cap on runs in flight and the runs it holds; a cap of 0 is no cap.
+ * @param queued How many of the factory's cards are queued.
  */
 export function capLine(ceilings: Pick<Ceilings, 'cap' | 'inFlight'>, queued: number): string {
   const cap =
@@ -295,6 +360,8 @@ export function capLine(ceilings: Pick<Ceilings, 'cap' | 'inFlight'>, queued: nu
  * The cards of the factory `picked` names that are not yet started, as the rail's Inbox badge counts them: each card that reads and whose
  * kind is `unstarted` (`CARD_KIND`: filed, queued or refused), never one whose run is in flight or ended; every factory's while `picked`
  * names none (`shownIn`), as the Inbox page lists them then.
+ * @param entries The inbox's entries.
+ * @param picked The factory picked, or undefined for every factory.
  */
 export const notStarted = (entries: readonly InboxEntry[], picked: string | undefined): InboxEntry[] =>
   shownIn(
@@ -302,6 +369,10 @@ export const notStarted = (entries: readonly InboxEntry[], picked: string | unde
     picked,
   );
 
-/** What the Inbox badge's `count` is, said whole for its hover and a screen reader: in the factory `picked`, or in every factory. */
+/**
+ * What the Inbox badge's `count` is, said whole for its hover and a screen reader: in the factory `picked`, or in every factory.
+ * @param count How many cards are not yet started.
+ * @param picked The factory picked, or undefined for every factory.
+ */
 export const inboxBadgeTitle = (count: number, picked: string | undefined): string =>
   `${count} ${count === 1 ? 'card' : 'cards'} not yet started, ${picked === undefined ? 'in every factory' : `in ${picked}`}`;

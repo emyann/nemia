@@ -14,7 +14,12 @@ import { listInForce, proposalRulesIn } from '../auto/index.ts';
 import { readConfirmed } from '../auto/auto.store.ts';
 import { DelegationDoor } from '../delegation/delegation.store.ts';
 
-/** `agent`'s standing in `factory`, in the store `home`: none of its confirmed rules read where the person's list does not read. */
+/**
+ * `agent`'s standing in `factory`, in the store `home`: none of its confirmed rules read where the person's list does not read.
+ * @param home The store's root.
+ * @param agent The agent's name.
+ * @param factory The factory's name.
+ */
 export const standingOf = (home: string, agent: string, factory: string): Effect.Effect<Standing, Refusal> =>
   Effect.gen(function* () {
     const level = yield* levelOfFactory(factory).pipe(Effect.provideService(StoreRoot, home));
@@ -31,7 +36,11 @@ export const standingOf = (home: string, agent: string, factory: string): Effect
     return { level, grants: delegation?.spec.rules ?? [], rules };
   });
 
-/** A proposal as approval reads it, waiting or not as `waiting` says. */
+/**
+ * A proposal as approval reads it, waiting or not as `waiting` says.
+ * @param proposal The proposal as the store holds it.
+ * @param waiting Whether it waits on an approval.
+ */
 export const factsOf = (proposal: Proposal, waiting: boolean): ProposalFacts => ({
   factory: proposal.metadata.namespace ?? '',
   proposedBy: proposal.status.proposedBy.agent ?? null,

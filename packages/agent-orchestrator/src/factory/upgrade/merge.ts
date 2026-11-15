@@ -288,6 +288,9 @@ function mergeFile(path: string, base?: TreeFile, ours?: TreeFile, theirs?: Tree
 /**
  * The tree `ours` merged three ways with `base` and `theirs`, each a tree's files: every path in any of them, in order, its file's
  * merge; what merged cleanly and from which side; and each conflict with its three sides.
+ * @param base The files of the template as last applied, the tree both sides changed from.
+ * @param ours The files of the factory's tree now.
+ * @param theirs The files of the template rendered at the new version.
  */
 export function mergeTrees(base: readonly TreeFile[], ours: readonly TreeFile[], theirs: readonly TreeFile[]): TreeMerge {
   const index = (files: readonly TreeFile[]) => new Map(files.map((file) => [file.path, file]));
@@ -382,6 +385,8 @@ function switchFile(path: string, ours?: TreeFile, theirs?: TreeFile): { file: F
 /**
  * The tree `ours` merged with `theirs`, a render of another template than the one its base holds, with no common base: every path of
  * either, in order, its file's merge (`switchFile`); what merged cleanly and from which side; and each conflict, its base side none.
+ * @param ours The files of the factory's tree now.
+ * @param theirs The files of the other template, rendered.
  */
 export function switchTrees(ours: readonly TreeFile[], theirs: readonly TreeFile[]): TreeMerge {
   const index = (files: readonly TreeFile[]) => new Map(files.map((file) => [file.path, file]));
@@ -413,6 +418,8 @@ function chosenText(conflict: Conflict, choice: Choice | undefined): string | nu
 /**
  * The merge `merge` composed with the person's `choices`, by address: the tree's files where every conflict has one, else those
  * pending.
+ * @param merge The merge of the trees: its files and its conflicts.
+ * @param choices The person's choice for each conflict, by its address.
  */
 export function compose(merge: TreeMerge, choices: Readonly<Record<string, Choice>>): { entries: TreeFile[] } | { pending: Conflict[] } {
   const pending = merge.conflicts.filter((conflict) => !Object.hasOwn(choices, conflict.at));
@@ -430,20 +437,36 @@ export function compose(merge: TreeMerge, choices: Readonly<Record<string, Choic
   return { entries };
 }
 
-/** Two versions, each x.y.z, compared by number: below zero where `a` is lower, zero where equal, above zero where higher. */
+/**
+ * Two versions, each x.y.z, compared by number: below zero where `a` is lower, zero where equal, above zero where higher.
+ * @param a The first version, x.y.z.
+ * @param b The version it is compared with, x.y.z.
+ */
 export function compareVersions(a: string, b: string): number {
   const [x, y] = [a.split('.').map(Number), b.split('.').map(Number)];
   for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0);
   return 0;
 }
 
-/** The line that resolves the conflict `at` of the factory `name`, as a person types it. */
+/**
+ * The line that resolves the conflict `at` of the factory `name`, as a person types it.
+ * @param name The factory's name.
+ * @param at The conflict's address.
+ */
 export const resolveLine = (name: string, at: string): string => `nemia factory resolve ${name} '${at}' --ours|--theirs|--file <path>`;
 
-/** The line that approves the proposal `proposal` resolving conflicts of the factory `name`, as a person types it. */
+/**
+ * The line that approves the proposal `proposal` resolving conflicts of the factory `name`, as a person types it.
+ * @param name The factory's name.
+ * @param proposal The proposal's id.
+ */
 export const approveLine = (name: string, proposal: string): string => `nemia proposals approve ${proposal} -n ${name}`;
 
-/** The line that declines the proposal `proposal` of the factory `name`, so its workflow's conflicts are resolved again. */
+/**
+ * The line that declines the proposal `proposal` of the factory `name`, so its workflow's conflicts are resolved again.
+ * @param name The factory's name.
+ * @param proposal The proposal's id.
+ */
 export const declineLine = (name: string, proposal: string): string => `nemia proposals decline ${proposal} -n ${name}`;
 
 /** The most lines of a side a status keeps of a conflict. */
@@ -457,7 +480,11 @@ function cutSide(text: string | null, max: number, where: string): string | null
   return `${lines.slice(0, max).join('')}… ${lines.length - max} more lines: read ${where}\n`;
 }
 
-/** A conflict as a status keeps it: each side cut to `max` lines, pointing to its file in the tree, the base or the template. */
+/**
+ * A conflict as a status keeps it: each side cut to `max` lines, pointing to its file in the tree, the base or the template.
+ * @param conflict The conflict, its address and its three sides whole.
+ * @param max The most lines of a side kept; absent, `KEPT_LINES`.
+ */
 export const conflictCut = (conflict: Conflict, max = KEPT_LINES): Conflict => {
   const file = conflict.at.replace(/(#.*|:\d+-\d+)$/, '');
   return {
@@ -488,6 +515,12 @@ export type Switched = { from: string; to: string };
  * and that it has no common base; what merges cleanly, then each conflict, its base side where it has one, the parameters the upgrade
  * drops where any, the plan's digest, and `next`'s line, which files it; then, where there are conflicts, the line that resolves each,
  * after the upgrade's, since a resolve is taken for an upgrade once it is filed.
+ * @param name The factory's name.
+ * @param from The version the base holds.
+ * @param to The version the upgrade goes to; the same as `from` for a change of parameters alone.
+ * @param merge The merge of the trees.
+ * @param next What files the upgrade: its line, the plan's digest, and the parameters it drops.
+ * @param switched The templates of a switch, the base's and the one switched onto; absent where the upgrade keeps its template.
  */
 export function planLines(name: string, from: string, to: string, merge: TreeMerge, next: PlanNext, switched?: Switched): string[] {
   const lines =
@@ -518,12 +551,18 @@ export function planLines(name: string, from: string, to: string, merge: TreeMer
   ];
 }
 
-/** Whether an upgrade from a base of the template `recorded` onto the template `now`, each by name, has a common base. */
+/**
+ * Whether an upgrade from a base of the template `recorded` onto the template `now`, each by name, has a common base.
+ * @param recorded The name of the template the base holds, or undefined where none is known.
+ * @param now The name of the template upgraded onto.
+ */
 export const mergeBaseOf: MergeBaseOf = (recorded, now) => (recorded === undefined || recorded === now ? 'common' : 'none');
 
 /**
  * The name of the template a base holds, from what a pass has seen of it: the render's, where the base is the render; else the name
  * recorded; else, where no upgrade is under way, the template the factory's file names, which wrote the base; else none.
+ * @param seen What a pass has seen of the base: the render's template, the name recorded, whether an upgrade is under way, and
+ *   the template the factory's file names.
  */
 export const baseTemplateOf: BaseTemplateOf = (seen) => {
   if (seen.rendered !== undefined) return seen.rendered;
@@ -531,13 +570,21 @@ export const baseTemplateOf: BaseTemplateOf = (seen) => {
   return seen.idle ? seen.named : undefined;
 };
 
-/** A key merged with no base: taken where the sides agree or only the template sets it, else asked. */
+/**
+ * A key merged with no base: taken where the sides agree or only the template sets it, else asked.
+ * @param ours The key's value in the tree, or undefined where it sets none.
+ * @param theirs The key's value in the template's render, or undefined where it sets none.
+ */
 export const unrelatedKey: UnrelatedKey = (ours, theirs) => {
   if (ours === theirs) return { taken: theirs ?? '' };
   if (ours === undefined && theirs !== undefined) return { taken: theirs };
   return { ask: true };
 };
 
-/** A set of names merged with no base: the template's where it holds every name the tree's does, else asked. */
+/**
+ * A set of names merged with no base: the template's where it holds every name the tree's does, else asked.
+ * @param ours The names the tree's set holds.
+ * @param theirs The names the template's set holds.
+ */
 export const unrelatedSet: UnrelatedSet = (ours, theirs) =>
   ours.every((name) => theirs.includes(name)) ? { taken: theirs } : { ask: true };

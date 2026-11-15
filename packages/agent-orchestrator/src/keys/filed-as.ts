@@ -53,7 +53,11 @@ const FLAG_AS: Readonly<Record<string, (flags: FiledFlags) => string | undefined
   budgetUsd: (f) => (f.budget === undefined ? undefined : `--budget ${f.budget}`),
 };
 
-/** The line a field of `step`'s filed config comes from: the flag a retry typed (`flags`), else the step's own key, else none. */
+/**
+ * The line a field of `step`'s filed config comes from: the flag a retry typed (`flags`), else the step's own key, else none.
+ * @param step The step whose own keys give a field's line.
+ * @param flags What the retry typed, `--model` and `--budget`; none where it typed neither.
+ */
 export const lineOf =
   (step: FiledStep, flags: FiledFlags = {}) =>
   (field: string): string | undefined =>
@@ -65,6 +69,9 @@ export const lineOf =
  * fields together, or of one no line of the step's gave.
  *
  * @param refusal The runtime's refusal of a config on the step's harness (`configRefusal`), undefined where it takes it.
+ * @param name The step's name, which the refusal starts with.
+ * @param config The config the step is filed with, each field asked alone to find the one refused.
+ * @param lines The line of the step's that gave a field (`lineOf`), undefined for a field no line gave.
  * @returns undefined where the runtime takes the config whole.
  */
 export function filedRefusal<C extends object>(

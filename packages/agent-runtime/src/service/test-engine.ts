@@ -591,6 +591,8 @@ const restartIn = (tasks: Map<string, TestTask>, id: string): TestTask => {
 /**
  * A stand-in with no task on it, and the layer that serves it: new at each call, so two share nothing.
  *
+ * @param options The harnesses the stand-in has, each with what it declares; the stand-in's own (`testHarnesses`) where none are
+ *   given.
  * @returns The layer a test gives where the `Engine` service is asked, and what it reads back and moves by hand (`TestEngine`).
  */
 export const testEngine = (options: { readonly harnesses?: readonly HarnessDeclared[] } = {}): TestEngine => {

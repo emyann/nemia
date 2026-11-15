@@ -139,7 +139,10 @@ const stepsCell = ({ status }: Run): string =>
 /** A row's object, as Kubernetes gives one beside a table's row: the item's metadata alone. */
 const partialOf = (metadata: Run['metadata']) => ({ kind: 'PartialObjectMetadata', apiVersion: 'meta.k8s.io/v1', metadata });
 
-/** The cells of `run`'s row, in `RUN_COLUMNS`' order. */
+/**
+ * The cells of `run`'s row, in `RUN_COLUMNS`' order.
+ * @param run The run of the row, as its list serves it.
+ */
 export const runCells = (run: Run): readonly unknown[] => [
   run.metadata.name,
   statusCell(run),
@@ -167,7 +170,10 @@ const unjudgedCells = (run: RunUnjudged): readonly unknown[] => [
   unjudgedStepsCell(run),
 ];
 
-/** `list` as a table: its page's place (`continue`), `RUN_COLUMNS`, and a row per run of the page, the judged first. */
+/**
+ * `list` as a table: its page's place (`continue`), `RUN_COLUMNS`, and a row per run of the page, the judged first.
+ * @param list The page of runs, judged and unjudged, with its place.
+ */
 export const runTable = (list: RunList): Table => ({
   kind: 'Table',
   apiVersion: 'meta.k8s.io/v1',

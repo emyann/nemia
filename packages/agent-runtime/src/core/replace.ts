@@ -22,6 +22,9 @@ type ReplaceOptions = {
  * Replaces `file` with `text`, written to a hidden file beside it under this process's name and renamed over it (`options`). Answers
  * whether it was replaced: `false` where `still` called it off. A write that fails throws as it does. Nothing is left beside the file
  * either way.
+ * @param file The path of the file to replace.
+ * @param text What the new file holds.
+ * @param options How it is replaced beyond its text: a flush, a mode, its times, and a last word before the rename.
  */
 export const replaceFile = (file: string, text: string | Uint8Array, options: ReplaceOptions = {}): boolean => {
   const beside = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${randomUUID()}.tmp`);

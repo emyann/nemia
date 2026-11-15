@@ -15,7 +15,11 @@ import { LiftHold } from './LiftHold';
 import { PruneRun } from './PruneRun';
 import { RemoveRun } from './RemoveRun';
 
-/** The run's actions: Remove for a try, Lift while held, else Hold where it can be held, and Prune where it would take anything. */
+/**
+ * The run's actions: Remove for a try, Lift while held, else Hold where it can be held, and Prune where it would take anything.
+ *
+ * @param run the run the actions are on
+ */
 export const runActionsOf = (run: RunDetail): Array<'remove' | 'hold' | 'lift' | 'prune'> => [
   ...(run.try ? (['remove'] as const) : []),
   ...(run.holding ? (['lift'] as const) : holdable(run) ? (['hold'] as const) : []),

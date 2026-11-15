@@ -22,7 +22,10 @@ import { nameFirst } from './name-order.ts';
 
 export type { FinishedKey, RunOutcomeSelector, RunSelector, RunStateSelector };
 
-/** The namespace of a run whose record names `factory`: that factory, or `default` for none. */
+/**
+ * The namespace of a run whose record names `factory`: that factory, or `default` for none.
+ * @param factory The factory the run's record names, or undefined where it names none.
+ */
 export const runNamespace: RunNamespace = (factory) => factory ?? DEFAULT_NAMESPACE;
 
 /** The field a run's list is selected by. */
@@ -31,7 +34,10 @@ const FIELD = 'status.state';
 /** `word` as a run's state, or null where it is none. */
 const stateOf = (word: string): RunState | null => RUN_STATES.find((s) => s === word) ?? null;
 
-/** The selector `text` spells (`RunStateSelector`): `status.state`, then `==`, `!=` or `=`, then a run's state; null for anything else. */
+/**
+ * The selector `text` spells (`RunStateSelector`): `status.state`, then `==`, `!=` or `=`, then a run's state; null for anything else.
+ * @param text The selector's text, as a list was asked it.
+ */
 export const runStateSelector: RunStateSelectorOf = (text) => {
   if (!text.startsWith(FIELD)) return null;
   const rest = text.slice(FIELD.length);
@@ -50,6 +56,7 @@ const outcomeOf = (word: string): RunOutcome | null => RUN_OUTCOMES.find((o) => 
 /**
  * The selector `text` spells on a finished run's outcome (`RunOutcomeSelector`): `status.outcome`, then `==`, `!=` or `=`, then an
  * outcome; null for anything else.
+ * @param text The selector's text, as a list was asked it.
  */
 export const runOutcomeSelector: RunOutcomeSelectorOf = (text) => {
   if (!text.startsWith(OUTCOME_FIELD)) return null;
@@ -63,11 +70,17 @@ export const runOutcomeSelector: RunOutcomeSelectorOf = (text) => {
 /**
  * Whether a list asked by `selector` takes `run`: on the state, the runs in it (or every other, for `!=`); on the outcome, the finished
  * runs that ended so (or every other run, one not finished among them, since it has no outcome).
+ * @param selector The selector the list was asked by: on the state, or on the outcome.
+ * @param run The run's state, and its outcome where it is finished.
  */
 export const selectorTakes: SelectorTakes = (selector, run) =>
   'state' in selector ? (run.state === selector.state) === selector.equal : (run.outcome === selector.outcome) === selector.equal;
 
-/** Whether the finished run at `a` comes before the one at `b`: newest first by when its work stopped, two together by name. */
+/**
+ * Whether the finished run at `a` comes before the one at `b`: newest first by when its work stopped, two together by name.
+ * @param a The first run's place: its name, and when its work stopped, in epoch ms.
+ * @param b The run it is compared with, in the same terms.
+ */
 export const finishedBefore: FinishedBefore = (a, b) =>
   a.finishedMs !== b.finishedMs ? a.finishedMs > b.finishedMs : nameFirst(a.name, b.name);
 
@@ -80,7 +93,10 @@ const FINISHED_MARK = 'f.';
 /** Where `run` stands in the finished order (`FinishedKey`). */
 const keyOf = (run: Finished): FinishedKey => ({ finishedMs: Date.parse(run.finishedAt), name: run.name });
 
-/** The `continue` token that asks for the finished runs after `run`: `f.`, then the base64url of `[finishedAt, name]` as JSON. */
+/**
+ * The `continue` token that asks for the finished runs after `run`: `f.`, then the base64url of `[finishedAt, name]` as JSON.
+ * @param run The last finished run a page answered: its name and when its work stopped.
+ */
 export const finishedToken = (run: Finished): string =>
   FINISHED_MARK + Buffer.from(JSON.stringify([run.finishedAt, run.name]), 'utf8').toString('base64url');
 
@@ -90,7 +106,10 @@ const badFinishedToken = (token: string): Invalid =>
     message: `continue ${JSON.stringify(token)} is no token of the finished runs' list (fieldSelector=status.state=finished, or status.outcome=<outcome>): pass the continue its last page's metadata answered, as it is, or leave continue out to read from the newest`,
   });
 
-/** The place `token` was made of (`finishedToken`), or `Invalid` where it is none: a name-order token among them. */
+/**
+ * The place `token` was made of (`finishedToken`), or `Invalid` where it is none: a name-order token among them.
+ * @param token The `continue` token a page's metadata answered.
+ */
 export const finishedAfter = (token: string): Finished | Invalid => {
   const body = token.slice(FINISHED_MARK.length);
   if (!token.startsWith(FINISHED_MARK) || !/^[A-Za-z0-9_-]+$/.test(body)) return badFinishedToken(token);
@@ -112,6 +131,9 @@ export const finishedAfter = (token: string): Finished | Invalid => {
  * The page `asked` cuts of `sorted`, the finished runs in their order (`finishedBefore`): it starts at the first run the token's place
  * comes before, so the next page holds what followed the last one answered though that one is gone, and is cut by `listPage` within
  * `bounds` (`LIST_PAGE` unless a test shortens them). `Invalid` for a limit `listPage` refuses or a token that is no finished token.
+ * @param sorted The finished runs, in their order.
+ * @param asked What the page asks: its limit and its `continue` token, each where given.
+ * @param bounds The least, the most and the default count of a page. Left out, `LIST_PAGE`.
  */
 export const finishedPageOf = <T extends Finished>(
   sorted: readonly T[],
@@ -133,6 +155,10 @@ export const finishedPageOf = <T extends Finished>(
   };
 };
 
-/** `a` before `b` in the finished order, as a sort's comparator reads it. */
+/**
+ * `a` before `b` in the finished order, as a sort's comparator reads it.
+ * @param a The first finished run.
+ * @param b The finished run it is compared with.
+ */
 export const byFinishedPlace = (a: Finished, b: Finished): number =>
   finishedBefore(keyOf(a), keyOf(b)) ? -1 : finishedBefore(keyOf(b), keyOf(a)) ? 1 : 0;

@@ -24,6 +24,9 @@ function rootsOf(home: string, factory: Factory, workflow: string): readonly str
 /**
  * The first file of the step `step` of `workflow` that names its own agent, and the agent it names: in each of `roots`' `workflows/`,
  * where a start in the factory reads a workflow by its name. A file that is not there or does not read names none.
+ * @param roots The folders read, in order, each holding a `workflows/` folder.
+ * @param workflow The workflow's name.
+ * @param step The step's name in the workflow.
  */
 export function ownAgentOf(roots: readonly string[], workflow: string, step: string): { named: string; file: string } | undefined {
   for (const root of roots) {
@@ -42,6 +45,9 @@ export function ownAgentOf(roots: readonly string[], workflow: string, step: str
 /**
  * The refusal a hire into `step` meets on disk, where its own file, in a folder a start in `factory` reads, names its agent: `Conflict`,
  * in `hireRefusalOf`'s words, then the file. What `wiringRefusal` cannot judge, since it reads no disk.
+ * @param home The store's root, a folder a start reads workflows from.
+ * @param factory The factory hired into: its repositories and its tree.
+ * @param step The step hired into, `<workflow>/<step>`.
  */
 export function ownAgentRefusal(home: string, factory: Factory, step: string): Conflict | undefined {
   const workflow = step.slice(0, step.indexOf('/'));

@@ -42,6 +42,7 @@ export type FactoryServers = Readonly<Record<string, FactoryServer>>;
  * Why `name` is no name for a factory's server, or `undefined`: the same name a `.mcp.json` keys one by (`SERVER_NAME`), since an
  * agent's `mcp:` line resolves a name against the record and the checkout's file alike, and one a session's tool names are built from
  * (`mcp__<name>__<tool>`).
+ * @param name The server's name as given.
  */
 export const serverNameRefusal = (name: string): string | undefined => {
   if (!name) return "A server is named, and this name is empty. Give the name an agent's `mcp:` line will ask for.";
@@ -62,6 +63,7 @@ export const serverNameRefusal = (name: string): string | undefined => {
  *
  * The runtime refuses the rest of a server's shape where it is handed one (`mcpRefuses`): this is what a *factory's* record refuses
  * beyond that.
+ * @param server The server as given, of any shape, read from a file or a request.
  */
 export const factoryServerRefusal = (server: unknown): string | undefined => {
   if (typeof server !== 'object' || server === null || Array.isArray(server)) {
@@ -95,7 +97,10 @@ export const factoryServerRefusal = (server: unknown): string | undefined => {
   return undefined;
 };
 
-/** Why a whole record cannot be written, or `undefined`: the first name or server it refuses, in the record's order. */
+/**
+ * Why a whole record cannot be written, or `undefined`: the first name or server it refuses, in the record's order.
+ * @param servers The record's servers by name, each of any shape.
+ */
 export const factoryServersRefusal = (servers: Readonly<Record<string, unknown>>): string | undefined => {
   for (const [name, server] of Object.entries(servers)) {
     const bad = serverNameRefusal(name) ?? factoryServerRefusal(server);
@@ -116,6 +121,8 @@ export const factoryServersRefusal = (servers: Readonly<Record<string, unknown>>
  * It hands a server on as the record holds it; the one producer of the bytes a harness sees (`mcpServerOf`) is applied once, by the
  * one reader of the record (`recordedServers`, `tick/told.verb.ts`), so a session is handed the same spelling a state read was: the
  * harness files a sign-in under those bytes, and two spellings are two servers to it. Pure.
+ * @param named The servers the agent's `mcp:` line names, or undefined where it names none.
+ * @param record The factory's servers by name, or undefined where it records none.
  */
 export const splitServers = (
   named: readonly string[] | undefined,
@@ -135,12 +142,17 @@ export const splitServers = (
  * A header as a write keeps it, against `stored`, the value the record holds for it, null for none: `sent` where it is a value of its
  * own; the stored value where it is `HEADER_MASK`, which a read served for it; refused where it is the mask and nothing is stored, a mask
  * that stands for no value.
+ * @param sent The header's value as the write sends it, perhaps `HEADER_MASK`.
+ * @param stored The value the record holds for the header, or null where it holds none.
  */
 export const headerWritten: HeaderWrittenOf = (sent, stored) => {
   if (sent !== HEADER_MASK) return { value: sent };
   return stored === null ? { refused: 'masked' } : { value: stored };
 };
 
-/** `headers` as a read serves them: each value as `HEADER_MASK`, so no read carries a header's value out of the store. */
+/**
+ * `headers` as a read serves them: each value as `HEADER_MASK`, so no read carries a header's value out of the store.
+ * @param headers A server's headers by name, as the record holds them.
+ */
 export const maskedHeaders = (headers: Readonly<Record<string, string>>): Record<string, string> =>
   Object.fromEntries(Object.keys(headers).map((name) => [name, HEADER_MASK]));

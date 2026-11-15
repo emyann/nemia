@@ -8,7 +8,10 @@
 /** A run of the merge: lines taken as they are, or a conflict over the base lines `a`..`b`, 1-based, `b` = `a` − 1 where it spans none. */
 export type Segment = { clean: string[] } | { conflict: { a: number; b: number; base: string[]; ours: string[]; theirs: string[] } };
 
-/** `text` cut into its lines, each with its `\n`; the last without one where the text does not end in one. */
+/**
+ * `text` cut into its lines, each with its `\n`; the last without one where the text does not end in one.
+ * @param text A file's text.
+ */
 export function linesOf(text: string): string[] {
   const lines = text.split(/(?<=\n)/);
   return lines.length === 1 && lines[0] === '' ? [] : lines;
@@ -56,7 +59,12 @@ function joined(segments: readonly Segment[]): Segment[] {
   return out;
 }
 
-/** `base`, `ours` and `theirs`, each a file's lines, merged three ways: the clean runs and the conflicts, in the order of the file. */
+/**
+ * `base`, `ours` and `theirs`, each a file's lines, merged three ways: the clean runs and the conflicts, in the order of the file.
+ * @param base The lines of the file both sides changed from.
+ * @param ours The lines of our side, the tree as it is.
+ * @param theirs The lines of their side, the one merged in.
+ */
 export function diff3Lines(base: readonly string[], ours: readonly string[], theirs: readonly string[]): Segment[] {
   const toOurs = matched(base, ours);
   const toTheirs = matched(base, theirs);
@@ -89,6 +97,8 @@ export function diff3Lines(base: readonly string[], ours: readonly string[], the
  * `ours` and `theirs`, two files' lines with no common base, merged two ways: the runs a longest common subsequence pairs are clean, and
  * every run between is a conflict, one only one side holds included, addressed by the lines of `ours` it spans (`b` = `a` − 1 where ours
  * holds none). Its `base` is empty: there is none.
+ * @param ours The lines of our side, which a conflict is addressed by.
+ * @param theirs The lines of their side.
  */
 export function diff2Lines(ours: readonly string[], theirs: readonly string[]): Segment[] {
   const toTheirs = matched(ours, theirs);

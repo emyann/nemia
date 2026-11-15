@@ -24,6 +24,8 @@ export type {
 /**
  * What the policy says of a check's verdict: the action of the first rule whose `onExitCodes` holds of its exit code, or `Count` where
  * no rule holds, no policy is declared, or the check did not finish. Pure.
+ * @param policy The step's policy, or undefined where it declares none.
+ * @param verdict The check's exit code, or `unfinished` where it did not finish.
  */
 export const checkFailureAction: CheckFailureActionOf = (policy, verdict) => {
   if (policy === undefined || verdict === 'unfinished') return 'Count';
@@ -43,6 +45,8 @@ const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 /**
  * A step's `checkFailurePolicy:` from the JSON text `readKeys` kept of its map; each shape it cannot take is refused with the line to
  * write.
+ * @param step The step's name, which each refusal opens with.
+ * @param text The JSON text kept of the step's map, or undefined where it has no `checkFailurePolicy:`.
  */
 export function checkFailurePolicyOf(step: string, text: string | undefined): CheckFailurePolicy | undefined {
   if (text === undefined) return undefined;
@@ -99,7 +103,10 @@ function ruleOf(step: string, n: number, rule: unknown): CheckFailureRule {
   return { action: action as CheckFailureRule['action'], onExitCodes: { operator, values } };
 }
 
-/** The policy as its line writes it, the map `checkFailurePolicyOf` reads back: each exit code written as its digits. */
+/**
+ * The policy as its line writes it, the map `checkFailurePolicyOf` reads back: each exit code written as its digits.
+ * @param policy The step's policy.
+ */
 export const checkFailurePolicyWritten = (policy: CheckFailurePolicy): FrontmatterValue => ({
   rules: policy.rules.map((rule) => ({
     action: rule.action,
@@ -107,7 +114,10 @@ export const checkFailurePolicyWritten = (policy: CheckFailurePolicy): Frontmatt
   })),
 });
 
-/** The policy as its line writes it, in YAML flow: `{ rules: [ { action: FailStep, onExitCodes: { operator: In, values: [78] } } ] }`. */
+/**
+ * The policy as its line writes it, in YAML flow: `{ rules: [ { action: FailStep, onExitCodes: { operator: In, values: [78] } } ] }`.
+ * @param policy The step's policy.
+ */
 export const checkFailurePolicyLine = (policy: CheckFailurePolicy): string =>
   `{ rules: [ ${policy.rules
     .map(

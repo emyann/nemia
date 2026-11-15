@@ -18,13 +18,17 @@ import { ARCHIVE_LIMIT, packArchive, unpackArchive } from '../archive/archive.ts
 import { templateFiles } from './door/templates.store.ts';
 import { templateNameRefusal } from './door/templates.ts';
 
-/** The folder of the store the templates sent to its api are kept in, each `<name>-<digest>.tgz`. */
+/**
+ * The folder of the store the templates sent to its api are kept in, each `<name>-<digest>.tgz`.
+ * @param home The store's root folder.
+ */
 export const sentTemplatesDir = (home: string): string => path.join(home, 'templates-sent');
 
 /**
  * The request's template of the `--template` word `given`, as `sourceGiven` reads it: a template's name is a builtin template's, sent by
  * its name; a file is an archive, sent as its bytes; a folder is packed as `nemia template pack` packs it. Refused: a place that is
  * neither (`Missing`, as an apply here refuses it), and a folder whose files cannot be packed (`Invalid`, each problem at its file).
+ * @param given The `--template` word: a builtin template's name, an archive's path or a folder's.
  */
 export const templateGiven = (given: string): Effect.Effect<TemplateGiven, Refusal> =>
   tried((): TemplateGiven => {
@@ -78,6 +82,9 @@ function taken(home: string, given: TemplateGiven): Taken {
 /**
  * `use` given the source of the template `given`, taken under the store (`taken`). An archive this request wrote is removed as it ends
  * where `keep` is `never` — a preview, which records nothing — or where `use` failed; else it stays where the factory names it.
+ * @param given The request's template, as `templateGiven` read it.
+ * @param keep `never` to remove an archive this request wrote as it ends; `made` to keep it unless `use` failed.
+ * @param use What is done with the template's source, given its place.
  */
 export const withTemplateTaken = <A, E, R>(
   given: TemplateGiven,

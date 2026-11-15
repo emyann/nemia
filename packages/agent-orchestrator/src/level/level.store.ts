@@ -23,7 +23,11 @@ const FactoryLevelSchema = Schema.StructWithRest(
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
 
-/** The file the factory `name`'s level is kept in, under the store `home`. Refused (`Invalid`): a name that is no factory's. */
+/**
+ * The file the factory `name`'s level is kept in, under the store `home`. Refused (`Invalid`): a name that is no factory's.
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export function factoryLevelFile(home: string, name: string): string {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
@@ -33,6 +37,8 @@ export function factoryLevelFile(home: string, name: string): string {
 /**
  * The factory `name`'s level file, or undefined where none was written. Refused (`Invalid`), naming the file, its first wrong field and the
  * command that writes it again, where it does not read as one.
+ * @param home The store's root.
+ * @param name The factory's name.
  */
 export const readFactoryLevel = (home: string, name: string): FactoryLevelFile | undefined => levelIn(factoryLevelFile(home, name), name);
 
@@ -61,7 +67,12 @@ function levelIn(file: string, name: string): FactoryLevelFile | undefined {
   return { ...(level === undefined ? {} : { level }), since, ...(raise === undefined ? {} : { raise: { ...raise } }) };
 }
 
-/** Writes the factory `name`'s level file whole; a file with neither a level nor a raise is removed, and the factory follows the store. */
+/**
+ * Writes the factory `name`'s level file whole; a file with neither a level nor a raise is removed, and the factory follows the store.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param level The file to write: the factory's own default and its raise, either absent.
+ */
 export const writeFactoryLevel = (home: string, name: string, level: FactoryLevelFile): void =>
   levelWritten(factoryLevelFile(home, name), level);
 

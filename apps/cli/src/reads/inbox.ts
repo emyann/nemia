@@ -25,6 +25,9 @@ const inPlay = (row: Table['rows'][number]): boolean => {
  * What `nemia inbox` prints after its table: with a card listed, how to start, queue or drop one, by its name, which a start takes on
  * this machine and on another's alike; with none, how many were left out for their run having ended (`ended`), else that none matches
  * where a selector was given, else that the inbox is empty.
+ * @param listed How many cards the table shows.
+ * @param selector The label selectors typed with `-l`, none where none was.
+ * @param ended How many cards were left out for their run having ended.
  */
 export const inboxSaid = (listed: number, selector: readonly string[], ended: number): string =>
   listed
@@ -35,7 +38,10 @@ export const inboxSaid = (listed: number, selector: readonly string[], ended: nu
         ? `no card of the inbox matches -l ${selector.join(' -l ')} — see them all with nemia inbox --show-labels`
         : `the inbox is empty — park an idea with nemia inbox add "<idea>"`;
 
-/** Prints the cards `args` asks for, as the server prints their table, and how to start, queue or drop one; answers 0. */
+/**
+ * Prints the cards `args` asks for, as the server prints their table, and how to start, queue or drop one; answers 0.
+ * @param args The command's words as parsed against `INBOX_READ_WORDS`.
+ */
 export async function inbox(args: Args): Promise<number> {
   const all = switchArg(args, 'all');
   const read = tableAsked(args);

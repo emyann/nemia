@@ -109,6 +109,7 @@ const marked = (value: unknown): boolean =>
  * An output schema's `properties` with each marked field expanded to the schema of its shape, its `description` kept, and the shape each
  * marked field was (`shapes`, none for an unmarked one); or why they cannot be. Refuses a shape it does not know, a marker beside any
  * schema key but `description`, and a marker anywhere but on a field itself.
+ * @param properties The output schema's `properties`, by field name.
  */
 export function expandShapes(
   properties: Record<string, unknown>,
@@ -147,7 +148,10 @@ export function expandShapes(
  */
 const isQuestionsSchema = (schema: unknown): boolean => sameSchema(schema, [QUESTIONS_SCHEMA, ...FORMER_QUESTIONS_SCHEMAS]);
 
-/** The fields a step's `output:` declares whose schema is `QUESTIONS_SCHEMA`, in the schema's order: none for a step without `output:`. */
+/**
+ * The fields a step's `output:` declares whose schema is `QUESTIONS_SCHEMA`, in the schema's order: none for a step without `output:`.
+ * @param step The step as its workflow says it; undefined where it is not known.
+ */
 export const questionFields = (step: StepSpec | undefined): string[] =>
   Object.entries(step?.output?.schema.properties ?? {})
     .filter(([, schema]) => isQuestionsSchema(schema))
@@ -171,7 +175,10 @@ const optionOf = (value: unknown, at: string): QuestionOption | string => {
 /** The keys a question has, sorted. */
 const QUESTION_KEYS = ['body', 'multiple', 'options', 'recommended', 'title'];
 
-/** The labels a question recommends, as a list: none for null, one for a label. */
+/**
+ * The labels a question recommends, as a list: none for null, one for a label.
+ * @param q The question, whose `recommended` is read.
+ */
 export const recommendedOf = (q: Pick<Question, 'recommended'>): readonly string[] =>
   q.recommended === null ? [] : typeof q.recommended === 'string' ? [q.recommended] : q.recommended;
 
@@ -240,6 +247,7 @@ function questionOf(value: unknown, at: string): Question | string {
  * A field's value read as questions, strictly, or why it is not: an array of questions, each with exactly the keys of `QUESTIONS_SCHEMA`,
  * at least one option, no label twice, a `recommended` that is one of its labels or null — or a list of them where it takes `multiple` —
  * and no title twice. What it answers is read afresh from `value`, never `value` itself.
+ * @param value The field's value, as the closeout gave it.
  */
 export function questionsOf(value: unknown): Question[] | { error: string } {
   const items = itemsOf(value);
@@ -260,6 +268,8 @@ export function questionsOf(value: unknown): Question[] | { error: string } {
  * What a closeout asks through its step's question fields: each field it gave that decodes and holds a question, in the schema's order.
  * None for a closeout that is not there or did not read, and none of a field that does not decode: it is drawn as any other field. None
  * at all when two fields ask one title: an answer names its question by title alone, so such a closeout is answered in words.
+ * @param step The step as its workflow says it, whose `output:` names its question fields; undefined where it is not known.
+ * @param said What the step's closeout said, or the error it was read with; undefined where it has said nothing.
  */
 export function askedQuestions(step: StepSpec | undefined, said: Closeout | { error: string } | undefined): Asked[] {
   if (!said || 'error' in said) return [];
@@ -276,6 +286,8 @@ export function askedQuestions(step: StepSpec | undefined, said: Closeout | { er
  * what to do: a field given that does not decode, and two fields that ask one title. None for a closeout not there or unreadable, nor of
  * a field it did not give, which `declaredOutput` counts as missing. The run refuses such a closeout back to its agent as it refuses an
  * envelope (`envelopeRefusals`), and a reader of one that stands says why the field is drawn as words.
+ * @param step The step as its workflow says it, whose `output:` names its question fields; undefined where it is not known.
+ * @param said What the step's closeout said, or the error it was read with; undefined where it has said nothing.
  */
 export function questionRefusals(step: StepSpec | undefined, said: Closeout | { error: string } | undefined): string[] {
   if (!said || 'error' in said) return [];
@@ -305,6 +317,9 @@ export function questionRefusals(step: StepSpec | undefined, said: Closeout | { 
  * What the run refuses of a closeout a step gave, each a sentence saying what to do instead: its envelope (`envelopeRefusals`), its
  * question fields (`questionRefusals`) and its budget fields (`budgetRefusals`, which reads the run's `steps` for the steps after it). A
  * closeout with any reads `unsigned`, and the run asks its session once a round to mend it.
+ * @param step The step that gave the closeout, as its workflow says it; undefined where it is not known.
+ * @param said The closeout the step gave.
+ * @param steps The run's steps, whose order says which come after `step`.
  */
 export const closeoutRefusals = (step: StepSpec | undefined, said: Closeout, steps: readonly StepSpec[]): string[] => [
   ...envelopeRefusals(said),
@@ -334,6 +349,8 @@ function oneAnswerRefusal(q: Question, a: Answer): string | null {
  * asked, two to one question, a label its question does not offer, several labels where one is taken, and a question left with neither
  * a choice nor words of the person's own.
  *
+ * @param asked The questions the step asks now.
+ * @param answers The person's answers, each naming its question by title.
  * @param instead How a person says what they mean to a step that asks none, as the refusal names it: in words, without `answers`, on the
  *   board's side; with `--message`, without `--answer`, at the terminal.
  */
@@ -390,6 +407,10 @@ function answerBlocks(asked: readonly Question[], answers: readonly Answer[], no
  * The words a step's next try reads for `answers` to `asked`, which `answerRefusal` let through: each question in the order asked, what was
  * chosen with what it means, and the person's own words; then `note`, when there is one; and last, who answered (`by`): the caller's actor,
  * or where the person answered in-process, on the board unless the terminal says otherwise.
+ * @param asked The questions asked, in the order asked.
+ * @param answers The person's answers, each naming its question by title.
+ * @param note The person's note under the answers; absent where there is none.
+ * @param by Who answered; the person, on the board, where absent.
  */
 export const answerText = (asked: readonly Question[], answers: readonly Answer[], note?: string, by: AnsweredBy = ON_THE_BOARD): string =>
   ['Answers to your questions:', ...answerBlocks(asked, answers, note, by)].join('\n\n');
@@ -398,6 +419,11 @@ export const answerText = (asked: readonly Question[], answers: readonly Answer[
  * The words an approval carries for `answers` to the questions `step` asked at its gate, which `answerRefusal` let through: read under
  * `## Approved` by the steps after the gate, so they open naming whose questions they answer; then each answer as `answerText` says it,
  * `note`, and who answered (`by`).
+ * @param step The name of the step whose gate asked the questions.
+ * @param asked The questions asked, in the order asked.
+ * @param answers The person's answers, each naming its question by title.
+ * @param note The person's note under the answers; absent where there is none.
+ * @param by Who answered; the person, on the board, where absent.
  */
 export const approvedAnswerText = (
   step: string,

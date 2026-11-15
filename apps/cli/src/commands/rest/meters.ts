@@ -50,7 +50,10 @@ const labelWords = (l: Readonly<Record<string, string>>): string =>
     .map((k) => `${k}=${l[k]}`)
     .join(' ');
 
-/** `nemia series`' lines: the range, then a line a series and label set, its points' count, and its latest and highest. */
+/**
+ * `nemia series`' lines: the range, then a line a series and label set, its points' count, and its latest and highest.
+ * @param read The series the api answers: the range, the span of a point, and each series's points.
+ */
 export const seriesLines = (read: SeriesRead): string[] =>
   read.series.length
     ? [
@@ -67,7 +70,10 @@ export const seriesLines = (read: SeriesRead): string[] =>
 /** The answer as `--json` prints it: the whole of it, indented. */
 const jsonLines = (answer: unknown): string[] => [JSON.stringify(answer, null, 2)];
 
-/** `nemia passes`' runner: the recent passes, the last `--last` of them where given. */
+/**
+ * `nemia passes`' runner: the recent passes, the last `--last` of them where given.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function passes(args: Args): Promise<number> {
   const last = textArg(args, 'last');
   const read = await asked(PASSES_WORDS.name, (c) => c.server.passes({ query: last === undefined ? {} : { last } }));
@@ -75,7 +81,10 @@ export async function passes(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia series`' runner: the system's series over `--range`, 24h where none is given. */
+/**
+ * `nemia series`' runner: the system's series over `--range`, 24h where none is given.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function series(args: Args): Promise<number> {
   const range = textArg(args, 'range');
   const read = await asked(SERIES_WORDS.name, (c) => c.server.series({ query: range === undefined ? {} : { range } }));

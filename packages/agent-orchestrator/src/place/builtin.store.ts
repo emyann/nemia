@@ -14,7 +14,10 @@ import { countSpawn, within, withinEffect } from '../meter/tally.store.ts';
 /** The folder of the skill a step's agent reads of the package's builtin place. */
 export const BUILTIN_PLACE = path.join(PLACE_SKILLS, 'git');
 
-/** `place`, each question counted as the pass's `place` phase. */
+/**
+ * `place`, each question counted as the pass's `place` phase.
+ * @param place The place whose questions are counted.
+ */
 export const meteredPlace = (place: Place): Place => ({
   declared: place.declared,
   ask: (verb, request, options) => withinEffect('place', place.ask(verb, request, options)),
@@ -30,6 +33,7 @@ export const gitPlaceLayer = PlaceService.layer(builtinGitPlace);
 /**
  * `program` given `builtinGitPlace`, and still to be run: the git place by name, for a caller outside the package that builds no layer
  * of its own. The api's tests call it, and the board's e2e seed does from a string no typecheck reads.
+ * @param program The program given the git place.
  */
 export const builtin = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, PlaceService>> =>
   Effect.provide(program, gitPlaceLayer);

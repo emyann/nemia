@@ -250,7 +250,12 @@ async function upgrade(args: readonly string[], env: NodeJS.ProcessEnv, seams: S
   return said(base, await followed(base, started, env, seams), env, seams);
 }
 
-/** `nemia server …`, on the words after `server`: `upgrade` its one subcommand, its usage on `-h` or `--help`. */
+/**
+ * `nemia server …`, on the words after `server`: `upgrade` its one subcommand, its usage on `-h` or `--help`.
+ * @param args The words typed after `server`.
+ * @param env The environment read for the context in use and the token.
+ * @param seams This client's release, where the runner writes, and the follow's bound: this process's own where they are left out.
+ */
 export async function server(
   args: readonly string[],
   env: NodeJS.ProcessEnv = process.env,
@@ -267,6 +272,8 @@ export async function server(
 /**
  * What a bare `nemia upgrade` says once it ran on this machine, under the remote context `name` whose server is `at`: that it was this
  * machine's install, and that the server is upgraded with the remote form.
+ * @param name The remote context's name.
+ * @param at The url of the context's server.
  */
 export const serverHint = (name: string, at: string): string =>
   `nemia upgrade is this machine's install. The server of the context ${name}, at ${at}, is upgraded from here with \`nemia server upgrade [<tag>]\`\n`;

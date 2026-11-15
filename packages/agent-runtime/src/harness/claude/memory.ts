@@ -40,6 +40,7 @@ const ownExcludes = (read: Record<string, unknown>): string[] => {
  * `settings`, as JSON or absent, with auto-memory off laid over them and every dependency's `CLAUDE.md` added to the excludes they
  * give, keeping every other key they hold (throws for excludes that are no list, `ownExcludes`); `undefined` for settings given as a
  * file's path, which the runtime does not rewrite: such a session keeps its auto-memory and its dependencies' `CLAUDE.md`.
+ * @param settings The task's Claude Code settings, as JSON or a file's path; absent, none of its own.
  */
 export const memorylessSettings = (settings: string | undefined): Record<string, unknown> | undefined => {
   const read = settingsObject(settings ?? '{}');

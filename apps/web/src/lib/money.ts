@@ -6,6 +6,7 @@
 /**
  * Dollars for a person: to the cent, and to three figures under one, since a session's $0.004 rounded to `$0.00` would read as nothing;
  * `-$0.13` for an amount below zero, and `—` for none.
+ * @param usd The amount, in dollars, or null for none.
  */
 export function dollars(usd: number | null): string {
   if (usd === null) return '—';
@@ -14,5 +15,8 @@ export function dollars(usd: number | null): string {
   return `${usd < 0 && said !== '0.00' ? '-' : ''}$${said}`;
 }
 
-/** A budget as its author writes one: `$16` when whole, else as `dollars` says it (`$2.50`). */
+/**
+ * A budget as its author writes one: `$16` when whole, else as `dollars` says it (`$2.50`).
+ * @param usd The budget, in dollars.
+ */
 export const budgetWord = (usd: number): string => (Number.isInteger(usd) ? `$${usd}` : dollars(usd));

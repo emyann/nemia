@@ -43,7 +43,10 @@ const readAs = <S extends Schema.Top & { readonly DecodingServices: never }>(sch
   );
 };
 
-/** `nemia stats`' runner: the stats asked, printed as `--json` or `--line` asks, else in words. */
+/**
+ * `nemia stats`' runner: the stats asked, printed as `--json` or `--line` asks, else in words.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function stats(args: Args): Promise<number> {
   const answer = await asked(COMMAND, (c) => c.server.stats({ query: queryOf(args) }));
   if (switchArg(args, 'json')) {

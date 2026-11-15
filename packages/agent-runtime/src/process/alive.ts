@@ -3,6 +3,7 @@ import fs from 'node:fs';
 /**
  * Whether the process `pid` is there, as signal 0 finds it: it reaches the process, or the process is another user's (`EPERM`), which
  * is there too. `ESRCH`, or any other refusal of the signal, reads as gone. The runtime's one reading: a leaf every folder may import.
+ * @param pid The process's id.
  */
 export const alive = (pid: number): boolean => {
   try {
@@ -18,6 +19,7 @@ export const alive = (pid: number): boolean => {
  * Code, a detached run's worker and its harness, so a pid another process has taken since is not read as it. `undefined` where there
  * is no `/proc`. The second field is the command's name in parentheses, which may hold spaces and parentheses, so the fields are counted
  * from the last `)`. Imports nothing but node's own, as `alive` does: `bin/ae-worker.ts` reads it, and stays dependency-free.
+ * @param pid The process's id.
  */
 export const processStart = (pid: number): string | undefined => {
   let stat: string;

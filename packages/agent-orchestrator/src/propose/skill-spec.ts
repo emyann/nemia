@@ -24,6 +24,10 @@ const PICKED = ['title', 'description', 'tags', 'examples'] as const;
 /**
  * The spec of the skill `name` whose SKILL.md is `skillMd`, its other text files `others` (each by its path in the folder) and its
  * `preload` as read.
+ * @param name The skill's name, as a refusal of its SKILL.md names it.
+ * @param skillMd The text of its SKILL.md.
+ * @param others Its folder's other text files, each by its path in the folder.
+ * @param preload Whether it is loaded whole every turn.
  */
 export function skillSpecOf(
   name: string,

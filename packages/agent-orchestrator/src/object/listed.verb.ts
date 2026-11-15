@@ -29,11 +29,17 @@ type Named = { readonly metadata: { readonly name: string; readonly labels?: Rea
 /**
  * The `resourceVersion` of an object: a digest of its spec and status as they encode, and of the sub-resources read beside them, `parts`,
  * where it has any (a Factory's rules and instruction). Without `parts` the digest is the spec's and the status's alone.
+ * @param spec The object's spec, as it encodes.
+ * @param status The object's status, as it encodes.
+ * @param parts The sub-resources read beside them, or undefined where the object has none.
  */
 export const versionOf = (spec: unknown, status: unknown, parts?: unknown): string =>
   valueVersion(parts === undefined ? { spec, status } : { spec, status, parts });
 
-/** When a file was made, or the epoch where it cannot be read: a part's `creationTimestamp`. */
+/**
+ * When a file was made, or the epoch where it cannot be read: a part's `creationTimestamp`.
+ * @param file The path of the file read.
+ */
 export const bornAt = (file: string): string => {
   try {
     const stat = fs.statSync(file);
@@ -43,7 +49,11 @@ export const bornAt = (file: string): string => {
   }
 };
 
-/** The refusal of a list's label selectors, naming the clause that is not one and `what` the list holds; none where each reads. */
+/**
+ * The refusal of a list's label selectors, naming the clause that is not one and `what` the list holds; none where each reads.
+ * @param selectors The list's label selectors, as asked.
+ * @param what What the list holds, named in the refusal (a card, a run).
+ */
 export const selectorsRefused = (selectors: readonly string[], what: string): Invalid | undefined => {
   const refusal = selectorsRefusal(selectors);
   return refusal === undefined
@@ -57,7 +67,11 @@ export type ListedBy<T> = { readonly key: (item: T) => string; readonly labels: 
 /**
  * The page of `items` a list's query asks — the list page every list of objects cuts: those its label selectors keep, sorted by `by.key`
  * as `<` compares, cut by its `limit` after its `continue` (`pageOf`), so `remainingItemCount` counts what the selectors keep. `Invalid`
- * for a selector, a limit or a token that is not one; `what` names what the list holds in the selector's refusal.
+ * for a selector, a limit or a token that is not one.
+ * @param items Every item the list holds, before its selectors keep any.
+ * @param query The list's query: its limit, its continue token and its label selectors.
+ * @param what What the list holds, named in the selector's refusal.
+ * @param by How an item is read: its key, sorted and paged by, and its labels.
  */
 export const pageListed = <T>(
   items: readonly T[],
@@ -79,7 +93,12 @@ export const pageListed = <T>(
 /** A list's metadata: how many objects are after the page, and the token of the next one. */
 export type ListedMeta = { remainingItemCount: number; continue?: string };
 
-/** The `<kind>List` of a page: its envelope, the page's count and token, and `items`, the page's objects. */
+/**
+ * The `<kind>List` of a page: its envelope, the page's count and token, and `items`, the page's objects.
+ * @param kind The kind of the objects listed, which the envelope's kind ends with `List`.
+ * @param page The page's count of what is after it and its next token, if any.
+ * @param items The page's objects, as served.
+ */
 export const listOf = <const K extends string, T>(
   kind: K,
   page: Omit<Paged<unknown>, 'items'>,
@@ -95,8 +114,11 @@ export const listOf = <const K extends string, T>(
 const byMetadata: ListedBy<Named> = { key: (o) => o.metadata.name, labels: (o) => o.metadata.labels ?? {} };
 
 /**
- * A page of `items`, as `<kind>List`: the list page (`pageListed`) by name. `Invalid` for a selector, a limit or a token that is not one;
- * `what` names the kind in the selector's refusal.
+ * A page of `items`, as `<kind>List`: the list page (`pageListed`) by name. `Invalid` for a selector, a limit or a token that is not one.
+ * @param kind The kind of the objects listed.
+ * @param items Every object of the kind, before the query's selectors keep any.
+ * @param query The list's query: its limit, its continue token and its label selectors.
+ * @param what The kind as a person reads it, named in the selector's refusal.
  */
 export const objectsListed = <const K extends string, T extends Named>(
   kind: K,

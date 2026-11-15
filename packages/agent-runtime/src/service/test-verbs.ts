@@ -28,7 +28,10 @@ export type TestHarnesses = {
   readonly takes: (verb: Capability, name: string) => boolean;
 };
 
-/** `declared` as a stand-in's verbs ask it (`TestHarnesses`). */
+/**
+ * `declared` as a stand-in's verbs ask it (`TestHarnesses`).
+ * @param declared The stand-in's harnesses, each with what it declares, the first its fallback.
+ */
 export const testHarnessesOf = (declared: readonly HarnessDeclared[]): TestHarnesses => {
   const fallback = declared[0]?.name ?? TEST_HARNESS;
   return {
@@ -66,6 +69,8 @@ export const unkeptVerbs = (): Pick<
  * The verbs of the stand-in that go to a harness by what it declares, each refused as the engine refuses it where none takes the verb
  * (`quotaRefusalOf`, `noMcpHarness`, `noSignInHarness`), else `kept`'s: `quota`, which the stand-in asks of no harness,
  * dies naming itself once a harness takes it.
+ * @param harnesses The stand-in's harnesses, as its verbs ask them.
+ * @param kept The stand-in's own MCP verbs, answered where a harness takes them.
  */
 export const declaredVerbsOf = (
   harnesses: TestHarnesses,

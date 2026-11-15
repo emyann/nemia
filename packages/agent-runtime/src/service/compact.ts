@@ -27,6 +27,7 @@ const taken = (args: readonly unknown[]): boolean => {
  * `compact` over `runners`, the engine's harnesses as the seam offers them: asks each harness with a `compact`, one after another,
  * to count its ended sessions' captures and what they would keep, or with `{ yes: true }` to rewrite them; a harness without it is
  * not asked. Refuses any argument but nothing or `{ yes }`, writing nothing; a harness's `RunnerError` fails the call.
+ * @param runners The engine's harnesses, each by its name.
  */
 export const compactVerbOf = (runners: Record<string, SeamOps>) =>
   Effect.fn('Engine.compact')(function* (options?: { yes?: boolean }): Effect.fn.Return<CompactReport, CompactRefused | RunnerError> {

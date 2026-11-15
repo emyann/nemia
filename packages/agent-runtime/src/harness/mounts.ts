@@ -35,6 +35,7 @@ const mountRefusalOf = (mount: unknown): string | undefined => {
  * Why a task's `config.mounts` cannot be handed to a harness — or `undefined`. Refuses a value that is not a list, an entry that
  * is not an object of `path` and `readOnly` alone, a path that is not absolute and resolved or holds a NUL, a `readOnly` that is
  * not true or false, and a path given twice, whose two modes no harness could hold at once.
+ * @param mounts The task's `config.mounts` as filed, of any shape; undefined where it is left out, which is no refusal.
  */
 export const mountsRefusalOf = (mounts: unknown): string | undefined => {
   if (mounts === undefined) return undefined;

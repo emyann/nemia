@@ -30,7 +30,11 @@ export function cutPoints(cut: number, inset = 0): string {
   ].join(', ');
 }
 
-/** The clip that leaves a box its cut shape: its top-right and bottom-left corners cut by `cut` pixels. */
+/**
+ * The clip that leaves a box its cut shape: its top-right and bottom-left corners cut by `cut` pixels.
+ *
+ * @param cut how long the cut of each of the two corners is, in pixels
+ */
 export const cutShape = (cut: number): string => `polygon(${cutPoints(cut)})`;
 
 /**

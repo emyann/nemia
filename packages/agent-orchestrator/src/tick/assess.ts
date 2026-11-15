@@ -168,6 +168,7 @@ export type AssessRead = {
  *   waits on its file for the lift. What a person decides (`toDecide`) is still asked: a word given is kept for the next pass.
  *
  * The read is the pass's (`readRun`), and every reader of a run is handed it, so the tick, the verbs and the screens say one thing of it.
+ * @param read The pass's read of the run: its record, its steps and the engine's views of its tasks.
  */
 export function assess(read: AssessRead): Assessment {
   const {
@@ -308,7 +309,12 @@ function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus
   return stops.length && stops.every((s) => s.status === 'awaiting approval') ? 'awaiting approval' : 'waiting';
 }
 
-/** What the run refused of the last try's closeout (`closeoutRefusals`), as its next try is told it; nothing for none. */
+/**
+ * What the run refused of the last try's closeout (`closeoutRefusals`), as its next try is told it; nothing for none.
+ * @param step The step the try is of, or undefined where the run's steps do not hold it.
+ * @param said The last try's closeout, or undefined where it gave none.
+ * @param steps The steps the run is judged by.
+ */
 export const refusedTold = (
   step: StepSpec | undefined,
   said: Closeout | undefined,
@@ -323,6 +329,8 @@ export const refusedTold = (
  * for a step on a local harness, and nothing for one on a remote A2A agent (`harness: a2a:<name>`), which runs as its operator configured
  * it. The runtime refuses a `config` with any key in it, one whose value is undefined included (`remoteRefuses`), so the fields are left
  * out, not emptied; and a try of a remote step is a new Task, never a turn of the last one.
+ * @param step The step filed.
+ * @param fields Makes the fields, asked only for a step on a local harness.
  */
 export const localFields = <T extends object>(step: StepSpec, fields: () => T): T | Record<string, never> =>
   isRemoteHarness(step.harness) ? {} : fields();

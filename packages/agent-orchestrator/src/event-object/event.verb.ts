@@ -42,6 +42,7 @@ const eventsAfter = Effect.fn('eventsAfter')(function* (cursor: number, limit?: 
  * `eventNamespace` puts there — as a function of a line and the bytes it starts and ends at: the Event, or undefined for a line the list
  * leaves out. The one rule a page of events and a watch of them (the api's, following the feed) both read. Its selectors are taken as
  * given: a list refuses one that is not before anything is read.
+ * @param query The list asked: its namespace, and its label selectors, taken as given.
  */
 export const eventKept = (query: Pick<EventQuery, 'namespace' | 'labelSelector'>) => {
   const selectors = parseSelectors(query.labelSelector ?? []);

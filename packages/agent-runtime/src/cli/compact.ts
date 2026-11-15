@@ -1,7 +1,10 @@
 /** What `ae compact` is asked, and the lines it prints of what `Engine.compact` answers. */
 import type { CompactReport } from '../index.ts';
 
-/** What `ae compact` is asked, off the arguments after it: `{ yes }`, given `--yes`. Refuses, with exit code 2, any other argument. */
+/**
+ * What `ae compact` is asked, off the arguments after it: `{ yes }`, given `--yes`. Refuses, with exit code 2, any other argument.
+ * @param rest The arguments after `compact`.
+ */
 export const compactAsked = (rest: readonly string[]): { yes: boolean } => {
   const other = rest.filter((a) => a !== '--yes');
   if (other.length)
@@ -11,7 +14,10 @@ export const compactAsked = (rest: readonly string[]): { yes: boolean } => {
   return { yes: rest.length > 0 };
 };
 
-/** The lines `ae compact` prints for `report`: per harness, its captures and their bytes before and after, and each left with why. */
+/**
+ * The lines `ae compact` prints for `report`: per harness, its captures and their bytes before and after, and each left with why.
+ * @param report What `Engine.compact` answered.
+ */
 export const compactLines = (report: CompactReport): string[] => {
   const done = report.compacted ? 'rewritten' : 'to rewrite: `ae compact --yes` rewrites them';
   const lines = Object.entries(report.harnesses).flatMap(([harness, h]) => [

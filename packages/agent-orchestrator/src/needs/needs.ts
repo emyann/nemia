@@ -9,7 +9,10 @@ import type { FixOrigin, FixRefusal, FixRefusalOf, NeedRan, NeedRead, NeedsHoldi
 
 export type { FixOrigin, FixRefusal, NeedRan, NeedRead };
 
-/** What one check's run says of its need: exit 0 met, any other exit missing, and no answer in its time or no shell `unknown`. */
+/**
+ * What one check's run says of its need: exit 0 met, any other exit missing, and no answer in its time or no shell `unknown`.
+ * @param ran How the check ran: exited with its code, or no answer in its time, or no shell.
+ */
 export const needStateOf: NeedStateOf = (ran) => {
   if (ran.kind !== 'exited') return 'unknown';
   return ran.code === 0 ? 'met' : 'missing';
@@ -19,6 +22,8 @@ export const needStateOf: NeedStateOf = (ran) => {
  * The names of the needs that hold a run now: every need read `missing` of a run that has filed nothing (`filedAny` false), in the order
  * read (a name twice where two needs share it), and none of a run that has filed a task, so a need that lapses mid-run never stops work
  * in flight.
+ * @param filedAny Whether the run has filed a task.
+ * @param needs The needs of the run, each as read, in the order read.
  */
 export const needsHolding: NeedsHolding = (filedAny, needs) =>
   filedAny ? [] : needs.filter((need) => need.state === 'missing').map((need) => need.name);
@@ -26,6 +31,7 @@ export const needsHolding: NeedsHolding = (filedAny, needs) =>
 /**
  * Whether a fix declared at `origin` may be started: a place's and a harness's always, a workflow's (and a repository need's) only where
  * its factory's places are trusted.
+ * @param origin Where the fix is declared: a place, a harness, or a workflow with whether its factory's places are trusted.
  */
 export const fixRefusal: FixRefusalOf = (origin) => (origin.kind === 'workflow' && !origin.trusted ? 'untrusted' : 'allowed');
 
@@ -35,6 +41,9 @@ export const fixRefusal: FixRefusalOf = (origin) => (origin.kind === 'workflow' 
  * need that `fills` a place need adds no need of its own: its fixes go first among the place need's, the place's own kept after them, and
  * its check stands beside the place's for nothing — the place's check says whether the need is met. A `fills` naming no need of the place
  * is a need of the workflow as it stands. Pure.
+ * @param workflow The needs the run's workflow declares.
+ * @param place The needs of the run's place.
+ * @param harness The needs of the harnesses the run runs on, none when absent.
  */
 export function needsOfRun(workflow: readonly Need[], place: readonly Need[], harness: readonly Need[] = []): Need[] {
   const fillers = new Map<string, NeedFix[]>();
@@ -62,6 +71,8 @@ export type FixAt = { readonly factory: string; readonly workflow?: string };
 /**
  * The command a person types to start the first fix of a need, `nemia doctor fix <need>`, with the factory and workflow it is declared by
  * (`--factory F --workflow W`), or the factory alone for a need of its repository (`--factory F`).
+ * @param need The need's name.
+ * @param at The factory, and the workflow where there is one, the need is declared by; undefined for a need declared by neither.
  */
 export const fixCommandOf = (need: string, at?: FixAt): string =>
   `nemia doctor fix ${need}${at === undefined ? '' : ` --factory ${at.factory}`}${at?.workflow === undefined ? '' : ` --workflow ${at.workflow}`}`;
@@ -78,6 +89,8 @@ export type NeedHeld = NeedRead & Omit<NeedWaited, 'name'>;
 /**
  * What a run waits on, from the needs `needsHolding` names among `needs`: each with its words, in the order named. None where nothing
  * holds the run.
+ * @param filedAny Whether the run has filed a task.
+ * @param needs The needs of the run as the pass hands them, each with its words.
  */
 export function needsWaited(filedAny: boolean, needs: readonly NeedHeld[]): NeedWaited[] {
   return [...new Set(needsHolding(filedAny, needs))].flatMap((name) => {
@@ -86,5 +99,8 @@ export function needsWaited(filedAny: boolean, needs: readonly NeedHeld[]): Need
   });
 }
 
-/** `waiting on <need>: <fix>` for each need a run waits on, joined: the words its listing says beside its phase. */
+/**
+ * `waiting on <need>: <fix>` for each need a run waits on, joined: the words its listing says beside its phase.
+ * @param waited The needs the run waits on.
+ */
 export const waitingOnNeedsWord = (waited: readonly NeedWaited[]): string => waited.map((w) => `waiting on ${w.name}: ${w.fix}`).join('; ');

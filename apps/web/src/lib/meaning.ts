@@ -11,7 +11,10 @@ type Meaning = 'yours' | 'alive' | 'money' | 'rest' | 'failure';
 /** A colour a meaning is drawn in: the meaning itself, or one of rest's two tints. */
 export type Hue = 'yours' | 'alive' | 'money' | 'failure' | 'grey' | 'sage';
 
-/** The meaning a hue says: `grey` and `sage` are both `rest`. */
+/**
+ * The meaning a hue says: `grey` and `sage` are both `rest`.
+ * @param hue The colour asked about.
+ */
 export const meaningOf = (hue: Hue): Meaning => (hue === 'grey' || hue === 'sage' ? 'rest' : hue);
 
 /** The loud form: the hue as the ground, its own ink on it. */

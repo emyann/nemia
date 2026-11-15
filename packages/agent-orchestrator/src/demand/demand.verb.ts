@@ -33,7 +33,10 @@ export type DemandHost = ServiceHost & {
   readonly env: Readonly<Record<string, string | undefined>>;
 };
 
-/** The machine as it is, the lease read every `DEMAND_POLL_MS` for at most `DEMAND_WAIT_MS`. */
+/**
+ * The machine as it is, the lease read every `DEMAND_POLL_MS` for at most `DEMAND_WAIT_MS`.
+ * @param root The store's directory (`WF_ROOT`).
+ */
 export const liveDemandHost = (root: string): DemandHost => ({
   ...liveHost(root),
   pollMs: DEMAND_POLL_MS,

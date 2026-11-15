@@ -113,6 +113,10 @@ const toldBy = (e: Engine, taskId: string, text: string): Effect.Effect<Said, Co
  * An ask is written under its try's name, exclusively, and never over a file there. One that does not read as an ask — `{}`, a hand edit, a
  * torn copy — is honoured by no pass, and `nemia ls` shows nothing asked, so "already asked for, wait for it" would be a wait for ever. The
  * way out is a person's: delete the file, and ask again.
+ * @param where The file the ask would be written to.
+ * @param stray Why the file there is no ask, as the tick reads it, or null where it reads as one or is gone.
+ * @param what What was asked for, as the refusal names it: `try 2 of review`.
+ * @param again The command that asks again once the file is deleted.
  */
 export function strayAsk(where: string, stray: string | null, what: string, again: string): string | null {
   if (stray === null) return null;

@@ -44,6 +44,8 @@ export type CancelPlan =
  *
  * Off the one read of the run (`AssessRead`) and its assessment, so it says finished of what the pass says finished: a try or round due
  * that the checkout or the store's pause holds back (`due`) still keeps the run going.
+ * @param read The one read of the run: its record and the phase of each of its tasks.
+ * @param assessed The pass's assessment of that read; assessed afresh from it where none is given.
  */
 export function cancelPlan(read: AssessRead, assessed: Assessment = assess(read)): CancelPlan {
   const { run, phaseOf } = read;

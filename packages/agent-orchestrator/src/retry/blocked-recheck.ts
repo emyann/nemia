@@ -11,7 +11,10 @@ export type { BlockedRecheck, BlockedRecheckRead, BlockedRecheckWhy } from '../.
 /** Where a step's branch is now, as its caller read it: undefined where it did not, and on a folder run, which has no branch. */
 export type TipOf = (branch: string) => string | undefined;
 
-/** The check may run again, or why not: see the contract for each `why`. */
+/**
+ * The check may run again, or why not: see the contract for each `why`.
+ * @param i What is read of the step (`blockedRecheckRead`).
+ */
 export const blockedRecheck: BlockedRechecked = (i) => {
   if (!i.blocked) return { recheck: false, why: 'not blocked' };
   if (!i.settled) return { recheck: false, why: 'unsettled' };
@@ -28,6 +31,10 @@ export const blockedRecheck: BlockedRechecked = (i) => {
 /**
  * What `blockedRecheck` is handed for a step, off its record as it is: `blocked`, whether it stands blocked on its own work (`ownStatus`,
  * the caller's reading); the try just behind the current one and its check; and where its branch is now (`tipOf`; left out, unread).
+ * @param record The step's record, or undefined where the run has none of it.
+ * @param blocked Whether the step stands blocked on its own work.
+ * @param phaseOf The phase of a task by its id.
+ * @param tipOf Where a branch is now, or undefined where it is left unread.
  */
 export const blockedRecheckRead = (
   record: StepRecord | undefined,

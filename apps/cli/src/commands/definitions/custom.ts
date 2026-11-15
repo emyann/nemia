@@ -43,7 +43,10 @@ function readLines({ name, file, words, error }: AgentInstructions): string[] {
   return [file, '', words];
 }
 
-/** `nemia agents custom`'s runner: a clear, a write of the words `--file` holds, or a read. */
+/**
+ * `nemia agents custom`'s runner: a clear, a write of the words `--file` holds, or a read.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function agentsCustom(args: Args): Promise<number> {
   const name = textArg(args, 'name') ?? '';
   const file = textArg(args, 'file');

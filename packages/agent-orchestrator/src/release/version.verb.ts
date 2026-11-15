@@ -39,6 +39,8 @@ export function runningRelease(): Running {
  * The newest release the release check of the store at `home` last read (`releases/latest.json`): its version, its tag, whether it is
  * newer than the install `running` runs, and the address of its notes where the check kept one; undefined for a checkout, which no
  * check reads for, and where none was read.
+ * @param home The store's folder.
+ * @param running The code this process runs.
  */
 export function latestRelease(home: string, running: Running): Latest | undefined {
   if (running.kind !== 'install') return undefined;
@@ -75,6 +77,7 @@ export type InFlight = {
 /**
  * The sessions in flight among `views`: each task's last attempt while it has not ended, settled or not — a process still running is
  * running on its release either way — with its harness (`DEFAULT_HARNESS` where the task names none) and whether that is a remote agent.
+ * @param views The engine's tasks.
  */
 export const inFlight = (views: readonly TaskView[]): InFlight[] =>
   views.flatMap((v) => {
@@ -87,6 +90,8 @@ export const inFlight = (views: readonly TaskView[]): InFlight[] =>
 /**
  * The sessions at work among `views`, counted by what their attempts recorded they run on (`sessionCounts`): those in flight
  * (`inFlight`) of a task not settled, each image placed under the store's real `releases` folder.
+ * @param views The engine's tasks.
+ * @param releases The store's real releases folder.
  */
 export const sessionsAtWork = (views: readonly TaskView[], releases: string): SessionCount[] =>
   sessionCounts(inFlight(views).flatMap((s) => (s.settled ? [] : [sessionRanOn(s.attempt, s.harness, releases)])));

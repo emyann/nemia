@@ -31,7 +31,11 @@ const OPTION = 'grid grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 gap-y-1 px-3 py-2.
 /** The same row chosen, and not. */
 const [OPTION_ON, OPTION_OFF] = [`bg-secondary-container text-on-secondary-container`, 'ring-1 ring-outline-variant ring-inset'];
 
-/** What the tag over an ask says, by what it is and whether it is answered: a permission asks to run a call of hers. */
+/**
+ * What the tag over an ask says, by what it is and whether it is answered: a permission asks to run a call of hers.
+ *
+ * @param ask the ask the tag stands over
+ */
 export const askTag = (ask: Ask): { words: string; hue: 'yours' | 'money' | 'grey' } =>
   ask.chose !== undefined
     ? { words: ask.kind === 'proposal' ? 'Proposed' : 'Answered', hue: 'grey' }

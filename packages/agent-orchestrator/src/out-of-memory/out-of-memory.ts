@@ -11,6 +11,8 @@ import type { OutOfMemoryKill, OutOfMemory } from '../../contracts/out-of-memory
  * the cgroup's limit was reached (`oom` of 1 or more, or a record written before the runtime carried `oom`), with the knob that raises
  * it — the step's own `memory:` (`own`) where it names one, else the daemon's default (`WF_MEMORY_LIMIT`); else the machine's, which no
  * limit knob raises. Undefined for no record, or one in which no process was killed.
+ * @param memory The attempt's memory record, or undefined where it has none.
+ * @param own The step's own `memory:`, or undefined where it names none.
  */
 export const outOfMemory: OutOfMemory = (memory, own) => {
   if (memory === undefined || memory.oomKills < 1) return undefined;
@@ -27,6 +29,7 @@ const GI = MI * KI;
 /**
  * A number of bytes as a Kubernetes binary quantity a person can type back into `memory:`: a whole number of `Gi` as `4Gi`, one decimal at
  * or past 1Gi (`3.7Gi`), whole `Mi` below that, rounded, and whole `Ki` below 1Mi, rounded up.
+ * @param n The number of bytes.
  */
 export const memoryBytesWord = (n: number): string => {
   if (n >= GI) return Number.isInteger(n / GI) ? `${n / GI}Gi` : `${(Math.round((n / GI) * 10) / 10).toString()}Gi`;
@@ -40,6 +43,9 @@ export const memoryBytesWord = (n: number): string => {
  * give the step one or raise `WF_MEMORY_LIMIT`, the daemon's default; a check runs under the default alone, so its words name
  * `WF_MEMORY_LIMIT` only. Killed because the machine ran out: no limit knob, since raising one squeezes the machine further, but fewer
  * sessions at once (`WF_MAX_CONCURRENT`) or more memory for the machine.
+ * @param k The kill, as `outOfMemory` read it: whose memory ran out, how many processes, the limit and the peak in bytes.
+ * @param own The step's own `memory:`, or undefined where it names none.
+ * @param of Whether a session or a check was killed, a session where none is said.
  */
 export const outOfMemoryWords = (k: OutOfMemoryKill, own: string | undefined, of: 'session' | 'check' = 'session'): string => {
   const head = of === 'check' ? 'check out of memory' : 'out of memory';

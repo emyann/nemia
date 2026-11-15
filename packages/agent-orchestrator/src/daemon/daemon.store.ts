@@ -67,6 +67,8 @@ const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
  * `totalBytes`, 1 GiB at least: `reservedFor`) are what the runtime admits a session by against the machine's memory (`storeLimits`,
  * `storeAdmission`), `request` absent when unset. A refusal of any of them is thrown, so the pass that reads them refuses itself, and
  * so does the daemon's start.
+ * @param config The settings the daemon is given, each read as its reader answers it.
+ * @param totalBytes Reads the machine's memory in bytes, for the default floor; `os.totalmem` by default.
  */
 export const ceilings = (
   config: Settings,
@@ -98,6 +100,7 @@ const isCeilings = Schema.is(Schema.Struct({ sessions: Schema.Finite, runs: Sche
 
 /**
  * The ceilings the last pass ran with (`tickFile`), or undefined before any pass has written them, or when the file does not read as them.
+ * @param home The store's directory (`WF_ROOT`).
  */
 export function lastCeilings(home: string): { sessions: number; runs: number } | undefined {
   let text: string;
@@ -114,6 +117,8 @@ export function lastCeilings(home: string): { sessions: number; runs: number } |
  * The ceilings a pass runs with, written down for `nemia ls` and `nemia decide` — only when they differ from what is there, and through a
  * hidden file renamed over it, so a reader never reads half of it. A store that cannot be written loses only this: a reader falls back to
  * its own environment, and the pass goes on.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param c The ceilings the pass runs with: the sessions a pool admits, and the runs in flight at once (0 for no cap).
  */
 export function recordCeilings(home: string, c: { sessions: number; runs: number }): void {
   const last = lastCeilings(home);
@@ -127,6 +132,7 @@ export function recordCeilings(home: string, c: { sessions: number; runs: number
 /**
  * What the last pass cost, phase by phase: `$WF_ROOT/tick-stats.json`, written by the pass that measured it, `nemia up`'s or `nemia
  * tick`'s, and read by `nemia up --stats` and the api. One pass's numbers, replaced by the next's: nothing reads it to decide.
+ * @param home The store's directory (`WF_ROOT`).
  */
 export const statsFile = (home: string): string => path.join(home, 'tick-stats.json');
 
@@ -162,13 +168,19 @@ const isPassCost = Schema.is(
   ),
 );
 
-/** A pass's cost as it reads off disk, or undefined when it does not read as one: a file from another version, or half of one. */
+/**
+ * A pass's cost as it reads off disk, or undefined when it does not read as one: a file from another version, or half of one.
+ * @param text The file's text.
+ */
 export const parsePassCost = (text: string): PassCostRead | undefined => {
   const c = jsonOr(text);
   return isPassCost(c) ? c : undefined;
 };
 
-/** The last pass's cost (`statsFile`), or undefined before any pass has written one, or when the file does not read as one. */
+/**
+ * The last pass's cost (`statsFile`), or undefined before any pass has written one, or when the file does not read as one.
+ * @param home The store's directory (`WF_ROOT`).
+ */
 export function lastPassCost(home: string): PassCostRead | undefined {
   let text: string;
   try {
@@ -183,6 +195,8 @@ export function lastPassCost(home: string): PassCostRead | undefined {
  * A pass's cost written down, through a hidden file renamed over the last, so a reader never reads half of it. A store that cannot be
  * written loses only this, which the next pass writes again, and the pass goes on. Answers with the time the write took, which is
  * measuring's too.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param cost The pass's cost, phase by phase.
  */
 export function recordPassCost(home: string, cost: PassCost): number {
   const t0 = performance.now();
@@ -193,7 +207,10 @@ export function recordPassCost(home: string, cost: PassCost): number {
   return performance.now() - t0;
 }
 
-/** `$WF_ROOT/daemon.json`: the store taken by one daemon, the api or a `nemia up`, written by it alone (`daemon.ts`). */
+/**
+ * `$WF_ROOT/daemon.json`: the store taken by one daemon, the api or a `nemia up`, written by it alone (`daemon.ts`).
+ * @param home The store's directory (`WF_ROOT`).
+ */
 export const daemonFile = (home: string): string => path.join(home, DAEMON_FILE);
 
 const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
@@ -245,7 +262,10 @@ const upgraded = ({ by, holder, serves, ...file }: typeof DaemonFileSchema.Type)
   return { ...file, by: by === 'api' ? 'api' : 'up', passedAt: file.passedAt ?? null, ...(cards ? { serves: cards } : {}) };
 };
 
-/** The file as a daemon writes it, or undefined when the text does not read as one (`DaemonFileSchema`). */
+/**
+ * The file as a daemon writes it, or undefined when the text does not read as one (`DaemonFileSchema`).
+ * @param text The file's text.
+ */
 export function parseDaemonFile(text: string): DaemonFile | undefined {
   const decoded = Schema.decodeUnknownResult(DaemonFileSchema)(jsonOr(text));
   return Result.isFailure(decoded) ? undefined : upgraded(decoded.success);
@@ -273,6 +293,7 @@ function readDaemon(home: string): DaemonRead | undefined {
 /**
  * When process `pid` started, in clock ticks since boot: field 22 of `/proc/<pid>/stat`, read after the last `)`, as the command name
  * before it may hold spaces and parentheses. Undefined where there is no `/proc`, or the process is gone.
+ * @param pid The process's id.
  */
 export function procStartOf(pid: number): number | undefined {
   try {
@@ -287,6 +308,7 @@ export function procStartOf(pid: number): number | undefined {
 /**
  * What the process table says of a file's pid (`Identity` in daemon.ts) — the lease's, or the holder a take-over's pause names: alive,
  * and whether it is the process that wrote the file.
+ * @param file The file's pid, and when its process started where the file says.
  */
 export function identify(file: Pick<DaemonFile, 'pid' | 'procStart'>): Identity {
   if (!alive(file.pid)) return 'gone';
@@ -345,7 +367,11 @@ function stamped(file: DaemonFile, stamp: keyof typeof MONO_OF, now: Instant): D
   return next;
 }
 
-/** Where the store stands now: who holds it, and whether it ticks (`daemonStanding` in daemon.ts, off the file and the process table). */
+/**
+ * Where the store stands now: who holds it, and whether it ticks (`daemonStanding` in daemon.ts, off the file and the process table).
+ * @param home The store's directory (`WF_ROOT`).
+ * @param now The instant to judge at, on both clocks; now by default.
+ */
 export const daemonStanding = (home: string, now: Instant = instantNow()): DaemonStanding =>
   standingOf(readDaemon(home), { now, identify });
 
@@ -379,6 +405,7 @@ function leaseOf(every: number, cwd: string, by: HolderKind, now: Instant, relea
  * An empty store is claimed with a link, which fails when the file appeared in between, so two starts on an empty store cannot both win —
  * the loser judges again. A file already there is replaced by a rename; two takeovers of one stale file both rename, and the loser learns
  * it at its first pass (`stillHeld`).
+ * @param home The store's directory (`WF_ROOT`).
  */
 export function takeStore(
   home: string,
@@ -422,6 +449,8 @@ export function takeStore(
 /**
  * Whether the store is still this daemon's, read at the start of each pass: undefined when it is — the file names this process, or there is
  * no file or none that reads, which the next write puts right — or the file of whoever took it over.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param held The file this daemon took the store by (`takeStore`).
  */
 export function stillHeld(home: string, held: DaemonFile): DaemonFile | undefined {
   const file = readDaemon(home)?.file;
@@ -432,6 +461,9 @@ export function stillHeld(home: string, held: DaemonFile): DaemonFile | undefine
  * Write down a pass this daemon completed, at `now` on both clocks — only while the store is still its own: a file that names another
  * holder is that holder's to write. Stamped on the file as it stands when it names this daemon, so what was written since it took the
  * store — its url, its beat — stays. Answers the file as it now stands.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param held The file this daemon took the store by (`takeStore`).
+ * @param now The instant the pass completed at, on both clocks; now by default.
  */
 export function passed(home: string, held: DaemonFile, now: Instant = instantNow()): DaemonFile {
   const file = readDaemon(home)?.file;
@@ -444,6 +476,8 @@ export function passed(home: string, held: DaemonFile, now: Instant = instantNow
 /**
  * Write down where the api serves, `url`, into the file this process holds the store by — only while it names this process and has not
  * let the store go: a file of another holder, or none, is not this process's to write. Answers whether it was written.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param url Where the api serves.
  */
 export function heldUrl(home: string, url: string): boolean {
   const file = readDaemon(home)?.file;
@@ -459,6 +493,8 @@ export function heldUrl(home: string, url: string): boolean {
  *
  * The cards carry nothing secret, and this file is no place for one: the token a viewer needs is the holder engine's own, kept 0600
  * in its store, and asked for there (`holderTokenOf`).
+ * @param home The store's directory (`WF_ROOT`).
+ * @param cards What the engine serves on its own port, an opaque card by harness name.
  */
 export function heldServes(home: string, cards: Record<string, Record<string, unknown>>): boolean {
   const file = readDaemon(home)?.file;
@@ -475,6 +511,8 @@ export function heldServes(home: string, cards: Record<string, Record<string, un
  * that has gone stalled names a port no one is listening on, so there is nothing to dial; and a lease *this* process holds names
  * this process's own port, which it must never dial — it answers that follow off its own engine, and a viewer that dialled itself
  * would ask its own port for a session it already holds.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param now The instant to judge at, on both clocks; now by default.
  */
 export function servesOnStore(home: string, now: Instant = instantNow()): Record<string, Record<string, unknown>> | undefined {
   const standing = daemonStanding(home, now);
@@ -486,6 +524,9 @@ export function servesOnStore(home: string, now: Instant = instantNow()): Record
  * The daemon's beat, on a timer of its interval: `beatAt` and `beatMono`, at `now` on both clocks, written into its own file, whatever the
  * pass is doing — only while the file names this daemon, as it took the store, and it has not let it go; a file gone or unreadable is the
  * next pass's to write. Never thrown: it runs on a timer, where a throw would end the process mid-pass.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param held The file this daemon took the store by (`takeStore`).
+ * @param now The instant of the beat, on both clocks; now by default.
  */
 export function beat(home: string, held: DaemonFile, now: Instant = instantNow()): void {
   try {
@@ -498,6 +539,9 @@ export function beat(home: string, held: DaemonFile, now: Instant = instantNow()
  * Let the store go: `stoppedAt` written, so the store reads free at once and a reused pid never holds it — only while the file still names
  * this daemon. Never thrown: it runs as the process stops, on a signal or a failure, and a store that cannot be written is read free anyway
  * once the process is gone.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param held The file this daemon took the store by (`takeStore`).
+ * @param at The time the store is let go at, an ISO stamp; now by default.
  */
 export function releaseStore(home: string, held: DaemonFile, at = new Date().toISOString()): void {
   try {
@@ -509,6 +553,9 @@ export function releaseStore(home: string, held: DaemonFile, at = new Date().toI
 /**
  * Why a pass by hand may not run now — a daemon of either kind ticks the store, named — or undefined when it may. A `nemia tick` never
  * writes the file.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param verb The verb asking, `tick`, whose words the refusal says.
+ * @param now The instant to judge at, on both clocks; now by default.
  */
 export function storeRefusal(home: string, verb: 'tick', now: Instant = instantNow()): string | undefined {
   const holder = holderAgainst(daemonStanding(home, now), process.pid);
@@ -519,6 +566,7 @@ export function storeRefusal(home: string, verb: 'tick', now: Instant = instantN
  * The recent passes, oldest first: `$WF_ROOT/tick-recent.json`, the tick's alone to write (`recordRecentPass`), at most `RECENT_KEPT` of
  * them, and read by `nemia passes` and the api. Kept on disk, so a restarted daemon and the command line read what the daemon's passes
  * cost; nothing reads it to decide.
+ * @param home The store's directory (`WF_ROOT`).
  */
 export const recentFile = (home: string): string => path.join(home, 'tick-recent.json');
 
@@ -563,7 +611,10 @@ const isRecentPass = Schema.is(
   ),
 );
 
-/** The recent passes as `text` holds them, and how many of its entries do not read as one; none of either for a text that is no list. */
+/**
+ * The recent passes as `text` holds them, and how many of its entries do not read as one; none of either for a text that is no list.
+ * @param text The file's text.
+ */
 export const parseRecentPasses = (text: string): { passes: RecentPass[]; unread: number } => {
   const list = jsonOr(text);
   if (!Array.isArray(list)) return { passes: [], unread: 0 };
@@ -583,6 +634,7 @@ const recentText = (home: string): string | undefined => {
 /**
  * The recent passes (`recentFile`), oldest first: none before any pass kept one, or for a file that is not a list. An entry that does not
  * read as a pass is left out, and the file named once on stderr with how many; the next pass writes the file without them.
+ * @param home The store's directory (`WF_ROOT`).
  */
 export function recentPasses(home: string): RecentPass[] {
   const text = recentText(home);
@@ -596,6 +648,10 @@ export function recentPasses(home: string): RecentPass[] {
  * The pass whose cost is `cost` kept among the recent (`recentOf`, with what it is kept with, `also`), after those
  * the file holds and the oldest left out past `keep`, written through a hidden file renamed over the last, as `recordPassCost` writes. A
  * store that cannot be written loses only this. Answers with the time it took, which is measuring's, and the passes kept, oldest first.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param cost The pass's cost, phase by phase.
+ * @param keep The most passes kept, the oldest left out past it; `RECENT_KEPT` by default.
+ * @param also What the pass is kept with besides its cost: the quota read, the checks at work and the disk reading; none by default.
  */
 export function recordRecentPass(
   home: string,

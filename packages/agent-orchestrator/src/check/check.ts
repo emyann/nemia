@@ -127,6 +127,10 @@ export type CheckEnv = {
  * run's base commit where the step works on a branch of a repository run, the file of the step's closeout (`t.closeout`) where it
  * signed off one, the run's copy of its workflow folder (`t.workflowFiles`) wherever the record names one — a repository run's step
  * and ending and a folder run's alike — and of its carried files (`t.carriedFiles`) the same way, and the run's labels.
+ * @param run The run's record: its id, its base commit and its labels.
+ * @param step The checked step: its name and its workspace.
+ * @param t The paths the check is told: the workspace, the artifacts folder, the closeout's file (undefined where the step signed off
+ * none), and the run's copies of its workflow and carried files where the record names them.
  */
 export const checkEnvOf = (
   run: Run,
@@ -186,6 +190,8 @@ export type CheckFirst = 'install' | 'unprovisioned';
  *   (`UNPROVISIONED`) and kills itself the same way, so the check ends unfinished, and the step's next session is told.
  *
  * The text is fixed here: nothing of the checkout's reaches the script.
+ * @param command The shell line the run froze for the check.
+ * @param first What runs before the command: an install, or no command at all (`unprovisioned`); left out, the command alone.
  */
 export const checkArgv = (command: string, first?: CheckFirst): string[] => [
   'sh',
@@ -207,17 +213,25 @@ export type Verdict = number | 'unfinished';
 /**
  * A check's verdict off its attempt: the exit code, when the attempt recorded one and was not ended by its `deadline` or by an `operator`;
  * otherwise `unfinished` — killed, stopped, never started, or not ended yet — which is no verdict on the work, never a guessed number.
+ * @param attempt The check's last attempt, its exit code and why it ended, or undefined where it has none.
  */
 export const attemptVerdict = (attempt: { exitCode?: number | null; reason?: string | null } | undefined): Verdict =>
   typeof attempt?.exitCode === 'number' && attempt.reason !== 'deadline' && attempt.reason !== 'operator' ? attempt.exitCode : 'unfinished';
 
-/** The last `n` non-trailing lines of some output. */
+/**
+ * The last `n` non-trailing lines of some output.
+ * @param text The output.
+ * @param n How many lines: `CHECK_TAIL_LINES` where none is given.
+ */
 export function lastLines(text: string, n = CHECK_TAIL_LINES): string {
   const lines = text.replace(/\s+$/, '').split('\n');
   return lines.slice(-n).join('\n');
 }
 
-/** How a verdict reads on a screen: `exit 1`, or `unfinished`. */
+/**
+ * How a verdict reads on a screen: `exit 1`, or `unfinished`.
+ * @param v The verdict.
+ */
 export const verdictWord = (v: Verdict): string => (v === 'unfinished' ? 'unfinished' : `exit ${v}`);
 
 /**
@@ -239,6 +253,8 @@ export type CheckVerdict = { result: CheckResult; exit: number | null };
  * A check's verdict as codes, off the phase its task stands in and its last attempt's verdict (`attemptVerdict`): `unknown` for a task
  * the engine has no record of, `passed` once it succeeded, `running` while it has not settled, and once it failed or was stopped, the
  * code it exited with (`failed`) or `unfinished`. Pure.
+ * @param phase The phase the check's task stands in.
+ * @param verdict Its last attempt's verdict (`attemptVerdict`).
  */
 export function checkVerdictOf(phase: TaskPhase, verdict: Verdict): CheckVerdict {
   if (phase === 'unknown') return { result: 'unknown', exit: null };
@@ -253,6 +269,7 @@ export function checkVerdictOf(phase: TaskPhase, verdict: Verdict): CheckVerdict
  *
  * A contract a step only learns about by failing it costs a whole session to communicate. Telling it
  * does not weaken the fence — the fence is about who AUTHORS the command, and that stays the run.
+ * @param command The check's shell line, as the run froze it.
  */
 export const checkContract = (command: string): string =>
   [
@@ -276,6 +293,8 @@ export const checkContract = (command: string): string =>
  * pull request on GitHub and a factory that stages a local merge are both told this, and the recipe of either is its step's own note.
  * How to stage a merge, and what the session is denied, are its place's words (`words`, `landingWords`); with none, it is sent to its
  * place's skill (*Stage a landing*).
+ * @param command The check's shell line, as the run froze it.
+ * @param words How the place stages a merge and what the session is denied, or undefined where the place says none.
  */
 export const landingContract = (command: string, words?: LandingWords): string =>
   [
@@ -312,6 +331,7 @@ export type CheckRefusal = { command: string; verdict: Verdict; stdout: string; 
  * whose words they are. A suite's output is text a step did not write and a run did not vet — a test name,
  * a log line — and it must read as evidence to weigh, never as this step's instructions. The last sentence
  * is the fence: a step that fails a check again is the step most tempted to make the check easier.
+ * @param r What the check said: its command, its verdict, the last lines of each stream, and the kill where one ended it.
  */
 export function refusalSection(r: CheckRefusal): string {
   const json = JSON.stringify({ command: r.command, exit: r.verdict, stdout: r.stdout, stderr: r.stderr }, null, 2);
@@ -354,6 +374,7 @@ export const REPORTED_LINES = 100;
  * space, at the very start of the line — whole and in order. A line a tool prefixed (turbo's
  * `pkg:test: wf …`) is not one. Past `REPORTED_LINES`, the first that many, and `cut`,
  * how many more there were.
+ * @param log The check's stdout.
  */
 export function reportedLines(log: string): { lines: string[]; cut: number } {
   const all = log
@@ -378,6 +399,7 @@ const SUBJECT_FAILED = /^\s*(?:\[[^\]\s]+\] )?[\w.-]+: (?:worker \d+ )?FAILED �
  * (TAP), after its indent and the prefix a tool gave it (turbo's `pkg:test: `) — trimmed, each once, in order, and never the heading
  * `✖ failing tests:` the spec reporter lists them again under — and a runner's failed subject (`SUBJECT_FAILED`), once per subject, as
  * it was first said. Past `FAILING_LINES`, the first that many, and `cut`, how many more there were. A check of another shape names none.
+ * @param log The check's output.
  */
 export function failingLines(log: string): { lines: string[]; cut: number } {
   const all = new Map<string, string>();
@@ -409,6 +431,7 @@ export type LandingSaid = { step: string; check: string; command: string } & (
  * `## What <step>'s check said on the merged tree`: the check of a run's ending that refused the merge (`LandingSaid`), told to the loop's
  * target filed to merge that base — as data, fenced as JSON under a line saying whose words these are; or, where it cannot be read, why,
  * and its task.
+ * @param said What the ending's check said, or why it cannot be read.
  */
 export function landingSaidSection(said: LandingSaid): string {
   const head = ['', `## What ${said.step}'s check said on the merged tree`, ''];
@@ -469,6 +492,7 @@ export type CheckHanded =
  * Evidence, not process: the run executed the command, so its output is a fact about the work, as the diff is, and the step reads it
  * rather than being sent to a log its fence may not reach. As data, fenced as JSON under a line saying whose words these are, since a
  * suite's output is text nobody vetted. A check that did not finish, or whose log cannot be read, says so: never nothing.
+ * @param said What the step's check said, or why it cannot be read.
  */
 export function checkHandedSection(said: CheckHanded): string {
   const head = ['', `## What ${said.step}'s check said`, ''];
@@ -519,6 +543,9 @@ function codeSpan(text: string): string {
  * it refused or did not finish, `checking` until then. An ending that lands on its check (`landsOnCheck`) stands where the run's landing of
  * its merge left it (`landingDue`), never on the check alone: `verified` once the run has committed the merge, and `checking` until it has
  * committed or aborted it. Read of a signed step, and of one whose session was ended at its budget once a recheck filed its check. Pure.
+ * @param step The step, whose workspace says whether it ends on the base.
+ * @param record The step's record: its check and what landed.
+ * @param phaseOf The phase of a task the engine holds, by its id.
  */
 export const onItsCheck = (
   step: StepSpec,

@@ -19,7 +19,11 @@ import { asked, discovered } from '../objects.ts';
 import { Refused } from '../refused.ts';
 import { type Applied, KIND_CALLS, orNone, type Prepared, type Served } from './kinds.ts';
 
-/** What apply does with one object, by what its read found and what its kind takes (`contracts/apply.contract.ts`). */
+/**
+ * What apply does with one object, by what its read found and what its kind takes (`contracts/apply.contract.ts`).
+ * @param found What the object's read found: whether it is served and, where it is, whether the file says what is served.
+ * @param writes What the object's kind takes over the api: a create, an update, and whether its update makes one missing.
+ */
 export const applyOf: ApplyOf = (found, writes) => {
   if (!found.exists) return writes.create ? 'create' : writes.upsert && writes.update ? 'update' : 'no-create';
   if (found.same) return 'unchanged';
@@ -39,6 +43,7 @@ Each prints <plural>/<name> created, configured or unchanged.
 /**
  * A value as JSON with its keys in order and a key that holds null left out, so two objects that say the same compare equal: a file
  * that leaves out a key the api serves as null (a workflow's `readme`) says what it says.
+ * @param value The value to write as JSON.
  */
 export const canonical = (value: unknown): string =>
   JSON.stringify(value, (_key, v: unknown) =>
@@ -51,7 +56,10 @@ export const canonical = (value: unknown): string =>
       : v,
   );
 
-/** Whether `value` is a plain object. */
+/**
+ * Whether `value` is a plain object.
+ * @param value The value asked of.
+ */
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -64,6 +72,9 @@ const stringsOf = (value: unknown): Record<string, string> | undefined =>
 /**
  * The objects of `text`, each document's, a `List`'s items in its place; refused where a document does not parse, naming the verb that
  * read it (`apply`, `propose`).
+ * @param text The file's text: YAML or JSON, one document or several.
+ * @param file The file's name as typed, named in the refusal.
+ * @param verb The verb that read it, named in the refusal: `apply` where it is left out.
  */
 export function objectsOf(text: string, file: string, verb = 'apply'): unknown[] {
   const objects: unknown[] = [];
@@ -123,6 +134,10 @@ export type Read = {
 /**
  * `object` read against `resources` and `-n`'s `namespace`; refused, naming what to type, where it is not one the verb (`apply`,
  * `propose`) writes.
+ * @param object One object of the file, as parsed.
+ * @param resources The resources discovery lists, its kind's resolved among them.
+ * @param namespace The namespace `-n` names, undefined where it names none.
+ * @param verb The verb that reads it, named in a refusal: `apply` where it is left out.
  */
 export function readOf(object: unknown, resources: readonly APIResource[], namespace: string | undefined, verb = 'apply'): Read {
   if (!isRecord(object)) throw new Refused(`nemia ${verb}: a document is no object: each holds apiVersion, kind, metadata and spec`);
@@ -150,7 +165,10 @@ export function readOf(object: unknown, resources: readonly APIResource[], names
   return { resource, name, meta, spec, where: filed ?? namespace };
 }
 
-/** The object `read` names as it is served, or null where none is: in its namespace, else across all where the kind is read so. */
+/**
+ * The object `read` names as it is served, or null where none is: in its namespace, else across all where the kind is read so.
+ * @param verb The verb that asks, named in a refusal: `apply` where it is left out.
+ */
 export async function servedOf({ resource, name, where }: Read, verb = 'apply'): Promise<Served | null> {
   const calls = KIND_CALLS[resource.kind];
   const call =
@@ -223,7 +241,11 @@ async function applied(object: unknown, resources: readonly APIResource[], names
   return said(action === 'unchanged' ? 'unchanged' : action === 'update' && served !== null ? 'configured' : 'created');
 }
 
-/** The text of `file`, stdin's for `-`; refused, naming the file and the verb that read it, where it does not read. */
+/**
+ * The text of `file`, stdin's for `-`; refused, naming the file and the verb that read it, where it does not read.
+ * @param file The file's name as typed, `-` for stdin.
+ * @param verb The verb that reads it, named in the refusal: `apply` where it is left out.
+ */
 export function textOf(file: string, verb = 'apply'): string {
   try {
     return fs.readFileSync(file === '-' ? 0 : file, 'utf8');
@@ -234,6 +256,11 @@ export function textOf(file: string, verb = 'apply'): string {
   }
 }
 
+/**
+ * `nemia apply -f <file|->`, on the words after `apply`: each object of the file applied, and the exit code, the highest of its refusals'
+ * (`Refused`): 2 for a usage refusal, 1 for a stale version (`Conflict`), 0 where none was refused.
+ * @param args The words typed after `apply`: `-f` and `-n` with their values, or `--help`.
+ */
 export async function apply(args: readonly string[]): Promise<number> {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(APPLY_HELP);

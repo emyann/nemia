@@ -30,13 +30,19 @@ export const PROPOSED_INSTEAD: readonly string[] = [
   'skills write factory',
 ];
 
-/** The class of `entry` for an agent: out of reach where it writes a factory's definitions (`PROPOSED_INSTEAD`), else its own. */
+/**
+ * The class of `entry` for an agent: out of reach where it writes a factory's definitions (`PROPOSED_INSTEAD`), else its own.
+ * @param entry The table's entry: its name and its own class.
+ */
 export function agentClassOf(entry: { readonly name: string; readonly class: CommandClass }): CommandClass {
   if (!PROPOSED_INSTEAD.includes(entry.name)) return entry.class;
   return typeof entry.class === 'object' ? { ...entry.class, sets: 'none' } : 'none';
 }
 
-/** The forms of `PROPOSED_INSTEAD` that are no entry's whole name but a command of `names` with its first word: each denied by itself. */
+/**
+ * The forms of `PROPOSED_INSTEAD` that are no entry's whole name but a command of `names` with its first word: each denied by itself.
+ * @param names The names of the table's entries.
+ */
 export const proposedForms = (names: readonly string[]): string[] =>
   PROPOSED_INSTEAD.filter((form) => !names.includes(form) && names.some((name) => form.startsWith(`${name} `)));
 
@@ -99,6 +105,7 @@ function ownBreaks(c: Classed): string[] {
  * unasked whatever it does; an `asksAlways` on a class but `ask`, or left out of a write of the person's rules for auto; and a name
  * that extends an `answer` or an `ask` name by a word (`approve now` under `approve`) in another class, whose own class the rule on
  * the shorter name would override.
+ * @param table The table's entries, each with whether it writes, its class, its `asksAlways` and its spec's flags.
  */
 export function classBreaks(table: readonly Classed[]): string[] {
   const breaks = table.flatMap(ownBreaks);

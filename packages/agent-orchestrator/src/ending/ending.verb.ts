@@ -50,6 +50,10 @@ const inFlightPhase = (phase: TaskPhase): boolean => phase === 'pending' || phas
  * flight is read once for the pass (`runSlots`): a run it holds files nothing, so its ending claims nothing (`mainClaim`). Its plain
  * guards are asked first, untraced: a listing asks this of every run, and most claim no checkout.
  *
+ * @param home The store's directory (`WF_ROOT`).
+ * @param e The engine whose tasks in flight are read.
+ * @param run The run's record.
+ * @param steps The run's workflow's steps.
  * @param from The pass that asks (`PassRead`), and the slot it gave this run (`advanceRun`'s): the runs whose claims are read are the
  *   pass's own listing, the very runs it advances, so a step it filed is read on the run it filed it on; the runs the cap holds are read
  *   once for the pass, and only where another run's claim waits on a slot, since this run's own claim reads the slot the pass gave it; and
@@ -189,6 +193,14 @@ const mainClaim = Effect.fnUntraced(function* (
  * run's — every commit it names is not a tip of the run's result branches — is left alone, the person's or the other run's; one that is
  * this run's is committed only if its check passed on it, and aborted otherwise.
  *
+ * @param home The store's directory (`WF_ROOT`).
+ * @param run The run's record, written in memory with what was done.
+ * @param steps The run's workflow's steps.
+ * @param phaseOf The phase of a task, by its id, as the engine reports it.
+ * @param signedOff The closeout a step signed, by its name, or undefined where it signed none.
+ * @param asked Whether a task was asked for its closeout, by the task's id, and whether its last attempt ended without it.
+ * @param spendOf What each task spent, by its id, or undefined where nothing is recorded of it.
+ * @param verdictOf The exit code of a step's check, by the step's name, or undefined where it has none.
  * @param memo The pass's reading of its places (`StatusMemo`), shared with its `checkoutHold`: the place to read and land through, in
  *   place of the run's own, where it names one.
  */

@@ -75,6 +75,8 @@ const button =
  * Laid out from the `after` edges the first time the run is seen in this browser; after that, wherever a
  * person dragged the nodes, kept per run until "Reset layout" lays it out again. The layering reads the steps' names and the graph's
  * edges only, so a refetch that moves a status does not redo it; a graph that cannot be laid out is said in place of the canvas.
+ *
+ * @param props the props: the run to draw, as the api gives it
  */
 export function RunCanvas(props: Props) {
   const names = useContent(props.run.steps.map((s) => s.name));

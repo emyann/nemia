@@ -51,6 +51,9 @@ const SAY: WrittenVerb<SayRefused, SayUnsent, NonNullable<Harnessed['runner']['s
 /**
  * `say` over the engine's journal (`read`, `go`), its runners and harnesses, and the harness a task runs on (`harnessOf`), as
  * `Engine.say` describes it.
+ * @param go Runs an effect with the engine's journal and runners provided.
+ * @param read Reads a task's journal, by its id.
+ * @param harnessOf The harness that answers for a task in a given state.
  */
 export const sayVerbOf = (
   go: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.Effect<A, E>,

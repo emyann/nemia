@@ -108,7 +108,10 @@ const refusalOf = (refused: VersionRefused): Refusal =>
       ? new Conflict({ message: refused.message })
       : new Invalid({ message: refused.message });
 
-/** The door over `layer`: each method as `doorOf` makes it, each name and each write checked before the layer acts. */
+/**
+ * The door over `layer`: each method as `doorOf` makes it, each name and each write checked before the layer acts.
+ * @param layer The layer the door acts on: the store's files, or the memory stand-in.
+ */
 export function agentDoorOver(layer: AgentLayer): AgentDoorShape {
   const door = doorOf<AgentLayer, AgentName>(layer);
   const judged = (name: AgentName, does: 'write' | 'remove', version: string | undefined, at: AgentAt) =>
@@ -168,6 +171,7 @@ export function agentDoorOver(layer: AgentLayer): AgentDoorShape {
  * The files of the store `home`, as a layer of the door: today's agents and custom instructions, read and written by the agents' own
  * functions. A version counts the skills a start on `repo` finds, where `repo` is given, as `writeAgent` reads it. Custom instructions
  * read given no repository are read with no check of a place (`readCustomInstructions`).
+ * @param home The store's root.
  */
 export function agentFiles(home: string): AgentLayer {
   const skillsAt = (at: AgentAt) =>
@@ -221,5 +225,8 @@ export const AgentDoor = Context.Reference<AgentDoorShape>('agent-orchestrator/A
   defaultValue: () => rootedDoor((root) => agentDoorOver(agentFiles(root)), 'Agent door'),
 });
 
-/** The Agent door over the files of the store `root`, as a layer: for a program that names its root by the door. */
+/**
+ * The Agent door over the files of the store `root`, as a layer: for a program that names its root by the door.
+ * @param root The store's root.
+ */
 export const agentDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(AgentDoor)(agentDoorOver(agentFiles(root)));

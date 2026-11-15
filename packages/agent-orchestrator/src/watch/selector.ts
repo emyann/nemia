@@ -47,6 +47,7 @@ export const SELECTOR_FORM =
 /**
  * Why `keys` cannot be the label keys — a label named as a reserved key, which would decide for a selector what that key means — or
  * undefined where none is. Pure, and asked of `LABEL_KEYS` itself, so a label added under a reserved name is refused by name.
+ * @param keys The label keys asked of.
  */
 export const labelKeysRefusal = (keys: readonly string[]): string | undefined => {
   const taken = keys.find((key) => RESERVED_KEYS.includes(key));
@@ -153,6 +154,7 @@ function clauseRefusal(text: string): string | undefined {
  * Why the selectors `values` spell are refused before anything is read — in the words of the first that is wrong — or undefined where
  * every one of them is a selector. A selector with no clause at all is refused too: `-l ''` and `-l ,` select nothing and say nothing.
  * Pure: what the api's feed refuses a label query in (422), and what a loader of a stored selector throws.
+ * @param values The selectors as typed, one per `-l` given.
  */
 export function selectorsRefusal(values: readonly string[]): string | undefined {
   for (const value of values) {
@@ -186,6 +188,7 @@ function clauseOf(text: string): Clause {
 /**
  * The selectors `values` spell, parsed: one list of clauses for each `-l` given, in the order given, and none at all for none, which
  * selects every line. Text already held to the grammar (`selectorsRefusal`): what it refuses, this does not read. Pure.
+ * @param values The selectors as typed, one per `-l` given.
  */
 export const parseSelectors = (values: readonly string[]): Selectors =>
   values.map((value) => (clausesOf(value) ?? []).filter((c) => c.trim()).map(clauseOf));
@@ -194,6 +197,7 @@ export const parseSelectors = (values: readonly string[]): Selectors =>
  * What `line` offers a selector: a flat map of its keys to their values, read off the signed line (`upgraded`) — `kind` from what it is
  * about, each label it carries, and each reserved key it names. A key the line does not carry is absent, which `=` and `in` never match
  * and `!=` and `notin` always do. The message is no key of it. Pure.
+ * @param line The feed line.
  */
 export function selectableOf(line: FeedLine): Readonly<Record<string, string>> {
   const signed = upgraded(line);
@@ -243,6 +247,8 @@ function holdsOf(clause: Clause, line: FeedLine, on: Readonly<Record<string, str
 /**
  * Whether `line` is selected by `selectors`: every clause of one selector holds of it (AND), and one selector of them does (OR) — and
  * every line where none was given. Pure.
+ * @param selectors The parsed selectors (`parseSelectors`).
+ * @param line The feed line.
  */
 export function selects(selectors: Selectors, line: FeedLine): boolean {
   if (selectors.length === 0) return true;
@@ -253,6 +259,8 @@ export function selects(selectors: Selectors, line: FeedLine): boolean {
 /**
  * Whether `labels`, a flat map such as a run's `metadata.labels` or a card's, is selected by `selectors`: the same clauses as a feed
  * line's, held of the map's keys alone (AND within a selector, OR across them), and every map where none was given. Pure.
+ * @param selectors The parsed selectors (`parseSelectors`).
+ * @param labels The flat map of label keys to their values.
  */
 export function selectsLabels(selectors: Selectors, labels: Readonly<Record<string, string>>): boolean {
   if (selectors.length === 0) return true;

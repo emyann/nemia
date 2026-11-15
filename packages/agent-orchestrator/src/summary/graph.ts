@@ -24,13 +24,17 @@ export type { TypedGraph } from '../../contracts/workflow-graph.contract.ts';
 /**
  * A Workflow object's graph: the run's (`inputGraphOf`), with every node and its kind on every workflow, routed or not, so a client never
  * infers a node's kind from its step's keys. Its laws are `contracts/workflow-graph.contract.ts`'s.
+ * @param steps The workflow's steps, in its order.
  */
 export const typedGraphOf: TypedGraphOf = (steps) => {
   const run = inputGraphOf(steps);
   return { roots: run.roots, edges: run.edges, nodes: steps.map(nodeOf) };
 };
 
-/** `inputGraphOf` without its `input` edges: the graph the list and the run page draw. Pure. */
+/**
+ * `inputGraphOf` without its `input` edges: the graph the list and the run page draw. Pure.
+ * @param steps The workflow's steps, in its order.
+ */
 export function graphOf(steps: readonly GraphStep[]): RunGraph {
   const { edges, ...rest } = inputGraphOf(steps);
   return { ...rest, edges: edges.filter((e): e is GraphEdge => e.kind !== 'input') };
@@ -45,12 +49,18 @@ const withShown = (steps: readonly GraphStep[], names: readonly string[]): Graph
  * The graph of the steps a run is judged by (`judgedSteps`) and shown with (`stepNames`): `graphOf` over the judged workflow, then a
  * step with no `after` for each name the run shows beside it, which is a root. One function for the run's page and the list, so a card
  * draws what its page draws.
+ * @param steps The steps the run is judged by.
+ * @param names The names of the steps the run shows, in their order.
  */
 export function runGraph(steps: readonly GraphStep[], names: readonly string[]): RunGraph {
   return graphOf(withShown(steps, names));
 }
 
-/** `runGraph` with the `input` edges: the run object's graph. Pure. */
+/**
+ * `runGraph` with the `input` edges: the run object's graph. Pure.
+ * @param steps The steps the run is judged by.
+ * @param names The names of the steps the run shows, in their order.
+ */
 export function runInputGraph(steps: readonly GraphStep[], names: readonly string[]): ObjectGraph {
   return inputGraphOf(withShown(steps, names));
 }
@@ -94,6 +104,7 @@ const endLines = (node: GraphNode, edges: readonly GraphEdge[]): string[] => {
 /**
  * A workflow drawn as a Mermaid state diagram: the card leads to each root, an edge per `after`, a labelled edge per route and loop, and
  * each way the run ends. Given no graph, the tests' `triage` workflow (`TRIAGE`), for `docs/model.md`'s `diagram:workflow`. Pure.
+ * @param graph The workflow's graph; left out, the tests' `triage` workflow's.
  */
 export const routedDiagram = (graph: RunGraph = graphOf(TRIAGE)): string => {
   const nodes =

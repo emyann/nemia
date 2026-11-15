@@ -40,7 +40,7 @@ const naming = (said: string | null, facts: readonly string[], row: string): voi
 };
 
 test("REFUSED, before anything is asked: each of nemia agents' lines a person mistypes, by what it names", () => {
-  const commands = 'card <name>, custom <name>, sources, copy <file>, or write, remove and try on the library\'s (user)';
+  const commands = "card <name>, custom <name>, sources, copy <file>, or write, remove and try on the library's (user)";
   const takes = 'It takes --repo <r>, and for a card --from repo|user';
   const repoTakes = ['--repo takes the repository whose workflows/agents to read', 'nemia agents --repo <r>'];
   const fromTakes = ['--from takes which place the agent is in', 'nemia agents card <name> --from repo|user'];

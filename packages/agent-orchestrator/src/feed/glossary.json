@@ -28,6 +28,16 @@
       "type": "Reason"
     },
     {
+      "term": "Library add missing",
+      "meaning": "a Warning line about a factory, `AddsMissing`, labelled with it (`labels.factory`): written by the tick once when an add the factory records (`library.json`) names an item no library holds — a builtin a newer Nemia dropped, an item of the user library removed — or the record does not read, its note each add's fix, and not again while one stays missing.",
+      "type": "Reason"
+    },
+    {
+      "term": "Library adds resolved",
+      "meaning": "a Normal line about a factory, `AddsResolved`: written by the tick once when a factory said missing an add misses none any more — the item made again, or the add taken off. A factory never said missing is never said resolved.",
+      "type": "Reason"
+    },
+    {
       "term": "Daemon's line",
       "meaning": "a line a daemon writes once it has taken the store, naming its pid and how the one before it ended.",
       "type": "DaemonLine"

@@ -256,6 +256,27 @@ export function libraryUsers(home: string, ref: LibraryRef | { readonly kind: 'W
 }
 
 /**
+ * Each factory's library adds as the tick's pass reads them, for the feed (`addsLines`): for `default` and every factory that records its
+ * adds, whether one is `missing`, and each missing add's fix, joined. A record that does not read is said missing too, its refusal's
+ * words the fix, since it gates every name. A factory with no record is left out: its adds are what it runs.
+ * @param home The store's root.
+ */
+export function addsMissingNow(home: string): { factory: string; missing: boolean; message?: string }[] {
+  const listed = doorAtOnce(home, (door) => door.factories.listed()).flatMap((f) => ('error' in f ? [] : [f.name]));
+  return [...new Set([DEFAULT_NAMESPACE, ...listed])].flatMap((factory) => {
+    let adds: readonly LibraryRef[] | undefined;
+    try {
+      adds = readLibraryAdds(home, factory);
+    } catch (e) {
+      return [{ factory, missing: true, message: e instanceof Error ? e.message : String(e) }];
+    }
+    if (adds === undefined) return [];
+    const fixes = adds.flatMap((ref) => libraryAddObject(home, factory, ref, true).status.message ?? []);
+    return [{ factory, missing: fixes.length > 0, ...(fixes.length > 0 && { message: fixes.join(' ') }) }];
+  });
+}
+
+/**
  * The library's MCP servers the factory `name` has added, by name: the person's record of each, else Nemia's builtin of that name. None
  * for a factory with no record of its adds, since the library held no server before adds were recorded.
  * @param home The store's root.

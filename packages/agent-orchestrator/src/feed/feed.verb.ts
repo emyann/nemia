@@ -28,6 +28,7 @@ import {
   type FeedResumed,
   type FeedLevels,
   type FeedConflicts,
+  type FeedMissing,
   type FeedReadiness,
   type FeedPublished,
   type FeedWords,
@@ -143,7 +144,7 @@ const loggedOf =
 /**
  * A pass's words written to the feed where they changed (`feedPass`, over this process's fold, `feedMemo`), with the store's pause put
  * or lifted where the pass hands the pause it read (`pause`) and each factory's level changed where it hands the levels (`levels`) and
- * its conflicts turned where it hands them (`conflicts`), and the store's readiness where it moved where it hands the daemon's read
+ * its conflicts turned where it hands them (`conflicts`), its library adds gone missing where it hands them (`missing`), and the store's readiness where it moved where it hands the daemon's read
  * (`readiness`), each
  * line written logged (`loggedOf`: a `closed out` line as its closeout, every other as its words) and, where the process has a hub
  * (`FeedHub`), published to it with the bytes it was written at
@@ -164,6 +165,7 @@ export const emitFeed = Effect.fn('emitFeed')(function* (
     resumed?: FeedResumed;
     levels?: FeedLevels;
     conflicts?: FeedConflicts;
+    missing?: FeedMissing;
     readiness?: FeedReadiness;
   } = {},
 ) {

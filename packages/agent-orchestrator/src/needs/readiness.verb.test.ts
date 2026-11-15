@@ -5,11 +5,11 @@
  * the release was tested with, and offers its removal once in place; a sign-in a person types is offered as typed, never started; the
  * default harness's kept token reaches its sign-in check, said as set and loading, never as good, and a token file others may read is
  * missing with the `chmod 600` that fixes it; a place's need is read by its check and carries the command that fixes it; a place's
- * repository need is read per factory, and a workflow's need of `scope: repository` in its factory's repository; the service, linger, bind and machine pieces follow what their commands and the environment
- * answer; a harness nothing runs on and nobody activated is `inactive`, never counted against `ready`, until it is installed or a
- * factory's workflow names it, its checks run over a PATH of the test's own, with no stand-in of it (`test/ambient.ts` puts one of each
- * harness first); Nemia's folder said only where the keeper's trust of it was refused; and the read is `ready` only where no piece is
- * missing. The test's store is its own, at `ROOT`.
+ * repository need is read per factory, and a workflow's need of `scope: repository` in its factory's repository; the service, linger,
+ * bind and machine pieces follow what their commands and the environment answer; a harness nothing runs on and nobody activated is
+ * `inactive`, never counted against `ready`, until it is installed or a factory's workflow names it, its checks run over a PATH of the
+ * test's own, with no stand-in of it (`test/ambient.ts` puts one of each harness first); Nemia's folder said only where the keeper's
+ * trust of it was refused; and the read is `ready` only where no piece is missing. The test's store is its own, at `ROOT`.
  */
 import { createFactoryAt } from '../factory/factory.store.ts';
 import path from 'node:path';
@@ -537,7 +537,12 @@ test("a workflow's need of scope repository is read in its factory's repository,
   const repo = fs.mkdtempSync(path.join(ROOT, 'scoped-'));
   const dir = path.join(repo, 'workflows', 'dev');
   fs.mkdirSync(dir, { recursive: true });
-  const need = (name: string, ...scope: string[]) => [`  - name: ${name}`, '    message: the tool', '    check: test -f only-here', ...scope];
+  const need = (name: string, ...scope: string[]) => [
+    `  - name: ${name}`,
+    '    message: the tool',
+    '    check: test -f only-here',
+    ...scope,
+  ];
   fs.writeFileSync(
     path.join(dir, 'README.md'),
     ['---', 'needs:', ...need('scoped-tool', '    scope: repository'), ...need('unscoped-tool'), '---', ''].join('\n'),

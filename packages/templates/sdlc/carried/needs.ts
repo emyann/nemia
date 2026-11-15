@@ -12,14 +12,24 @@
  *   status`), 1 where it is signed out or the scope is missing, saying which.
  * - `identity` sets git's global name and email from the account gh is signed in to: its name (its login where it has none) and its
  *   noreply address, `<id>+<login>@users.noreply.github.com`, so a commit is made under the account without publishing an address.
+ * - `browser` exits 0 where the Chromium the steps' browser tools launch is installed, checked in the repository it runs in (the need
+ *   says `scope: repository`): the `playwright-core` the browser tools run is resolved from there — the one `@playwright/mcp` resolves
+ *   where the repository has it, else the repository's own — and the need is met where its `chromium.executablePath()` is on disk, and
+ *   missing, naming the build, where it is not. Where the repository holds neither (the tools fetched another way), any Chromium where
+ *   Playwright looks (`PLAYWRIGHT_BROWSERS_PATH`, else its cache in the home folder) meets it.
+ * - `browser --install` installs that build with that same `playwright-core`'s installer, `node <playwright-core>/cli.js install
+ *   chromium`, as the user it runs as; refused where the repository holds no `playwright-core`.
  *
  * Refuses, exit 1 on stderr with what to do next: no `NEMIA_TOOLS`, a machine gh ships no archive for, a release or a download that
- * cannot be read, a sum that differs, gh missing or signed out. It imports Node's built-ins alone: the run freezes the carried folder
- * whole, and a fix runs it with the machine's `node`.
+ * cannot be read, a sum that differs, gh missing or signed out, a Chromium the browser tools would not find, an install with no
+ * `playwright-core` or one that fails. It imports Node's built-ins alone: the run freezes the carried folder whole, and a fix runs it
+ * with the machine's `node`.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import os from 'node:os';
 import path from 'node:path';
 
 /** A reason the verb is refused: said on stderr, exit 1. */
@@ -214,15 +224,116 @@ function identity(): string[] {
   return [`git commits as ${shown} <${email}>`];
 }
 
+/** How long the browser's install may take, in milliseconds: a download of a Chromium build and its headless shell. */
+const INSTALL_BOUND = 840_000;
+
+/** The `playwright-core` the browser tools run, found in a repository: its folder, its version and who resolves it. */
+type Core = { dir: string; version: string; via: string };
+
+/** The folder of the package `name` as Node resolves it from the folder `from`, by its `package.json`; none where it does not. */
+function resolvedFrom(from: string, name: string): string | undefined {
+  try {
+    return path.dirname(createRequire(path.join(from, 'noop.js')).resolve(`${name}/package.json`));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The `playwright-core` the browser tools run, resolved from the repository `repo`: the one `@playwright/mcp` resolves where the
+ * repository has it, else the repository's own; none where it holds neither.
+ */
+function coreOf(repo: string): Core | undefined {
+  const mcp = resolvedFrom(repo, '@playwright/mcp');
+  const fromMcp = mcp === undefined ? undefined : resolvedFrom(mcp, 'playwright-core');
+  const dir = fromMcp ?? resolvedFrom(repo, 'playwright-core');
+  if (dir === undefined) return undefined;
+  let version = 'of no version';
+  try {
+    const read = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { version?: unknown };
+    if (typeof read.version === 'string') version = read.version;
+  } catch {
+    version = 'of an unreadable package.json';
+  }
+  return { dir, version, via: fromMcp === undefined ? 'the repository' : '@playwright/mcp' };
+}
+
+/** The Chromium `core` launches, by its own `chromium.executablePath()`; refuses where it names none. */
+function executableOf(core: Core): string {
+  let file: unknown;
+  try {
+    const loaded = createRequire(path.join(core.dir, 'package.json'))(core.dir) as { chromium?: { executablePath?: () => string } };
+    file = loaded.chromium?.executablePath?.();
+  } catch (err) {
+    throw new Refusal(
+      `playwright-core ${core.version} at ${core.dir} does not load (${(err as Error).message}): install the repository's dependencies again`,
+    );
+  }
+  if (typeof file !== 'string' || !file)
+    throw new Refusal(`playwright-core ${core.version} at ${core.dir} names no Chromium: install the repository's dependencies again`);
+  return file;
+}
+
+/** The build a Chromium's path names (`chromium-<build>`), or the path itself where it names none. */
+const buildOf = (file: string): string => /chromium(?:_headless_shell)?-(\d+)/.exec(file)?.[1] ?? file;
+
+/** The folders Playwright keeps its browsers in where nothing names its own: `PLAYWRIGHT_BROWSERS_PATH`, else its caches. */
+function browserFolders(): string[] {
+  const named = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  const home = os.homedir();
+  return [named || path.join(home, '.cache', 'ms-playwright'), path.join(home, 'Library', 'Caches', 'ms-playwright')];
+}
+
+/** The command that installs the browser with `core`'s installer. */
+const installerOf = (core: Core): string[] => [path.join(core.dir, 'cli.js'), 'install', 'chromium'];
+
+/** `browser`: whether the Chromium the browser tools launch is installed; `browser --install` installs it with their installer. */
+function browser(args: string[]): string[] {
+  const install = args.includes('--install');
+  const unknown = args.filter((a) => a !== '--install');
+  if (unknown.length)
+    throw new Refusal(`browser takes --install alone, not ${unknown.join(' ')}: give \`browser\` or \`browser --install\``);
+  const repo = process.cwd();
+  const core = coreOf(repo);
+  if (install) {
+    if (core === undefined)
+      throw new Refusal(
+        `${repo} holds no @playwright/mcp nor playwright-core to install the browser with: install the repository's dependencies, or install Chromium with the installer of the Playwright your browser tools run`,
+      );
+    const ran = spawnSync(process.execPath, installerOf(core), { stdio: ['ignore', 'inherit', 'inherit'], timeout: INSTALL_BOUND });
+    if (ran.status !== 0)
+      throw new Refusal(
+        `playwright-core ${core.version}'s installer ended ${ran.status ?? ran.signal ?? ran.error?.message}: read its output above, then run the fix again`,
+      );
+    const file = executableOf(core);
+    if (!fs.existsSync(file)) throw new Refusal(`the installer ended well, yet ${file} is not there: run the fix again`);
+    return [`Chromium build ${buildOf(file)} installed with playwright-core ${core.version}, at ${file}`];
+  }
+  if (core === undefined) {
+    const found = browserFolders().some((dir) => fs.existsSync(dir) && fs.readdirSync(dir).some((name) => name.startsWith('chromium-')));
+    if (!found)
+      throw new Refusal(
+        `${repo} holds no playwright-core, and no Chromium is where Playwright looks (${browserFolders().join(', ')}): install Chromium with the installer of the Playwright your browser tools run`,
+      );
+    return [`${repo} holds no playwright-core, and a Chromium is where Playwright looks`];
+  }
+  const file = executableOf(core);
+  if (!fs.existsSync(file))
+    throw new Refusal(
+      `the browser tools' playwright-core ${core.version} (resolved by ${core.via}) launches Chromium build ${buildOf(file)}, and ${file} is not there: install it with \`node "$WF_CARRIED_FILES/needs.ts" browser --install\` in the repository`,
+    );
+  return [`the browser tools' playwright-core ${core.version} (resolved by ${core.via}) finds Chromium build ${buildOf(file)} at ${file}`];
+}
+
 /** The verbs, by name. */
-const VERBS: Record<string, (args: string[]) => string[] | Promise<string[]>> = { 'install-gh': installGh, scope, identity };
+const VERBS: Record<string, (args: string[]) => string[] | Promise<string[]>> = { 'install-gh': installGh, scope, identity, browser };
 
 /** The whole run: exit 0 with what was done on stdout, 1 with the refusal on stderr. */
 async function main(): Promise<number> {
   const [verb = '', ...args] = process.argv.slice(2);
   try {
     const act = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;
-    if (!act) throw new Refusal(`\`${verb}\` is no verb: give install-gh, scope <scope> or identity`);
+    if (!act) throw new Refusal(`\`${verb}\` is no verb: give install-gh, scope <scope>, identity or browser [--install]`);
     for (const line of await act(args)) process.stdout.write(`nemia needs: ${line}\n`);
     return 0;
   } catch (err) {

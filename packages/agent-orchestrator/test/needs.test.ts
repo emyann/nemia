@@ -221,18 +221,25 @@ test("a run's workflow need of scope repository is checked in the run's reposito
   };
   const scoped = (scope: string[]): string =>
     workflow(
-      ['---', 'needs:', '  - name: inside', '    message: met inside the repository', '    check: test -f only-here', ...scope, '---', ''].join(
-        '\n',
-      ),
+      [
+        '---',
+        'needs:',
+        '  - name: inside',
+        '    message: met inside the repository',
+        '    check: test -f only-here',
+        ...scope,
+        '---',
+        '',
+      ].join('\n'),
     );
 
-  await s.test('scoped to the repository, the need reads met in the run\'s repository and the first step is filed', async () => {
+  await s.test("scoped to the repository, the need reads met in the run's repository and the first step is filed", async () => {
     const id = (await stage.runPlaced(startRun({ brief: 'build it', repo: marked(), workflowDir: scoped(['    scope: repository']) }))).id;
     await tick(id);
     assert.deepEqual(b.filings, [`${id}-implement`]);
   });
 
-  await s.test('with no scope, the same check reads the store\'s folder, and the run waits on it', async () => {
+  await s.test("with no scope, the same check reads the store's folder, and the run waits on it", async () => {
     const before = b.filings.length;
     const id = (await stage.runPlaced(startRun({ brief: 'build it', repo: marked(), workflowDir: scoped([]) }))).id;
     await tick(id);

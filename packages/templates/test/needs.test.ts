@@ -2,8 +2,8 @@
  * sdlc's machine needs (`spec.needs` of `build` and `quick`), as a factory gets them: rendered each way of landing into each workflow's
  * README frontmatter, where the daemon reads them, and run as the sweep runs a check (`sh -c`). Where `github` is true a run needs gh on
  * the PATH, signed in with the `workflow` scope, and a git identity, which the account fills; where it is false nothing of GitHub holds
- * a run: the two gh checks are met, whatever the machine has. Either way a run needs a Chromium where Playwright looks, which the steps'
- * browser tools open (`browser`).
+ * a run: the two gh checks are met, whatever the machine has. Either way a run needs the Chromium the steps' browser tools open
+ * (`browser`), checked and fixed in the factory's repository (`scope: repository`) by the carried `needs.ts`, whose fix the server runs.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +15,13 @@ import { scratch } from 'test-kit/scratch';
 import { renderedSdlc } from './template.ts';
 
 /** A need as the README's frontmatter holds it, as far as this test reads it. */
-type Need = { name: string; check: string; fills?: string; fixes?: Array<{ command: string; code?: string; kind?: string }> };
+type Need = {
+  name: string;
+  check: string;
+  fills?: string;
+  scope?: string;
+  fixes?: Array<{ command: string; code?: string; kind?: string }>;
+};
 
 /** The two workflows that land a change, and so need what landing on GitHub takes. */
 const LANDING = ['build', 'quick'];
@@ -65,17 +71,28 @@ for (const github of [true, false]) {
   });
 }
 
-test('build and quick declare a browser, met where Playwright keeps a Chromium and missing where it keeps none', async () => {
+test("build and quick declare a browser checked in the repository by the browser tools' own Playwright, its fix the server runs, any Chromium meeting it where the repository holds none", async () => {
   const { tree } = await renderedSdlc([]);
+  const carried = path.join(tree, 'workflows', 'carried');
   for (const workflow of LANDING) {
     const browser = needsOf(tree, workflow).find((need) => need.name === 'browser');
-    assert.equal(browser?.fixes?.[0]?.kind, 'typed', `${workflow}'s browser is installed by the person, with their Playwright's installer`);
+    assert.equal(browser?.scope, 'repository', `${workflow}'s browser is checked and fixed in the factory's repository`);
+    assert.equal(browser?.fixes?.[0]?.kind, undefined, `${workflow}'s browser is installed by the server, not typed by a person`);
+    assert.match(browser?.fixes?.[0]?.command ?? '', /needs\.ts" browser --install$/);
     const home = scratch('nemia-needs-home-');
+    const repo = scratch('nemia-needs-repo-');
     const ran = () =>
-      spawnSync('/bin/sh', ['-c', browser?.check ?? 'exit 9'], { cwd: home, env: { PATH: '/usr/bin:/bin', HOME: home }, timeout: 30_000 })
-        .status;
+      spawnSync('/bin/sh', ['-c', browser?.check ?? 'exit 9'], {
+        cwd: repo,
+        env: { PATH: `${path.dirname(process.execPath)}:/usr/bin:/bin`, HOME: home, WF_CARRIED_FILES: carried },
+        timeout: 30_000,
+      }).status;
     assert.notEqual(ran(), 0, `${workflow}'s browser is missing where Playwright keeps no Chromium`);
     fs.mkdirSync(path.join(home, '.cache', 'ms-playwright', 'chromium-1200'), { recursive: true });
     assert.equal(ran(), 0, `${workflow}'s browser is met once Playwright keeps a Chromium`);
   }
+  assert.deepEqual(
+    ...(LANDING.map((workflow) => needsOf(tree, workflow).find((need) => need.name === 'browser')) as [unknown, unknown]),
+    'build and quick say the one need',
+  );
 });

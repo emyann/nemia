@@ -6,9 +6,9 @@
  * `src/release/nemia-link.boundary.test.ts`); an answer left out, a need no place declares and a fix of a workflow of a
  * factory whose places are not trusted are refused, nothing filed; a repository need named by its factory alone is filed in that
  * factory's repository once its places are trusted, and refused, naming the trust, before; a workflow's own need of `scope: repository`
- * is filed in its factory's repository with the workflow's folders, where one with no scope is filed in the store's; and the fix's phase, output and exit code
- * are read off its task as it settles. The test's store is its own, at `ROOT`, given as `ENV`, and the harness's trust file a folder of
- * its own, so no place is trusted until a test trusts it.
+ * is filed in its factory's repository with the workflow's folders, where one with no scope is filed in the store's; and the fix's
+ * phase, output and exit code are read off its task as it settles. The test's store is its own, at `ROOT`, given as `ENV`, and the
+ * harness's trust file a folder of its own, so no place is trusted until a test trusts it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -186,8 +186,15 @@ test("a workflow's need of scope repository is fixed in its factory's repository
   stand().world.repository(repo, { 'a.txt': 'one\n' });
   const dir = path.join(repo, 'workflows', 'dev');
   fs.mkdirSync(dir, { recursive: true });
-  const need = (name: string, ...scope: string[]) =>
-    [`  - name: ${name}`, '    message: the tool', '    check: exit 1', ...scope, '    fixes:', '      - command: echo installed', '        message: install it'];
+  const need = (name: string, ...scope: string[]) => [
+    `  - name: ${name}`,
+    '    message: the tool',
+    '    check: exit 1',
+    ...scope,
+    '    fixes:',
+    '      - command: echo installed',
+    '        message: install it',
+  ];
   fs.writeFileSync(
     path.join(dir, 'README.md'),
     ['---', 'needs:', ...need('inside', '    scope: repository'), ...need('outside'), '---', ''].join('\n'),
@@ -195,8 +202,9 @@ test("a workflow's need of scope repository is fixed in its factory's repository
   createFactoryAt(ROOT, { name: 'scoped', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
   await run(trustPlaces([repo]));
   const inside = engine().tasks.get((await run(startFix({ need: 'inside', factory: 'scoped', workflow: 'dev' }))).id)?.spec;
-  assert.equal(inside?.cwd, repo);
-  const env = (inside?.config as { env: Record<string, string> }).env;
+  assert.ok(inside);
+  assert.equal(inside.cwd, repo);
+  const env = (inside.config as { env: Record<string, string> }).env;
   assert.equal(env.WF_WORKFLOW_FILES, dir);
   assert.ok(env.WF_CARRIED_FILES, 'told the carried files, as the check is');
   const outside = engine().tasks.get((await run(startFix({ need: 'outside', factory: 'scoped', workflow: 'dev' }))).id)?.spec;

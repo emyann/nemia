@@ -38,7 +38,8 @@ const AT_ONCE = 4;
 /**
  * Where a check runs: its command, the folders a workflow's check is told as a step's is — its workflow's (`WF_WORKFLOW_FILES`) and
  * its carried files' (`WF_CARRIED_FILES`) — none for a place's, the folder it runs in (`cwd`: a factory's repository for a place's or a
- * workflow's need of `scope: repository`, the store's folder where left out), and whether the default harness's kept token is in its environment (`token`).
+ * workflow's need of `scope: repository`, the store's folder where left out), and whether the default harness's kept token is in its
+ * environment (`token`).
  */
 export type CheckAt = {
   readonly check: string;
@@ -436,15 +437,26 @@ export const runNeeds = Effect.fnUntraced(function* (memo: NeedsMemo | undefined
       held.push({ name: need.name, state, message: need.message, fix: fixWords(need, true, fixAt) });
       continue;
     }
-    const at = fromPlace ? { check: need.check } : ownCheckOf(need, { workflowFiles, ...carriedFiles }, repository);
-    if (at === undefined) {
-      held.push({ name: need.name, state: 'missing', message: noRepositoryMessage(need), fix: noRepositoryMessage(need) });
-      continue;
-    }
-    const state = yield* readOrCheck(memo, at);
-    held.push({ name: need.name, state, message: need.message, fix: fixWords(need, fromPlace, workflow) });
+    held.push(
+      yield* checkedHeld(
+        memo,
+        need,
+        fromPlace ? { check: need.check } : ownCheckOf(need, { workflowFiles, ...carriedFiles }, repository),
+        fixWords(need, fromPlace, workflow),
+      ),
+    );
   }
   return held;
+});
+
+/**
+ * A run's `need` read where it is checked (`at`, through `readOrCheck`), with the words of its `fix`; missing, saying why, where it has
+ * no place to be checked: a workflow's need of `scope: repository` of a run in no repository (`noRepositoryMessage`).
+ */
+const checkedHeld = Effect.fnUntraced(function* (memo: NeedsMemo, need: Need, at: CheckAt | undefined, fix: string) {
+  if (at === undefined)
+    return { name: need.name, state: 'missing', message: noRepositoryMessage(need), fix: noRepositoryMessage(need) } satisfies NeedHeld;
+  return { name: need.name, state: yield* readOrCheck(memo, at), message: need.message, fix } satisfies NeedHeld;
 });
 
 /**

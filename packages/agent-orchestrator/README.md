@@ -3918,7 +3918,11 @@ any other version `untested` (it still runs), and none `unread` (`harnessVersion
 **A repository need** (`scope: repository`) is checked and fixed in each trusted factory's repository, read per factory in the area
 `repository` and fixed with `nemia doctor fix <need> --factory <factory>`: the git place's `repository-toolchain`, whose check is
 mise's `mise install --dry-run-code` and whose fix is `mise install`, beside its machine need `mise`. A repository says its tools in
-mise's own file (`.tool-versions`, `mise.toml`); one where mise reads none is met, and says so.
+mise's own file (`.tool-versions`, `mise.toml`); one where mise reads none is met, and says so. A workflow's own need may say it too:
+its check and its fix then run in its factory's first repository, still told the workflow's folders (`WF_WORKFLOW_FILES`,
+`WF_CARRIED_FILES`), and a run's in the run's repository (`ownCheckOf`); read under its workflow and fixed with `--factory <factory>
+--workflow <workflow>` as any of the workflow's needs, and unmet, saying why, where there is no repository. A workflow's need that says
+no scope runs in the store's folder.
 
 **The carry.** `nemia doctor carry` installs, at this release's pins, each harness the tools folder holds activated and each a release
 of the store carries in its own tree (`upgradeCarries`, `src/release/carry.ts`). `nemia upgrade` runs the new release's before it

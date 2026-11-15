@@ -111,19 +111,19 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                --json: the whole answer
                                on the port: series
   nemia agents [--repo .]
-                               the agents a step may name, the repository's then yours: what each is
+                               the agents a step may name, the repository's then the library's: what each is
                                for, what it says it can do (an entry for each skill, read off its
                                SKILL.md), and the skills it is given (its skills:)
                                on the port: agents
-  nemia agents card <name> [--repo .] [--from repo|yours]
+  nemia agents card <name> [--repo .] [--from repo|user]
                                that agent in the shape of an A2A Agent Card, JSON on stdout and
                                nothing else — every field the protocol marks REQUIRED but
                                supportedInterfaces, which is left out because nothing here serves an
                                agent over A2A. The card describes; it is not an address
                                on the port: agents_card
   nemia agents sources [--path <folder>]
-                               the agent files the store knows of, to copy into your library:
-                               each repository's, yours, and those of a --path <folder>
+                               the agent files the store knows of, to copy into the store's library:
+                               each repository's, the library's, and those of a --path <folder>
                                on the port: agents_sources
   nemia agents custom <name> [--file <path>|-] [--clear] [--repo .]
                                your custom instructions for that agent: words you add to it without
@@ -338,10 +338,24 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                own (nemia token add <name> --agent <agent>) as that agent. An
                                agent's words reach the step under its name, never as yours
                                on the port: say
-  nemia agents run yours <name> --brief <words>
-                               an agent of yours tried on a short brief, in a folder of its own,
+  nemia agents write (user | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]
+                               an agent of the user library, or of a templated --factory, written from its file:
+                               <name> is the agent it changes or renames, at the --version it was
+                               read at; none, a new one
+                               on the port: agents_write, agents_replace
+  nemia agents copy <file> [--as <name>] [--keep <part>]...
+                               an agent file copied into the store's library, with its schema and skills;
+                               a part the library holds otherwise stops it: --as or --keep
+                               on the port: agents_copy
+  nemia agents run user <name> --brief <words>
+                               an agent of the user library tried on a short brief, in a folder of its own,
                                capped at $1
                                on the port: agents_run
+  nemia skills write (user | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]
+                               a skill of the user library, or of a templated --factory, written from its
+                               SKILL.md: <name> is the skill it changes, at the --version it was
+                               read at; none, a new one
+                               on the port: skills_write, skills_replace, skills_copy
   nemia hold <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
                                file nothing more of a run until other runs land, as --after would
                                have: what is in flight finishes, nothing new is filed, and nothing
@@ -409,6 +423,11 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                ticks starts it, unless NEMIA_DAEMON_START=off): its state, its pid and
                                the url the api serves at, from its lease. --json: the whole answer
                                on the port: daemon
+  nemia workflows write (user | factory) <name> --folder <draft> [--factory <name>] [--version <v>]
+                               a workflow folder of the user library, or of a templated --factory, written from
+                               a draft folder, its steps, README, scripts and schemas, leaving a file
+                               it does not carry; one there already, at the --version it was read at
+                               on the port: workflows_write, workflows_replace
 ```
 
 ## Prompts the person
@@ -522,23 +541,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                write the folder a template's archive holds at <dir>/<name>, each file's
                                bytes and mode as packed
                                CLI only: a template is a folder on the machine nemia runs on; the board reads none yet
-  nemia agents write (yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]
-                               an agent of yours, or of a templated --factory, written from its file:
-                               <name> is the agent it changes or renames, at the --version it was
-                               read at; none, a new one
-                               on the port: agents_write, agents_replace
-  nemia agents copy <file> [--as <name>] [--keep <part>]...
-                               an agent file copied into your library, with its schema and skills;
-                               a part your library holds otherwise stops it: --as or --keep
-                               on the port: agents_copy
-  nemia agents rm yours <name> --version <v>
-                               an agent of yours removed, at the --version it was read at
+  nemia agents rm user <name> --version <v>
+                               an agent of the user library removed, at the --version it was read at
                                on the port: agents_rm
-  nemia skills write (yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]
-                               a skill of yours, or of a templated --factory, written from its
-                               SKILL.md: <name> is the skill it changes, at the --version it was
-                               read at; none, a new one
-                               on the port: skills_write, skills_replace, skills_copy
   nemia cancel <runId>
                                stop what it has in flight; file nothing more
                                on the port: cancel
@@ -659,13 +664,8 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                line form, under the folders given or the store's own. --check: write
                                nothing, and exit 1 where a rewrite is due
                                CLI only: it rewrites files on the machine nemia runs on, folders a person names among them
-  nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]
-                               a workflow folder of yours, or of a templated --factory, written from
-                               a draft folder, its steps, README, scripts and schemas, leaving a file
-                               it does not carry; one there already, at the --version it was read at
-                               on the port: workflows_write, workflows_replace
-  nemia workflows rm yours <name> --version <v>
-                               a workflow folder of yours removed, at the --version it was read at
+  nemia workflows rm user <name> --version <v>
+                               a workflow folder of the user library removed, at the --version it was read at
                                on the port: workflows_rm
 ```
 

@@ -398,4 +398,28 @@ export const SKILL_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: { copy: { refused: 'Invalid' }, left: [] },
     },
   ],
+  'skills.remove': [
+    {
+      name: 'removed at its version: its folder gone whole, the library left without it',
+      walk: (side) => {
+        const version = made(side, { ...aSkill(), files: OTHERS });
+        const removed = done(side.door.skills.remove('tidy-notes', libraryOn(side), version));
+        return { ...removed, left: left(side) };
+      },
+      says: { dir: '<root>/workflows/skills/tidy-notes', name: 'tidy-notes', left: [] },
+    },
+    {
+      name: 'REFUSED: at a version the skill no longer has is a Conflict, the skill kept',
+      walk: (side) => {
+        made(side);
+        return { remove: act(side.door.skills.remove('tidy-notes', libraryOn(side), 'v-stale')), left: left(side) };
+      },
+      says: { remove: { refused: 'Conflict' }, left: ['tidy-notes'] },
+    },
+    {
+      name: 'REFUSED: a skill the library does not hold is Missing',
+      walk: (side) => ({ remove: act(side.door.skills.remove('no-such-skill', libraryOn(side), 'v-1')), left: left(side) }),
+      says: { remove: { refused: 'Missing' }, left: [] },
+    },
+  ],
 };

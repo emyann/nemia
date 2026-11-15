@@ -10,7 +10,7 @@ import path from 'node:path';
 import { API_VERSION, type DefinitionOrigin, type LibraryAdd, type LibraryAddList } from 'objects';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { DEFAULT_NAMESPACE, type Factory } from '../factory/factory.ts';
-import { readFactoriesAt } from '../factory/factory.store.ts';
+import { doorAtOnce } from '../factory/door/factories.store.ts';
 import { stepsFilled } from '../roster/fills.store.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { BUILTIN_SKILLS, REPOSITORY_HOLDER } from '../skills/read.store.ts';
@@ -20,7 +20,7 @@ import { Missing, type Refusal } from '../refusal/refusal.ts';
 import { objectsListed, type ObjectQuery } from '../object/listed.verb.ts';
 import { tried } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import type { BuiltinServer, FactoryServer, FactoryServers } from '../factory/servers/servers.ts';
+import type { BuiltinServer, FactoryServer, FactoryServers } from '../factory/servers/index.ts';
 import { addName, libraryAddRefusal, libraryAddState, libraryAddsOf, sameAdd, type LibraryRef } from './library.ts';
 import { libraryAddsFile, libraryDir, libraryServers, readLibraryAdds, writeLibraryAdds } from './library.store.ts';
 
@@ -37,7 +37,7 @@ export type FactoryAdds = { readonly recorded: boolean; readonly adds: readonly 
 
 /** The factory `name` as its file reads, or undefined for `default`, which has no file, and for one whose file does not read. */
 const factoryNamed = (home: string, name: string): Factory | undefined => {
-  const listing = readFactoriesAt(home).find((f) => f.name === name);
+  const listing = doorAtOnce(home, (door) => door.factories.listed()).find((f) => f.name === name);
   return listing === undefined || 'error' in listing ? undefined : listing;
 };
 
@@ -226,7 +226,7 @@ export function writeLibraryAdd(home: string, name: string, does: 'add' | 'remov
  * @param ref The item, or a workflow by its name.
  */
 export function libraryUsers(home: string, ref: LibraryRef | { readonly kind: 'Workflow'; readonly name: string }): string[] {
-  const factories = readFactoriesAt(home).filter((f): f is Factory & { file: string } => !('error' in f));
+  const factories = doorAtOnce(home, (door) => door.factories.listed()).filter((f): f is Factory & { file: string } => !('error' in f));
   if (ref.kind === 'Workflow')
     return factories
       .filter((f) => f.workflows.includes(ref.name))

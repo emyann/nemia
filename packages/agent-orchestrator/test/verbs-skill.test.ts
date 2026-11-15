@@ -53,9 +53,11 @@ test('every command the CLI serves her is listed, and none out of her reach nor 
   for (const verb of CLI_VERBS) assert.ok(lists(sectionOf(text, 'Reads'), verb.name), `${verb.name} is listed as a read`);
 });
 
-test('the library’s writers are listed by who answers for them: a write or a removal prompts the person, a try is hers', () => {
+test('the library’s writers are listed by who answers for them: a make or an edit is hers, a removal prompts the person, a try is hers', () => {
   const text = verbsSkill();
-  for (const name of ['agents write', 'agents rm', 'skills write', 'workflows write', 'workflows rm'])
+  for (const name of ['agents write', 'skills write', 'workflows write'])
+    assert.ok(lists(sectionOf(text, 'Yours'), name), `${name} is hers to run unasked`);
+  for (const name of ['agents rm', 'workflows rm'])
     assert.ok(lists(sectionOf(text, 'Prompts the person'), name), `${name} prompts the person`);
   assert.ok(lists(sectionOf(text, 'Yours'), 'agents run'), 'agents run is hers to run unasked');
 });

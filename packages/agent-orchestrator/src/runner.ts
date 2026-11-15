@@ -601,18 +601,7 @@ export { FACTORY_PLAN, FACTORY_RESOLVE, FACTORY_UPGRADE } from './factory/upgrad
 export { withResolutionProposerAs } from './factory/upgrade/proposed.verb.ts';
 export { sentTemplatesDir, templateGiven, withTemplateTaken } from './template/given.store.ts';
 export { factoryExported, factoryImported } from './factory/move/move.verb.ts';
-export {
-  addedServers,
-  factoryAdds,
-  libraryAddList,
-  libraryAddNamed,
-  libraryAddObject,
-  libraryAddWritten,
-  libraryOrigin,
-  libraryUsers,
-  refOf,
-  type FactoryAdds,
-} from './library/library.verb.ts';
+export { libraryAddList, libraryAddNamed, libraryAddWritten, libraryUsers, refOf, type FactoryAdds } from './library/library.verb.ts';
 export {
   libraryServerList,
   libraryServerObjects,
@@ -620,5 +609,5 @@ export {
   libraryServerThere,
   libraryServerWritten,
 } from './library/library-servers.verb.ts';
-export { builtinCopies, libraryServers, recordBuiltinCopy, writeLibraryServers } from './library/library.store.ts';
-export { addName, type LibraryRef } from './library/library.ts';
+export { builtinCopies, recordBuiltinCopy } from './library/library.store.ts';
+export { type LibraryRef } from './library/library.ts';

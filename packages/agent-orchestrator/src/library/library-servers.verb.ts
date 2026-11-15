@@ -11,7 +11,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import { objectsListed, versionOf, type ObjectQuery } from '../object/listed.verb.ts';
 import { specOf } from '../factory/object/mcp-server.verb.ts';
 import { headersKept, writeRefusal } from '../factory/servers/servers.verb.ts';
-import { factoryServerRefusal, serverNameRefusal } from '../factory/servers/servers.ts';
+import { factoryServerRefusal, serverNameRefusal } from '../factory/servers/index.ts';
 import { libraryServers, writeLibraryServers } from './library.store.ts';
 import { libraryUsers, recordedAt } from './library.verb.ts';
 

@@ -18,7 +18,7 @@ import { firstRefusal } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { readServersAt, writeServersAt } from '../factory/servers/servers.store.ts';
-import type { FactoryServers } from '../factory/servers/servers.ts';
+import type { FactoryServers } from '../factory/servers/index.ts';
 import type { LibraryKind, LibraryRef } from './library.ts';
 import type { LibraryAdded } from '../skills/read.store.ts';
 

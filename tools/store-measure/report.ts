@@ -51,7 +51,9 @@
  * - `factoryList`, `factoryGet`, `factoryCommands`, `scheduleList`, `hireList`, `volumeList`, `mcpServerList`: `GET /api/factories`,
  *   and of the copy's first factory but the default by name, `GET /api/factories/:name`, `…/commands` and
  *   `GET /api/namespaces/:name/schedules`, `hires`, `volumes` and `mcpservers`, over apps as `runList` is; null where the copy has no
- *   factory of its own. `ceilings`: `GET /api/ceilings`, the same way, and `ceilingsAfterPass` the same asked after a pass has filled the
+ *   factory of its own. `libraryAddList`: `GET /api/namespaces/:name/libraryadds` of that factory, the same way: its adds, recorded or
+ *   derived from what its workflows resolve. `libraryAgents`, `librarySkills`: `GET /api/agents` and `/api/skills` at the store's level,
+ *   over apps as `runList` is, each item with the factories that use it, the library's reverse lookup over every factory. `ceilings`: `GET /api/ceilings`, the same way, and `ceilingsAfterPass` the same asked after a pass has filled the
  *   app's informer, as `runListAfterPass` is.
  *
  * Each read over apps carries the run records (`runs/<id>.json`) one call read, cold and warm (`records`), counted on a call of its own,
@@ -549,6 +551,9 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     hireList: await ofFactory((f) => `/api/namespaces/${f}/hires`),
     volumeList: await ofFactory((f) => `/api/namespaces/${f}/volumes`),
     mcpServerList: await ofFactory((f) => `/api/namespaces/${f}/mcpservers`),
+    libraryAddList: await ofFactory((f) => `/api/namespaces/${f}/libraryadds`),
+    libraryAgents: await overApps(fresh, (app) => get(app, '/api/agents?limit=500'), repeat),
+    librarySkills: await overApps(fresh, (app) => get(app, '/api/skills?limit=500'), repeat),
     ceilings: await overApps(fresh, (app) => get(app, '/api/ceilings'), repeat),
     ceilingsAfterPass: await overApps(passed, (app) => get(app, '/api/ceilings'), repeat),
   };

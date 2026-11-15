@@ -153,7 +153,7 @@ export default {
     let seat: Awaited<ReturnType<typeof serveSeat>> | undefined;
     try {
       seat = await serveSeat('harnessed');
-      await goto(page, new URL(`/agents/yours/${seeded.name}`, seat.base).href);
+      await goto(page, new URL(`/agents/user/${seeded.name}`, seat.base).href);
       const panel = page.locator('section[data-try-agent]');
       await expectVisible(
         panel.locator('[data-try-fence]', { hasText: "A rehearsal fenced to its own folder, not the agent's own permissions" }),
@@ -222,7 +222,7 @@ export default {
 
       ranTo(id);
       fed(id, 'try', 'done');
-      await goto(page, `/agents/yours/${seeded.name}`);
+      await goto(page, `/agents/user/${seeded.name}`);
       const shown = panel.locator(`[data-try="${id}"]`);
       await expectVisible(shown.locator('[data-try-status]', { hasText: 'succeeded' }), 'the panel shows the state the try ended in');
       await expectVisible(shown.locator('[data-try-spent]', { hasText: TRY.spent }), `and what it spent of its dollar (${TRY.spent})`);

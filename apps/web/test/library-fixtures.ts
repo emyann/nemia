@@ -34,14 +34,14 @@ export const skillRow = (extra: Partial<SkillRow> = {}): SkillRow => ({
   preload: false,
   cost: { preload: false, listed: 30, body: 900, perTurn: 30 },
   usedBy: ['agora'],
-  found: 'yours',
+  found: 'user',
   ...extra,
 });
 
 /** One agent of yours, with a card, a schema, a skill it gives and a node that names it. */
 export const agent = (extra: Partial<AgentListing> = {}): AgentListing => ({
   name: 'agora',
-  from: 'yours',
+  from: 'user',
   dir: '/store/workflows/agents',
   file: '/store/workflows/agents/agora.md',
   role: 'Code reviewer',
@@ -57,7 +57,7 @@ export const agent = (extra: Partial<AgentListing> = {}): AgentListing => ({
   given: [
     {
       name: 'review-a-change',
-      from: 'yours',
+      from: 'user',
       foundIn: null,
       entry: skillEntry(),
       error: null,
@@ -67,7 +67,7 @@ export const agent = (extra: Partial<AgentListing> = {}): AgentListing => ({
   ],
   source: '---\nrole: Code reviewer\n---\nReview the change.\n',
   version: 'v-1',
-  usedBy: [{ from: 'yours', workflow: 'build', step: 'review' }],
+  usedBy: [{ from: 'user', workflow: 'build', step: 'review' }],
   fills: [],
   error: null,
   untried: { why: 'a try runs Claude Code', copy: null },
@@ -87,7 +87,7 @@ export const skillPlace = (extra: Partial<SkillPlace> = {}): SkillPlace => ({
 
 /** One skill of yours on its page, its draft setting every key. */
 export const skillDetail = (extra: Partial<SkillDetail> = {}): SkillDetail => ({
-  skill: skillRow({ from: 'yours', found: null }),
+  skill: skillRow({ from: 'user', found: null }),
   version: 'v-2',
   draft: {
     name: 'review-a-change',
@@ -150,7 +150,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
 /** A workflow of yours with one step, which sets two keys of its own over its agent's. */
 export const workflow = (extra: Partial<WorkflowListing> = {}): WorkflowListing => ({
   name: 'build',
-  from: 'yours',
+  from: 'user',
   dir: '/store/workflows/build',
   description: 'An intent to main.',
   readme: '# build\n\nAn intent to main.\n\nEach step lands what the last one made.\n',
@@ -307,7 +307,7 @@ export const consistentSkill = (extra: Partial<SkillDetail> = {}): SkillDetail =
   const detail = skillDetail(extra);
   return {
     ...detail,
-    skill: { ...detail.skill, usedBy: detail.users.filter((u) => u.from === 'yours').map((u) => u.name) },
+    skill: { ...detail.skill, usedBy: detail.users.filter((u) => u.from === 'user').map((u) => u.name) },
   };
 };
 

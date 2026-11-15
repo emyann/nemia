@@ -167,7 +167,7 @@ export default {
       );
       await expectVisible(page.locator('article h1', { hasText: SHADOW.step }), "and the tree's step is drawn there too");
 
-      await goto(page, `/workflows/yours/${yours.name}?factory=${TREED}&build=true`);
+      await goto(page, `/workflows/user/${yours.name}?factory=${TREED}&build=true`);
       const builder = page.locator(`section[data-builder="${yours.name}"]`);
       await expectVisible(builder, `one of yours opens its builder in ${TREED}, which hires into its step`);
       await expectCount(page.getByText('is listed with'), 0, 'drafted from the list read with no factory, so nothing is refused');

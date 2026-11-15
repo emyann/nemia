@@ -136,7 +136,7 @@ export function CustomInstructions({ name, repo, reach = HIRED }: { name: string
       )}
       {failed && (
         <div data-custom-refused>
-          <AgentRefused message={failed.message} users={[]} from="yours" verb={failed.verb} />
+          <AgentRefused message={failed.message} users={[]} from="user" verb={failed.verb} />
         </div>
       )}
     </section>

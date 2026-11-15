@@ -351,7 +351,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
           {step.workflow} <span className="text-muted-foreground">·</span> {step.step}
         </span>
         <span className={`${CHIP} bg-muted text-muted-foreground`}>{step.harness}</span>
-        {step.from === 'yours' && <span className={`${CHIP} ${container.grey}`}>yours</span>}
+        {step.from === 'user' && <span className={`${CHIP} ${container.grey}`}>yours</span>}
       </div>
 
       <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-body-small">

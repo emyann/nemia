@@ -142,7 +142,7 @@ const ReadOnlyCommandsSchema = decodes<ReadOnlyCommands>()(
  */
 export type StepReach = {
   workflow: string;
-  from: Extract<DefinitionOrigin, 'repo' | 'yours'>;
+  from: Extract<DefinitionOrigin, 'repo' | 'user'>;
   step: string;
   harness: string;
   claudeCode: boolean;
@@ -219,7 +219,7 @@ const AllowedForSchema = decodes<StepReach['allowed']>()(
 const StepReachSchema = decodes<StepReach>()(
   Schema.Struct({
     workflow: Schema.String,
-    from: Schema.Literals(['repo', 'yours']),
+    from: Schema.Literals(['repo', 'user']),
     step: Schema.String,
     harness: Schema.String,
     claudeCode: Schema.Boolean,

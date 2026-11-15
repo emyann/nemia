@@ -69,7 +69,7 @@ function WorkflowsPage() {
         <NewWorkflow
           folder={store.workflows}
           onCreated={(name) =>
-            void navigate({ to: '/workflows/$from/$workflow', params: { from: 'yours', workflow: name }, search: { build: true } })
+            void navigate({ to: '/workflows/$from/$workflow', params: { from: 'user', workflow: name }, search: { build: true } })
           }
         />
       </div>

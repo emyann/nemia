@@ -21,7 +21,7 @@ export type SkillRow = {
   /** The agents of yours that give it. */
   usedBy: string[];
   /** A builtin skill's name, where an agent of yours already finds a skill of it; null elsewhere. */
-  found: Extract<DefinitionOrigin, 'yours' | 'repo'> | null;
+  found: Extract<DefinitionOrigin, 'user' | 'repo'> | null;
 };
 
 /** One place, in the order an agent of yours finds a name, the builtin last; its folder, null where it holds no skill to say it. */
@@ -42,7 +42,7 @@ const skillRowOf = (skill: Skill): SkillRow => ({
   error: skill.status.error,
   preload: skill.status.preload,
   cost: skill.status.cost ? { ...skill.status.cost } : null,
-  usedBy: skill.status.usedBy.filter((u) => u.from === 'yours').map((u) => u.name),
+  usedBy: skill.status.usedBy.filter((u) => u.from === 'user').map((u) => u.name),
   found: skill.status.found,
 });
 
@@ -51,7 +51,7 @@ const skillRowOf = (skill: Skill): SkillRow => ({
  * its repository's and Nemia's; in the default namespace, which works on no repository, your library and Nemia's.
  */
 const skillOrigins = (namespace: string): DefinitionOrigin[] =>
-  namespace === DEFAULT_NAMESPACE ? ['yours', 'builtin'] : ['factory', 'yours', 'repo', 'builtin'];
+  namespace === DEFAULT_NAMESPACE ? ['user', 'builtin'] : ['factory', 'user', 'repo', 'builtin'];
 
 /**
  * Every skill of `namespace`'s places, a list each read by its origin (`?origin=`), shadowed or not, read from disk on each request; keyed
@@ -89,7 +89,7 @@ const refused: Refuse = (words, status) => new SkillRefusal(words, status);
  * @param name The skill's name, its folder's.
  */
 export const copySkill = async (name: string): Promise<SkillAdded> => ({
-  skill: skillRowOf(await served.copy(DEFAULT_NAMESPACE, name, refused)),
+  skill: skillRowOf(await served.copy(name, refused)),
 });
 
 /**
@@ -107,7 +107,7 @@ export type SkillDraft = {
 };
 
 /** An agent that gives a skill, by its place and its name. */
-export type SkillUser = { from: Extract<DefinitionOrigin, 'factory' | 'yours' | 'repo'>; name: string };
+export type SkillUser = { from: Extract<DefinitionOrigin, 'factory' | 'user' | 'repo'>; name: string };
 
 /**
  * One skill on its page — its row, the version a write carries back, its draft (null where its SKILL.md does not read, `body` its
@@ -178,7 +178,7 @@ const specOfDraft = ({ name: _, ...spec }: SkillDraft) => spec;
  * @param draft The skill to write: its name, its card's lines and its instructions.
  */
 export const createSkill = async (draft: SkillDraft): Promise<SkillSaved> =>
-  skillDetailOf(await served.create(DEFAULT_NAMESPACE, { metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused));
+  skillDetailOf(await served.create({ metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused));
 
 /**
  * A skill of yours written again, whole, at the version it was read at: refused 409 when it has changed since.
@@ -188,7 +188,7 @@ export const createSkill = async (draft: SkillDraft): Promise<SkillSaved> =>
  */
 export const saveSkill = async (name: string, version: string, draft: SkillDraft): Promise<SkillSaved> =>
   skillDetailOf(
-    await served.replace(DEFAULT_NAMESPACE, name, { metadata: { resourceVersion: version }, spec: specOfDraft(draft) }, refused),
+    await served.replace(name, { metadata: { resourceVersion: version }, spec: specOfDraft(draft) }, refused),
   );
 
 /**
@@ -198,4 +198,4 @@ export const saveSkill = async (name: string, version: string, draft: SkillDraft
  * @param preload Whether it is loaded every turn; false names it for a session to load.
  */
 export const switchPreload = async (name: string, version: string, preload: boolean): Promise<SkillSaved> =>
-  skillDetailOf(await served.replace(DEFAULT_NAMESPACE, name, { metadata: { resourceVersion: version }, preload }, refused));
+  skillDetailOf(await served.replace(name, { metadata: { resourceVersion: version }, preload }, refused));

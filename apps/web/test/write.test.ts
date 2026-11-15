@@ -289,9 +289,7 @@ test("each family of writes: its answer decoded, an answer unread refused with w
       const err = await rejection(createAgent({ ...agentDraft, keys: { model: 'opus', tools: null, effort: undefined } }));
       assert.ok(err instanceof UnreadAnswer && !(err instanceof AgentRefusal), String(err));
       assert.ok(
-        /^POST \/api\/namespaces\/default\/agents answered what this board does not read: at [\w.]+, the value is missing\./.test(
-          err.message,
-        ),
+        /^POST \/api\/agents answered what this board does not read: at [\w.]+, the value is missing\./.test(err.message),
         err.message,
       );
       assert.ok(err.message.includes('The agent may be written'), err.message);
@@ -314,7 +312,7 @@ test("each family of writes: its answer decoded, an answer unread refused with w
       assert.deepEqual([named.message, named.users, named.status], ['build/implement still names implementer.', ['build/implement'], 409]);
       assert.deepEqual(
         [removing[0]?.init?.method, removing[0]?.url],
-        ['DELETE', '/api/namespaces/default/agents/implementer?resourceVersion=v1'],
+        ['DELETE', '/api/agents/implementer?resourceVersion=v1'],
         'the version it was read at is its query',
       );
       answering(t, { error: 'another site' }, 403);
@@ -324,7 +322,7 @@ test("each family of writes: its answer decoded, an answer unread refused with w
       answering(t, { removed: 'all' });
       await assert.rejects(
         removeAgent('implementer', 'v1'),
-        (e: unknown) => e instanceof UnreadAnswer && e.route === 'DELETE /api/namespaces/default/agents/implementer',
+        (e: unknown) => e instanceof UnreadAnswer && e.route === 'DELETE /api/agents/implementer',
       );
     },
   );
@@ -332,7 +330,7 @@ test("each family of writes: its answer decoded, an answer unread refused with w
     const sent = answering(t, { written: [] });
     const err = await rejection(saveSkill('s', 'v1', skillDraft));
     assert.ok(err instanceof UnreadAnswer && !(err instanceof SkillRefusal), String(err));
-    assert.equal(err.route, 'PUT /api/namespaces/default/skills/s');
+    assert.equal(err.route, 'PUT /api/skills/s');
     assert.ok(err.message.includes('The skill may be written'), err.message);
     assert.deepEqual(JSON.parse(String(sent[0]?.init?.body)), {
       metadata: { resourceVersion: 'v1' },
@@ -342,10 +340,7 @@ test("each family of writes: its answer decoded, an answer unread refused with w
     const changed = await rejection(saveSkill('s', 'v1', skillDraft));
     assert.ok(changed instanceof SkillRefusal && changed.status === 409, String(changed));
     answering(t, { skill: null, written: [] }, 201);
-    await assert.rejects(
-      copySkill('s'),
-      (e: unknown) => e instanceof UnreadAnswer && e.route === 'POST /api/namespaces/default/skills/s/copy',
-    );
+    await assert.rejects(copySkill('s'), (e: unknown) => e instanceof UnreadAnswer && e.route === 'POST /api/skills/s/copy');
   });
   await t.test(
     'REFUSED: builder — a save answered with no workflow is unread; a refusal keeps its steps and status; a step is sent as its file writes it',
@@ -361,7 +356,7 @@ test("each family of writes: its answer decoded, an answer unread refused with w
       const sent = answering(t, { ...workflowObject(), status: null });
       await assert.rejects(
         saveWorkflow('w', save),
-        unread('PUT /api/namespaces/default/workflows/w', 'status', 'is null, where the board reads', 'before writing it again.'),
+        unread('PUT /api/workflows/w', 'status', 'is null, where the board reads', 'before writing it again.'),
       );
       const { spec, metadata } = JSON.parse(String(sent[0]?.init?.body)) as { spec: { steps: unknown[] }; metadata: unknown };
       assert.deepEqual(metadata, { resourceVersion: 'v1' }, 'the version it was read at');

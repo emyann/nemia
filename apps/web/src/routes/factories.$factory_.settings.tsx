@@ -8,6 +8,7 @@ import { FactoryTrust } from '@/components/factory/FactoryTrust';
 import { FactorySchedules } from '@/components/factory/FactorySchedules';
 import { FactoryServers } from '@/components/factory/FactoryServers';
 import { FactoryVolumes } from '@/components/factory/FactoryVolumes';
+import { LibraryAdds } from '@/components/library/LibraryAdds';
 import { routeLink } from '@/components/nav/routeLink';
 import { LinkButton } from '@/components/ui/button';
 import { delegationsQuery } from '@/lib/api/proposals';
@@ -94,6 +95,7 @@ function SettingsPage() {
           <FactoryDelegations name={name} />
           <FactoryInstruction name={name} />
           <FactoryServers name={name} />
+          <LibraryAdds name={name} />
           <FactorySchedules factory={factory} />
         </>
       )}

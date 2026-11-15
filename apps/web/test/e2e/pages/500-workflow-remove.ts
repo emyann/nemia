@@ -45,7 +45,7 @@ export default {
       await expectVisible(listed, `${GOING} is listed`);
       await expectCount(page.locator('main').getByRole('button', { name: 'Remove…' }), 0, 'no card offers Remove: its page does');
       await listed.getByRole('heading').getByRole('link').click();
-      await page.waitForURL((url) => url.pathname === `/workflows/yours/${GOING}`, { timeout: WAIT_MS });
+      await page.waitForURL((url) => url.pathname === `/workflows/user/${GOING}`, { timeout: WAIT_MS });
       await idle(page);
       const card = cardOf(page);
       await card.getByRole('button', { name: 'Remove…' }).click();

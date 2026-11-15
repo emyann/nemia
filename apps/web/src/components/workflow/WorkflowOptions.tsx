@@ -14,7 +14,7 @@ export function WorkflowsUnread({ workflows }: { workflows: readonly WorkflowLis
       {unread.map((w) => (
         <p key={workflowKey(w)} data-unread={w.name} className="whitespace-pre-wrap break-words">
           <span className="font-mono">{w.name}</span>
-          {w.from === 'yours' ? ' (yours)' : ''}: {w.error}
+          {w.from === 'user' ? ' (yours)' : ''}: {w.error}
         </p>
       ))}
     </div>

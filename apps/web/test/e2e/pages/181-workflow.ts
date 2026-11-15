@@ -256,7 +256,7 @@ export default {
         await expectCount(bad.locator('textarea, .react-flow'), 0, 'and has no brief box and no graph');
         await photograph(again, path.join(OUT, `workflow-refused-${await themeOf(again)}.png`), { fullPage: true });
 
-        await again.goto(new URL(`/workflows/yours/${yours.name}`, again.url()).href, { waitUntil: 'load' });
+        await again.goto(new URL(`/workflows/user/${yours.name}`, again.url()).href, { waitUntil: 'load' });
         await idle(again);
         await expectVisible(
           again.locator('article').getByText('yours', { exact: true }),

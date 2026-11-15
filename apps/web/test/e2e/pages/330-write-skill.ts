@@ -93,7 +93,7 @@ export default {
     }
 
     const versionOfScribe = async (): Promise<string> => {
-      const answer = await page.request.get(new URL(`/api/namespaces/default/agents/${seeded.name}?origin=yours`, page.url()).href);
+      const answer = await page.request.get(new URL(`/api/namespaces/default/agents/${seeded.name}?origin=user`, page.url()).href);
       return ((await answer.json()) as { metadata: { resourceVersion: string } }).metadata.resourceVersion;
     };
 
@@ -134,7 +134,7 @@ export default {
       if (written !== expectedFile)
         throw new Refused(`skills/${SKILL.name}/SKILL.md is written as the package renders it — it holds ${JSON.stringify(written)}`);
 
-      await page.waitForURL((url) => url.pathname === `/agents/skills/yours/${SKILL.name}`, { timeout: WAIT_MS });
+      await page.waitForURL((url) => url.pathname === `/agents/skills/user/${SKILL.name}`, { timeout: WAIT_MS });
       await expectVisible(page.getByRole('heading', { name: SKILL.name, level: 1 }), `${SKILL.name}'s page`);
       await expectVisible(
         page.locator(`[data-skill-users] a[data-agent-link="${seeded.name}"]`),
@@ -198,7 +198,7 @@ export default {
       const stale = await page.context().newPage();
       try {
         const { problems } = watch(stale);
-        await stale.goto(new URL(`/agents/skills/yours/${SKILL.name}`, page.url()).href, { waitUntil: 'load' });
+        await stale.goto(new URL(`/agents/skills/user/${SKILL.name}`, page.url()).href, { waitUntil: 'load' });
         await idle(stale);
         const form = stale.locator(`form[data-skill-form="${SKILL.name}"]`);
         const description = form.getByRole('textbox', { name: 'Description', exact: true });

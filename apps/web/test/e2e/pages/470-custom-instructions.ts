@@ -107,7 +107,7 @@ export default {
    * words are saved and cleared on its page in a factory, as that page offers.
    */
   name: 'custom-instructions',
-  route: `/agents/yours/${CUSTOM.agent}`,
+  route: `/agents/user/${CUSTOM.agent}`,
   expect: async (page) => {
     const file = path.join(store!, 'custom-instructions', `${CUSTOM.agent}.md`);
     if (fs.existsSync(file)) throw new Refused(`the store holds no custom instructions before the page writes any — ${file} is there`);

@@ -22,7 +22,7 @@ const LINK = cn('rounded-sm underline decoration-outline underline-offset-2 hove
 const AGENT_FROM: Readonly<Record<AgentListing['from'], string>> = {
   factory: "the factory's",
   repo: 'this repository',
-  yours: 'yours',
+  user: 'the user library',
   builtin: "Nemia's",
 };
 
@@ -33,7 +33,7 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
       data-from={from}
       className={cn(
         'rounded-full px-2 py-0.5 text-body-small leading-none font-medium',
-        from === 'yours' ? container.grey : 'bg-muted text-muted-foreground',
+        from === 'user' ? container.grey : 'bg-muted text-muted-foreground',
       )}
     >
       {AGENT_FROM[from]}
@@ -51,7 +51,7 @@ function NodeLink({ user }: { user: AgentUser | AgentFill }) {
     <RouteLink
       to="/workflows/$from/$workflow/$step"
       params={{ from: user.from, workflow: user.workflow, step: user.step }}
-      search={user.from === 'yours' && !('hired' in user && user.hired) ? {} : here}
+      search={user.from === 'user' && !('hired' in user && user.hired) ? {} : here}
       data-node={`${user.workflow}/${user.step}`}
       className={cn('font-mono text-body-small text-foreground', LINK)}
     >
@@ -336,7 +336,7 @@ export function SkillSourceBadge({ from, foundIn = null }: { from: SkillSource |
       data-skill-from={folder ? 'folder' : (from ?? 'none')}
       className={cn(
         'shrink-0 rounded-full px-2 py-0.5 text-body-small leading-none font-medium',
-        from === 'yours' && container.grey,
+        from === 'user' && container.grey,
         (from === 'repo' || folder) && 'bg-muted text-muted-foreground',
         from === 'builtin' && hairline,
         lost && container.failure,

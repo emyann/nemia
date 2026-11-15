@@ -44,7 +44,7 @@ async function expectChip(told: Locator, layer: string, skill: { id: string }): 
 /** The step's page of yours: each skill named with its folder is a chip as written, found, under the layer that gives it. */
 async function expectStep(page: Page): Promise<void> {
   const { workflow, step, agentSkill, stepSkill } = FOLDER_SKILLS;
-  await goto(page, `/workflows/yours/${workflow}/${step}${IN}`);
+  await goto(page, `/workflows/user/${workflow}/${step}${IN}`);
   const told = page.locator('details[data-will-be-told]');
   await expectChip(told, 'instructions', agentSkill);
   await expectChip(told, 'policy', stepSkill);
@@ -56,7 +56,7 @@ async function expectStep(page: Page): Promise<void> {
 async function expectAgent(page: Page): Promise<void> {
   const { agent, agentSkill } = FOLDER_SKILLS;
   const { written, foundIn } = folderSkill(agentSkill);
-  await goto(page, `/agents/yours/${agent}${IN}`);
+  await goto(page, `/agents/user/${agent}${IN}`);
   const form = page.locator(`form[data-agent-form="${agent}"]`);
   const row = form.locator(`[data-given-skill="${written}"]`);
   await expectVisible(row.locator('[data-skill-from="folder"]', { hasText: 'this repository' }), `${written} is the repository's`);
@@ -80,7 +80,7 @@ async function expectAgent(page: Page): Promise<void> {
  */
 async function expectNoBuilder(page: Page): Promise<void> {
   const { workflow } = FOLDER_SKILLS;
-  await goto(page, `/workflows/yours/${workflow}?build=true`);
+  await goto(page, `/workflows/user/${workflow}?build=true`);
   await expectCount(page.locator(`section[data-builder="${workflow}"]`), 0, 'in the default factory, no builder opens');
   await expectVisible(page.locator('[data-no-builder]'), 'and the page says why');
   await expectVisible(page.getByText(/read with no repository/), 'the folder not reading, a skill named with its folder needing one');

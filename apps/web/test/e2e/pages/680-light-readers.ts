@@ -94,7 +94,7 @@ export default {
       });
 
       await reading("an agent's Try panel", [OPEN_SELECTOR, FINISHED_SELECTOR], async () => {
-        await visit(page, `/agents/yours/${AGENTS.seeded.name}`);
+        await visit(page, `/agents/user/${AGENTS.seeded.name}`);
         await expectVisible(page.locator('section[data-try-agent]'), 'the Try panel is drawn');
       });
     } finally {

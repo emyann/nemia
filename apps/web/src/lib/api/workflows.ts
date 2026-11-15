@@ -310,9 +310,7 @@ export const saveWorkflow = async (
   save: { version: string; steps: readonly StepWritten[]; schemas: readonly SchemaFile[]; readme?: string },
 ): Promise<WorkflowListing> =>
   workflowViewOf(
-    await served.replace(
-      DEFAULT_NAMESPACE,
-      name,
+    await served.replace(name,
       {
         metadata: { resourceVersion: save.version },
         spec: { steps: save.steps.map(writtenStepOf), ...(save.readme === undefined ? {} : { readme: save.readme }) },
@@ -329,7 +327,7 @@ export const saveWorkflow = async (
  * @param step Its first step, as the builder holds it.
  */
 export const createWorkflow = async (name: string, step: StepWritten): Promise<WorkflowListing> =>
-  workflowViewOf(await served.create(DEFAULT_NAMESPACE, { metadata: { name }, spec: { steps: [writtenStepOf(step)] } }, refused));
+  workflowViewOf(await served.create({ metadata: { name }, spec: { steps: [writtenStepOf(step)] } }, refused));
 
 /**
  * Remove a folder of yours whole, against the version it was read at (`DELETE /api/namespaces/default/workflows/<name>`): answers the
@@ -340,4 +338,4 @@ export const createWorkflow = async (name: string, step: StepWritten): Promise<W
  * @param version The version it was read at (`WorkflowListing.version`).
  */
 export const removeWorkflow = async (name: string, version: string): Promise<WorkflowListing> =>
-  workflowViewOf(await served.delete(DEFAULT_NAMESPACE, name, version));
+  workflowViewOf(await served.delete(name, version));

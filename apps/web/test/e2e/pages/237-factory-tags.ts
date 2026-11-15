@@ -107,7 +107,7 @@ export default {
       fs.writeFileSync(brokenFile, brokenText);
     }
 
-    const scribe = page.locator(`section[data-agent="${AGENTS.seeded.name}"][data-from="yours"]`);
+    const scribe = page.locator(`section[data-agent="${AGENTS.seeded.name}"][data-from="user"]`);
     await open(page, '/agents');
     await expectVisible(scribe, `${AGENTS.seeded.name}, yours, is listed`);
     await expectCount(scribe.locator('[data-factory-tag]'), 0, 'and, hired nowhere, with no tag');

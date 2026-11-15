@@ -206,7 +206,7 @@ export default {
       await sheet.getByRole('button', { name: 'Close', exact: true }).click();
       await expectCount(sheet, 0, 'the sheet closes');
       await expectVisible(
-        form.locator(`[data-given-skill="${made.skills}"] [data-skill-from="yours"]`),
+        form.locator(`[data-given-skill="${made.skills}"] [data-skill-from="user"]`),
         `${made.skills} is given, from your library`,
       );
       await expectVisible(

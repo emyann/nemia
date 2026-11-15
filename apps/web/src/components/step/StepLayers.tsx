@@ -43,14 +43,14 @@ export function AgentLayers({ agent, layers }: { agent: string; layers: StepLaye
         </details>
         <Skills word="Its skills:" skills={layers.agentSkills} />
         <p className={LINE}>
-          Written in <AgentLink from="yours" name={agent} />
+          Written in <AgentLink from="user" name={agent} />
           's file, <span className="font-mono">agents/{agent}.md</span>.
         </p>
       </Layer>
       <Layer name="custom" title={CUSTOM_INSTRUCTIONS}>
         {layers.custom === null ? (
           <p className={LINE}>
-            None. Write them on <AgentLink from="yours" name={agent} />
+            None. Write them on <AgentLink from="user" name={agent} />
             's page.
           </p>
         ) : (

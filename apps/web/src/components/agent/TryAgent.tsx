@@ -97,7 +97,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
             </span>
           )}
         </div>
-        {start.isError && <AgentRefused message={start.error.message} users={[]} from="yours" verb="Not started" />}
+        {start.isError && <AgentRefused message={start.error.message} users={[]} from="user" verb="Not started" />}
       </form>
       {shown && <TryRun id={shown} />}
     </section>

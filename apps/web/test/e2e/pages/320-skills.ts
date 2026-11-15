@@ -19,7 +19,7 @@ export default {
    * the store as seeded.
    */
   name: 'skills',
-  route: `/agents/yours/${AGENTS.seeded.name}`,
+  route: `/agents/user/${AGENTS.seeded.name}`,
   expect: async (page) => {
     const { seeded, made } = AGENTS;
     const library = path.join(store!, 'workflows', 'skills');
@@ -110,7 +110,7 @@ export default {
         );
 
       const given = form.locator(`[data-given-skill="${mine}"]`);
-      await expectVisible(given.locator('[data-skill-from="yours"]'), `${mine} is given, from your library`);
+      await expectVisible(given.locator('[data-skill-from="user"]'), `${mine} is given, from your library`);
       await expectVisible(given.locator('[data-skill-cost]', { hasText: /tokens/ }), 'with what it costs a turn');
 
       await form.getByRole('textbox', { name: 'Tools', exact: true }).fill('Read');

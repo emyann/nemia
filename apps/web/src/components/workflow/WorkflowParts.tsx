@@ -15,7 +15,7 @@ export function FromBadge({ from, factory }: { from: WorkflowListing['from']; fa
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-body-small leading-none font-medium ${
-        from === 'yours' ? container.grey : 'bg-muted text-muted-foreground'
+        from === 'user' ? container.grey : 'bg-muted text-muted-foreground'
       }`}
     >
       {fromWord(from, factory)}

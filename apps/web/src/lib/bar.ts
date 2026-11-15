@@ -8,9 +8,9 @@ import type { PagePlace } from './api/workflows.ts';
 
 /**
  * What the bar shows: the start of a run in a factory, or in none yet (`null`), which asks which first; a factory, a run, a step of a run,
- * a step of a workflow (`spec`), read from its origin (`from`: the factory's own tree, the repository's or yours), the machine's gauges the
- * top bar opens: the daemon, the feed, what is at work, the quota and the version, whole, or the runs waiting on you across every factory,
- * which the Runs page opens under what waits on you.
+ * a step of a workflow (`spec`), read from its origin (`from`: the factory's own tree, the repository's or the user library), the machine's
+ * gauges the top bar opens: the daemon, the feed, what is at work, the quota and the version, whole, or the runs waiting on you across
+ * every factory, which the Runs page opens under what waits on you.
  */
 export type Bar =
   | { kind: 'start'; factory: string | null }
@@ -42,7 +42,7 @@ function stepOf(name: string): Bar | undefined {
 
 /**
  * The step of a workflow `name` names, `<from>/<workflow>/<step>`, split at its first two `/`; none for a `from` that is no origin
- * (`factory`, `repo`, `yours`, `builtin`), or without a workflow or a step.
+ * (`factory`, `repo`, `user`, `builtin`), or without a workflow or a step.
  */
 function specOf(name: string): Bar | undefined {
   const [word, workflow] = name.split('/', 2);

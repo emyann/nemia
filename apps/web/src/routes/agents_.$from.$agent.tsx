@@ -36,7 +36,7 @@ export const Route = createFileRoute('/agents_/$from/$agent')({
     Promise.all([
       context.queryClient.ensureQueryData(agentQuery(params.from, params.agent, deps)),
       context.queryClient.prefetchQuery(keyFormQuery),
-      params.from === 'yours' ? context.queryClient.prefetchQuery(customInstructionsQuery(params.agent)) : null,
+      params.from === 'user' ? context.queryClient.prefetchQuery(customInstructionsQuery(params.agent)) : null,
     ]),
   component: AgentPage,
   errorComponent: ({ error }) => (
@@ -66,7 +66,7 @@ function AgentPage() {
   const { data: factories } = useQuery({ ...factoriesQuery, enabled: agent.from === 'repo' && place.repo === undefined });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const mine = agent.from === 'yours';
+  const mine = agent.from === 'user';
   const [kept, setKept] = useState<KeptForm | null>(null);
   const formKey = formKeyOf(agent.version, kept);
 
@@ -76,11 +76,11 @@ function AgentPage() {
       settleSave({
         rename:
           saved.agent.name !== agent.name
-            ? () => navigate({ to: '/agents/$from/$agent', params: { from: 'yours', agent: saved.agent.name } })
+            ? () => navigate({ to: '/agents/$from/$agent', params: { from: 'user', agent: saved.agent.name } })
             : undefined,
         invalidate: () => invalidateAgents(queryClient),
         release: () =>
-          setKept((was) => keptAfterSave(was, queryClient.getQueryData(agentQuery('yours', saved.agent.name).queryKey)?.version)),
+          setKept((was) => keptAfterSave(was, queryClient.getQueryData(agentQuery('user', saved.agent.name).queryKey)?.version)),
       }),
   });
   const remove = useMutation({
@@ -102,7 +102,7 @@ function AgentPage() {
         setKept(now && keptAfterCopy(agent, now, formKey));
       }}
       saving={save.isPending || remove.isPending}
-      refusal={error && <AgentRefused message={error.message} users={error instanceof AgentRefusal ? error.users : []} from="yours" />}
+      refusal={error && <AgentRefused message={error.message} users={error instanceof AgentRefusal ? error.users : []} from="user" />}
       onSave={(draft) => {
         remove.reset();
         save.mutate(draft);
@@ -134,7 +134,7 @@ function AgentPage() {
         {form}
       </FormIn>
 
-      {agent.from === 'yours' && <CustomInstructions name={agent.name} />}
+      {agent.from === 'user' && <CustomInstructions name={agent.name} />}
       {agent.from === 'repo' && <RepoInstructions name={agent.name} repo={repoOfPlace(place, factories)} />}
 
       {mine ? <TryAgent agent={agent} /> : <TryYours agent={agent} />}

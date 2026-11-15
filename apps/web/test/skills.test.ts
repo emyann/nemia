@@ -21,7 +21,7 @@ import {
 
 const row = (fields: Partial<SkillRow> = {}): SkillRow => ({
   name: 'write-a-note',
-  from: 'yours',
+  from: 'user',
   dir: '/store/workflows/skills/write-a-note',
   entry: { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] },
   error: null,
@@ -33,7 +33,7 @@ const row = (fields: Partial<SkillRow> = {}): SkillRow => ({
 });
 
 const places = (yours: SkillRow[], repo: SkillRow[] = [], builtin: SkillRow[] = []): SkillPlace[] => [
-  { from: 'yours', dir: '/store/workflows/skills', skills: yours },
+  { from: 'user', dir: '/store/workflows/skills', skills: yours },
   { from: 'repo', dir: '/repo/.claude/skills', skills: repo },
   { from: 'builtin', dir: '/hkb/workflows/skills', skills: builtin },
 ];
@@ -82,7 +82,7 @@ test('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, 
       assert.deepEqual(
         rows.map((r) => [r.name, r.from, r.foundIn, r.error]),
         [
-          ['write-a-note', 'yours', null, null],
+          ['write-a-note', 'user', null, null],
           ['apps/site:lay-out', null, 'apps/site/.claude/skills/lay-out', null],
         ],
       );
@@ -97,7 +97,7 @@ test('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, 
       assert.deepEqual(
         rows.map((r) => [r.name, r.from]),
         [
-          ['write-a-note', 'yours'],
+          ['write-a-note', 'user'],
           ['old', 'repo'],
           ['ship-it', null],
         ],
@@ -112,7 +112,7 @@ test('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, 
       );
       assert.deepEqual(
         [copied[0].from, copied[0].error],
-        ['yours', null],
+        ['user', null],
         'the list read again after a copy has the skill in your library: what it says now wins over the agent that was read missing it',
       );
       assert.deepEqual(
@@ -136,7 +136,7 @@ test('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, 
         why: 'SKILL.md has no frontmatter',
       });
       assert.deepEqual(offerOf(row({ from: 'builtin', entry: null, error: 'a link' }), []), { kind: 'refused', why: 'a link' });
-      assert.deepEqual(offerOf(row({ from: 'builtin', found: 'yours' }), []), { kind: 'found', where: 'yours' });
+      assert.deepEqual(offerOf(row({ from: 'builtin', found: 'user' }), []), { kind: 'found', where: 'user' });
       assert.deepEqual(offerOf(row({ from: 'builtin', found: 'repo' }), []), { kind: 'found', where: 'repo' });
     },
   );
@@ -144,7 +144,7 @@ test('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, 
     assert.equal(reachWords([]), 'No agent gives it yet: a change reaches none.');
     assert.equal(
       reachWords([
-        { from: 'yours', name: 'coder' },
+        { from: 'user', name: 'coder' },
         { from: 'repo', name: 'reviewer' },
       ]),
       'A change, this switch included, changes every agent that gives it, from its next run: coder, reviewer (this repository).',

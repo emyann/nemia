@@ -45,7 +45,7 @@ function serving(t: { after: (fn: () => void) => void }, answer: (asked: string)
 const answering = (t: { after: (fn: () => void) => void }, body: unknown, status = 200) => serving(t, () => body, status);
 
 const readAgents = agentsQuery.queryFn as unknown as () => Promise<LibraryAgent[]>;
-const readSkill = skillQuery('yours', 'review-a-change').queryFn as unknown as () => Promise<SkillDetail>;
+const readSkill = skillQuery('user', 'review-a-change').queryFn as unknown as () => Promise<SkillDetail>;
 const readSkills = skillsQuery.queryFn as unknown as () => Promise<SkillPlace[]>;
 const readWorkflows = workflowsQuery.queryFn as unknown as () => Promise<WorkflowListing[]>;
 
@@ -77,7 +77,7 @@ test("a step's page and a list of workflows are read in the place named, under a
           ],
         },
         skillsFrom: [
-          { name: 'alpha', from: 'yours', foundIn: null },
+          { name: 'alpha', from: 'user', foundIn: null },
           { name: 'apps/site:set-type', from: null, foundIn: 'apps/site/.claude/skills/set-type' },
           { name: 'gamma', from: null, foundIn: null },
         ],
@@ -90,7 +90,7 @@ test("a step's page and a list of workflows are read in the place named, under a
       t.after(() => {
         globalThis.fetch = before;
       });
-      const placed = stepQuery('yours', 'w', 'review', { factory: 'f' });
+      const placed = stepQuery('user', 'w', 'review', { factory: 'f' });
       const read = await (placed.queryFn as unknown as () => Promise<WorkflowStepPage>)();
       assert.deepEqual(read, page);
       assert.equal(
@@ -98,11 +98,11 @@ test("a step's page and a list of workflows are read in the place named, under a
         'apps/site/.claude/skills/set-type',
         'where a skill named with its folder was found is kept',
       );
-      assert.equal(asked.at(-1), '/api/namespaces/f/workflows/w/steps/review?origin=yours');
-      assert.notDeepEqual(placed.queryKey, stepQuery('yours', 'w', 'review').queryKey, 'two places, two answers kept apart');
-      assert.notDeepEqual(placed.queryKey, stepQuery('yours', 'w', 'review', { factory: 'g' }).queryKey);
-      await (stepQuery('yours', 'w', 'review', { factory: 'f', repo: '/code/app' }).queryFn as unknown as () => Promise<unknown>)();
-      assert.equal(asked.at(-1), '/api/namespaces/f/workflows/w/steps/review?origin=yours&repo=%2Fcode%2Fapp');
+      assert.equal(asked.at(-1), '/api/namespaces/f/workflows/w/steps/review?origin=user');
+      assert.notDeepEqual(placed.queryKey, stepQuery('user', 'w', 'review').queryKey, 'two places, two answers kept apart');
+      assert.notDeepEqual(placed.queryKey, stepQuery('user', 'w', 'review', { factory: 'g' }).queryKey);
+      await (stepQuery('user', 'w', 'review', { factory: 'f', repo: '/code/app' }).queryFn as unknown as () => Promise<unknown>)();
+      assert.equal(asked.at(-1), '/api/namespaces/f/workflows/w/steps/review?origin=user&repo=%2Fcode%2Fapp');
     },
   );
   await t.test("a Workflow is read as the board's view of it, and a step its object spells `workspace: main` is unread", async (t) => {
@@ -138,13 +138,13 @@ test("get, the library's reads: each decodes what the api gives, keeps out what 
     async (t) => {
       const { examples: _, ...bare } = skillEntry();
       const asked = serving(t, (path) =>
-        listOfItems('Agent', path.includes('origin=yours') ? [agentObject(listedAgent({ card: [bare], untried: null }))] : []),
+        listOfItems('Agent', path.includes('origin=user') ? [agentObject(listedAgent({ card: [bare], untried: null }))] : []),
       );
       const [read, ...more] = await readAgents();
       assert.deepEqual(more, []);
       assert.deepEqual(
         [...asked],
-        ['/api/namespaces/default/agents?limit=500&origin=yours'],
+        ['/api/namespaces/default/agents?limit=500&origin=user'],
         'yours read whole, shadowed or not: the default namespace has no repository to read',
       );
       assert.equal(Object.hasOwn(read.card?.[0] ?? {}, 'examples'), false);
@@ -153,13 +153,13 @@ test("get, the library's reads: each decodes what the api gives, keeps out what 
       const draft = without(consistentSkill().draft ?? assert.fail('the fixture has a draft'), 'preload', 'title');
       const skillAsked = answering(t, skillObject(consistentSkill({ draft })));
       const skill = await readSkill();
-      assert.equal(skillAsked.at(-1), '/api/namespaces/default/skills/review-a-change?origin=yours');
+      assert.equal(skillAsked.at(-1), '/api/namespaces/default/skills/review-a-change?origin=user');
       assert.equal(Object.hasOwn(skill.draft ?? {}, 'preload') || Object.hasOwn(skill.draft ?? {}, 'title'), false);
       assert.deepEqual(skill, consistentSkill({ draft }));
     },
   );
   await t.test('a key the board does not know is dropped, not refused', async (t) => {
-    serving(t, (path) => listOfItems('Agent', path.includes('origin=yours') ? [{ ...agentObject(), colour: 'blue' }] : []));
+    serving(t, (path) => listOfItems('Agent', path.includes('origin=user') ? [{ ...agentObject(), colour: 'blue' }] : []));
     const [read] = await readAgents();
     assert.equal(Object.hasOwn(read, 'colour'), false);
     assert.deepEqual(read, listedAgent());
@@ -176,7 +176,7 @@ test("get, the library's reads: each decodes what the api gives, keeps out what 
   });
   await t.test("an agent the api refused still rejects in the api's words and status, not as an answer unread", async (t) => {
     answering(t, { error: 'no agent agora of yours' }, 404);
-    const err: unknown = await readAgent('yours', 'agora').then(
+    const err: unknown = await readAgent('user', 'agora').then(
       () => assert.fail('a 404 was read'),
       (e: unknown) => e,
     );
@@ -197,7 +197,7 @@ test('the skills are read a place at a time, by origin, each place its folder; a
   const places = await readSkills();
   assert.deepEqual(
     places.map((place) => place.from),
-    ['yours', 'builtin'],
+    ['user', 'builtin'],
     'in the order an agent of yours finds a name, the builtin last; the default namespace has no repository to read',
   );
   assert.equal(

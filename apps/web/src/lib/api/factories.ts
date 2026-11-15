@@ -23,7 +23,7 @@ import {
   type SignInStarted,
   type SignInState,
 } from 'objects';
-import { builtin, factories, hireName, hires, mcpServers, schedules } from './objects.ts';
+import { factories, library, hireName, hires, mcpServers, schedules } from './objects.ts';
 
 export type { FactoryCondition, FactoryInstruction, FactoryRules, McpServerWrite, SignInStarted, SignInState } from 'objects';
 
@@ -316,7 +316,7 @@ export const factoryServersQuery = (name: string) =>
   queryOptions({
     queryKey: ['factory-servers', name],
     queryFn: async (): Promise<FactoryServers> => {
-      const [listed, offered] = await Promise.all([mcpServers.list(name), builtin.mcpServers()]);
+      const [listed, offered] = await Promise.all([mcpServers.list(name), library.mcpServers()]);
       return { factory: name, servers: listed.items.map(serverViewOf), builtin: offered.items.map(builtinViewOf) };
     },
     staleTime: Infinity,

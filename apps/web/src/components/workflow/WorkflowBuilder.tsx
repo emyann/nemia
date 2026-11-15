@@ -115,7 +115,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
   const reread = useMutation({
     mutationFn: () => queryClient.fetchQuery({ ...workflowsQuery, staleTime: 0 }),
     onSuccess: (list) => {
-      const now = list.find((w) => w.from === 'yours' && w.name === base.name);
+      const now = list.find((w) => w.from === 'user' && w.name === base.name);
       if (!now || now.error) return onClose();
       startFrom(now);
       setRefusal(null);

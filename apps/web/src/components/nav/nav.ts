@@ -1,4 +1,4 @@
-import { Bot, ChartColumn, Factory, House, Inbox, List, type LucideIcon, MessageCircle, Settings, Waypoints } from 'lucide-react';
+import { Bot, ChartColumn, Factory, House, Inbox, Library, List, type LucideIcon, MessageCircle, Settings, Waypoints } from 'lucide-react';
 import { openRunsQuery } from '../../lib/api/runs.ts';
 import { factorySearch } from '../../lib/factories.ts';
 
@@ -65,8 +65,8 @@ export type Destination = { id: string; label: string; icon: LucideIcon; lights:
 
 /**
  * The rail's destinations, in their order: Overview, the factories' canvas at `/`; Runs, the Inbox, Factories (a factory's floor and its
- * settings), Agents and Workflows, each lit on its page and under it; Stats; Nemia, her chat as a page of its own, which her docked face
- * also opens; and Settings, lit on each of its tabs (`SETTINGS_TABS`). A label's page lights Runs.
+ * settings), Agents and Workflows, the store's Library, each lit on its page and under it; Stats; Nemia, her chat as a page of its own,
+ * which her docked face also opens; and Settings, lit on each of its tabs (`SETTINGS_TABS`). A label's page lights Runs.
  */
 export const DESTINATIONS: readonly Destination[] = [
   { id: 'overview', label: 'Overview', icon: House, lights: (path) => path === '/' },
@@ -75,6 +75,7 @@ export const DESTINATIONS: readonly Destination[] = [
   { id: 'factories', label: 'Factories', icon: Factory, lights: under('/factories') },
   { id: 'agents', label: 'Agents', icon: Bot, lights: under('/agents') },
   { id: 'workflows', label: 'Workflows', icon: Waypoints, lights: under('/workflows') },
+  { id: 'library', label: 'Library', icon: Library, lights: under('/library') },
   { id: 'stats', label: 'Stats', icon: ChartColumn, lights: under('/stats') },
   { id: 'nemia', label: 'Nemia', icon: MessageCircle, lights: under('/chat') },
   { id: 'settings', label: 'Settings', icon: Settings, lights: (path) => SETTINGS_TABS.some((tab) => under(tab.to)(path)) },

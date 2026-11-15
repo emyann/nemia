@@ -2939,14 +2939,14 @@ const hiredPage = async (extra: Record<string, unknown> = {}) => {
   const { stepPage } = await import('./library-fixtures.ts');
   return stepPage({
     workflow: 'w',
-    from: 'yours',
+    from: 'user',
     dir: '/store/workflows/w',
     step: 'review',
     factory: 'hiring',
     layers: { ...LAYERS, task: null },
     hired: 'writer',
     skillsFrom: [
-      { name: 'alpha', from: 'yours', foundIn: null },
+      { name: 'alpha', from: 'user', foundIn: null },
       { name: 'gamma', from: null, foundIn: null },
     ],
     ...extra,
@@ -2958,7 +2958,7 @@ test("on a step's page, a skill named with its folder is drawn as written, the r
   const page = await hiredPage({
     layers: { ...LAYERS, task: null, addedSkills: ['apps/site:set-type', 'gamma'] },
     skillsFrom: [
-      { name: 'alpha', from: 'yours', foundIn: null },
+      { name: 'alpha', from: 'user', foundIn: null },
       { name: 'apps/site:set-type', from: null, foundIn: 'apps/site/.claude/skills/set-type' },
       { name: 'gamma', from: null, foundIn: null },
     ],
@@ -2966,7 +2966,7 @@ test("on a step's page, a skill named with its folder is drawn as written, the r
   const html = await routedWith(createElement(StepTold, { page, place: { factory: 'hiring' } }));
   const chip = (name: string): string =>
     new RegExp(`data-skill="${name}"[^>]*>[^]*?</span>(?=\\s*(<span[^>]*data-skill=|</))`).exec(html)?.[0] ?? '';
-  assert.match(chip('alpha'), /<a[^>]*href="\/agents\/skills\/yours\/alpha"/, 'one with a page stays linked');
+  assert.match(chip('alpha'), /<a[^>]*href="\/agents\/skills\/user\/alpha"/, 'one with a page stays linked');
   const folder = chip('apps/site:set-type');
   assert.match(
     folder,
@@ -2985,8 +2985,8 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
   assert.match(html, /data-read-now[^>]*>Read now from the files, and frozen when a run starts/);
   assert.match(html, /<details data-instructions-fold="true">[^]*You are the writer\./, "the agent's words folded, closed");
   const home = (name: string): string => new RegExp(`<span data-home="${name}"[^]*?</span>`).exec(html)?.[0] ?? '';
-  assert.match(home('instructions'), /href="\/agents\/yours\/writer"/);
-  assert.match(home('custom'), /href="\/agents\/yours\/writer#custom-instructions"/);
+  assert.match(home('instructions'), /href="\/agents\/user\/writer"/);
+  assert.match(home('custom'), /href="\/agents\/user\/writer#custom-instructions"/);
   const theirs = await routedWith(
     createElement(StepTold, { page: { ...(await hiredPage()), from: 'repo' }, place: { factory: 'hiring' } }),
   );
@@ -2996,8 +2996,8 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
     /href="\/agents\/repo\/writer\?factory=hiring#custom-instructions"/,
     "a repository's agent's page, in the factory the step is read in: the default reads no repository",
   );
-  assert.match(home('policy'), /href="\/workflows\/yours\/w\?factory=hiring&amp;build=true"/, 'one of yours: its builder, in the place');
-  assert.match(html, /data-skill="alpha"[^>]*><a[^>]*href="\/agents\/skills\/yours\/alpha"/, 'a skill found: linked to its page');
+  assert.match(home('policy'), /href="\/workflows\/user\/w\?factory=hiring&amp;build=true"/, 'one of yours: its builder, in the place');
+  assert.match(html, /data-skill="alpha"[^>]*><a[^>]*href="\/agents\/skills\/user\/alpha"/, 'a skill found: linked to its page');
   assert.match(html, /data-skill="gamma"[^>]*>gamma</, 'a skill found nowhere: its name alone');
   assert.match(html, /data-layer="task"[^>]*>Then the task: the brief a run is started with\./);
   assert.doesNotMatch(html, /Not composed|What it was told|What it would be told now/);
@@ -3042,7 +3042,7 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
 test("a step's agent: the one the factory picked hires, marked hired; else its file's, and each factory that hires into it, linked to this page there", async () => {
   const { StepAgent } = await import('../src/components/step/StepParts.tsx');
   const hired = await routedWith(createElement(StepAgent, { page: await hiredPage() }));
-  assert.match(hired, /href="\/agents\/yours\/writer"/);
+  assert.match(hired, /href="\/agents\/user\/writer"/);
   assert.match(hired, /data-hired="hiring"[^>]*>hired by hiring</);
   assert.doesNotMatch(hired, /data-hired-in/);
 
@@ -3056,11 +3056,11 @@ test("a step's agent: the one the factory picked hires, marked hired; else its f
       }),
     }),
   );
-  assert.match(plain, /href="\/agents\/yours\/scribe"[^]*named by its file/);
+  assert.match(plain, /href="\/agents\/user\/scribe"[^]*named by its file/);
   assert.doesNotMatch(plain, /data-hired=/);
   assert.match(
     plain,
-    /Hired into this step by:[^]*data-hired-in="hiring"[^>]*href="\/workflows\/yours\/w\/review\?factory=hiring"[^>]*>hiring</,
+    /Hired into this step by:[^]*data-hired-in="hiring"[^>]*href="\/workflows\/user\/w\/review\?factory=hiring"[^>]*>hiring</,
   );
   assert.match(
     await routedWith(createElement(StepAgent, { page: await hiredPage({ factory: null, hired: null, keys: [] }) })),
@@ -3097,7 +3097,7 @@ const PICKABLE = {
 
 test('hiring into a step: the agent hired with Fire; else the picker of the agents beside it, with Hire and, on yours, New agent', async () => {
   const hired = await hireOn({});
-  assert.match(hired, /hiring hires[^]*href="\/agents\/yours\/writer"[^]*into this step\./);
+  assert.match(hired, /hiring hires[^]*href="\/agents\/user\/writer"[^]*into this step\./);
   assert.match(hired, /data-fire="writer"[^>]*>Fire</);
   assert.doesNotMatch(hired, /data-hire-picker|data-new-agent|data-hire-refused/, 'a step hired into is fired before another is hired');
 
@@ -3246,9 +3246,9 @@ test("a step's recent runs link to the step on each run's page, filed or not rea
 test("a run's step links to the step's page in the run's place, and a run whose workflow the board pages on no address links none", async () => {
   const { StepPageLink } = await import('../src/components/step/StepParts.tsx');
   const html = await routedWith(
-    createElement(StepPageLink, { page: { from: 'yours', workflow: 'w', factory: 'hiring', repo: null }, step: 'review' }),
+    createElement(StepPageLink, { page: { from: 'user', workflow: 'w', factory: 'hiring', repo: null }, step: 'review' }),
   );
-  assert.match(html, /href="\/workflows\/yours\/w\/review\?factory=hiring"[^>]*>What it will be told now →</);
+  assert.match(html, /href="\/workflows\/user\/w\/review\?factory=hiring"[^>]*>What it will be told now →</);
   assert.equal(await routedWith(createElement(StepPageLink, { page: null, step: 'review' })), '');
 });
 

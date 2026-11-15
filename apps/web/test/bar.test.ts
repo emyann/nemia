@@ -89,8 +89,8 @@ test("barOf, barValue and barSearch: a bar's address, read and written", async (
     "a workflow's step's address names where the workflow is read from, the workflow up to the next slash and the step after it",
     () => {
       assert.deepEqual(barOf('spec:repo/dev/review'), SPEC);
-      assert.deepEqual(barOf('spec:yours/mine/plan'), { kind: 'spec', from: 'yours', workflow: 'mine', step: 'plan' });
-      assert.deepEqual(barOf('spec:yours/w/a/b:c'), { kind: 'spec', from: 'yours', workflow: 'w', step: 'a/b:c' }, 'a step keeps its own');
+      assert.deepEqual(barOf('spec:user/mine/plan'), { kind: 'spec', from: 'user', workflow: 'mine', step: 'plan' });
+      assert.deepEqual(barOf('spec:user/w/a/b:c'), { kind: 'spec', from: 'user', workflow: 'w', step: 'a/b:c' }, 'a step keeps its own');
       assert.deepEqual(
         barOf('spec:factory/dev/draft'),
         { kind: 'spec', from: 'factory', workflow: 'dev', step: 'draft' },
@@ -123,7 +123,7 @@ test("barOf, barValue and barSearch: a bar's address, read and written", async (
       'step:abc/a/b',
       'step:abc/x:y',
       'spec:repo/dev/review',
-      'spec:yours/w/a/b:c',
+      'spec:user/w/a/b:c',
     ])
       assert.equal(barValue(barOf(value)!), value);
     assert.deepEqual(barOf(barValue(OTHER)), OTHER);
@@ -190,7 +190,7 @@ test('nextBar, specStep and inspects: what a press shows or closes', async (t) =
       assert.deepEqual(nextBar(SPEC, implement), implement, 'another step of the same workflow');
       const elsewhere: Bar = { ...SPEC, workflow: 'other' };
       assert.deepEqual(nextBar(SPEC, elsewhere), elsewhere, 'the same step of another workflow');
-      const mine: Bar = { ...SPEC, from: 'yours' };
+      const mine: Bar = { ...SPEC, from: 'user' };
       assert.deepEqual(nextBar(SPEC, mine), mine, 'the same workflow and step, read from yours');
       const ran: Bar = { kind: 'step', run: 'dev', step: 'review' };
       assert.deepEqual(nextBar(SPEC, ran), ran, "a run's step of the same name");
@@ -200,7 +200,7 @@ test('nextBar, specStep and inspects: what a press shows or closes', async (t) =
     "a workflow's canvas and its Build read the step the bar shows of that workflow alone: not another's, nor yours of the same name",
     () => {
       assert.equal(specStep(SPEC, 'repo', 'dev'), 'review');
-      assert.equal(specStep(SPEC, 'yours', 'dev'), null, 'yours, of the same name');
+      assert.equal(specStep(SPEC, 'user', 'dev'), null, 'yours, of the same name');
       assert.equal(specStep(SPEC, 'repo', 'other'), null, 'another workflow');
       assert.equal(specStep({ kind: 'step', run: 'dev', step: 'review' }, 'repo', 'dev'), null, "a run's step");
       assert.equal(specStep(undefined, 'repo', 'dev'), null, 'no bar');

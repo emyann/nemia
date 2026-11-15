@@ -303,7 +303,7 @@ function WorkflowRow({
         <span className="min-w-0 flex-1 space-y-0.5">
           <span className={`block font-medium ${why ? 'text-muted-foreground' : ''}`}>
             {workflow.name}
-            {workflow.from === 'yours' && <span className="font-normal text-muted-foreground"> (yours)</span>}
+            {workflow.from === 'user' && <span className="font-normal text-muted-foreground"> (yours)</span>}
           </span>
           {workflow.description && <span className="block text-body-small text-muted-foreground">{workflow.description}</span>}
           {why && (

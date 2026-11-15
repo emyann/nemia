@@ -11,11 +11,11 @@ const lit = (path: string) => destinationOf(path)?.label;
 
 test("DESTINATIONS, destinationOf, SETTINGS_TABS and tabsOf: the rail's destinations and the tabs of Settings", async (t) => {
   await t.test(
-    "the rail's destinations are Overview, Runs, Inbox, Factories, Agents, Workflows, Stats, Nemia and Settings, in that order",
+    "the rail's destinations are Overview, Runs, Inbox, Factories, Agents, Workflows, Library, Stats, Nemia and Settings, in that order",
     () => {
       assert.deepEqual(
         DESTINATIONS.map((item) => item.label),
-        ['Overview', 'Runs', 'Inbox', 'Factories', 'Agents', 'Workflows', 'Stats', 'Nemia', 'Settings'],
+        ['Overview', 'Runs', 'Inbox', 'Factories', 'Agents', 'Workflows', 'Library', 'Stats', 'Nemia', 'Settings'],
       );
     },
   );
@@ -29,6 +29,7 @@ test("DESTINATIONS, destinationOf, SETTINGS_TABS and tabsOf: the rail's destinat
       assert.equal(lit('/factories/nemia/settings'), 'Factories', "a factory's own settings are its, not the store's Settings");
       assert.equal(lit('/agents/skills/new'), 'Agents');
       assert.equal(lit('/workflows/repo/dev/review'), 'Workflows');
+      assert.equal(lit('/library'), 'Library');
       assert.equal(lit('/stats'), 'Stats');
       assert.equal(lit('/chat'), 'Nemia', 'her chat is a page of its own, and the rail lights her on it');
       for (const path of ['/settings', '/setup', '/capabilities', '/tokens']) assert.equal(lit(path), 'Settings', path);
@@ -92,10 +93,10 @@ test('pickedOf, destinationHref and pickTo: the picked factory, read and carried
       assert.equal(pickedOf('/runs', { factory: 3 }), undefined, 'a name that is no string picks none');
       assert.equal(pickedOf('/factories/nemia', { factory: 'hiring' }), 'nemia', 'on a floor the path wins over a stray ?factory=');
       assert.equal(pickedOf('/workflows/repo/dev', { factory: 'hiring' }), 'hiring', "a workflow's page is read in the factory picked");
-      assert.equal(pickedOf('/workflows/yours/w/review', { factory: 'hiring' }), 'hiring', "and a step's page");
+      assert.equal(pickedOf('/workflows/user/w/review', { factory: 'hiring' }), 'hiring', "and a step's page");
       assert.equal(pickedOf('/agents/factory/drafter', { factory: 'treed' }), 'treed', "a factory's own agent is read in its factory");
       assert.equal(pickedOf('/agents/skills/factory/outline', { factory: 'treed' }), 'treed', 'and its own skill');
-      for (const path of ['/agents/yours/drafter', '/agents/skills/repo/outline'])
+      for (const path of ['/agents/user/drafter', '/agents/skills/repo/outline'])
         assert.equal(pickedOf(path, { factory: 'treed' }), undefined, `refused: ${path} is read in default, whatever factory is picked`);
       for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/workflows/repo/dev', '/workflows/repo/dev/review'])
         assert.equal(pickedOf(path, {}), undefined, `${path} picks none`);
@@ -169,10 +170,10 @@ test('pickedOf, destinationHref and pickTo: the picked factory, read and carried
       assert.equal(pickTo('/runs/r-1', {}, undefined), null);
       assert.equal(pickTo('/agents', {}, undefined), null);
       assert.deepEqual(
-        pickTo('/workflows/yours/w/review', { factory: 'hiring', repo: '/code/app', bar: 'x' }, 'nemia'),
+        pickTo('/workflows/user/w/review', { factory: 'hiring', repo: '/code/app', bar: 'x' }, 'nemia'),
         {
           to: '/workflows/$from/$workflow/$step',
-          params: { from: 'yours', workflow: 'w', step: 'review' },
+          params: { from: 'user', workflow: 'w', step: 'review' },
           search: { bar: 'x', factory: 'nemia' },
         },
         "a step's page stays, read in the factory picked, the repository the last one named dropped",

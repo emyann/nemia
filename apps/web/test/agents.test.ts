@@ -37,7 +37,7 @@ import {
 
 const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   name: 'scribe',
-  from: 'yours',
+  from: 'user',
   dir: '/store/agents',
   file: '/store/agents/scribe.md',
   role: 'Note writer',

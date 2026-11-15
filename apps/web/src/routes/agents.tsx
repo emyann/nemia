@@ -38,7 +38,7 @@ function AgentsPage() {
   const { data: agents } = useSuspenseQuery(agentsQuery);
   const { data: store } = useSuspenseQuery(storeQuery);
   const { data: skills } = useQuery(skillsQuery);
-  const yours = agents.filter((a) => a.from === 'yours');
+  const yours = agents.filter((a) => a.from === 'user');
 
   return (
     <article className="space-y-8">
@@ -120,7 +120,7 @@ function SkillPlaces({ places, library }: { places: readonly SkillPlace[]; libra
             </ul>
           ) : (
             <p className="text-body-small text-muted-foreground">
-              {place.from === 'yours' ? <>None yet. New skill writes one.</> : 'None.'}
+              {place.from === 'user' ? <>None yet. New skill writes one.</> : 'None.'}
             </p>
           )}
         </section>

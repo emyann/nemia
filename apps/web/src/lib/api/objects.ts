@@ -44,6 +44,8 @@ import {
   FactoryRules,
   Hire,
   HireList,
+  LibraryAdd,
+  LibraryAddList,
   type LabelEdit,
   Labelled,
   McpServer,
@@ -516,9 +518,37 @@ export const mcpServers = {
     call((c) => c.mcpservers.signOut({ params: { namespace, name } }), write(SignedOut, SIGN_IN_ASKED)),
 };
 
-/** Nemia's own servers, which a factory may record (`GET /api/builtin/mcpservers`), every page. */
-export const builtin = {
-  mcpServers: (): Promise<McpServerList> => everyPage((asked) => call((c) => c.builtin.mcpservers({ query: asked }), read(McpServerList))),
+/**
+ * The store's library, in no namespace: its MCP servers (`GET /api/mcpservers`), the user library's beside Nemia's own, which a factory
+ * adds; and each kind's items with the factories that add each, every page.
+ */
+export const library = {
+  mcpServers: (): Promise<McpServerList> => everyPage((asked) => call((c) => c.mcpservers.listLibrary({ query: asked }), read(McpServerList))),
+  skills: (): Promise<Skill[]> =>
+    everyPage((asked) => call((c) => c.skills.listLibrary({ query: asked }).pipe(Effect.flatMap(listed)), read(SkillList))).then((l) => [
+      ...l.items,
+    ]),
+  agents: (): Promise<Agent[]> =>
+    everyPage((asked) => call((c) => c.agents.listLibrary({ query: asked }).pipe(Effect.flatMap(listed)), read(AgentList))).then((l) => [
+      ...l.items,
+    ]),
+  workflows: (): Promise<Workflow[]> =>
+    everyPage((asked) => call((c) => c.workflows.listLibrary({ query: asked }), read(WorkflowList))).then((l) => [...l.items]),
+};
+
+/** What a factory's add may have done, and what to look at before sending it again. */
+const ADD_WRITTEN = "The add may be written: read the factory's adds again before sending it again.";
+
+/** What a factory has added from the library, each a LibraryAdd named `<kind>.<name>` with its state. */
+export const libraryAdds = {
+  list: (namespace: string): Promise<LibraryAdd[]> =>
+    everyPage((asked) => call((c) => c.libraryadds.list({ params: { namespace }, query: asked }), read(LibraryAddList))).then((l) => [
+      ...l.items,
+    ]),
+  add: (namespace: string, name: string): Promise<LibraryAdd> =>
+    call((c) => c.libraryadds.put({ params: { namespace, name } }), write(LibraryAdd, ADD_WRITTEN)),
+  remove: (namespace: string, name: string): Promise<LibraryAdd> =>
+    call((c) => c.libraryadds.delete({ params: { namespace, name } }), write(LibraryAdd, ADD_WRITTEN)),
 };
 
 /** A factory's schedules, each named by its workflow. */
@@ -625,14 +655,14 @@ export const workflows = {
     ).then((list) => [...list.items]),
   get: (namespace: string, name: string, at?: DefinitionRead): Promise<Workflow> =>
     call((c) => c.workflows.get({ params: { namespace, name }, query: originOf(at) }), read(Workflow, repoOf(at))),
-  create: (namespace: string, body: WorkflowCreate, refuse?: Refuse): Promise<Workflow> =>
-    call((c) => c.workflows.create({ params: { namespace }, payload: body }), write(Workflow, WORKFLOW_WRITTEN, undefined, refuse)),
-  replace: (namespace: string, name: string, body: WorkflowWrite, refuse?: Refuse): Promise<Workflow> =>
-    call((c) => c.workflows.replace({ params: { namespace, name }, payload: body }), write(Workflow, WORKFLOW_WRITTEN, undefined, refuse)),
+  create: (body: WorkflowCreate, refuse?: Refuse): Promise<Workflow> =>
+    call((c) => c.workflows.createLibrary({ payload: body }), write(Workflow, WORKFLOW_WRITTEN, undefined, refuse)),
+  replace: (name: string, body: WorkflowWrite, refuse?: Refuse): Promise<Workflow> =>
+    call((c) => c.workflows.replaceLibrary({ params: { name }, payload: body }), write(Workflow, WORKFLOW_WRITTEN, undefined, refuse)),
   /** The workflow `name` removed, against the `resourceVersion` it was read at. */
-  delete: (namespace: string, name: string, resourceVersion: string, refuse?: Refuse): Promise<Workflow> =>
+  delete: (name: string, resourceVersion: string, refuse?: Refuse): Promise<Workflow> =>
     call(
-      (c) => c.workflows.delete({ params: { namespace, name }, query: { resourceVersion } }),
+      (c) => c.workflows.deleteLibrary({ params: { name }, query: { resourceVersion } }),
       write(Workflow, 'The folder may be removed: reload the Workflows page before removing it again.', undefined, refuse),
     ),
   /** A step of the workflow `name`, for its page: its keys, its layers, its hires and its recent runs, read where `at` says. */
@@ -656,19 +686,19 @@ export const agents = {
     ).then((list) => [...list.items]),
   get: (namespace: string, name: string, at?: DefinitionRead): Promise<Agent> =>
     call((c) => c.agents.get({ params: { namespace, name }, query: originOf(at) }), read(Agent, repoOf(at))),
-  create: (namespace: string, body: AgentWrite, refuse?: Refuse): Promise<Agent> =>
-    call((c) => c.agents.create({ params: { namespace }, payload: body }), write(Agent, AGENT_WRITTEN, undefined, refuse)),
-  replace: (namespace: string, name: string, body: AgentWrite, refuse?: Refuse): Promise<Agent> =>
-    call((c) => c.agents.replace({ params: { namespace, name }, payload: body }), write(Agent, AGENT_WRITTEN, undefined, refuse)),
-  delete: (namespace: string, name: string, resourceVersion: string, refuse?: Refuse): Promise<Agent> =>
+  create: (body: AgentWrite, refuse?: Refuse): Promise<Agent> =>
+    call((c) => c.agents.createLibrary({ payload: body }), write(Agent, AGENT_WRITTEN, undefined, refuse)),
+  replace: (name: string, body: AgentWrite, refuse?: Refuse): Promise<Agent> =>
+    call((c) => c.agents.replaceLibrary({ params: { name }, payload: body }), write(Agent, AGENT_WRITTEN, undefined, refuse)),
+  delete: (name: string, resourceVersion: string, refuse?: Refuse): Promise<Agent> =>
     call(
-      (c) => c.agents.delete({ params: { namespace, name }, query: { resourceVersion } }),
+      (c) => c.agents.deleteLibrary({ params: { name }, query: { resourceVersion } }),
       write(Agent, AGENT_WRITTEN, undefined, refuse),
     ),
   /** A try of the agent `name` on `brief`: the run it started. */
-  try: (namespace: string, name: string, brief: string, refuse?: Refuse): Promise<AgentTried> =>
+  try: (name: string, brief: string, refuse?: Refuse): Promise<AgentTried> =>
     call(
-      (c) => c.agents.try({ params: { namespace, name }, payload: { brief } }),
+      (c) => c.agents.tryLibrary({ params: { name }, payload: { brief } }),
       write(AgentTried, 'The try may have started: look on the Runs page before trying the agent again.', undefined, refuse),
     ),
   card: (namespace: string, name: string, at?: DefinitionRead): Promise<AgentCard> =>
@@ -689,13 +719,13 @@ export const skills = {
     ).then((list) => [...list.items]),
   get: (namespace: string, name: string, at?: DefinitionRead): Promise<Skill> =>
     call((c) => c.skills.get({ params: { namespace, name }, query: originOf(at) }), read(Skill, repoOf(at))),
-  create: (namespace: string, body: SkillWrite, refuse?: Refuse): Promise<Skill> =>
-    call((c) => c.skills.create({ params: { namespace }, payload: body }), write(Skill, SKILL_WRITTEN, undefined, refuse)),
-  replace: (namespace: string, name: string, body: SkillWrite, refuse?: Refuse): Promise<Skill> =>
-    call((c) => c.skills.replace({ params: { namespace, name }, payload: body }), write(Skill, SKILL_WRITTEN, undefined, refuse)),
+  create: (body: SkillWrite, refuse?: Refuse): Promise<Skill> =>
+    call((c) => c.skills.createLibrary({ payload: body }), write(Skill, SKILL_WRITTEN, undefined, refuse)),
+  replace: (name: string, body: SkillWrite, refuse?: Refuse): Promise<Skill> =>
+    call((c) => c.skills.replaceLibrary({ params: { name }, payload: body }), write(Skill, SKILL_WRITTEN, undefined, refuse)),
   /** The builtin skill `name` copied into your library: the copy, as yours. */
-  copy: (namespace: string, name: string, refuse?: Refuse): Promise<Skill> =>
-    call((c) => c.skills.copy({ params: { namespace, name } }), write(Skill, SKILL_WRITTEN, undefined, refuse)),
+  copy: (name: string, refuse?: Refuse): Promise<Skill> =>
+    call((c) => c.skills.copyLibrary({ params: { name } }), write(Skill, SKILL_WRITTEN, undefined, refuse)),
   files: (namespace: string, name: string, at?: DefinitionRead): Promise<SkillFiles> =>
     call((c) => c.skills.files({ params: { namespace, name }, query: originOf(at) }), read(SkillFiles, repoOf(at))),
 };

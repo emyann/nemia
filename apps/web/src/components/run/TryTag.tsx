@@ -28,7 +28,7 @@ export function StartedFrom({
   return (
     <span className="flex items-center gap-1.5 text-body-small text-muted-foreground" title={run.workflowDir}>
       <TryTag agent={run.try.agent} />
-      of <AgentLink from="yours" name={run.try.agent} className="text-foreground" />
+      of <AgentLink from="user" name={run.try.agent} className="text-foreground" />
     </span>
   );
 }

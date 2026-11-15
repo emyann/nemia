@@ -116,7 +116,7 @@ function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
       </>
     ),
     words:
-      page.from === 'yours' ? (
+      page.from === 'user' ? (
         <>
           lives in its file, edited in{' '}
           <RouteLink

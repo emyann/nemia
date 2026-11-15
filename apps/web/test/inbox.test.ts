@@ -75,7 +75,7 @@ const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> 
   ...extra,
 });
 
-const listing = (name: string, from: 'repo' | 'yours', dir: string, error: string | null = null): WorkflowListing => ({
+const listing = (name: string, from: 'repo' | 'user', dir: string, error: string | null = null): WorkflowListing => ({
   name,
   from,
   dir,
@@ -93,8 +93,8 @@ const listing = (name: string, from: 'repo' | 'yours', dir: string, error: strin
 const WORKFLOWS = [
   listing('dev', 'repo', '/code/app/workflows/dev'),
   listing('broken', 'repo', '/code/app/workflows/broken', 'review: `afer` is not a key a step has.'),
-  listing('dev', 'yours', '/home/me/.agent-workflows/workflows/dev'),
-  listing('mine', 'yours', '/home/me/.agent-workflows/workflows/mine'),
+  listing('dev', 'user', '/home/me/.agent-workflows/workflows/dev'),
+  listing('mine', 'user', '/home/me/.agent-workflows/workflows/mine'),
 ];
 
 /** An entry as the inbox lists it: a card by its name, a stray file by its own, which is its name too. */
@@ -262,14 +262,14 @@ test('newestCardsFirst, hasPage: the cards in order, a refusal on its own entry,
 test("afterFor, workflowKey: the runs a card's start waits on, and a workflow as a pick is keyed", async (t) => {
   await t.test('a workflow as a pick is keyed by its source and its name: yours and the repository may each have one of a name', () => {
     assert.equal(workflowKey(WORKFLOWS[0]), 'repo:dev');
-    assert.equal(workflowKey(WORKFLOWS[2]), 'yours:dev');
+    assert.equal(workflowKey(WORKFLOWS[2]), 'user:dev');
   });
   await t.test('a start sends the runs it waits on, as they were picked', () => {
     const onRepo = listing('dev', 'repo', '/code/app/workflows/dev');
     assert.deepEqual(afterFor(onRepo, ['a-run-k2q9', 'another-c3d4']), ['a-run-k2q9', 'another-c3d4']);
   });
   await t.test('REFUSED: a start of a team that works in folders sends none, whatever the picker was left holding', () => {
-    const inFolders = { ...listing('note', 'yours', '/home/me/.agent-workflows/workflows/note'), folderTeam: true };
+    const inFolders = { ...listing('note', 'user', '/home/me/.agent-workflows/workflows/note'), folderTeam: true };
     assert.deepEqual(
       afterFor(inFolders, ['a-run-k2q9', 'another-c3d4']),
       [],

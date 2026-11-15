@@ -137,7 +137,7 @@ const blockedCloseout = {
   summary: 'Half of it is done.',
   body: null,
   needs: 'Which database?',
-  artifacts: [{ path: 'NOTES.md' }],
+  artifacts: [{ path: 'NOTES.md', relativePath: 'NOTES.md' }],
   values: [],
   refused: [],
   output: {},
@@ -2369,7 +2369,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
       assert.ok(closeout);
       assert.deepEqual(
         [closeout.outcome, closeout.artifacts, closeout.output, closeout.missing],
-        ['done', [{ path: 'PLAN.md' }], { approach: 'Cache it.' }, ['files']],
+        ['done', [{ path: 'PLAN.md', relativePath: 'PLAN.md' }], { approach: 'Cache it.' }, ['files']],
         'an outcome that is neither word, an artifact that is not a path, a field nobody declared: read forgivingly',
       );
       assert.deepEqual(
@@ -2627,6 +2627,7 @@ test("a step's files: a closeout's files with where they are served, each served
       assert.ok(shoot?.closeout);
       const served = (name: string, kind: string, size: number) => ({
         path: path.join(dir, name),
+        relativePath: name,
         name,
         url: `/api/runs/r-52/steps/shoot/artifacts/${encodeURIComponent(name)}`,
         kind,
@@ -2640,11 +2641,11 @@ test("a step's files: a closeout's files with where they are served, each served
           served('trace.zip', 'other', 2),
           served('diagram.svg', 'image', Buffer.byteLength(SVG)),
           { path: named[4] },
-          { path: named[5] },
-          { path: named[6] },
-          { path: named[7] },
-          { path: named[8] },
-          { path: 'RESPONSE.md' },
+          { path: named[5], relativePath: path.join('sub', 'deep.png') },
+          { path: named[6], relativePath: 'link.png' },
+          { path: named[7], relativePath: '..shot.png' },
+          { path: named[8], relativePath: 'gone.png' },
+          { path: 'RESPONSE.md', relativePath: 'RESPONSE.md' },
           { path: '/etc/hosts' },
         ],
         'the path alone: outside the directory however it is spelled, under it where no name reaches, a link out of it, a name the route refuses, a file it does not have, a path on the branch, and an absolute path anywhere else, which is not looked at',
@@ -2716,13 +2717,14 @@ test("a step's files: a closeout's files with where they are served, each served
         const said = `its files were removed at ${files.at} (nemia prune --artifacts)`;
         const shoot = await closeoutOf(app, 'r-52', 'shoot');
         assert.ok(shoot?.closeout);
+        const prunedOf = (i: number) => ({ path: named[i], relativePath: path.relative(dir, named[i]), pruned: said, prunedAt: files.at });
         assert.deepEqual(
           shoot.closeout.artifacts,
           [
-            ...[0, 1, 2, 3].map((i) => ({ path: named[i], pruned: said, prunedAt: files.at })),
+            ...[0, 1, 2, 3].map(prunedOf),
             { path: named[4] },
-            ...[5, 6, 7, 8].map((i) => ({ path: named[i], pruned: said, prunedAt: files.at })),
-            { path: 'RESPONSE.md' },
+            ...[5, 6, 7, 8].map(prunedOf),
+            { path: 'RESPONSE.md', relativePath: 'RESPONSE.md' },
             { path: '/etc/hosts' },
           ],
           'every file named in the directory went with it, one beneath it and one the route refuses by name included; beside the directory is not in it: the path alone',

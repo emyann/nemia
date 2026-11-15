@@ -17,21 +17,21 @@ const CUSTOM = {
   frontmatter: '---\nmodel: opus\n---\nBe bold.',
 } as const;
 
-const route = `/api/namespaces/default/agents/${CUSTOM.agent}/instructions`;
+const route = `/api/agents/${CUSTOM.agent}/instructions`;
 
 const answered = (page: Page, method: 'PUT' | 'DELETE', at = route) =>
   page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname === at, { timeout: WAIT_MS });
 
 /**
  * A repository's agent's custom instructions, saved and cleared on its page in FACTORIES' `hiring`, the factory on the checkout: the
- * write goes to `default` with the repository the agent was read from (`?repo=`), since the default namespace reads none of its own,
- * and the api answers what the page says — saved, the file written; cleared, gone.
+ * write goes to the store's level with the repository the agent was read from (`?repo=`), since the default namespace reads none of its
+ * own, and the api answers what the page says — saved, the file written; cleared, gone.
  */
 async function savedForRepoAgent(page: Page): Promise<void> {
   const { good } = WORKFLOWS;
   const agent = good.agent.name;
   const file = path.join(store!, 'custom-instructions', `${agent}.md`);
-  const at = `/api/namespaces/default/agents/${agent}/instructions`;
+  const at = `/api/agents/${agent}/instructions`;
   const takeBack = checkoutIn(store!, [good.name]);
   try {
     await page.goto(new URL(`/agents/repo/${agent}?factory=${FACTORIES.hiring.name}`, page.url()).href, { waitUntil: 'load' });
@@ -107,7 +107,7 @@ export default {
    * words are saved and cleared on its page in a factory, as that page offers.
    */
   name: 'custom-instructions',
-  route: `/agents/yours/${CUSTOM.agent}`,
+  route: `/agents/user/${CUSTOM.agent}`,
   expect: async (page) => {
     const file = path.join(store!, 'custom-instructions', `${CUSTOM.agent}.md`);
     if (fs.existsSync(file)) throw new Refused(`the store holds no custom instructions before the page writes any — ${file} is there`);

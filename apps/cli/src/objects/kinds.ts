@@ -19,7 +19,9 @@ import {
   DelegationSpec,
   HireSpec,
   type Kind,
+  LibraryAddSpec,
   McpServerSpec,
+  DEFAULT_NAMESPACE,
   Missing,
   type ObjectMeta,
   ProposalSpec,
@@ -199,6 +201,13 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
       update: (a) => (c) => c.hires.put({ ...params(a), payload: { agent: spec.agent ?? '' } }),
     })),
   },
+  LibraryAdd: {
+    list: { in: (namespace, s) => (c) => everyPage((page) => c.libraryadds.list({ params: { namespace }, query: query(s, page) })) },
+    get: { in: (namespace, name) => (c) => c.libraryadds.get({ params: { namespace, name } }) },
+    writes: writable(Schema.decodeUnknownSync(LibraryAddSpec), { create: false, update: true, upsert: true, labels: false }, () => ({
+      update: (a) => (c) => c.libraryadds.put({ params: { namespace: a.namespace, name: a.name } }),
+    })),
+  },
   Volume: {
     list: { in: (namespace, s) => (c) => everyPage((page) => c.volumes.list({ params: { namespace }, query: query(s, page) })) },
     get: { in: (namespace, name) => (c) => c.volumes.get({ params: { namespace, name } }) },
@@ -207,24 +216,42 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
     list: { in: (namespace, s) => (c) => everyPage((page) => c.workflows.list({ params: { namespace }, query: query(s, page) })) },
     get: { in: (namespace, name) => (c) => c.workflows.get({ params: { namespace, name }, query: {} }) },
     writes: writable(Schema.decodeUnknownSync(WorkflowSpec), { create: true, update: true, upsert: false, labels: false }, (spec) => ({
-      create: (a) => (c) => c.workflows.create({ params: { namespace: a.namespace }, payload: { metadata: { name: a.name }, spec } }),
-      update: (a) => (c) => c.workflows.replace({ ...params(a), payload: { metadata: versioned(a), spec } }),
+      create: (a) => (c) =>
+        a.namespace === DEFAULT_NAMESPACE
+          ? c.workflows.createLibrary({ payload: { metadata: { name: a.name }, spec } })
+          : c.workflows.create({ params: { namespace: a.namespace }, payload: { metadata: { name: a.name }, spec } }),
+      update: (a) => (c) =>
+        a.namespace === DEFAULT_NAMESPACE
+          ? c.workflows.replaceLibrary({ params: { name: a.name }, payload: { metadata: versioned(a), spec } })
+          : c.workflows.replace({ ...params(a), payload: { metadata: versioned(a), spec } }),
     })),
   },
   Agent: {
     list: { in: (namespace, s) => (c) => pageOf(everyPage((page) => c.agents.list({ params: { namespace }, query: query(s, page) }))) },
     get: { in: (namespace, name) => (c) => c.agents.get({ params: { namespace, name }, query: {} }) },
     writes: writable(Schema.decodeUnknownSync(AgentSpec), { create: true, update: true, upsert: false, labels: false }, (spec) => ({
-      create: (a) => (c) => c.agents.create({ params: { namespace: a.namespace }, payload: { metadata: { name: a.name }, spec } }),
-      update: (a) => (c) => c.agents.replace({ ...params(a), payload: { metadata: versioned(a), spec } }),
+      create: (a) => (c) =>
+        a.namespace === DEFAULT_NAMESPACE
+          ? c.agents.createLibrary({ payload: { metadata: { name: a.name }, spec } })
+          : c.agents.create({ params: { namespace: a.namespace }, payload: { metadata: { name: a.name }, spec } }),
+      update: (a) => (c) =>
+        a.namespace === DEFAULT_NAMESPACE
+          ? c.agents.replaceLibrary({ params: { name: a.name }, payload: { metadata: versioned(a), spec } })
+          : c.agents.replace({ ...params(a), payload: { metadata: versioned(a), spec } }),
     })),
   },
   Skill: {
     list: { in: (namespace, s) => (c) => pageOf(everyPage((page) => c.skills.list({ params: { namespace }, query: query(s, page) }))) },
     get: { in: (namespace, name) => (c) => c.skills.get({ params: { namespace, name }, query: {} }) },
     writes: writable(Schema.decodeUnknownSync(SkillSpec), { create: true, update: true, upsert: false, labels: false }, (spec) => ({
-      create: (a) => (c) => c.skills.create({ params: { namespace: a.namespace }, payload: { metadata: { name: a.name }, spec } }),
-      update: (a) => (c) => c.skills.replace({ ...params(a), payload: { metadata: versioned(a), spec } }),
+      create: (a) => (c) =>
+        a.namespace === DEFAULT_NAMESPACE
+          ? c.skills.createLibrary({ payload: { metadata: { name: a.name }, spec } })
+          : c.skills.create({ params: { namespace: a.namespace }, payload: { metadata: { name: a.name }, spec } }),
+      update: (a) => (c) =>
+        a.namespace === DEFAULT_NAMESPACE
+          ? c.skills.replaceLibrary({ params: { name: a.name }, payload: { metadata: versioned(a), spec } })
+          : c.skills.replace({ ...params(a), payload: { metadata: versioned(a), spec } }),
     })),
   },
   Template: {

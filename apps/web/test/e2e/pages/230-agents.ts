@@ -42,7 +42,7 @@ export default {
     await expectCount(yours.locator('section[data-agent]'), 1, `yours lists one agent, ${seeded.name}`);
     await expectCount(page.locator('section[aria-label="This repository"]'), 0, 'and no section is drawn of this repository');
     await expectCount(card(page, 'repo', good.agent.name), 0, `nor ${good.agent.name}, the checkout's: the default factory reads none`);
-    const scribe = card(page, 'yours', seeded.name);
+    const scribe = card(page, 'user', seeded.name);
     await expectVisible(scribe.getByText(seeded.description, { exact: true }), `${seeded.name} with its description`);
     await expectTexts(
       scribe.locator('[data-agent-stats] dd'),
@@ -155,7 +155,7 @@ export default {
       takeBack();
     }
 
-    await page.goto(new URL(agentPath('yours', seeded.name), page.url()).href, { waitUntil: 'load' });
+    await page.goto(new URL(agentPath('user', seeded.name), page.url()).href, { waitUntil: 'load' });
     await idle(page);
     const scribeForm = page.locator(`form[data-agent-form="${seeded.name}"]`);
     await expectVisible(scribeForm, `${seeded.name}'s form`);
@@ -198,7 +198,7 @@ export default {
       await form.getByRole('button', { name: 'Add a skill' }).click();
       const sheet = page.getByRole('dialog', { name: 'Add a skill' });
       await sheet
-        .locator('section[aria-label="Your library"]')
+        .locator('section[aria-label="The user library"]')
         .getByRole('button', { name: `Add ${made.skills}`, exact: true })
         .click();
       await expectVisible(
@@ -208,7 +208,7 @@ export default {
       await sheet.getByRole('button', { name: 'Close', exact: true }).click();
       await expectCount(sheet, 0, 'the sheet closes');
       await expectVisible(
-        form.locator(`[data-given-skill="${made.skills}"] [data-skill-from="yours"]`),
+        form.locator(`[data-given-skill="${made.skills}"] [data-skill-from="user"]`),
         `${made.skills} is given, from your library`,
       );
       await expectVisible(
@@ -220,13 +220,13 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `agents-new-${await themeOf(page)}.png`), { fullPage: true });
       const [created] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/namespaces/default/agents', {
+        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/agents', {
           timeout: WAIT_MS,
         }),
         form.getByRole('button', { name: 'Create agent' }).click(),
       ]);
       if (created.status() !== 201) throw new Refused(`the api makes the agent — it answered ${created.status()}: ${await created.text()}`);
-      await page.waitForURL((url) => url.pathname === agentPath('yours', made.name), { timeout: WAIT_MS });
+      await page.waitForURL((url) => url.pathname === agentPath('user', made.name), { timeout: WAIT_MS });
       const written = `---\ndescription: ${made.description}\nskills: ${made.skills}\nmcp: fixture\nmodel: ${made.model}\nclaude:\n  fence:\n    tools: ${made.tools}\n---\n${made.body}\n`;
       if (!fs.existsSync(madeFile) || fs.readFileSync(madeFile, 'utf8') !== written)
         throw new Refused(
@@ -253,12 +253,9 @@ export default {
         throw new Refused(`the MCP servers it names are read back as written — they read ${JSON.stringify(servers)}`);
       await madeForm.getByRole('textbox', { name: 'Model' }).fill(made.edited);
       const [saved] = await Promise.all([
-        page.waitForResponse(
-          (r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/namespaces/default/agents/${made.name}`,
-          {
-            timeout: WAIT_MS,
-          },
-        ),
+        page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/agents/${made.name}`, {
+          timeout: WAIT_MS,
+        }),
         madeForm.getByRole('button', { name: 'Save' }).click(),
       ]);
       if (saved.status() !== 200) throw new Refused(`the api saves the agent — it answered ${saved.status()}: ${await saved.text()}`);
@@ -279,18 +276,15 @@ export default {
         'the ask names its file alone: it names no schema, and no card file goes with it',
       );
       const [removed] = await Promise.all([
-        page.waitForResponse(
-          (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/namespaces/default/agents/${made.name}`,
-          {
-            timeout: WAIT_MS,
-          },
-        ),
+        page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/agents/${made.name}`, {
+          timeout: WAIT_MS,
+        }),
         page.locator('[data-remove-asks]').getByRole('button', { name: 'Remove', exact: true }).click(),
       ]);
       if (removed.status() !== 200)
         throw new Refused(`the api removes the agent — it answered ${removed.status()}: ${await removed.text()}`);
       await page.waitForURL((url) => url.pathname === '/agents', { timeout: WAIT_MS });
-      await expectCount(card(page, 'yours', made.name), 0, `${made.name} is gone from the list`);
+      await expectCount(card(page, 'user', made.name), 0, `${made.name} is gone from the list`);
       if (fs.existsSync(madeFile)) throw new Refused(`agents/${made.name}.md is removed from disk`);
     } finally {
       fs.rmSync(madeFile, { force: true });
@@ -302,7 +296,7 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      await refused.goto(new URL(agentPath('yours', seeded.name), page.url()).href, { waitUntil: 'load' });
+      await refused.goto(new URL(agentPath('user', seeded.name), page.url()).href, { waitUntil: 'load' });
       await idle(refused);
       await expectVisible(
         refused.locator(`[data-used-by] a[data-node="${naming}/write"]`),
@@ -310,27 +304,22 @@ export default {
       );
       await refused.getByRole('button', { name: 'Remove…' }).click();
       const [answered] = await Promise.all([
-        refused.waitForResponse(
-          (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/namespaces/default/agents/${seeded.name}`,
-          { timeout: WAIT_MS },
-        ),
+        refused.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/agents/${seeded.name}`, {
+          timeout: WAIT_MS,
+        }),
         refused.locator('[data-remove-asks]').getByRole('button', { name: 'Remove', exact: true }).click(),
       ]);
       const { error, users } = (await answered.json()) as { error?: string; users?: string[] };
-      if (
-        answered.status() !== 409 ||
-        !error?.startsWith(`agents/${seeded.name}.md is named by a step beside it — ${naming}/write — `) ||
-        JSON.stringify(users) !== JSON.stringify([`${naming}/write`])
-      ) {
+      if (answered.status() !== 409 || error === undefined || JSON.stringify(users) !== JSON.stringify(['default'])) {
         throw new Refused(
-          `the package refuses to remove an agent a node names — the api answered ${answered.status()}: ${JSON.stringify({ error, users })}`,
+          `the api refuses to remove an agent a factory uses, naming the factory whose workflow names it — it answered ${answered.status()}: ${JSON.stringify({ error, users })}`,
         );
       }
       const alert = refused.locator('[data-agent-refused]');
       await expectVisible(alert, 'the refusal is shown, not swallowed');
       const said = await alert.locator('p.font-mono').textContent();
       if (said !== error) throw new Refused(`the refusal is the package's sentence, verbatim — it shows ${JSON.stringify(said)}`);
-      await expectVisible(alert.locator(`a[data-node="${naming}/write"]`), 'with the node that names it, linked');
+      await expectVisible(alert.locator('a[data-factory-user="default"]'), 'with the factory that uses it, linked');
       if (JSON.stringify(filesIn(agentsDir)) !== JSON.stringify(before))
         throw new Refused(`nothing is removed on a refusal — ${agentsDir} changed`);
       await settled(refused);
@@ -350,7 +339,7 @@ export default {
     await page.reload({ waitUntil: 'load' });
     await idle(page);
     await expectTexts(
-      card(page, 'yours', seeded.name).locator('[data-used-by]'),
+      card(page, 'user', seeded.name).locator('[data-used-by]'),
       ['No node names it yet.'],
       `back on the list, no node names ${seeded.name} again`,
     );

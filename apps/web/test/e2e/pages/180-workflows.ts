@@ -22,7 +22,10 @@ export default {
     const { good, broken, yours } = WORKFLOWS;
     const card = (name: string) => page.locator(`section[aria-label="Workflow ${name}"]`);
     await expectCount(page.locator('section[aria-label^="Workflow "]'), 1, 'with no factory, a card for yours alone');
-    await expectVisible(card(yours.name).getByText('yours', { exact: true }), `${yours.name}, under workflows/ in the store, is yours`);
+    await expectVisible(
+      card(yours.name).getByText('the user library', { exact: true }),
+      `${yours.name}, under workflows/ in the store, is yours`,
+    );
     await expectCount(page.getByText('this repository', { exact: true }), 0, "the default factory says no workflow is this repository's");
 
     const takeBack = checkoutIn(store!, [good.name, broken.name, yours.name]);
@@ -48,12 +51,15 @@ export default {
       const bad = card(broken.name);
       await expectVisible(bad.locator('[data-refusal]'), 'a folder the loader refuses says so on its card');
       const mine = card(yours.name);
-      await expectVisible(mine.getByText('yours', { exact: true }), `${yours.name}, under workflows/ in the store, is marked as yours`);
+      await expectVisible(
+        mine.getByText('the user library', { exact: true }),
+        `${yours.name}, under workflows/ in the store, is marked as yours`,
+      );
 
       for (const [from, name] of [
         ['repo', good.name],
         ['repo', broken.name],
-        ['yours', yours.name],
+        ['user', yours.name],
       ] as const) {
         const href = await card(name).getByRole('heading').getByRole('link').getAttribute('href');
         const to = `/factories/${hiring.name}/workflows/${from}/${name}`;

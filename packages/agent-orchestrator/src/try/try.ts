@@ -118,7 +118,7 @@ export type Untried = { why: string; copy: string | null };
  * beside it, and its file's text, whose `overridable:` line says whether a try may narrow its fence.
  */
 export type TriedAgent = {
-  from: 'repo' | 'yours';
+  from: 'repo' | 'user';
   name: string;
   file: string;
   keys: { harness?: string; remote?: string } & FencedKeys;

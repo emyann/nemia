@@ -39,8 +39,18 @@ import { DelegationsGroup, ProposalsGroup } from './proposal-api.ts';
 import { RunsGroup } from './run-api.ts';
 import { StepsGroup } from './step-api.ts';
 import { NemiaGroup } from './nemia-api.ts';
+import { Subscription, SubscriptionList } from './subscription.ts';
+import { Event, EventList } from './event.ts';
+import { KINDS, type Kind } from './words.ts';
+import { APIResourceList } from './discovery.ts';
+import { ServerGroup, Subscribed, SubscriptionWrite, Unsubscribed } from './server-api.ts';
+import { ReadinessGroup } from './readiness.ts';
+import { UpgradesGroup } from './upgrade.ts';
+import { LinksGroup, PairingsGroup } from './pairing.ts';
+import { SessionGroup } from './session.ts';
+import { TokensGroup } from './token.ts';
 import { CardsGroup } from './card-api.ts';
-import { BuiltinGroup, FactoriesGroup, HiresGroup, McpServersGroup, SchedulesGroup, VolumesGroup } from './factory-api.ts';
+import { FactoriesGroup, HiresGroup, LibraryAddsGroup, McpServersGroup, SchedulesGroup, VolumesGroup } from './factory-api.ts';
 import {
   AgentListObject,
   AgentObject,
@@ -52,18 +62,17 @@ import {
   WorkflowObject,
   WorkflowsGroup,
 } from './definition-api.ts';
-import { Subscription, SubscriptionList } from './subscription.ts';
-import { Event, EventList } from './event.ts';
-import { KINDS, type Kind } from './words.ts';
-import { APIResourceList } from './discovery.ts';
-import { ServerGroup, Subscribed, SubscriptionWrite, Unsubscribed } from './server-api.ts';
-import { ReadinessGroup } from './readiness.ts';
-import { UpgradesGroup } from './upgrade.ts';
-import { LinksGroup, PairingsGroup } from './pairing.ts';
-import { SessionGroup } from './session.ts';
-import { TokensGroup } from './token.ts';
-
 export {
+  CardsGroup,
+  FactoriesGroup,
+  McpServersGroup,
+  SchedulesGroup,
+  HiresGroup,
+  LibraryAddsGroup,
+  VolumesGroup,
+  WorkflowsGroup,
+  AgentsGroup,
+  SkillsGroup,
   BadRequest,
   Conflict,
   Failed,
@@ -232,6 +241,7 @@ export const RESOURCE_PLURALS = {
   McpServer: McpServersGroup.identifier,
   Schedule: SchedulesGroup.identifier,
   Hire: HiresGroup.identifier,
+  LibraryAdd: LibraryAddsGroup.identifier,
   Volume: VolumesGroup.identifier,
   Workflow: WorkflowsGroup.identifier,
   Agent: AgentsGroup.identifier,
@@ -250,9 +260,9 @@ export const Api = HttpApi.make('nemia')
   .add(CardsGroup)
   .add(FactoriesGroup)
   .add(McpServersGroup)
-  .add(BuiltinGroup)
   .add(SchedulesGroup)
   .add(HiresGroup)
+  .add(LibraryAddsGroup)
   .add(VolumesGroup)
   .add(WorkflowsGroup)
   .add(AgentsGroup)

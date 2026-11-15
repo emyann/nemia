@@ -5,8 +5,9 @@
  * entries load, which cannot load `objects` at run time: `wordsHeld` holds each such tuple equal to these at compile time, both ways
  * (`packages/agent-orchestrator/src/object/run.model.ts`), so a word added on one side alone fails the typecheck.
  *
- * `nemia/v1` is additions only: a word is never renamed or dropped under it, and a word added is one an older reader refuses, so it is a
- * change of the version (`packages/objects/CLAUDE.md`).
+ * `nemia/v1` is additions only once it has a client besides the owner's board, CLI and MCP port: until then a word is renamed at once,
+ * the three moved with it and the break said beside the word (the origin `user`, once spelled otherwise, and the write way `library`);
+ * from then on a word is never renamed or dropped under it, and a word added is a change of the version (`packages/objects/CLAUDE.md`).
  */
 
 /**
@@ -389,16 +390,20 @@ export type SignInStateWord = (typeof SIGN_IN_STATES)[number];
 
 /**
  * Where a definition — a Workflow, an Agent, a Skill — is read from, in the order a factory looks a name up: the factory's own tree
- * (`factory`, the folder a factory made from a template keeps in the store), the repository (`repo`), your library (`yours`),
- * or what Nemia builds in (`builtin`).
+ * (`factory`, the folder a factory made from a template keeps in the store), the repository (`repo`), the person's library (`user`),
+ * or what Nemia builds in (`builtin`). A break of `nemia/v1` done at once while the owner's board, client and MCP port
+ * are its only clients (`packages/objects/CLAUDE.md`): the retired spelling is on the glossary's Origin row.
  */
-export const DEFINITION_ORIGINS = ['factory', 'repo', 'yours', 'builtin'] as const;
+export const DEFINITION_ORIGINS = ['factory', 'repo', 'user', 'builtin'] as const;
 
 /** One of `DEFINITION_ORIGINS`. */
 export type DefinitionOrigin = (typeof DEFINITION_ORIGINS)[number];
 
-/** Where an agent file the store knows of was found: a repository a factory names, your library, or the folder `?path=` names. */
-export const AGENT_SOURCE_PLACES = ['repository', 'library', 'path'] as const;
+/**
+ * Where an agent file the store knows of was found: a repository a factory names, your library, the folder a harness keeps its user's own
+ * agents in, or the folder `?path=` names.
+ */
+export const AGENT_SOURCE_PLACES = ['repository', 'library', 'harness', 'path'] as const;
 
 /** One of `AGENT_SOURCE_PLACES`. */
 export type AgentSourcePlace = (typeof AGENT_SOURCE_PLACES)[number];
@@ -415,11 +420,33 @@ export const EDGE_KINDS = ['after', 'input', 'loop', 'route'] as const;
 /** One of `EDGE_KINDS`. */
 export type EdgeKind = (typeof EDGE_KINDS)[number];
 
-/** How a refused write's definition changes instead: through the `default` namespace, or the factory's own way. */
-export const WRITE_WAYS = ['default', 'factory'] as const;
+/**
+ * How a refused write's definition changes instead: at the store's library (`/api/skills`, `/api/agents`, `/api/workflows`, in no
+ * namespace), or the factory's own way. A break done at once, as `packages/objects/CLAUDE.md` allows: the
+ * library's way was the namespace `default`.
+ */
+export const WRITE_WAYS = ['library', 'factory'] as const;
 
 /** One of `WRITE_WAYS`. */
 export type WriteWay = (typeof WRITE_WAYS)[number];
+
+/**
+ * The kinds a factory adds from the store's library by name, each add a live reference (its kind and its name). A workflow is added by
+ * `nemia factory attach`, the factory's `workflows`, and is no add of this record.
+ */
+export const LIBRARY_KINDS = ['Agent', 'Skill', 'McpServer'] as const;
+
+/** One of `LIBRARY_KINDS`. */
+export type LibraryKind = (typeof LIBRARY_KINDS)[number];
+
+/**
+ * What an add of a library item is in its factory: `resolved`, the library holds it and nothing of the factory's comes first;
+ * `shadowed`, the factory's own tree or its repository holds the name too, and wins it; `missing`, the library holds it no longer.
+ */
+export const LIBRARY_ADD_STATES = ['resolved', 'shadowed', 'missing'] as const;
+
+/** One of `LIBRARY_ADD_STATES`. */
+export type LibraryAddStateWord = (typeof LIBRARY_ADD_STATES)[number];
 
 /** Where a gate's budgets come from: the gated step's proposal, before the approval; the approval's caps, after it. */
 export const GATE_BUDGETS_FROM = ['proposed', 'approved'] as const;
@@ -472,6 +499,8 @@ export const EVENT_REASONS = [
   'Ready',
   'ConflictsPending',
   'ConflictsSettled',
+  'AddsMissing',
+  'AddsResolved',
   'LeftEnded',
 ] as const;
 
@@ -592,7 +621,7 @@ export const APPROVED_BY = ['person', 'rule'] as const;
 export type ApprovedBy = (typeof APPROVED_BY)[number];
 
 /** The kinds a proposal carries: a factory's definitions and wiring, never the person's settings. */
-export const PROPOSABLE_KINDS = ['Workflow', 'Agent', 'Skill', 'Hire', 'McpServer', 'Factory'] as const;
+export const PROPOSABLE_KINDS = ['Workflow', 'Agent', 'Skill', 'Hire', 'McpServer', 'Factory', 'LibraryAdd'] as const;
 
 /** One of `PROPOSABLE_KINDS`. */
 export type ProposableKind = (typeof PROPOSABLE_KINDS)[number];
@@ -650,6 +679,7 @@ export const KINDS = [
   'McpServer',
   'Schedule',
   'Hire',
+  'LibraryAdd',
   'Volume',
   'Workflow',
   'Agent',

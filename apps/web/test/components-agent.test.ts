@@ -26,7 +26,7 @@ test("an agent's form shows its card read-only, generated from its skills: an en
   const { AgentForm } = await import('../src/components/agent/AgentForm.tsx');
   const agent = {
     name: 'scribe',
-    from: 'yours' as const,
+    from: 'user' as const,
     dir: '/store/agents',
     file: '/store/agents/scribe.md',
     role: null,
@@ -74,12 +74,12 @@ test("an agent's form shows its card read-only, generated from its skills: an en
 
 const PLACES = [
   {
-    from: 'yours',
+    from: 'user',
     dir: '/store/workflows/skills',
     skills: [
       {
         name: 'write-a-note',
-        from: 'yours',
+        from: 'user',
         dir: '/store/workflows/skills/write-a-note',
         entry: { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] },
         error: null,
@@ -144,7 +144,7 @@ async function agentFormWith(listing: Record<string, unknown>, readOnly = false)
 
 const composing = {
   name: 'scribe',
-  from: 'yours',
+  from: 'user',
   dir: '/store/agents',
   file: '/store/agents/scribe.md',
   role: null,
@@ -209,13 +209,13 @@ test('an agent of yours lists the skills it gives, each with where it is found a
   );
   assert.deepEqual(
     [...html.matchAll(/data-skill-from="([^"]+)"/g)].map((m) => m[1]),
-    ['yours', 'repo', 'none'],
+    ['user', 'repo', 'none'],
   );
   assert.deepEqual(
     [...html.matchAll(/href="([^"]+)"[^>]*data-skill-link="([^"]+)"|data-skill-link="([^"]+)"[^>]*href="([^"]+)"/g)].map(
       (m) => m[1] ?? m[4],
     ),
-    ['/agents/skills/yours/write-a-note', '/agents/skills/repo/ask-first'],
+    ['/agents/skills/user/write-a-note', '/agents/skills/repo/ask-first'],
     'each found skill links to its page, where it is found; the one found nowhere has no page',
   );
   const texts = textsOf(html);
@@ -328,7 +328,7 @@ const SKILL_DETAIL = {
     body: 'Write them.\n',
   },
   body: 'Write them.\n',
-  users: [{ from: 'yours', name: 'scribe' }],
+  users: [{ from: 'user', name: 'scribe' }],
   copyHint: "mkdir -p '/repo/.claude/skills' && cp -r '/store/workflows/skills/write-a-note' '/repo/.claude/skills/'",
 };
 
@@ -588,8 +588,8 @@ test('REFUSED: a character card shows what its agent can do and its model, effor
 
 test("a character card holds one link to its agent's page, and its nodes' links beside it, never inside it", async () => {
   const html = await agentCard({});
-  assert.equal([...html.matchAll(/href="\/agents\/yours\/iris"/g)].length, 1, html);
-  assert.match(html, /<a [^>]*href="\/agents\/yours\/iris"[^>]*>Iris<\/a>/, "the person's name is the link");
+  assert.equal([...html.matchAll(/href="\/agents\/user\/iris"/g)].length, 1, html);
+  assert.match(html, /<a [^>]*href="\/agents\/user\/iris"[^>]*>Iris<\/a>/, "the person's name is the link");
   assert.match(html, /href="\/workflows\/repo\/intake\/ask"/);
   assert.doesNotMatch(html, /<a [^>]*>(?:(?!<\/a>)[\s\S])*<a /, 'no link inside a link');
 });
@@ -637,8 +637,8 @@ test('a link to a factory definition keeps its factory and repository in its add
   assert.match(agent, /href="\/factories\/treed\/agents\/drafter\?repo=%2Fr"/, 'the agent link names the factory');
   const skill = await routedWith(createElement(SkillLink, { from: 'factory', name: 'outline', place }));
   assert.match(skill, /href="\/factories\/treed\/skills\/outline\?repo=%2Fr"/, 'the skill link names the factory');
-  const yours = await routedWith(createElement(AgentLink, { from: 'yours', name: 'drafter', place }));
-  assert.match(yours, /href="\/agents\/yours\/drafter"/, 'a link of yours is read in default, with no factory');
+  const yours = await routedWith(createElement(AgentLink, { from: 'user', name: 'drafter', place }));
+  assert.match(yours, /href="\/agents\/user\/drafter"/, 'a link of yours is read in default, with no factory');
 });
 
 test('a link to a factory definition given no place is read in the factory of the page it is drawn on', async () => {
@@ -670,13 +670,13 @@ test("a link to a repository's agent, or to a node of a repository's workflow, k
   const usedBy = {
     usedBy: [
       { from: 'repo' as const, workflow: 'dev', step: 'implement' },
-      { from: 'yours' as const, workflow: 'mine', step: 'plan' },
+      { from: 'user' as const, workflow: 'mine', step: 'plan' },
     ],
     fills: [
       { from: 'factory' as const, workflow: 'dev', step: 'implement', hired: false },
       { from: 'factory' as const, workflow: 'build', step: 'review', hired: true },
       { from: 'factory' as const, workflow: 'build', step: 'review', hired: false },
-      { from: 'yours' as const, workflow: 'mine', step: 'ship', hired: true },
+      { from: 'user' as const, workflow: 'mine', step: 'ship', hired: true },
     ],
   };
   const html = renderToStaticMarkup(
@@ -684,10 +684,10 @@ test("a link to a repository's agent, or to a node of a repository's workflow, k
     createElement(RouterContextProvider, { router, children: createElement(UsedBy, { listing: usedBy }) }),
   );
   assert.match(html, /href="\/factories\/treed\/workflows\/repo\/dev\/implement"/, "a repository's node, in the page's factory");
-  assert.match(html, /href="\/workflows\/yours\/mine\/plan"/, 'a node of yours, with none');
+  assert.match(html, /href="\/workflows\/user\/mine\/plan"/, 'a node of yours, with none');
   assert.match(
     html,
-    /href="\/factories\/treed\/workflows\/yours\/mine\/ship"/,
+    /href="\/factories\/treed\/workflows\/user\/mine\/ship"/,
     'a step of yours the factory hires it into, in that factory',
   );
   assert.equal(

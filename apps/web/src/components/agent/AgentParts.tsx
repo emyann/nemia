@@ -23,7 +23,7 @@ const LINK = cn('rounded-sm underline decoration-outline underline-offset-2 hove
 const AGENT_FROM: Readonly<Record<AgentListing['from'], string>> = {
   factory: "the factory's",
   repo: 'this repository',
-  yours: 'yours',
+  user: 'the user library',
   builtin: "Nemia's",
 };
 
@@ -34,7 +34,7 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
       data-from={from}
       className={cn(
         'rounded-full px-2 py-0.5 text-body-small leading-none font-medium',
-        from === 'yours' ? container.grey : 'bg-muted text-muted-foreground',
+        from === 'user' ? container.grey : 'bg-muted text-muted-foreground',
       )}
     >
       {AGENT_FROM[from]}
@@ -50,7 +50,7 @@ function NodeLink({ user }: { user: AgentUser | AgentFill }) {
   const here = usePagePlace();
   return (
     <RouteLink
-      {...workflowLink(user.from === 'yours' && !('hired' in user && user.hired) ? {} : here, user.from, user.workflow, user.step)}
+      {...workflowLink(user.from === 'user' && !('hired' in user && user.hired) ? {} : here, user.from, user.workflow, user.step)}
       data-node={`${user.workflow}/${user.step}`}
       className={cn('font-mono text-body-small text-foreground', LINK)}
     >
@@ -239,8 +239,23 @@ export function AgentLink({
   );
 }
 
+/** A factory that uses a library item, linked to its settings, where its adds are. */
+function FactoryUserLink({ factory }: { factory: string }) {
+  return (
+    <RouteLink
+      to="/factories/$factory/settings"
+      params={{ factory }}
+      data-factory-user={factory}
+      className={cn('font-mono text-body-small text-foreground', LINK)}
+    >
+      {factory}
+    </RouteLink>
+  );
+}
+
 /**
- * A write of an agent refused: the package's words, and the nodes that still name it when that is why, each linked. `verb` is what did not
+ * A write of an agent refused: the package's words, and what still uses it when that is why, each linked — a node that names it, or a
+ * factory that uses it from the library, at its settings, where its adds are taken off. `verb` is what did not
  * happen: a try refused is not started.
  */
 export function AgentRefused({
@@ -262,6 +277,7 @@ export function AgentRefused({
         <p className="flex flex-wrap gap-x-2 text-body-small text-on-failure-container">
           <span>Open</span>
           {users.map((user) => {
+            if (!user.includes('/')) return <FactoryUserLink key={user} factory={user} />;
             const [workflow = '', step = ''] = user.split('/');
             return <NodeLink key={user} user={{ from: sourceOf(from), workflow, step }} />;
           })}
@@ -307,7 +323,7 @@ export function SkillSourceBadge({ from, foundIn = null }: { from: SkillSource |
       data-skill-from={folder ? 'folder' : (from ?? 'none')}
       className={cn(
         'shrink-0 rounded-full px-2 py-0.5 text-body-small leading-none font-medium',
-        from === 'yours' && container.grey,
+        from === 'user' && container.grey,
         (from === 'repo' || folder) && 'bg-muted text-muted-foreground',
         from === 'builtin' && hairline,
         lost && container.failure,

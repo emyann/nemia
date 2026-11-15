@@ -333,20 +333,27 @@ export const appliesMatch = (file: string, globs: readonly string[]): boolean =>
  */
 export type { Looked, LookupRoot } from '../../contracts/lookup.contract.ts';
 
-/** Whether the root `at` of `roots` holds the name, and is a place of `repo` where one is named. */
-const holdsAt = (roots: readonly LookupRoot[], at: number, repo?: string): boolean =>
-  roots.at(at)?.has === true && (repo === undefined || roots.at(at)?.repo === repo);
+/**
+ * Whether the root `at` of `roots` holds the name where it may be read — a library root only for a name `added` — and is a place of
+ * `repo` where one is named.
+ */
+const holdsAt = (roots: readonly LookupRoot[], at: number, added: boolean, repo?: string): boolean => {
+  const root = roots.at(at);
+  return root?.has === true && (!root.library || added) && (repo === undefined || root.repo === repo);
+};
 
 /**
  * Which of the lookup roots a name is read from, or the refusal of a name one repository holds in both of its places, as the doc of its
  * contract's types above says.
- * @param roots The lookup roots, in their order: which repository each is a place of, and whether it holds the name.
+ * @param roots The lookup roots, in their order: which repository each is a place of, whether it holds the name, and whether it is the
+ * store's library.
+ * @param added Whether the factory the run is in has added the name from the library.
  */
-export const lookedUp: LookedUp = (roots) => {
-  const at = holdsAt(roots, 0) ? 0 : holdsAt(roots, 1) ? 1 : holdsAt(roots, 2) ? 2 : -1;
+export const lookedUp: LookedUp = (roots, added) => {
+  const at = holdsAt(roots, 0, added) ? 0 : holdsAt(roots, 1, added) ? 1 : holdsAt(roots, 2, added) ? 2 : -1;
   if (at < 0) return { kind: 'none' };
   const repo = roots.at(at)?.repo;
   if (repo === undefined) return { kind: 'found', at };
-  const again = at < 1 && holdsAt(roots, 1, repo) ? 1 : at < 2 && holdsAt(roots, 2, repo) ? 2 : -1;
+  const again = at < 1 && holdsAt(roots, 1, added, repo) ? 1 : at < 2 && holdsAt(roots, 2, added, repo) ? 2 : -1;
   return again < 0 ? { kind: 'found', at } : { kind: 'both', at, again };
 };

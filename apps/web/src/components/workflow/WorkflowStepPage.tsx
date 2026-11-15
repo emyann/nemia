@@ -30,7 +30,7 @@ export function WorkflowStepPage({ from, workflow, step, place }: { from: string
           <span
             data-from={page.from}
             className={`rounded-full px-2 py-0.5 text-body-small leading-none font-medium ${
-              page.from === 'yours' ? container.grey : 'bg-muted text-muted-foreground'
+              page.from === 'user' ? container.grey : 'bg-muted text-muted-foreground'
             }`}
           >
             {fromWord(page.from, place.factory)}

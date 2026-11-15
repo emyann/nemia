@@ -18,6 +18,7 @@
  * The door's default is rooted (`rootedDoor`): the files at the store's root the program is given (`StoreRoot`), refused where it was
  * given none (`test/root-given.test.ts`).
  */
+import fs from 'node:fs';
 import path from 'node:path';
 import { Context, Effect, Layer } from 'effect';
 import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
@@ -52,7 +53,8 @@ export type SkillWhere = { readonly anywhere?: boolean };
  * (`skillsFor`); the skills a folder of skills holds, by name; a skill of a folder of skills (`at`) read for its page, its other text
  * files at any depth by their path in its folder, sorted (none where no skill is), and what is there now (`DefinitionThere`); a skill
  * made or changed (`version` the one it was read at, none for a skill made), its other text files replaced whole where the change gives
- * them; and a skill copied whole from one folder of skills into another, under its name.
+ * them; a skill copied whole from one folder of skills into another, under its name; and a skill's folder removed whole, at the version
+ * it was read at.
  */
 export type SkillLayer = {
   readonly skills: {
@@ -63,8 +65,12 @@ export type SkillLayer = {
     readonly there: (name: string, at: string) => DefinitionThere;
     readonly write: (name: string, change: SkillChange, version: string | undefined, at: string, where?: SkillWhere) => SkillWritten;
     readonly copy: (name: string, from: string, to: string, where?: SkillWhere) => SkillCopied;
+    readonly remove: (name: string, at: string) => SkillRemoved;
   };
 };
+
+/** A skill removed: its folder, gone whole. */
+export type SkillRemoved = { readonly dir: string; readonly name: string };
 
 type Methods = DoorOf<SkillLayer, SkillName>['skills'];
 
@@ -73,8 +79,9 @@ type Methods = DoorOf<SkillLayer, SkillName>['skills'];
  * holder's plain path.
  */
 export type SkillDoorShape = {
-  readonly skills: Omit<Methods, 'list'> & {
+  readonly skills: Omit<Methods, 'list' | 'remove'> & {
     readonly list: (holder: string) => Effect.Effect<readonly string[], Refusal>;
+    readonly remove: (name: string, at: string, version: string | undefined) => Effect.Effect<SkillRemoved, Refusal>;
   };
 };
 
@@ -138,6 +145,19 @@ export function skillDoorOver(layer: SkillLayer): SkillDoorShape {
           return yield* door.write(name, named, version, at, where);
         }),
       copy: (name, from, to, where) => Effect.andThen(nameChecked(name), door.copy(name, from, to, where)),
+      remove: (asked, at, version) =>
+        Effect.gen(function* () {
+          yield* nameChecked(asked);
+          const name = SkillName.read(asked);
+          const there = yield* door.there(name, at);
+          if (there.kind === 'none')
+            return yield* Effect.fail(
+              new Missing({ message: `No skill ${name} in ${at}: list the skills there, and remove one it holds.` }),
+            );
+          const refused = definitionVersionRefusal('skill', name, 'remove', there, version);
+          if (refused !== null) return yield* Effect.fail(refusalOf(refused));
+          return yield* door.remove(name, at);
+        }),
     },
   };
 }
@@ -160,6 +180,11 @@ export function skillFiles(home: string): SkillLayer {
       write: (name, change, version, at, where) =>
         writeSkill(home, at, { ...change, name }, { version: version ?? null, anywhere: where?.anywhere }),
       copy: (name, from, to, where) => copySkill(home, from, to, name, where),
+      remove: (name, at) => {
+        const dir = path.join(at, name);
+        fs.rmSync(dir, { recursive: true, force: true });
+        return { dir, name };
+      },
     },
   };
 }

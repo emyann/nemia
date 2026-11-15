@@ -23,6 +23,7 @@ import { listedAtOnce } from '../factory/door/factories.store.ts';
 import type { Factory, FactoryListing } from '../factory/factory.ts';
 import { workflowDirAt, workflowNeedsRead } from '../folder/folder.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
+import { addedOf } from '../library/library.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
@@ -520,7 +521,7 @@ const workflowHarnesses = Effect.fnUntraced(function* (home: string, f: Factory,
   const loaded = yield* Effect.exit(
     Effect.flatMap(
       tried(() => ({ dir: workflowDirAt(w.dir), fills: factoryFills(home, f, w.workflow).fills })),
-      ({ dir, fills }) => door.read(dir, placesOf(home, f.repos[0] ?? f.tree), fills),
+      ({ dir, fills }) => door.read(dir, placesOf(home, f.repos[0] ?? f.tree, addedOf(home, f.name)), fills),
     ),
   );
   return Exit.isSuccess(loaded) ? runHarnesses(loaded.value) : [];

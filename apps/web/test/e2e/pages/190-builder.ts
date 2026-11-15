@@ -124,11 +124,11 @@ export default {
     const { yours } = WORKFLOWS;
     const card = (p: Page, name: string) => p.locator(`article[aria-label="Workflow ${name}"]`);
     const open = async (p: Page, name: string) => {
-      await p.goto(new URL(`/workflows/yours/${name}`, page.url()).href, { waitUntil: 'load' });
+      await p.goto(new URL(`/workflows/user/${name}`, page.url()).href, { waitUntil: 'load' });
       await idle(p);
     };
     const puts = (name: string) => (r: Response) =>
-      r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/namespaces/default/workflows/${name}`;
+      r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/workflows/${name}`;
 
     const mineDir = path.join(store!, 'workflows', yours.name);
     const before = filesIn(mineDir);
@@ -394,7 +394,7 @@ export default {
       await form.getByRole('radio', { name: /^On a repository's branches/ }).check();
       await photograph(form, path.join(OUT, `builder-new-chosen-${await themeOf(page)}.png`));
       const [created] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/namespaces/default/workflows', {
+        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/workflows', {
           timeout: WAIT_MS,
         }),
         make.click(),
@@ -406,7 +406,7 @@ export default {
 
       const builder = card(page, name).locator(`section[data-builder="${name}"]`);
       await expectVisible(builder, 'the workflow made opens in its builder');
-      await page.waitForURL((url) => url.pathname === `/workflows/yours/${name}`, { timeout: WAIT_MS });
+      await page.waitForURL((url) => url.pathname === `/workflows/user/${name}`, { timeout: WAIT_MS });
       if (new URL(page.url()).searchParams.get('build') !== 'true')
         throw new Refused(`on its own page, the address saying so, ?build=true — it is ${page.url()}`);
       await expectVisible(builder.locator('span', { hasText: /^Saved$/ }), 'with nothing unsaved');
@@ -449,7 +449,7 @@ export default {
       if ((await keys.locator('[data-field="output"] select').inputValue()) !== 'implement.schema.json')
         throw new Refused("once saved, implement's output names the schema beside it, as the folder lists it");
 
-      const answered = await page.request.get(new URL(`/api/namespaces/default/workflows/${name}?origin=yours`, page.url()).href);
+      const answered = await page.request.get(new URL(`/api/namespaces/default/workflows/${name}?origin=user`, page.url()).href);
       const object = (await answered.json()) as {
         status?: {
           origin: string;
@@ -458,7 +458,7 @@ export default {
           error: string | null;
         };
       };
-      const listing = object.status?.origin === 'yours' ? object.status : undefined;
+      const listing = object.status?.origin === 'user' ? object.status : undefined;
       const read = listing && {
         error: listing.error,
         steps: listing.steps.map((s) => [s.name, s.spec.after, s.spec.effort, s.spec.check, s.spec.output, s.body]),
@@ -484,7 +484,7 @@ export default {
       if (JSON.stringify(filesIn(made)) !== JSON.stringify(files))
         throw new Refused(`the folder's files are the steps as built — ${made} holds ${JSON.stringify(filesIn(made))}`);
       const stepPage = await page.request.get(
-        new URL(`/api/namespaces/default/workflows/${name}/steps/implement?origin=yours`, page.url()).href,
+        new URL(`/api/namespaces/default/workflows/${name}/steps/implement?origin=user`, page.url()).href,
       );
       const { source } = (await stepPage.json()) as { source?: string };
       if (source !== files[0][1]) throw new Refused(`the step's page reads implement.md as written — it read ${JSON.stringify(source)}`);

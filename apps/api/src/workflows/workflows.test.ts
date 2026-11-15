@@ -287,7 +287,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
         },
         {
           name: 'mine',
-          from: 'yours',
+          from: 'user',
           dir: mine,
           description: null,
           readme: null,
@@ -376,10 +376,10 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
         "in the package's order, set or not",
       );
 
-      const plan = (await (await stepPage('yours', 'mine', 'plan')).json()) as WorkflowStepPage;
+      const plan = (await (await stepPage('user', 'mine', 'plan')).json()) as WorkflowStepPage;
       assert.deepEqual(
         [plan.from, plan.dir, plan.body, plan.source],
-        ['yours', mine, 'Write PLAN.md.', '---\nplace: git\nharness: codex\ncheck: test -f PLAN.md\nretries: 1\n---\nWrite PLAN.md.\n'],
+        ['user', mine, 'Write PLAN.md.', '---\nplace: git\nharness: codex\ncheck: test -f PLAN.md\nretries: 1\n---\nWrite PLAN.md.\n'],
       );
       assert.deepEqual(
         plan.keys,
@@ -388,7 +388,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
       );
 
       write(path.join(mine, 'notes.md'), '---\nplace: git\n---\nTake notes.\n');
-      const notes = (await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage;
+      const notes = (await (await stepPage('user', 'mine', 'notes')).json()) as WorkflowStepPage;
       assert.deepEqual(
         [notes.body, notes.keys],
         ['Take notes.', rows({})],
@@ -397,7 +397,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
       fs.rmSync(path.join(mine, 'notes.md'));
 
       write(path.join(mine, 'notes.md'), '---\nplace: git\ncontext: 150000\n---\nTake notes.\n');
-      const windowed = (await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage;
+      const windowed = (await (await stepPage('user', 'mine', 'notes')).json()) as WorkflowStepPage;
       assert.deepEqual(
         windowed.keys,
         rows({ context: '150k' }),
@@ -415,7 +415,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
         '---\nname: take-notes\ntitle: Take notes\ndescription: Writes down what was decided.\ntags: ["notes", "writing"]\n---\nWrite it.\n',
       );
       write(path.join(mine, 'notes.md'), '---\nplace: git\nagent: scribe\n---\nTake notes.\n');
-      const attached = (await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage;
+      const attached = (await (await stepPage('user', 'mine', 'notes')).json()) as WorkflowStepPage;
       assert.deepEqual(
         attached.agentSkills,
         said,
@@ -429,19 +429,19 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
       assert.equal(attached.layers.instructions, 'Write it down.', "what a run would be told first: the agent's instructions, read now");
       assert.deepEqual(
         attached.skillsFrom,
-        [{ name: 'take-notes', from: 'yours', foundIn: null }],
+        [{ name: 'take-notes', from: 'user', foundIn: null }],
         "each skill of its layers, with where it is found: in your library, so its page is yours'",
       );
       write(path.join(mine, 'notes.md'), '---\nplace: git\n---\nTake notes.\n');
       assert.equal(
-        ((await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage).agentSkills,
+        ((await (await stepPage('user', 'mine', 'notes')).json()) as WorkflowStepPage).agentSkills,
         null,
         'the same step with the line taken off: the agent is not named, so the page says nothing it can do',
       );
       fs.rmSync(path.join(mine, 'notes.md'));
       write(path.join(mine, 'notes.md'), '---\nplace: git\nagent: scribe\n---\nTake notes.\n');
       fs.rmSync(path.join(root, 'workflows', 'skills'), { recursive: true });
-      const lost = await stepPage('yours', 'mine', 'notes');
+      const lost = await stepPage('user', 'mine', 'notes');
       assert.equal(
         ((await lost.json()) as WorkflowStepPage).agentSkills ?? null,
         null,
@@ -469,9 +469,9 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
       for (const [where, name] of [
         ['repo', '..%2Fworkflows%2Fgood'],
         ['repo', 'mine'],
-        ['yours', 'good'],
+        ['user', 'good'],
         ['repo', '.draft'],
-        ['yours', '.git'],
+        ['user', '.git'],
       ]) {
         assert.equal(
           (await stepPage(where, name, 'implement')).status,
@@ -741,7 +741,7 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
       assert.equal(unknown.status, 404);
       const { error } = (await unknown.json()) as { error: string };
       assert.ok(error.startsWith("No workflow 'nope' in "), error);
-      assert.ok(error.includes('broken (repo), good (repo), mine (yours).'), error);
+      assert.ok(error.includes('broken (repo), good (repo), mine (user).'), error);
       for (const workflow of ['..', 'good/../mine', 'NOTES.txt', '.draft', '.git', '.vscode', 'agents'])
         assert.equal(
           (await post({ workflow, brief: 'Do it.' })).status,
@@ -928,7 +928,7 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
       assert.ok(error.includes('"from": "repo"'), error);
       assert.deepEqual(runFiles(), before);
 
-      const chosen = await post({ workflow: 'good', from: 'yours', brief: 'Do it my way.' });
+      const chosen = await post({ workflow: 'good', from: 'user', brief: 'Do it my way.' });
       assert.equal(chosen.status, 201);
       const run = runsAtOnce(root).runs.read(((await chosen.json()) as { id: string }).id);
       assert.equal(run.workflowDir, yours);
@@ -977,9 +977,13 @@ test("a Workflow's spec carries its folder's other text files: served sorted, wr
   fs.writeFileSync(path.join(dir, 'logo.png'), picture);
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const url = '/api/namespaces/default/workflows/scripted';
-  const got = async () => (await (await app.request(`${url}?origin=yours`)).json()) as import('objects').Workflow;
+  const got = async () => (await (await app.request(`${url}?origin=user`)).json()) as import('objects').Workflow;
   const put = (body: unknown) =>
-    app.request(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    app.request(url.replace('/api/namespaces/default/', '/api/'), {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   const files = () => fs.readdirSync(dir).sort();
 
   const read = await got();
@@ -1048,9 +1052,13 @@ test("a Workflow's spec carries the needs its README's frontmatter declares: ser
   );
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const url = '/api/namespaces/default/workflows/needful';
-  const got = async () => (await (await app.request(`${url}?origin=yours`)).json()) as import('objects').Workflow;
+  const got = async () => (await (await app.request(`${url}?origin=user`)).json()) as import('objects').Workflow;
   const put = (body: unknown) =>
-    app.request(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    app.request(url.replace('/api/namespaces/default/', '/api/'), {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
   const read = await got();
   await t.test('GET serves the needs in spec.needs, and the README without its frontmatter', () => {

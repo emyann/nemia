@@ -601,3 +601,13 @@ export { FACTORY_PLAN, FACTORY_RESOLVE, FACTORY_UPGRADE } from './factory/upgrad
 export { withResolutionProposerAs } from './factory/upgrade/proposed.verb.ts';
 export { sentTemplatesDir, templateGiven, withTemplateTaken } from './template/given.store.ts';
 export { factoryExported, factoryImported } from './factory/move/move.verb.ts';
+export { libraryAddList, libraryAddNamed, libraryAddWritten, libraryUsers, refOf, type FactoryAdds } from './library/library.verb.ts';
+export {
+  libraryServerList,
+  libraryServerObjects,
+  libraryServerRemoved,
+  libraryServerThere,
+  libraryServerWritten,
+} from './library/library-servers.verb.ts';
+export { addedOf, builtinCopies, recordBuiltinCopy } from './library/library.store.ts';
+export { type LibraryRef } from './library/library.ts';

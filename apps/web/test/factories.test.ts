@@ -319,9 +319,9 @@ test('namespaceOf, factoryIn, shownIn, workflowFactories, listPlace, hirePlaceOf
         factory('d-here', { repos: ['/r'], workflows: ['build'] }),
       ];
       assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, factories), ['a-here']);
-      assert.deepEqual(workflowFactories({ name: 'dev', from: 'yours' }, factories), ['a-here', 'b-other']);
+      assert.deepEqual(workflowFactories({ name: 'dev', from: 'user' }, factories), ['a-here', 'b-other']);
       assert.deepEqual(workflowFactories({ name: 'build', from: 'repo' }, factories), ['d-here']);
-      assert.deepEqual(workflowFactories({ name: 'intake', from: 'yours' }, factories), []);
+      assert.deepEqual(workflowFactories({ name: 'intake', from: 'user' }, factories), []);
       assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, []), [], 'with no factories read, a workflow is in none');
     },
   );
@@ -375,10 +375,10 @@ test('namespaceOf, factoryIn, shownIn, workflowFactories, listPlace, hirePlaceOf
     },
   );
   await t.test(
-    "REFUSED: a workflow read in a named factory is the factory's, never said to be this repository's; yours is yours anywhere",
+    "REFUSED: a workflow read in a named factory is the factory's, never said to be this repository's; the user library's is the user library's anywhere",
     () => {
-      assert.equal(fromWord('yours'), 'yours');
-      assert.equal(fromWord('yours', 'pipao'), 'yours');
+      assert.equal(fromWord('user'), 'the user library');
+      assert.equal(fromWord('user', 'pipao'), 'the user library');
       assert.equal(fromWord('repo'), 'this repository');
       assert.equal(fromWord('repo', 'default'), 'this repository');
       assert.equal(fromWord('repo', 'pipao'), "the factory's");

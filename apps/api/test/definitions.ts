@@ -57,7 +57,7 @@ export const asAgentListing = (o: Obj) => {
   };
 };
 
-/** The objects of `plural` in `ns`, each as its listing, `query` the list's (`origin=yours`, `repo=…`). */
+/** The objects of `plural` in `ns`, each as its listing, `query` the list's (`origin=user`, `repo=…`). */
 export async function listedIn<T = Record<string, unknown>>(on: Requesting, plural: string, query = '', ns = 'default'): Promise<T[]> {
   const res = await on.request(`/api/namespaces/${ns}/${plural}${query ? `?${query}` : ''}`);
   const body = (await res.json()) as { items?: Obj[]; error?: string };
@@ -70,7 +70,7 @@ export async function listedIn<T = Record<string, unknown>>(on: Requesting, plur
 /** Every origin's of `plural` in `ns`, each listed whole, shadowed or not, in the lookup order. */
 export async function everyOrigin<T = Record<string, unknown>>(on: Requesting, plural: string, ns = 'default', query = ''): Promise<T[]> {
   const out: T[] = [];
-  for (const origin of ['factory', 'repo', 'yours', 'builtin'])
+  for (const origin of ['factory', 'repo', 'user', 'builtin'])
     out.push(...(await listedIn<T>(on, plural, `origin=${origin}${query ? `&${query}` : ''}`, ns)));
   return out;
 }
@@ -88,7 +88,7 @@ export async function workflowsListed<T = ReturnType<typeof asWorkflowListing>>(
   const ns = asked.get('factory') ?? 'default';
   const repo = asked.get('repo');
   const out: T[] = [];
-  for (const origin of ['factory', 'repo', 'yours']) {
+  for (const origin of ['factory', 'repo', 'user']) {
     const res = await on.request(
       `/api/namespaces/${encodeURIComponent(ns)}/workflows?origin=${origin}${repo === null ? '' : `&repo=${encodeURIComponent(repo)}`}`,
     );

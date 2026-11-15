@@ -41,8 +41,13 @@ fs.mkdirSync(path.join(root, 'workflows', 'agents'), { recursive: true });
 fs.writeFileSync(path.join(root, 'workflows', 'agents', 'archivist.md'), '---\ndescription: Files it away.\n---\nFile it away.\n');
 
 const json = { 'content-type': 'application/json' };
+/** A write or a clear of `url`, sent to the library's path of the same agent: the instructions are written at the store's level alone. */
 const send = (method: string, url: string, body: unknown, headers: Record<string, string> = json) =>
-  app.request(url, { method, headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  app.request(url.replace(/^\/api\/namespaces\/[^/]+\/agents\//, '/api/agents/'), {
+    method,
+    headers,
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
 
 /** What the store's custom-instructions folder holds: each file's text by its name, `{}` when there is no folder. */
 const held = (): Record<string, string> =>
@@ -133,7 +138,11 @@ test('a person’s custom instructions for an agent: none at first, put in your 
   await s.test('DELETE reads no body: what its route fixes clears the words, whatever the body says', async () => {
     for (const body of [undefined, 'not json', JSON.stringify({ words: 'Kept?' })]) {
       writeCustomInstructions(root, 'scribe', 'Mind the margins.', repo);
-      const res = await app.request(at('scribe'), { method: 'DELETE', headers: json, body });
+      const res = await app.request(at('scribe').replace('/api/namespaces/default/agents/', '/api/agents/'), {
+        method: 'DELETE',
+        headers: json,
+        body,
+      });
       assert.equal(res.status, 200, `${body}: ${await res.clone().text()}`);
       assert.deepEqual(held(), {}, String(body));
     }
@@ -173,7 +182,7 @@ test('what the instructions refuse — a name no place has, blank words, a front
   await t.test(
     'REFUSED: in `default` with no `?repo=`, an agent of a repository is a name no place has (404), never looked for in the api’s folder; yours is written',
     async () => {
-      const bare = (name: string) => `/api/namespaces/default/agents/${name}/instructions`;
+      const bare = (name: string) => `/api/agents/${name}/instructions`;
       const missed = await refused(() => send('PUT', bare('scribe'), { words: 'Write it.' }), 404);
       assert.ok(missed.includes('The agents there: archivist.'), missed);
       assert.ok(!missed.includes(process.cwd()), 'the api’s own folder is not where an agent is looked for');
@@ -199,9 +208,11 @@ test('what the instructions refuse — a name no place has, blank words, a front
     assert.equal(fs.existsSync(path.join(root, 'x.md')), false);
   });
 
-  await t.test('REFUSED: a write or a clear outside `default` (422), naming the namespace that takes it, nothing written', async () => {
-    const put = await refused(() => send('PUT', at('scribe', 'elsewhere'), { words: 'Here.' }), 422);
-    assert.ok(put.includes('/api/namespaces/default/'), put);
-    assert.ok((await refused(() => send('DELETE', at('scribe', 'elsewhere'), {}), 422)).includes('/api/namespaces/default/'));
+  await t.test('REFUSED: a write or a clear in a namespace is no route: the instructions are written at the library alone', async () => {
+    for (const method of ['PUT', 'DELETE']) {
+      const res = await app.request(at('scribe', 'elsewhere'), { method, headers: json, body: JSON.stringify({ words: 'Here.' }) });
+      assert.equal(res.status, 404, `${method} in a namespace`);
+    }
+    assert.deepEqual(held(), {}, 'nothing written');
   });
 });

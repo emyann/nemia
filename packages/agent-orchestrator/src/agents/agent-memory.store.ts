@@ -16,7 +16,7 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { AGENTS_FOLDER, WorkflowError } from '../step/step.ts';
 import { customInstructionsRefusal, parseAgent, renderAgent, type Agent } from './agents.ts';
 import { lookedUp } from '../skills/skills.ts';
-import { lookupOf, lookupRoots, type Places } from '../skills/read.store.ts';
+import { addedIn, libraryRootOf, lookupOf, lookupRoots, type Places } from '../skills/read.store.ts';
 import { customInstructionsFile } from './read.store.ts';
 import { isStoreAgent } from '../custom/custom.store.ts';
 import { AgentDoor, agentDoorOver, type AgentAt, type AgentLayer } from './agent-door.store.ts';
@@ -61,7 +61,10 @@ function foundIn(held: Holding, dir: string, places: Places): Map<string, Agent 
   const folders = roots.map((root) => folderOf(held, path.posix.join(root, AGENTS_FOLDER)));
   const out = new Map<string, Agent | WorkflowError>();
   for (const name of new Set(folders.flatMap((one) => [...one.keys()]))) {
-    const looked = lookedUp(lookupOf(roots, (at) => folders[at]?.has(name) === true));
+    const looked = lookedUp(
+      lookupOf(roots, (at) => folders[at]?.has(name) === true, libraryRootOf(places)),
+      addedIn(places, 'agents', name),
+    );
     if (looked.kind === 'none') continue;
     const one = folders[looked.at]?.get(name);
     if (one === undefined) continue;

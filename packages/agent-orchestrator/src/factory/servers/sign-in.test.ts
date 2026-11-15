@@ -16,6 +16,8 @@ import { serverSignIn, serverSignInCallback, serverSignInState, serverSignOut } 
 import { writeFactoryServers } from './servers.store.ts';
 import { SHIPPED_CLIENT_SECRETS, shippedSecretOf } from './clients.ts';
 import { DEFAULT_NAMESPACE } from '../factory.ts';
+import { libraryAddsFile, writeLibraryAdds } from '../../library/library.store.ts';
+import { writeFileSync } from 'node:fs';
 
 const ROOT = scratch('wf-sign-in-');
 
@@ -108,4 +110,19 @@ test('a pasted callback completes a waiting sign-in; refused by kind where none 
   assert.deepEqual(engine.callbacks, [{ name: 'github', url: PASTED }]);
   engine.settleSignIn('github', { state: 'connected' });
   assert.deepEqual(await runWith(engineOf(engine.layer), serverSignInState(DEFAULT_NAMESPACE, 'github', ROOT)), { state: 'connected' });
+});
+
+test("a server the factory added from the library is signed in to by its name, Nemia's builtin handed its secret", async () => {
+  const home = scratch('wf-sign-in-added-');
+  const engine = testEngine();
+  writeLibraryAdds(home, DEFAULT_NAMESPACE, [{ kind: 'McpServer', name: 'github' }]);
+  await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', home));
+  assert.deepEqual(engine.signIns, [{ name: 'github', secret: true }]);
+  writeLibraryAdds(home, DEFAULT_NAMESPACE, []);
+  const gone = await refusal(runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', home)));
+  assert.equal(gone._tag, 'Missing', 'the add taken off, nothing holds the server');
+  writeFileSync(libraryAddsFile(home, DEFAULT_NAMESPACE), '{ not json');
+  const broken = await refusal(runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', home)));
+  assert.equal(broken._tag, 'Invalid', 'a broken record of the adds is said, never read as no adds');
+  assert.deepEqual(engine.signIns, [{ name: 'github', secret: true }], 'and nothing more is signed in');
 });

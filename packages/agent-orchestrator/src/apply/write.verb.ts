@@ -13,6 +13,7 @@ import {
   RESOURCE_PLURALS,
   type AgentSpec,
   type HireSpec,
+  type LibraryAddSpec,
   type McpServerSpec,
   type ProposedObject,
   type SkillSpec,
@@ -20,7 +21,8 @@ import {
   type WorkflowStep,
 } from 'objects';
 import { tried } from '../runtime-client.ts';
-import type { Refusal } from '../refusal/refusal.ts';
+import { Invalid, type Refusal } from '../refusal/refusal.ts';
+import { refOf, writeLibraryAdd } from '../library/library.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { factoryWriteOf } from '../workflows/workflows.verb.ts';
@@ -209,6 +211,20 @@ const serverWritten = (factory: string, object: ProposedObject) =>
     return uncounted(object);
   });
 
+/** A LibraryAdd written: the library item added to the factory, or its add taken off where it is removed. */
+const libraryAddWritten = (factory: string, object: ProposedObject) =>
+  Effect.gen(function* () {
+    const home = yield* StoreRoot;
+    const spec = object.spec as LibraryAddSpec | undefined;
+    const ref = spec ?? refOf(object.metadata.name);
+    if (ref === undefined)
+      return yield* Effect.fail(
+        new Invalid({ message: `${object.metadata.name} is no add: name it <kind>.<name>, its kind Agent, Skill or McpServer.` }),
+      );
+    yield* tried(() => writeLibraryAdd(home, factory, verbOf(object) === 'delete' ? 'remove' : 'add', ref));
+    return uncounted(object);
+  });
+
 /** The Factory's attached workflows, rules and instruction, each the proposal names, written through the Factory door. */
 const factoryWritten = (factory: string, object: ProposedObject) =>
   Effect.gen(function* () {
@@ -252,6 +268,8 @@ export const objectWritten = (
         return serverWritten(factory, object);
       case 'Factory':
         return factoryWritten(factory, object);
+      case 'LibraryAdd':
+        return libraryAddWritten(factory, object);
     }
   })();
   return Effect.provideService(written, StoreRoot, place.home);

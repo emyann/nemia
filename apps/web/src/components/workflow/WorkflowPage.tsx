@@ -39,7 +39,7 @@ export const loadWorkflow = (client: QueryClient, place: PagePlace, from: string
   Promise.all([
     loadWorkflowsIn(client, place),
     client.ensureQueryData(storeQuery),
-    from === 'yours' ? client.prefetchQuery(workflowsQuery) : null,
+    from === 'user' ? client.prefetchQuery(workflowsQuery) : null,
   ]);
 
 /**
@@ -127,14 +127,14 @@ function StartsInFactory({ name, factories }: { name: string; factories: readonl
  */
 function InFactory({ from, name, address, place, building, factory }: Asked & { place: Place; factory: Factory | undefined }) {
   const { data: listed } = useSuspenseQuery(workflowsInQuery(place));
-  const { data: plain } = useQuery({ ...workflowsQuery, enabled: from === 'yours' });
+  const { data: plain } = useQuery({ ...workflowsQuery, enabled: from === 'user' });
   const workflow = listed.find((w) => fromMatches(w.from, from) && w.name === name);
   if (!workflow) return <NotOffered name={name} place={place} address={address} attach={factory?.commands.attach} />;
   const why = whyNotStarted(workflow);
   return (
     <Workflow
       workflow={workflow}
-      own={from === 'yours' ? plain?.find((w) => w.from === from && w.name === name) : undefined}
+      own={from === 'user' ? plain?.find((w) => w.from === from && w.name === name) : undefined}
       address={address}
       building={building}
       tags={[place.factory]}
@@ -182,7 +182,7 @@ function Workflow({
   children: ReactNode;
 }) {
   const navigate = useNavigate();
-  const buildable = own !== undefined && own.from === 'yours' && !own.error;
+  const buildable = own !== undefined && own.from === 'user' && !own.error;
   const open = building && buildable;
 
   return (
@@ -206,7 +206,7 @@ function Workflow({
             : undefined
         }
         onRemoved={() => navigate(workflowsLink(address))}
-        removable={own !== undefined && own.from === 'yours' && !open ? own : undefined}
+        removable={own !== undefined && own.from === 'user' && !open ? own : undefined}
       />
       {!open && <Readme text={workflow.readme} />}
       {workflow.error ? (
@@ -338,7 +338,7 @@ function NotListed({ from, name }: { from: string; name: string }) {
     <div className="space-y-3">
       <BackToWorkflows />
       <p data-not-listed className="text-body-medium text-muted-foreground">
-        No workflow <span className="font-mono">{name}</span> is listed {from === 'yours' ? 'among yours' : "in this repository's"}: it may
+        No workflow <span className="font-mono">{name}</span> is listed {from === 'user' ? 'among yours' : "in this repository's"}: it may
         have been removed or renamed.
       </p>
     </div>

@@ -18,9 +18,9 @@ import { engine, Informer } from 'agent-orchestrator';
 /** The board's list of the runs not finished: the RunList asked by state, which reads the tasks. */
 const OPEN = '/api/runs?fieldSelector=status.state!%3Dfinished';
 
-/** The names of the workflows `GET /api/namespaces/default/workflows?origin=yours` lists as yours, through `on`. */
+/** The names of the workflows `GET /api/namespaces/default/workflows?origin=user` lists as yours, through `on`. */
 const yoursOn = async (on: typeof app): Promise<string[]> =>
-  (await listedIn<{ from: string; name: string }>(on, 'workflows', 'origin=yours')).filter((w) => w.from === 'yours').map((w) => w.name);
+  (await listedIn<{ from: string; name: string }>(on, 'workflows', 'origin=user')).filter((w) => w.from === 'user').map((w) => w.name);
 
 test("appOf: a mounted router reads the engine and the store's root of the app it was asked through, and an app keeps its reads of its own", async (t) => {
   await t.test("a mounted router's route reads the engine of the app it was asked through", async () => {

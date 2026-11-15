@@ -56,6 +56,7 @@ import { currentOf } from '../former-reason/former-reason.ts';
 import type { FactoryLevel } from '../level/level.ts';
 import type { Actor, EventWaits, Readiness } from 'objects';
 import type { ConflictsDue } from '../../contracts/conflicts-said.contract.ts';
+import type { AddsMissingDue } from '../../contracts/adds-missing-said.contract.ts';
 
 export { DAEMON_STARTED, REMOVED, LINE_WORDS };
 export type { InvolvedKind, Reason, LineSource, LineType };
@@ -343,6 +344,9 @@ const levelKey = (factory: string): string => `Level/${factory}`;
  */
 const conflictsKey = (factory: string): string => `Conflicts/${factory}`;
 
+/** Where the fold keeps what was last said of the factory `factory`'s library adds: no `Run/` or `Step/` key, as `conflictsKey`. */
+const addsKey = (factory: string): string => `Adds/${factory}`;
+
 /** Where the fold keeps the store's readiness last said: no `Run/` or `Step/` key, as `levelKey`, so no `removed` forgets it. */
 const READINESS_KEY = 'Readiness/store';
 
@@ -429,10 +433,14 @@ function foldStore(fold: FeedFold, l: StoreLine): void {
   if (reason === 'NotReady' || reason === 'Ready') fold.said.set(READINESS_KEY, { ...saidOf(l), reason });
 }
 
-/** A factory's line `l` folded: its conflicts pending or settled kept as the last word said of them, with its reason; any other passed. */
+/**
+ * A factory's line `l` folded: its conflicts pending or settled, and its library adds missing or resolved, each kept as the last word said
+ * of them, with its reason; any other passed.
+ */
 function foldFactory(fold: FeedFold, l: FactoryLine): void {
   const reason = reasonOfLine(l, involvedOf(l));
   if (reason === 'ConflictsPending' || reason === 'ConflictsSettled') fold.said.set(conflictsKey(l.factory), { ...saidOf(l), reason });
+  if (reason === 'AddsMissing' || reason === 'AddsResolved') fold.said.set(addsKey(l.factory), { ...saidOf(l), reason });
 }
 
 /** The word and the note `line` says, as the fold keeps them. */
@@ -765,6 +773,46 @@ function conflictLines(fold: FeedFold, at: string, conflicts: FeedConflicts): Fa
   });
 }
 
+/**
+ * Each recorded factory's library adds as a pass read them (`addsMissingNow`): whether one is `missing` — the library holds no item of its
+ * kind and name — and what to do about it. A factory with no record of its adds is left out, its adds being what it runs; a caller that
+ * did not read them passes nothing, and the feed says nothing of any factory's adds.
+ */
+export type FeedMissing = readonly { factory: string; missing: boolean; message?: string }[];
+
+/**
+ * What a pass owes the feed of one factory's library adds (`contracts/adds-missing-said.contract.ts`): `AddsMissing` where one is missing
+ * and the feed did not last say so, `AddsResolved` where none is and it did, else nothing. Pure.
+ * @param said What the feed last said of the factory's adds, or undefined where it has said nothing of them.
+ * @param missing Whether an add of the factory's record is missing now.
+ */
+export const addsMissingDue: AddsMissingDue = (said, missing) =>
+  missing ? (said === 'AddsMissing' ? undefined : 'AddsMissing') : said === 'AddsMissing' ? 'AddsResolved' : undefined;
+
+/**
+ * The lines a factory's library adds owe the feed: one for each factory whose missing adds turned since the feed last said them
+ * (`addsMissingDue`, reading the reason the fold keeps under `addsKey`), its note what to do. Compared by its reason alone, as
+ * `conflictLines` compares, so a second add going missing beside the first writes no line. Pure.
+ */
+function addsLines(fold: FeedFold, at: string, adds: FeedMissing): FactoryLine[] {
+  return adds.flatMap(({ factory, missing, message }) => {
+    const said = fold.said.get(addsKey(factory))?.reason;
+    const due = addsMissingDue(said === 'AddsMissing' || said === 'AddsResolved' ? said : undefined, missing);
+    if (due === undefined) return [];
+    return [
+      upgraded({
+        at,
+        factory,
+        word: LINE_WORDS[due],
+        ...(message !== undefined && message !== '' ? { note: message } : {}),
+        involved: { kind: 'Factory', name: factory },
+        labels: { factory },
+        reason: due,
+      }) as FactoryLine,
+    ];
+  });
+}
+
 /** One call a step's sessions were denied, as the one-shot the feed writes of it: the call in its word and as a field of its own. */
 const denialOnce = (d: FeedDenial): Once => ({
   step: d.step,
@@ -840,6 +888,7 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): R
  * @param conflicts Each factory's `ConflictsPending` condition, or undefined where the pass read none.
  * @param readiness The store's readiness as the daemon last read it, or undefined where none was handed.
  * @param resumed Who last lifted the store's pause by hand, and the pause it lifted; undefined where none was left.
+ * @param missing Each recorded factory's library adds, or undefined where the pass read none.
  */
 export function feedChanges(
   fold: FeedFold,
@@ -851,6 +900,7 @@ export function feedChanges(
   conflicts?: FeedConflicts,
   readiness?: FeedReadiness,
   resumed?: FeedResumed,
+  missing?: FeedMissing,
 ): Array<RunLine | StoreLine | FactoryLine> {
   const line = (run: string, step: string | undefined, said: FeedSaid, labels: FeedLabels): RunLine =>
     upgraded({
@@ -878,12 +928,19 @@ export function feedChanges(
     const id = key.startsWith('Run/') ? key.slice('Run/'.length) : undefined;
     if (id !== undefined && !now.has(id) && !unjudged.has(id)) out.push(line(id, undefined, { word: REMOVED }, { run: id }));
   }
-  return [
-    ...out,
-    ...storeChanges(fold, at, pause, levels, readiness, resumed),
-    ...(conflicts === undefined ? [] : conflictLines(fold, at, conflicts)),
-  ];
+  return [...out, ...storeChanges(fold, at, pause, levels, readiness, resumed), ...factoryChanges(fold, at, conflicts, missing)];
 }
+
+/** The factories' lines a pass owes: their conflicts' where it read them (`conflictLines`), their adds' where it read them. Pure. */
+const factoryChanges = (
+  fold: FeedFold,
+  at: string,
+  conflicts: FeedConflicts | undefined,
+  missing: FeedMissing | undefined,
+): FactoryLine[] => [
+  ...(conflicts === undefined ? [] : conflictLines(fold, at, conflicts)),
+  ...(missing === undefined ? [] : addsLines(fold, at, missing)),
+];
 
 /**
  * The store's lines a pass owes: its pause's where the pass read it (`storeLines`), its factories' levels' where it read them, and its

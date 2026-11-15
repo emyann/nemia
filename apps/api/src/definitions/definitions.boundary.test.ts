@@ -71,6 +71,8 @@ const send = async (method: string, url: string, body?: unknown, headers: Record
 };
 const byName = (list: List) => Object.fromEntries(list.items.map((o) => [o.metadata.name, o]));
 const W = '/api/namespaces/default/workflows';
+/** The library's workflows, where a write of the user library is sent. */
+const L = '/api/workflows';
 
 test("default's WorkflowList: each name once, the repository's first, each with its typed graph and its revision", async () => {
   const { status, body } = await get<List>(W);
@@ -86,12 +88,12 @@ test("default's WorkflowList: each name once, the repository's first, each with 
   }
 });
 
-test('?origin=yours serves yours, shadowed by the repository; a name none holds is a 404', async () => {
-  const { body } = await get<List>(`${W}?origin=yours`);
+test('?origin=user serves yours, shadowed by the repository; a name none holds is a 404', async () => {
+  const { body } = await get<List>(`${W}?origin=user`);
   const shared = byName(body).shared;
-  assert.deepEqual([shared?.status.origin, shared?.status.shadowedBy], ['yours', 'repo']);
+  assert.deepEqual([shared?.status.origin, shared?.status.shadowedBy], ['user', 'repo']);
   assert.equal((await get(`${W}/nothing`)).status, 404);
-  assert.equal((await get(`${W}/make?origin=yours`)).status, 404);
+  assert.equal((await get(`${W}/make?origin=user`)).status, 404);
   assert.equal((await get(`${W}?origin=tree`)).status, 422, 'an origin outside the four words');
 });
 
@@ -153,13 +155,13 @@ test("a factory's own workflow, a make in a factory and yours outside default ar
   assert.deepEqual([made.status, made.body.way], [422, 'factory']);
   assert.equal(fs.existsSync(path.join(STORE, 'fresh')), false);
   const away = await send('PUT', '/api/namespaces/works/workflows/mine', { metadata: { resourceVersion: 'x' }, spec: { steps: [] } });
-  assert.deepEqual([away.status, away.body.way], [422, 'default']);
+  assert.deepEqual([away.status, away.body.way], [422, 'library']);
   const rex = await send('PUT', '/api/namespaces/default/agents/rex', { metadata: { resourceVersion: 'x' }, spec: {} });
   assert.equal(rex.status, 422, "the repository's agent is no write of the api's");
 });
 
 test("a builder's save round-trips its spec, the step files keep only their own keys, a stale version is a 409 and a cycle a 422 naming its steps", async () => {
-  const read = (await get<Obj>(`${W}/mine?origin=yours`)).body;
+  const read = (await get<Obj>(`${W}/mine?origin=user`)).body;
   const steps = read.spec.steps ?? [];
   assert.deepEqual(
     steps.map((s) => [s.name, s.keys]),
@@ -168,46 +170,46 @@ test("a builder's save round-trips its spec, the step files keep only their own 
       ['make', { after: ['plan'], place: 'git', agent: 'implementer' }],
     ],
   );
-  const saved = await send('PUT', `${W}/mine`, { metadata: { resourceVersion: read.metadata.resourceVersion }, spec: { steps } });
+  const saved = await send('PUT', `${L}/mine`, { metadata: { resourceVersion: read.metadata.resourceVersion }, spec: { steps } });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   assert.equal(saved.body.kind, 'Workflow');
   assert.deepEqual(saved.body.spec.steps, steps);
   assert.doesNotMatch(fs.readFileSync(path.join(STORE, 'mine', 'make.md'), 'utf8'), /model:/, "the agent's keys stay its own");
-  const stale = await send('PUT', `${W}/mine`, { metadata: { resourceVersion: read.metadata.resourceVersion + 'x' }, spec: { steps } });
+  const stale = await send('PUT', `${L}/mine`, { metadata: { resourceVersion: read.metadata.resourceVersion + 'x' }, spec: { steps } });
   assert.equal(stale.status, 409);
-  const now = (await get<Obj>(`${W}/mine?origin=yours`)).body.metadata.resourceVersion;
+  const now = (await get<Obj>(`${W}/mine?origin=user`)).body.metadata.resourceVersion;
   const cycle = steps.map((s) => (s.name === 'plan' ? { ...s, keys: { ...s.keys, after: ['make'] } } : s));
-  const refused = await send('PUT', `${W}/mine`, { metadata: { resourceVersion: now }, spec: { steps: cycle } });
+  const refused = await send('PUT', `${L}/mine`, { metadata: { resourceVersion: now }, spec: { steps: cycle } });
   assert.equal(refused.status, 422);
   assert.deepEqual(refused.body.steps, ['make', 'plan']);
 });
 
 test('a workflow of yours made with its first step (201), then removed at the version read', async () => {
-  const made = await send('POST', W, {
+  const made = await send('POST', L, {
     metadata: { name: 'fresh' },
     spec: { steps: [{ name: 'only', keys: { place: 'git' }, body: 'Do it.' }] },
   });
   assert.equal(made.status, 201, JSON.stringify(made.body));
-  assert.equal(made.body.status.origin, 'yours');
-  const missing = await send('DELETE', `${W}/fresh`);
+  assert.equal(made.body.status.origin, 'user');
+  const missing = await send('DELETE', `${L}/fresh`);
   assert.equal(missing.status, 422, 'a removal says the version it read');
-  const gone = await send('DELETE', `${W}/fresh?resourceVersion=${made.body.metadata.resourceVersion}`);
+  const gone = await send('DELETE', `${L}/fresh?resourceVersion=${made.body.metadata.resourceVersion}`);
   assert.equal(gone.status, 200, JSON.stringify(gone.body));
   assert.equal(fs.existsSync(path.join(STORE, 'fresh')), false);
 });
 
 test('an agent of yours made (201), tried (201), and its removal refused while a step names it (409, with its users)', async () => {
-  const made = await send('POST', '/api/namespaces/default/agents', {
+  const made = await send('POST', '/api/agents', {
     metadata: { name: 'tess' },
     spec: { keys: { harness: 'claude' }, instructions: 'You test.' },
   });
   assert.equal(made.status, 201, JSON.stringify(made.body));
-  assert.deepEqual([made.body.kind, made.body.status.origin], ['Agent', 'yours']);
-  const tried = await send('POST', '/api/namespaces/default/agents/tess/try', { brief: 'Test the cache.' });
+  assert.deepEqual([made.body.kind, made.body.status.origin], ['Agent', 'user']);
+  const tried = await send('POST', '/api/agents/tess/try', { brief: 'Test the cache.' });
   assert.equal(tried.status, 201, JSON.stringify(tried.body));
   assert.equal(typeof tried.body.id, 'string');
-  const implementer = (await get<Obj>('/api/namespaces/default/agents/implementer?origin=yours')).body;
-  const kept = await send('DELETE', `/api/namespaces/default/agents/implementer?resourceVersion=${implementer.metadata.resourceVersion}`);
+  const implementer = (await get<Obj>('/api/namespaces/default/agents/implementer?origin=user')).body;
+  const kept = await send('DELETE', `/api/agents/implementer?resourceVersion=${implementer.metadata.resourceVersion}`);
   assert.equal(kept.status, 409, JSON.stringify(kept.body));
   assert.ok(Array.isArray(kept.body.users));
   const repos = (await get<List>('/api/namespaces/default/agents?origin=repo')).body;
@@ -222,11 +224,11 @@ test('a builtin skill copied to yours (201), its files listed by path', async ()
   assert.equal(builtin.kind, 'SkillList');
   const name = builtin.items[0]?.metadata.name;
   assert.ok(name, 'Nemia builds in a skill');
-  const copied = await send('POST', `/api/namespaces/default/skills/${name}/copy`);
+  const copied = await send('POST', `/api/skills/${name}/copy`);
   assert.equal(copied.status, 201, JSON.stringify(copied.body));
-  assert.equal(copied.body.status.origin, 'yours');
+  assert.equal(copied.body.status.origin, 'user');
   const shadowed = (await get<Obj>(`/api/namespaces/default/skills/${name}?origin=builtin`)).body;
-  assert.equal(shadowed.status.shadowedBy, 'yours');
+  assert.equal(shadowed.status.shadowedBy, 'user');
   const files = (await get<{ paths: string[] }>(`/api/namespaces/default/skills/${name}/files`)).body;
   assert.ok(files.paths.includes('SKILL.md'));
 });
@@ -255,18 +257,15 @@ test("a workflow's revision is read and never written: the same on a second read
 
 test('each retired path answers 404', async () => {
   const retired: Array<[string, string]> = [
-    ['GET', '/api/workflows'],
     ['POST', '/api/workflows/yours'],
     ['PUT', '/api/workflows/yours/mine'],
     ['DELETE', '/api/workflows/yours/mine'],
-    ['GET', '/api/agents'],
     ['GET', '/api/agents/yours/implementer'],
     ['PUT', '/api/agents/yours/implementer'],
     ['DELETE', '/api/agents/yours/implementer'],
     ['POST', '/api/agents/yours'],
     ['GET', '/api/agents/yours/implementer/card'],
     ['POST', '/api/agents/yours/implementer/try'],
-    ['GET', '/api/skills'],
     ['GET', '/api/skills/yours/x'],
     ['PUT', '/api/skills/yours/x'],
     ['POST', '/api/skills/yours'],
@@ -289,15 +288,15 @@ test("each status.revision is the number a run's start pins: 1 at the first star
     cwd: repo,
   });
   const pinnedAtStart = async (): Promise<Record<string, number>> => {
-    const started = await send('POST', '/api/namespaces/works/runs', { workflow: 'mine', from: 'yours', brief: 'Make the plan.' });
+    const started = await send('POST', '/api/namespaces/works/runs', { workflow: 'mine', from: 'user', brief: 'Make the plan.' });
     assert.equal(started.status, 201, JSON.stringify(started.body));
     const pins = runsAtOnce(root).runs.read(String(started.body.id)).pinned ?? [];
     return Object.fromEntries(pins.map((p) => [`${p.kind}/${p.name}`, p.n]));
   };
   const served = async () => ({
-    'workflow/mine': (await get<Obj>(`${W}/mine?origin=yours`)).body.status.revision,
-    'agent/implementer': (await get<Obj>('/api/namespaces/default/agents/implementer?origin=yours')).body.status.revision,
-    'skill/notes': (await get<Obj>('/api/namespaces/default/skills/notes?origin=yours')).body.status.revision,
+    'workflow/mine': (await get<Obj>(`${W}/mine?origin=user`)).body.status.revision,
+    'agent/implementer': (await get<Obj>('/api/namespaces/default/agents/implementer?origin=user')).body.status.revision,
+    'skill/notes': (await get<Obj>('/api/namespaces/default/skills/notes?origin=user')).body.status.revision,
   });
   const first = await pinnedAtStart();
   assert.deepEqual(

@@ -2,9 +2,9 @@
  * `nemia workflows write (yours | factory) <name> --folder <draft> [--factory <f>] [--version <v>]`: the draft folder's own files read
  * here (`folderFiles`), read into the workflow's spec by the api (`workflows.read`, which writes nothing; on `factory`, read for the
  * factory, `?factory=`, so a step it hires an agent into reads as a run there reads it), then written in `default`:
- * made (`workflows.create`) with no `--version`, else written whole at it (`workflows.replace`), its files merged first over the ones the
- * workflow has now (`workflows.get`), so a file the draft does not carry is left, as its help says. On `factory`, the same object is
- * proposed to the factory (`proposalMade`).
+ * made (`workflows.createLibrary`) with no `--version`, else written whole at it (`workflows.replaceLibrary`), its files merged first over
+ * the ones the workflow has now (`workflows.get`), so a file the draft does not carry is left, as its help says. On `factory`, the same
+ * object is proposed to the factory (`proposalMade`).
  */
 import { type Args, WORKFLOWS_WRITE_WORDS, type WorkflowFile, type WorkflowSpec } from 'objects';
 import { asked } from '../objects.ts';
@@ -57,8 +57,8 @@ export async function workflowsWrite(args: Args): Promise<number> {
     });
   const written = await asked(COMMAND, (c) =>
     version === undefined
-      ? c.workflows.create({ params: { namespace }, payload: { metadata: { name }, spec } })
-      : c.workflows.replace({ params: { namespace, name }, payload: { metadata: { resourceVersion: version }, spec } }),
+      ? c.workflows.createLibrary({ payload: { metadata: { name }, spec } })
+      : c.workflows.replaceLibrary({ params: { name }, payload: { metadata: { resourceVersion: version }, spec } }),
   );
   process.stdout.write(writtenLine('workflows', written.metadata.name, version === undefined, written.metadata.resourceVersion));
   return 0;

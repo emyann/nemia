@@ -76,11 +76,11 @@ export default {
    * page takes back the factory and the agent.
    */
   name: 'step-hire',
-  route: `/workflows/yours/${WORKFLOWS.yours.name}/plan`,
+  route: `/workflows/user/${WORKFLOWS.yours.name}/plan`,
   expect: async (page) => {
     const theme = await themeOf(page);
     const { yours, good } = WORKFLOWS;
-    const step = `/workflows/yours/${yours.name}/plan`;
+    const step = `/workflows/user/${yours.name}/plan`;
     const takeBack = written();
     try {
       await expectCount(page.locator('[data-step-hire]'), 0, 'with no factory picked, the step says nothing of a hire');
@@ -90,7 +90,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `step-hire-default-${theme}.png`));
 
-      await goto(page, `/workflows/yours/${yours.name}?factory=${FACTORY}`);
+      await goto(page, `/workflows/user/${yours.name}?factory=${FACTORY}`);
       const row = page.locator('[data-step-hire="plan"]');
       await expectVisible(row.locator('[data-hire-picker]'), "the workflow page's row of plan offers a picker");
       await expectVisible(row.locator('[data-new-agent]'), 'and New agent');

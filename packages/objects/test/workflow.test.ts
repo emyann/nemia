@@ -44,7 +44,7 @@ const workflow = {
   },
 } as const;
 
-const shadowed = { ...workflow, status: { ...workflow.status, origin: 'yours', shadowedBy: 'repo' } };
+const shadowed = { ...workflow, status: { ...workflow.status, origin: 'user', shadowedBy: 'repo' } };
 
 test("the Api's get answers a workflow and its list a page of them, every key kept, absent keys left absent; another kind refused", () => {
   assert.deepEqual(answered('workflows', 'get', workflow), workflow);
@@ -63,7 +63,7 @@ test('REFUSED: a node without its kind, a kind outside the words, a graph withou
   assert.throws(() => decode(withGraph({ ...graph, nodes: [{ name: 'design', kind: 'gate' }] })), 'a kind is one of NODE_KINDS');
   assert.throws(() => decode(withGraph({ roots: graph.roots, edges: graph.edges })), "a workflow's graph always has its nodes");
   assert.throws(() => decode({ ...workflow, status: { ...workflow.status, origin: 'tree' } }), 'the tree is the origin `factory`');
-  assert.deepEqual(DEFINITION_ORIGINS, ['factory', 'repo', 'yours', 'builtin']);
+  assert.deepEqual(DEFINITION_ORIGINS, ['factory', 'repo', 'user', 'builtin']);
 });
 
 test('every edge kind of EDGE_KINDS is one GraphEdge reads, and no other', () => {

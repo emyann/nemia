@@ -77,23 +77,65 @@ function filledIn(from: FillPlace, dir: string, workflow: string, hires: Readonl
  */
 export function stepsFilled(repo: string | undefined, home: string, factory?: Factory): FilledStep[] {
   const places: Places = repo === undefined ? { home } : { repo, home };
+  return workflowsFilled(repo, home, factory).flatMap(({ from, dir, workflow }) => {
+    const hires = new Map(factory ? Object.entries(fillsOf(factory.hires, workflow)) : []);
+    return filledIn(from, dir, workflow, hires, places);
+  });
+}
+
+/** The folders of the workflows `factory` fills on `repo`, each with its place and name, as `stepsFilled` reads them. */
+function workflowsFilled(
+  repo: string | undefined,
+  home: string,
+  factory: Factory | undefined,
+): Array<{ from: FillPlace; dir: string; workflow: string }> {
   const tree = factory?.tree;
   const sources: Array<{ from: FillPlace; dir: string }> = [
     ...(tree === undefined ? [] : [{ from: 'factory' as const, dir: path.join(tree, 'workflows') }]),
     ...(repo === undefined ? [] : [{ from: 'repo' as const, dir: path.join(repo, 'workflows') }]),
-    { from: 'yours', dir: path.join(home, 'workflows') },
+    { from: 'user', dir: path.join(home, 'workflows') },
   ];
   const read = new Set<string>();
   return sources.flatMap(({ from, dir }) =>
     foldersIn(dir)
       .filter((workflow) => !factory || factory.workflows.includes(workflow))
       .filter((workflow) => tree === undefined || !read.has(workflow))
-      .flatMap((workflow) => {
+      .map((workflow) => {
         read.add(workflow);
-        const hires = new Map(factory ? Object.entries(fillsOf(factory.hires, workflow)) : []);
-        return filledIn(from, path.join(dir, workflow), workflow, hires, places);
+        return { from, dir: path.join(dir, workflow), workflow };
       }),
   );
+}
+
+/**
+ * The skills each step `factory` fills on `repo` names on its own `skills:` line, beside its agent's, in the order they are listed. Throws
+ * where a place's folder cannot be listed, as `stepsFilled` does.
+ * @param repo The repository read, or undefined for the store's workflows alone.
+ * @param home The store's root.
+ * @param factory The factory whose workflows are read, or undefined for every workflow.
+ */
+export function stepSkillsNamed(repo: string | undefined, home: string, factory?: Factory): string[] {
+  return workflowsFilled(repo, home, factory).flatMap(({ dir }) => {
+    let entries: string[];
+    try {
+      entries = fs.readdirSync(dir);
+    } catch {
+      return [];
+    }
+    return stepFiles(entries).flatMap((entry) => {
+      let text: string;
+      try {
+        text = fs.readFileSync(path.join(dir, entry), 'utf8');
+      } catch {
+        return [];
+      }
+      return (frontmatterKey(text, 'skills') ?? '')
+        .replace(/^\[|\]$/g, '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    });
+  });
 }
 
 /**

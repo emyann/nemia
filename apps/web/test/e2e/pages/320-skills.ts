@@ -19,7 +19,7 @@ export default {
    * the store as seeded.
    */
   name: 'skills',
-  route: `/agents/yours/${AGENTS.seeded.name}`,
+  route: `/agents/user/${AGENTS.seeded.name}`,
   expect: async (page) => {
     const { seeded, made } = AGENTS;
     const library = path.join(store!, 'workflows', 'skills');
@@ -75,11 +75,11 @@ export default {
       const sheet = page.getByRole('dialog', { name: 'Add a skill' });
       await expectTexts(
         sheet.locator('section[data-skill-place] h3'),
-        ['Your library', 'Built into Nemia'],
+        ['The user library', 'Built into Nemia'],
         'the sheet lists your library and what is built into Nemia, in the order an agent of yours finds a name, and no repository',
       );
       await expectCount(sheet.locator('section[aria-label="This repository"]'), 0, "no group of this repository's: the default reads none");
-      const scratch = sheet.locator('section[aria-label="Your library"] [data-offered-skill="scratch-e2e"]');
+      const scratch = sheet.locator('section[aria-label="The user library"] [data-offered-skill="scratch-e2e"]');
       await expectVisible(
         scratch.locator('[data-offer-refused]', { hasText: 'has no frontmatter' }),
         'a skill of your library with no frontmatter is listed, refused with its reason',
@@ -92,7 +92,7 @@ export default {
           builtIn.locator(`[data-offered-skill="${name}"]`).getByRole('button', { name: `Copy ${name} to my library and add` }),
           `${name} is offered as a copy into your library`,
         );
-      const offered = sheet.locator(`section[aria-label="Your library"] [data-offered-skill="${mine}"]`);
+      const offered = sheet.locator(`section[aria-label="The user library"] [data-offered-skill="${mine}"]`);
       await expectVisible(offered.locator('p', { hasText: /tokens/ }), `${mine} says what it costs a turn`);
       await settled(page);
       await photograph(page, path.join(OUT, `skills-sheet-${await themeOf(page)}.png`));
@@ -110,7 +110,7 @@ export default {
         );
 
       const given = form.locator(`[data-given-skill="${mine}"]`);
-      await expectVisible(given.locator('[data-skill-from="yours"]'), `${mine} is given, from your library`);
+      await expectVisible(given.locator('[data-skill-from="user"]'), `${mine} is given, from your library`);
       await expectVisible(given.locator('[data-skill-cost]', { hasText: /tokens/ }), 'with what it costs a turn');
 
       await form.getByRole('textbox', { name: 'Tools', exact: true }).fill('Read');
@@ -130,12 +130,9 @@ export default {
       await photograph(page, path.join(OUT, `skills-composed-${await themeOf(page)}.png`), { fullPage: true });
 
       const [saved] = await Promise.all([
-        page.waitForResponse(
-          (r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/namespaces/default/agents/${seeded.name}`,
-          {
-            timeout: WAIT_MS,
-          },
-        ),
+        page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/agents/${seeded.name}`, {
+          timeout: WAIT_MS,
+        }),
         form.getByRole('button', { name: 'Save' }).click(),
       ]);
       if (saved.status() !== 200) throw new Refused(`the api saves the agent — it answered ${saved.status()}: ${await saved.text()}`);

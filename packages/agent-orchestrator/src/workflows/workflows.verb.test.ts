@@ -73,7 +73,7 @@ test('a folder written from its steps through the entry is the folder its list a
     { name: 'plan', after: [], place: 'git' as const, body: 'Plan it.' },
     { name: 'build', after: ['plan'], place: 'git' as const, body: 'Build it.' },
   ];
-  const done = await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', draft })));
+  const done = await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'user', name: 'written', draft })));
   assert.deepEqual(done.written, ['build.md', 'plan.md']);
   assert.equal(fs.existsSync(dir), false, 'written to the memory layer, not the disk');
   const listed = await runWith(e(), onMemory(listedOf([dir])));
@@ -95,7 +95,7 @@ test('a step the folder does not have is none, with the names of those it has', 
   const onMemory = memoryOver();
   const dir = path.join(ROOT, 'workflows', 'one-step');
   const draft = [{ name: 'only', after: [], place: 'git' as const, body: 'Do it.' }];
-  await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'one-step', draft })));
+  await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'user', name: 'one-step', draft })));
   const read = await runWith(e(), onMemory(WORKFLOWS_STEP.handler({ name: 'one-step', step: 'other', dir })));
   assert.deepEqual(read, { step: null, steps: ['only'] });
 });
@@ -115,7 +115,7 @@ test("REFUSED: a draft the model's Workflow refuses is thrown as the door's Inva
     { name: 'plan', after: [], place: 'git' as const, body: 'Plan it.' },
     { name: 'plan', after: [], place: 'git' as const, body: 'Plan it again.' },
   ];
-  await assert.rejects(runWith(e(), WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', draft })), (err: Error) => {
+  await assert.rejects(runWith(e(), WORKFLOWS_WRITE.handler({ from: 'user', name: 'twice', draft })), (err: Error) => {
     assert.deepEqual([(err as { _tag?: string })._tag, (err as { exitCode?: number }).exitCode], ['Invalid', 2]);
     assert.ok(err.message.includes('plan.md'), err.message);
     return true;
@@ -132,7 +132,7 @@ function versionAt(dir: string): { version?: string } {
 
 /** The folder of yours `dir` removed through the entry, by its name, at the version it is at, as the api hands it. */
 const remove = (dir: string) =>
-  runWith(e(), WORKFLOWS_REMOVE.handler({ from: 'yours', name: path.relative(path.join(ROOT, 'workflows'), dir), ...versionAt(dir) }));
+  runWith(e(), WORKFLOWS_REMOVE.handler({ from: 'user', name: path.relative(path.join(ROOT, 'workflows'), dir), ...versionAt(dir) }));
 
 /** That removing `dir` is refused as `kind`, in exactly `message`, and the folder is still on disk. */
 async function refused(dir: string, kind: new (...args: never[]) => Error, message: string): Promise<void> {

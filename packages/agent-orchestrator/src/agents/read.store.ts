@@ -23,7 +23,16 @@ import {
   type SkillsFound,
 } from './agents.ts';
 import { lookedUp } from '../skills/skills.ts';
-import { folderForVersion, lookupOf, lookupRoots, readForVersion, skillsFor, type Places } from '../skills/read.store.ts';
+import {
+  addedIn,
+  folderForVersion,
+  libraryRootOf,
+  lookupOf,
+  lookupRoots,
+  readForVersion,
+  skillsFor,
+  type Places,
+} from '../skills/read.store.ts';
 
 /**
  * The file of a person's custom instructions for the agent `name`, in the store `home`: `<home>/custom-instructions/<name>.md`.
@@ -154,7 +163,10 @@ export function agentsFor(workflowDir: string, places: Places = {}): Agents {
   const loaded = roots.map((root) => loadAgents(path.join(root, AGENTS_FOLDER)));
   const found = new Map<string, Agent | WorkflowError>();
   for (const name of new Set(loaded.flatMap((agents) => [...agents.keys()]))) {
-    const looked = lookedUp(lookupOf(roots, (at) => loaded[at]?.has(name) === true));
+    const looked = lookedUp(
+      lookupOf(roots, (at) => loaded[at]?.has(name) === true, libraryRootOf(places)),
+      addedIn(places, 'agents', name),
+    );
     if (looked.kind === 'none') continue;
     const agent = loaded[looked.at]?.get(name);
     if (agent === undefined) continue;

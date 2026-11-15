@@ -100,6 +100,7 @@ test('REFUSED before any layer acts: a skill the model refuses — no descriptio
       there: () => ({ kind: 'none' }),
       write: unreached,
       copy: unreached,
+      remove: unreached,
       others: unreached,
     },
   };

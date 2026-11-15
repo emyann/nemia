@@ -41,12 +41,12 @@ function NewAgentPage() {
     mutationFn: (draft: AgentDraft) => createAgent(draft),
     onSuccess: async (saved) => {
       await invalidateAgents(queryClient);
-      if (!hireInto) return navigate({ to: '/agents/$from/$agent', params: { from: 'yours', agent: saved.agent.name } });
+      if (!hireInto) return navigate({ to: '/agents/$from/$agent', params: { from: 'user', agent: saved.agent.name } });
       const { factory, workflow, step } = hireInto;
       const made = await hireOnCreate(hireInto, saved.agent.name, hireAgent);
       await invalidateHires(queryClient);
       if (!made.hired) return setUnhired({ agent: saved.agent.name, why: made.why });
-      return navigate(workflowLink({ factory }, 'yours', workflow, step));
+      return navigate(workflowLink({ factory }, 'user', workflow, step));
     },
   });
   const refused = create.error instanceof AgentRefusal ? create.error : null;
@@ -67,7 +67,7 @@ function NewAgentPage() {
         listing={null}
         keyForm={keyForm}
         saving={create.isPending}
-        refusal={create.error && <AgentRefused message={create.error.message} users={refused?.users ?? []} from="yours" />}
+        refusal={create.error && <AgentRefused message={create.error.message} users={refused?.users ?? []} from="user" />}
         onSave={(draft) => create.mutate(draft)}
       />
     </article>
@@ -80,7 +80,7 @@ function HiredInto({ place: { factory, workflow, step } }: { place: HirePlace })
     <p data-hire-into={`${workflow}/${step}`} className="text-body-medium text-muted-foreground">
       Once created, {factory} hires it into{' '}
       <RouteLink
-        {...workflowLink({ factory }, 'yours', workflow, step)}
+        {...workflowLink({ factory }, 'user', workflow, step)}
         className="font-mono text-body-small text-foreground underline underline-offset-2"
       >
         {workflow}/{step}
@@ -104,11 +104,11 @@ function Unhired({ place: { factory, workflow, step }, agent, why }: { place: Hi
       </p>
       <p className="text-body-small whitespace-pre-wrap">{why}</p>
       <p className="text-body-small">
-        <RouteLink {...workflowLink({ factory }, 'yours', workflow, step)} className="underline underline-offset-2">
+        <RouteLink {...workflowLink({ factory }, 'user', workflow, step)} className="underline underline-offset-2">
           Back to the step
         </RouteLink>{' '}
         or{' '}
-        <RouteLink to="/agents/$from/$agent" params={{ from: 'yours', agent }} className="underline underline-offset-2">
+        <RouteLink to="/agents/$from/$agent" params={{ from: 'user', agent }} className="underline underline-offset-2">
           open {agent}
         </RouteLink>
         .

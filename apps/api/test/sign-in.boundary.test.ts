@@ -108,7 +108,7 @@ test('a sign-in answers the address to open, then its state; a sign-out answers 
   assert.deepEqual(JSON.parse(connected.text), { state: 'connected' });
   const out = await asked(app, 'DELETE', `${URL}/github/sign-in`);
   assert.deepEqual([out.status, JSON.parse(out.text)], [200, { signedOut: true }]);
-  const read = await asked(app, 'GET', '/api/builtin/mcpservers');
+  const read = await asked(app, 'GET', '/api/mcpservers');
   const builtin = (JSON.parse(read.text) as { items: Array<{ metadata: { name: string }; spec: Record<string, unknown> }> }).items.map(
     (s) => ({ name: s.metadata.name, ...s.spec }),
   );

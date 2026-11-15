@@ -23,7 +23,7 @@ const storeNow = (): string[] => (fs.existsSync(root) ? (fs.readdirSync(root, { 
 test('a SKILL.md reads as the spec a GET of the same file in your library answers, named by its name:, and writes nothing', async () => {
   fs.mkdirSync(path.join(SKILLS, 'tidy'), { recursive: true });
   fs.writeFileSync(path.join(SKILLS, 'tidy', 'SKILL.md'), TIDY);
-  const got = await app.request('/api/namespaces/default/skills/tidy?origin=yours');
+  const got = await app.request('/api/namespaces/default/skills/tidy?origin=user');
   const skill = (await got.json()) as Skill;
   assert.equal(got.status, 200, JSON.stringify(skill));
   assert.equal(skill.status.error, null, 'the file written to yours reads');

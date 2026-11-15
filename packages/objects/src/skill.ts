@@ -46,10 +46,10 @@ export const SkillSpec = Schema.Struct({
 });
 export type SkillSpec = typeof SkillSpec.Type;
 
-/** An agent that gives a skill: its place — the factory's own, in its tree, the repository's or yours — and its name. */
+/** An agent that gives a skill: its place — the factory's own, in its tree, the repository's or the person's — and its name. */
 export const SkillUser = Schema.Struct({
-  from: Schema.Literals(['factory', 'repo', 'yours']).annotate({
-    description: "The agent's place: the factory's own tree, the repository or yours.",
+  from: Schema.Literals(['factory', 'repo', 'user']).annotate({
+    description: "The agent's place: the factory's own tree, the repository or the person's library (`user`).",
   }),
   name: Schema.String.annotate({ description: "The agent's name." }),
 });
@@ -63,8 +63,8 @@ export const SkillStatus = Schema.Struct({
   preload: Schema.Boolean.annotate({ description: 'Whether it is loaded whole every turn.' }),
   cost: Schema.NullOr(SkillCost).annotate({ description: 'What it costs a turn; null where it cannot be counted.' }),
   usedBy: Schema.Array(SkillUser).annotate({ description: 'The agents that give it.' }),
-  found: Schema.NullOr(Schema.Literals(['yours', 'repo'])).annotate({
-    description: 'Where a builtin skill is already found, yours or the repository; null where it is not.',
+  found: Schema.NullOr(Schema.Literals(['user', 'repo'])).annotate({
+    description: 'Where a builtin skill is already found, the user library or the repository; null where it is not.',
   }),
   copyHint: Text.annotate({ description: 'The command that copies it; null where there is none.' }),
 }).annotate({
@@ -88,8 +88,8 @@ export const SkillList = listOf('Skill', Skill);
 export type SkillList = typeof SkillList.Type;
 
 /**
- * A skill of yours made (`POST …/skills`, `metadata.name` its name) or written (`PUT …/skills/<name>`, `metadata.resourceVersion` the
- * version it was read at): its spec whole, or `preload` alone.
+ * A skill of the person's library made (`POST …/skills`, `metadata.name` its name) or written (`PUT …/skills/<name>`,
+ * `metadata.resourceVersion` the version it was read at): its spec whole, or `preload` alone.
  */
 export const SkillWrite = Schema.Union([
   Schema.Struct({ metadata: WriteMeta, spec: SkillSpec }),

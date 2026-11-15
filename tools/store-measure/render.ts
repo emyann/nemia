@@ -34,6 +34,9 @@ export const MEASURES = [
   'hireList',
   'volumeList',
   'mcpServerList',
+  'libraryAddList',
+  'libraryAgents',
+  'librarySkills',
   'ceilings',
   'ceilingsAfterPass',
 ] as const;

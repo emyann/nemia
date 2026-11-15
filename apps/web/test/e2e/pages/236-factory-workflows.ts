@@ -167,7 +167,7 @@ export default {
       );
       await expectVisible(page.locator('article h1', { hasText: SHADOW.step }), "and the tree's step is drawn there too");
 
-      await goto(page, `/workflows/yours/${yours.name}?factory=${TREED}&build=true`);
+      await goto(page, `/workflows/user/${yours.name}?factory=${TREED}&build=true`);
       const builder = page.locator(`section[data-builder="${yours.name}"]`);
       await expectVisible(builder, `one of yours opens its builder in ${TREED}, which hires into its step`);
       await expectCount(page.getByText('is listed with'), 0, 'drafted from the list read with no factory, so nothing is refused');
@@ -272,7 +272,7 @@ export default {
       await goto(page, '/workflows');
       await expectCount(card(OWN.name), 0, "with no factory picked, the tree's own workflow is not listed");
       await expectCount(card(good.name), 0, `nor the checkout's ${good.name}: the default factory works on no repository`);
-      await expectVisible(card(yours.name).getByText('yours', { exact: true }), `and ${yours.name}, yours, is`);
+      await expectVisible(card(yours.name).getByText('the user library', { exact: true }), `and ${yours.name}, yours, is`);
     } finally {
       takeBack();
     }

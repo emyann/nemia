@@ -45,7 +45,7 @@ export default {
       await expectVisible(listed, `${GOING} is listed`);
       await expectCount(page.locator('main').getByRole('button', { name: 'Remove…' }), 0, 'no card offers Remove: its page does');
       await listed.getByRole('heading').getByRole('link').click();
-      await page.waitForURL((url) => url.pathname === `/workflows/yours/${GOING}`, { timeout: WAIT_MS });
+      await page.waitForURL((url) => url.pathname === `/workflows/user/${GOING}`, { timeout: WAIT_MS });
       await idle(page);
       const card = cardOf(page);
       await card.getByRole('button', { name: 'Remove…' }).click();
@@ -66,12 +66,9 @@ export default {
 
       await card.getByRole('button', { name: 'Remove…' }).click();
       const [answered] = await Promise.all([
-        page.waitForResponse(
-          (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/namespaces/default/workflows/${GOING}`,
-          {
-            timeout: WAIT_MS,
-          },
-        ),
+        page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/workflows/${GOING}`, {
+          timeout: WAIT_MS,
+        }),
         card.getByRole('button', { name: 'Remove', exact: true }).click(),
       ]);
       if (answered.status() !== 200) throw new Refused(`the api removes the folder — it answered ${answered.status()}`);

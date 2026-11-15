@@ -62,6 +62,7 @@ export {
   type AttemptEnd,
   CHECK_RESULTS,
   DEFINITION_ORIGINS,
+  LIBRARY_KINDS,
   EDGE_KINDS,
   ENGINE_OUTCOMES,
   type EngineOutcome,
@@ -154,6 +155,8 @@ export type {
   TryCause,
   WaitOn,
   WriteWay,
+  LibraryAddStateWord,
+  LibraryKind,
 } from './words.ts';
 export {
   CARD_KEYS,
@@ -256,6 +259,7 @@ export { headline } from './headline.ts';
 export { Answered, apiClient, type ApiClient, type ApiClientOptions, READ_BOUND_MS, timedOut } from './api-client.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';
+export { LibraryAdd, LibraryAddList, LibraryAddSpec, LibraryAddStatus } from './library.ts';
 export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';
 export {
   Api,
@@ -784,6 +788,7 @@ export {
   AGENTS_SOURCES_WORDS,
   AGENTS_WORDS,
 } from './commands-definitions-agents.ts';
+export { LIBRARY_ADD_WORDS, LIBRARY_RM_WORDS, LIBRARY_WORDS } from './commands-library.ts';
 export { CLOSEOUT_WORDS, INBOX_READ_WORDS, LS_WORDS, READ_WORDS, SHOW_WORDS, WATCH_WORDS } from './commands-reads.ts';
 export { REST_WORDS } from './commands-rest.ts';
 export { CONCLUDED_WORDS, LAST_TAKES, LOGS_WORDS, MEMORY_WORDS, PASSES_WORDS, RANGE_TAKES, SERIES_WORDS } from './commands-rest-reads.ts';

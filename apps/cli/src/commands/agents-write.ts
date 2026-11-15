@@ -1,9 +1,9 @@
 /**
  * `nemia agents write (yours | factory) [<name>] --file <name>.md [--factory <f>] [--version <v>]`: the agent's file and the `*.json`
  * files beside it read here (`agentFiles`), read into the agent's spec by the api (`agents.read`, which writes nothing, and refuses a
- * result schema its `output:` names that was not sent), named by the file; then made in `default` (`agents.create`) with no
- * `--version`, else written at it (`agents.replace`) at `<name>`, renamed where the file names another. On `factory`, the same object
- * is proposed to the factory (`proposalMade`).
+ * result schema its `output:` names that was not sent), named by the file; then made in the user library (`agents.createLibrary`) with no
+ * `--version`, else written at it (`agents.replaceLibrary`) at `<name>`, renamed where the file names another. On `factory`, the same
+ * object is proposed to the factory (`proposalMade`).
  */
 import { AGENTS_WRITE_WORDS, type Args } from 'objects';
 import { asked } from '../objects.ts';
@@ -40,8 +40,8 @@ export async function agentsWrite(args: Args): Promise<number> {
     });
   const written = await asked(COMMAND, (c) =>
     version === undefined
-      ? c.agents.create({ params: { namespace }, payload: { metadata: { name: target }, spec } })
-      : c.agents.replace({ params: { namespace, name: target }, payload: { metadata: { name: named, resourceVersion: version }, spec } }),
+      ? c.agents.createLibrary({ payload: { metadata: { name: target }, spec } })
+      : c.agents.replaceLibrary({ params: { name: target }, payload: { metadata: { name: named, resourceVersion: version }, spec } }),
   );
   process.stdout.write(writtenLine('agents', written.metadata.name, version === undefined, written.metadata.resourceVersion));
   return 0;

@@ -28,7 +28,7 @@ import { Api } from 'objects';
 import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
 import { cardsHandlers } from './cards.ts';
 import {
-  builtinHandlers,
+  libraryAddsHandlers,
   factoriesHandlers,
   hiresHandlers,
   mcpServersHandlers,
@@ -180,7 +180,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
         cardsHandlers,
         factoriesHandlers,
         mcpServersHandlers,
-        builtinHandlers,
+        libraryAddsHandlers,
         schedulesHandlers,
         hiresHandlers,
         volumesHandlers,

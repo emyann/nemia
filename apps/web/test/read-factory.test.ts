@@ -280,7 +280,7 @@ test("a factory's servers are McpServer objects beside Nemia's builtin ones, eac
         ...mcpServerObject(),
         metadata: { ...mcpServerObject().metadata, name: 'linear' },
       });
-    if (url.startsWith('/api/builtin/mcpservers'))
+    if (url.startsWith('/api/mcpservers'))
       return mcpServerList({ ...mcpServerObject(), metadata: { name: 'github', creationTimestamp: 'x', resourceVersion: 'y' } });
     return mcpServerObject();
   });

@@ -22,7 +22,7 @@ function NewSkillPage() {
     mutationFn: (draft: SkillDraft) => createSkill(draft),
     onSuccess: async (saved) => {
       await invalidateSkills(queryClient);
-      await navigate({ to: '/agents/skills/$from/$skill', params: { from: 'yours', skill: saved.skill.name } });
+      await navigate({ to: '/agents/skills/$from/$skill', params: { from: 'user', skill: saved.skill.name } });
     },
   });
 

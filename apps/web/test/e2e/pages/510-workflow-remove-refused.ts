@@ -28,15 +28,14 @@ export default {
       fs.writeFileSync(path.join(dir, 'plan.md'), '---\nplace: git\nharness: claude\n---\nWrite PLAN.md.\n');
       fs.writeFileSync(card, `---\nworkflow: ${dir}\nqueued: 2026-10-01T00:00:00.000Z\n---\nAn idea queued on it.\n`);
       const { problems } = watch(refused);
-      await refused.goto(new URL(`/workflows/yours/${NEEDED}`, page.url()).href, { waitUntil: 'load' });
+      await refused.goto(new URL(`/workflows/user/${NEEDED}`, page.url()).href, { waitUntil: 'load' });
       await idle(refused);
       const section = refused.locator(`article[aria-label="Workflow ${NEEDED}"]`);
       await section.getByRole('button', { name: 'Remove…' }).click();
       const [answered] = await Promise.all([
-        refused.waitForResponse(
-          (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/namespaces/default/workflows/${NEEDED}`,
-          { timeout: WAIT_MS },
-        ),
+        refused.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/workflows/${NEEDED}`, {
+          timeout: WAIT_MS,
+        }),
         section.getByRole('button', { name: 'Remove', exact: true }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };

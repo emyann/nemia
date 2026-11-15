@@ -96,8 +96,8 @@ export const RunStart = Schema.Struct({
   ...startExtras,
   workflow: notBlank('The workflow to run, by name.'),
   from: Schema.optionalKey(
-    Schema.Literals(['repo', 'yours']).annotate({
-      description: 'Where the workflow is read from when both the repository and your library have it: repo or yours.',
+    Schema.Literals(['repo', 'user']).annotate({
+      description: 'Where the workflow is read from when both the repository and the user library have it: repo or user.',
     }),
   ),
   after: Schema.optionalKey(Schema.Array(NotBlank).annotate({ description: 'The runs its first steps wait on to land (--after), by id.' })),

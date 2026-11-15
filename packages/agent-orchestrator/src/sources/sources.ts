@@ -4,7 +4,7 @@
  */
 
 /** Where an agent file was found: a repository the store knows, the person's library, or the folder they named. */
-export type AgentSourcePlace = 'repository' | 'library' | 'path';
+export type AgentSourcePlace = 'repository' | 'library' | 'harness' | 'path';
 
 /**
  * One agent file the store knows of: where it was found (`place`, and `repo` for a repository's), its folder and file, its name, what it

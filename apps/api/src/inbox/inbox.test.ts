@@ -523,7 +523,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       );
       const yours = await filedFrom(await file({ body: 'Plan the inbox', workflow: 'mine' }));
       assert.deepEqual([yours.workflow, yours.repo], ['mine', null], 'yours: by its name too, never a folder');
-      for (const from of ['repo', 'yours'] as const) {
+      for (const from of ['repo', 'user'] as const) {
         assert.equal(
           (await filedFrom(await file({ body: `Both, said ${from}`, workflow: 'both', from }))).workflow,
           'both',

@@ -11,9 +11,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
+import { REAL_HOME } from './ambient.ts';
+import { userAgentFolders } from '../src/runtime-client.ts';
 import { anAgent } from './agent-walks.ts';
 import { aSkill } from './skill-walks.ts';
 import { teamCopy } from './team.ts';
@@ -25,6 +28,7 @@ import { runWith as runEngine, startRun } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import { AGENTS_COPY } from '../src/sources/copy.verb.ts';
+import { AGENTS_SOURCES } from '../src/sources/sources.verb.ts';
 import { agentsRead as agentsReadAt } from '../src/roster/roster.store.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { agentSources } from '../src/sources/sources.store.ts';
@@ -223,6 +227,28 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
       await assert.rejects(sourcesAt({ at: path.join(home, 'none'), home }), refusedWith('Missing', 'none is not a folder'));
     },
   );
+
+  await s.test('nemia agents sources lists the agents a harness keeps for its user, and a folder named from ~ under the home', async () => {
+    assert.notEqual(os.homedir(), REAL_HOME, "the test's home is a throwaway, never the person's");
+    const home = scratch('wf-agents-copy-harness-');
+    const [kept] = userAgentFolders();
+    assert.ok(kept !== undefined);
+    fs.mkdirSync(kept.folder, { recursive: true });
+    fs.cpSync(path.join(teamCopy(), 'agents', 'implementer.md'), path.join(kept.folder, 'drafter.md'));
+    const { sources } = await stage.runWith(stage.board().e, Effect.provideService(AGENTS_SOURCES.handler({}), StoreRoot, home));
+    assert.deepEqual(
+      sources.filter((s) => s.place === 'harness').map((s) => [s.name, s.dir]),
+      [['drafter', kept.folder]],
+    );
+    const tilde = path.join(os.homedir(), 'agent-files');
+    fs.mkdirSync(tilde, { recursive: true });
+    fs.cpSync(path.join(teamCopy(), 'agents', 'implementer.md'), path.join(tilde, 'scout.md'));
+    const named = (await sourcesAt({ at: '~/agent-files', home })).sources.filter((s) => s.place === 'path');
+    assert.deepEqual(
+      named.map((s) => [s.name, s.dir]),
+      [['scout', tilde]],
+    );
+  });
 
   await s.test('nemia agents sources reads each folder through the Agent door: an agent only its memory holds is listed', async () => {
     const home = scratch('wf-agents-copy-home-');

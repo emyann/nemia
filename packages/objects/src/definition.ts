@@ -15,11 +15,22 @@ export const Origin = Schema.Literals(DEFINITION_ORIGINS);
  * it holds now (decision 25), read without a write, absent where the ledger cannot number it.
  */
 export const definitionStatus = {
-  origin: Origin.annotate({ description: 'Where it was read from: the factory, the repository, yours or a builtin.' }),
+  origin: Origin.annotate({ description: "Where it was read from: the factory, the repository, the person's library or a builtin." }),
   shadowedBy: Schema.optionalKey(
     Origin.annotate({ description: 'The origin that holds its name first in the namespace; absent where none does.' }),
   ),
   revision: Schema.optionalKey(describedNumber("The ledger's number for what it holds now; absent where the ledger cannot number it.")),
+  factories: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description:
+        "On a library definition read at the store's level, the factories that use it: each that has added it or fills a step with it.",
+    }),
+  ),
+  builtinChanged: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description: "On the person's copy of a builtin, true where the builtin has changed since the copy was made; absent otherwise.",
+    }),
+  ),
 };
 
 /** A skill as an A2A Agent Card entry: what a card says an agent can do. */

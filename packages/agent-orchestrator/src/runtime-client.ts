@@ -130,6 +130,8 @@ export { trustedFolder } from 'agent-runtime';
  * under the repository the place answered for the folder; each `undefined` for a harness that keeps no trust.
  */
 export { folderTrust, trustFolder, type FolderTrust, type FolderTrusted } from 'agent-runtime';
+/** Where each harness keeps its user's own agent files, listed as the sources' `harness` place. */
+export { userAgentFolders } from 'agent-runtime';
 /**
  * One MCP server a factory records and a harness is handed (`RemoteMcpServer`), and the one producer of its bytes (`mcpServerOf`): the
  * record carries the server's wire facts, and the runtime spells them in the one key order a sign-in is filed under.

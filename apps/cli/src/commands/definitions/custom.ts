@@ -51,7 +51,7 @@ export async function agentsCustom(args: Args): Promise<number> {
   const name = textArg(args, 'name') ?? '';
   const file = textArg(args, 'file');
   const hers = name === STORE_AGENT;
-  const params = { namespace: DEFAULT_NAMESPACE, name };
+  const params = { name };
   if (switchArg(args, 'clear')) {
     said(
       clearedLines(
@@ -75,7 +75,11 @@ export async function agentsCustom(args: Args): Promise<number> {
   }
   said(
     readLines(
-      await asked(COMMAND, (c) => (hers ? c.nemia.instructions() : onRepo(args, (query) => c.agents.instructions({ params, query })))),
+      await asked(COMMAND, (c) =>
+        hers
+          ? c.nemia.instructions()
+          : onRepo(args, (query) => c.agents.instructions({ params: { namespace: DEFAULT_NAMESPACE, name }, query })),
+      ),
     ),
   );
   return 0;

@@ -878,6 +878,14 @@ wins over the store's, and a workflow of the store finds its own first. A name o
 is refused, naming both. A folder team, which has no repository, reads the `.claude/` of the directory it was started from. Where no
 place has a name, Nemia's own skills are looked in last: the place's (`place/`, `PLACE_SKILLS`), then its builtin skills (`skills/`,
 `BUILTIN_SKILLS`), the two sharing no name. A step still names every skill it takes: nothing of Nemia's loads unnamed.
+
+The store's `workflows/` and Nemia's builtins are the store's library, served in no namespace (`/api/skills`, `/api/agents`,
+`/api/mcpservers`, `/api/workflows`), and a factory reads from it only what it has added (`nemia library add <kind> <name> --factory
+<factory>`, a LibraryAdd of its namespace, recorded in `factories/<name>/library.json`). A factory with no such record reads the library
+whole, its adds derived from what its workflows resolve today — the agents its steps run, the skills they give and the skills a step
+names itself — and its first add writes those with the new one, so nothing it ran is lost. A record that does not read gates every
+name. `nemia library --factory <factory>` lists a factory's adds, each `resolved`, `shadowed` by its own tree or repository, or
+`missing` from the library with the fix.
 `agentVersion` digests each skill it gives, every file of its folder, so an edit moves the agent's version and the board's save
 refuses a stale read.
 

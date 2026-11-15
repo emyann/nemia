@@ -38,6 +38,16 @@ export const McpServerStatus = Schema.Struct({
   ),
   tools: Schema.optionalKey(describedNumber('How many tools the server offers.')),
   error: Schema.optionalKey(Schema.String.annotate({ description: 'Why it failed; absent where it did not.' })),
+  origin: Schema.optionalKey(
+    Schema.Literals(['user', 'builtin']).annotate({
+      description: "Where a library server is kept: the user library, or Nemia's builtins; absent on a factory's own server.",
+    }),
+  ),
+  factories: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description: "The factories that add a library server, which a removal of it is refused for; absent on a factory's own server.",
+    }),
+  ),
 });
 export type McpServerStatus = typeof McpServerStatus.Type;
 

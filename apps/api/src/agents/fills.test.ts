@@ -98,15 +98,15 @@ test("a step's written agent counts in a factory only when the factory attaches 
 test("a hire is credited to the file a start would run, the workflow's own agents/ before yours, and yours when the repository has none", async () => {
   const listed = await agents();
   assert.deepEqual(one(listed, 'repo', 'ada').factories, ['hired']);
-  assert.deepEqual([one(listed, 'yours', 'ada').fills, one(listed, 'yours', 'ada').factories], [[], []]);
+  assert.deepEqual([one(listed, 'user', 'ada').fills, one(listed, 'user', 'ada').factories], [[], []]);
 
   const theirs = path.join(repoR, 'workflows', 'agents', 'ada.md');
   const text = fs.readFileSync(theirs, 'utf8');
   fs.rmSync(theirs);
   try {
     const fallen = await agents('hired');
-    assert.deepEqual(one(fallen, 'yours', 'ada').fills, [{ from: 'repo', workflow: 'alpha', step: 'implement', hired: true }]);
-    assert.deepEqual(one(await agents(), 'yours', 'ada').factories, ['hired']);
+    assert.deepEqual(one(fallen, 'user', 'ada').fills, [{ from: 'repo', workflow: 'alpha', step: 'implement', hired: true }]);
+    assert.deepEqual(one(await agents(), 'user', 'ada').factories, ['hired']);
   } finally {
     fs.writeFileSync(theirs, text);
   }
@@ -114,15 +114,15 @@ test("a hire is credited to the file a start would run, the workflow's own agent
 
 test("the repository's .claude/agents/ comes before yours: a hire it answers is not credited to yours of the same name", async () => {
   assert.deepEqual(await agents('shadow'), [], "the repository's max is not on the page, and yours does not fill it");
-  const max = one(await agents(), 'yours', 'max');
+  const max = one(await agents(), 'user', 'max');
   assert.deepEqual([max.fills, max.factories], [[], []]);
 });
 
 test('in the default factory every agent is listed, each tagged with the factories it fills a step in — on any repository of theirs', async () => {
   const listed = await agents();
-  assert.deepEqual(who(listed), ['repo:ada', 'repo:bo', 'repo:cleo', 'repo:iris', 'yours:ada', 'yours:max', 'yours:zed']);
-  assert.deepEqual(one(listed, 'yours', 'zed').factories, ['other'], 'hired by a factory on repoS, into a workflow of yours');
-  assert.deepEqual(one(listed, 'yours', 'zed').fills, [], 'the default factory hires no one');
+  assert.deepEqual(who(listed), ['repo:ada', 'repo:bo', 'repo:cleo', 'repo:iris', 'user:ada', 'user:max', 'user:zed']);
+  assert.deepEqual(one(listed, 'user', 'zed').factories, ['other'], 'hired by a factory on repoS, into a workflow of yours');
+  assert.deepEqual(one(listed, 'user', 'zed').fills, [], 'the default factory hires no one');
   assert.deepEqual(one(listed, 'repo', 'iris').factories, ['hired'], 'named by a step of a workflow hired attaches');
   assert.deepEqual(one(listed, 'repo', 'cleo').factories, [], 'named only in gamma, which no factory attaches');
   assert.deepEqual(one(listed, 'repo', 'cleo').fills, [{ from: 'repo', workflow: 'gamma', step: 'plan', hired: false }]);
@@ -132,7 +132,7 @@ test('a factory whose file does not read tags nothing, and hides no other', asyn
   write(path.join(root, 'factories', 'broken.json'), '{ not json');
   try {
     const listed = await agents();
-    assert.deepEqual(one(listed, 'yours', 'zed').factories, ['other']);
+    assert.deepEqual(one(listed, 'user', 'zed').factories, ['other']);
     assert.deepEqual(one(listed, 'repo', 'ada').factories, ['hired']);
   } finally {
     fs.rmSync(path.join(root, 'factories', 'broken.json'));

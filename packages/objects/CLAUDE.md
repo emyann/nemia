@@ -34,9 +34,11 @@ orchestrator, the api, the board and the client import it through its one entry,
   page shows under it on its own (`apps/api/src/openapi/openapi.ts`). `test/described-endpoints.test.ts` refuses an endpoint with none
   and one that copies a help line of a command that links it; its baseline, `test/described-endpoints.baseline.json`, only shrinks.
 
-- **`nemia/v1` is additions only.** A key added to an object is optional, and no key changes its meaning or its type under the same
-  `apiVersion`: a reader of an older store, or an older client, reads the object still. A change that breaks a reader is a new
-  version beside this one, never an edit of it.
+- **`nemia/v1` is additions only once it has a client besides the owner's board, CLI and MCP port.** Until then a break is done at
+  once, with no alias, the three moved in the same change, and said beside the word it breaks (the origin `user`, once spelled
+  otherwise, and the write way `library`). From then on a key added to an object is optional, and no key changes its meaning or its
+  type under the same `apiVersion`: a reader of an older store, or an older client, reads the object still, and a change that breaks a
+  reader is a new version beside this one, never an edit of it.
 - **It imports `effect` and nothing else**: no workspace package, no node built-in, no path out of `src` but a contract's type
   (`import type` of `../contracts/<name>.contract.ts`, which the verifier proves the function by: `discovery.ts`'s `resourcesOf`). The
   board runs it in a browser, and the layers above share it, so a reach to any of them would be a cycle. The lint block for

@@ -52,7 +52,7 @@ import { runPlaced } from '../store.ts';
 import type { DefinitionOrigin, StepKeys, WorkflowFile } from 'objects';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
-export type WorkflowSource = Extract<DefinitionOrigin, 'repo' | 'yours'>;
+export type WorkflowSource = Extract<DefinitionOrigin, 'repo' | 'user'>;
 
 /** A list as the board holds it, writable: objects' Schemas read a list as `readonly`. */
 type Writable<T> = T extends readonly (infer U)[] ? U[] : T;
@@ -184,7 +184,7 @@ export const stepSourceOf = (dir: string, name: string): string => fs.readFileSy
 export const sourcesOf = (repo: string, home: string, tree?: string): Array<{ from: WorkflowSource; dir: string }> => [
   ...(tree !== undefined ? [{ from: 'repo' as const, dir: path.join(tree, 'workflows') }] : []),
   { from: 'repo', dir: path.join(repo, 'workflows') },
-  { from: 'yours', dir: path.join(home, 'workflows') },
+  { from: 'user', dir: path.join(home, 'workflows') },
 ];
 
 /** The first of `found` from each source: the folder a tree shadows is no second one. */

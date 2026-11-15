@@ -291,7 +291,7 @@ async function startMarkup(folderTeam: boolean, repo?: string): Promise<string> 
   const { StartRun } = await import('../src/components/run/StartRun.tsx');
   const workflow = {
     name: 'note',
-    from: 'yours' as const,
+    from: 'user' as const,
     dir: '/home/me/.agent-workflows/workflows/note',
     description: null,
     readme: null,
@@ -342,7 +342,7 @@ test("a try's run is tagged try and names the agent it tried, linked to its page
     createElement(StartedFrom, { run: { workflowDir: '/store/tries/scribe', workflowPage: null, try: { agent: 'scribe' } } }),
   );
   assert.match(html, /data-try-tag="scribe"[^>]*>try</);
-  assert.match(html, /href="\/agents\/yours\/scribe"/);
+  assert.match(html, /href="\/agents\/user\/scribe"/);
   assert.doesNotMatch(html, /data-workflow=/, 'its folder is on no page');
   const other = await routedWith(
     createElement(StartedFrom, { run: { workflowDir: '/store/workflows/notes', workflowPage: null, try: null } }),
@@ -354,12 +354,12 @@ test("a try's run is tagged try and names the agent it tried, linked to its page
     createElement(StartedFrom, {
       run: {
         workflowDir: '/store/workflows/notes',
-        workflowPage: { from: 'yours', workflow: 'notes', factory: 'nemia', repo: '/code/app' },
+        workflowPage: { from: 'user', workflow: 'notes', factory: 'nemia', repo: '/code/app' },
         try: null,
       },
     }),
   );
-  assert.match(paged, /href="\/factories\/nemia\/workflows\/yours\/notes\?repo=%2Fcode%2Fapp"/, paged);
+  assert.match(paged, /href="\/factories\/nemia\/workflows\/user\/notes\?repo=%2Fcode%2Fapp"/, paged);
 });
 
 /** A run's card on the floor, inside the router its title links with, as the floor draws it: shown in the bar or not (`inspected`). */

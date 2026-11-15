@@ -3,13 +3,19 @@
  * (`mcpServerList`), one (`mcpServerObject`), each header masked — recorded (`nemia factory server add`, a header sent as the mask keeping
  * the value stored, `headerWritten`) and taken off (`server rm`), each answered with what it wrote (`written`); its sign-in to one
  * started, read, completed with the address a person's browser landed on (the body's `url`, which no answer or log carries) and signed out
- * (`serverSignIn`, `serverSignInState`, `serverSignInCallback`, `serverSignOut`), each writing the harness's own store; and Nemia's
- * builtin servers (`builtinServerList`), a spec each and no namespace.
+ * (`serverSignIn`, `serverSignInState`, `serverSignInCallback`, `serverSignOut`), each writing the harness's own store; and the store's
+ * library of servers, in no namespace (`/api/mcpservers`): the user library's beside Nemia's builtins, each with the factories that add
+ * it, kept at the store's level, a builtin never removed and one a factory adds refused its removal naming each.
  */
 import { Effect } from 'effect';
 import {
   mcpServerTable,
-  builtinServerList,
+  libraryServerList,
+  libraryServerObjects,
+  libraryServerRemoved,
+  libraryServerThere,
+  libraryServerWritten,
+  libraryUsers,
   FACTORY_SERVER_ADD,
   FACTORY_SERVER_RM,
   mcpServerList,
@@ -21,10 +27,11 @@ import {
   serverSignOut,
   Invalid as Refused,
 } from 'agent-orchestrator';
-import { Api } from 'objects';
+import { Api, Missing } from 'objects';
 import type { Served } from '../../layer.ts';
 import { factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
+import { writeGoes } from '../../definitions/served.ts';
 import { wantsTable } from '../../objects/table.ts';
 import { readsBounded } from '../../objects/answer-bound.ts';
 
@@ -39,11 +46,38 @@ const named = (route: string, namespace: string, name: string): void => {
   if (wrong !== undefined) throw new Refused({ message: `${route}: ${wrong}` });
 };
 
+/** The library's server `name`, read now; `Missing` naming the list where the library holds none. */
+const libraryServerIn = (s: Served, name: string) => {
+  const found = libraryServerObjects(s.home).find((one) => one.metadata.name === name);
+  if (found === undefined)
+    throw new Missing({
+      error: `the library holds no server ${name}: list them with GET /api/mcpservers, or record it with PUT /api/mcpservers/${name}.`,
+    });
+  return found;
+};
+
 /** The server `name` of `namespace`, read now. */
 const serverIn = (s: Served, namespace: string, name: string) => s.inRequest(mcpServerObject(s.home, namespace, name));
 
 export const mcpServersHandlers = readsBounded(Api, 'mcpservers', (handlers) =>
   handlers
+    .handle('listLibrary', ({ query }) => answered((s) => s.inRequest(libraryServerList(s.home, queryOf(query)))))
+    .handle('getLibrary', ({ params: { name } }) => answered(async (s) => libraryServerIn(s, name)))
+    .handle('putLibrary', ({ params: { name }, payload }) =>
+      answered(async (s) => {
+        writeGoes('library', libraryServerThere(s.home, name) === 'none' ? 'create' : 'replace', libraryServerThere(s.home, name));
+        libraryServerWritten(s.home, name, payload);
+        return libraryServerIn(s, name);
+      }),
+    )
+    .handle('deleteLibrary', ({ params: { name } }) =>
+      answered(async (s) => {
+        writeGoes('library', 'remove', libraryServerThere(s.home, name), libraryUsers(s.home, { kind: 'McpServer', name }));
+        const server = libraryServerIn(s, name);
+        libraryServerRemoved(s.home, name);
+        return server;
+      }),
+    )
     .handle('list', ({ params: { namespace }, query }) =>
       Effect.flatMap(wantsTable, (table) =>
         answered(async (s) => {
@@ -98,8 +132,4 @@ export const mcpServersHandlers = readsBounded(Api, 'mcpservers', (handlers) =>
         return s.inRequest(serverSignOut(namespace, name, s.home));
       }),
     ),
-);
-
-export const builtinHandlers = readsBounded(Api, 'builtin', (handlers) =>
-  handlers.handle('mcpservers', ({ query }) => answered((s) => s.inRequest(builtinServerList(queryOf(query))))),
 );

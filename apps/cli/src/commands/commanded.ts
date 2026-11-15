@@ -9,6 +9,7 @@ import { type Args, COMMAND_WORDS, CommandRefused, helpOf, type MovedCommand, pa
 import { Refused } from '../refused.ts';
 import { agentsWrite } from './agents-write.ts';
 import { DEFINITION_RUNNERS } from './definitions/runners.ts';
+import { LIBRARY_RUNNERS } from './library/runners.ts';
 import { FACTORY_RUNNERS } from './factories/runners.ts';
 import { INBOX_RUNNERS } from './inbox/runners.ts';
 import { READ_RUNNERS } from './reads/runners.ts';
@@ -27,6 +28,7 @@ const RUNNERS: Readonly<Record<MovedCommand, Runner>> = {
   'agents write': agentsWrite,
   'skills write': skillsWrite,
   ...DEFINITION_RUNNERS,
+  ...LIBRARY_RUNNERS,
   ...READ_RUNNERS,
   ...REST_RUNNERS,
 };

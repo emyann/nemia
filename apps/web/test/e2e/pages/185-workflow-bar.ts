@@ -112,17 +112,20 @@ async function presses(page: Page): Promise<void> {
   await expectSpec(page, 'repo', good.name, WAITS, `a click on ${WAITS}'s node then switches the bar to it`);
   await settled(page);
   const [mine] = yours.steps;
-  await visit(page, `/factories/${hiring.name}/workflows/yours/${yours.name}?bar=spec:repo/${good.name}/${WAITS}`);
+  await visit(page, `/factories/${hiring.name}/workflows/user/${yours.name}?bar=spec:repo/${good.name}/${WAITS}`);
   await expectVisible(specBar(page, 'repo', good.name, WAITS), `the bar showing ${WAITS} stays open on ${yours.name}'s page`);
   await nodeOf(page, yours.name, mine).click();
   const theirs = await expectSpec(
     page,
-    'yours',
+    'user',
     yours.name,
     mine,
     `a click on ${mine}'s node, on ${yours.name}'s page, switches the bar to it`,
   );
-  await expectVisible(theirs.getByText(`a step of ${yours.name} · yours`), `and says it is a step of ${yours.name}, yours`);
+  await expectVisible(
+    theirs.getByText(`a step of ${yours.name} · the user library`),
+    `and says it is a step of ${yours.name}, the user library's`,
+  );
   await settled(page);
   await clickPane(page, yours.name);
   await expectNoBar(page, 'a click on the empty canvas closes the bar');
@@ -160,9 +163,9 @@ async function opens(page: Page): Promise<void> {
  */
 async function builds(page: Page): Promise<void> {
   const [mine] = yours.steps;
-  await visit(page, pageOf('yours', yours.name));
+  await visit(page, pageOf('user', yours.name));
   await nodeOf(page, yours.name, mine).click();
-  await expectSpec(page, 'yours', yours.name, mine, `a click on ${mine}'s node shows it`);
+  await expectSpec(page, 'user', yours.name, mine, `a click on ${mine}'s node shows it`);
   await page.getByRole('button', { name: 'Build', exact: true }).focus();
   await page.keyboard.press('Enter');
   const builder = page.locator(`section[data-builder="${yours.name}"]`);

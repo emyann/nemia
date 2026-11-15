@@ -161,8 +161,35 @@
     },
     {
       "term": "Origin",
-      "meaning": "where a definition is read from, in the order a factory looks a name up: `factory`, the factory's own tree; `repo`, the repository's checkout; `yours`, your library; `builtin`, what Nemia builds in (`DEFINITION_ORIGINS`, `packages/objects/src/words.ts`).",
-      "type": "DefinitionOrigin"
+      "meaning": "where a definition is read from, in the order a factory looks a name up: `factory`, the factory's own tree; `repo`, the repository's checkout; `user`, the person's library; `builtin`, what Nemia builds in (`DEFINITION_ORIGINS`, `packages/objects/src/words.ts`).",
+      "type": "DefinitionOrigin",
+      "retired": [
+        {
+          "spelling": "yours",
+          "card": "library: a store-wide library a factory adds definitions from",
+          "kept": [
+            { "path": "packages/objects/src/card.ts", "why": "stored cards hold the retired `from` literal, read and ignored, so the schema still accepts it" },
+            { "path": "packages/objects/src/commands-factories-manual.ts", "why": "another sense: the person's own to edit, in a manual's prose" },
+            { "path": "packages/objects/src/commands-rest-pairing.ts", "why": "another sense: a token of the person's own, minted at a pairing" },
+            { "path": "packages/objects/src/commands-rest-tokens.ts", "why": "another sense: a token of the person's own, not an agent's" },
+            { "path": "packages/objects/src/commands-runs-answer.ts", "why": "another sense: words said as the person, never as an agent" }
+          ]
+        }
+      ]
+    },
+    {
+      "term": "Library",
+      "meaning": "the store's one library of skills, agents, MCP servers and workflows, served in no namespace (`/api/skills`, `/api/agents`, `/api/mcpservers`, `/api/workflows`): the person's items (origin `user`) beside what Nemia ships (`builtin`). A factory resolves a library item only once it has added it."
+    },
+    {
+      "term": "LibraryAdd",
+      "meaning": "a factory's live reference to one library item, its kind and its name, served in the factory's namespace as `<kind>.<name>` and proposable like a Hire (`LibraryAdd`, `packages/objects/src/library.ts`). A factory with no record of its adds has those its workflows resolve today.",
+      "type": "LibraryKind"
+    },
+    {
+      "term": "Library add state",
+      "meaning": "what an add is in its factory: `resolved`, `shadowed` by the factory's own tree or repository, or `missing` from the library (`LIBRARY_ADD_STATES`, `packages/objects/src/words.ts`).",
+      "type": "LibraryAddStateWord"
     },
     {
       "term": "Shadowed",

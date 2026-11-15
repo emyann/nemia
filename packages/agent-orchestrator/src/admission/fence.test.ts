@@ -96,14 +96,15 @@ test("REFUSED for an agent: a factory's definition written by hand is out of her
     assert.ok(denied(line), line);
   assert.ok(!denied('nemia factory rules acme'), 'the rules still read bare');
   const asked = (line: string) => fence.ask.some((rule) => reaches(rule, line));
+  const allowed = (line: string) => fence.allow.some((rule) => reaches(rule, unassigned(line)));
   for (const line of [
-    'nemia workflows write yours build --folder d',
-    'nemia agents write yours implementer --file implementer.md',
-    'nemia agents rm yours implementer',
+    'nemia workflows write user build --folder d',
+    'nemia agents write user implementer --file implementer.md',
     'nemia agents copy implementer',
   ])
-    assert.ok(asked(line) && !denied(line), `the person's library, which no proposal carries, asks as before: ${line}`);
-  const allowed = (line: string) => fence.allow.some((rule) => reaches(rule, unassigned(line)));
+    assert.ok(allowed(line) && !asked(line) && !denied(line), `the person's library, made and edited, acts: ${line}`);
+  for (const line of ['nemia agents rm user implementer'])
+    assert.ok(asked(line) && !denied(line), `a removal from the person's library asks: ${line}`);
   assert.ok(allowed('nemia propose -f change.yaml -n acme'));
   assert.ok(allowed('nemia proposals approve implementer-ab12c -n acme'));
   assert.ok(!denied('nemia propose -f change.yaml -n acme'));

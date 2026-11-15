@@ -13,7 +13,7 @@ test("RAIL_GROUPS and PANE_PLACES: the store rail's groups and the factory pane'
       RAIL_GROUPS.map((group) => [group.label, group.items.map((item) => item.label)]),
       [
         ['Across factories', ['Factories', 'Waiting']],
-        ['Yours', ['Agents', 'Skills']],
+        ['Yours', ['Agents', 'Skills', 'Library']],
         ['You', ['Stats', 'Settings']],
       ],
     );
@@ -40,13 +40,14 @@ test('seatOf: each page of the seat table at its level, under its destination or
       ['/workflows/repo/dev/review', 'agents'],
       ['/agents', 'agents'],
       ['/agents/new', 'agents'],
-      ['/agents/yours/a', 'agents'],
+      ['/agents/user/a', 'agents'],
       ['/agents/skills/new', 'skills'],
-      ['/agents/skills/yours/s', 'skills'],
+      ['/agents/skills/user/s', 'skills'],
       ['/capabilities', 'settings'],
       ['/settings', 'settings'],
       ['/setup', 'settings'],
       ['/tokens', 'settings'],
+      ['/library', 'library'],
       ['/stats', 'stats'],
       ['/chat', 'nemia'],
     ];
@@ -85,10 +86,10 @@ test('litOf, railHref and placeHref: what the rail lights, and where the rail an
     assert.equal(litOf(seatOf('/chat')), undefined, 'her face says her page');
     assert.equal(litOf(undefined), undefined);
   });
-  await t.test('each destination leads to its page, Skills to its section of the Agents page until the Library', () => {
+  await t.test('each destination leads to its page, Skills to its section of the Agents page, the Library to its own', () => {
     assert.deepEqual(
       RAIL_GROUPS.flatMap((group) => group.items).map((item) => railHref(item.id)),
-      ['/', '/runs', '/agents', '/agents#skills', '/stats', '/settings'],
+      ['/', '/runs', '/agents', '/agents#skills', '/library', '/stats', '/settings'],
     );
   });
   await t.test('each place leads under its factory’s path, the name escaped, the floor the path itself', () => {
@@ -109,8 +110,10 @@ test("pageNameOf: a page's head names its factory's place, else the store's page
     ['/labels/k/v', 'Runs'],
     ['/inbox/card', 'Inbox'],
     ['/workflows/repo/dev', 'Workflows'],
-    ['/agents/yours/a', 'Agents'],
+    ['/agents/user/a', 'Agents'],
     ['/agents/skills/new', 'Skills'],
+    ['/library', 'Library'],
+    ['/library/x', 'Library'],
     ['/stats', 'Stats'],
     ['/tokens', 'Settings'],
     ['/chat', 'Nemia'],

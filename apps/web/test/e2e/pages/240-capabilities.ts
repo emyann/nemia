@@ -35,6 +35,10 @@ async function unread(page: Page): Promise<void> {
     `picked, the factory ${FACTORIES.bare}'s repository is read`,
   );
   await expectVisible(page.locator('section[aria-label="Skills"]'), 'and its sections are drawn');
+  await expectVisible(
+    page.locator('[data-capabilities-library]').getByRole('link', { name: 'open the Library' }),
+    "the store's library counted beside it, linked to the Library",
+  );
 
   const read = await page.request.get(new URL('/api/capabilities?factory=default', page.url()).href);
   const { measured, readOnly } = (await read.json()) as { measured: unknown; readOnly: unknown };

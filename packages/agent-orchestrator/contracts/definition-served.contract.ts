@@ -65,14 +65,14 @@ const firstHolder = (found: readonly DefinitionFound[], name: string): Definitio
     ? 'factory'
     : holds(found, name, 'repo')
       ? 'repo'
-      : holds(found, name, 'yours')
-        ? 'yours'
+      : holds(found, name, 'user')
+        ? 'user'
         : holds(found, name, 'builtin')
           ? 'builtin'
           : undefined;
 
 /** The order a factory looks a name up in. */
-const LOOKUP: readonly DefinitionOrigin[] = ['factory', 'repo', 'yours', 'builtin'];
+const LOOKUP: readonly DefinitionOrigin[] = ['factory', 'repo', 'user', 'builtin'];
 
 const heldOriginsSpec = spec<(found: readonly DefinitionFound[], name: string) => DefinitionOrigin[]>({
   ensures: {

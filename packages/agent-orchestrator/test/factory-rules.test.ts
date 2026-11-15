@@ -173,7 +173,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     "a factory's page of a step loads it with the rules, and leaves out rules that cannot be told, refusing nothing",
     async () => {
       const step = async (): Promise<StepSpec> => {
-        const args = { from: 'yours', name: 'dev', step: 'implement', dir: here.dev, factory: 'pipao' };
+        const args = { from: 'user', name: 'dev', step: 'implement', dir: here.dev, factory: 'pipao' };
         return (await stage.runWith(stage.board().e, WORKFLOWS_STEP.handler(args))).step!;
       };
       clearRules(ROOT, { name: 'pipao' });

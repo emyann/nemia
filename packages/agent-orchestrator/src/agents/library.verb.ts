@@ -52,7 +52,7 @@ export type AgentsInput = typeof AgentsInput.Type;
 export const AgentCardInput = Schema.Struct({
   name: Schema.String,
   repo: Schema.optionalKey(Schema.String),
-  from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
+  from: Schema.optionalKey(Schema.Literals(['repo', 'user'])),
 });
 export type AgentCardInput = typeof AgentCardInput.Type;
 

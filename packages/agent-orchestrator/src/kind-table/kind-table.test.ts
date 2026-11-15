@@ -56,7 +56,7 @@ const skillOf = (name: string, more: { spec?: Partial<Skill['spec']>; status?: P
   metadata: meta(name),
   spec: { body: 'The whole body\nof the skill.', ...more.spec },
   status: {
-    origin: 'yours',
+    origin: 'user',
     dir: '/s',
     entry: null,
     error: null,
@@ -125,7 +125,7 @@ test("an agent's row: its words, why it does not read, what shadows it, its card
           copied: { source: '/t/reviewer.md', version: 'abc', now: 'changed' },
         },
       }),
-      agentOf('broken', { status: { error: 'its frontmatter is not YAML\nline 2', shadowedBy: 'yours', cardError: 'no output' } }),
+      agentOf('broken', { status: { error: 'its frontmatter is not YAML\nline 2', shadowedBy: 'user', cardError: 'no output' } }),
     ]),
   );
   oneLineEach(table);
@@ -142,7 +142,7 @@ test("an agent's row: its words, why it does not read, what shadows it, its card
     Copied: 'from /t/reviewer.md at abc; the source has changed since',
   });
   const broken = cellsOf(table, 1);
-  assert.match(String(broken.Note), /^does not read: its frontmatter is not YAML; shadowed by yours$/);
+  assert.match(String(broken.Note), /^does not read: its frontmatter is not YAML; shadowed by user$/);
   assert.match(String(broken['Can do']), /no output/);
 });
 
@@ -164,7 +164,7 @@ test("a skill's row: its description from its entry where its spec has none, its
   oneLineEach(table);
   assert.deepEqual(cellsOf(table, 0), {
     Name: 'git',
-    Origin: 'yours',
+    Origin: 'user',
     Description: 'Keep work in git.',
     Note: 'shadowed by factory',
     Preload: 'preload',

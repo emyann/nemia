@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import type { CapabilitiesUnread } from 'objects';
 import { when } from '../step/Facts';
 import { FactoryPicker } from '../factory/FactoryPicker';
@@ -19,6 +19,25 @@ import { skillsLink } from '@/lib/factoryAddress';
 import { Link } from '@tanstack/react-router';
 import { repoName } from '@/lib/factory';
 import { container, hairline } from '@/lib/meaning';
+import { libraryCount, libraryQuery } from '@/lib/api/storeLibrary';
+
+/**
+ * How many items the store's library holds, besides what this repository offers, and a link to the Library, where a factory's adds are
+ * read; nothing while it is read, and nothing where it does not read, the page being about the repository.
+ */
+function LibraryCount() {
+  const { data } = useQuery(libraryQuery());
+  if (data === undefined) return null;
+  return (
+    <p data-capabilities-library={data.length} className="text-body-medium text-muted-foreground">
+      The store's library holds {libraryCount(data)}, which a factory adds from:{' '}
+      <Link to="/library" className="underline underline-offset-2 hover:text-foreground">
+        open the Library
+      </Link>
+      .
+    </p>
+  );
+}
 
 /**
  * What the repository of the address's place offers a step (the factory its path names, `?repo=`), section by section, each thing with
@@ -35,6 +54,7 @@ export function CapabilitiesPage({ place: search }: { place: PagePlace }) {
         What this repository offers a step, read from <code className="font-mono text-body-small">{repo}</code>. What a step was actually
         given is on its run's page.
       </p>
+      <LibraryCount />
 
       {warnings.map((warning) => (
         <p key={warning} className="rounded bg-surface-container-highest px-3 py-2 text-body-medium text-on-surface-variant">
@@ -334,7 +354,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
           {step.workflow} <span className="text-muted-foreground">·</span> {step.step}
         </span>
         <span className={`${CHIP} bg-muted text-muted-foreground`}>{step.harness}</span>
-        {step.from === 'yours' && <span className={`${CHIP} ${container.grey}`}>yours</span>}
+        {step.from === 'user' && <span className={`${CHIP} ${container.grey}`}>yours</span>}
       </div>
 
       <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-body-small">

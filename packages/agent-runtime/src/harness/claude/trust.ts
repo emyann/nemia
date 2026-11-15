@@ -8,6 +8,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { replaceFile } from '../../core/replace.ts';
 
+/** Claude Code's config folder when `CLAUDE_CONFIG_DIR` moves it nowhere: `.claude` in the home, read at call time. */
+export const claudeHome = (): string => path.join(os.homedir(), '.claude');
+
 /** Claude Code's own `.claude.json`: in `CLAUDE_CONFIG_DIR` when it is set, else beside `~/.claude`, read at call time. */
 export const claudeConfigFile = (): string =>
   process.env.CLAUDE_CONFIG_DIR ? path.join(process.env.CLAUDE_CONFIG_DIR, '.claude.json') : path.join(os.homedir(), '.claude.json');

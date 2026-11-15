@@ -100,7 +100,7 @@ test("nemia agents' handlers: both places read with what each agent can do, one 
         read.agents.map(({ name, from, description }) => ({ name, from, description })),
         [
           { name: 'scribe', from: 'repo', description: 'Writes it down.' },
-          { name: 'archivist', from: 'yours', description: 'Files it away.' },
+          { name: 'archivist', from: 'user', description: 'Files it away.' },
         ],
         "the repository's place comes first, as it does on the board",
       );
@@ -122,7 +122,7 @@ test("nemia agents' handlers: both places read with what each agent can do, one 
     );
     assert.deepEqual(
       read.agents.map(({ from, name, error, description }) => ({ from, name, error, description })),
-      [{ from: 'yours', name: 'courier', error: null, description: 'Use courier when a change needs its notes written.' }],
+      [{ from: 'user', name: 'courier', error: null, description: 'Use courier when a change needs its notes written.' }],
     );
     assert.equal(fs.existsSync(path.join(MEMORY_AGENTS, 'courier.md')), false, 'read from the door, not from a file');
   });
@@ -258,7 +258,7 @@ test('REFUSED at shipped defaults: nemia agents, its card and its custom words, 
     'a --from that is neither place',
     ['agents', 'card', 'twin', '--repo', repo, '--from', 'elsewhere'],
     undefined,
-    'nemia agents --from takes repo or yours, not elsewhere',
+    'nemia agents --from takes repo or user, not elsewhere',
   );
   await t.test('a card for an agent in both places with nothing saying which; said which, each place answers for its own', async () => {
     anAgent(YOURS, 'twin', 'Yours.');
@@ -266,9 +266,9 @@ test('REFUSED at shipped defaults: nemia agents, its card and its custom words, 
       () => asked('agents', 'card', 'twin', '--repo', repo),
       undefined,
       'twin is an agent in both places',
-      'Say which: --from repo or --from yours',
+      'Say which: --from repo or --from user',
     );
-    const mine = await asked<CardRead>('agents', 'card', 'twin', '--repo', repo, '--from', 'yours');
+    const mine = await asked<CardRead>('agents', 'card', 'twin', '--repo', repo, '--from', 'user');
     assert.equal(mine.card.description, 'Yours.');
     fs.rmSync(path.join(YOURS, 'twin.md'));
   });

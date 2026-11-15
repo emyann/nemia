@@ -16,11 +16,11 @@ export type AgentSkill = CardSkill;
 export type SkillSource = DefinitionOrigin;
 
 /**
- * The word the api reads — on a step's page, a start, a card's `from:` — for where a workflow is from: `yours`, or `repo` for any
+ * The word the api reads — on a step's page, a start, a card's `from:` — for where a workflow is from: `user`, or `repo` for any
  * other origin, the factory's own tree among them, which those routes read under `repo`.
  * @param from The origin a page's address names.
  */
-export const sourceOf = (from: string): Extract<DefinitionOrigin, 'repo' | 'yours'> => (from === 'yours' ? 'yours' : 'repo');
+export const sourceOf = (from: string): Extract<DefinitionOrigin, 'repo' | 'user'> => (from === 'user' ? 'user' : 'repo');
 
 /**
  * A card entry as an object says it, its lists copied into the board's plain type.

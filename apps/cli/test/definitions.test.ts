@@ -107,12 +107,12 @@ test('`nemia agents` and its card, typed in a repository with no --repo, read th
   for (const here of [THEIRS, sub]) {
     const listed = ok(await nemia(['agents'], store.env, '', here), `agents typed in ${here}`);
     assert.match(listed, /^outrider {2}repo {2}Rides out\.$/m, `typed in ${here}`);
-    assert.match(listed, /^archivist {2}yours {2}Files it away\.$/m);
+    assert.match(listed, /^archivist {2}user {2}Files it away\.$/m);
   }
   const card = ok(await nemia(['agents', 'card', 'outrider'], store.env, '', THEIRS), 'card typed in THEIRS');
   assert.equal((JSON.parse(card) as { name: string }).name, 'outrider');
   const loose = ok(await nemia(['agents'], store.env, '', LOOSE), 'agents typed in a folder of no repository');
-  assert.match(loose, /^archivist {2}yours {2}Files it away\.$/m);
+  assert.match(loose, /^archivist {2}user {2}Files it away\.$/m);
   assert.doesNotMatch(loose, /outrider/);
 });
 
@@ -120,7 +120,7 @@ test('`nemia agents` lists yours and the repository --repo names, with what each
   const listed = ok(await store.nemia(['agents', '--repo', THEIRS]), 'agents');
   assert.match(listed, /^outrider {2}repo {2}Rides out\.$/m);
   assert.match(listed, /^ {3}outrider {2}outrider — Rides out\.$/m);
-  assert.match(listed, /^archivist {2}yours {2}Files it away\.$/m);
+  assert.match(listed, /^archivist {2}user {2}Files it away\.$/m);
   assert.match(listed, /one in A2A's shape: nemia agents card <name>/);
   assert.doesNotMatch(ok(await store.nemia(['agents']), 'agents bare'), /outrider/, "the api's own repository, with no --repo");
 
@@ -172,22 +172,22 @@ test('`nemia agents copy` copies a file into yours, said where it came from; `ag
   assert.ok(fs.existsSync(path.join(store.root, 'workflows', 'agents', 'critic.md')));
   assert.match(ok(await store.nemia(['agents']), 'listed'), new RegExp(`^ {3}copied from ${path.join(LOOSE, 'critic.md')} at \\S+$`, 'm'));
 
-  const removed = ok(await store.nemia(['agents', 'rm', 'yours', 'critic', '--version', await versionOf('agent', 'critic')]), 'rm');
+  const removed = ok(await store.nemia(['agents', 'rm', 'user', 'critic', '--version', await versionOf('agent', 'critic')]), 'rm');
   assert.equal(removed, `removed from ${path.join(store.root, 'workflows', 'agents')}: critic.md\n`);
   assert.equal(fs.existsSync(path.join(store.root, 'workflows', 'agents', 'critic.md')), false);
 
-  const started = ok(await store.nemia(['agents', 'run', 'yours', 'archivist', '--brief', 'File the notes.']), 'run');
+  const started = ok(await store.nemia(['agents', 'run', 'user', 'archivist', '--brief', 'File the notes.']), 'run');
   const id = /^(\S+) {2}a try of archivist started: nemia ls shows how it goes, and its page on the board$/m.exec(started)?.[1];
   assert.ok(id !== undefined, started);
   assert.ok(fs.existsSync(path.join(store.root, 'runs', `${id}.json`)), 'its run is in the store');
 
-  const stale = await store.nemia(['agents', 'rm', 'yours', 'archivist', '--version', '0000000000000000']);
+  const stale = await store.nemia(['agents', 'rm', 'user', 'archivist', '--version', '0000000000000000']);
   assert.equal(stale.code, 1, `a stale version is the api's Conflict: ${stale.err}`);
   assert.ok(fs.existsSync(path.join(store.root, 'workflows', 'agents', 'archivist.md')), 'left as it was');
 });
 
 test('`nemia workflows rm` removes a folder of yours at its version, printing the files it held', async () => {
-  const removed = ok(await store.nemia(['workflows', 'rm', 'yours', 'errand', '--version', await versionOf('workflow', 'errand')]), 'rm');
+  const removed = ok(await store.nemia(['workflows', 'rm', 'user', 'errand', '--version', await versionOf('workflow', 'errand')]), 'rm');
   assert.equal(removed, `removed ${path.join(store.root, 'workflows', 'errand')}: go.md\n`);
   assert.equal(fs.existsSync(path.join(store.root, 'workflows', 'errand')), false);
 });
@@ -214,7 +214,26 @@ test('under a remote context pointed at the served store: the same verbs land th
   ok(await nemia(['agents', 'custom', 'archivist', '--file', '-'], env, 'Far away.\n'), 'custom');
   assert.equal(fs.readFileSync(path.join(exposed.root, 'custom-instructions', 'archivist.md'), 'utf8'), 'Far away.\n');
   const version = /"resourceVersion":\s*"([^"]+)"/.exec(ok(await nemia(['get', 'workflow', 'errand', '-o', 'json'], env), 'get'))?.[1];
-  ok(await nemia(['workflows', 'rm', 'yours', 'errand', '--version', version ?? ''], env), 'workflows rm');
+  ok(await nemia(['workflows', 'rm', 'user', 'errand', '--version', version ?? ''], env), 'workflows rm');
   assert.equal(fs.existsSync(path.join(exposed.root, 'workflows', 'errand')), false, 'removed on the remote store');
   assert.equal(fs.existsSync(env.WF_ROOT ?? ''), false, "nothing read or made on this machine's store");
+});
+
+test("`nemia library` lists the library with who adds each item, and a factory's adds with --factory; `library add` adds one to a factory, `library rm` takes it off, a kind the library holds not refused exit 2", async () => {
+  const listed = ok(await store.nemia(['library', 'agents']), 'library');
+  assert.match(listed, /^agents\/archivist {2}user {2}added by/m);
+  const added = ok(await store.nemia(['library', 'add', 'Agent', 'archivist', '--factory', 'elsewhere']), 'library add');
+  assert.match(added, /^Agent\.archivist added in elsewhere: resolved/);
+  assert.match(ok(await store.nemia(['library', 'agents']), 'library'), /^agents\/archivist {2}user {2}added by .*elsewhere/m);
+  assert.match(
+    ok(await store.nemia(['library', '--factory', 'elsewhere']), 'library --factory'),
+    /^Agent\.archivist added in elsewhere: resolved/m,
+  );
+  assert.match(
+    ok(await store.nemia(['library', 'rm', 'Agent', 'archivist', '--factory', 'elsewhere']), 'library rm'),
+    /taken off in elsewhere/,
+  );
+  const wrong = await store.nemia(['library', 'add', 'Gadget', 'x', '--factory', 'elsewhere']);
+  assert.equal(wrong.code, 2, 'a kind the library does not hold is refused before anything is asked');
+  assert.match(wrong.err, /nemia library add/);
 });

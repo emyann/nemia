@@ -65,8 +65,8 @@ for (const kind of KINDS) {
   });
 }
 
-test('the builtin MCP servers are a McpServerList, at their own path', () => {
-  assert.ok(answers.some((e) => e.method === 'GET' && e.path === '/api/builtin/mcpservers' && e.kinds.includes('McpServerList')));
+test("the library's MCP servers are a McpServerList, at the store's level", () => {
+  assert.ok(answers.some((e) => e.method === 'GET' && e.path === '/api/mcpservers' && e.kinds.includes('McpServerList')));
 });
 
 test("a factory's sub-resources are served under its path: rules, instruction, its words, its commands, and the writes that name a template", () => {

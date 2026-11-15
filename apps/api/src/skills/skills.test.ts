@@ -104,7 +104,7 @@ const rowOfObject = ({ metadata: { name }, status: o }: SkillObject): SkillRow =
     error: o.error,
     preload: o.preload,
     cost: o.cost,
-    usedBy: o.usedBy.filter((u) => u.from === 'yours').map((u) => u.name),
+    usedBy: o.usedBy.filter((u) => u.from === 'user').map((u) => u.name),
     found: o.found,
   }) as SkillRow;
 
@@ -122,7 +122,7 @@ const detailOfObject = (o: SkillObject) => {
  */
 async function sentTo(method: 'POST' | 'PUT', url: string, body: unknown, headers: Record<string, string>): Promise<Response> {
   const [, name] = /^\/api\/skills\/[^/]+(?:\/([^/]+))?$/.exec(url) ?? [];
-  const D = '/api/namespaces/default/skills';
+  const D = '/api/skills';
   const asked = (typeof body === 'object' && body !== null && !Array.isArray(body) ? body : null) as Record<string, unknown> | null;
   let at = method === 'PUT' ? `${D}/${name}` : D;
   let sent: string | undefined = typeof body === 'string' ? body : JSON.stringify(body);
@@ -168,7 +168,7 @@ async function refused(res: Response | Promise<Response>, status: number, patter
 /** The skills by place, as the retired `GET /api/skills` listed them: yours, the repository's, the builtin. */
 async function listed(on: { request: typeof app.request } = app): Promise<SkillPlace[]> {
   const places: SkillPlace[] = [];
-  for (const from of ['yours', 'repo', 'builtin'] as const) {
+  for (const from of ['user', 'repo', 'builtin'] as const) {
     const res = await on.request(`/api/namespaces/default/skills?origin=${from}`);
     assert.equal(res.status, 200);
     const items = ((await res.json()) as { items: SkillObject[] }).items;
@@ -185,7 +185,7 @@ test("the skills are listed by place — yours, the repository's, then what is b
   assert.deepEqual(
     places.map((p) => [p.from, p.dir]),
     [
-      ['yours', LIBRARY],
+      ['user', LIBRARY],
       ['repo', THEIRS],
       ['builtin', BUILTIN],
     ],
@@ -204,8 +204,8 @@ test("the skills are listed by place — yours, the repository's, then what is b
     builtin,
   );
   assert.ok(builtin.length > 0, 'Nemia ships builtin skills');
-  assert.equal(rowOf(places, 'yours', 'shared')!.entry?.description, 'Mine.', 'your library wins a name the repository has too');
-  assert.equal(rowOf(places, 'yours', 'shared')!.dir, path.join(LIBRARY, 'shared'));
+  assert.equal(rowOf(places, 'user', 'shared')!.entry?.description, 'Mine.', 'your library wins a name the repository has too');
+  assert.equal(rowOf(places, 'user', 'shared')!.dir, path.join(LIBRARY, 'shared'));
   assert.ok(
     !places.some((p) => p.skills.some((s) => s.name === 'beside')),
     "the repository's workflows/skills is no place an agent of yours looks",
@@ -228,14 +228,14 @@ test('a builtin skill an agent of yours gives, which no place has, lists that ag
 
 test('a skill is listed with its card entry, whether it is loaded every turn, what it costs a turn, and the agents of yours that give it', async () => {
   const places = await listed();
-  const mine = rowOf(places, 'yours', 'mine')!;
+  const mine = rowOf(places, 'user', 'mine')!;
   assert.deepEqual(mine.entry, { id: 'mine', name: 'mine', description: 'Writes a decision.', tags: ['decision'] });
   assert.equal(mine.error, null);
   assert.equal(mine.preload, false);
   assert.deepEqual(mine.cost, skillTurnCost('mine', fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8')));
   assert.equal(mine.cost.perTurn, mine.cost.listed, 'named, it costs its listing');
   assert.deepEqual(mine.usedBy, ['clerk', 'scribe'], 'the agents of yours that give it, and not one that does not read');
-  const always = rowOf(places, 'yours', 'always')!;
+  const always = rowOf(places, 'user', 'always')!;
   assert.equal(always.preload, true);
   assert.equal(always.cost!.perTurn, always.cost!.listed + always.cost!.body, 'preloaded, its body too');
   assert.deepEqual(always.usedBy, []);
@@ -251,7 +251,7 @@ test('a skill whose SKILL.md is no card entry is listed with the refusal, and a 
   skill(outside, 'far', '---\ndescription: Far away.\n---\nSecret.\n');
   fs.symlinkSync(path.join(outside, 'far'), path.join(LIBRARY, 'far'));
   try {
-    const far = rowOf(await listed(), 'yours', 'far')!;
+    const far = rowOf(await listed(), 'user', 'far')!;
     assert.equal(far.entry, null);
     assert.equal(far.cost, null, 'nothing of what it points at is read');
     assert.match(far.error ?? '', /^far is a link/);
@@ -276,7 +276,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
     assert.equal(page.skill.entry?.description, 'Kept inside.');
     assert.match(page.version, /^[0-9a-f]{16}$/);
 
-    assert.equal(rowOf(places, 'yours', 'apart'), undefined, 'listed where its folder is');
+    assert.equal(rowOf(places, 'user', 'apart'), undefined, 'listed where its folder is');
     const apart = rowOf(places, 'repo', 'apart')!;
     assert.equal(apart.entry, null);
     assert.equal(apart.cost, null, 'nothing of what it points at is read');
@@ -297,7 +297,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
 test('a builtin skill says where an agent of yours already finds its name: in your library, in the repository, or nowhere yet', async () => {
   const yoursRead = await Effect.runPromise(Effect.provideService(yourSkillsRead(repo, root, TEAM_SKILLS), StoreRoot, root));
   const places = await listSkills(readSkills, repo, root, yoursRead);
-  assert.equal(rowOf(places, 'builtin', inLibrary)!.found, 'yours');
+  assert.equal(rowOf(places, 'builtin', inLibrary)!.found, 'user');
   assert.equal(rowOf(places, 'builtin', inRepo)!.found, 'repo');
   assert.equal(rowOf(places, 'builtin', toCopy)!.found, null);
   assert.equal(rowOf(places, 'builtin', toCopy)!.error, null, 'every skill of the place reads');
@@ -318,18 +318,18 @@ test("REFUSED at shipped defaults: a skill Nemia does not ship, a name that is n
 test('an agent is listed with each skill it gives, where it is found and what it costs, and one no place has with why', async () => {
   fs.writeFileSync(path.join(root, 'workflows', 'agents', 'lost.md'), '---\ndescription: Lost.\nskills: always, gone\n---\nLook.\n');
   try {
-    const res = await app.request('/api/namespaces/default/agents/scribe?origin=yours');
+    const res = await app.request('/api/namespaces/default/agents/scribe?origin=user');
     const scribe = asAgentListing((await res.json()) as never) as unknown as import('../agents/agents.ts').AgentListing;
     assert.deepEqual(
       scribe.given.map((g) => [g.name, g.from, g.entry?.description ?? g.error]),
       [
-        ['mine', 'yours', 'Writes a decision.'],
-        ['shared', 'yours', 'Mine.'],
+        ['mine', 'user', 'Writes a decision.'],
+        ['shared', 'user', 'Mine.'],
         ['review', 'repo', 'Reviews a change.'],
       ],
     );
     const lost = asAgentListing(
-      (await (await app.request('/api/namespaces/default/agents/lost?origin=yours')).json()) as never,
+      (await (await app.request('/api/namespaces/default/agents/lost?origin=user')).json()) as never,
     ) as unknown as import('../agents/agents.ts').AgentListing;
     assert.equal(lost.given[0].preload, true);
     assert.equal(lost.given[0].cost!.perTurn, lost.given[0].cost!.listed + lost.given[0].cost!.body);
@@ -370,7 +370,7 @@ async function detail(from: string, name: string): Promise<SkillDetail> {
 }
 
 const agentVersionOf = async (name: string): Promise<string> =>
-  ((await (await app.request(`/api/namespaces/default/agents/${name}?origin=yours`)).json()) as { metadata: { resourceVersion: string } })
+  ((await (await app.request(`/api/namespaces/default/agents/${name}?origin=user`)).json()) as { metadata: { resourceVersion: string } })
     .metadata.resourceVersion;
 
 const NOTES = {
@@ -391,7 +391,7 @@ test('a skill named with its folder is listed on its agent as written, found, wi
   );
   try {
     const typer = asAgentListing(
-      (await (await app.request('/api/namespaces/default/agents/typer?origin=yours')).json()) as never,
+      (await (await app.request('/api/namespaces/default/agents/typer?origin=user')).json()) as never,
     ) as unknown as import('../agents/agents.ts').AgentListing;
     assert.deepEqual(
       typer.given.map((g) => [g.name, g.from, g.foundIn, g.entry?.description ?? null]),
@@ -443,7 +443,7 @@ test("a skill's page names every agent that gives it where the repository's two 
   try {
     assert.deepEqual((await detail('repo', 'joined')).users, [
       { from: 'repo', name: 'joiner' },
-      { from: 'yours', name: 'mine-too' },
+      { from: 'user', name: 'mine-too' },
     ]);
   } finally {
     fs.rmSync(path.join(root, 'workflows', 'agents', 'mine-too.md'));
@@ -460,7 +460,7 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
     "---\ndescription: The repository's.\nskills: mine, shared\n---\nWork.\n",
   );
   try {
-    const mine = await detail('yours', 'mine');
+    const mine = await detail('user', 'mine');
     assert.deepEqual(mine.draft, {
       name: 'mine',
       title: null,
@@ -473,14 +473,14 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
     assert.match(mine.version, /^[0-9a-f]{16}$/);
     assert.deepEqual(mine.users, [
       { from: 'repo', name: 'theirs' },
-      { from: 'yours', name: 'clerk' },
-      { from: 'yours', name: 'scribe' },
+      { from: 'user', name: 'clerk' },
+      { from: 'user', name: 'scribe' },
     ]);
     assert.deepEqual(mine.skill.cost, skillTurnCost('mine', fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8')));
     assert.equal(mine.copyHint, `mkdir -p '${THEIRS}' && cp -r '${path.join(LIBRARY, 'mine')}' '${THEIRS}/'`);
     assert.deepEqual(
-      (await detail('yours', 'shared')).users,
-      [{ from: 'yours', name: 'scribe' }],
+      (await detail('user', 'shared')).users,
+      [{ from: 'user', name: 'scribe' }],
       '`shared` is in both places: an agent of yours finds yours',
     );
     const theirs = await detail('repo', 'shared');
@@ -496,8 +496,8 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
   } finally {
     fs.rmSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
   }
-  assert.equal((await pageOf('yours', 'no-such')).status, 404);
-  assert.equal((await pageOf('yours', 'Bad_Name')).status, 404);
+  assert.equal((await pageOf('user', 'no-such')).status, 404);
+  assert.equal((await pageOf('user', 'Bad_Name')).status, 404);
   assert.equal((await pageOf('elsewhere', 'mine')).status, 422, 'an origin that is none of the four');
 });
 
@@ -524,11 +524,11 @@ test('a skill written on the board is made in your library, read back as its pag
     fs.readFileSync(path.join(LIBRARY, 'tidy-notes', 'SKILL.md'), 'utf8'),
     '---\nname: tidy-notes\ntitle: Tidy notes\ndescription: Rewrites notes one fact a line.\ntags: [ notes ]\nexamples: [ tidy my notes ]\n---\n# Tidy\n\nOne fact a line.\n',
   );
-  assert.ok(rowOf(await listed(), 'yours', 'tidy-notes'));
+  assert.ok(rowOf(await listed(), 'user', 'tidy-notes'));
 });
 
 test("a Skill's other text files: served in its spec where its folder holds any, and a write that gives them replaces them whole, a picture left", async () => {
-  const D = '/api/namespaces/default/skills';
+  const D = '/api/skills';
   const files = [
     { path: 'notes/deep/how.md', text: 'One fact a line.\n' },
     { path: 'run.sh', text: 'echo ok\n' },
@@ -545,7 +545,7 @@ test("a Skill's other text files: served in its spec where its folder holds any,
   assert.equal(fs.readFileSync(path.join(LIBRARY, 'filed', 'notes', 'deep', 'how.md'), 'utf8'), files[0].text);
   const picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
   fs.writeFileSync(path.join(LIBRARY, 'filed', 'logo.png'), picture);
-  const read = (await (await app.request(`${D}/filed?origin=yours`)).json()) as SkillObject;
+  const read = (await (await app.request(`${D}/filed?origin=user`)).json()) as SkillObject;
   assert.deepEqual(read.spec.files, files, 'the picture is not among them');
   const replaced = await app.request(`${D}/filed`, {
     method: 'PUT',
@@ -560,7 +560,7 @@ test("a Skill's other text files: served in its spec where its folder holds any,
   assert.deepEqual(now.spec.files, [{ path: 'run.sh', text: 'echo two\n' }]);
   assert.equal(fs.existsSync(path.join(LIBRARY, 'filed', 'notes', 'deep', 'how.md')), false);
   assert.deepEqual(new Uint8Array(fs.readFileSync(path.join(LIBRARY, 'filed', 'logo.png'))), picture);
-  const none = (await (await app.request(`${D}/mine?origin=yours`)).json()) as SkillObject;
+  const none = (await (await app.request(`${D}/mine?origin=user`)).json()) as SkillObject;
   assert.equal('files' in none.spec, false, 'a skill whose folder holds no other text file serves no files');
   const out = await app.request(`${D}/filed`, {
     method: 'PUT',
@@ -576,7 +576,7 @@ test("a Skill's other text files: served in its spec where its folder holds any,
 
 test('a change of a skill moves the version of every agent that gives it, and the preload switch alone does too', async () => {
   const before = { scribe: await agentVersionOf('scribe'), clerk: await agentVersionOf('clerk') };
-  const { version } = await detail('yours', 'mine');
+  const { version } = await detail('user', 'mine');
   const res = await put('/api/skills/yours/mine', {
     version,
     skill: { name: 'mine', description: 'Writes a decision down.', tags: ['decision'], body: 'Write it down, dated.' },
@@ -617,11 +617,11 @@ test('REFUSED at shipped defaults: a name that is not a folder-safe id, a clash 
 });
 
 test('REFUSED at shipped defaults: a change at a version the skill has moved on from, of a skill not there, or under another name', async () => {
-  const { version } = await detail('yours', 'always');
+  const { version } = await detail('user', 'always');
   fs.appendFileSync(path.join(LIBRARY, 'always', 'SKILL.md'), 'Edited by hand.\n');
   await refused(put('/api/skills/yours/always', { version, preload: false }), 409, /^skills\/always changed since it was read \(version /);
   await refused(put('/api/skills/yours/gone', { version, preload: false }), 404, /^Nothing is at that name/);
-  const now = (await detail('yours', 'always')).version;
+  const now = (await detail('user', 'always')).version;
   await refused(
     put('/api/skills/yours/always', { version: now, skill: { ...NOTES, name: 'renamed' } }),
     422,
@@ -657,11 +657,10 @@ test("a skill's copy command, run as the page gives it, puts the folder under it
   assert.deepEqual(fs.readdirSync(path.join(into, 'mine')), ['SKILL.md'], 'copied again, it lands on the same folder, not inside it');
 });
 
-test("REFUSED at shipped defaults: a write of the repository's skills, its own words saying to copy it to yours", async () => {
+test("REFUSED at shipped defaults: a write of the repository's skills, which the library does not hold (404)", async () => {
   const theirs = snapshotOf(THEIRS);
   const res = await put('/api/skills/repo/review', { version: 'x', preload: true });
-  assert.equal(res.status, 422);
-  assert.match(((await res.json()) as { error: string }).error, /copy the definition to yours/);
+  assert.equal(res.status, 404, 'the library holds no repository skill');
   assert.deepEqual(snapshotOf(THEIRS), theirs, 'nothing is written into the checkout');
 });
 
@@ -700,7 +699,7 @@ test("the picker finds a skill and the agents of yours that give it through the 
   assert.equal(res.status, 200);
   const places = await res.json();
   assert.deepEqual(
-    places.find((p) => p.from === 'yours')?.skills.map((s) => [s.name, s.usedBy]),
+    places.find((p) => p.from === 'user')?.skills.map((s) => [s.name, s.usedBy]),
     [[kept, [agent]]],
     "yours are the door's skills alone, each with the door's agents that give it",
   );

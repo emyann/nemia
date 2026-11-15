@@ -60,7 +60,19 @@ export function factoryServersFile(home: string, name: string): string {
  * @param name The factory's name.
  */
 export function readFactoryServers(home: string, name: string): FactoryServersFile | undefined {
-  const file = factoryServersFile(home, name);
+  return readServersAt(
+    factoryServersFile(home, name),
+    `add the server again with nemia factory server add ${name} <server> --url <address>`,
+  );
+}
+
+/**
+ * The servers recorded in `file`, a factory's or the library's, or `undefined` where none was written. Refused (`Invalid`), naming the
+ * file, its first wrong field and `fix`, where it does not read as a record.
+ * @param file The servers file.
+ * @param fix The command that writes it again, as a refusal names it.
+ */
+export function readServersAt(file: string, fix: string): FactoryServersFile | undefined {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -68,7 +80,6 @@ export function readFactoryServers(home: string, name: string): FactoryServersFi
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  const fix = `add the server again with nemia factory server add ${name} <server> --url <address>`;
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -103,14 +114,22 @@ export const factoryServers = (home: string, name: string): FactoryServers => re
  * @param servers The factory's servers by name, all of them; none removes the record.
  */
 export function writeFactoryServers(home: string, name: string, servers: FactoryServers): void {
-  const file = factoryServersFile(home, name);
+  writeServersAt(factoryServersFile(home, name), servers);
+}
+
+/**
+ * Writes the servers file `file`, a factory's or the library's, whole, as `writeFactoryServers` says.
+ * @param file The servers file.
+ * @param servers Every server, by name; none removes the record.
+ */
+export function writeServersAt(file: string, servers: FactoryServers): void {
   if (!Object.keys(servers).length) {
     fs.rmSync(file, { force: true });
     return;
   }
   let kept: Record<string, unknown> = {};
   try {
-    const { servers: _gone, ...rest } = readFactoryServers(home, name) ?? {};
+    const { servers: _gone, ...rest } = readServersAt(file, '') ?? {};
     kept = rest;
   } catch {
     kept = {};

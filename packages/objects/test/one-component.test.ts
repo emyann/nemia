@@ -10,7 +10,7 @@ import { OpenApi } from 'effect/http-api';
 import { Api } from 'objects';
 
 /** The second components the `httpApiStatus: 201` pipes of `api.ts` and `proposal-api.ts` make today, by name. */
-const MADE_BY_201: readonly string[] = ['Agent_1', 'Card_1', 'Proposal_1', 'Skill_1', 'Skill_2', 'Workflow_1'];
+const MADE_BY_201: readonly string[] = ['Agent_1', 'Card_1', 'Proposal_1', 'Skill_1', 'Workflow_1'];
 
 /** A component's name as the document gives a second one of a schema: its name, `_`, and a number. */
 const SECOND = /^.+_\d+$/;

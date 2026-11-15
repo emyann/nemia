@@ -4,7 +4,10 @@
  */
 import { CLI, type CommandWords, type Flag, type Positional, type Spec } from './command.ts';
 
-/** The place a writer is named on (`<from>`), required: `yours`, the one it writes, or `factory`, a templated factory's tree. */
+/**
+ * The place a writer is named on (`<from>`), required: `user`, the person's library, the one it writes, or `factory`, a templated
+ * factory's tree.
+ */
 export const FROM: Positional = { key: 'from', takes: 'required', kind: 'name' };
 
 /**
@@ -61,15 +64,15 @@ export const writerSpec = (command: string, usage: string, positionals: readonly
   unknown: (arg) => `${CLI} ${command} takes no ${arg}: ${CLI} ${command} ${usage}`,
 });
 
-const WORKFLOWS_WRITE_USAGE = '(yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]';
+const WORKFLOWS_WRITE_USAGE = '(user | factory) <name> --folder <draft> [--factory <name>] [--version <v>]';
 
-/** `nemia workflows write`: a workflow folder of yours written from a draft folder, or proposed to a templated factory. */
+/** `nemia workflows write`: a workflow folder of the person's library written from a draft folder, or proposed to a templated factory. */
 export const WORKFLOWS_WRITE_WORDS = {
   name: 'workflows write',
-  served: [{ endpoint: 'workflows.create' }, { endpoint: 'workflows.replace', as: 'workflows_replace' }],
+  served: [{ endpoint: 'workflows.createLibrary' }, { endpoint: 'workflows.replaceLibrary', as: 'workflows_replace' }],
   usage: WORKFLOWS_WRITE_USAGE,
   help: [
-    'a workflow folder of yours, or of a templated --factory, written from',
+    'a workflow folder of the user library, or of a templated --factory, written from',
     'a draft folder, its steps, README, scripts and schemas, leaving a file',
     'it does not carry; one there already, at the --version it was read at',
   ],
@@ -89,22 +92,22 @@ export const WORKFLOWS_WRITE_WORDS = {
     ],
   ),
   writes: true,
-  class: 'ask',
+  class: 'act',
   only: {
     side: 'cli',
-    why: "the api serves it as the Workflow's `create` and `replace` verb of `objects`' Api (`/api/namespaces/:namespace/workflows`), which calls this entry's handler: no route of its own",
+    why: "the api serves it as the Workflow's `create` and `replace` verb of `objects`' Api (`/api/workflows`, the store's library; a factory's tree is written by a proposal), which calls this entry's handler: no route of its own",
   },
 } as const satisfies CommandWords;
 
-const AGENTS_WRITE_USAGE = '(yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]';
+const AGENTS_WRITE_USAGE = '(user | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]';
 
-/** `nemia agents write`: an agent of yours written from its file, or proposed to a templated factory. */
+/** `nemia agents write`: an agent of the person's library written from its file, or proposed to a templated factory. */
 export const AGENTS_WRITE_WORDS = {
   name: 'agents write',
-  served: [{ endpoint: 'agents.create' }, { endpoint: 'agents.replace', as: 'agents_replace' }],
+  served: [{ endpoint: 'agents.createLibrary' }, { endpoint: 'agents.replaceLibrary', as: 'agents_replace' }],
   usage: AGENTS_WRITE_USAGE,
   help: [
-    'an agent of yours, or of a templated --factory, written from its file:',
+    'an agent of the user library, or of a templated --factory, written from its file:',
     '<name> is the agent it changes or renames, at the --version it was',
     'read at; none, a new one',
   ],
@@ -124,26 +127,26 @@ export const AGENTS_WRITE_WORDS = {
     ],
   ),
   writes: true,
-  class: 'ask',
+  class: 'act',
   only: {
     side: 'cli',
-    why: "the api serves it as the Agent's `create` and `replace` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
+    why: "the api serves it as the Agent's `create` and `replace` verb of `objects`' Api (`/api/agents`, the store's library; a factory's tree is written by a proposal), which calls this entry's handler: no route of its own",
   },
 } as const satisfies CommandWords;
 
-const SKILLS_WRITE_USAGE = '(yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]';
+const SKILLS_WRITE_USAGE = '(user | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]';
 
-/** `nemia skills write`: a skill of yours written from its SKILL.md, or proposed to a templated factory. */
+/** `nemia skills write`: a skill of the person's library written from its SKILL.md, or proposed to a templated factory. */
 export const SKILLS_WRITE_WORDS = {
   name: 'skills write',
   served: [
-    { endpoint: 'skills.create' },
-    { endpoint: 'skills.replace', as: 'skills_replace' },
-    { endpoint: 'skills.copy', as: 'skills_copy' },
+    { endpoint: 'skills.createLibrary' },
+    { endpoint: 'skills.replaceLibrary', as: 'skills_replace' },
+    { endpoint: 'skills.copyLibrary', as: 'skills_copy' },
   ],
   usage: SKILLS_WRITE_USAGE,
   help: [
-    'a skill of yours, or of a templated --factory, written from its',
+    'a skill of the user library, or of a templated --factory, written from its',
     'SKILL.md: <name> is the skill it changes, at the --version it was',
     'read at; none, a new one',
   ],
@@ -163,10 +166,10 @@ export const SKILLS_WRITE_WORDS = {
     ],
   ),
   writes: true,
-  class: 'ask',
+  class: 'act',
   only: {
     side: 'cli',
-    why: "the api serves it as the Skill's `create`, `replace` and `copy` verb of `objects`' Api (`/api/namespaces/:namespace/skills`), which calls this entry's handler: no route of its own",
+    why: "the api serves it as the Skill's `create`, `replace` and `copy` verb of `objects`' Api (`/api/skills`, the store's library; a factory's tree is written by a proposal), which calls this entry's handler: no route of its own",
   },
 } as const satisfies CommandWords;
 

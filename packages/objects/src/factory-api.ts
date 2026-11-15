@@ -1,12 +1,6 @@
 /**
- * Group `factories`: the factories, which no namespace holds, listed, read, removed, exported whole and filed from another store's export,
- * and each one's sub-resources — its rules and its instruction, read, written and cleared, the lines a person types for it (`commands`),
- * its cost line per workflow, its revisions policy, its places trusted again, a workflow attached and detached, and a harness setting set
- * and taken off; and the writes that name a template or a folder: a factory filed, a volume mounted and taken off, a factory made from a
- * template, a hand-made one taken over by one, either previewed, an upgrade filed and a conflict's choice. The factory's parts are each
- * in the factory's namespace: group `mcpservers`, its MCP servers, read, recorded and taken off, and signed in to; group `builtin`, the
- * servers Nemia offers, in no namespace; groups `schedules` and `hires`, read, written and taken back; and group `volumes`, read alone.
- * Cut from `api.ts`, which adds them to `Api`.
+ * The factories and their parts as groups of the `Api` (`api.ts`): the factories, which no namespace holds; and in each factory's
+ * namespace its MCP servers (with the store's library of servers, in no namespace), schedules, hires, adds from the library and volumes.
  */
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
@@ -44,11 +38,21 @@ import {
 } from './factory.ts';
 import { FactoryExport, FactoryImported, FactoryImportWrite, MOVE_CARDS } from './factory-move.ts';
 import { Hire, HireList, HireWrite } from './hire.ts';
+import { LibraryAdd, LibraryAddList } from './library.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInCallback, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
 import { Volume, VolumeList } from './volume.ts';
+import {
+  cardParams,
+  namespaceParams,
+  factoryParams,
+  factoryWorkflowParams,
+  factorySettingParams,
+  factoryOwnParams,
+  libraryParams,
+  libraryAddParams,
+} from './api-params.ts';
 import { listQuery, objectErrors } from './api-errors.ts';
-import { cardParams, namespaceParams, factoryParams, factoryWorkflowParams, factorySettingParams, factoryOwnParams } from './api-params.ts';
 
 /** The factory's kinds and a page of each, named so that the document holds each as a component. */
 const FactoryObject = Factory.annotate({ identifier: 'Factory' });
@@ -62,6 +66,8 @@ const ScheduleObject = Schedule.annotate({ identifier: 'Schedule' });
 const ScheduleListObject = ScheduleList.annotate({ identifier: 'ScheduleList' });
 const HireObject = Hire.annotate({ identifier: 'Hire' });
 const HireListObject = HireList.annotate({ identifier: 'HireList' });
+const LibraryAddObject = LibraryAdd.annotate({ identifier: 'LibraryAdd' });
+const LibraryAddListObject = LibraryAddList.annotate({ identifier: 'LibraryAddList' });
 const VolumeObject = Volume.annotate({ identifier: 'Volume' });
 const VolumeListObject = VolumeList.annotate({ identifier: 'VolumeList' });
 /** The factories and a factory's MCP servers, each a page or the same page as a `Table` where the request asks for one, as the cards. */
@@ -311,8 +317,37 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   ),
 ) {}
 
-/** A factory's MCP servers, in its namespace, and their sign-in. */
+/**
+ * A factory's MCP servers, in its namespace, and their sign-in; and the store's library of servers, in no namespace: the person's, kept
+ * once for every factory that adds one, beside those Nemia offers.
+ */
 export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
+  HttpApiEndpoint.get('listLibrary', '/api/mcpservers', { query: listQuery, success: McpServerListObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "The store's library of MCP servers: the person's, recorded once for every factory that adds one, beside those Nemia offers, each with the factories that add it.",
+  ),
+  HttpApiEndpoint.get('getLibrary', '/api/mcpservers/:name', {
+    params: libraryParams,
+    success: McpServerObject,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, "One MCP server of the store's library, the person's or a builtin, by its name."),
+  HttpApiEndpoint.put('putLibrary', '/api/mcpservers/:name', {
+    params: libraryParams,
+    payload: McpServerWrite,
+    success: McpServerObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Records an MCP server in the person's library, whole, its headers kept masked; a factory gets it once it adds it.",
+  ),
+  HttpApiEndpoint.delete('deleteLibrary', '/api/mcpservers/:name', {
+    params: libraryParams,
+    success: McpServerObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Takes an MCP server off the person's library; refused with a 409 naming each factory that adds it, and a builtin is never taken off.",
+  ),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/mcpservers', {
     params: namespaceParams,
     query: listQuery,
@@ -368,18 +403,6 @@ export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
     success: SignedOut,
     error: objectErrors,
   }).annotate(OpenApi.Description, "Signs a factory's MCP server out of the harness's store. Answers SignedOut."),
-) {}
-
-/** The MCP servers Nemia offers a factory: a page whose items carry their spec alone, in no namespace. */
-export class BuiltinGroup extends HttpApiGroup.make('builtin').add(
-  HttpApiEndpoint.get('mcpservers', '/api/builtin/mcpservers', {
-    query: listQuery,
-    success: McpServerListObject,
-    error: objectErrors,
-  }).annotate(
-    OpenApi.Description,
-    'Lists the MCP servers Nemia offers a factory, in no namespace, each its spec alone. Answers an McpServerList.',
-  ),
 ) {}
 
 /** A factory's schedules, in its namespace, each named by its workflow. */
@@ -455,6 +478,43 @@ export class HiresGroup extends HttpApiGroup.make('hires').add(
   }).annotate(
     OpenApi.Description,
     'Fires the agent hired into the step. Answers the Hire as it reads after, with the file written and the agent it fired.',
+  ),
+) {}
+
+/**
+ * A factory's adds from the store's library, in its namespace, each named `<kind>.<name>`: what the factory resolves of the library. A
+ * factory with no record of its adds has those its workflows resolve today, until the first add or removal writes the record.
+ */
+export class LibraryAddsGroup extends HttpApiGroup.make('libraryadds').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/libraryadds', {
+    params: namespaceParams,
+    query: listQuery,
+    success: LibraryAddListObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "The library items a factory has added, each with what it is there: resolved, shadowed by the factory's own, or missing from the library.",
+  ),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/libraryadds/:name', {
+    params: libraryAddParams,
+    success: LibraryAddObject,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, 'One add of a library item in a factory, by `<kind>.<name>`, with what it is there.'),
+  HttpApiEndpoint.put('put', '/api/namespaces/:namespace/libraryadds/:name', {
+    params: libraryAddParams,
+    success: LibraryAddObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Adds a library item to a factory, so its runs resolve it; refused as Missing where the library holds no such item. Idempotent.',
+  ),
+  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/libraryadds/:name', {
+    params: libraryAddParams,
+    success: LibraryAddObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Takes an add off a factory, missing from the library or not; refused as Missing where it was not added.',
   ),
 ) {}
 

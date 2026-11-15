@@ -25,7 +25,7 @@ const code = (text: string) => <code className="font-mono text-body-small break-
 export function SkillPage({ from, name, place }: { from: string; name: string; place: PagePlace }) {
   const { data: detail } = useSuspenseQuery(skillQuery(from, name, place));
   const queryClient = useQueryClient();
-  const mine = detail.skill.from === 'yours';
+  const mine = detail.skill.from === 'user';
   const [changed, setChanged] = useState(false);
   const [drawn, setDrawn] = useState(detail);
   const shown = drawnSkill(drawn, detail, changed);
@@ -175,7 +175,7 @@ function Elsewhere({ detail }: { detail: SkillDetail }) {
   const { from } = detail.skill;
   return (
     <p data-copy-hint className="text-body-small text-muted-foreground">
-      {from === 'yours' && detail.copyHint && (
+      {from === 'user' && detail.copyHint && (
         <>
           For this repository's agents to be given it, copy it into the repository by hand — the board writes no checkout — and commit it:{' '}
           {code(detail.copyHint)}.
@@ -212,7 +212,7 @@ function Preload({
 }) {
   const id = useId();
   const { skill } = detail;
-  const mine = skill.from === 'yours';
+  const mine = skill.from === 'user';
   return (
     <fieldset data-preload className="space-y-2 rounded border border-outline-variant px-3 py-3">
       <legend className="px-1 text-label-medium text-muted-foreground uppercase">Every turn, or when needed</legend>

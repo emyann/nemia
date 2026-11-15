@@ -4,13 +4,13 @@
  * (`definitionWriteRefusal`) as the `Api`'s error.
  */
 import { Effect, Result } from 'effect';
-import { objectsListed, type ObjectQuery } from 'agent-orchestrator';
-import { definitionsServed, definitionWriteRefusal, type DefinitionWrite } from 'agent-orchestrator/workflow';
-import { DEFINITION_ORIGINS, Invalid, Missing, type DefinitionOrigin } from 'objects';
+import { addedOf, objectsListed, type ObjectQuery } from 'agent-orchestrator';
+import { definitionsServed, definitionWriteRefusal, type DefinitionWrite, type WriteAt } from 'agent-orchestrator/workflow';
+import { Conflict, DEFAULT_NAMESPACE, DEFINITION_ORIGINS, Invalid, Missing, type DefinitionOrigin } from 'objects';
 import { repoNeeded, type Place } from '../factory/place.ts';
 export { writtenAt } from '../workflows/builder.ts';
 
-/** An origin a definition is read from: the factory's tree, the repository, yours, or Nemia's builtin. */
+/** An origin a definition is read from: the factory's tree, the repository, the person's library, or Nemia's builtin. */
 export type Origin = DefinitionOrigin;
 
 /** A definition read at one origin, before it is served: its name, its origin, and what the object is made from. */
@@ -82,29 +82,44 @@ export function servedNamed<T>(held: readonly Held<T>[], name: string, asked: Or
 }
 
 /**
- * What a write of `name` would change, as `definitionWriteRefusal` asks it: the factory's own where its tree holds the name, yours where
- * your library does (shadowed or not: a write names yours), else the origin served there, `none` where nothing is.
+ * What a write of `name` would change, as `definitionWriteRefusal` asks it: the factory's own where its tree holds the name, the person's
+ * where the library does (shadowed or not: a write names the person's), else the origin served there, `none` where nothing is.
  * @param held Every definition held, each with its name and origin.
  * @param name The definition's name the write names.
  */
 export function thereOf<T>(held: readonly Held<T>[], name: string): Origin | 'none' {
   const at = held.filter((h) => h.name === name);
   if (at.some((h) => h.origin === 'factory')) return 'factory';
-  if (at.some((h) => h.origin === 'yours')) return 'yours';
+  if (at.some((h) => h.origin === 'user')) return 'user';
   return servedOf(at, undefined).at(0)?.origin ?? 'none';
 }
 
 /**
- * Thrown as the `Api`'s error where `definitionWriteRefusal` refuses `does` in `namespace` on what is `there`; nothing if it goes on.
- * @param namespace The namespace the write is in.
+ * Thrown as the `Api`'s error where `definitionWriteRefusal` refuses `does` sent `at` the library or a namespace on what is `there`;
+ * nothing if it goes on. A Conflict carries the factories that use the definition.
+ * @param at Where the write is sent: the store's library, or a factory's namespace.
  * @param does What the write does.
  * @param there What the write would change (thereOf), none where nothing is.
+ * @param users The factories that use the definition (`libraryUsers`); none for a write in a namespace, which is refused before them.
  */
-export function writeGoes(namespace: string, does: DefinitionWrite, there: Origin | 'none'): void {
-  const refused = definitionWriteRefusal(namespace, does, there);
+export function writeGoes(at: WriteAt, does: DefinitionWrite, there: Origin | 'none', users: readonly string[] = []): void {
+  const refused = definitionWriteRefusal(at, does, there, users);
   if (refused === null) return;
   if (refused.kind === 'Missing') throw new Missing({ error: refused.message });
+  if (refused.kind === 'Conflict') throw new Conflict({ error: refused.message, users: [...(refused.users ?? [])] });
   throw new Invalid({ error: refused.message, ...(refused.way !== undefined && { way: refused.way }) });
+}
+
+/**
+ * A write sent to the namespace `namespace`, refused naming the way it takes: in `default`, which holds no tree of its own, the library's;
+ * in a factory's, the factory's for its own definitions and a create, else the library's (`writeGoes` at `factory`).
+ * @param namespace The namespace the write was sent to.
+ * @param does What the write would do.
+ * @param there What the write would change (thereOf), none where nothing is.
+ */
+export function namespacedWriteRefused(namespace: string, does: DefinitionWrite, there: Origin | 'none'): never {
+  writeGoes('factory', namespace === DEFAULT_NAMESPACE ? 'replace' : does, namespace === DEFAULT_NAMESPACE ? 'user' : there);
+  throw new Error(`a write sent to ${namespace} was not refused: definitionWriteRefusal refuses every write at a namespace.`);
 }
 
 type Named = { metadata: { name: string; labels?: Readonly<Record<string, string>> } };
@@ -121,3 +136,18 @@ export const listed = <const K extends string, T extends Named>(kind: K, items: 
   if (Result.isFailure(page)) throw new Invalid({ error: page.failure.message });
   return page.success;
 };
+
+/**
+ * What a namespace serves of `held` once its factory's adds gate the library: a definition of the user library or a builtin only where the
+ * factory has added it, as its runs resolve it (`addedOf`); every one while the factory records no adds, its lookup reading the library
+ * whole.
+ * @param home The store's root.
+ * @param namespace The namespace read, `default` among them.
+ * @param kind Which of the factory's adds gate `held`: its agents or its skills.
+ * @param held What the namespace holds at each origin.
+ */
+export function addsGated<T>(home: string, namespace: string, kind: 'agents' | 'skills', held: readonly Held<T>[]): Held<T>[] {
+  const added = addedOf(home, namespace);
+  if (added === undefined) return [...held];
+  return held.filter((h) => (h.origin !== 'user' && h.origin !== 'builtin') || added[kind].has(h.name));
+}

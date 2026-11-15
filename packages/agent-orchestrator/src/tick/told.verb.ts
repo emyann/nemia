@@ -48,6 +48,7 @@ import { splitFrontmatter, type StepSpec } from '../step/step.ts';
 import { realRepoOf } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn } from '../agents/agents.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
+import { addedOf } from '../library/library.store.ts';
 import { workflowDescription } from '../folder/folder.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
@@ -63,6 +64,7 @@ import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import type { FactoryServers } from '../factory/servers/index.ts';
+import { addedServers } from '../library/library.verb.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { NeedsMemory, runNeeds } from '../needs/needs.verb.ts';
@@ -101,7 +103,10 @@ export const toldOf = Effect.fnUntraced(function* (run: Run, step: StepSpec) {
 const skillsTold = Effect.fnUntraced(function* (step: StepSpec, run: Run) {
   const home = yield* StoreRoot;
   const door = (yield* SkillDoor).skills;
-  const found = yield* door.found({ dir: run.workflowDir, places: placesOf(home, run.repo) });
+  const found = yield* door.found({
+    dir: run.workflowDir,
+    places: placesOf(home, run.repo, addedOf(home, run.factory ?? DEFAULT_NAMESPACE)),
+  });
   const told: SkillAgain[] = [];
   for (const name of step.agent?.skills ?? []) {
     const from = found.at.get(name);
@@ -281,17 +286,21 @@ export const filedAt = (
 });
 
 /**
- * The MCP servers the factory `factory` records, each through `mcpServerOf` — the runtime's one producer of the bytes a harness sees,
- * applied here and nowhere else on this road, so a session is handed the spelling a state read was handed and finds the sign-in filed
- * under it. `{}` for a factory that records none — and `{}`, silently here, for a record that does not read: this is spread into
- * every filing, and a throw would be a defect that stops the whole pass over one bad file. The pass refuses the step itself and says
- * why (`fileReady`), where a note can carry the file and the command to type, and `nemia factory servers` refuses it loudly to the
- * person who asks.
+ * The MCP servers the factory `factory` records, beside the library's it has added (its own winning a name), each through `mcpServerOf` —
+ * the runtime's one producer of the bytes a harness sees, applied here and nowhere else on this road, so a session is handed the spelling a
+ * state read was handed and finds the sign-in filed under it. `{}` for a factory that records none — and `{}`, silently here, for a record
+ * that does not read: this is spread into every filing, and a throw would be a defect that stops the whole pass over one bad file. The pass
+ * refuses the step itself and says why (`fileReady`), where a note can carry the file and the command to type, and `nemia factory servers`
+ * refuses it loudly to the person who asks.
+ * @param factory The run's factory, or undefined for the default one.
+ * @param home The store's root.
  */
-const recordedServers = (factory: string | undefined, home: string): FactoryServers => {
+export const recordedServers = (factory: string | undefined, home: string): FactoryServers => {
   try {
-    const record = doorAtOnce(home, (door) => door.servers.read(FactoryName.read(factory ?? DEFAULT_NAMESPACE)));
-    return Object.fromEntries(Object.entries(record).map(([name, server]) => [name, mcpServerOf(server)]));
+    const name = factory ?? DEFAULT_NAMESPACE;
+    const own = doorAtOnce(home, (door) => door.servers.read(FactoryName.read(name)));
+    const record = { ...addedServers(home, name), ...own };
+    return Object.fromEntries(Object.entries(record).map(([server, at]) => [server, mcpServerOf(at)]));
   } catch {
     return {};
   }

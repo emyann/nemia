@@ -279,7 +279,7 @@ test('orderOf, listUnsetWords, listOf, numberOf, listedWith, readmeSent: the ste
   await t.test(
     "a folder written goes into the page's listing in the listing's order: the repository's, then yours, each by name — once",
     () => {
-      const w = (name: string, from: 'repo' | 'yours'): WorkflowListing => ({
+      const w = (name: string, from: 'repo' | 'user'): WorkflowListing => ({
         name,
         from,
         dir: `/${from}/${name}`,
@@ -293,17 +293,17 @@ test('orderOf, listUnsetWords, listOf, numberOf, listedWith, readmeSent: the ste
         error: null,
         unfilled: null,
       });
-      const list = [w('dev', 'repo'), w('ui', 'repo'), w('mine', 'yours')];
+      const list = [w('dev', 'repo'), w('ui', 'repo'), w('mine', 'user')];
       assert.deepEqual(
-        listedWith(list, w('built', 'yours')).map((x) => `${x.from}:${x.name}`),
-        ['repo:dev', 'repo:ui', 'yours:built', 'yours:mine'],
+        listedWith(list, w('built', 'user')).map((x) => `${x.from}:${x.name}`),
+        ['repo:dev', 'repo:ui', 'user:built', 'user:mine'],
       );
       assert.deepEqual(
-        listedWith(list, { ...w('mine', 'yours'), description: 'Mine.' }).map((x) => x.description),
+        listedWith(list, { ...w('mine', 'user'), description: 'Mine.' }).map((x) => x.description),
         [null, null, 'Mine.'],
       );
       assert.deepEqual(
-        listedWith(undefined, w('built', 'yours')).map((x) => x.name),
+        listedWith(undefined, w('built', 'user')).map((x) => x.name),
         ['built'],
       );
     },

@@ -52,10 +52,10 @@ const ROLE_KEYS: readonly AgentRoleKey[] = [
 ];
 
 /** A node that names an agent: the step of a workflow in the agent's own place. */
-export type AgentUser = { from: Extract<DefinitionOrigin, 'repo' | 'yours'>; workflow: string; step: string };
+export type AgentUser = { from: Extract<DefinitionOrigin, 'repo' | 'user'>; workflow: string; step: string };
 
 /** A step an agent fills, hired or named by its own `agent:` line: read from either place, or from a factory's own tree (`factory`). */
-export type AgentFill = { from: Extract<DefinitionOrigin, 'factory' | 'repo' | 'yours'>; workflow: string; step: string; hired: boolean };
+export type AgentFill = { from: Extract<DefinitionOrigin, 'factory' | 'repo' | 'user'>; workflow: string; step: string; hired: boolean };
 
 /**
  * An agent as the board reads it, off its Agent object: its keys as its file writes them, its instructions, the result schema its
@@ -144,7 +144,7 @@ export const agentViewOf = (agent: Agent): LibraryAgent => {
  * The origins the Agents page reads, each listed whole, shadowed or not: yours, the default namespace working on no repository and Nemia
  * shipping no agent.
  */
-const LISTED: readonly DefinitionOrigin[] = ['yours'];
+const LISTED: readonly DefinitionOrigin[] = ['user'];
 
 /** Every agent of yours, with the factories each fills a step in, read from disk on each request. */
 export const agentsQuery = queryOptions({
@@ -239,7 +239,7 @@ const refused: Refuse = (words, status, answer) =>
  * @param draft The agent to make: its name, keys, instructions and schema.
  */
 export const createAgent = async (draft: AgentDraft): Promise<AgentSaved> => ({
-  agent: agentViewOf(await served.create(DEFAULT_NAMESPACE, { metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused)),
+  agent: agentViewOf(await served.create({ metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused)),
 });
 
 /**
@@ -250,12 +250,7 @@ export const createAgent = async (draft: AgentDraft): Promise<AgentSaved> => ({
  */
 export const saveAgent = async (name: string, version: string, draft: AgentDraft): Promise<AgentSaved> => ({
   agent: agentViewOf(
-    await served.replace(
-      DEFAULT_NAMESPACE,
-      name,
-      { metadata: { name: draft.name, resourceVersion: version }, spec: specOfDraft(draft) },
-      refused,
-    ),
+    await served.replace(name, { metadata: { name: draft.name, resourceVersion: version }, spec: specOfDraft(draft) }, refused),
   ),
 });
 
@@ -265,7 +260,7 @@ export const saveAgent = async (name: string, version: string, draft: AgentDraft
  * @param version The version it was read at (`AgentListing.version`).
  */
 export const removeAgent = async (name: string, version: string): Promise<AgentListing> =>
-  agentViewOf(await served.delete(DEFAULT_NAMESPACE, name, version, refused));
+  agentViewOf(await served.delete(name, version, refused));
 
 /** The run a try started, which its page follows. */
 type AgentTried = { id: string };
@@ -277,7 +272,7 @@ type AgentTried = { id: string };
  * @param brief What the try asks of it, in a person's words.
  */
 export const tryAgent = async (name: string, brief: string): Promise<AgentTried> => ({
-  id: (await served.try(DEFAULT_NAMESPACE, name, brief, refused)).id,
+  id: (await served.try(name, brief, refused)).id,
 });
 
 /** A person's custom instructions for an agent: the file they are kept in, their words (null for none), and why they do not read. */
@@ -327,7 +322,7 @@ export const writeCustomInstructions = (name: string, words: string, repo?: stri
     (c) =>
       name === NEMIA
         ? c.nemia.writeInstructions({ payload: { words } })
-        : c.agents.putInstructions({ params: { namespace: DEFAULT_NAMESPACE, name }, query: repoQuery(repo), payload: { words } }),
+        : c.agents.putInstructions({ params: { name }, query: repoQuery(repo), payload: { words } }),
     write(AgentInstructionsAnswer, CUSTOM_WRITTEN),
   );
 
@@ -339,9 +334,6 @@ export const writeCustomInstructions = (name: string, words: string, repo?: stri
  */
 export const clearCustomInstructions = (name: string, repo?: string): Promise<CustomInstructionsCleared> =>
   call(
-    (c) =>
-      name === NEMIA
-        ? c.nemia.clearInstructions()
-        : c.agents.deleteInstructions({ params: { namespace: DEFAULT_NAMESPACE, name }, query: repoQuery(repo) }),
+    (c) => (name === NEMIA ? c.nemia.clearInstructions() : c.agents.deleteInstructions({ params: { name }, query: repoQuery(repo) })),
     write(AgentInstructionsClearedAnswer, CUSTOM_WRITTEN),
   );

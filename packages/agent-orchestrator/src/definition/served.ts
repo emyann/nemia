@@ -2,17 +2,18 @@
  * What a namespace serves of the definitions — the Workflows, Agents and Skills a factory resolves — and where a write of one goes: two
  * pure deciders the api's handlers read, so which definition a factory resolves stays the orchestrator's meaning.
  *
- * `definitionServed`: of the origins that hold one name, in the order the factory looks a name up (its tree, the repository, yours, the
- * builtin), the one served — the first, or, with an origin asked, that origin where it holds the name — and what shadows it. Its laws are
- * `contracts/definition-served.contract.ts`'s.
+ * `definitionServed`: of the origins that hold one name, in the order the factory looks a name up (its tree, the repository, the person's
+ * library, the builtin), the one served — the first, or, with an origin asked, that origin where it holds the name — and what shadows it.
+ * Its laws are `contracts/definition-served.contract.ts`'s.
  *
  * `definitionsServed`: a namespace's list, every name found served once, `definitionServed` of the origins that hold it in the lookup
  * order (`heldOrigins`, whose laws are the same file's). Its list laws are held by `served.test.ts`, over every list up to a size: tsverify
  * decides none of them today (Z3 runs out of memory at its default work; a loop needs an invariant `src` may not import; `flatMap` over
  * the two proved helpers is unknown).
  *
- * `definitionWriteRefusal`: the api writes your library alone, and only in `default`, where every definition of yours is served; a
- * factory's own definitions change the factory's way. Its laws are `contracts/definition-write.contract.ts`'s.
+ * `definitionWriteRefusal`: the api writes the person's library alone, at the store's level alone (`/api/skills`, `/api/agents`,
+ * `/api/workflows`), and never removes what a factory uses; a factory's own definitions change the factory's way. Its laws are
+ * `contracts/definition-write.contract.ts`'s.
  */
 import type {
   DefinitionOrigin,
@@ -24,7 +25,7 @@ import type {
 import type { DefinitionWriteRefusal } from '../../contracts/definition-write.contract.ts';
 
 export type { DefinitionFound, DefinitionListed, DefinitionOrigin, DefinitionServed } from '../../contracts/definition-served.contract.ts';
-export type { DefinitionWrite, WriteRefused, WriteThere, WriteWay } from '../../contracts/definition-write.contract.ts';
+export type { DefinitionWrite, WriteAt, WriteRefused, WriteThere, WriteWay } from '../../contracts/definition-write.contract.ts';
 
 /**
  * Of the origins that hold one name, the one served — the first, or, with an origin asked, that origin where it holds the name — and the
@@ -40,10 +41,10 @@ export const definitionServed: DefinitionServedOf = (held, asked) => {
 };
 
 /**
- * The order a factory looks a name up in: its own tree, the repository, yours, then Nemia's builtin. `objects`' `DEFINITION_ORIGINS` word
- * for word (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`).
+ * The order a factory looks a name up in: its own tree, the repository, the person's library, then Nemia's builtin. `objects`'
+ * `DEFINITION_ORIGINS` word for word (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`).
  */
-export const LOOKUP = ['factory', 'repo', 'yours', 'builtin'] as const satisfies readonly DefinitionOrigin[];
+export const LOOKUP = ['factory', 'repo', 'user', 'builtin'] as const satisfies readonly DefinitionOrigin[];
 
 /**
  * The origins that hold `name` among `found`, in the lookup order.
@@ -69,33 +70,39 @@ export const definitionsServed = (found: readonly DefinitionFound[], asked: Defi
 const FACTORYS_WAY =
   "A factory's own definitions are its tree, and change the factory's way, never through this path: propose the objects with `nemia propose -f <file> -n <factory>`.";
 
-/** Yours are written in `default`, where every one of them is served. */
-const DEFAULTS_WAY =
-  'Your definitions are written in the `default` namespace, which serves every one of them: send the write to `/api/namespaces/default/…`.';
+/** The person's definitions are written at the store's library, in no namespace. */
+const LIBRARYS_WAY =
+  "The person's definitions are written at the store's library, in no namespace: send the write to `/api/skills`, `/api/agents` or `/api/workflows`, and add the item to a factory with `nemia library add <kind> <name> --factory <factory>`.";
 
 /** Nothing of that name to change. */
-const NONE = 'Nothing is at that name in `default`: list the namespace for the names it holds, or make it with a POST to the list’s path.';
+const NONE = 'Nothing is at that name in the library: list it (`GET /api/<kind>`) for the names it holds, or make it with a POST there.';
 
-/** The repository's and Nemia's definitions are no write of the api's. */
-const NOT_YOURS =
-  "The api writes your library alone, never the repository's checkout nor what Nemia builds in: copy the definition to yours, then write that.";
+/** A builtin is never removed. */
+const BUILTIN_KEPT =
+  "A builtin is never removed from the library: write the person's copy of it instead (`PUT /api/<kind>/<name>`), which shadows it.";
 
-/** The namespace every definition of yours is served and written in. */
-const DEFAULT = 'default';
+/**
+ * A library definition a factory uses is not removed.
+ * @param users The factories that use it.
+ */
+const inUse = (users: readonly string[]): string =>
+  `${users.join(', ')} use${users.length === 1 ? 's' : ''} it: take it off each first (\`nemia library rm <kind> <name> --factory <factory>\`), then remove it.`;
 
 /**
  * Why the api refuses a write of a definition, with the way to make it instead, or null where it writes it.
- * @param namespace The namespace the write is sent to.
+ * @param at Where the write is sent: the store's library, or a factory's namespace.
  * @param does What the write does: create, replace, remove or act.
  * @param there The origin that holds the name served now, or `none` where nothing does.
+ * @param users The factories that use the definition: each that has added it or fills a step with it.
  */
-export const definitionWriteRefusal: DefinitionWriteRefusal = (namespace, does, there) => {
-  if (does !== 'create' && there === 'factory') return { kind: 'Invalid', way: 'factory', message: FACTORYS_WAY };
-  if (namespace !== DEFAULT)
-    return does === 'create'
-      ? { kind: 'Invalid', way: 'factory', message: FACTORYS_WAY }
-      : { kind: 'Invalid', way: 'default', message: DEFAULTS_WAY };
-  if (does === 'create' || there === 'yours') return null;
+export const definitionWriteRefusal: DefinitionWriteRefusal = (at, does, there, users) => {
+  if (at === 'factory') {
+    if (does === 'create' || there === 'factory') return { kind: 'Invalid', way: 'factory', message: FACTORYS_WAY };
+    return { kind: 'Invalid', way: 'library', message: LIBRARYS_WAY };
+  }
+  if (does === 'create') return null;
   if (there === 'none') return { kind: 'Missing', message: NONE };
-  return does === 'act' ? null : { kind: 'Invalid', message: NOT_YOURS };
+  if (does !== 'remove') return null;
+  if (there === 'builtin') return { kind: 'Invalid', message: BUILTIN_KEPT };
+  return users.length === 0 ? null : { kind: 'Conflict', users: [...users], message: inUse(users) };
 };

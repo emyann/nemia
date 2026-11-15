@@ -70,7 +70,7 @@ export default {
       await photograph(graph, path.join(OUT, `run-routed-graph-${await themeOf(page)}.png`));
       await photograph(page, path.join(OUT, `run-routed-page-${await themeOf(page)}.png`), { fullPage: true });
 
-      await page.goto(new URL(`/workflows/yours/${ROUTED.folder}`, page.url()).href, { waitUntil: 'load' });
+      await page.goto(new URL(`/workflows/user/${ROUTED.folder}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
       const folder = page.locator('.react-flow__node');
       await expectVisible(

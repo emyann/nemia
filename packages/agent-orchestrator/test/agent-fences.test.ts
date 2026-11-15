@@ -1532,7 +1532,7 @@ test('her fence asks every write that prompts and every write form of a command 
     ['nemia factory instruction --store f', 'ask'],
     ['nemia agents custom --clear ada', 'ask'],
     ['nemia agents custom ada --file -', 'ask'],
-    ['nemia agents write ada', 'ask'],
+    ['nemia agents write ada', 'allow'],
     ['nemia agents write factory scribe --file scribe.md', 'deny'],
     ['nemia tick', 'deny'],
     ['nemia up --port 8787', 'deny'],

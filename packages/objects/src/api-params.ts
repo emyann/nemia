@@ -26,6 +26,21 @@ export const namespaceParams = {
   }),
 };
 
+/** An item of the store's library, in no namespace, by its name. */
+export const libraryParams = {
+  name: Schema.String.annotate({ description: "The library item's name, unique in the store's library for its kind." }),
+};
+
+/** A factory's add of a library item, in the factory's namespace, named `<kind>.<name>`. */
+export const libraryAddParams = {
+  namespace: Schema.String.annotate({
+    description: 'The namespace the add is in: the name of its factory, default for one that names none.',
+  }),
+  name: Schema.String.annotate({
+    description: 'The add, `<kind>.<name>`: the kind of the library item (Agent, Skill, McpServer) and its name.',
+  }),
+};
+
 /** A factory, by its name. */
 export const factoryParams = { name: Schema.String.annotate({ description: "The factory's name." }) };
 export const factoryWorkflowParams = {
@@ -70,13 +85,13 @@ export const originQuery = {
 
 /**
  * The query of an agent's custom instructions: the repository whose agents the name is looked for in, one a factory works on; none for
- * yours and the builtins alone.
+ * the person's library and the builtins alone.
  */
 export const instructionsQuery = {
   repo: Schema.optionalKey(
     Schema.String.annotate({
       description:
-        "The path on the api's machine of a repository a factory works on, whose agents the name is looked for in; absent, yours and the builtins alone.",
+        "The path on the api's machine of a repository a factory works on, whose agents the name is looked for in; absent, the person's library and the builtins alone.",
     }),
   ),
 };
@@ -91,27 +106,28 @@ export const removeQuery = {
 };
 
 /**
- * The repository a definition is read or judged on beside yours (`?repo=`), a path on the api's machine: one a factory works on, or a
- * folder under one, read as that repository; none where none is named, yours and the builtins alone.
+ * The repository a definition is read or judged on beside the person's library (`?repo=`), a path on the api's machine: one a factory works
+ * on, or a folder under one, read as that repository; none where none is named, the person's library and the builtins alone.
  */
 export const repoQuery = {
   repo: Schema.optionalKey(
     Schema.String.annotate({
       description:
-        "The path on the api's machine of a repository a factory works on, or a folder under one, read as that repository; absent, yours and the builtins alone.",
+        "The path on the api's machine of a repository a factory works on, or a folder under one, read as that repository; absent, the person's library and the builtins alone.",
     }),
   ),
 };
 
 /**
  * The query of a workflow's draft read (`POST /api/workflows/read`): the factory it is read for (`?factory=`), whose hires fill its steps
- * as a run of it there would read them, and the repository (`?repo=`) among the factory's; none for yours and the builtins alone.
+ * as a run of it there would read them, and the repository (`?repo=`) among the factory's; none for the person's library and the
+ * builtins alone.
  */
 export const draftReadQuery = {
   factory: Schema.optionalKey(
     Schema.String.annotate({
       description:
-        'The name of the factory the workflow is read for, whose hires fill its steps as a run of it there would read them; absent, yours and the builtins alone.',
+        'The name of the factory the workflow is read for, whose hires fill its steps as a run of it there would read them; absent, the user library and the builtins alone.',
     }),
   ),
   ...repoQuery,

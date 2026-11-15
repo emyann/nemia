@@ -280,7 +280,7 @@ export const workflowFactories = (workflow: Pick<WorkflowListing, 'name' | 'from
   const here = factories.find((f) => f.default)?.repos[0];
   return factories
     .filter((f) => !f.default && f.error === null && f.workflows !== null && f.workflows.includes(workflow.name))
-    .filter((f) => workflow.from === 'yours' || (here !== undefined && f.repos.includes(here)))
+    .filter((f) => workflow.from === 'user' || (here !== undefined && f.repos.includes(here)))
     .map((f) => f.name)
     .sort();
 };
@@ -318,14 +318,14 @@ export const listPlace = (address: PagePlace, factories: readonly Factory[]): Li
 };
 
 /**
- * The word for where a workflow read from `from` comes from, read in `factory`: `yours` for one of yours anywhere; `the factory's` for one
- * of the factory's own tree; `this repository` for one read with no factory or in the default one; `the factory's` in a named factory,
- * whose folder its page prints — the word a route kept on Hono says `repo` for its tree too (`sourceOf`).
+ * The word for where a workflow read from `from` comes from, read in `factory`: `the user library` for one of the user library, anywhere;
+ * `the factory's` for one of the factory's own tree; `this repository` for one read with no factory or in the default one; `the factory's`
+ * in a named factory, whose folder its page prints — the word a route kept on Hono says `repo` for its tree too (`sourceOf`).
  * @param from Where the workflow was read from, as the list says it.
  * @param factory The factory's name it is read in, or undefined where it is read with none.
  */
 export const fromWord = (from: WorkflowListing['from'], factory?: string): string => {
-  if (from === 'yours') return 'yours';
+  if (from === 'user') return 'the user library';
   if (from === 'factory') return "the factory's";
   return factory === undefined || factory === DEFAULT_NAMESPACE ? 'this repository' : "the factory's";
 };

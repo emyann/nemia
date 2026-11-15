@@ -176,10 +176,12 @@ const STORE_LINES: readonly Case[] = [
   },
 ];
 
-/** The two words a factory's lines say, spelled by hand as the owner named them, each with its `ConflictsPending` condition's message. */
+/** The four words a factory's lines say, spelled by hand as the owner named them, each with its `ConflictsPending` condition's message. */
 const FACTORY_LINES: readonly Case[] = [
   { kind: 'Factory', word: 'conflicts pending', note: 'agents/coder.md: choose one', reason: 'ConflictsPending' },
   { kind: 'Factory', word: 'conflicts settled', note: 'merged', reason: 'ConflictsSettled' },
+  { kind: 'Factory', word: 'library add missing', note: 'Skill notes is no longer in the library', reason: 'AddsMissing' },
+  { kind: 'Factory', word: 'library adds resolved', reason: 'AddsResolved' },
 ];
 
 /** A parked step's words (`pausedWord`): paused between two calls, after the call it stopped after, or with the call it cut. */
@@ -263,8 +265,8 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
         `${runCodes('waiting', null, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
       );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 52, 'the table the owner named has 52 entries');
-    assert.equal(REASON_CODES.length, 41, 'of 41 distinct codes');
+    assert.equal(entries.length, 54, "the table the owner named has 54 entries, a factory's library adds two of them");
+    assert.equal(REASON_CODES.length, 43, 'of 43 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],

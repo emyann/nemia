@@ -99,8 +99,8 @@ function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: bo
   if (agents.length === 0)
     return (
       <p data-hire-none className="text-body-small text-muted-foreground">
-        {page.from === 'yours' ? 'None of your agents reads' : `None of ${whose(page)} agents reads`}, so there is no agent to hire into
-        this step in {page.factory}.
+        {page.from === 'user' ? 'None of your agents reads' : `None of ${whose(page)} agents reads`}, so there is no agent to hire into this
+        step in {page.factory}.
       </p>
     );
   return (
@@ -139,7 +139,7 @@ function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: bo
  * repository's, said on its page alone: through a card, or by copying the workflow into yours.
  */
 function NewAgent({ page, where }: { page: WorkflowStepPage; where: 'page' | 'row' }) {
-  if (page.from === 'yours')
+  if (page.from === 'user')
     return (
       <RouteLink
         to="/agents/new"

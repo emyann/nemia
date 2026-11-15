@@ -25,17 +25,40 @@ import { LOOKUP, type DefinitionOrigin } from '../definition/served.ts';
  * `.claude/skills/` are read, and the store (`WF_ROOT`), whose `workflows/agents/` and `workflows/skills/` are. With neither, a workflow
  * finds only what is beside it.
  */
-export type Places = { repo?: string; home?: string };
+export type Places = { repo?: string; home?: string; added?: LibraryAdded };
+
+/**
+ * The names a factory has added from the store's library, by kind, which its lookup reads the library for (`lookedUp`'s `added`). Absent
+ * from `Places`, the lookup reads the library for every name: a read outside any factory, or a factory with no record of its adds, whose
+ * adds are those its workflows resolve today (`libraryAddsOf`), which an ungated read resolves the same.
+ */
+export type LibraryAdded = { readonly agents: ReadonlySet<string>; readonly skills: ReadonlySet<string> };
+
+/**
+ * Whether the lookup in `places` may read the library for `name`, an agent's or a skill's.
+ * @param places The places looked in, with the factory's adds where it has a record of them.
+ * @param kind Whether the name is an agent's or a skill's.
+ * @param name The name looked up.
+ */
+export const addedIn = (places: Places, kind: 'agents' | 'skills', name: string): boolean =>
+  places.added === undefined || places.added[kind].has(name);
+
+/**
+ * The store's library root of `places`, `<home>/workflows`, or undefined where no store is looked in.
+ * @param places The places looked in.
+ */
+export const libraryRootOf = (places: Places): string | undefined =>
+  places.home ? path.join(path.resolve(places.home), 'workflows') : undefined;
 
 /** The folder of a repository that holds its own `agents/` and `skills/`, which a session there reads too. */
-const REPOSITORY_HOLDER = '.claude';
+export const REPOSITORY_HOLDER = '.claude';
 
 /**
  * The folders a workflow's agents and skills are looked for in, each holding an `agents/` and a `skills/`, in the one order a name is
  * looked up (`LOOKUP`, which the served definitions read too): the workflow's own root (the folder beside it, `agentsDir`'s parent), as a
- * factory's tree is, then the repository's `.claude/`, then yours, the store's `workflows/`. The builtin skills hold no root: they are
- * found past every root (`skillsFor`). So the repository wins over the store, and a workflow of the store finds its own first. One
- * folder is listed once.
+ * factory's tree is, then the repository's `.claude/`, then the person's library, the store's `workflows/`. The builtin skills hold no
+ * root: they are found past every root (`skillsFor`). So the repository wins over the store, and a workflow of the store finds its own
+ * first. One folder is listed once.
  * @param workflowDir The workflow's folder, whose root is looked in first.
  * @param places The repository and the store's root, each looked in where given.
  */
@@ -43,7 +66,7 @@ export function lookupRoots(workflowDir: string, places: Places = {}): string[] 
   const rootOf: Readonly<Record<DefinitionOrigin, string | undefined>> = {
     factory: path.dirname(agentsDir(workflowDir)),
     repo: places.repo ? path.join(path.resolve(places.repo), REPOSITORY_HOLDER) : undefined,
-    yours: places.home ? path.join(path.resolve(places.home), 'workflows') : undefined,
+    user: libraryRootOf(places),
     builtin: undefined,
   };
   return [...new Set(LOOKUP.flatMap((origin) => rootOf[origin] ?? []))];
@@ -59,12 +82,14 @@ export const repositoryOf = (root: string): string | undefined =>
   path.basename(root) === 'workflows' || path.basename(root) === REPOSITORY_HOLDER ? path.dirname(root) : undefined;
 
 /**
- * The roots as the precedence reads them (`lookedUp`): which repository each is a place of, and whether it holds the name.
+ * The roots as the precedence reads them (`lookedUp`): which repository each is a place of, whether it holds the name, and whether it is
+ * the store's library — the library root, where it is not the workflow's own (the first, which a library workflow's own root is).
  * @param roots The folders looked in, in their order (`lookupRoots`).
  * @param holds Whether the root at that index holds the name.
+ * @param library The store's library root (`libraryRootOf`), or undefined where no store is looked in.
  */
-export const lookupOf = (roots: readonly string[], holds: (root: number) => boolean): LookupRoot[] =>
-  roots.map((root, at) => ({ repo: repositoryOf(root), has: holds(at) }));
+export const lookupOf = (roots: readonly string[], holds: (root: number) => boolean, library?: string): LookupRoot[] =>
+  roots.map((root, at) => ({ repo: repositoryOf(root), has: holds(at), library: at > 0 && library !== undefined && root === library }));
 
 /**
  * The names in the folder `dir`, unsorted; none for a folder that is not there or cannot be read.
@@ -120,10 +145,11 @@ export function oneFolder(a: string, b: string): boolean {
 
 /**
  * The skills of the roots `roots`, by bare name, each the folder it is or its refusal, the package's skills found last
- * (`packageSkillFolders`). One folder under
+ * (`packageSkillFolders`), a library skill and a builtin one only where the factory of `places` has added it. One folder under
  * both of a repository's places, the one a link to the other, is one skill, given from the first.
  */
-function rootSkills(roots: readonly string[]): Map<string, string | WorkflowError> {
+function rootSkills(roots: readonly string[], places: Places): Map<string, string | WorkflowError> {
+  const library = libraryRootOf(places);
   const held = roots.map((root) =>
     entriesOf(path.join(root, SKILLS_FOLDER))
       .sort()
@@ -131,7 +157,10 @@ function rootSkills(roots: readonly string[]): Map<string, string | WorkflowErro
   );
   const found = new Map<string, string | WorkflowError>();
   for (const name of new Set(held.flat())) {
-    const looked = lookedUp(lookupOf(roots, (at) => held[at]?.includes(name) === true));
+    const looked = lookedUp(
+      lookupOf(roots, (at) => held[at]?.includes(name) === true, library),
+      addedIn(places, 'skills', name),
+    );
     if (looked.kind === 'none') continue;
     const at = path.join(roots[looked.at] ?? '', SKILLS_FOLDER, name);
     const again = looked.kind === 'both' ? path.join(roots[looked.again] ?? '', SKILLS_FOLDER, name) : undefined;
@@ -144,7 +173,8 @@ function rootSkills(roots: readonly string[]): Map<string, string | WorkflowErro
         : (skillLinkRefusal(at) ?? rulesRefusal(at) ?? at),
     );
   }
-  for (const [name, at] of packageSkillFolders()) if (!found.has(name)) found.set(name, at);
+  for (const [name, at] of packageSkillFolders())
+    if (!found.has(name) && (typeof at !== 'string' || !isBuiltinSkill(at) || addedIn(places, 'skills', name))) found.set(name, at);
   return found;
 }
 
@@ -225,7 +255,7 @@ function folderSkill(written: string, given: Required<GivenSkill>, repo: string 
 export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound {
   const roots = lookupRoots(workflowDir, places);
   const looked = [...roots.map((root) => path.join(root, SKILLS_FOLDER)), PLACE_SKILLS, BUILTIN_SKILLS];
-  const all = rootSkills(roots);
+  const all = rootSkills(roots, places);
   const nested = new Map<string, string | WorkflowError>();
   const get = (name: string): string | WorkflowError | undefined => {
     const given = givenSkillOf(name);

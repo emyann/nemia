@@ -121,7 +121,7 @@ const theirs = path.join(repo, 'workflows', 'good');
 write(path.join(theirs, 'implement.md'), '---\nplace: git\nmodel: opus\n---\nImplement it.\n');
 
 /** A workflow's steps as GET /api/workflows lists them. */
-async function listedSteps(name: string, from = 'yours'): Promise<ListedStep[]> {
+async function listedSteps(name: string, from = 'user'): Promise<ListedStep[]> {
   const all = await listedIn<{ name: string; from: string; steps: ListedStep[] }>(app, 'workflows', `origin=${from}&${ON_REPO}`);
   const found = all.find((w) => w.name === name && w.from === from);
   assert.ok(found, `${from} lists ${name}`);
@@ -133,14 +133,14 @@ const json = { 'content-type': 'application/json' };
  * A PUT of `body`: sent with the folder's version as it is on disk now, as a board that has just read it sends it — unless the body says
  * `version` itself, which the tests of a stale or a missing one do.
  */
-const put = (name: string, body: unknown, from = 'yours', headers: Record<string, string> = json) => {
+const put = (name: string, body: unknown, from = 'user', headers: Record<string, string> = json) => {
   const read =
     typeof body === 'object' && body !== null && !Array.isArray(body) && !('version' in body)
       ? { version: versionOf(path.join(STORE, decodeURIComponent(name))), ...body }
       : body;
-  return sentTo('PUT', `/api/namespaces/default/workflows/${name}?${ON_REPO}`, read, headers);
+  return sentTo('PUT', `/api/workflows/${name}?${ON_REPO}`, read, headers);
 };
-const post = (body: unknown, _from = 'yours', headers: Record<string, string> = json) =>
+const post = (body: unknown, _from = 'user', headers: Record<string, string> = json) =>
   sentTo('POST', `/api/namespaces/default/workflows?${ON_REPO}`, body, headers);
 
 type SentStep = { name?: unknown; spec?: Record<string, unknown>; body?: unknown; own?: { keys: string[]; body: string } | null };
@@ -177,7 +177,7 @@ async function sentTo(method: 'POST' | 'PUT', url: string, body: unknown, header
       ...(schemas !== undefined && { schemas }),
     });
   }
-  const res = await app.request(url, { method, headers, body: sent });
+  const res = await app.request(url.replace(/^\/api\/namespaces\/default\//, '/api/'), { method, headers, body: sent });
   if (!res.ok) return res;
   return new Response(JSON.stringify({ workflow: asWorkflowListing((await res.json()) as never) }), { status: res.status, headers: json });
 }
@@ -228,9 +228,9 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
 test('a person builds a workflow of theirs on the board: the form, a new folder, a save as listed, a change drawn, schemas pasted', async (t) => {
   const s = story(t);
   await s.test(
-    "GET /api/workflows/keys is the form a step is drawn in: every key in the package's order with its line of meaning, how it is set, and the words it may take",
+    "GET /api/workflow-keys is the form a step is drawn in: every key in the package's order with its line of meaning, how it is set, and the words it may take",
     async () => {
-      const res = await app.request('/api/workflows/keys');
+      const res = await app.request('/api/workflow-keys');
       assert.equal(res.status, 200);
       const form = (await res.json()) as KeyForm;
       assert.deepEqual(
@@ -268,7 +268,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
         JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false }),
       );
       write(path.join(STORE, 'agents', 'broken.md'), '---\nloop: build\n---\nWired wrong.\n');
-      const withAgents = (await (await app.request('/api/workflows/keys')).json()) as KeyForm;
+      const withAgents = (await (await app.request('/api/workflow-keys')).json()) as KeyForm;
       const agents = withAgents.keys.find((k) => k.key === 'agent');
       assert.deepEqual(
         [agents?.kind, agents?.choices?.includes('picked'), agents?.choices?.includes('broken')],
@@ -384,7 +384,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       const declared = path.join(root, 'a2a-agents.json');
       t.after(() => fs.rmSync(declared, { force: true }));
       write(declared, JSON.stringify({ reviewer: { url: 'https://agents.example.com/reviewer' } }));
-      const form = (await (await app.request('/api/workflows/keys')).json()) as KeyForm;
+      const form = (await (await app.request('/api/workflow-keys')).json()) as KeyForm;
       assert.deepEqual(form.keys.find((k) => k.key === 'harness')?.choices, [...HARNESSES, 'a2a:reviewer']);
       for (const key of ['effort', 'permissionMode', 'sandbox'] as const)
         assert.equal(
@@ -399,7 +399,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       );
 
       write(declared, '{ "reviewer": ');
-      const broken = await app.request('/api/workflows/keys');
+      const broken = await app.request('/api/workflow-keys');
       assert.equal(broken.status, 200, 'a file of agents refused as it stands still draws the form');
       assert.deepEqual(
         ((await broken.json()) as KeyForm).keys.find((k) => k.key === 'harness')?.choices,
@@ -457,7 +457,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
           )
         ).find((w) => w.name === 'fresh'),
       );
-      assert.equal(saved.workflow.from, 'yours');
+      assert.equal(saved.workflow.from, 'user');
       assert.deepEqual(
         loadWorkflows(dir).map((s) => renderStep(s)),
         ['---\nplace: git\nharness: codex\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n'],
@@ -505,7 +505,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
             root,
             inRoot,
           )
-        ).find((w) => w.name === 'as-listed' && w.from === 'yours'),
+        ).find((w) => w.name === 'as-listed' && w.from === 'user'),
         'answered as the listing reads it',
       );
     },
@@ -743,7 +743,7 @@ test('a step with an agent on the board: listed resolved, with its layers and se
       const dir = attached('with-servers');
       const [build] = await listedSteps('with-servers');
       assert.deepEqual([build.spec.mcp, build.mcp], [[], []], 'neither the step nor its agent names a server');
-      const form = (await (await app.request('/api/workflows/keys')).json()) as KeyForm;
+      const form = (await (await app.request('/api/workflow-keys')).json()) as KeyForm;
       assert.equal(form.keys.find((k) => k.key === 'mcp')?.kind, 'list');
       assert.ok(form.policyKeys.includes('mcp'));
       const res = await put('with-servers', {
@@ -820,7 +820,7 @@ test('a step with an agent on the board: listed resolved, with its layers and se
             root,
             inRoot,
           )
-        ).find((w) => w.name === 'skilled' && w.from === 'yours');
+        ).find((w) => w.name === 'skilled' && w.from === 'user');
         assert.equal(
           listing?.error,
           null,
@@ -1032,8 +1032,8 @@ test('a former key on the board: listed and saved under the name it has now, and
     async () => {
       const dir = path.join(STORE, 'placed');
       write(path.join(dir, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\n---\nWrite the note.\n');
-      const listed = await listedIn<{ name: string; from: string; folderTeam: boolean }>(app, 'workflows', `origin=yours&${ON_REPO}`);
-      const folder = listed.find((w) => w.name === 'placed' && w.from === 'yours');
+      const listed = await listedIn<{ name: string; from: string; folderTeam: boolean }>(app, 'workflows', `origin=user&${ON_REPO}`);
+      const folder = listed.find((w) => w.name === 'placed' && w.from === 'user');
       assert.equal(folder?.folderTeam, true, 'the former spelling is still a folder team');
       const [step] = (await listedSteps('placed')) as [ListedStep];
       assert.deepEqual([step.spec.place, step.spec.workspace], ['folder', null], 'listed under the key it has now');
@@ -1114,14 +1114,13 @@ test('a former key on the board: listed and saved under the name it has now, and
 
 test("the builder's routes: a body not in its shape, a source not yours, a folder not there or taken — refused, and nothing written", async (t) => {
   await t.test(
-    "a write to the repository's workflow is refused 422 — the api writes your library alone — and one sent to a factory's namespace is refused naming default; nothing is written there or in yours",
+    "a write to the repository's workflow is refused 404 — the library holds it not — and one sent to a factory's namespace is refused naming default; nothing is written there or in yours",
     async () => {
       planned('mine');
       const before = [snapshot(theirs), snapshot(path.join(STORE, 'mine'))];
       const step = { name: 'implement', spec: spec({ model: 'sonnet' }), body: 'Implement it my way.' };
       const repos = await put('good', { steps: [step] });
-      assert.equal(repos.status, 422, "PUT …/default/workflows/good, the repository's: the api writes yours alone");
-      assert.equal(((await repos.json()) as { way?: string }).way, undefined, 'its fix is in default itself: no other way');
+      assert.equal(repos.status, 404, "PUT /api/workflows/good, the repository's: the library holds no such workflow");
       const elsewhere = await sentTo('PUT', '/api/namespaces/elsewhere/workflows/mine', { steps: [step] }, json);
       assert.equal(elsewhere.status, 404, 'a namespace that is no factory has nothing to write');
       assert.deepEqual([snapshot(theirs), snapshot(path.join(STORE, 'mine'))], before);
@@ -1695,7 +1694,7 @@ test("the form a step is drawn in reads yours' agents through the app's Agent do
     ),
   );
   assert.equal(fs.existsSync(path.join(STORE, 'agents', 'remembered.md')), false, 'the agent is held by the door, not on disk');
-  const res = await own.request('/api/workflows/keys');
+  const res = await own.request('/api/workflow-keys');
   assert.equal(res.status, 200);
   const form = (await res.json()) as KeyForm;
   assert.deepEqual(

@@ -1,12 +1,12 @@
 import { defaultStringifySearch } from '@tanstack/react-router';
-import { BookOpen, Bot, ChartColumn, Factory, Hourglass, type LucideIcon, Settings } from 'lucide-react';
+import { BookOpen, Bot, ChartColumn, Factory, Hourglass, Library, type LucideIcon, Settings } from 'lucide-react';
 import { openRunsQuery } from '../../lib/api/runs.ts';
 
 /** Whether `path` is `to` or a page under it: `/agents/new` is under `/agents`, `/agentsx` is not. */
 const under = (to: string) => (path: string) => path === to || path.startsWith(`${to}/`);
 
 /** A destination of the store's rail, by its key. */
-type RailId = 'factories' | 'waiting' | 'agents' | 'skills' | 'stats' | 'settings';
+type RailId = 'factories' | 'waiting' | 'agents' | 'skills' | 'library' | 'stats' | 'settings';
 
 /** A place of a factory's pane, by its key: the factory's floor, then its lists, then its settings. */
 export type PanePlace = 'floor' | 'runs' | 'inbox' | 'workflows' | 'agents' | 'skills' | 'settings';
@@ -49,6 +49,7 @@ const STORE_SEATS: readonly { lights: (path: string) => boolean; rail: RailId | 
   { lights: under('/agents/skills'), rail: 'skills', name: 'Skills' },
   { lights: under('/agents'), rail: 'agents', name: 'Agents' },
   { lights: under('/workflows'), rail: 'agents', name: 'Workflows' },
+  { lights: under('/library'), rail: 'library', name: 'Library' },
   { lights: under('/stats'), rail: 'stats', name: 'Stats' },
   { lights: (path) => SETTINGS_TABS.some((tab) => under(tab.to)(path)), rail: 'settings', name: 'Settings' },
   { lights: under('/chat'), rail: 'nemia', name: 'Nemia' },
@@ -97,7 +98,8 @@ export type RailGroup = { readonly id: 'across' | 'yours' | 'you'; readonly labe
 
 /**
  * The store rail's groups, under Nemia's face: what spans factories (Factories, the canvas of them all, and Waiting, what waits on the
- * person in every factory); the person's own library (their agents and their skills); and at the foot the person's (Stats and Settings).
+ * person in every factory); the person's own library (their agents, their skills, and the store's Library of every kind with the factories
+ * that add each); and at the foot the person's (Stats and Settings).
  */
 export const RAIL_GROUPS: readonly RailGroup[] = [
   {
@@ -114,6 +116,7 @@ export const RAIL_GROUPS: readonly RailGroup[] = [
     items: [
       { id: 'agents', label: 'Agents', icon: Bot },
       { id: 'skills', label: 'Skills', icon: BookOpen },
+      { id: 'library', label: 'Library', icon: Library },
     ],
   },
   {
@@ -126,12 +129,13 @@ export const RAIL_GROUPS: readonly RailGroup[] = [
   },
 ];
 
-/** Where each destination of the rail leads: Skills to its section of the Agents page, the nearest page there is until the Library. */
+/** Where each destination of the rail leads: Skills to its section of the Agents page, the Library to its own page. */
 const RAIL_HREF: Readonly<Record<RailId, string>> = {
   factories: '/',
   waiting: '/runs',
   agents: '/agents',
   skills: '/agents#skills',
+  library: '/library',
   stats: '/stats',
   settings: '/settings',
 };

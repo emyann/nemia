@@ -65,7 +65,7 @@ test('`nameOf`: the longest moved name a command opens with, else its first word
     [['inbox'], 'inbox'],
     [['factory', 'hire', 'f', 'a'], 'factory hire'],
     [['decide', 'r-1'], 'decide'],
-    [['workflows', 'write', 'yours', 'w', '--folder', 'd'], 'workflows write'],
+    [['workflows', 'write', 'user', 'w', '--folder', 'd'], 'workflows write'],
     [['agents', 'write', '--help'], 'agents write'],
     [['skills', 'write'], 'skills write'],
     [['workflows', 'ls'], 'workflows'],
@@ -282,7 +282,7 @@ test('`--local` is refused, exit 2, naming a `nemia` command, for a read, a move
   ] as const)
     for (const argv of [
       ['show', 'r', '--local'],
-      ['workflows', 'write', 'yours', 'w', '--folder', 'd', '--local'],
+      ['workflows', 'write', 'user', 'w', '--folder', 'd', '--local'],
       ['up', '--local'],
     ]) {
       const { code, said, out } = await nemia(argv, laptop.env, hook);
@@ -292,11 +292,11 @@ test('`--local` is refused, exit 2, naming a `nemia` command, for a read, a move
     }
 });
 
-test("`nemia workflows write yours w --folder d` is the client's under this machine's context and a remote one; `nemia workflows ls` spawns the old path", async () => {
+test("`nemia workflows write user w --folder d` is the client's under this machine's context and a remote one; `nemia workflows ls` spawns the old path", async () => {
   const hook = plantedEntry('nemia-route-moved-planted-');
   const local = localLaptop('nemia-route-moved-');
   for (const laptop of [local, remoteLaptop('nemia-route-moved-remote-')]) {
-    const argv = ['workflows', 'write', 'yours', 'w', '--folder', path.join(scratch('nemia-route-nofolder-'), 'd')];
+    const argv = ['workflows', 'write', 'user', 'w', '--folder', path.join(scratch('nemia-route-nofolder-'), 'd')];
     const { code, said, out } = await nemia(argv, laptop.env, hook);
     assert.equal(code, 2, `the client refused the folder that is not there, before asking anything: ${said}`);
     assert.match(said, /nofolder/, 'naming the folder');

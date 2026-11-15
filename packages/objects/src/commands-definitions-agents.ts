@@ -1,7 +1,7 @@
 /**
  * The words of the agents' verbs the client holds but `agents write` (`commands-writers.ts`): the listing and one agent's card, where agent
- * files are and one copied into yours, a person's custom instructions for one, and one of yours removed and tried. Listed by
- * `commands-definitions.ts`. Pure.
+ * files are and one copied into the person's library, a person's custom instructions for one, and one of the library's removed and tried.
+ * Listed by `commands-definitions.ts`. Pure.
  */
 import { CLI, type Args, type CommandWords, type Flag, type Positional, type Spec } from './command.ts';
 import { leftOut } from './commands-flags.ts';
@@ -16,10 +16,10 @@ const textIn = (args: Args, key: string): string | undefined => {
 /** The refusal of a value left out of each of `nemia agents`' two flags, saying what it takes. */
 const AGENTS_TAKES = {
   '--repo': '--repo takes the repository whose workflows/agents to read: nemia agents --repo <r>',
-  '--from': '--from takes which place the agent is in: nemia agents card <name> --from repo|yours',
+  '--from': '--from takes which place the agent is in: nemia agents card <name> --from repo|user',
 } as const;
 
-/** `--repo <r>` once, and `--from repo|yours` once, which the listing takes and leaves unread. */
+/** `--repo <r>` once, and `--from repo|user` once, which the listing takes and leaves unread. */
 const AGENTS_FLAGS = (['--repo', '--from'] as const).map((flag): Flag => ({
   flag,
   kind: 'text',
@@ -34,29 +34,29 @@ const agentsSpec = (positionals: readonly Positional[]): Spec => ({
   flags: AGENTS_FLAGS,
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `${CLI} agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
-      : `${CLI} agents takes no argument but card <name>, custom <name>, sources, copy <file>, or write, remove and try on yours: nemia agents, nemia agents card ${arg}, or nemia agents custom ${arg}.`,
+      ? `${CLI} agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|user.`
+      : `${CLI} agents takes no argument but card <name>, custom <name>, sources, copy <file>, or write, remove and try on the library's (user): nemia agents, nemia agents card ${arg}, or nemia agents custom ${arg}.`,
   apart: (_value, flag) => AGENTS_TAKES[flag as keyof typeof AGENTS_TAKES],
 });
 
-/** Refused of `nemia agents`' flags: a value empty or starting `--`, which reads as the value left out, and a place but repo or yours. */
+/** Refused of `nemia agents`' flags: a value empty or starting `--`, which reads as the value left out, and a place but repo or user. */
 function agentsRefusal(args: Args): string | null {
   for (const flag of ['--repo', '--from'] as const) {
     const value = textIn(args, flag.slice(2));
     if (value !== undefined && (!value || value.startsWith('--'))) return AGENTS_TAKES[flag];
   }
   const from = textIn(args, 'from');
-  if (from === undefined || from === 'repo' || from === 'yours') return null;
-  return `${CLI} agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`;
+  if (from === undefined || from === 'repo' || from === 'user') return null;
+  return `${CLI} agents --from takes repo or user, not ${from}: repo is <repo>/workflows/agents, user is the store's library.`;
 }
 
-/** `nemia agents`: every agent of both places, the repository's then yours. */
+/** `nemia agents`: every agent of both places, the repository's then the library's. */
 export const AGENTS_WORDS = {
   name: 'agents',
   served: [{ endpoint: 'agents.list' }],
   usage: '[--repo .]',
   help: [
-    "the agents a step may name, the repository's then yours: what each is",
+    "the agents a step may name, the repository's then the library's: what each is",
     'for, what it says it can do (an entry for each skill, read off its',
     'SKILL.md), and the skills it is given (its skills:)',
   ],
@@ -74,7 +74,7 @@ export const AGENTS_WORDS = {
 export const AGENTS_CARD_WORDS = {
   name: 'agents card',
   served: [{ endpoint: 'agents.card' }],
-  usage: '<name> [--repo .] [--from repo|yours]',
+  usage: '<name> [--repo .] [--from repo|user]',
   help: [
     'that agent in the shape of an A2A Agent Card, JSON on stdout and',
     'nothing else — every field the protocol marks REQUIRED but',
@@ -91,12 +91,15 @@ export const AGENTS_CARD_WORDS = {
   },
 } as const satisfies CommandWords;
 
-/** `nemia agents sources`: every agent file the store knows of, to copy into your library, and the folder named with `--path`. */
+/** `nemia agents sources`: every agent file the store knows of, to copy into the store's library, and the folder named with `--path`. */
 export const AGENTS_SOURCES_WORDS = {
   name: 'agents sources',
   served: [{ endpoint: 'agents.sources' }],
   usage: '[--path <folder>]',
-  help: ['the agent files the store knows of, to copy into your library:', "each repository's, yours, and those of a --path <folder>"],
+  help: [
+    "the agent files the store knows of, to copy into the store's library:",
+    "each repository's, the library's, and those of a --path <folder>",
+  ],
   spec: {
     positionals: [],
     flags: [
@@ -114,7 +117,7 @@ export const AGENTS_SOURCES_WORDS = {
   class: 'read',
   only: {
     side: 'cli',
-    why: "the api serves it as the Agent's `sources` verb of `objects`' Api (`GET /api/agents/sources`), which calls this entry's handler: no route of its own",
+    why: "the api serves it as the Agent's `sources` verb of `objects`' Api (`GET /api/agent-sources`), which calls this entry's handler: no route of its own",
   },
 } as const satisfies CommandWords;
 
@@ -179,20 +182,20 @@ export const AGENTS_CUSTOM_WORDS = {
   class: { bare: 'read', sets: 'ask', setsBy: ['--file', '--clear'], readsBy: ['--repo'] },
   only: {
     side: 'cli',
-    why: "the api serves it as the Agent's `instructions`, `putInstructions` and `deleteInstructions` verbs of `objects`' Api (`/api/namespaces/:namespace/agents/:name/instructions`) and Nemia's at `/api/nemia/instructions`, each calling this entry's handler: no route of its own",
+    why: "the api serves it as the Agent's `instructions`, `putInstructions` and `deleteInstructions` verbs of `objects`' Api (read at `/api/namespaces/:namespace/agents/:name/instructions`, written at the library's `/api/agents/:name/instructions`) and Nemia's at `/api/nemia/instructions`, each calling this entry's handler: no route of its own",
   },
 } as const satisfies CommandWords;
 
 const COPY_USAGE = '<file> [--as <name>] [--keep <part>]...';
 
-/** `nemia agents copy`: an agent file copied into your library, with its schema and skills. */
+/** `nemia agents copy`: an agent file copied into the store's library, with its schema and skills. */
 export const AGENTS_COPY_WORDS = {
   name: 'agents copy',
-  served: [{ endpoint: 'agents.copy' }],
+  served: [{ endpoint: 'agents.copyLibrary' }],
   usage: COPY_USAGE,
   help: [
-    'an agent file copied into your library, with its schema and skills;',
-    'a part your library holds otherwise stops it: --as or --keep',
+    "an agent file copied into the store's library, with its schema and skills;",
+    'a part the library holds otherwise stops it: --as or --keep',
   ],
   spec: writerSpec(
     'agents copy',
@@ -203,7 +206,7 @@ export const AGENTS_COPY_WORDS = {
         flag: '--as',
         kind: 'name',
         key: 'as',
-        takes: '--as takes the name the agent has in your library: nemia agents copy <file> --as <name>',
+        takes: '--as takes the name the agent has in the library: nemia agents copy <file> --as <name>',
       },
       {
         flag: '--keep',
@@ -215,10 +218,10 @@ export const AGENTS_COPY_WORDS = {
     ],
   ),
   writes: true,
-  class: 'ask',
+  class: 'act',
   only: {
     side: 'cli',
-    why: "the api serves it as the Agent's `copy` verb of `objects`' Api (`/api/namespaces/:namespace/agents/copy`), which calls this entry's handler: no route of its own",
+    why: "the api serves it as the Agent's `copyLibrary` verb of `objects`' Api (`/api/agents/copy`, the store's library), which calls this entry's handler: no route of its own",
   },
 } as const satisfies CommandWords;
 
@@ -228,36 +231,36 @@ const PLACE_AND_NAME: readonly Positional[] = [
   { key: 'name', takes: 'required', kind: 'name' },
 ];
 
-/** `nemia agents rm yours <name> --version <v>`: an agent of yours removed, at the version it was read at. */
+/** `nemia agents rm user <name> --version <v>`: an agent of the person's library removed, at the version it was read at. */
 export const AGENTS_RM_WORDS = {
   name: 'agents rm',
-  served: [{ endpoint: 'agents.delete' }],
-  usage: 'yours <name> --version <v>',
-  help: ['an agent of yours removed, at the --version it was read at'],
-  spec: writerSpec('agents rm', 'yours <name> --version <v>', PLACE_AND_NAME, [versionFlag('agents rm', 'the agent')]),
+  served: [{ endpoint: 'agents.deleteLibrary' }],
+  usage: 'user <name> --version <v>',
+  help: ['an agent of the user library removed, at the --version it was read at'],
+  spec: writerSpec('agents rm', 'user <name> --version <v>', PLACE_AND_NAME, [versionFlag('agents rm', 'the agent')]),
   writes: true,
   class: 'ask',
   only: {
     side: 'cli',
-    why: "the api serves it as the Agent's `delete` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
+    why: "the api serves it as the Agent's `deleteLibrary` verb of `objects`' Api (`/api/agents/:name`, the store's library), which calls this entry's handler: no route of its own",
   },
 } as const satisfies CommandWords;
 
 /** What a try of an agent is capped at, in dollars: the orchestrator's `TRY_BUDGET`, which a try's run is started with. */
 const TRY_CAP = 1;
 
-/** `nemia agents run yours <name> --brief <words>`: an agent of yours tried on a short brief, in a folder of its own. */
+/** `nemia agents run user <name> --brief <words>`: an agent of the person's library tried on a short brief, in a folder of its own. */
 export const AGENTS_RUN_WORDS = {
   name: 'agents run',
-  served: [{ endpoint: 'agents.try' }],
-  usage: 'yours <name> --brief <words>',
-  help: ['an agent of yours tried on a short brief, in a folder of its own,', `capped at $${TRY_CAP}`],
-  spec: writerSpec('agents run', 'yours <name> --brief <words>', PLACE_AND_NAME, [
+  served: [{ endpoint: 'agents.tryLibrary' }],
+  usage: 'user <name> --brief <words>',
+  help: ['an agent of the user library tried on a short brief, in a folder of its own,', `capped at $${TRY_CAP}`],
+  spec: writerSpec('agents run', 'user <name> --brief <words>', PLACE_AND_NAME, [
     {
       flag: '--brief',
       kind: 'text',
       key: 'brief',
-      takes: '--brief takes what the agent is asked to do, a sentence is enough: nemia agents run yours <name> --brief "<words>"',
+      takes: '--brief takes what the agent is asked to do, a sentence is enough: nemia agents run user <name> --brief "<words>"',
       twice: `${CLI} agents run takes --brief once: a try is one brief.`,
     },
   ]),
@@ -265,7 +268,7 @@ export const AGENTS_RUN_WORDS = {
   class: 'act',
   only: {
     side: 'cli',
-    why: "the api serves it as the Agent's `try` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
+    why: "the api serves it as the Agent's `tryLibrary` verb of `objects`' Api (`/api/agents/:name/try`, the store's library), which calls this entry's handler: no route of its own",
   },
   ticks: true,
 } as const satisfies CommandWords;

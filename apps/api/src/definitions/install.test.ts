@@ -92,17 +92,17 @@ test('an install with no repository and no factory named: yours is created, read
   };
 
   await t.test('a workflow of yours', async () => {
-    const made = await send('POST', `${D}/workflows`, {
+    const made = await send('POST', `/api/workflows`, {
       metadata: { name: 'notes' },
       spec: { steps: [{ name: 'write', keys: { place: 'folder' }, body: 'Write the notes.' }] },
     });
     const created = (await made.json()) as Workflow;
     assert.equal(made.status, 201, JSON.stringify(created));
-    assert.equal(created.status.origin, 'yours');
+    assert.equal(created.status.origin, 'user');
     assert.ok(fs.existsSync(path.join(home, 'workflows', 'notes', 'write.md')), 'written in the store, in yours');
     const read = await got<Workflow>(`${D}/workflows/notes`);
     assert.equal(read.metadata.resourceVersion, created.metadata.resourceVersion, 'read back as written');
-    const put = await send('PUT', `${D}/workflows/notes`, {
+    const put = await send('PUT', `/api/workflows/notes`, {
       metadata: { resourceVersion: read.metadata.resourceVersion },
       spec: { steps: [{ name: 'write', keys: { place: 'folder' }, body: 'Write the notes again.' }] },
     });
@@ -112,18 +112,18 @@ test('an install with no repository and no factory named: yours is created, read
     const list = await got<{ items: Workflow[] }>(`${D}/workflows`);
     assert.deepEqual(
       list.items.map((w) => [w.metadata.name, w.status.origin]),
-      [['notes', 'yours']],
+      [['notes', 'user']],
     );
   });
 
   await t.test('an agent of yours', async () => {
     const spec = { description: 'Use this when notes are due.', keys: {}, instructions: 'Write it.' };
-    const made = await send('POST', `${D}/agents`, { metadata: { name: 'scribe' }, spec });
+    const made = await send('POST', `/api/agents`, { metadata: { name: 'scribe' }, spec });
     const created = (await made.json()) as Agent;
     assert.equal(made.status, 201, JSON.stringify(created));
-    assert.equal(created.status.origin, 'yours');
+    assert.equal(created.status.origin, 'user');
     const read = await got<Agent>(`${D}/agents/scribe`);
-    const put = await send('PUT', `${D}/agents/scribe`, {
+    const put = await send('PUT', `/api/agents/scribe`, {
       metadata: { resourceVersion: read.metadata.resourceVersion },
       spec: { ...spec, instructions: 'Write it again.' },
     });
@@ -143,10 +143,10 @@ test('an install with no repository and no factory named: yours is created, read
     }
     assert.deepEqual(
       list.items.map((a) => [a.metadata.name, a.status.origin]),
-      [['scribe', 'yours']],
+      [['scribe', 'user']],
       'yours alone: no repository is read, nor an agent of the folder the api runs in (stray)',
     );
-    const carder = await send('POST', `${D}/agents`, {
+    const carder = await send('POST', `/api/agents`, {
       metadata: { name: 'carder' },
       spec: { description: 'Use this when cards are due.', keys: {}, skills: 'stray-skill', instructions: 'Card it.' },
     });
@@ -172,12 +172,12 @@ test('an install with no repository and no factory named: yours is created, read
 
   await t.test('a skill of yours, beside the builtins', async () => {
     const spec = { description: 'Keeps notes short.', body: 'One fact a line.' };
-    const made = await send('POST', `${D}/skills`, { metadata: { name: 'short-notes' }, spec });
+    const made = await send('POST', `/api/skills`, { metadata: { name: 'short-notes' }, spec });
     const created = (await made.json()) as Skill;
     assert.equal(made.status, 201, JSON.stringify(created));
-    assert.equal(created.status.origin, 'yours');
+    assert.equal(created.status.origin, 'user');
     const read = await got<Skill>(`${D}/skills/short-notes`);
-    const put = await send('PUT', `${D}/skills/short-notes`, {
+    const put = await send('PUT', `/api/skills/short-notes`, {
       metadata: { resourceVersion: read.metadata.resourceVersion },
       spec: { ...spec, body: 'One fact a line, no more.' },
     });
@@ -186,14 +186,14 @@ test('an install with no repository and no factory named: yours is created, read
     assert.equal(replaced.spec.body.trim(), 'One fact a line, no more.');
     const list = await got<{ items: Skill[] }>(`${D}/skills`);
     const origins = new Set(list.items.map((s) => s.status.origin));
-    assert.ok(list.items.some((s) => s.metadata.name === 'short-notes' && s.status.origin === 'yours'));
-    assert.deepEqual([...origins].sort(), ['builtin', 'yours'], 'yours and the builtins, no repository');
+    assert.ok(list.items.some((s) => s.metadata.name === 'short-notes' && s.status.origin === 'user'));
+    assert.deepEqual([...origins].sort(), ['builtin', 'user'], 'yours and the builtins, no repository');
   });
 
   await t.test("a step's page of a workflow of yours", async () => {
     const page = await got<WorkflowStepPage>(`${D}/workflows/notes/steps/write`);
     assert.equal(page.factory, null, 'in the default factory');
-    assert.deepEqual([page.from, page.body.trim()], ['yours', 'Write the notes again.'], 'read from yours');
+    assert.deepEqual([page.from, page.body.trim()], ['user', 'Write the notes again.'], 'read from yours');
   });
 
   await t.test("a template's workflows, read from its render", async () => {

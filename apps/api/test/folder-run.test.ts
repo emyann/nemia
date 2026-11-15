@@ -382,7 +382,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
       const filed = await app().request('/api/namespaces/default/cards', {
         method: 'POST',
         headers: json,
-        body: JSON.stringify({ body: 'a note on tides', workflow: 'notes', from: 'yours' }),
+        body: JSON.stringify({ body: 'a note on tides', workflow: 'notes', from: 'user' }),
       });
       assert.equal(filed.status, 201);
       const { spec } = (await filed.json()) as Card;
@@ -391,7 +391,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
       const refused = await app().request('/api/namespaces/default/cards', {
         method: 'POST',
         headers: json,
-        body: JSON.stringify({ body: 'a note on tides', workflow: 'notes', from: 'yours', repo: notARepo }),
+        body: JSON.stringify({ body: 'a note on tides', workflow: 'notes', from: 'user', repo: notARepo }),
       });
       assert.equal(refused.status, 422, 'a repo is retired for every team');
       const { error } = (await refused.json()) as { error: string };
@@ -417,7 +417,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
         app().request(`/api/namespaces/default/cards/${card}/start?factory=shore`, {
           method: 'POST',
           headers: json,
-          body: JSON.stringify({ workflow: 'notes', from: 'yours', brief: 'Write the note.' }),
+          body: JSON.stringify({ workflow: 'notes', from: 'user', brief: 'Write the note.' }),
         });
 
       const named = oldCard('a-note-on-the-tides-k2q9', 'a note on the tides, from a card that names a repository', notARepo);

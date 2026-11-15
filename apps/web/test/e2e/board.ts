@@ -39,7 +39,7 @@ export const pickedIn = (url: URL): string | null => {
 /** The store rail's groups, in their order, each with its destinations in theirs. */
 export const RAIL_GROUPS = [
   ['Across factories', ['Factories', 'Waiting']],
-  ['Yours', ['Agents', 'Skills']],
+  ['Yours', ['Agents', 'Skills', 'Library']],
   ['You', ['Stats', 'Settings']],
 ] as const;
 

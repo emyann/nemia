@@ -40,10 +40,10 @@ const naming = (said: string | null, facts: readonly string[], row: string): voi
 };
 
 test("REFUSED, before anything is asked: each of nemia agents' lines a person mistypes, by what it names", () => {
-  const commands = 'card <name>, custom <name>, sources, copy <file>, or write, remove and try on yours';
-  const takes = 'It takes --repo <r>, and for a card --from repo|yours';
+  const commands = "card <name>, custom <name>, sources, copy <file>, or write, remove and try on the library's (user)";
+  const takes = 'It takes --repo <r>, and for a card --from repo|user';
   const repoTakes = ['--repo takes the repository whose workflows/agents to read', 'nemia agents --repo <r>'];
-  const fromTakes = ['--from takes which place the agent is in', 'nemia agents card <name> --from repo|yours'];
+  const fromTakes = ['--from takes which place the agent is in', 'nemia agents card <name> --from repo|user'];
   const rows: ReadonlyArray<[string, CommandWords, readonly string[], readonly string[]]> = [
     ['a word that is none of its commands', AGENTS_WORDS, ['nope'], [commands, 'nemia agents card nope', 'nemia agents custom nope']],
     ['a flag it does not take', AGENTS_WORDS, ['--nope'], ['nemia agents does not take --nope', takes]],
@@ -53,9 +53,9 @@ test("REFUSED, before anything is asked: each of nemia agents' lines a person mi
     ['--repo= with nothing', AGENTS_WORDS, ['--repo='], repoTakes],
     ['--from left out', AGENTS_CARD_WORDS, ['scribe', '--from'], fromTakes],
     ['--from followed by another flag', AGENTS_CARD_WORDS, ['scribe', '--from', '--repo', '.'], fromTakes],
-    ['--from that is neither place', AGENTS_CARD_WORDS, ['twin', '--from', 'elsewhere'], ['nemia agents --from takes repo or yours']],
+    ['--from that is neither place', AGENTS_CARD_WORDS, ['twin', '--from', 'elsewhere'], ['nemia agents --from takes repo or user']],
     ['--repo twice', AGENTS_WORDS, ['--repo', 'a', '--repo', 'b'], ['nemia agents takes --repo once', 'one repository']],
-    ['--from twice', AGENTS_CARD_WORDS, ['x', '--from', 'repo', '--from', 'yours'], ['nemia agents takes --from once', 'one place']],
+    ['--from twice', AGENTS_CARD_WORDS, ['x', '--from', 'repo', '--from', 'user'], ['nemia agents takes --from once', 'one place']],
     ['a flag it does not take after --repo', AGENTS_WORDS, ['--repo', '.', '--nope'], ['nemia agents does not take --nope', takes]],
     ['a word after the card', AGENTS_CARD_WORDS, ['scribe', 'extra'], [commands, 'nemia agents card extra', 'nemia agents custom extra']],
     ['custom given --file and --clear both', AGENTS_CUSTOM_WORDS, ['scribe', '--file', 'w.md', '--clear'], ['--file or --clear']],
@@ -63,8 +63,8 @@ test("REFUSED, before anything is asked: each of nemia agents' lines a person mi
     [
       'a key the api alone takes: agents rm --repo',
       AGENTS_RM_WORDS,
-      ['yours', 'plain', '--repo', 'x'],
-      ['nemia agents rm takes no --repo', 'nemia agents rm yours <name> --version <v>'],
+      ['user', 'plain', '--repo', 'x'],
+      ['nemia agents rm takes no --repo', 'nemia agents rm user <name> --version <v>'],
     ],
   ];
   for (const [row, words, argv, facts] of rows) naming(refusalOf(words, argv), facts, row);
@@ -84,10 +84,10 @@ test("REFUSED, before anything is asked: each of nemia policy's lines a person m
 });
 
 test('a line each takes, read into the arguments its runner sends', () => {
-  assert.deepEqual(parseArgv(AGENTS_CARD_WORDS.spec, ['scribe', '--repo=/r', '--from', 'yours']), {
+  assert.deepEqual(parseArgv(AGENTS_CARD_WORDS.spec, ['scribe', '--repo=/r', '--from', 'user']), {
     name: 'scribe',
     repo: '/r',
-    from: 'yours',
+    from: 'user',
   });
   assert.deepEqual(parseArgv(POLICY_REACH_WORDS.spec, ['nemia', '--run', 'r-1']), { name: 'nemia', runId: 'r-1' });
   assert.deepEqual(parseArgv(AGENTS_CUSTOM_WORDS.spec, ['scribe', '--clear']), { name: 'scribe', clear: true });
@@ -100,7 +100,7 @@ test('each command of the group says its class, and only an ask is asked of the 
     'agents card': 'read',
     'agents sources': 'read',
     'agents custom': { bare: 'read', sets: 'ask', setsBy: ['--file', '--clear'], readsBy: ['--repo'] },
-    'agents copy': 'ask',
+    'agents copy': 'act',
     'agents rm': 'ask',
     'agents run': 'act',
     policy: 'read',

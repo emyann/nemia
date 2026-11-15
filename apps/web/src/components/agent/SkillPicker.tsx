@@ -195,7 +195,7 @@ function Offered({
         )}
         {offer.kind === 'found' && (
           <span className="flex items-center gap-1.5 text-body-small text-muted-foreground">
-            {offer.where === 'yours' ? 'in' : 'given from'} <SkillSourceBadge from={offer.where} />
+            {offer.where === 'user' ? 'in' : 'given from'} <SkillSourceBadge from={offer.where} />
           </span>
         )}
       </div>

@@ -152,10 +152,11 @@ export const runList = Effect.fn('runList')(function* (e: Engine, how: SummaryHo
 const notJudged = (run: Pick<Run, 'id'>) => Effect.die(new Error(`Run ${run.id} was handed to its judgement and not judged.`));
 
 /**
- * How a run's listed object is answered (`listed`: no harness asked, no drift read, no step's artifacts folder read) off its
- * `judgement`: the object kept beside that judgement (`keptObject`), before its disk parts (`runObjectCore`), with them read now and laid over
- * (`withDiskParts`), or one built and its core kept (`keepObject`) where none is and its read did not fail (`readFailed`). Under `verify`,
- * one served from memory is built afresh too, and one that differs dies. Each workflow folder is loaded once a request (`folderReader`).
+ * How a run's listed object is answered (`listed`: no harness asked, no drift read, no step's artifacts folder read) off its `judgement`:
+ * the object kept beside that judgement (`keptObject`), before its disk parts (`runObjectCore`), with them read now and laid over
+ * (`withDiskParts`), or one built and its core kept (`keepObject`) where none is and its read did not fail (`readFailed`). Under
+ * `verify`, one served from memory is built afresh too, and one that differs dies. Each workflow folder is loaded once a request
+ * (`folderReader`).
  */
 const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verify: boolean, git: BranchReader) => {
   const folders = folderReader(home);

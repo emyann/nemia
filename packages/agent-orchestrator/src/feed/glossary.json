@@ -29,7 +29,7 @@
     },
     {
       "term": "Library add missing",
-      "meaning": "a Warning line about a factory, `AddsMissing`, labelled with it (`labels.factory`): written by the tick once when an add the factory records (`library.json`) names an item no library holds — a builtin a newer Nemia dropped, an item of the user library removed — or the record does not read, its note each add's fix, and not again while one stays missing.",
+      "meaning": "a Warning line about a factory, `AddsMissing`, labelled with it (`labels.factory`): written by the tick once when an add the factory records names an item no library holds — a builtin a newer Nemia dropped, an item of the user library removed — or the record does not read, its note each add's fix, and not again while one stays missing.",
       "type": "Reason"
     },
     {

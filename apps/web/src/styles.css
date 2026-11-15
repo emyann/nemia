@@ -305,12 +305,18 @@
  * The frame's heights, which a page that fills the window stands between: the page's head (`FrameHeader.tsx`), one line, as tall as
  * `--frame-top`; under it the frame's lines (a newer release, the setup banner, a refused link), as tall as `--frame-lines`, which the
  * frame measures and sets on the column the page stands in (`__root.tsx`); and at the window's foot the machine bar (`MachineBar.tsx`), as
- * tall as `--frame-foot`. A page that fills the window is `100svh` less the three.
+ * tall as `--frame-foot`. A page that fills the window is `100svh` less the three. What stands in the page's column and is brought into
+ * view, by a focus or by `scrollIntoView`, stops above the machine bar, which stays over the window's foot (`scroll-margin-bottom`); a
+ * popover, portaled over the frame and the bar alike, keeps the window's whole height.
  */
 :root {
   --frame-top: 3.5rem;
   --frame-lines: 0px;
   --frame-foot: 2.25rem;
+}
+
+main[data-frame-page] * {
+  scroll-margin-bottom: var(--frame-foot);
 }
 
 /*

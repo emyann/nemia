@@ -37,7 +37,7 @@ const ROUTER_TOOLS_AT: CSSProperties = { left: '4.5rem', bottom: '2.5rem' };
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   validateSearch: (search: Record<string, unknown>) => ({ ...barSearch(search), ...trySearch(search), ...viewSearch(search) }),
   beforeLoad: ({ location }) => {
-    const href = factoryRedirect(location.pathname, location.search as Record<string, unknown>);
+    const href = factoryRedirect(location.pathname, location.search);
     if (href !== undefined) throw redirect({ href, replace: true });
   },
   component: Root,

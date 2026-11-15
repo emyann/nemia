@@ -1,12 +1,12 @@
 /**
  * The tools of the MCP port, generated, never listed by hand: one for each endpoint a verb of the command table links (`served`, read by
- * the package's `toolsOf`, which names it), described by the verb's help, its endpoint's own description and its CLI usage, its input the JSON Schema of the endpoint's
- * path, query and payload joined into one object (`objects`' `Api`, read by reflection), its hints its verb's class and its endpoint's
- * method (`toolHints`), and what the port needs to call it: the endpoint's method and path, which keys of the input fill the path
- * and the query, whether the endpoint answers a `Table` (`objects`' server-side printing, which the port asks for and answers as its
- * lines), and the query values its link sends where a call gives none (`defaults`, the link's `query`). A link to a stream, a method that
- * is not a call, a key two of the three say, a default for a key the query has not, or an endpoint that says nothing of what it does is
- * thrown as the tools are built.
+ * the package's `toolsOf`, which names it), described by the verb's help, its endpoint's own description and its CLI usage, its input
+ * the JSON Schema of the endpoint's path, query and payload joined into one object (`objects`' `Api`, read by reflection), its hints its
+ * verb's class and its endpoint's method (`toolHints`), and what the port needs to call it: the endpoint's method and path, which keys of
+ * the input fill the path and the query, whether the endpoint answers a `Table` (`objects`' server-side printing, which the port asks for
+ * and answers as its lines), and the query values its link sends where a call gives none (`defaults`, the link's `query`). A link to a
+ * stream, a method that is not a call, a key two of the three say, a default for a key the query has not, or an endpoint that says
+ * nothing of what it does is thrown as the tools are built.
  */
 import { Context, Option, Schema } from 'effect';
 import { OpenApi } from 'effect/http-api';
@@ -213,7 +213,7 @@ const keysSaid = (input: ToolInput): string[] => {
   return [...said].map(([key, words]) => `${key}: ${words}`);
 };
 
-/** What `endpoint` says it does (`OpenApi.Description`, as `objects` annotates it), thrown where it says nothing: a tool is chosen by it. */
+/** What `endpoint` says it does (`OpenApi.Description`, as `objects` annotates it), thrown where it says nothing. */
 const endpointSaid = (name: string, endpoint: EndpointRead): string => {
   const said = Context.getOption(endpoint.annotations, OpenApi.Description).pipe(Option.filter((words) => words.trim().length > 0));
   if (Option.isNone(said))
@@ -224,10 +224,10 @@ const endpointSaid = (name: string, endpoint: EndpointRead): string => {
 };
 
 /**
- * A tool's description: its verb's help, then what its endpoint says it does (`endpointSaid`) as a paragraph of its own, how the CLI says it, and the endpoint it calls; then what each key of its input says it takes
- * where its schema says so (`keysSaid`), since the help is the command line's and its forms are not the input's; then how the port answers
- * it — a `Table` as its lines, a page of `PORT_PAGE` where a call gives no `limit`, and each default its link sends where the call gives
- * none.
+ * A tool's description: its verb's help, then what its endpoint says it does (`endpointSaid`) as a paragraph of its own, how the CLI
+ * says it, and the endpoint it calls; then what each key of its input says it takes where its schema says so (`keysSaid`), since the
+ * help is the command line's and its forms are not the input's; then how the port answers it — a `Table` as its lines, a page of
+ * `PORT_PAGE` where a call gives no `limit`, and each default its link sends where the call gives none.
  */
 const describe = (
   verb: PortVerb,

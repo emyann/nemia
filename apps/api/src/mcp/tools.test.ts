@@ -218,7 +218,7 @@ test('a key that is an identified schema whole is said by its words, and each me
 });
 
 /** The description `name` carries on its endpoint (`OpenApi.Description`), read off the `Api` as the API page reads it. */
-const saidOfEndpoint = (name: string): string => {
+const saidOfEndpoint = (name: ApiEndpointName): string => {
   const endpoint = ENDPOINTS.get(name);
   assert.ok(endpoint, `${name} is an endpoint of the Api`);
   const said = Context.getOption(endpoint.annotations, OpenApi.Description);

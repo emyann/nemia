@@ -33,7 +33,7 @@ function mintedFor(home: string, marked: Marked, nowMs: number): { token: string
  * The pairing `id` claimed with `secret` at `nowMs`: a pairing that waits for its approval answers its phase alone, and the client asks
  * again; an approved one is marked claimed and a person's token minted for it, named after its client (`-2`, `-3`… where the name is
  * taken), answered this once with its name. Refused: a pairing the store does not keep or a secret not its own (`Missing`), and one
- * claimed already or past its time (`Conflict`). The api's `POST /api/pair/:id/claim`.
+ * claimed already or past its time (`Conflict`). The api's `POST /api/pairings/:id/claim`.
  * @param home The store's root.
  * @param id The pairing's id.
  * @param secret The secret the client presents, which must be the pairing's own.
@@ -48,7 +48,7 @@ export function pairingClaimed(home: string, id: string, secret: string, nowMs: 
 /**
  * The first-visit link whose secret is `secret` claimed at `nowMs`: marked claimed and a person's token minted for the browser that
  * opened it, named `board-<day>` (`-2`, `-3`… where taken), answered this once with its name, for the board's cookie. Refused: a link the
- * store does not keep (`Missing`), and one claimed already or past its time (`Conflict`). The api's `POST /api/pair/link`.
+ * store does not keep (`Missing`), and one claimed already or past its time (`Conflict`). The api's `POST /api/links/claim`.
  * @param home The store's root.
  * @param secret The link's secret, as the browser presents it.
  * @param nowMs The time of the claim, in ms since the epoch.

@@ -83,8 +83,9 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   an empty page at the feed's end for a URI no listen holds. A test waits for `liveViews()` to fall with `until`.
   It says what Nemia is on `initialize` and `server/discover`, and which tools come first, for a host that defers its tools (`PORT_INSTRUCTIONS`,
   `src/mcp/instructions.ts`), every tool it names one the port lists. Every store, marked exposed (`WF_EXPOSED=1`) or not, loopback
-  included, refuses a request with no token on every route of the api (`/api`, `/openapi`) but a pairing route; `/mcp` takes a standing
-  token, the person's or an agent's, never a session's; a page of the board needs none (`needOf`, `src/caller/caller.ts`).
+  included, refuses a request with no token on every route of the api (`/api`, `/openapi`) but its three open routes (a pairing asked
+  or claimed, a first-visit link claimed, each by method and path); `/mcp` takes a standing token, the person's or an agent's, never a
+  session's; a page of the board needs none (`needOf`, `src/caller/caller.ts`).
 - **The board's built pages are host content, served after the mount** (`src/board/board.ts`, `GET /*`): `NEMIA_BOARD_DIR`, else the
   running code's `apps/web/dist`, `index.html` for a route of the board's, never a path under `/api`, `/openapi` or `/mcp`. The board's
   token is an HttpOnly cookie (`TOKEN_COOKIE`) the api sets and clears (`POST` and `DELETE /api/session`, `src/server/session.ts`);

@@ -4,10 +4,11 @@
  * package (`sessionCaller`). Resolved once per request, before any router is reached (`callerGate`, app.ts), and put on the request for
  * `served` to hand every handler as `caller` (layer.ts): a proposal's and a delegation's handlers read it there.
  *
- * What a route needs: the MCP port (`/mcp`) always a standing token, one the person minted, held by the person or an agent; a route the
- * api answers (`API_PATHS`) a token, any live one, on every store, loopback included: no request to the api is the person for presenting
- * none. A pairing route needs none, as it judges its own secret, and a page of the board (board/board.ts) none: it carries no data of the
- * store. The person's own `nemia` presents the credential the daemon keeps for it with nothing to type.
+ * What a route needs: the MCP port (`/mcp`) always a standing token, one the person minted, held by the person or an agent; a route the api
+ * answers (`API_PATHS`) a token, any live one, on every store, loopback included: no request to the api is the person for presenting none.
+ * The three routes a client with no token yet reaches (a pairing asked or claimed, a first-visit link claimed) need none, as each judges
+ * its own secret, and a page of the board (board/board.ts) none: it carries no data of the store. The person's own `nemia` presents the
+ * credential the daemon keeps for it with nothing to type.
  *
  * Every request that presents a token is judged, whatever its route, not only the proposals' and delegations': a session's client sends
  * its token on every request (apps/cli), so a token refused on a read is the same forged or ended token a write would carry, and a
@@ -22,12 +23,12 @@ import { deleteCookie } from 'hono/cookie';
 import { PERSON, PlaceService, sessionCaller, type ProposalCaller, type TokenNeed } from 'agent-orchestrator';
 import { Forbidden, TOKEN_COOKIE, type TokenRefusal } from 'objects';
 import type { NeedOf } from '../../contracts/token-need.contract.ts';
-import { MCP_PATH, PAIR_PATH } from './paths.ts';
+import { CLAIM_SEGMENT, LINK_CLAIM_PATH, MCP_PATH, OPEN_METHOD, PAIRINGS_PATH } from './paths.ts';
 import { bearerOf, cookieTokenOf } from '../guard.ts';
 import { type ApiEnv, type Served, traceOf } from '../layer.ts';
 import { Engine, runPlaced, StoreConfig, StoreRoot } from '../store.ts';
 
-export { MCP_PATH, PAIR_PATH } from './paths.ts';
+export { MCP_PATH } from './paths.ts';
 
 /** A request whose token the api refuses, with the reason where it presented one: the api's 401 (`objects`' `Unauthorized`). */
 export class Unauthorized extends TaggedError('Unauthorized')<{ readonly message: string; readonly reason?: TokenRefusal }> {
@@ -49,8 +50,19 @@ const under = (path: string, root: string): boolean => path === root || path.sta
  */
 export const onPort = (path: string): boolean => under(path, MCP_PATH);
 
-/** Whether `path` is a pairing route's (`PAIR_PATH`), or under it. */
-const onPairing = (path: string): boolean => under(path, PAIR_PATH);
+/** Whether `path` is a pairing's claim, `/api/pairings/<id>/claim`, its id one segment that is not empty. */
+const pairingClaim = (path: string): boolean => {
+  const id =
+    path.startsWith(PAIRINGS_PATH + '/') && path.endsWith(CLAIM_SEGMENT) ? path.slice(PAIRINGS_PATH.length + 1, -CLAIM_SEGMENT.length) : '';
+  return id !== '' && !id.includes('/');
+};
+
+/**
+ * Whether `method` on `path` is one of the three routes a client with no token yet reaches, each judging the secret it is sent: `POST
+ * /api/pairings`, `POST /api/pairings/:id/claim` and `POST /api/links/claim`.
+ */
+const openRoute = (method: string, path: string): boolean =>
+  method === OPEN_METHOD && (path === PAIRINGS_PATH || path === LINK_CLAIM_PATH || pairingClaim(path));
 
 /**
  * Whether `path` is one the api answers on (`API_PATHS`): any other but the port's is a page of the board (board/board.ts).
@@ -59,12 +71,14 @@ const onPairing = (path: string): boolean => under(path, PAIR_PATH);
 export const answered = (path: string): boolean => API_PATHS.some((root) => under(path, root));
 
 /**
- * What a request to `path` needs of a token: a standing one on the MCP port; none on a pairing route (`PAIR_PATH`), which judges its own
- * secret; a token, any live one, on a route the api answers, exposed or not; and none on a page of the board, which carries no data of
- * the store, so that a browser with no token loads the page that asks for one.
+ * What a request of `method` to `path` needs of a token: a standing one on the MCP port; none on the three routes a client with no token
+ * yet reaches (`openRoute`), each judging its own secret; a token, any live one, on every other route the api answers, exposed or not;
+ * and none on a page of the board, which carries no data of the store, so that a browser with no token loads the page that asks for one.
+ * @param method The request's method, in upper case.
  * @param path The request's path.
  */
-export const needOf: NeedOf = (path) => (onPort(path) ? 'standing' : onPairing(path) ? 'none' : answered(path) ? 'token' : 'none');
+export const needOf: NeedOf = (method, path) =>
+  onPort(path) ? 'standing' : openRoute(method, path) ? 'none' : answered(path) ? 'token' : 'none';
 
 /** How a client sends a token, and where the person finds or mints one. */
 const SEND =
@@ -82,8 +96,8 @@ const REFUSED_WORDS: Readonly<Record<TokenRefusal, string>> = {
 /**
  * The caller `token` is (`undefined`: none presented), asked of the package over the app's engine and store for a route that needs `need`;
  * refused, `Unauthorized`. A request with no token is the person (`PERSON`, what an in-process program is) only on a route that needs none
- * (a pairing route, which judges its own secret, and a page of the board, which carries no data of the store); on any other the package
- * refuses it.
+ * (a pairing asked or claimed, or a first-visit link claimed, each judging its own secret, and a page of the board, which carries no data
+ * of the store); on any other the package refuses it.
  * @param c The request's context, whose app's engine and store are asked.
  * @param token The token the request presents, or undefined where it presents none.
  * @param need What the request's route needs of a token (needOf).
@@ -143,7 +157,7 @@ async function callerOfRequest(c: Parameters<MiddlewareHandler<ApiEnv>>[0]): Pro
       message: `${c.req.method} ${path} reads its Authorization header as \`Bearer <token>\`, and this one is not: send a token as \`Authorization: Bearer <token>\` — a session's is in $WF_SESSION_TOKEN, and \`nemia token add <name>\` mints one of yours.`,
     });
   const token = bearer ?? (onPort(path) || answered(path) ? cookieTokenOf(c) : undefined);
-  return callerBy(c, token, needOf(path));
+  return callerBy(c, token, needOf(c.req.method, path));
 }
 
 /**

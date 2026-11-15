@@ -408,8 +408,8 @@ async function deactivateRefused(page: Page): Promise<void> {
 
 /** A pairing asked for by a client, listed under Setup with its name, and approved there by the code the client shows. */
 async function approvesPairing(page: Page): Promise<void> {
-  const asked = await page.request.post(new URL('/api/pair', page.url()).href, { data: { client: CLIENT } });
-  if (!asked.ok()) throw new Refused(`POST /api/pair asks a pairing — it answered ${asked.status()}`);
+  const asked = await page.request.post(new URL('/api/pairings', page.url()).href, { data: { client: CLIENT } });
+  if (!asked.ok()) throw new Refused(`POST /api/pairings asks a pairing — it answered ${asked.status()}`);
   const { code } = (await asked.json()) as { code: string };
   await page.reload();
   await idle(page);
@@ -468,7 +468,7 @@ async function signsInByLink(page: Page): Promise<void> {
     await settled(other);
     await photograph(other, path.join(OUT, `setup-pair-waiting-${await themeOf(other)}.png`));
 
-    const claim = new URL('/api/pair/link', seat.base).href;
+    const claim = new URL('/api/links/claim', seat.base).href;
     const others = problems().filter(
       (p) =>
         p !== `request answered 409: POST ${claim}` &&

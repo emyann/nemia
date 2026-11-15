@@ -7,19 +7,21 @@
  * Plain Schemas of JSON, as every object of this package is.
  */
 import { Schema } from 'effect';
-import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
+import { API_VERSION, ObjectMeta, describedNumber, listOf } from './meta.ts';
 import { LEVELS } from './words.ts';
 
 /** Whose lines it is told by level: those of a factory that runs at `atLeast` or above. */
-export const SubscriptionScope = Schema.Struct({ atLeast: Schema.Literals(LEVELS) });
+export const SubscriptionScope = Schema.Struct({
+  atLeast: Schema.Literals(LEVELS).annotate({ description: 'The least level of a factory whose lines the task is told.' }),
+});
 export type SubscriptionScope = typeof SubscriptionScope.Type;
 
 /** What was asked: the task told, the feed's selectors it matches (OR'd), the digest's wait in minutes, and its scope where given. */
 export const SubscriptionSpec = Schema.Struct({
-  task: Schema.String,
-  selectors: Schema.Array(Schema.String),
-  digestEvery: Schema.Number,
-  scope: Schema.optionalKey(SubscriptionScope),
+  task: Schema.String.annotate({ description: 'The runtime task that is told.' }),
+  selectors: Schema.Array(Schema.String).annotate({ description: "The feed's selectors it matches; a line matching any of them is told." }),
+  digestEvery: describedNumber('The minutes between digests of routine lines.'),
+  scope: Schema.optionalKey(SubscriptionScope.annotate({ description: 'Whose lines it is told by level; absent where not given.' })),
 }).annotate({
   description:
     'What was asked: the task told, the label queries it matches (any of them), the minutes between digests of routine lines, and the least level of a factory whose lines it is told.',
@@ -32,11 +34,11 @@ export type SubscriptionSpec = typeof SubscriptionSpec.Type;
  * deliverer's file did not read, where it did not (`error`).
  */
 export const SubscriptionStatus = Schema.Struct({
-  from: Schema.Number,
-  cursor: Schema.Number,
-  pending: Schema.Number,
-  since: Schema.optionalKey(Schema.String),
-  error: Schema.optionalKey(Schema.String),
+  from: describedNumber('The byte its news starts from.'),
+  cursor: describedNumber('The byte every line before which is told or folded.'),
+  pending: describedNumber('How many routine lines are folded into its digest and not yet told.'),
+  since: Schema.optionalKey(Schema.String.annotate({ description: 'When the first pending line was folded; absent with none pending.' })),
+  error: Schema.optionalKey(Schema.String.annotate({ description: "Why the deliverer's file did not read; absent where it did." })),
 }).annotate({
   description:
     'Where the deliverer is: the byte its news starts from, the byte before which every line is told or folded, the routine lines folded and not yet told and since when, and why its file did not read.',

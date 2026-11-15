@@ -11,45 +11,55 @@
  */
 import { Schema } from 'effect';
 import { Actor } from './token.ts';
-import { describedNumber } from './meta.ts';
+import { describedNumber, describedOne } from './meta.ts';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Invalid, Missing } from './api-errors.ts';
-import {
-  DAEMON_IDENTITIES,
-  DAEMON_KINDS,
-  FEED_STREAM_EVENTS,
-  FINISHING_KINDS,
-  SESSION_COOKIE_STATES,
-  INTERRUPT_KINDS,
-  METRIC_TYPES,
-  QUOTA_STATES,
-  SERIES_RANGES,
-  SERIES_SPANS,
-  STATS_BY,
-} from './words.ts';
+import { Ceilings, Daemon, Metrics, PassesRead, Quota, SeriesRead } from './server-machine.ts';
+import { FEED_STREAM_EVENTS, FINISHING_KINDS, SESSION_COOKIE_STATES, INTERRUPT_KINDS, STATS_BY } from './words.ts';
 import { SubscriptionScope } from './subscription.ts';
 import { SessionReleaseSchema } from './run.ts';
 import { Event } from './event.ts';
 
-/** A part of an answer said as JSON, typed by its own reader. */
-const Json = Schema.Unknown;
+export {
+  Ceilings,
+  Daemon,
+  HeldRun,
+  MetricRead,
+  Metrics,
+  PassCost,
+  PassesRead,
+  Quota,
+  QuotaWindow,
+  RecentPass,
+  SeriesPoint,
+  SeriesRead,
+} from './server-machine.ts';
+
+/** A part of an answer said as JSON, typed by its own reader, and what it holds. */
+const Json = (description: string) => describedOne(Schema.Unknown, description);
 
 /** A text that may be absent from the record it is read from: null. */
-const OrNull = <S extends Schema.Top>(s: S) => Schema.NullOr(s);
+const OrNull = <S extends Schema.Top>(s: S, description: string) => Schema.NullOr(s).annotate({ description });
 
 /** `GET /api/health`: the api answers. */
-export const Health = Schema.Struct({ ok: Schema.Literal(true), release: Schema.optionalKey(Schema.String) });
+export const Health = Schema.Struct({
+  ok: Schema.Literal(true).annotate({ description: 'That the api answers: always true.' }),
+  release: Schema.optionalKey(Schema.String.annotate({ description: 'The version the api runs, where it knows it.' })),
+});
 export type Health = typeof Health.Type;
 
 /** Where the code runs from: the two words a session's release says (`SessionRelease`, run.ts). */
-const ReleaseKind = Schema.Union([SessionReleaseSchema.members[0].fields.kind, SessionReleaseSchema.members[1].fields.kind]);
+const ReleaseKind = Schema.Literals([
+  SessionReleaseSchema.members[0].fields.kind.literal,
+  SessionReleaseSchema.members[1].fields.kind.literal,
+]);
 
 /** The code the api runs, as the lease records it: the repository's working copy's folder, or an install's folder, tag and commit. */
 export const Release = Schema.Struct({
-  kind: ReleaseKind,
-  root: Schema.String,
-  tag: Schema.optionalKey(Schema.String),
-  commit: Schema.optionalKey(Schema.String),
+  kind: ReleaseKind.annotate({ description: 'Where the code runs from: the repository, a working copy, or an install.' }),
+  root: Schema.String.annotate({ description: "The folder it runs from: the working copy's, or the install's." }),
+  tag: Schema.optionalKey(Schema.String.annotate({ description: "The install's release tag; absent for a working copy." })),
+  commit: Schema.optionalKey(Schema.String.annotate({ description: "The install's commit; absent for a working copy." })),
 });
 export type Release = typeof Release.Type;
 
@@ -60,18 +70,22 @@ export type Release = typeof Release.Type;
  * not yet made.
  */
 export const LatestRelease = Schema.Struct({
-  version: Schema.String,
-  newer: Schema.Boolean,
-  tag: Schema.optionalKey(Schema.String),
-  notes: Schema.optionalKey(Schema.String),
-});
+  version: Schema.String.annotate({ description: "The newest release's version." }),
+  newer: Schema.Boolean.annotate({ description: 'Whether it is newer than the version the api runs.' }),
+  tag: Schema.optionalKey(Schema.String.annotate({ description: 'Its tag, which `POST /api/upgrades` takes.' })),
+  notes: Schema.optionalKey(Schema.String.annotate({ description: 'The address of its notes, where the release publishes one.' })),
+}).annotate({ description: 'The newest release the daemon last read: its version, whether it is newer, its tag and its notes.' });
 export type LatestRelease = typeof LatestRelease.Type;
 
 /**
  * `GET /api/version`: the release's version (the root package.json's), the code the api runs, and the newest release the daemon
  * knows of (`latest`), which the board and `nemia version` say when it is newer.
  */
-export const VersionAnswer = Schema.Struct({ version: Schema.String, release: Release, latest: Schema.optionalKey(LatestRelease) });
+export const VersionAnswer = Schema.Struct({
+  version: Schema.String.annotate({ description: "The release's version, the root package.json's." }),
+  release: Release.annotate({ description: 'The code the api runs, as the lease records it.' }),
+  latest: Schema.optionalKey(LatestRelease),
+});
 export type VersionAnswer = typeof VersionAnswer.Type;
 
 /**
@@ -80,20 +94,26 @@ export type VersionAnswer = typeof VersionAnswer.Type;
  * browser then sends on every read, stream and write of the board's, and which no script of the page can read. A delete clears the
  * cookie. Either answers that it did, and never the token.
  */
-export const SessionAnswer = Schema.Struct({ cookie: Schema.Literals(SESSION_COOKIE_STATES) });
+export const SessionAnswer = Schema.Struct({
+  cookie: Schema.Literals(SESSION_COOKIE_STATES).annotate({
+    description: "What the call did to the board's cookie: set it, or cleared it.",
+  }),
+});
 export type SessionAnswer = typeof SessionAnswer.Type;
 
 /** `GET /api/repository`: the repository a start runs in, as the request's `?factory=` and `?repo=` resolve it. */
-export const RepositoryAnswer = Schema.Struct({ repo: Schema.String });
+export const RepositoryAnswer = Schema.Struct({
+  repo: Schema.String.annotate({ description: 'The repository a start runs in, as the request resolves it.' }),
+});
 export type RepositoryAnswer = typeof RepositoryAnswer.Type;
 
 /** `GET /api/store`: your store's folders, the line that files a factory in it and the line that turns Nemia on. */
 export const YourStore = Schema.Struct({
-  workflows: Schema.String,
-  agents: Schema.String,
-  skills: Schema.String,
-  fileFactory: Schema.String,
-  turnOnNemia: Schema.String,
+  workflows: Schema.String.annotate({ description: "The folder of the store's workflows." }),
+  agents: Schema.String.annotate({ description: "The folder of the store's agents." }),
+  skills: Schema.String.annotate({ description: "The folder of the store's skills." }),
+  fileFactory: Schema.String.annotate({ description: 'The line that files a factory in the store.' }),
+  turnOnNemia: Schema.String.annotate({ description: 'The line that turns Nemia on.' }),
 });
 export type YourStore = typeof YourStore.Type;
 
@@ -111,12 +131,16 @@ export type CapabilitiesUnreadReason = (typeof CAPABILITIES_UNREAD)[number];
  * `no-factory` (`commands`); empty where they say nothing.
  */
 export const CapabilitiesUnread = Schema.Struct({
-  reason: Schema.Literals(CAPABILITIES_UNREAD),
-  message: Schema.String,
-  factory: Schema.NullOr(Schema.String),
-  repos: Schema.Array(Schema.String),
-  commands: Schema.Array(Schema.String),
-});
+  reason: Schema.Literals(CAPABILITIES_UNREAD).annotate({
+    description: 'Why no repository is read: several factories, several repositories, or no factory.',
+  }),
+  message: Schema.String.annotate({ description: 'What to do about it, as a sentence a person reads.' }),
+  factory: OrNull(Schema.String, 'The factory whose repositories are `repos`, for several-repositories; null otherwise.'),
+  repos: Schema.Array(Schema.String).annotate({
+    description: 'The repositories the factory works on, each read with ?factory=<factory>&repo=<repo>; empty unless several-repositories.',
+  }),
+  commands: Schema.Array(Schema.String).annotate({ description: 'The lines that file a factory, for no-factory; empty otherwise.' }),
+}).annotate({ description: 'Why the Capabilities page reads no repository, and what to do.' });
 export type CapabilitiesUnread = typeof CapabilitiesUnread.Type;
 
 /**
@@ -125,159 +149,55 @@ export type CapabilitiesUnread = typeof CapabilitiesUnread.Type;
  * read, `repo` is left out, every list is empty and `unread` says why and what to do.
  */
 export const CapabilitiesWithSteps = Schema.Struct({
-  repo: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String.annotate({ description: 'The repository read; left out where none is read.' })),
   unread: Schema.optionalKey(CapabilitiesUnread),
-  skills: Schema.Array(Json),
-  agents: Schema.Array(Json),
-  mcp: Schema.Array(Json),
-  denied: Schema.Array(Json),
-  asked: Schema.Array(Json),
-  allowed: Schema.Array(Json),
-  warnings: Schema.Array(Schema.String),
-  measured: Json,
-  readOnly: Json,
-  steps: Schema.Array(Json),
+  skills: Schema.Array(Schema.Unknown).annotate({
+    description: 'The skills the repository offers a step, each as the Capabilities page reads it.',
+  }),
+  agents: Schema.Array(Schema.Unknown).annotate({
+    description: 'The agents the repository offers, each as the Capabilities page reads it.',
+  }),
+  mcp: Schema.Array(Schema.Unknown).annotate({
+    description: 'The MCP servers the repository offers, each as the Capabilities page reads it.',
+  }),
+  denied: Schema.Array(Schema.Unknown).annotate({ description: 'The permission rules that deny, each as the Capabilities page reads it.' }),
+  asked: Schema.Array(Schema.Unknown).annotate({ description: 'The permission rules that ask, each as the Capabilities page reads it.' }),
+  allowed: Schema.Array(Schema.Unknown).annotate({
+    description: 'The permission rules that allow, each as the Capabilities page reads it.',
+  }),
+  warnings: Schema.Array(Schema.String).annotate({ description: 'What the read warned of, each a sentence; empty where nothing.' }),
+  measured: Json('The measured set: what the repository offers that a step is measured by, as the Capabilities page reads it.'),
+  readOnly: Json('The read-only commands a step is allowed, as the Capabilities page reads them.'),
+  steps: Schema.Array(Schema.Unknown).annotate({
+    description: 'What each step of each workflow gets, each as the Capabilities page reads it.',
+  }),
 });
 export type CapabilitiesWithSteps = typeof CapabilitiesWithSteps.Type;
 
-/** What the last pass cost, as it wrote it: its time, what it saw, and its phases and harnesses, each read by its own reader. */
-export const PassCost = Schema.Struct({
-  at: Schema.String,
-  ms: Schema.Number,
-  phases: Schema.Record(Schema.String, Json),
-  harnesses: Schema.Record(Schema.String, Json),
-  records: Schema.Number,
-  bytes: Schema.Number,
-  spawned: Schema.Number,
-  overheadMs: Schema.Number,
-  rested: Schema.Number,
-  unobserved: Schema.optionalKey(Schema.Array(Schema.String)),
-  runs: Schema.optionalKey(Schema.Number),
-  tasks: Schema.optionalKey(Schema.Number),
-  queued: Schema.optionalKey(Schema.Number),
-  admitted: Schema.optionalKey(Schema.Number),
-  waitMs: Schema.optionalKey(Schema.Number),
-  load: Schema.optionalKey(Schema.Number),
-});
-export type PassCost = typeof PassCost.Type;
-
-/** A run the cap holds: the count it is held at, the cap, and `nemia ls`'s words on it. */
-export const HeldRun = Schema.Struct({ run: Schema.String, inFlight: Schema.Number, cap: Schema.Number, word: Schema.String });
-
-/**
- * `GET /api/ceilings`: what the daemon's last pass ran with (`last`), the cap a run is judged by (`cap`, 0 for none), the runs that count
- * against it (`inFlight`, null with no cap), the runs it holds (`held`), and what the last pass cost (`pass`).
- */
-export const Ceilings = Schema.Struct({
-  last: OrNull(Schema.Struct({ sessions: Schema.Number, runs: Schema.Number })),
-  cap: Schema.Number,
-  inFlight: OrNull(Schema.Array(Schema.String)),
-  held: Schema.Array(HeldRun),
-  pass: OrNull(PassCost),
-});
-export type Ceilings = typeof Ceilings.Type;
-
-/** One recent pass of the tick: when, how long, what it saw and read, its phases' times, and its quota, checks and disk where kept. */
-export const RecentPass = Schema.Struct({
-  at: Schema.String,
-  ms: Schema.Number,
-  records: Schema.Number,
-  rested: Schema.Number,
-  reads: Schema.Number,
-  runs: Schema.Number,
-  tasks: Schema.Number,
-  queued: Schema.Number,
-  admitted: Schema.Number,
-  waitMs: Schema.optionalKey(Schema.Number),
-  load: Schema.optionalKey(Schema.Number),
-  phases: Schema.Record(Schema.String, Schema.Number),
-  quota: Schema.optionalKey(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Number))),
-  checks: Schema.optionalKey(Schema.Array(Json)),
-  disk: Schema.optionalKey(Json),
-});
-
-/** `GET /api/passes`: the recent passes, oldest first, the histogram over `bounds`, the phases' parts and the summary. */
-export const PassesRead = Schema.Struct({
-  recent: Schema.Array(RecentPass),
-  histogram: Schema.Array(Schema.Struct({ le: OrNull(Schema.Number), count: Schema.Number })),
-  parts: Schema.Array(Schema.Struct({ phase: Schema.String, ms: Schema.Number, share: Schema.Number })),
-  summary: OrNull(
-    Schema.Struct({
-      passes: Schema.Number,
-      medianMs: Schema.Number,
-      slowestMs: Schema.Number,
-      reads: Schema.Number,
-      at: Schema.String,
-      runs: Schema.Number,
-      tasks: Schema.Number,
-      queued: Schema.Number,
-      admitted: Schema.Number,
-    }),
-  ),
-  bounds: Schema.Array(Schema.Number),
-});
-export type PassesRead = typeof PassesRead.Type;
-
-/** One point of a series: its span's start, and of the samples in it how many, their mean, least, most and last, and percentiles. */
-export const SeriesPoint = Schema.Struct({
-  t: Schema.String,
-  n: Schema.Number,
-  mean: Schema.Number,
-  min: Schema.Number,
-  max: Schema.Number,
-  last: Schema.Number,
-  p50: Schema.optionalKey(Schema.Number),
-  p95: Schema.optionalKey(Schema.Number),
-});
-
-/** `GET /api/series`: a range, the span of its points, and each series and label set's points in time. */
-export const SeriesRead = Schema.Struct({
-  range: Schema.Literals(SERIES_RANGES),
-  span: Schema.Literals(SERIES_SPANS),
-  from: Schema.String,
-  to: Schema.String,
-  series: Schema.Array(
-    Schema.Struct({ s: Schema.String, l: Schema.Record(Schema.String, Schema.String), points: Schema.Array(SeriesPoint) }),
-  ),
-});
-export type SeriesRead = typeof SeriesRead.Type;
-
-/**
- * One metric of the process: its name, kind, description and attributes, and its value — a counter's `count`, a gauge's `value`, or a
- * histogram's `count`, `sum`, `min`, `max` and cumulative `buckets`.
- */
-export const MetricRead = Schema.Struct({
-  name: Schema.String,
-  type: Schema.Literals(METRIC_TYPES),
-  description: OrNull(Schema.String),
-  attributes: Schema.Record(Schema.String, Schema.String),
-  count: Schema.optionalKey(Schema.Number),
-  value: Schema.optionalKey(Schema.Number),
-  sum: Schema.optionalKey(Schema.Number),
-  min: Schema.optionalKey(Schema.Number),
-  max: Schema.optionalKey(Schema.Number),
-  buckets: Schema.optionalKey(Schema.Array(Schema.Struct({ le: Schema.Number, count: Schema.Number }))),
-});
-export type MetricRead = typeof MetricRead.Type;
-
-/** `GET /api/metrics`: every metric of the app's runtime, by name and then attributes. */
-export const Metrics = Schema.Array(MetricRead);
-
 /** The store's pause: since when, by whom, why, and the timeout it parks sessions within. */
 export const Pause = Schema.Struct({
-  at: Schema.String,
-  by: Schema.String,
-  why: Schema.optionalKey(Schema.String),
-  timeoutMs: Schema.optionalKey(Schema.Number),
+  at: Schema.String.annotate({ description: 'Since when the store is paused, as an ISO 8601 time.' }),
+  by: Schema.String.annotate({ description: 'Who paused it.' }),
+  why: Schema.optionalKey(Schema.String.annotate({ description: 'Why it was paused; absent where none was said.' })),
+  timeoutMs: Schema.optionalKey(
+    describedNumber('How long a call in flight is given to finish, in milliseconds; absent where the store timeout applies.'),
+  ),
   actor: Schema.optionalKey(Actor),
-});
+}).annotate({ description: "The store's pause: since when, by whom, why, and the timeout it parks sessions within." });
 export type Pause = typeof Pause.Type;
 
 /** A step of a run, as the pause names one. */
-const RunStep = { run: Schema.String, step: Schema.String };
+const RunStep = {
+  run: Schema.String.annotate({ description: "The run's id." }),
+  step: Schema.String.annotate({ description: "The run's step." }),
+};
 
 /** A task a pause at once would cut, or cut: its run, its step, a session or a check, and its task. */
-export const Interrupt = Schema.Struct({ ...RunStep, kind: Schema.Literals(INTERRUPT_KINDS), taskId: Schema.String });
+export const Interrupt = Schema.Struct({
+  ...RunStep,
+  kind: Schema.Literals(INTERRUPT_KINDS).annotate({ description: "What the task is: a step's session or its check." }),
+  taskId: Schema.String.annotate({ description: "The task's id." }),
+}).annotate({ description: 'A task a pause at once would cut, or cut: its run, its step, its kind and its id.' });
 export type Interrupt = typeof Interrupt.Type;
 
 /**
@@ -285,24 +205,35 @@ export type Interrupt = typeof Interrupt.Type;
  * landing it holds with its merge staged; and each other check it holds.
  */
 export const Paused = Schema.Struct({
-  pause: OrNull(Pause),
+  pause: OrNull(Pause, "The store's pause; null where it is not paused."),
   finishing: Schema.Array(
     Schema.Struct({
       ...RunStep,
-      kind: Schema.Literals(FINISHING_KINDS),
-      stopping: Schema.optionalKey(Schema.Literal(true)),
-      resumed: Schema.optionalKey(Schema.Literal(true)),
-      calling: Schema.optionalKey(Schema.String),
+      kind: Schema.Literals(FINISHING_KINDS).annotate({ description: 'What is finishing: a session, a check or a landing.' }),
+      stopping: Schema.optionalKey(Schema.Literal(true).annotate({ description: 'True where it is being stopped; absent otherwise.' })),
+      resumed: Schema.optionalKey(Schema.Literal(true).annotate({ description: 'True where it was resumed; absent otherwise.' })),
+      calling: Schema.optionalKey(Schema.String.annotate({ description: 'The tool call it waits on; absent where none.' })),
     }),
-  ),
-  parked: Schema.Array(Schema.Struct({ ...RunStep, after: Schema.optionalKey(Schema.String), cut: Schema.optionalKey(Schema.String) })),
-  staged: Schema.Array(Schema.Struct({ ...RunStep, repo: Schema.String })),
-  held: Schema.Array(Schema.Struct(RunStep)),
+  ).annotate({ description: 'Each task still finishing under the pause.' }),
+  parked: Schema.Array(
+    Schema.Struct({
+      ...RunStep,
+      after: Schema.optionalKey(Schema.String.annotate({ description: 'The tool call it was parked after; absent where none.' })),
+      cut: Schema.optionalKey(Schema.String.annotate({ description: 'The tool call that was cut; absent where none.' })),
+    }),
+  ).annotate({ description: "Each session the pause parked at a tool call's end." }),
+  staged: Schema.Array(
+    Schema.Struct({ ...RunStep, repo: Schema.String.annotate({ description: 'The repository the merge is staged in.' }) }),
+  ).annotate({ description: 'Each landing the pause holds with its merge staged.' }),
+  held: Schema.Array(Schema.Struct(RunStep)).annotate({ description: 'Each other check the pause holds.' }),
 });
 export type Paused = typeof Paused.Type;
 
 /** `GET /api/pause/now`: what a pause at once would cut, each task at work but a landing, and the sentence of what that costs. */
-export const PauseNowRead = Schema.Struct({ interrupts: Schema.Array(Interrupt), cost: Schema.String });
+export const PauseNowRead = Schema.Struct({
+  interrupts: Schema.Array(Interrupt).annotate({ description: 'Each task a pause at once would cut.' }),
+  cost: Schema.String.annotate({ description: 'The sentence of what that costs.' }),
+});
 export type PauseNowRead = typeof PauseNowRead.Type;
 
 /**
@@ -311,10 +242,12 @@ export type PauseNowRead = typeof PauseNowRead.Type;
  * 422.
  */
 export const PauseWrite = Schema.Struct({
-  why: Schema.optionalKey(Schema.String),
-  by: Schema.optionalKey(Schema.String),
-  timeout: Schema.optionalKey(Schema.String),
-  now: Schema.optionalKey(Schema.Boolean),
+  why: Schema.optionalKey(Schema.String.annotate({ description: 'Why to pause.' })),
+  by: Schema.optionalKey(Schema.String.annotate({ description: 'Who pauses.' })),
+  timeout: Schema.optionalKey(
+    Schema.String.annotate({ description: 'How long a call in flight is given, as 15m; the store timeout where left out.' }),
+  ),
+  now: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Whether to pause at once, cutting what is at work.' })),
 });
 export type PauseWrite = typeof PauseWrite.Type;
 
@@ -322,9 +255,9 @@ export type PauseWrite = typeof PauseWrite.Type;
 export const PauseAnswer = Schema.Union([
   Schema.Struct({
     pause: Pause,
-    kept: Schema.Boolean,
-    interrupted: Schema.Array(Interrupt),
-    skipped: Schema.Array(Interrupt),
+    kept: Schema.Boolean.annotate({ description: 'Whether an earlier pause was kept, which this call left as it was.' }),
+    interrupted: Schema.Array(Interrupt).annotate({ description: 'The tasks the pause at once cut.' }),
+    skipped: Schema.Array(Interrupt).annotate({ description: 'The tasks it left, which a pause at once does not cut.' }),
   }),
   Schema.Struct({ pause: Pause }),
 ]);
@@ -366,64 +299,6 @@ export const PauseTimeoutWrite = Schema.Struct({
 }).annotate({ identifier: 'PauseTimeoutWrite' });
 export type PauseTimeoutWrite = typeof PauseTimeoutWrite.Type;
 
-/** A file of the daemon's, read as it says itself: who it is, where it serves, and when it last moved. */
-export const Daemon = Schema.Struct({
-  kind: Schema.Literals(DAEMON_KINDS),
-  by: OrNull(Schema.String),
-  url: OrNull(Schema.String),
-  start: Schema.String,
-  ticking: Schema.Boolean,
-  pid: OrNull(Schema.Number),
-  cwd: OrNull(Schema.String),
-  every: OrNull(Schema.Number),
-  startedAt: OrNull(Schema.String),
-  passedAt: OrNull(Schema.String),
-  lastHeardAt: OrNull(Schema.String),
-  stoppedAt: OrNull(Schema.String),
-  staleAfterMs: OrNull(Schema.Number),
-  identity: OrNull(Schema.Literals(DAEMON_IDENTITIES)),
-  line: Schema.String,
-  unobserved: Schema.Array(Schema.String),
-  /**
-   * The line `nemia ls` says of where the result branches stand: how long ago the tick's last pass read them, where that is older than
-   * `staleAfterMs` or nothing ticks, or that no pass has; null where a ticking daemon read them lately. Left out by an older api.
-   */
-  branchesLine: Schema.optionalKey(OrNull(Schema.String)),
-});
-export type Daemon = typeof Daemon.Type;
-
-/** A window of the plan's quota, as the board shows it. */
-export const QuotaWindow = Schema.Struct({
-  key: Schema.String,
-  label: Schema.String,
-  usedPercentage: Schema.Number,
-  resetsAt: OrNull(Schema.String),
-  reset: Schema.Boolean,
-  marked: Schema.Boolean,
-});
-export type QuotaWindow = typeof QuotaWindow.Type;
-
-/** `GET /api/quota`: the subscription's quota as the board is given it, every case a 200 with a sentence (`said`) but `fresh`. */
-export const Quota = Schema.Struct({
-  state: Schema.Literals(QUOTA_STATES),
-  askedAt: OrNull(Schema.String),
-  ageMs: OrNull(Schema.Number),
-  againAt: OrNull(Schema.String),
-  subscription: OrNull(Schema.String),
-  windows: Schema.Array(QuotaWindow),
-  last: OrNull(Schema.Struct({ askedAt: Schema.String, windows: Schema.Array(QuotaWindow) })),
-  keepMs: Schema.Number,
-  markAt: Schema.Number,
-  said: OrNull(Schema.String),
-  /**
-   * Where Claude Code is signed in by a long-lived token, whose `get_usage` has no limits: the windows are those the newest
-   * `rate_limit_event` of the sessions said, and this is when a session's turn received it and how long ago, in ms (`fresh`); null while
-   * no session has reported one (`no-plan`). Left out where the windows are `get_usage`'s own, for every other answer, and by an older api.
-   */
-  heard: Schema.optionalKey(OrNull(Schema.Struct({ at: Schema.String, ageMs: Schema.Number }))),
-});
-export type Quota = typeof Quota.Type;
-
 /**
  * `GET /api/stats`' query: `from` and `to` UTC days, `by` what the rows go by, and the facts kept by `agent`, `step`, `workflow`,
  * `ofFactory` and `ofRepo` (named so beside `factory` and `repo`, which name the place every route is answered in). Each kept as the text
@@ -432,15 +307,19 @@ export type Quota = typeof Quota.Type;
  * field of.
  */
 export const StatsQuery = {
-  from: Schema.optionalKey(Schema.String),
-  to: Schema.optionalKey(Schema.String),
-  by: Schema.optionalKey(Schema.String),
-  agent: Schema.optionalKey(Schema.String),
-  step: Schema.optionalKey(Schema.String),
-  workflow: Schema.optionalKey(Schema.String),
-  ofFactory: Schema.optionalKey(Schema.String),
-  ofRepo: Schema.optionalKey(Schema.String),
-  labelSelector: Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)])),
+  from: Schema.optionalKey(Schema.String.annotate({ description: 'The first UTC day of the range, as YYYY-MM-DD.' })),
+  to: Schema.optionalKey(Schema.String.annotate({ description: 'The last UTC day of the range, as YYYY-MM-DD.' })),
+  by: Schema.optionalKey(Schema.String.annotate({ description: 'What the rows go by: agent, step, factory, workflow or repo.' })),
+  agent: Schema.optionalKey(Schema.String.annotate({ description: 'Keep the facts of this agent.' })),
+  step: Schema.optionalKey(Schema.String.annotate({ description: 'Keep the facts of this step.' })),
+  workflow: Schema.optionalKey(Schema.String.annotate({ description: 'Keep the facts of this workflow.' })),
+  ofFactory: Schema.optionalKey(Schema.String.annotate({ description: 'Keep the facts of this factory.' })),
+  ofRepo: Schema.optionalKey(Schema.String.annotate({ description: 'Keep the facts of this repository.' })),
+  labelSelector: Schema.optionalKey(
+    Schema.Union([Schema.String, Schema.Array(Schema.String)]).annotate({
+      description: 'A label query, given once or again: keep the runs whose labels one of them takes.',
+    }),
+  ),
 };
 
 /**
@@ -449,14 +328,18 @@ export const StatsQuery = {
  * by the board's own reader.
  */
 export const Stats = Schema.Struct({
-  from: OrNull(Schema.String),
-  to: Schema.String,
-  by: OrNull(Schema.Literals(STATS_BY)),
-  filters: Schema.Record(Schema.String, Schema.String),
-  all: Json,
-  groups: Schema.Array(Json),
-  unreadable: Schema.Array(Schema.String),
-  health: Json,
+  from: OrNull(Schema.String, 'The first day of the range, as YYYY-MM-DD; null where it has none.'),
+  to: Schema.String.annotate({ description: 'The last day of the range, as YYYY-MM-DD.' }),
+  by: OrNull(Schema.Literals(STATS_BY), 'What the rows go by; null where they go by nothing.'),
+  filters: Schema.Record(Schema.String, Schema.String).annotate({
+    description: 'The filters the facts were kept by, each a name and its value.',
+  }),
+  all: Json("Every run's group: its headline, days, steps, tiles, marks, tallies and slow landings, as the board reads it."),
+  groups: Schema.Array(Schema.Unknown).annotate({
+    description: 'Each group of runs the rows go by, under its key, as the board reads it.',
+  }),
+  unreadable: Schema.Array(Schema.String).annotate({ description: 'The ids of the runs that did not read.' }),
+  health: Json("The system's health over the range: a pass's time, the store, the queue, the load and the quota windows."),
 });
 export type Stats = typeof Stats.Type;
 
@@ -466,10 +349,12 @@ export type Stats = typeof Stats.Type;
  * kept as text, so a word that is no level is refused in the package's words, a 422.
  */
 export const SubscriptionWrite = Schema.Struct({
-  task: Schema.String,
-  selectors: Schema.optionalKey(Schema.Array(Schema.String)),
-  digestEvery: Schema.optionalKey(Schema.Number),
-  atLeast: Schema.optionalKey(Schema.String),
+  task: Schema.String.annotate({ description: 'The task told to the long-lived session when a line wakes it.' }),
+  selectors: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({ description: 'The selectors of the lines that wake it; waits=person where left out.' }),
+  ),
+  digestEvery: Schema.optionalKey(describedNumber('The minutes a digest waits; 60 where left out.')),
+  atLeast: Schema.optionalKey(Schema.String.annotate({ description: "The level a run's factory is at least at; kept as text." })),
 });
 export type SubscriptionWrite = typeof SubscriptionWrite.Type;
 
@@ -479,20 +364,25 @@ export type SubscriptionWrite = typeof SubscriptionWrite.Type;
  * api).
  */
 export const Subscribed = Schema.Struct({
-  name: Schema.String,
+  name: Schema.String.annotate({ description: 'The name the subscription is put under.' }),
   subscription: Schema.Struct({
-    task: Schema.String,
-    selectors: Schema.Array(Schema.String),
-    digestEvery: Schema.Number,
-    from: Schema.Number,
-    scope: Schema.optionalKey(SubscriptionScope),
-  }),
-  hints: Schema.optionalKey(Schema.Array(Schema.String)),
+    task: Schema.String.annotate({ description: 'The task told when a line wakes it.' }),
+    selectors: Schema.Array(Schema.String).annotate({ description: 'The selectors of the lines that wake it.' }),
+    digestEvery: describedNumber('The minutes a digest waits.'),
+    from: describedNumber("The feed's byte its news starts from."),
+    scope: Schema.optionalKey(SubscriptionScope.annotate({ description: 'Whose lines it is told by level; absent where not given.' })),
+  }).annotate({ description: 'The subscription put: its task, selectors, digest wait, where its news starts and its scope.' }),
+  hints: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description:
+        'A sentence for each former word one of its selectors still says, naming what it says now; empty where none does; left out by an older api.',
+    }),
+  ),
 });
 export type Subscribed = typeof Subscribed.Type;
 
 /** What `DELETE /api/subscriptions/:name` answers: the name taken away. */
-export const Unsubscribed = Schema.Struct({ name: Schema.String });
+export const Unsubscribed = Schema.Struct({ name: Schema.String.annotate({ description: 'The name of the subscription taken away.' }) });
 export type Unsubscribed = typeof Unsubscribed.Type;
 
 /**
@@ -501,9 +391,11 @@ export type Unsubscribed = typeof Unsubscribed.Type;
  * and a bookmark, its id, the cursor an EventSource sends back as Last-Event-ID.
  */
 export const FeedStreamEvent = Schema.Struct({
-  id: Schema.optionalKey(Schema.String),
-  event: Schema.Literals(FEED_STREAM_EVENTS),
-  data: Schema.String,
+  id: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The cursor an EventSource sends back as Last-Event-ID; on a line and a bookmark alone.' }),
+  ),
+  event: Schema.Literals(FEED_STREAM_EVENTS).annotate({ description: "The event's name." }),
+  data: Schema.String.annotate({ description: 'The JSON of what it says: a line as the feed wrote it, a hint, a failed read, or empty.' }),
 });
 export type FeedStreamEvent = typeof FeedStreamEvent.Type;
 
@@ -513,9 +405,11 @@ export type FeedStreamEvent = typeof FeedStreamEvent.Type;
  * another, the api reads off the request as it reads `GET /api/stats`' (`StatsQuery`).
  */
 export const FeedQuery = {
-  from: Schema.optionalKey(Schema.String),
-  after: Schema.optionalKey(Schema.String),
-  until: Schema.optionalKey(Schema.String),
+  from: Schema.optionalKey(Schema.String.annotate({ description: "end, to start from the feed's end." })),
+  after: Schema.optionalKey(
+    Schema.String.annotate({ description: 'A cursor this stream gave, to read the lines after; a Last-Event-ID wins over it.' }),
+  ),
+  until: Schema.optionalKey(Schema.String.annotate({ description: 'end, to read the feed once and stop.' })),
 };
 
 /** Why a wait ended: `matched`, a line a label query takes was read; `bound`, its bound came with none. */
@@ -544,13 +438,20 @@ export type FeedWait = typeof FeedWait.Type;
  * `from`, the cursor to read from (the feed's end when none); `for`, the bound as `nemia wait --for` takes it (`30s`, `4m`).
  */
 export const FeedWaitQuery = {
-  labelSelector: Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)])),
-  from: Schema.optionalKey(Schema.String),
-  for: Schema.optionalKey(Schema.String),
+  labelSelector: Schema.optionalKey(
+    Schema.Union([Schema.String, Schema.Array(Schema.String)]).annotate({
+      description: 'A label query, given once or again, each as `nemia watch -l` takes it.',
+    }),
+  ),
+  from: Schema.optionalKey(Schema.String.annotate({ description: "The cursor to read from; the feed's end when none." })),
+  for: Schema.optionalKey(Schema.String.annotate({ description: 'The bound, as `nemia wait --for` takes it (30s, 4m).' })),
 };
 
 /** A query of the place a request is answered in, which a route of the server reads: the factory and the repository it names. */
-const placeQuery = { factory: Schema.optionalKey(Schema.String), repo: Schema.optionalKey(Schema.String) };
+const placeQuery = {
+  factory: Schema.optionalKey(Schema.String.annotate({ description: 'The factory the request is answered in.' })),
+  repo: Schema.optionalKey(Schema.String.annotate({ description: 'The repository of that factory the request is answered in.' })),
+};
 
 /**
  * What a read of the package's refuses with: a value it does not take, or a file that does not read, a 422; and a failure that is no
@@ -573,12 +474,14 @@ export class ServerGroup extends HttpApiGroup.make('server').add(
   HttpApiEndpoint.get('store', '/api/store', { success: YourStore, error: readErrors }),
   HttpApiEndpoint.get('ceilings', '/api/ceilings', { success: Ceilings, error: readErrors }),
   HttpApiEndpoint.get('passes', '/api/passes', {
-    query: { last: Schema.optionalKey(Schema.String) },
+    query: { last: Schema.optionalKey(Schema.String.annotate({ description: 'How many of the recent passes to read.' })) },
     success: PassesRead,
     error: readErrors,
   }),
   HttpApiEndpoint.get('series', '/api/series', {
-    query: { range: Schema.optionalKey(Schema.String) },
+    query: {
+      range: Schema.optionalKey(Schema.String.annotate({ description: 'The range the series are read over: 24h, 7d, 30d or all.' })),
+    },
     success: SeriesRead,
     error: readErrors,
   }),
@@ -603,7 +506,11 @@ export class ServerGroup extends HttpApiGroup.make('server').add(
   HttpApiEndpoint.get('wait', '/api/feed/wait', { query: FeedWaitQuery, success: FeedWait, error: [BadRequest, Invalid] }),
   HttpApiEndpoint.get('feed', '/api/feed/stream', {
     query: FeedQuery,
-    headers: { 'last-event-id': Schema.optionalKey(Schema.String) },
+    headers: {
+      'last-event-id': Schema.optionalKey(
+        Schema.String.annotate({ description: 'The id of the last event received, which an EventSource sends on reconnecting.' }),
+      ),
+    },
     success: HttpApiSchema.StreamSse({ events: FeedStreamEvent }),
     error: [BadRequest, Invalid],
   }),

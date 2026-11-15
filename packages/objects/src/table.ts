@@ -6,6 +6,7 @@
  * board nor the cli keeps a printer of its own: `tableLines` prints one as `kubectl get` does, for the client and the api's MCP port alike.
  */
 import { Schema } from 'effect';
+import { describedNumber, describedOne } from './meta.ts';
 import { TABLE_COLUMN_TYPES } from './words.ts';
 
 /** The `Accept` value that asks a list for a `Table`, as `kubectl get` asks it. */
@@ -13,31 +14,33 @@ export const TABLE_ACCEPT = 'application/json;as=Table;g=meta.k8s.io;v=v1';
 
 /** One column: its name, the type of its cells (`TABLE_COLUMN_TYPES`), a format beside it, what it says, and when it is shown. */
 export const TableColumnDefinition = Schema.Struct({
-  name: Schema.String,
-  type: Schema.Literals(TABLE_COLUMN_TYPES),
-  format: Schema.String,
-  description: Schema.String,
-  priority: Schema.Number,
+  name: Schema.String.annotate({ description: "The column's name." }),
+  type: Schema.Literals(TABLE_COLUMN_TYPES).annotate({ description: 'The type of its cells.' }),
+  format: Schema.String.annotate({ description: 'A format beside the type.' }),
+  description: Schema.String.annotate({ description: 'What the column says.' }),
+  priority: describedNumber('When it is shown: 0 by default, higher only when asked wide.'),
 });
 export type TableColumnDefinition = typeof TableColumnDefinition.Type;
 
 /** One row: its cells, in the columns' order, and the object it prints where the server gives it. */
 export const TableRow = Schema.Struct({
-  cells: Schema.Array(Schema.Unknown),
-  object: Schema.optionalKey(Schema.Unknown),
+  cells: Schema.Array(Schema.Unknown).annotate({ description: "The row's cells, in the columns' order." }),
+  object: Schema.optionalKey(describedOne(Schema.Unknown, 'The object the row prints, where the server gives it.')),
 });
 export type TableRow = typeof TableRow.Type;
 
 /** A list as a table: where the page stands (`resourceVersion`, `continue`), its columns and its rows. */
 export const Table = Schema.Struct({
-  kind: Schema.Literal('Table'),
-  apiVersion: Schema.Literal('meta.k8s.io/v1'),
+  kind: Schema.Literal('Table').annotate({ description: 'What the object is: a Table.' }),
+  apiVersion: Schema.Literal('meta.k8s.io/v1').annotate({ description: 'The version the table is served under, meta.k8s.io/v1.' }),
   metadata: Schema.Struct({
-    resourceVersion: Schema.optionalKey(Schema.String),
-    continue: Schema.optionalKey(Schema.String),
-  }),
-  columnDefinitions: Schema.Array(TableColumnDefinition),
-  rows: Schema.Array(TableRow),
+    resourceVersion: Schema.optionalKey(Schema.String.annotate({ description: "The list's position as it was read." })),
+    continue: Schema.optionalKey(
+      Schema.String.annotate({ description: 'The opaque word that asks for the next page; absent on the last.' }),
+    ),
+  }).annotate({ description: 'Where the page stands.' }),
+  columnDefinitions: Schema.Array(TableColumnDefinition).annotate({ description: 'The columns a client prints.' }),
+  rows: Schema.Array(TableRow).annotate({ description: "A row per item, its cells in the columns' order." }),
 });
 export type Table = typeof Table.Type;
 

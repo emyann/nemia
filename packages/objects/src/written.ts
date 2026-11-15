@@ -10,10 +10,18 @@ import { Schema } from 'effect';
  * dollars of a cost line (`replaced`) — null where it replaced nothing.
  */
 export const FactoryWritten = Schema.Struct({
-  file: Schema.String,
-  already: Schema.optionalKey(Schema.Boolean),
-  was: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  replaced: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+  file: Schema.String.annotate({ description: 'The file the write wrote.' }),
+  already: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Whether it was so already and the write changed nothing.' })),
+  was: Schema.optionalKey(
+    Schema.NullOr(Schema.String).annotate({
+      description: 'What the write replaced, a policy, an agent, a cron or an address; null where it replaced nothing.',
+    }),
+  ),
+  replaced: Schema.optionalKey(
+    Schema.NullOr(Schema.Finite).annotate({
+      description: 'The dollars of the cost line the write replaced; null where it replaced nothing.',
+    }),
+  ),
 }).annotate({
   description: "What this write did, on a write's answer alone: the file it wrote, whether it was so already, and what it replaced.",
 });

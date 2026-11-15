@@ -25,59 +25,109 @@ const FillPlace = Schema.Literals(['factory', 'repo', 'yours']);
  * lines write them, `harnessPrompt:`, the schema its `output:` names (its file and text) and its instructions (`instructions`, the body).
  */
 export const AgentSpec = Schema.Struct({
-  role: Schema.optionalKey(Text),
-  description: Schema.optionalKey(Text),
-  keys: Schema.optionalKey(Schema.Record(Schema.String, Schema.NullOr(Schema.String))),
-  skills: Schema.optionalKey(Text),
-  harnessPrompt: Schema.optionalKey(Text),
-  mcp: Schema.optionalKey(Text),
-  output: Schema.optionalKey(Schema.NullOr(Schema.Struct({ file: Schema.String, text: Schema.String }))),
-  instructions: Schema.optionalKey(Schema.String),
+  role: Schema.optionalKey(Text.annotate({ description: "The agent's `role:` line; null where it has none." })),
+  description: Schema.optionalKey(
+    Text.annotate({ description: "The agent's `description:` line, what it says it is for; null where it has none." }),
+  ),
+  keys: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.NullOr(Schema.String)).annotate({
+      description: "The agent's harness keys, each line as written by its key; null for a key with no value.",
+    }),
+  ),
+  skills: Schema.optionalKey(Text.annotate({ description: "The agent's `skills:` line as written; null where it has none." })),
+  harnessPrompt: Schema.optionalKey(
+    Text.annotate({ description: "The agent's `harnessPrompt:` line as written; null where it has none." }),
+  ),
+  mcp: Schema.optionalKey(Text.annotate({ description: "The agent's `mcp:` line as written; null where it has none." })),
+  output: Schema.optionalKey(
+    Schema.NullOr(
+      Schema.Struct({
+        file: Schema.String.annotate({ description: 'The file of the schema its `output:` line names.' }),
+        text: Schema.String.annotate({ description: 'The text of that schema.' }),
+      }),
+    ).annotate({ description: 'The schema its `output:` line names, with its file and text; null where it names none.' }),
+  ),
+  instructions: Schema.optionalKey(Schema.String.annotate({ description: "The agent's instructions, the body of its file." })),
 }).annotate({
   description: 'The agent as its file says it: its role, description, harness keys, skills, MCP servers, output schema and instructions.',
 });
 export type AgentSpec = typeof AgentSpec.Type;
 
 /** A step that names the agent (`usedBy`), and one it fills in the factory, hired or by its own `agent:` line (`fills`). */
-export const AgentUser = Schema.Struct({ from: AgentPlace, workflow: Schema.String, step: Schema.String });
-export const AgentFill = Schema.Struct({ from: FillPlace, workflow: Schema.String, step: Schema.String, hired: Schema.Boolean });
+export const AgentUser = Schema.Struct({
+  from: AgentPlace.annotate({ description: 'The place the step reads the agent from: the repository or yours.' }),
+  workflow: Schema.String.annotate({ description: 'The workflow the step is in.' }),
+  step: Schema.String.annotate({ description: "The step's name." }),
+});
+export const AgentFill = Schema.Struct({
+  from: FillPlace.annotate({
+    description: 'Where the step is read from: the repository, yours, or the tree of a factory made from a template (`factory`).',
+  }),
+  workflow: Schema.String.annotate({ description: 'The workflow the step is in.' }),
+  step: Schema.String.annotate({ description: "The step's name." }),
+  hired: Schema.Boolean.annotate({ description: 'Whether the agent is hired to the step, rather than named by its own `agent:` line.' }),
+});
 
 /**
  * A skill the agent gives, as its line names it: the origin a start finds it in (null where none, `foundIn` then the folder the repository
  * has it in, or null too), its card entry or why it has none, and what it costs a turn.
  */
 export const GivenSkill = Schema.Struct({
-  name: Schema.String,
-  from: Schema.NullOr(Schema.Literals(DEFINITION_ORIGINS)),
-  foundIn: Text,
-  entry: Schema.NullOr(CardSkill),
-  error: Text,
-  preload: Schema.Boolean,
-  cost: Schema.NullOr(SkillCost),
+  name: Schema.String.annotate({ description: "The skill's name, as the agent's line names it." }),
+  from: Schema.NullOr(Schema.Literals(DEFINITION_ORIGINS)).annotate({
+    description: 'The origin a start finds the skill in; null where none.',
+  }),
+  foundIn: Text.annotate({
+    description: 'The folder the repository has the skill in, where a start finds none; null too where it has none.',
+  }),
+  entry: Schema.NullOr(CardSkill).annotate({ description: 'Its card entry; null where it has none.' }),
+  error: Text.annotate({ description: 'Why it has no card entry; null where it has one.' }),
+  preload: Schema.Boolean.annotate({ description: 'Whether the skill is loaded whole at the start of a session.' }),
+  cost: Schema.NullOr(SkillCost).annotate({ description: 'What the skill costs a turn, about; null where it is not known.' }),
 });
 export type GivenSkill = typeof GivenSkill.Type;
 
 /** What Nemia reads of an agent; see the file's head. */
 export const AgentStatus = Schema.Struct({
   ...definitionStatus,
-  dir: Schema.String,
-  file: Schema.String,
-  source: Schema.String,
-  usedBy: Schema.Array(AgentUser),
-  fills: Schema.Array(AgentFill),
-  factories: Schema.Array(Schema.String),
-  given: Schema.Array(GivenSkill),
+  dir: Schema.String.annotate({ description: 'The folder the agent was found in.' }),
+  file: Schema.String.annotate({ description: "The agent's file." }),
+  source: Schema.String.annotate({ description: "The text of the agent's file." }),
+  usedBy: Schema.Array(AgentUser).annotate({ description: 'The steps that name the agent.' }),
+  fills: Schema.Array(AgentFill).annotate({ description: 'The steps it fills in the factory, hired or by their own `agent:` line.' }),
+  factories: Schema.Array(Schema.String).annotate({ description: 'The factories it fills a step in.' }),
+  given: Schema.Array(GivenSkill).annotate({ description: 'Each skill the agent gives, as its line names it.' }),
   copied: Schema.NullOr(
-    Schema.Struct({ source: Schema.String, version: Schema.String, now: Schema.Literals(['same', 'changed', 'gone']) }),
+    Schema.Struct({
+      source: Schema.String.annotate({ description: 'The file it was copied from.' }),
+      version: Schema.String.annotate({ description: 'The version the copy recorded.' }),
+      now: Schema.Literals(['same', 'changed', 'gone']).annotate({
+        description: 'Whether the file it was copied from is the same version now, changed, or gone.',
+      }),
+    }),
+  ).annotate({ description: 'Where the agent was copied from; null where it was not copied.' }),
+  untried: Schema.NullOr(
+    Schema.Struct({
+      why: Schema.String.annotate({ description: 'Why the agent cannot be tried.' }),
+      copy: Text.annotate({
+        description: 'The command that copies it to yours, to make it one that can be tried; null where a copy does not.',
+      }),
+    }),
+  ).annotate({ description: 'Why the agent cannot be tried; null where nothing refuses it.' }),
+  card: Schema.NullOr(Schema.Array(CardSkill)).annotate({ description: "The agent's card entries; null where its file does not read." }),
+  cardError: Text.annotate({ description: 'Why it has no card; null where it has one.' }),
+  error: Text.annotate({ description: 'Why the agent does not read; null where it reads.' }),
+  custom: Schema.optionalKey(
+    Text.annotate({
+      description:
+        "The file of a person's custom instructions for it (`nemia agents custom`); null where they wrote none; absent from an older api.",
+    }),
   ),
-  untried: Schema.NullOr(Schema.Struct({ why: Schema.String, copy: Text })),
-  card: Schema.NullOr(Schema.Array(CardSkill)),
-  cardError: Text,
-  error: Text,
-  /** The file of a person's custom instructions for it (`nemia agents custom`), null where they wrote none; absent from an older api. */
-  custom: Schema.optionalKey(Text),
-  /** The files a removal took (`DELETE …/agents/<name>`), on that answer alone: the agent's file and a schema no other agent names. */
-  removed: Schema.optionalKey(Schema.Array(Schema.String)),
+  removed: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description: "The files a removal took, on that answer alone: the agent's file and a schema no other agent names.",
+    }),
+  ),
 }).annotate({
   description:
     'What Nemia reads of the agent: where it was found, the steps that name it and those it fills, the skills it gives, where it was copied from, why it does not read, and its revision.',
@@ -106,15 +156,20 @@ export const AgentWrite = Schema.Struct({ metadata: WriteMeta, spec: AgentSpec }
 export type AgentWrite = typeof AgentWrite.Type;
 
 /** An agent's files read into its spec (`POST /api/agents/read`): the name it is read under, and what its files say. */
-export const AgentDrafted = Schema.Struct({ metadata: Schema.Struct({ name: Schema.String }), spec: AgentSpec });
+export const AgentDrafted = Schema.Struct({
+  metadata: Schema.Struct({ name: Schema.String.annotate({ description: 'The name the files are read under.' }) }).annotate({
+    description: 'The name the agent is read under.',
+  }),
+  spec: AgentSpec,
+});
 export type AgentDrafted = typeof AgentDrafted.Type;
 
 /** A try of an agent (`POST …/agents/<name>/try`): what it is asked to do. */
-export const AgentTry = Schema.Struct({ brief: Schema.String });
+export const AgentTry = Schema.Struct({ brief: Schema.String.annotate({ description: 'What the agent is asked to do.' }) });
 export type AgentTry = typeof AgentTry.Type;
 
 /** What a try answers: the run it started. */
-export const AgentTried = Schema.Struct({ id: Schema.String });
+export const AgentTried = Schema.Struct({ id: Schema.String.annotate({ description: 'The id of the run the try started.' }) });
 export type AgentTried = typeof AgentTried.Type;
 
 /**
@@ -123,18 +178,25 @@ export type AgentTried = typeof AgentTried.Type;
  */
 export const AgentCard = Schema.Struct({
   card: Schema.Struct({
-    name: Schema.String,
-    description: Schema.String,
-    version: Schema.String,
-    capabilities: Schema.Struct({ streaming: Schema.Boolean, pushNotifications: Schema.Boolean, extendedAgentCard: Schema.Boolean }),
-    defaultInputModes: Schema.Array(Schema.String),
-    defaultOutputModes: Schema.Array(Schema.String),
-    skills: Schema.Array(CardSkill),
-  }),
-  servedOverA2A: Schema.Literal(false),
-  why: Schema.String,
-  /** The place the agent was read from, which `nemia agents card` says beside the card; absent from an older api. */
-  from: Schema.optionalKey(AgentPlace),
+    name: Schema.String.annotate({ description: "The agent's name." }),
+    description: Schema.String.annotate({ description: 'What the agent says it is for.' }),
+    version: Schema.String.annotate({ description: "The agent's version." }),
+    capabilities: Schema.Struct({
+      streaming: Schema.Boolean.annotate({ description: 'Whether the agent streams its answers.' }),
+      pushNotifications: Schema.Boolean.annotate({ description: 'Whether the agent sends push notifications.' }),
+      extendedAgentCard: Schema.Boolean.annotate({ description: 'Whether the agent has an extended card.' }),
+    }).annotate({ description: 'What the agent can do as an A2A server.' }),
+    defaultInputModes: Schema.Array(Schema.String).annotate({ description: 'The media types the agent takes by default.' }),
+    defaultOutputModes: Schema.Array(Schema.String).annotate({ description: 'The media types the agent answers in by default.' }),
+    skills: Schema.Array(CardSkill).annotate({ description: 'What the agent can do, a skill to an entry.' }),
+  }).annotate({ description: 'The agent as an A2A Agent Card.' }),
+  servedOverA2A: Schema.Literal(false).annotate({ description: 'Whether the agent is served over A2A: always false.' }),
+  why: Schema.String.annotate({ description: 'What the card shape leaves out of the agent.' }),
+  from: Schema.optionalKey(
+    AgentPlace.annotate({
+      description: 'The place the agent was read from, which `nemia agents card` says beside the card; absent from an older api.',
+    }),
+  ),
 });
 export type AgentCard = typeof AgentCard.Type;
 
@@ -143,14 +205,14 @@ export type AgentCard = typeof AgentCard.Type;
  * and file, its name, what it says it is for, its version (what a copy records), and, for one that does not read, why.
  */
 export const AgentSource = Schema.Struct({
-  place: Schema.Literals(AGENT_SOURCE_PLACES),
-  repo: Text,
-  dir: Schema.String,
-  file: Schema.String,
-  name: Schema.String,
-  description: Text,
-  version: Text,
-  error: Text,
+  place: Schema.Literals(AGENT_SOURCE_PLACES).annotate({ description: 'Where the file was found.' }),
+  repo: Text.annotate({ description: "The repository the file was found in, for a repository's; null otherwise." }),
+  dir: Schema.String.annotate({ description: 'The folder of the file.' }),
+  file: Schema.String.annotate({ description: 'The file.' }),
+  name: Schema.String.annotate({ description: "The agent's name." }),
+  description: Text.annotate({ description: 'What the agent says it is for; null where it does not read or says none.' }),
+  version: Text.annotate({ description: 'The version of the file, which a copy records; null where it does not read.' }),
+  error: Text.annotate({ description: 'Why the file does not read; null where it reads.' }),
 });
 export type AgentSource = typeof AgentSource.Type;
 

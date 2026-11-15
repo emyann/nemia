@@ -40,16 +40,28 @@ import {
  * as its text, so a
  * wrong one is refused in the package's words, a 422. A list asked by it carries the frame's parts (`RunStatus`, `RunListMeta`).
  */
-const runListQuery = { ...listQuery, fieldSelector: Schema.optionalKey(Schema.String) };
+const runListQuery = {
+  ...listQuery,
+  fieldSelector: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        'The runs in one state or outcome, as one term: status.state=<state> or status.state!=<state>, status.outcome=<outcome> or status.outcome!=<outcome>.',
+    }),
+  ),
+};
 
 /** What a list of runs answers: the `RunList`, or, asked with `TABLE_ACCEPT`, the `Table` of its page (never on a watch). */
 const runListed = Schema.Union([RunList, Table]);
 
 /** A run, by its name. */
-const nameParams = { name: Schema.String };
+const nameParams = {
+  name: Schema.String.annotate({ description: "The run's name, found among the runs the store lists in any namespace." }),
+};
 
 /** A namespace, for a list in it. */
-const namespaceParams = { namespace: Schema.String };
+const namespaceParams = {
+  namespace: Schema.String.annotate({ description: "The namespace, a run's factory (default for one that names none)." }),
+};
 
 /** What a run's reads refuse with: none by that name, a query the package refuses, a run not judged. */
 const runReadErrors = [Missing, Invalid, Unjudged];
@@ -67,16 +79,23 @@ const runActionErrors = [BadRequest, Missing, Conflict, Invalid, WriteFailed];
  * too; `forceUnmerged` beside it, the others too, with their work.
  */
 const removeQuery = {
-  whole: Schema.optionalKey(Schema.String),
-  deleteBranches: Schema.optionalKey(Schema.String),
-  forceUnmerged: Schema.optionalKey(Schema.String),
+  whole: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        'true to remove a run of a workflow as nemia rm does, its worktrees removed through git and its branches kept; left out, only a try is removed.',
+    }),
+  ),
+  deleteBranches: Schema.optionalKey(Schema.String.annotate({ description: 'true to delete its branches merged into its base too.' })),
+  forceUnmerged: Schema.optionalKey(
+    Schema.String.annotate({ description: 'true, beside deleteBranches, to delete the unmerged ones too, with their work.' }),
+  ),
 };
 
 /** A run, by its namespace and its name. */
-const runParams = { namespace: Schema.String, name: Schema.String };
+const runParams = { ...namespaceParams, name: Schema.String.annotate({ description: "The run's name." }) };
 
 /** A step of a run, by the run's namespace and name and the step's. */
-const runStepParams = { ...runParams, step: Schema.String };
+const runStepParams = { ...runParams, step: Schema.String.annotate({ description: "The step's name." }) };
 
 /** An action's answer, taken and not yet done: a 202. */
 const takenLater = <S extends Schema.Top>(answer: S) => answer.pipe(Schema.annotate({ httpApiStatus: 202 }));
@@ -100,7 +119,13 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/runs/:name', { params: runParams, success: Run, error: runReadErrors }),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/runs', {
     params: namespaceParams,
-    query: { repo: Schema.optionalKey(Schema.String) },
+    query: {
+      repo: Schema.optionalKey(
+        Schema.String.annotate({
+          description: 'The folder whose repository holds the factory that places the run, for a start in default.',
+        }),
+      ),
+    },
     payload: RunStart,
     success: RunStarted.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: runActionErrors,
@@ -178,14 +203,21 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
   }),
   HttpApiEndpoint.get('record', '/api/runs/:name/record', { params: nameParams, success: RunRecord, error: [Missing, Invalid] }),
   HttpApiEndpoint.get('decision', '/api/runs/:runId/decision', {
-    params: { runId: Schema.String },
-    /** Comma-separated globs whose changed files the decision shows in full (`nemia decide --sensitive`); else the defaults. */
-    /**
-     * And `diffs`, comma-separated paths whose diffs it answers whole, `*` for every one: every other file's lines are left out, its
-     * path and counts kept (`decisionNarrowed`). Not given, no diff is answered whole: a decision reads its summary, and its diffs by
-     * name.
-     */
-    query: { sensitive: Schema.optionalKey(Schema.String), diffs: Schema.optionalKey(Schema.String) },
+    params: { runId: Schema.String.annotate({ description: "The run's id." }) },
+    query: {
+      sensitive: Schema.optionalKey(
+        Schema.String.annotate({
+          description:
+            'Comma-separated globs whose changed files the decision shows in full (nemia decide --sensitive); else the defaults.',
+        }),
+      ),
+      diffs: Schema.optionalKey(
+        Schema.String.annotate({
+          description:
+            "Comma-separated paths whose diffs it answers whole, * for every one; every other file's lines are left out, its path and counts kept. Not given, no diff is answered whole.",
+        }),
+      ),
+    },
     success: RunDecision,
     error: [Missing, Unjudged],
   }),

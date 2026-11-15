@@ -138,44 +138,160 @@ export const STEP_KEY_FORM = {
 
 /** Each key a step has as the loader reads it, every one optional: a key added to `STEP_KEYS` without one does not typecheck. */
 const stepKeyFields = {
-  after: Schema.optionalKey(Strings),
-  resume: Schema.optionalKey(Text),
-  input: Schema.optionalKey(Strings),
-  place: Schema.optionalKey(Schema.NullOr(Schema.Literals(PLACE_KINDS))),
-  workspace: Schema.optionalKey(Schema.NullOr(Schema.Literal('base'))),
-  writable: Schema.optionalKey(Strings),
-  reads: Schema.optionalKey(Strings),
-  slot: Schema.optionalKey(Schema.NullOr(Schema.Literal('none'))),
-  agent: Schema.optionalKey(Text),
-  skills: Schema.optionalKey(Strings),
-  mcp: Schema.optionalKey(Strings),
-  harness: Schema.optionalKey(Text),
-  model: Schema.optionalKey(Text),
-  effort: Schema.optionalKey(Text),
-  context: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-  permissionMode: Schema.optionalKey(Text),
-  sandbox: Schema.optionalKey(Text),
-  tools: Schema.optionalKey(Schema.NullOr(Strings)),
-  disallowedTools: Schema.optionalKey(Strings),
-  allowedTools: Schema.optionalKey(Strings),
-  denials: Schema.optionalKey(Schema.NullOr(Schema.Literal('fail'))),
-  remote: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
-  deadlineSeconds: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-  memory: Schema.optionalKey(Text),
-  budget: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-  check: Schema.optionalKey(Text),
-  retries: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-  checkFailurePolicy: Schema.optionalKey(Text),
-  gate: Schema.optionalKey(Schema.NullOr(Schema.Literal(true))),
-  output: Schema.optionalKey(Text),
-  tally: Schema.optionalKey(Strings),
-  loop: Schema.optionalKey(Text),
-  rounds: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-  routes: Schema.optionalKey(Schema.NullOr(Strings)),
-  route: Schema.optionalKey(Text),
-  when: Schema.optionalKey(Schema.NullOr(Strings)),
-  ends: Schema.optionalKey(Schema.NullOr(Strings)),
-  workflow: Schema.optionalKey(Text),
+  after: Schema.optionalKey(
+    Strings.annotate({
+      description: 'The steps that must finish first, verified, or unverified where one has no check; none, and it starts at once.',
+    }),
+  ),
+  resume: Schema.optionalKey(
+    Text.annotate({ description: 'The step whose session this one continues instead of starting cold, which implies waiting on it.' }),
+  ),
+  input: Schema.optionalKey(
+    Strings.annotate({ description: 'The steps whose declared output this one is handed in its brief, as data; each one it waits on.' }),
+  ),
+  place: Schema.optionalKey(
+    Schema.NullOr(Schema.Literals(PLACE_KINDS)).annotate({
+      description: 'Where the step works: folder, a folder the run makes, or git, branches of a repository.',
+    }),
+  ),
+  workspace: Schema.optionalKey(
+    Schema.NullOr(Schema.Literal('base')).annotate({
+      description:
+        "base: the step runs in the repository's own working tree rather than a worktree of its own, as a workflow's last step does.",
+    }),
+  ),
+  writable: Schema.optionalKey(
+    Strings.annotate({
+      description: "The folders of the run's factory this step may write, each by its directory's name; every other step only reads them.",
+    }),
+  ),
+  reads: Schema.optionalKey(
+    Strings.annotate({
+      description:
+        'What of the store the step reads and never writes, each by name: inbox, the cards waiting to be started, or costs, what recent runs of its workflow cost.',
+    }),
+  ),
+  slot: Schema.optionalKey(
+    Schema.NullOr(Schema.Literal('none')).annotate({
+      description: "none: the run takes no run slot, for a session that watches the other runs rather than doing a run's work.",
+    }),
+  ),
+  agent: Schema.optionalKey(
+    Text.annotate({
+      description:
+        "The agent attached to the node to do its work, by its name; its role keys are the step's defaults and the step's own keys win.",
+    }),
+  ),
+  skills: Schema.optionalKey(
+    Strings.annotate({ description: "The skills the step adds to its agent's, each a folder in a skills folder beside the agents." }),
+  ),
+  mcp: Schema.optionalKey(
+    Strings.annotate({ description: "The MCP servers the step adds to its agent's, each by its name in the repository's .mcp.json." }),
+  ),
+  harness: Schema.optionalKey(
+    Text.annotate({ description: 'What runs the session: claude, codex, or a2a:<name>, a remote A2A agent the store declares.' }),
+  ),
+  model: Schema.optionalKey(
+    Text.annotate({ description: "The model the harness runs the session on; the harness's own default when unset." }),
+  ),
+  effort: Schema.optionalKey(Text.annotate({ description: 'How hard the harness thinks, in its own words.' })),
+  context: Schema.optionalKey(
+    Schema.NullOr(Schema.Number).annotate({ description: "The session's context window, in tokens; the model's whole window when unset." }),
+  ),
+  permissionMode: Schema.optionalKey(
+    Text.annotate({
+      description: "Claude Code's permission mode, whether it asks, denies or allows what no rule decides; on claude only.",
+    }),
+  ),
+  sandbox: Schema.optionalKey(
+    Text.annotate({ description: "Codex's sandbox: read-only, workspace-write or danger-full-access; on codex only." }),
+  ),
+  tools: Schema.optionalKey(
+    Schema.NullOr(Strings).annotate({
+      description: "The only tools the session may have, in the harness's names; the harness's own set when unset.",
+    }),
+  ),
+  disallowedTools: Schema.optionalKey(
+    Strings.annotate({
+      description:
+        "What the session may not have, in Claude Code's permission rules; a deny beats an allow the repository's settings give.",
+    }),
+  ),
+  allowedTools: Schema.optionalKey(
+    Strings.annotate({ description: "What the session may do without being asked, in Claude Code's permission rules." }),
+  ),
+  denials: Schema.optionalKey(
+    Schema.NullOr(Schema.Literal('fail')).annotate({
+      description: 'fail: a try the harness denied a call is not passed on; the step reads denied and waits on a person; on claude only.',
+    }),
+  ),
+  remote: Schema.optionalKey(
+    Schema.NullOr(Schema.Boolean).annotate({
+      description:
+        'true: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it; on claude only.',
+    }),
+  ),
+  deadlineSeconds: Schema.optionalKey(
+    Schema.NullOr(Schema.Number).annotate({ description: 'The seconds the engine lets the step run before stopping it.' }),
+  ),
+  memory: Schema.optionalKey(
+    Text.annotate({
+      description:
+        "The most memory each session of the step may use, as a container's limit such as 4Gi; unset takes the daemon's default.",
+    }),
+  ),
+  budget: Schema.optionalKey(
+    Schema.NullOr(Schema.Number).annotate({
+      description:
+        "The most the step's tries may cost together, in dollars; past it the run files nothing more for it until a person raises it.",
+    }),
+  ),
+  check: Schema.optionalKey(
+    Text.annotate({
+      description: "A shell command the run executes in the step's workspace after it hands off; exit 0 makes the step verified.",
+    }),
+  ),
+  retries: Schema.optionalKey(
+    Schema.NullOr(Schema.Number).annotate({
+      description:
+        'How many times the run re-files the step after its check refuses it, or runs its check again where the machine killed it.',
+    }),
+  ),
+  checkFailurePolicy: Schema.optionalKey(
+    Text.annotate({
+      description: 'Which exit codes of its check a person answers, as rules read in order, the first that holds deciding.',
+    }),
+  ),
+  gate: Schema.optionalKey(
+    Schema.NullOr(Schema.Literal(true)).annotate({
+      description: "true: the step's closeout waits for a person's approval before anything after it is filed.",
+    }),
+  ),
+  output: Schema.optionalKey(
+    Text.annotate({ description: 'A JSON Schema file beside the step: what its closeout declares, for a step that reads it with input.' }),
+  ),
+  tally: Schema.optionalKey(
+    Strings.annotate({ description: "What stats count of the step's closeouts, per day: fields its output declares." }),
+  ),
+  loop: Schema.optionalKey(
+    Text.annotate({ description: "The step to run again when this one's closeout says again: true; one it waits on." }),
+  ),
+  rounds: Schema.optionalKey(Schema.NullOr(Schema.Number).annotate({ description: 'How many rounds loop may run, the first included.' })),
+  routes: Schema.optionalKey(Schema.NullOr(Strings).annotate({ description: 'The routes this condition may answer, a closed list.' })),
+  route: Schema.optionalKey(
+    Text.annotate({
+      description: "How this condition answers: a table over a producer's fact field, a script, or judge, a read-only agent.",
+    }),
+  ),
+  when: Schema.optionalKey(
+    Schema.NullOr(Strings).annotate({
+      description: 'The routes of the condition this node waits on that it runs on; on any other it reads skipped.',
+    }),
+  ),
+  ends: Schema.optionalKey(
+    Schema.NullOr(Strings).annotate({ description: 'The routes of this condition on which the run ends, nothing after it running.' }),
+  ),
+  workflow: Schema.optionalKey(Text.annotate({ description: 'The workflow this node routes to: it files a card for it from this run.' })),
 } satisfies { readonly [K in StepKey]: Schema.Top };
 
 /**
@@ -187,15 +303,27 @@ export const StepKeys = Schema.StructWithRest(Schema.Struct(stepKeyFields), [Sch
 export type StepKeys = typeof StepKeys.Type;
 
 /** A step as its file writes it: its name, the keys its file sets, and its note — all of its body for a step with no agent. */
-export const WorkflowStep = Schema.Struct({ name: Schema.String, keys: StepKeys, body: Schema.String });
+export const WorkflowStep = Schema.Struct({
+  name: Schema.String.annotate({ description: "The step's name." }),
+  keys: StepKeys.annotate({ description: 'The keys its file sets.' }),
+  body: Schema.String.annotate({ description: "The step's note: all of its body for a step with no agent." }),
+});
 export type WorkflowStep = typeof WorkflowStep.Type;
 
 /** A text file directly in a workflow's folder that is no markdown — a script, a schema, a table: its name in the folder and its text. */
-export const WorkflowFile = Schema.Struct({ path: Schema.String, text: Schema.String });
+export const WorkflowFile = Schema.Struct({
+  path: Schema.String.annotate({ description: "The file's name in the folder, with / between folders." }),
+  text: Schema.String.annotate({ description: "The file's text." }),
+});
 export type WorkflowFile = typeof WorkflowFile.Type;
 
 /** An answer a fix asks the person for before it runs, given to its command as `NEMIA_ANSWER_<NAME>` (its name in capitals). */
-export const NeedAsk = Schema.Struct({ name: Schema.String, message: Schema.String });
+export const NeedAsk = Schema.Struct({
+  name: Schema.String.annotate({
+    description: 'The name of the answer, given to the fix command as NEMIA_ANSWER_<NAME>, its name in capitals.',
+  }),
+  message: Schema.String.annotate({ description: 'The question put to the person.' }),
+});
 export type NeedAsk = typeof NeedAsk.Type;
 
 /**
@@ -204,11 +332,19 @@ export type NeedAsk = typeof NeedAsk.Type;
  * out, `typed` for one a person types on the server, `removes` for one that takes the need away).
  */
 export const NeedFix = Schema.Struct({
-  command: Schema.String,
-  message: Schema.String,
-  asks: Schema.optionalKey(Schema.Array(NeedAsk)),
-  code: Schema.optionalKey(Schema.String),
-  kind: Schema.optionalKey(Schema.Literals(FIX_KINDS)),
+  command: Schema.String.annotate({ description: 'The shell command that puts the need in place.' }),
+  message: Schema.String.annotate({ description: 'What the fix does, in words.' }),
+  asks: Schema.optionalKey(Schema.Array(NeedAsk).annotate({ description: 'The answers it asks the person for before it runs.' })),
+  code: Schema.optionalKey(
+    Schema.String.annotate({
+      description: 'The pattern of a code its output shows a person, such as a device code, which the board and the client show large.',
+    }),
+  ),
+  kind: Schema.optionalKey(
+    Schema.Literals(FIX_KINDS).annotate({
+      description: 'Its kind: puts where left out, typed for one a person types on the server, removes for one that takes the need away.',
+    }),
+  ),
 });
 export type NeedFix = typeof NeedFix.Type;
 
@@ -218,12 +354,20 @@ export type NeedFix = typeof NeedFix.Type;
  * `scope` (`NEED_SCOPES`: `machine` where left out, `repository` for a need checked and fixed in each factory's repository).
  */
 export const Need = Schema.Struct({
-  name: Schema.String,
-  message: Schema.String,
-  check: Schema.String,
-  fixes: Schema.optionalKey(Schema.Array(NeedFix)),
-  fills: Schema.optionalKey(Schema.String),
-  scope: Schema.optionalKey(Schema.Literals(NEED_SCOPES)),
+  name: Schema.String.annotate({ description: "The need's name." }),
+  message: Schema.String.annotate({ description: 'What the need is, in words.' }),
+  check: Schema.String.annotate({ description: 'The shell command whose exit 0 says the need is in place.' }),
+  fixes: Schema.optionalKey(Schema.Array(NeedFix).annotate({ description: 'The fixes that put the need in place.' })),
+  fills: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The name of a place's need whose fixes this one's come before, as sdlc fills the git identity.",
+    }),
+  ),
+  scope: Schema.optionalKey(
+    Schema.Literals(NEED_SCOPES).annotate({
+      description: "Where it is checked and fixed: machine where left out, repository in each factory's repository.",
+    }),
+  ),
 });
 export type Need = typeof Need.Type;
 
@@ -234,11 +378,15 @@ export type Need = typeof Need.Type;
  * text is never touched; left out, the folder's other files stay.
  */
 export const WorkflowSpec = Schema.Struct({
-  description: Schema.optionalKey(Text),
-  needs: Schema.optionalKey(Schema.Array(Need)),
-  readme: Schema.optionalKey(Text),
-  steps: Schema.Array(WorkflowStep),
-  files: Schema.optionalKey(Schema.Array(WorkflowFile)),
+  description: Schema.optionalKey(Text.annotate({ description: "The workflow's description; null where it has none." })),
+  needs: Schema.optionalKey(Schema.Array(Need).annotate({ description: "The machine needs its README's frontmatter declares." })),
+  readme: Schema.optionalKey(Text.annotate({ description: "The workflow's README; null for none." })),
+  steps: Schema.Array(WorkflowStep).annotate({ description: "The workflow's steps, in its order." }),
+  files: Schema.optionalKey(
+    Schema.Array(WorkflowFile).annotate({
+      description: "The folder's other text files, sorted by name; given on a write, their whole set, so a text file left out is removed.",
+    }),
+  ),
 }).annotate({
   description:
     "The workflow as its files say it: its description, the machine needs its README declares, its README, its steps in order, and the folder's other text files.",
@@ -247,17 +395,24 @@ export type WorkflowSpec = typeof WorkflowSpec.Type;
 
 /** What a run of a step would be told, by layer (`ToldLayers`): its agent's, yours and the factory's, and the step's policy. */
 export const StepLayers = Schema.Struct({
-  agent: Text,
-  instructions: Text,
-  custom: Text,
-  factory: Text,
-  agentSkills: Strings,
-  policy: Schema.String,
-  addedSkills: Strings,
-  fence: Schema.Array(Schema.Struct({ key: Schema.String, value: Schema.String })),
-  folderFiles: Schema.Boolean,
-  task: Text,
-  via: Schema.Literals(['prompt', 'brief']),
+  agent: Text.annotate({ description: "The agent's layer: what its file tells the session; null for none." }),
+  instructions: Text.annotate({ description: "The instructions layer: the agent's own instructions; null for none." }),
+  custom: Text.annotate({ description: 'Your layer: what you added for the agent; null for none.' }),
+  factory: Text.annotate({ description: "The factory's layer: what the factory tells every session; null for none." }),
+  agentSkills: Strings.annotate({ description: 'What the agent says it can do, as the names of its skills.' }),
+  policy: Schema.String.annotate({ description: "The step's policy: what its file sets over its agent." }),
+  addedSkills: Strings.annotate({ description: "The skills the step adds to its agent's." }),
+  fence: Schema.Array(
+    Schema.Struct({
+      key: Schema.String.annotate({ description: 'The fence key, a tools or permission setting.' }),
+      value: Schema.String.annotate({ description: "The key's value." }),
+    }),
+  ).annotate({ description: 'The fence the session runs under: each setting and its value.' }),
+  folderFiles: Schema.Boolean.annotate({ description: 'Whether the session is told the files of its folder.' }),
+  task: Text.annotate({ description: 'The task the session is given; null for none.' }),
+  via: Schema.Literals(['prompt', 'brief']).annotate({
+    description: 'How the task reaches the session: in its prompt, or as a brief file.',
+  }),
 });
 export type StepLayers = typeof StepLayers.Type;
 
@@ -267,13 +422,18 @@ export type StepLayers = typeof StepLayers.Type;
  * (null for a step with no agent) and the MCP servers its sessions load.
  */
 export const WorkflowStepStatus = Schema.Struct({
-  name: Schema.String,
-  spec: StepKeys,
-  body: Schema.String,
-  own: Schema.NullOr(Schema.Struct({ keys: Strings, body: Schema.String })),
-  hired: Text,
-  layers: Schema.NullOr(StepLayers),
-  mcp: Strings,
+  name: Schema.String.annotate({ description: "The step's name." }),
+  spec: StepKeys.annotate({ description: "The step's keys with its agent's, every key resolved, null where unset." }),
+  body: Schema.String.annotate({ description: "What its agent is told: the step's body with the agent's." }),
+  own: Schema.NullOr(
+    Schema.Struct({
+      keys: Strings.annotate({ description: 'The keys its own file sets.' }),
+      body: Schema.String.annotate({ description: "The step's own note." }),
+    }),
+  ).annotate({ description: 'What its own file sets, for a step with an agent; null for one without, whose file is all of it.' }),
+  hired: Text.annotate({ description: 'The agent the factory hires into the step; null for none.' }),
+  layers: Schema.NullOr(StepLayers).annotate({ description: 'What a run of the step is told, by layer; null for a step with no agent.' }),
+  mcp: Strings.annotate({ description: 'The MCP servers its sessions load.' }),
 });
 export type WorkflowStepStatus = typeof WorkflowStepStatus.Type;
 
@@ -284,15 +444,16 @@ export type WorkflowStepStatus = typeof WorkflowStepStatus.Type;
  */
 export const WorkflowStatus = Schema.Struct({
   ...definitionStatus,
-  dir: Schema.String,
-  graph: TypedGraph,
-  steps: Schema.Array(WorkflowStepStatus),
-  schemas: Strings,
-  folderTeam: Schema.Boolean,
-  error: Text,
-  unfilled: Text,
-  /** The files a removal took (`DELETE …/workflows/<name>`), by their path in the folder, on that answer alone. */
-  removed: Schema.optionalKey(Strings),
+  dir: Schema.String.annotate({ description: "The workflow's folder." }),
+  graph: TypedGraph.annotate({ description: "The workflow's typed graph: every node with its kind." }),
+  steps: Schema.Array(WorkflowStepStatus).annotate({ description: "Each step resolved, in the workflow's order." }),
+  schemas: Strings.annotate({ description: 'The schema files beside its steps.' }),
+  folderTeam: Schema.Boolean.annotate({ description: 'Whether every step works in a folder.' }),
+  error: Text.annotate({ description: 'Why the workflow does not load; null where it does.' }),
+  unfilled: Text.annotate({ description: 'Why a run of it cannot start in the factory; null where it can.' }),
+  removed: Schema.optionalKey(
+    Strings.annotate({ description: 'The files a removal took, by their path in the folder, on that answer alone.' }),
+  ),
 }).annotate({
   description:
     'What Nemia reads of the workflow: where it was found, its folder, its graph, each step resolved, why it does not load or cannot start in the factory, and its revision.',
@@ -314,7 +475,10 @@ export const WorkflowList = listOf('Workflow', Workflow);
 export type WorkflowList = typeof WorkflowList.Type;
 
 /** A JSON Schema file beside the steps, which an `output:` may name, by its file and its text. */
-export const SchemaFile = Schema.Struct({ file: Schema.String, text: Schema.String });
+export const SchemaFile = Schema.Struct({
+  file: Schema.String.annotate({ description: "The schema file's name beside the steps." }),
+  text: Schema.String.annotate({ description: "The schema's text." }),
+});
 export type SchemaFile = typeof SchemaFile.Type;
 
 /**
@@ -324,12 +488,17 @@ export type SchemaFile = typeof SchemaFile.Type;
 export const WorkflowWrite = Schema.Struct({
   metadata: Schema.optionalKey(WriteMeta),
   spec: WorkflowSpec,
-  schemas: Schema.optionalKey(Schema.Array(SchemaFile)),
+  schemas: Schema.optionalKey(Schema.Array(SchemaFile).annotate({ description: 'The schema files beside the steps.' })),
 });
 export type WorkflowWrite = typeof WorkflowWrite.Type;
 
 /** A workflow of yours made (`POST …/workflows`): its name, and its spec, of one step. */
-export const WorkflowCreate = Schema.Struct({ metadata: Schema.Struct({ name: Schema.String }), spec: WorkflowSpec });
+export const WorkflowCreate = Schema.Struct({
+  metadata: Schema.Struct({ name: Schema.String.annotate({ description: 'The name of the workflow to make.' }) }).annotate({
+    description: 'The workflow to make, by its name.',
+  }),
+  spec: WorkflowSpec,
+});
 export type WorkflowCreate = typeof WorkflowCreate.Type;
 
 /**
@@ -338,7 +507,12 @@ export type WorkflowCreate = typeof WorkflowCreate.Type;
  * skill's SKILL.md first, then its folder's other text files. Each by its path in the folder, with `/`, and its text. `name`, the name it
  * is read under where its files say none: a workflow's folder, an agent's file without `.md`, a skill whose SKILL.md names none.
  */
-export const DefinitionFiles = Schema.Struct({ name: Schema.optionalKey(Schema.String), files: Schema.Array(WorkflowFile) });
+export const DefinitionFiles = Schema.Struct({
+  name: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The name the files are read under where they say none: the folder, or the file without .md.' }),
+  ),
+  files: Schema.Array(WorkflowFile).annotate({ description: "The definition's files, each by its path in the folder and its text." }),
+});
 export type DefinitionFiles = typeof DefinitionFiles.Type;
 
 /**
@@ -346,11 +520,13 @@ export type DefinitionFiles = typeof DefinitionFiles.Type;
  * set to where there are some, and, for a key whose words are the harness's, those of each harness.
  */
 export const KeyField = Schema.Struct({
-  key: Schema.Literals(STEP_KEYS),
-  meaning: Schema.String,
-  kind: Schema.Literals(STEP_KEY_FORMS),
-  choices: Schema.NullOr(Strings),
-  byHarness: Schema.NullOr(Schema.Record(Schema.String, Strings)),
+  key: Schema.Literals(STEP_KEYS).annotate({ description: 'The key.' }),
+  meaning: Schema.String.annotate({ description: "The package's line of what the key means." }),
+  kind: Schema.Literals(STEP_KEY_FORMS).annotate({ description: 'How the key is set on a form.' }),
+  choices: Schema.NullOr(Strings).annotate({ description: 'The words it may be set to; null where it takes any.' }),
+  byHarness: Schema.NullOr(Schema.Record(Schema.String, Strings)).annotate({
+    description: "For a key whose words are the harness's, the words of each harness by its name; null otherwise.",
+  }),
 });
 export type KeyField = typeof KeyField.Type;
 
@@ -371,14 +547,21 @@ export const KeyForm = Schema.Struct({
   agents: Schema.Record(Schema.String, StepKeys).annotate({
     description: 'The role values each agent of yours gives a step it is attached to, by its name.',
   }),
-  remote: Schema.Struct({ prefix: Schema.String, refuses: Schema.Array(Schema.Literals(STEP_KEYS)) }).annotate({
+  remote: Schema.Struct({
+    prefix: Schema.String.annotate({ description: 'The prefix the harness: line gives a remote A2A agent, a2a:.' }),
+    refuses: Schema.Array(Schema.Literals(STEP_KEYS)).annotate({ description: 'The keys a step naming a remote agent may not set.' }),
+  }).annotate({
     description: 'How a step names a remote A2A agent: the prefix its harness: line gives (a2a:), and the keys such a step may not set.',
   }),
 }).annotate({ identifier: 'KeyForm' });
 export type KeyForm = typeof KeyForm.Type;
 
 /** One key of a file as a step's page lays them out: the key, its value as the package read it (null where unset), and what it means. */
-export const KeyRow = Schema.Struct({ key: Schema.String, value: Text, meaning: Schema.String });
+export const KeyRow = Schema.Struct({
+  key: Schema.String.annotate({ description: 'The key.' }),
+  value: Text.annotate({ description: 'Its value as the package read it; null where unset.' }),
+  meaning: Schema.String.annotate({ description: 'What the key means.' }),
+});
 export type KeyRow = typeof KeyRow.Type;
 
 /**
@@ -408,29 +591,45 @@ export const WorkflowStepPage = Schema.Struct({
     description: "What a run of the step would be told now, by layer: its agent's, yours, the factory's, and the step's policy.",
   }),
   hired: Text.annotate({ description: 'The agent the factory hires into the step; null where it hires none.' }),
-  hiredIn: Schema.Array(Schema.Struct({ factory: Schema.String, agent: Schema.String })).annotate({
+  hiredIn: Schema.Array(
+    Schema.Struct({
+      factory: Schema.String.annotate({ description: 'The factory that hires an agent into the step.' }),
+      agent: Schema.String.annotate({ description: 'The agent it hires.' }),
+    }),
+  ).annotate({
     description: 'The factories that hire an agent into the step, each with the agent; empty where none does.',
   }),
   hiring: Schema.Struct({
-    refused: Text,
-    agents: Schema.Array(Schema.Struct({ name: Schema.String, description: Text })),
+    refused: Text.annotate({ description: 'Why no agent can be hired into the step; null where one can.' }),
+    agents: Schema.Array(
+      Schema.Struct({
+        name: Schema.String.annotate({ description: "The agent's name." }),
+        description: Text.annotate({ description: "The agent's description; null for none." }),
+      }),
+    ).annotate({ description: 'The agents that can be hired into the step.' }),
   }).annotate({
     description:
       'Whether an agent can be hired into the step: why not (null where it can), and the agents that can, each with its description.',
   }),
   skillsFrom: Schema.Array(
-    Schema.Struct({ name: Schema.String, from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'builtin'])), foundIn: Text }),
+    Schema.Struct({
+      name: Schema.String.annotate({ description: "The skill's name." }),
+      from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'builtin'])).annotate({
+        description: 'Where the skill is found: yours, the repository or a builtin; null where none is found.',
+      }),
+      foundIn: Text.annotate({ description: 'The folder it is found in; null where none is found.' }),
+    }),
   ).annotate({
     description:
       "Where each skill of the step's layers is found: yours, the repository's or a builtin, and the folder; null where none is found.",
   }),
   recentRuns: Schema.Array(
     Schema.Struct({
-      id: Schema.String,
-      brief: Schema.String,
-      createdAt: Schema.String,
-      factory: Text,
-      filed: Schema.Boolean,
+      id: Schema.String.annotate({ description: "The run's id." }),
+      brief: Schema.String.annotate({ description: "The run's brief." }),
+      createdAt: Schema.String.annotate({ description: 'When the run was made, as an ISO 8601 time.' }),
+      factory: Text.annotate({ description: "The run's factory; null for none." }),
+      filed: Schema.Boolean.annotate({ description: "Whether the run's task was filed." }),
     }),
   ).annotate({
     description: "The step's newest runs: each run's id, brief, when it was made, its factory and whether its task was filed.",

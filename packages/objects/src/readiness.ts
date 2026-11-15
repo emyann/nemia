@@ -7,6 +7,7 @@
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
+import { describedNumber } from './meta.ts';
 import { NeedAsk } from './workflow.ts';
 import {
   ADDRESS_KINDS,
@@ -27,13 +28,20 @@ import {
  * person types on the server; `removes`, one that takes a met piece away, a harness deactivated).
  */
 export const ReadinessFix = Schema.Struct({
-  message: Schema.String,
-  command: Schema.String,
-  startable: Schema.Boolean,
-  index: Schema.optionalKey(Schema.Number),
-  asks: Schema.optionalKey(Schema.Array(NeedAsk)),
-  code: Schema.optionalKey(Schema.String),
-  kind: Schema.optionalKey(Schema.Literals(FIX_KINDS)),
+  message: Schema.String.annotate({ description: 'What the fix does, in words.' }),
+  command: Schema.String.annotate({
+    description: 'Its command: typed by the person where startable is false, or started by the server where it is true.',
+  }),
+  startable: Schema.Boolean.annotate({ description: 'Whether the server starts it, not the person.' }),
+  index: Schema.optionalKey(describedNumber("Which of the need's fixes it is; absent where it is not startable.")),
+  asks: Schema.optionalKey(Schema.Array(NeedAsk).annotate({ description: 'The answers it asks first.' })),
+  code: Schema.optionalKey(Schema.String.annotate({ description: 'The pattern of a code its output shows.' })),
+  kind: Schema.optionalKey(
+    Schema.Literals(FIX_KINDS).annotate({
+      description:
+        'Its kind where it is no puts: typed, a command the person types on the server, or removes, one that takes a met piece away.',
+    }),
+  ),
 });
 export type ReadinessFix = typeof ReadinessFix.Type;
 
@@ -45,16 +53,35 @@ export type ReadinessFix = typeof ReadinessFix.Type;
  * none is read as `run`).
  */
 export const ReadinessPiece = Schema.Struct({
-  name: Schema.String,
-  area: Schema.Literals(READINESS_AREAS),
-  state: Schema.Literals(READINESS_STATES),
-  message: Schema.String,
-  fixes: Schema.Array(ReadinessFix),
-  factory: Schema.optionalKey(Schema.String),
-  workflow: Schema.optionalKey(Schema.String),
-  addressKind: Schema.optionalKey(Schema.Literals(ADDRESS_KINDS)),
-  harness: Schema.optionalKey(Schema.Struct({ name: Schema.String, part: Schema.Literals(HARNESS_PARTS) })),
-  cost: Schema.optionalKey(Schema.Literals(READINESS_COSTS)),
+  name: Schema.String.annotate({ description: "The piece's name; a need's name for a declared need." }),
+  area: Schema.Literals(READINESS_AREAS).annotate({
+    description:
+      'The area of the readiness read it belongs to: a harness, the service, the bind, the machine, a place, a workflow, a repository, the factories, the release or the client.',
+  }),
+  state: Schema.Literals(READINESS_STATES).annotate({ description: 'Whether it is in place, missing or not activated.' }),
+  message: Schema.String.annotate({ description: 'A sentence of what it is or why it is not in place.' }),
+  fixes: Schema.Array(ReadinessFix).annotate({ description: 'The ways to put it in place.' }),
+  factory: Schema.optionalKey(
+    Schema.String.annotate({ description: "The factory of a workflow's need, or the factory alone of a repository's; absent otherwise." }),
+  ),
+  workflow: Schema.optionalKey(Schema.String.annotate({ description: "The workflow of a workflow's need; absent otherwise." })),
+  addressKind: Schema.optionalKey(
+    Schema.Literals(ADDRESS_KINDS).annotate({ description: "The kind of the bind's address, for the bind piece." }),
+  ),
+  harness: Schema.optionalKey(
+    Schema.Struct({
+      name: Schema.String.annotate({ description: 'The harness the piece is of.' }),
+      part: Schema.Literals(HARNESS_PARTS).annotate({ description: "Which of the harness's two needs the piece is." }),
+    }).annotate({
+      description:
+        "For a harness's piece, the harness it is of and which of its two needs, so a reader groups a harness's pieces; absent otherwise.",
+    }),
+  ),
+  cost: Schema.optionalKey(
+    Schema.Literals(READINESS_COSTS).annotate({
+      description: 'What it costs while it is missing; a server that declares none is read as run.',
+    }),
+  ),
 });
 export type ReadinessPiece = typeof ReadinessPiece.Type;
 
@@ -63,9 +90,11 @@ export type ReadinessPiece = typeof ReadinessPiece.Type;
  * read's order, and whether a run was ever started on this server (`ran`; not known where it is left out).
  */
 export const Readiness = Schema.Struct({
-  ready: Schema.Boolean,
-  pieces: Schema.Array(ReadinessPiece),
-  ran: Schema.optionalKey(Schema.Boolean),
+  ready: Schema.Boolean.annotate({ description: 'Whether every piece is in place: none is missing; an inactive one is not.' }),
+  pieces: Schema.Array(ReadinessPiece).annotate({ description: "The pieces, in the read's order." }),
+  ran: Schema.optionalKey(
+    Schema.Boolean.annotate({ description: 'Whether a run was ever started on this server; absent where it is not known.' }),
+  ),
 });
 export type Readiness = typeof Readiness.Type;
 
@@ -124,11 +153,17 @@ export function readinessSaid(read: Readiness): string {
  * which of its fixes (`index`, the first where left out), and the answers its asks were given, by their names.
  */
 export const FixStart = Schema.Struct({
-  need: Schema.String,
-  factory: Schema.optionalKey(Schema.String),
-  workflow: Schema.optionalKey(Schema.String),
-  index: Schema.optionalKey(Schema.Number),
-  answers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  need: Schema.String.annotate({ description: 'The need whose fix to start.' }),
+  factory: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The factory of a workflow's need, or the factory alone of a repository's need; absent for a place's or a harness's.",
+    }),
+  ),
+  workflow: Schema.optionalKey(Schema.String.annotate({ description: "The workflow of a workflow's need." })),
+  index: Schema.optionalKey(describedNumber('Which of its fixes to start; the first where left out.')),
+  answers: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.String).annotate({ description: 'The answers its asks were given, by their names.' }),
+  ),
 });
 export type FixStart = typeof FixStart.Type;
 
@@ -137,23 +172,31 @@ export type FixStart = typeof FixStart.Type;
  * output shows (the declared `code`), and its exit code once it ended.
  */
 export const Fix = Schema.Struct({
-  id: Schema.String,
-  need: Schema.String,
-  factory: Schema.optionalKey(Schema.String),
-  workflow: Schema.optionalKey(Schema.String),
-  phase: Schema.Literals(FIX_PHASES),
-  output: Schema.String,
-  code: Schema.optionalKey(Schema.String),
-  exitCode: Schema.optionalKey(Schema.Number),
+  id: Schema.String.annotate({ description: "The fix's id." }),
+  need: Schema.String.annotate({ description: 'The need it fixes.' }),
+  factory: Schema.optionalKey(Schema.String.annotate({ description: 'The factory it fixes the need of; absent where the need has none.' })),
+  workflow: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The workflow it fixes the need of; absent where the need has none.' }),
+  ),
+  phase: Schema.Literals(FIX_PHASES).annotate({
+    description:
+      'Where the fix stands, as the task that runs it says: pending until it starts, running, then succeeded on exit 0 or failed.',
+  }),
+  output: Schema.String.annotate({ description: 'The tail of what it printed.' }),
+  code: Schema.optionalKey(Schema.String.annotate({ description: 'The pattern of the code its output shows, as declared.' })),
+  exitCode: Schema.optionalKey(describedNumber('Its exit code once it ended; absent while it runs.')),
 });
 export type Fix = typeof Fix.Type;
 
 /** One event of a fix's output stream: a chunk of what it printed (`output`), or its end (`ended`, its data the `Fix` as JSON). */
-export const FixStreamEvent = Schema.Struct({ event: Schema.Literals(FIX_STREAM_EVENTS), data: Schema.String });
+export const FixStreamEvent = Schema.Struct({
+  event: Schema.Literals(FIX_STREAM_EVENTS).annotate({ description: 'What the event is: a chunk of output, or the end of the fix.' }),
+  data: Schema.String.annotate({ description: 'A chunk of what the fix printed, or, at its end, the Fix as JSON.' }),
+});
 export type FixStreamEvent = typeof FixStreamEvent.Type;
 
 /** A fix's id in a path. */
-const fixParams = { id: Schema.String };
+const fixParams = { id: Schema.String.annotate({ description: "The fix's id." }) };
 
 /** The readiness read and its fixes. */
 export class ReadinessGroup extends HttpApiGroup.make('readiness').add(

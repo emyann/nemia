@@ -18,7 +18,10 @@ const Words = Schema.NullOr(Schema.Array(Schema.String));
  * A text file of a skill's folder beside its SKILL.md: its path in the folder, with `/`, at any depth, and its text. A file that is not
  * text — a picture — is never one.
  */
-export const SkillFile = Schema.Struct({ path: Schema.String, text: Schema.String });
+export const SkillFile = Schema.Struct({
+  path: Schema.String.annotate({ description: "The file's path in the skill's folder, with / between folders." }),
+  text: Schema.String.annotate({ description: "The file's text." }),
+});
 export type SkillFile = typeof SkillFile.Type;
 
 /**
@@ -26,13 +29,17 @@ export type SkillFile = typeof SkillFile.Type;
  * any; a write that gives them gives the whole set, so one left out is removed, and a file that is not text is never touched.
  */
 export const SkillSpec = Schema.Struct({
-  title: Schema.optionalKey(Text),
-  description: Schema.optionalKey(Text),
-  tags: Schema.optionalKey(Words),
-  examples: Schema.optionalKey(Words),
-  preload: Schema.optionalKey(Schema.Boolean),
-  body: Schema.String,
-  files: Schema.optionalKey(Schema.Array(SkillFile)),
+  title: Schema.optionalKey(Text.annotate({ description: "The skill's title; null or absent where its SKILL.md sets none." })),
+  description: Schema.optionalKey(Text.annotate({ description: "The skill's description; null or absent where its SKILL.md sets none." })),
+  tags: Schema.optionalKey(Words.annotate({ description: "The skill's tags; null or absent where its SKILL.md sets none." })),
+  examples: Schema.optionalKey(Words.annotate({ description: "The skill's examples; null or absent where its SKILL.md sets none." })),
+  preload: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Whether the skill is loaded whole every turn.' })),
+  body: Schema.String.annotate({ description: "The skill's instructions: what its SKILL.md says after its keys." }),
+  files: Schema.optionalKey(
+    Schema.Array(SkillFile).annotate({
+      description: "The folder's other text files; a write that gives them gives the whole set, so one left out is removed.",
+    }),
+  ),
 }).annotate({
   description:
     "The skill as its SKILL.md says it: its title, description, tags, examples, whether it is preloaded, its body, and its folder's other text files.",
@@ -40,19 +47,26 @@ export const SkillSpec = Schema.Struct({
 export type SkillSpec = typeof SkillSpec.Type;
 
 /** An agent that gives a skill: its place — the factory's own, in its tree, the repository's or yours — and its name. */
-export const SkillUser = Schema.Struct({ from: Schema.Literals(['factory', 'repo', 'yours']), name: Schema.String });
+export const SkillUser = Schema.Struct({
+  from: Schema.Literals(['factory', 'repo', 'yours']).annotate({
+    description: "The agent's place: the factory's own tree, the repository or yours.",
+  }),
+  name: Schema.String.annotate({ description: "The agent's name." }),
+});
 
 /** What Nemia reads of a skill; see the file's head. */
 export const SkillStatus = Schema.Struct({
   ...definitionStatus,
-  dir: Schema.String,
-  entry: Schema.NullOr(CardSkill),
-  error: Text,
-  preload: Schema.Boolean,
-  cost: Schema.NullOr(SkillCost),
-  usedBy: Schema.Array(SkillUser),
-  found: Schema.NullOr(Schema.Literals(['yours', 'repo'])),
-  copyHint: Text,
+  dir: Schema.String.annotate({ description: "The skill's folder." }),
+  entry: Schema.NullOr(CardSkill).annotate({ description: 'Its card entry; null where it has none.' }),
+  error: Text.annotate({ description: 'Why it has no card entry; null where it has one.' }),
+  preload: Schema.Boolean.annotate({ description: 'Whether it is loaded whole every turn.' }),
+  cost: Schema.NullOr(SkillCost).annotate({ description: 'What it costs a turn; null where it cannot be counted.' }),
+  usedBy: Schema.Array(SkillUser).annotate({ description: 'The agents that give it.' }),
+  found: Schema.NullOr(Schema.Literals(['yours', 'repo'])).annotate({
+    description: 'Where a builtin skill is already found, yours or the repository; null where it is not.',
+  }),
+  copyHint: Text.annotate({ description: 'The command that copies it; null where there is none.' }),
 }).annotate({
   description:
     'What Nemia reads of the skill: where it was found, its card entry, what it costs a turn, the agents that give it, the command that copies it, and its revision.',
@@ -79,14 +93,24 @@ export type SkillList = typeof SkillList.Type;
  */
 export const SkillWrite = Schema.Union([
   Schema.Struct({ metadata: WriteMeta, spec: SkillSpec }),
-  Schema.Struct({ metadata: WriteMeta, preload: Schema.Boolean }),
+  Schema.Struct({
+    metadata: WriteMeta,
+    preload: Schema.Boolean.annotate({ description: 'Whether the skill is loaded whole every turn.' }),
+  }),
 ]);
 export type SkillWrite = typeof SkillWrite.Type;
 
 /** A skill's files read into its spec (`POST /api/skills/read`): the name its SKILL.md says, and what its files say. */
-export const SkillDrafted = Schema.Struct({ metadata: Schema.Struct({ name: Schema.String }), spec: SkillSpec });
+export const SkillDrafted = Schema.Struct({
+  metadata: Schema.Struct({ name: Schema.String.annotate({ description: 'The name its SKILL.md says.' }) }).annotate({
+    description: 'The skill read, by its name.',
+  }),
+  spec: SkillSpec,
+});
 export type SkillDrafted = typeof SkillDrafted.Type;
 
 /** The files of a skill's folder, by their path in it: SKILL.md among them. */
-export const SkillFiles = Schema.Struct({ paths: Schema.Array(Schema.String) });
+export const SkillFiles = Schema.Struct({
+  paths: Schema.Array(Schema.String).annotate({ description: "The path of each file of the skill's folder, SKILL.md among them." }),
+});
 export type SkillFiles = typeof SkillFiles.Type;

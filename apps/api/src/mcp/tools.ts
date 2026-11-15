@@ -183,11 +183,32 @@ function inputOf(endpoint: EndpointRead, name: string): Pick<PortTool, 'inputSch
   };
 }
 
-/** Each key of `input` whose schema says what it takes (its JSON Schema `description`, as `objects` annotates it), with that. */
-const keysSaid = (input: ToolInput): string[] =>
-  Object.entries(input.properties).flatMap(([key, schema]) =>
-    typeof schema.description === 'string' && schema.description.trim() ? [`${key}: ${schema.description}`] : [],
-  );
+/** What `schema` says it takes: its own `description`, or, where it is a definition whole (a bare `$ref` into `$defs`), that one's. */
+const saidOf = (schema: JsonSchema, defs: Readonly<Record<string, JsonSchema>>): string | undefined => {
+  const own = schema.description;
+  if (typeof own === 'string' && own.trim()) return own;
+  const ref = schema.$ref;
+  const referred = typeof ref === 'string' ? defs[ref.split('/').at(-1) ?? '']?.description : undefined;
+  return typeof referred === 'string' && referred.trim() ? referred : undefined;
+};
+
+/**
+ * Each key of `input` whose schema says what it takes (its JSON Schema `description`, as `objects` annotates it, or that of the
+ * definition it is whole), with that: its own keys, then each key of a member of its `anyOf` it has not, the first member that says it.
+ */
+const keysSaid = (input: ToolInput): string[] => {
+  const defs = input.$defs ?? {};
+  const members = (input.anyOf ?? []).flatMap((member) => {
+    const properties = member.properties;
+    return typeof properties === 'object' && properties !== null ? Object.entries(properties as Record<string, JsonSchema>) : [];
+  });
+  const said = new Map<string, string>();
+  for (const [key, schema] of [...Object.entries(input.properties), ...members]) {
+    const words = said.has(key) ? undefined : saidOf(schema, defs);
+    if (words !== undefined) said.set(key, words);
+  }
+  return [...said].map(([key, words]) => `${key}: ${words}`);
+};
 
 /**
  * A tool's description: its verb's help, how the CLI says it, and the endpoint it calls; then what each key of its input says it takes

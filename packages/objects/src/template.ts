@@ -12,26 +12,38 @@ import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 import { REVISIONS_POLICIES, TEMPLATE_PARAMETER_TYPES } from './words.ts';
 
 /** Text as a template writes it: the words themselves, a file of the template (`{ path }`), or a parameter's value (`{ param }`). */
-export const TemplateText = Schema.Union([Schema.String, Schema.Struct({ path: Schema.String }), Schema.Struct({ param: Schema.String })]);
+export const TemplateText = Schema.Union([
+  Schema.String,
+  Schema.Struct({ path: Schema.String.annotate({ description: 'A file of the template whose text it is.' }) }),
+  Schema.Struct({ param: Schema.String.annotate({ description: 'The name of the parameter whose value it is.' }) }),
+]);
 export type TemplateText = typeof TemplateText.Type;
 
 /** A value a person gives when the template is applied: its type, what it is for, and the value taken when they give none. */
 export const TemplateParameter = Schema.Struct({
-  type: Schema.Literals(TEMPLATE_PARAMETER_TYPES),
-  description: Schema.String,
-  default: Schema.optionalKey(Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
+  type: Schema.Literals(TEMPLATE_PARAMETER_TYPES).annotate({ description: "The parameter's type." }),
+  description: Schema.String.annotate({ description: 'What the parameter is for.' }),
+  default: Schema.optionalKey(
+    Schema.Union([Schema.String, Schema.Number, Schema.Boolean]).annotate({ description: 'The value taken when the person gives none.' }),
+  ),
 });
 export type TemplateParameter = typeof TemplateParameter.Type;
 
 /** The manifest's spec, as written; a key it does not give is absent. */
 export const TemplateSpec = Schema.Struct({
-  version: Schema.optionalKey(Schema.String),
-  description: Schema.optionalKey(Schema.String),
-  instruction: Schema.optionalKey(TemplateText),
-  rules: Schema.optionalKey(TemplateText),
-  parameters: Schema.Record(Schema.String, TemplateParameter),
-  hires: Schema.Record(Schema.String, Schema.String),
-  revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
+  version: Schema.optionalKey(Schema.String.annotate({ description: "The content's version." })),
+  description: Schema.optionalKey(Schema.String.annotate({ description: 'What the template is.' })),
+  instruction: Schema.optionalKey(TemplateText.annotate({ description: "The factory's instruction." })),
+  rules: Schema.optionalKey(TemplateText.annotate({ description: "The factory's rules." })),
+  parameters: Schema.Record(Schema.String, TemplateParameter).annotate({
+    description: 'The values a person fills when applying the template, by parameter name.',
+  }),
+  hires: Schema.Record(Schema.String, Schema.String).annotate({
+    description: 'The agent that fills each <workflow>/<step>, by that name.',
+  }),
+  revisions: Schema.optionalKey(
+    Schema.Literals(REVISIONS_POLICIES).annotate({ description: "Whether the factory's runs follow merged revisions." }),
+  ),
 }).annotate({
   description: "The template's manifest as written: its version, description, instruction, rules, parameters, hires and revisions policy.",
 });
@@ -42,12 +54,14 @@ export type TemplateSpec = typeof TemplateSpec.Type;
  * workflows, agents and skills, sorted, and each problem that stops it being read or applied, as a person reads one.
  */
 export const TemplateStatus = Schema.Struct({
-  source: Schema.String,
-  digest: Schema.optionalKey(Schema.String),
-  workflows: Schema.Array(Schema.String),
-  agents: Schema.Array(Schema.String),
-  skills: Schema.Array(Schema.String),
-  problems: Schema.optionalKey(Schema.Array(Schema.String)),
+  source: Schema.String.annotate({ description: 'Where the template is read from.' }),
+  digest: Schema.optionalKey(Schema.String.annotate({ description: "Its content's digest; absent where its tree does not read." })),
+  workflows: Schema.Array(Schema.String).annotate({ description: 'The names of its workflows, sorted.' }),
+  agents: Schema.Array(Schema.String).annotate({ description: 'The names of its agents, sorted.' }),
+  skills: Schema.Array(Schema.String).annotate({ description: 'The names of its skills, sorted.' }),
+  problems: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({ description: 'Each problem that stops it being read or applied, as a person reads one.' }),
+  ),
 }).annotate({
   description:
     'What Nemia read of the template: where it is read from, its digest, its workflows, agents and skills, and each problem that stops it being read or applied.',

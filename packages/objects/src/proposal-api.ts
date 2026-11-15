@@ -9,10 +9,13 @@ import { Proposal, ProposalCreate, ProposalList } from './proposal.ts';
 import { Delegation, DelegationList, DelegationWrite } from './delegation.ts';
 
 /** An object a namespace holds, by its namespace and its name. */
-const cardParams = { namespace: Schema.String, name: Schema.String };
+const cardParams = {
+  namespace: Schema.String.annotate({ description: "The factory's namespace." }),
+  name: Schema.String.annotate({ description: "The object's name in the namespace." }),
+};
 
 /** A namespace, for a list in it. */
-const namespaceParams = { namespace: Schema.String };
+const namespaceParams = { namespace: cardParams.namespace };
 
 /** The proposals and the delegations over them, and a page of each, named so that the document holds each as a component. */
 const ProposalObject = Proposal.annotate({ identifier: 'Proposal' });

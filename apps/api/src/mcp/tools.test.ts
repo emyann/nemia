@@ -142,3 +142,77 @@ test('REFUSED: a link that sends by default a key its endpoint’s query does no
   assert.throws(() => portTools([], [{ ...entry, served: [{ endpoint: 'cards.getAll', query: { fieldSelector: 'x' } }] }], Api), Error);
   assert.doesNotThrow(() => portTools([], [{ ...entry, served: [{ endpoint: 'cards.listAll', query: { fieldSelector: 'x' } }] }], Api));
 });
+
+/** The keys a tool's description says, each the word before a key line's first colon, read off the lines `keysSaid` writes. */
+const keysSaidBy = (description: string, keys: readonly string[]): Set<string> =>
+  new Set(
+    description
+      .split('\n')
+      .map((line) => line.split(':')[0] ?? '')
+      .filter((key) => keys.includes(key)),
+  );
+
+/** Every key of a tool's input: its own, and each key of a member of its `anyOf`. */
+const inputKeys = (input: (typeof TOOLS)[number]['inputSchema']): string[] => [
+  ...new Set([
+    ...Object.keys(input.properties),
+    ...(input.anyOf ?? []).flatMap((member) => Object.keys((member.properties ?? {}) as Record<string, unknown>)),
+  ]),
+];
+
+test('every tool says every key of its input, with its words', () => {
+  for (const each of TOOLS) {
+    const keys = inputKeys(each.inputSchema);
+    assert.deepEqual([...keysSaidBy(each.description, keys)].sort(), [...keys].sort(), `${each.name} says each key it takes`);
+  }
+});
+
+test('inbox_add says its body keys, and agents_custom_put its path, query and body keys', () => {
+  const inbox = tool('inbox_add');
+  assert.deepEqual([...keysSaidBy(inbox.description, inputKeys(inbox.inputSchema))].sort(), [
+    'body',
+    'factory',
+    'from',
+    'label',
+    'namespace',
+    'repo',
+    'workflow',
+  ]);
+  const put = tool('agents_custom_put');
+  const said = keysSaidBy(put.description, inputKeys(put.inputSchema));
+  for (const key of [...put.pathKeys, ...put.queryKeys, ...inputKeys(put.inputSchema)])
+    assert.ok(said.has(key), `agents_custom_put says ${key}`);
+  assert.ok(put.queryKeys.includes('repo'), 'agents_custom_put takes a query key');
+});
+
+const Weight = Schema.Struct({ grams: Schema.String }).annotate({ identifier: 'Weight', description: 'How heavy it is.' });
+const PLANTED = HttpApi.make('planted').add(
+  HttpApiGroup.make('probe').add(
+    HttpApiEndpoint.post('weigh', '/api/probe/weigh', {
+      payload: Schema.Struct({ weight: Weight }),
+      success: Schema.Struct({}),
+    }),
+    HttpApiEndpoint.post('either', '/api/probe/either', {
+      payload: Schema.Union([
+        Schema.Struct({ left: Schema.String.annotate({ description: 'The left way.' }) }),
+        Schema.Struct({ right: Schema.String.annotate({ description: 'The right way.' }) }),
+      ]),
+      success: Schema.Struct({}),
+    }),
+  ),
+);
+
+test('a key that is an identified schema whole is said by its words, and each member of a union payload by its own', () => {
+  const entry = { usage: '', help: ['a probe'], class: 'read' as const };
+  const [weigh, either] = portTools(
+    [],
+    [
+      { ...entry, name: 'weigh', served: [{ endpoint: 'probe.weigh' as ApiEndpointName }] },
+      { ...entry, name: 'either', served: [{ endpoint: 'probe.either' as ApiEndpointName }] },
+    ],
+    PLANTED,
+  );
+  assert.ok(weigh && either, 'both planted tools are served');
+  assert.deepEqual([...keysSaidBy(weigh.description, ['weight'])], ['weight']);
+  assert.deepEqual([...keysSaidBy(either.description, ['left', 'right'])].sort(), ['left', 'right']);
+});

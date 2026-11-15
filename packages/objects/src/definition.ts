@@ -3,6 +3,7 @@
  * shadows it in its namespace, the ledger's revision of it, and the A2A card entry a skill gives. Plain Schemas of JSON.
  */
 import { Schema } from 'effect';
+import { describedNumber } from './meta.ts';
 import { DEFINITION_ORIGINS } from './words.ts';
 
 /** One of `DEFINITION_ORIGINS`. */
@@ -14,27 +15,41 @@ export const Origin = Schema.Literals(DEFINITION_ORIGINS);
  * it holds now (decision 25), read without a write, absent where the ledger cannot number it.
  */
 export const definitionStatus = {
-  origin: Origin,
-  shadowedBy: Schema.optionalKey(Origin),
-  revision: Schema.optionalKey(Schema.Number),
+  origin: Origin.annotate({ description: 'Where it was read from: the factory, the repository, yours or a builtin.' }),
+  shadowedBy: Schema.optionalKey(
+    Origin.annotate({ description: 'The origin that holds its name first in the namespace; absent where none does.' }),
+  ),
+  revision: Schema.optionalKey(describedNumber("The ledger's number for what it holds now; absent where the ledger cannot number it.")),
 };
 
 /** A skill as an A2A Agent Card entry: what a card says an agent can do. */
 export const CardSkill = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  description: Schema.String,
-  tags: Schema.Array(Schema.String),
-  examples: Schema.optionalKey(Schema.Array(Schema.String)),
-  inputModes: Schema.optionalKey(Schema.Array(Schema.String)),
-  outputModes: Schema.optionalKey(Schema.Array(Schema.String)),
+  id: Schema.String.annotate({ description: "The skill's id." }),
+  name: Schema.String.annotate({ description: "The skill's name." }),
+  description: Schema.String.annotate({ description: 'What the skill does, as the card says it.' }),
+  tags: Schema.Array(Schema.String).annotate({ description: "The skill's tags." }),
+  examples: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: 'Examples of what to ask it.' })),
+  inputModes: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: 'The media types it takes in.' })),
+  outputModes: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: 'The media types it gives back.' })),
 });
 export type CardSkill = typeof CardSkill.Type;
 
 /** What a skill costs a turn, about: whether it is loaded whole, and its listing, its body and a turn's cost, in tokens. */
-export const SkillCost = Schema.Struct({ preload: Schema.Boolean, listed: Schema.Number, body: Schema.Number, perTurn: Schema.Number });
+export const SkillCost = Schema.Struct({
+  preload: Schema.Boolean.annotate({ description: 'Whether the skill is loaded whole every turn.' }),
+  listed: describedNumber("The cost of the skill's listing, in tokens."),
+  body: describedNumber("The cost of the skill's body, in tokens."),
+  perTurn: describedNumber('What every turn carries: the listing, and the body too when it is preloaded, in tokens.'),
+});
 export type SkillCost = typeof SkillCost.Type;
 
 /** The metadata a write hands back: the `resourceVersion` it read, which the write is refused on where the files hold another. */
-export const WriteMeta = Schema.Struct({ name: Schema.optionalKey(Schema.String), resourceVersion: Schema.optionalKey(Schema.String) });
+export const WriteMeta = Schema.Struct({
+  name: Schema.optionalKey(Schema.String.annotate({ description: 'The name of the object written.' })),
+  resourceVersion: Schema.optionalKey(
+    Schema.String.annotate({
+      description: 'The resourceVersion the write read, which the write is refused on where the files hold another.',
+    }),
+  ),
+}).annotate({ description: 'The metadata a write hands back: its name and the resourceVersion it read.' });
 export type WriteMeta = typeof WriteMeta.Type;

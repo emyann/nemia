@@ -21,9 +21,14 @@ orchestrator, the api, the board and the client import it through its one entry,
   second component, `<Name>_1`, whose every field is owed again, and `test/one-component.test.ts` refuses one but those the
   `httpApiStatus: 201` pipes make today. On a schema that takes a `.check(…)`, the description goes before the check: after it, the
   document drops it. So does `Schema.Number`'s own description, and `Schema.Unknown`'s: a number is described by `describedNumber`, an
-  unknown by `describedOne` (`src/meta.ts`). `test/described.test.ts` counts the properties still said nowhere, per schema, in
-  `test/described.baseline.json`, which only shrinks: describe a field and lower its count in the same commit (`node
-  test/described.test.ts --print` prints today's).
+  unknown by `describedOne` (`src/meta.ts`). `test/described.test.ts` counts the fields still said nowhere, per component and per
+  operation (by its `operationId`), in `test/described.baseline.json`, which only shrinks: a property at any depth (nested, an array's
+  items, a union's branches, a record's values) of a component or of a body or an answer inlined into its operation, and each path and
+  query parameter, described on the field's Schema in the endpoint's `params` or `query` Struct, whose words effect writes on
+  `parameter.schema.description`. Describe a field and lower its count in the same commit (`node test/described.test.ts --print`
+  prints today's). A nullable field is described on its `NullOr`, an optional one inside `Schema.optionalKey(…)` or on
+  `Schema.optional(…)` whole, and a `Schema.fromJsonString(…)` field by `Schema.annotateEncoded`: the document drops a description set
+  inside them.
 
 - **`nemia/v1` is additions only.** A key added to an object is optional, and no key changes its meaning or its type under the same
   `apiVersion`: a reader of an older store, or an older client, reads the object still. A change that breaks a reader is a new

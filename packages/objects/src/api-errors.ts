@@ -141,8 +141,13 @@ export class Gone extends Schema.Class<Gone>('Gone')(
   { httpApiStatus: 410 },
 ) {}
 
-/** One label query, or several given again, OR'd. */
-const LabelQuery = Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)]));
+/**
+ * One label query, or several given again, OR'd.
+ *
+ * @param description What the key it is the value of selects.
+ */
+const labelQuery = (description: string) =>
+  Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)]).annotate({ description }));
 
 /**
  * The query of a list: `limit` (a whole number from 1), `continue` (the token the page before answered), `labelSelector`, and `selector`,
@@ -153,10 +158,21 @@ const LabelQuery = Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(
  * or of a page's `metadata`, and is sent no state; a watch of any other list refuses one, since nothing keeps its old versions.
  */
 export const listQuery = {
-  limit: Schema.optionalKey(Schema.String),
-  continue: Schema.optionalKey(Schema.String),
-  labelSelector: LabelQuery,
-  selector: LabelQuery,
-  watch: Schema.optionalKey(Schema.String),
-  resourceVersion: Schema.optionalKey(Schema.String),
+  limit: Schema.optionalKey(Schema.String.annotate({ description: 'The most items a page holds, a whole number from 1.' })),
+  continue: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The token the page before answered, to read the page after it; absent, the first page.' }),
+  ),
+  labelSelector: labelQuery(
+    'A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.',
+  ),
+  selector: labelQuery('The retired spelling of labelSelector, read the same.'),
+  watch: Schema.optionalKey(
+    Schema.String.annotate({ description: 'true asks for the list as a stream of watch events instead of a page.' }),
+  ),
+  resourceVersion: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        "With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.",
+    }),
+  ),
 };

@@ -15,16 +15,20 @@ import { FactoryWritten } from './written.ts';
  * ignored, sent back as it is, and a write that sets or changes it is refused, naming `nemia factory attach`.
  */
 export const ScheduleSpec = Schema.Struct({
-  cron: Schema.String,
-  brief: Schema.String,
-  /** Retired: read and ignored; the factory's wiring places a scheduled run. */
-  repo: Schema.optionalKey(Schema.String),
-  tz: Schema.optionalKey(Schema.String),
+  cron: Schema.String.annotate({ description: 'The cron, five or six fields, its runs start at.' }),
+  brief: Schema.String.annotate({ description: 'The brief each run is asked.' }),
+  repo: Schema.optionalKey(
+    Schema.String.annotate({ description: "Retired: read and ignored, since the factory's wiring places a scheduled run." }),
+  ),
+  tz: Schema.optionalKey(Schema.String.annotate({ description: 'The time zone the cron is read in.' })),
 }).annotate({ description: 'What the person set (nemia factory schedule): the cron, the brief each run is asked, and the time zone.' });
 export type ScheduleSpec = typeof ScheduleSpec.Type;
 
 /** A scheduled run: its id, and when it was started. */
-export const ScheduleFired = Schema.Struct({ run: Schema.String, at: Schema.String });
+export const ScheduleFired = Schema.Struct({
+  run: Schema.String.annotate({ description: "The scheduled run's id." }),
+  at: Schema.String.annotate({ description: 'When it was started, as an ISO 8601 time.' }),
+});
 export type ScheduleFired = typeof ScheduleFired.Type;
 
 /**
@@ -32,10 +36,10 @@ export type ScheduleFired = typeof ScheduleFired.Type;
  * why its latest fire was refused, where it was.
  */
 export const ScheduleStatus = Schema.Struct({
-  since: Schema.String,
-  next: Schema.optionalKey(Schema.String),
-  last: Schema.optionalKey(ScheduleFired),
-  refused: Schema.optionalKey(Schema.String),
+  since: Schema.String.annotate({ description: 'When the schedule was set, as an ISO 8601 time.' }),
+  next: Schema.optionalKey(Schema.String.annotate({ description: 'Its next fire; absent where it never fires.' })),
+  last: Schema.optionalKey(ScheduleFired.annotate({ description: 'Its last scheduled run; absent where none has run.' })),
+  refused: Schema.optionalKey(Schema.String.annotate({ description: 'Why its latest fire was refused; absent where it was not.' })),
 }).annotate({
   description:
     'What Nemia read of the schedule: since when it holds, its next fire, its last scheduled run, and why its latest fire was refused.',

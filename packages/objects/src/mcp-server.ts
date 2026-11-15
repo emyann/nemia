@@ -7,31 +7,37 @@
  * Plain Schemas of JSON, as every object of this package is.
  */
 import { Schema } from 'effect';
-import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
+import { API_VERSION, ObjectMeta, describedNumber, listOf } from './meta.ts';
 import { FactoryWritten } from './written.ts';
 import { MCP_STATES, MCP_TRANSPORTS, SIGN_IN_STATES } from './words.ts';
 
 /** The OAuth client a server signs in with: its id, and the port its callback listens on, where it names one. */
 export const McpServerOAuth = Schema.Struct({
-  clientId: Schema.String,
-  callbackPort: Schema.optionalKey(Schema.Number),
+  clientId: Schema.String.annotate({ description: 'The OAuth client id the server signs in with.' }),
+  callbackPort: Schema.optionalKey(describedNumber('The port its callback listens on; absent where it names none.')),
 });
 export type McpServerOAuth = typeof McpServerOAuth.Type;
 
 /** A server as a factory records it: its transport, its url, its headers by name (each value `HEADER_MASK` as served), its OAuth client. */
 export const McpServerSpec = Schema.Struct({
-  type: Schema.Literals(MCP_TRANSPORTS),
-  url: Schema.String,
-  headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  oauth: Schema.optionalKey(McpServerOAuth),
+  type: Schema.Literals(MCP_TRANSPORTS).annotate({ description: "The server's transport." }),
+  url: Schema.String.annotate({ description: "The server's url." }),
+  headers: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.String).annotate({
+      description: 'Its headers by name, each value HEADER_MASK as served and never as kept; absent where it has none.',
+    }),
+  ),
+  oauth: Schema.optionalKey(McpServerOAuth.annotate({ description: 'The OAuth client it signs in with; absent where it uses none.' })),
 }).annotate({ description: 'The server as the factory records it: its transport, url, headers (each value masked) and OAuth client.' });
 export type McpServerSpec = typeof McpServerSpec.Type;
 
 /** The state the server's harness reports now, its tools counted, and why it failed; `state` absent where it could not be read. */
 export const McpServerStatus = Schema.Struct({
-  state: Schema.optionalKey(Schema.Literals(MCP_STATES)),
-  tools: Schema.optionalKey(Schema.Number),
-  error: Schema.optionalKey(Schema.String),
+  state: Schema.optionalKey(
+    Schema.Literals(MCP_STATES).annotate({ description: "The state the server's harness reports now; absent where it could not be read." }),
+  ),
+  tools: Schema.optionalKey(describedNumber('How many tools the server offers.')),
+  error: Schema.optionalKey(Schema.String.annotate({ description: 'Why it failed; absent where it did not.' })),
 });
 export type McpServerStatus = typeof McpServerStatus.Type;
 
@@ -61,22 +67,29 @@ export type McpServerList = typeof McpServerList.Type;
  * client. A header sent as `HEADER_MASK` keeps the value the server holds, and is refused for a header it does not hold.
  */
 export const McpServerWrite = Schema.Struct({
-  type: Schema.optionalKey(Schema.Literals(MCP_TRANSPORTS)),
-  url: Schema.String,
-  headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  oauth: Schema.optionalKey(McpServerOAuth),
+  type: Schema.optionalKey(Schema.Literals(MCP_TRANSPORTS).annotate({ description: 'The transport; http where none is given.' })),
+  url: Schema.String.annotate({ description: "The server's url." }),
+  headers: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.String).annotate({
+      description: 'Its headers by name; a value sent as HEADER_MASK keeps the value the server holds.',
+    }),
+  ),
+  oauth: Schema.optionalKey(McpServerOAuth.annotate({ description: 'The OAuth client it signs in with.' })),
 });
 export type McpServerWrite = typeof McpServerWrite.Type;
 
 /** A sign-in started: the address the person opens to sign in, and when the sign-in stops waiting. */
-export const SignInStarted = Schema.Struct({ authUrl: Schema.String, until: Schema.String });
+export const SignInStarted = Schema.Struct({
+  authUrl: Schema.String.annotate({ description: 'The address the person opens to sign in.' }),
+  until: Schema.String.annotate({ description: 'When the sign-in stops waiting, as an ISO 8601 time.' }),
+});
 export type SignInStarted = typeof SignInStarted.Type;
 
 /** Where a server's sign-in stands: its word, when a waiting one stops waiting, and why a failed one failed. */
 export const SignInState = Schema.Struct({
-  state: Schema.Literals(SIGN_IN_STATES),
-  until: Schema.optionalKey(Schema.String),
-  why: Schema.optionalKey(Schema.String),
+  state: Schema.Literals(SIGN_IN_STATES).annotate({ description: "Where the server's sign-in stands." }),
+  until: Schema.optionalKey(Schema.String.annotate({ description: 'When a waiting sign-in stops waiting, as an ISO 8601 time.' })),
+  why: Schema.optionalKey(Schema.String.annotate({ description: 'Why a failed sign-in failed.' })),
 });
 export type SignInState = typeof SignInState.Type;
 
@@ -84,9 +97,15 @@ export type SignInState = typeof SignInState.Type;
  * The address a person's browser was sent back to once they approved a server's sign-in, pasted to complete it where the daemon's own
  * machine could not receive it. It carries a one-time code: never logged, journalled or written to the feed.
  */
-export const SignInCallback = Schema.Struct({ url: Schema.String });
+export const SignInCallback = Schema.Struct({
+  url: Schema.String.annotate({
+    description: "The address the person's browser was sent back to once they approved the sign-in; it carries a one-time code.",
+  }),
+});
 export type SignInCallback = typeof SignInCallback.Type;
 
 /** A server signed out of: whether a sign-in was cleared. */
-export const SignedOut = Schema.Struct({ signedOut: Schema.Boolean });
+export const SignedOut = Schema.Struct({
+  signedOut: Schema.Boolean.annotate({ description: 'Whether a sign-in was cleared.' }),
+});
 export type SignedOut = typeof SignedOut.Type;

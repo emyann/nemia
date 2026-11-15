@@ -3,7 +3,7 @@
  * activated, with the command or the fix that puts it there and what it costs while missing (`cost`: a run waits on it, or it keeps the
  * server up or open) — each declared harness's two needs (installed, signed in), the service and its linger, the bind, the machine
  * (cgroup v2, the user's service manager, the tools folder, whether the sessions' memory fits it, whether their slice holds them to
- * what it allocates), the places' needs, every factory's
+ * what it allocates, and Nemia's folder where the keeper could not trust it), the places' needs, every factory's
  * workflows' needs, the places' repository needs in each factory's repository, a factory at all, and a newer release — and whether a
  * run was ever started here (`ran`). Composed
  * from facts the package already holds; the machine's are read through `ReadinessFacts`, which a test hands its own. A controller: it
@@ -29,7 +29,8 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { carriedDirOf } from '../frozen/frozen.store.ts';
 import { PlaceService } from '../place/place.store.ts';
-import { tried } from '../runtime-client.ts';
+import { tried, trustedFolder } from '../runtime-client.ts';
+import { nemiaDir, readUntrusted } from '../nemia/level.store.ts';
 import { archiveInstall, type Running } from '../release/index.ts';
 import { toolsNeed, toolsNemia } from '../release/nemia-link.store.ts';
 import { latestRelease, runningRelease } from '../release/version.verb.ts';
@@ -141,6 +142,9 @@ const FACTORY: Of = { name: 'factory', area: 'factory', cost: 'run' };
 /** A newer release keeps the server current: no run waits on it. */
 const RELEASE: Of = { name: 'release', area: 'release', cost: 'server' };
 
+/** Nemia's folder trusted by her harness keeps her, the store's own agent, filed: no run waits on it. */
+const NEMIA_FOLDER: Of = { name: 'nemia-folder', area: 'machine', cost: 'server' };
+
 /** The service: its unit running under the user's service manager, and the user's linger, which keeps it running once they log out. */
 function servicePieces(facts: ReadinessFacts): ReadinessPiece[] {
   const unit = `${DEFAULT_NAME}.service`;
@@ -189,7 +193,7 @@ function bindPiece(facts: ReadinessFacts): ReadinessPiece {
 /**
  * The machine: cgroup v2, the user's service manager reached, and the tools folder made and first on the daemon's PATH. A run waits on
  * the first two only where the daemon files its sessions under a memory limit (`WF_MEMORY_LIMIT`), which needs both; else they keep the
- * service alone.
+ * service alone. Nemia's folder beside them, only where the keeper's trust of it was refused (`nemiaFolderPieces`).
  */
 function machinePieces(home: string, facts: ReadinessFacts): ReadinessPiece[] {
   const limited = (facts.env.WF_MEMORY_LIMIT ?? '') !== '';
@@ -211,7 +215,18 @@ function machinePieces(home: string, facts: ReadinessFacts): ReadinessPiece[] {
         : piece(manager, 'missing', "the user's service manager (systemd --user) does not answer", [
             typed('log in as the user once, so their manager starts, and keep it with linger', `sudo loginctl enable-linger ${facts.user}`),
           ]);
-  return [cgroup, user, toolsPiece(home, facts), memoryFitPiece(facts), sessionsSlicePiece(facts)];
+  return [cgroup, user, toolsPiece(home, facts), memoryFitPiece(facts), sessionsSlicePiece(facts), ...nemiaFolderPieces(home)];
+}
+
+/**
+ * Nemia's folder, said only where the keeper's write of her harness's trust was refused and the folder is still not trusted: missing,
+ * with the keeper's words, which name the fix; the keeper gives the trust again at its next beat that owes her session. None otherwise:
+ * the keeper trusts her folder itself.
+ */
+function nemiaFolderPieces(home: string): ReadinessPiece[] {
+  const refused = readUntrusted(home);
+  if (refused === undefined || trustedFolder(DEFAULT_HARNESS, nemiaDir(home)) !== false) return [];
+  return [piece(NEMIA_FOLDER, 'missing', refused)];
 }
 
 /** `bytes` in whole MiB, as a person reads them. */

@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './tsx.ts';
-import { nemiaUp, proposalIn, routedWith, TRUST, withProposal } from './markup-fixtures.ts';
+import { nemiaUp, proposalIn, routedWith, UNTRUSTED, trustLineOf, withProposal } from './markup-fixtures.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -46,7 +46,7 @@ async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): 
     spend: null,
     allows: [],
     factories: [],
-    trust: null,
+    untrusted: null,
     ...level,
   });
   client.setQueryData(['nemia', 'memory'], { dir: '/store/nemia/memory', facts, fact: null });
@@ -173,19 +173,21 @@ const trustAt = (html: string): 'level' | 'elsewhere' | 'none' => {
   return at > html.indexOf('data-nemia-pick') && at < html.indexOf('>Factories</h3>') ? 'level' : 'elsewhere';
 };
 
-test('Nemia waiting on her folder trusted: under the switch, that no session is filed until it is, and the line to copy, said once; her session untrusted; trusted: no such line', async () => {
-  const html = await nemiaWith({ level: 'semi-auto', since: '2026-10-05T12:00:00.000Z', task: 'nemia-1', trust: TRUST });
-  assert.equal(trustAt(html), 'level', 'the wait is plain beside the switch that reads Semi-auto');
-  assert.match(
-    html,
-    /data-nemia-trust[\s\S]*>No session of hers is filed until her folder is trusted: run this once in a terminal[^<]*<\/p>/,
-  );
-  assert.match(html, /data-nemia-trust[\s\S]*<code[^>]*>cd &#x27;\/store\/nemia&#x27; &amp;&amp; claude<\/code><button[^>]*data-copy/);
+test("Nemia's folder the keeper could not trust: under the switch, the refusal's words said once, no command to run; her session untrusted; no refusal: no such line", async () => {
+  const html = await nemiaWith({
+    level: 'semi-auto',
+    since: '2026-10-05T12:00:00.000Z',
+    task: 'nemia-1',
+    untrusted: UNTRUSTED,
+  });
+  assert.equal(trustAt(html), 'level', 'the refusal is plain beside the switch that reads Semi-auto');
+  assert.match(html, /data-nemia-trust[\s\S]*\/home\/me\/\.claude\.json did not take the trust of her folder/);
+  assert.doesNotMatch(trustLineOf(html), /<code|data-copy/, 'no command to copy');
   assert.equal(html.split('data-nemia-trust').length, 2, 'the line is drawn once');
-  assert.equal(html.split('in a terminal').length, 2, 'how to trust it is said once');
-  assert.match(html, /data-nemia-session="true" data-state="untrusted"[\s\S]*>Waiting on your trust: the keeper files her session/);
-  assert.equal(trustAt(await nemiaWith({ trust: TRUST })), 'level', 'off, the line is shown before she is turned on');
-  assert.doesNotMatch(await nemiaWith({ ...nemiaUp }), /data-nemia-trust/, 'a trusted folder: no trust line');
+  assert.match(html, /data-nemia-session="true" data-state="untrusted"[\s\S]*>Not filed: the keeper could not trust her folder/);
+  assert.equal(trustAt(await nemiaWith({ untrusted: UNTRUSTED })), 'level', 'off, a refusal still standing is said');
+  assert.doesNotMatch(await nemiaWith({ ...nemiaUp }), /data-nemia-trust/, 'a trusted folder: no line');
+  assert.doesNotMatch(await nemiaWith({ level: 'semi-auto', task: 'nemia-1' }), /data-nemia-trust/, 'nothing refused: nothing to say');
 });
 
 test('Nemia stopped from outside: said so, with a way to a fresh session', async () => {
@@ -194,8 +196,8 @@ test('Nemia stopped from outside: said so, with a way to a fresh session', async
   assert.match(html, /data-nemia-restart[^>]*>Start a fresh session</);
 });
 
-test('Nemia not filed, or waiting on her trust, names no task; filed, it names its task and phase', async () => {
-  const untrusted = await nemiaWith({ level: 'semi-auto', since: '2026-10-05T12:00:00.000Z', task: 'nemia-1', trust: TRUST });
+test('Nemia not filed, or her folder untrusted, names no task; filed, it names its task and phase', async () => {
+  const untrusted = await nemiaWith({ level: 'semi-auto', since: '2026-10-05T12:00:00.000Z', task: 'nemia-1', untrusted: UNTRUSTED });
   assert.match(untrusted, /data-state="untrusted"/);
   assert.doesNotMatch(untrusted, /data-nemia-task|>Task/, 'waiting on her trust: nothing filed, no task named');
   const notFiled = await nemiaWith({ level: 'semi-auto', task: 'nemia-1' });

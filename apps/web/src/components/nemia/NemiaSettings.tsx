@@ -144,8 +144,8 @@ function LevelSelect({
 }
 
 /**
- * Her level, picked among the three, what it means, and since when she is there; while her folder is not trusted, beside the switch, that
- * no session of hers is filed until it is, and the line that trusts it.
+ * Her level, picked among the three, what it means, and since when she is there; where the keeper could not trust her folder, beside the
+ * switch, that no session of hers is filed, and why, in the api's words, which name the fix.
  */
 function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: boolean; onAsk: (level: Level) => void }) {
   const now = useNow(60_000);
@@ -159,7 +159,7 @@ function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bool
         {LEVEL_LINES[nemia.level]}
         {nemia.since !== null && <span data-nemia-since> Set at {clockWord(new Date(nemia.since), new Date(now))}.</span>}
       </p>
-      <TrustLine trust={nemia.trust} />
+      <TrustLine untrusted={nemia.untrusted} />
     </Part>
   );
 }

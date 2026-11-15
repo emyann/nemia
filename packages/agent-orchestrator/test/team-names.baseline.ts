@@ -92,7 +92,7 @@ export const TEAM_NAMES: Baseline = {
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/janitor-argus.md': { count: 2, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/quick-implement.md': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/quick-land.md': { count: 1, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/nemia-keeper.test.ts': { count: 41, ...TEAM_MOVES.fixtures },
+  'packages/agent-orchestrator/test/nemia-keeper.test.ts': { count: 40, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/stats.test.ts': { count: 5, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/subscription-wakes.test.ts': { count: 5, ...TEAM_MOVES.fixtures },
   'packages/agent-runtime/src/harness/settings.test.ts': { count: 1, ...TEAM_MOVES.fixtures },

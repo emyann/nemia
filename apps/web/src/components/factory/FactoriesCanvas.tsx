@@ -164,8 +164,8 @@ function NoFactory() {
 
 /**
  * Nemia off, the store's own agent: a button that sets her level to Semi-auto, one approval, beside `line`, the same act from the command
- * line as the api answers it. Once she is above Manual, her session's state in the board's words and the line that trusts her folder while
- * it is not. A refusal is shown in the api's words; nothing while her level is not read.
+ * line as the api answers it. Once she is above Manual, her session's state in the board's words and why the keeper could not trust her
+ * folder, where its write was refused. A refusal is shown in the api's words; nothing while her level is not read.
  */
 function TurnOn({ line }: { line: string | null }) {
   const queryClient = useQueryClient();
@@ -183,7 +183,7 @@ function TurnOn({ line }: { line: string | null }) {
     return (
       <CardContent data-nemia-on data-state={kind} className="flex flex-col gap-2 border-t pt-4">
         <p className="text-body-medium">Nemia is on. {words}</p>
-        <TrustLine trust={nemia.trust} />
+        <TrustLine untrusted={nemia.untrusted} />
       </CardContent>
     );
   }

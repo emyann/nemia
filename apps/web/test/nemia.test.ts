@@ -31,7 +31,7 @@ const nemiaLevel = (over: Partial<NemiaLevel> = {}): NemiaLevel => ({
   spend: null,
   allows: [],
   factories: [],
-  trust: null,
+  untrusted: null,
   ...over,
 });
 
@@ -67,17 +67,14 @@ test("sessionOf: her session's state, judged from the orchestrator's facts", asy
     },
   );
   await t.test(
-    'her session not filed while her folder is not trusted reads untrusted, waiting on a person to trust it, and off whatever her trust',
+    "her session not filed while the keeper's trust of her folder is refused reads untrusted, and off whatever the refusal",
     () => {
-      const waiting = nemiaLevel({ level: 'semi-auto', task: 'nemia-1', trust: "cd '/store/nemia' && claude" });
+      const waiting = nemiaLevel({ level: 'semi-auto', task: 'nemia-1', untrusted: 'the file did not read: fix it' });
       assert.equal(sessionOf(waiting).kind, 'untrusted');
-      assert.match(
-        sessionOf(waiting).words,
-        /^Waiting on your trust: the keeper files her session at its next beat once her folder is trusted\.$/,
-      );
+      assert.match(sessionOf(waiting).words, /^Not filed: the keeper could not trust her folder/);
       assert.equal(sessionOf({ ...waiting, level: 'manual', task: null }).kind, 'off');
       assert.equal(
-        sessionOf({ ...up, trust: "cd '/store/nemia' && claude" }).kind,
+        sessionOf({ ...up, untrusted: 'the file did not read: fix it' }).kind,
         'up',
         'a phase read is a session filed, whatever the trust',
       );
@@ -189,12 +186,15 @@ test('levelQuery, nemiaMemoryQuery, nemiaFactQuery: what the api answers of her,
       );
     },
   );
-  await t.test('the line that trusts her folder reads back; REFUSED: an answer with no trust', async (t) => {
-    answering(t, { ...up, trust: "cd '/store/nemia' && claude" });
-    assert.equal((await readLevel()).trust, "cd '/store/nemia' && claude");
-    const { trust: _trust, ...noTrust } = up;
-    answering(t, noTrust);
-    await assert.rejects(readLevel(), (err: unknown) => err instanceof UnreadAnswer && /at trust, the value is missing/.test(err.message));
+  await t.test('why her folder could not be trusted reads back; REFUSED: an answer with no untrusted', async (t) => {
+    answering(t, { ...up, untrusted: 'the file did not read: fix it' });
+    assert.equal((await readLevel()).untrusted, 'the file did not read: fix it');
+    const { untrusted: _untrusted, ...noUntrusted } = up;
+    answering(t, noUntrusted);
+    await assert.rejects(
+      readLevel(),
+      (err: unknown) => err instanceof UnreadAnswer && /at untrusted, the value is missing/.test(err.message),
+    );
   });
   await t.test('REFUSED: a level the board has no word for, and an answer with no reach', async (t) => {
     answering(t, { ...up, level: 'on' });

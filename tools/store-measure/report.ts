@@ -44,7 +44,8 @@
  *   before her chat was followed. `chatBeatBefore` is `followChat`'s `first` from the cursor that history gave, its follow none: the same
  *   reads and the same answer as the old stream's beat, the whole re-projection it paid every 2 s per open stream. `chatFoldStep` is
  *   what a follower pays now for one moment of her session (`chatFold`): `followChat`'s `rest`, after a listing not timed, run until the
- *   first thing it sends, its follow handing one `events` moment of one new event; null where no session of hers is filed. Its time holds
+ *   first thing it sends, its follow handing one `events` moment of one new event; null where no session of hers is filed, or where
+ *   the task her level file names has no journal in the copy (pruned), since a follow of a task the engine lacks sends nothing. Its time holds
  *   the rest's start too (the follow of the feed, the look at the files), so it bounds the fold from above.
  *
  * - `factoryList`, `factoryGet`, `factoryCommands`, `scheduleList`, `hireList`, `volumeList`, `mcpServerList`: `GET /api/factories`,
@@ -465,12 +466,13 @@ async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, env:
     return { cold: medianOf(cold), warm: medianOf(warm) };
   };
   const task = orch.nemiaChatPlace(root).task ?? null;
+  const journalled = task !== null && fs.existsSync(path.join(root, 'engine', 'tasks', `${task}.jsonl`));
   return {
     asked: { task, events: listed.events.length, cursor: listed.cursor },
     measures: {
       chatHistory: await over(history),
       chatBeatBefore: await over(async (at) => (await followed(at, none)).first),
-      chatFoldStep: task === null ? null : await foldOver(),
+      chatFoldStep: journalled ? await foldOver() : null,
     },
   };
 }

@@ -42,7 +42,6 @@ export const loadWorkflow = (client: QueryClient, place: PagePlace, from: string
     from === 'yours' ? client.prefetchQuery(workflowsQuery) : null,
   ]);
 
-
 /**
  * One workflow, read in the address's place (`listPlace`): with no factory, the folder the list read with none names (`Everywhere`); in a
  * named factory, the folder the api lists in it, its own where it shadows the repository's (`InFactory`); and where the factory lists
@@ -85,7 +84,7 @@ export function WorkflowPage({ from, name, address, building }: Asked) {
 }
 
 /** What both readings of a workflow's page are given: the workflow the address names, its place, and whether its builder is asked for. */
-export type Asked = { from: string; name: string; address: PagePlace; building: boolean };
+type Asked = { from: string; name: string; address: PagePlace; building: boolean };
 
 /** The workflow `name` read from `from` with no factory, tagged with the factories it is in; or that none is listed by that name. */
 function Everywhere({ from, name, address, building, factories }: Asked & { factories: readonly Factory[] | undefined }) {

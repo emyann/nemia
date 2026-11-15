@@ -38,6 +38,7 @@ test('REFUSED: every route of the board has a seat, a factory’s path a place o
 
 test('REFUSED: a route with no seat, or a factory’s path seated off its pane, is named', () => {
   assert.deepEqual(unseated(['/nowhere'], seatOf), ['/nowhere has no seat']);
-  const storeOnly = (one: string): Seat | undefined => (one.startsWith('/factories/') ? { level: 'store', rail: 'factories' } : seatOf(one));
+  const storeOnly = (one: string): Seat | undefined =>
+    one.startsWith('/factories/') ? { level: 'store', rail: 'factories' } : seatOf(one);
   assert.deepEqual(unseated(['/factories/x/runs'], storeOnly), ["/factories/x/runs is no place of factory x's pane"]);
 });

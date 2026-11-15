@@ -5,8 +5,9 @@ import { loadRun } from '../lib/runView';
 import { objectHome } from '../lib/factoryAddress';
 
 /**
- * The page of a step's session, at /factories/$factory/runs/$runId/steps/$step: `$runId_` draws it on its own, not inside the run's page, which has no
- * outlet for it. A run of another factory, or of the default one, is loaded again at the address it belongs at (`objectHome`), its search kept.
+ * The page of a step's session, at /factories/$factory/runs/$runId/steps/$step: `$runId_` draws it on its own, not inside the run's page,
+ * which has no outlet for it. A run of another factory, or of the default one, is loaded again at the address it belongs at (`objectHome`),
+ * its search kept.
  */
 export const Route = createFileRoute('/factories/$factory_/runs/$runId_/steps/$step')({
   loader: async ({ context, params, location }) => {

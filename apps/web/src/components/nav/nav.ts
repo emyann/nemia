@@ -6,7 +6,7 @@ import { openRunsQuery } from '../../lib/api/runs.ts';
 const under = (to: string) => (path: string) => path === to || path.startsWith(`${to}/`);
 
 /** A destination of the store's rail, by its key. */
-export type RailId = 'factories' | 'waiting' | 'agents' | 'skills' | 'stats' | 'settings';
+type RailId = 'factories' | 'waiting' | 'agents' | 'skills' | 'stats' | 'settings';
 
 /** A place of a factory's pane, by its key: the factory's floor, then its lists, then its settings. */
 export type PanePlace = 'floor' | 'runs' | 'inbox' | 'workflows' | 'agents' | 'skills' | 'settings';
@@ -88,7 +88,7 @@ export function seatOf(path: string): Seat | undefined {
 export const factoryOf = (seat: Seat | undefined): string | undefined => (seat?.level === 'factory' ? seat.factory : undefined);
 
 /** A destination of the rail: its key, its name and its icon. */
-export type RailDestination = { readonly id: RailId; readonly label: string; readonly icon: LucideIcon };
+type RailDestination = { readonly id: RailId; readonly label: string; readonly icon: LucideIcon };
 
 /** A group of the rail: its name, said to a screen reader and drawn over its destinations, and its destinations in their order. */
 export type RailGroup = { readonly id: 'across' | 'yours' | 'you'; readonly label: string; readonly items: readonly RailDestination[] };
@@ -154,7 +154,7 @@ export function litOf(seat: Seat | undefined): RailId | undefined {
 }
 
 /** A place of the pane: its key and its name. */
-export type PanePlaceItem = { readonly id: PanePlace; readonly label: string };
+type PanePlaceItem = { readonly id: PanePlace; readonly label: string };
 
 /** The factory pane's places, in their order: the floor, its runs, its inbox, its workflows, its agents, its skills and its settings. */
 export const PANE_PLACES: readonly PanePlaceItem[] = [

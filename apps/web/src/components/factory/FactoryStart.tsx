@@ -37,7 +37,14 @@ export function PaneStart({ name }: { name: string }) {
   const factory = startIn(factories.data, name);
   const expanded = open?.kind === 'start' && open.factory === factory;
   return (
-    <KitButton variant="tonal" icon={PlusIcon} data-pane-start aria-expanded={expanded} onPress={() => show({ kind: 'start', factory })} className="w-full">
+    <KitButton
+      variant="tonal"
+      icon={PlusIcon}
+      data-pane-start
+      aria-expanded={expanded}
+      onPress={() => show({ kind: 'start', factory })}
+      className="w-full"
+    >
       Start a run
     </KitButton>
   );

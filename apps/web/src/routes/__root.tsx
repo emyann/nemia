@@ -120,7 +120,7 @@ function Root() {
   );
 }
 
-/** The factory pane of the page at `path` with `search`, where the frame docks it (`frameFold`): on a factory's page, open, and uncovered. */
+/** The factory pane of the page at `path` with `search`, where the frame docks it (`frameFold`): a factory's page, open, uncovered. */
 function FrameFactoryPane({ path, search }: { path: string; search: Record<string, unknown> }) {
   const fold = useFrameFold();
   const seat = seatOf(path);

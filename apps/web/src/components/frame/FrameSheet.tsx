@@ -1,8 +1,9 @@
 /**
  * The frame's one side sheet: the kit's standard side sheet, 400 wide, docked in the frame's row at the right of the page, the page
- * narrowing beside it — at 1600 and wider the third pane beside the factory pane, narrower in the factory pane's room — or on a narrow screen the kit's modal sheet over the page. It shows one thing at a time (`FrameFold.shows`): what
- * the address's `?bar=` names (`OpenBar`), on every page, or else Nemia's chat (`HerPanel`) where her face opened it, off her own page
- * (`/chat`), which is the panel itself. Each holds its own header, so the kit's sheet is given no title and draws no header of its own.
+ * narrowing beside it — at 1600 and wider the third pane beside the factory pane, narrower in the factory pane's room — or on a narrow
+ * screen the kit's modal sheet over the page. It shows one thing at a time (`FrameFold.shows`): what the address's `?bar=` names
+ * (`OpenBar`), on every page, or else Nemia's chat (`HerPanel`) where her face opened it, off her own page (`/chat`), which is the panel
+ * itself. Each holds its own header, so the kit's sheet is given no title and draws no header of its own.
  */
 import { SideSheet } from '@/components/ui/ds';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -26,11 +27,7 @@ export function FrameSheet({ path, feed }: { path: string; feed: FeedStatus }) {
   const narrow = useIsMobile();
   const close = fold.shows === 'bar' ? bar.close : her.close;
   const content =
-    fold.shows === 'bar' ? (
-      <OpenBar feed={feed} />
-    ) : fold.shows === 'her' ? (
-      <HerPanel path={path} onClose={her.close} />
-    ) : null;
+    fold.shows === 'bar' ? <OpenBar feed={feed} /> : fold.shows === 'her' ? <HerPanel path={path} onClose={her.close} /> : null;
   if (narrow)
     return (
       <SideSheet
@@ -44,7 +41,11 @@ export function FrameSheet({ path, feed }: { path: string; feed: FeedStatus }) {
       </SideSheet>
     );
   return (
-    <div data-frame-sheet={fold.sheet} data-sheet-shows={fold.shows} className="sticky top-0 z-30 h-[calc(100svh-var(--frame-foot))] shrink-0 self-start">
+    <div
+      data-frame-sheet={fold.sheet}
+      data-sheet-shows={fold.shows}
+      className="sticky top-0 z-30 h-[calc(100svh-var(--frame-foot))] shrink-0 self-start"
+    >
       <SideSheet
         variant="standard"
         isOpen={fold.sheet === 'docked'}

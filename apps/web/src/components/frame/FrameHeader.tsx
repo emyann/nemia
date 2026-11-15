@@ -26,10 +26,7 @@ export function FrameHeader({ path }: { path: string }) {
   const { isMobile } = useSidebar();
   const name = seatName(seatOf(path));
   return (
-    <header
-      data-frame-header
-      className="sticky top-0 z-20 flex h-(--frame-top) shrink-0 items-center gap-3 bg-background px-6 max-md:px-3"
-    >
+    <header data-frame-header className="sticky top-0 z-20 flex h-(--frame-top) shrink-0 items-center gap-3 bg-background px-6 max-md:px-3">
       {isMobile && <MenuButton />}
       {isMobile && <HerFace path={path} />}
       {name && <PageName>{name}</PageName>}

@@ -116,11 +116,7 @@ function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
       page.from === 'yours' ? (
         <>
           lives in its file, edited in{' '}
-          <RouteLink
-            {...workflowLink(place, page.from, page.workflow, undefined, true)}
-            data-home-link="words"
-            className={LINK}
-          >
+          <RouteLink {...workflowLink(place, page.from, page.workflow, undefined, true)} data-home-link="words" className={LINK}>
             the workflow's builder
           </RouteLink>
         </>

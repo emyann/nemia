@@ -395,7 +395,11 @@ test('namespaceOf, factoryIn, shownIn, workflowFactories, listPlace, hirePlaceOf
       assert.deepEqual(hirePlaceOf({}), {});
       assert.deepEqual(hirePlaceOf({ ...whole, step: '' }), {}, 'a step named with nothing');
       assert.deepEqual(hirePlaceOf({ ...whole, into: undefined }), {}, 'no factory');
-      assert.deepEqual(hirePlaceOf({ workflow: 'dev', step: 'implement', factory: 'nemia' }), {}, 'the factory is the hire’s `into`, never `factory`');
+      assert.deepEqual(
+        hirePlaceOf({ workflow: 'dev', step: 'implement', factory: 'nemia' }),
+        {},
+        'the factory is the hire’s `into`, never `factory`',
+      );
       assert.deepEqual(hirePlaceOf({ ...whole, workflow: 3 }), {}, 'a workflow that is no string');
     },
   );

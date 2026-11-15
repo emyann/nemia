@@ -22,6 +22,5 @@ export const Route = createFileRoute('/capabilities')({
 
 /** The page, read off its address. */
 function Page() {
-  
   return <CapabilitiesPage place={{ ...Route.useSearch() }} />;
 }

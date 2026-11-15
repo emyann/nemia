@@ -16,7 +16,6 @@ import { PLACE_LABELS } from '@/lib/skills';
 export const loadAgents = (client: QueryClient) =>
   Promise.all([client.ensureQueryData(agentsQuery), client.ensureQueryData(storeQuery), client.prefetchQuery(skillsQuery)]);
 
-
 const RouterLinkButton = routeLink(LinkButton);
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 

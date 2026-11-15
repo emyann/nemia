@@ -94,7 +94,8 @@ test('litOf, railHref and placeHref: what the rail lights, and where the rail an
   await t.test('each place leads under its factory’s path, the name escaped, the floor the path itself', () => {
     assert.equal(placeHref('floor', 'kit'), '/factories/kit');
     assert.equal(placeHref('runs', 'a b/c'), '/factories/a%20b%2Fc/runs');
-    for (const place of PANE_PLACES) assert.deepEqual(seatOf(placeHref(place.id, 'kit')), { level: 'factory', factory: 'kit', place: place.id });
+    for (const place of PANE_PLACES)
+      assert.deepEqual(seatOf(placeHref(place.id, 'kit')), { level: 'factory', factory: 'kit', place: place.id });
   });
 });
 

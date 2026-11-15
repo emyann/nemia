@@ -99,15 +99,15 @@ const frameFoldSpec = spec<(at: FrameAt) => FrameFold>({
     },
     aFoldedPaneStaysFolded: {
       description: 'A factory pane the person folded stays folded, whether the sheet is open or not, wider than a narrow screen',
-      condition: ({ input: [at], output }) =>
-        (output.pane === 'folded') === (at.hasPane && at.width !== 'narrow' && !at.paneOpen),
+      condition: ({ input: [at], output }) => (output.pane === 'folded') === (at.hasPane && at.width !== 'narrow' && !at.paneOpen),
     },
     theSheetCoversThePaneUnderWide: {
       description: 'Under 1600 the docked sheet opens over an open factory pane, whatever it shows, and the pane is back once it closes',
       condition: ({ input: [at], output }) => (output.pane === 'covered') === (paneKept(at) && sheetTakesThePane(at)),
     },
     thePaneIsDockedOtherwise: {
-      description: 'An open factory pane is docked left of the page at 1600 and wider, the sheet its third pane, and narrower with no sheet',
+      description:
+        'An open factory pane is docked left of the page at 1600 and wider, the sheet its third pane, and narrower with no sheet',
       condition: ({ input: [at], output }) => (output.pane === 'docked') === (paneKept(at) && !sheetTakesThePane(at)),
     },
   },

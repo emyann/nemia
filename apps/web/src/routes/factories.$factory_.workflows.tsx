@@ -9,7 +9,10 @@ export const Route = createFileRoute('/factories/$factory_/workflows')({
   validateSearch: pagePlaceOf,
   loaderDeps: ({ search }) => ({ repo: search.repo }),
   loader: ({ context, deps, params }) =>
-    Promise.all([loadWorkflowsIn(context.queryClient, { ...deps, factory: params.factory }), context.queryClient.ensureQueryData(storeQuery)]),
+    Promise.all([
+      loadWorkflowsIn(context.queryClient, { ...deps, factory: params.factory }),
+      context.queryClient.ensureQueryData(storeQuery),
+    ]),
   component: Page,
   errorComponent: ({ error }) => (
     <p className="text-body-medium text-failure">

@@ -38,7 +38,6 @@ export const loadAgent = (client: QueryClient, from: string, name: string, place
     from === 'yours' ? client.prefetchQuery(customInstructionsQuery(name)) : null,
   ]);
 
-
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
 /**

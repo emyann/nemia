@@ -385,4 +385,3 @@ export const placeOfAddress = ({ factory, repo }: WorkflowPageAddress): PagePlac
   ...(factory ? { factory } : {}),
   ...(repo ? { repo } : {}),
 });
-

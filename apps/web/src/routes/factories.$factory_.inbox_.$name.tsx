@@ -5,8 +5,9 @@ import { namespaceOf } from '../lib/api/namespace.ts';
 import { objectHome } from '../lib/factoryAddress';
 
 /**
- * The page of an inbox card, at /factories/$factory/inbox/$name: `inbox_` draws it on its own, not inside the Inbox page, which has no outlet for it.
- * A card of another factory, or of the default one, is loaded again at the address it belongs at (`objectHome`), its search kept.
+ * The page of an inbox card, at /factories/$factory/inbox/$name: `inbox_` draws it on its own, not inside the Inbox page, which has no
+ * outlet for it. A card of another factory, or of the default one, is loaded again at the address it belongs at (`objectHome`), its search
+ * kept.
  */
 export const Route = createFileRoute('/factories/$factory_/inbox_/$name')({
   loader: async ({ context, params, location }) => {

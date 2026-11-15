@@ -288,11 +288,7 @@ export function SkillRefused({ message }: { message: string }) {
 export function SkillLink({ from, name, className, place }: { from: SkillSource; name: string; className?: string; place?: PagePlace }) {
   const here = usePagePlace();
   return (
-    <RouteLink
-      {...definitionLink('skill', from, name, place ?? here)}
-      data-skill-link={name}
-      className={cn('font-mono', LINK, className)}
-    >
+    <RouteLink {...definitionLink('skill', from, name, place ?? here)} data-skill-link={name} className={cn('font-mono', LINK, className)}>
       {name}
     </RouteLink>
   );
@@ -383,10 +379,7 @@ export function GivenSkills({
 /** The way back to the Agents page. */
 export function BackToAgents() {
   return (
-    <RouteLink
-      to="/agents"
-      className="rounded-sm text-body-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-    >
+    <RouteLink to="/agents" className={cn('rounded-sm text-body-medium text-muted-foreground hover:text-foreground', focusRing())}>
       ← Agents
     </RouteLink>
   );

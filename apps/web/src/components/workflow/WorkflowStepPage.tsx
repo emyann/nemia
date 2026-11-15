@@ -8,7 +8,6 @@ import { workflowLink } from '@/lib/factoryAddress';
 import { fromWord } from '@/lib/factories';
 import { container } from '@/lib/meaning';
 
-
 /**
  * One step of a workflow, to read, in the factory picked: its agent, hired or named by its file (`StepAgent`), with what that agent says
  * it can do (`skills:`), a description of the work that fences nothing; hired and fired there (`StepHire`); what a run of it will be
@@ -57,10 +56,7 @@ export function WorkflowStepPage({ from, workflow, step, place }: { from: string
  */
 export function BackToWorkflow({ from, workflow, place }: { from: string; workflow: string; place: PagePlace }) {
   return (
-    <Link
-      {...workflowLink(place, from, workflow)}
-      className="font-mono text-body-medium text-muted-foreground hover:text-foreground"
-    >
+    <Link {...workflowLink(place, from, workflow)} className="font-mono text-body-medium text-muted-foreground hover:text-foreground">
       ← {workflow}
     </Link>
   );

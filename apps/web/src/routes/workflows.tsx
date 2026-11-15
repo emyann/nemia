@@ -21,6 +21,5 @@ export const Route = createFileRoute('/workflows')({
 
 /** The workflows page, read off its address. */
 function Page() {
-  
   return <WorkflowsPage place={{ ...Route.useSearch() }} />;
 }

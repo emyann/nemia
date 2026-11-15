@@ -31,10 +31,7 @@ function StepRow({ step, workflow, place, hiring }: { step: ListedStep; workflow
   return (
     <li data-step-row={step.name} className="min-w-0 space-y-1.5 p-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <RouteLink
-          {...workflowLink(place, workflow.from, workflow.name, step.name)}
-          className={LINK}
-        >
+        <RouteLink {...workflowLink(place, workflow.from, workflow.name, step.name)} className={LINK}>
           {step.name}
         </RouteLink>
         <span className="text-body-small text-muted-foreground">

@@ -111,17 +111,20 @@ test("REFUSED: Nemia's cue, the pane's Runs line and the Runs page's plate count
     assert.match(dock, new RegExp(`presenceOf\\(\\s*chat\\.state\\.presence,[^,]+,\\s*${counted}\\?\\.counts\\.waiting\\b`));
     assert.doesNotMatch(dock, /presence\.waitsOnYou/, "the api's own sum is no part of the cue");
   });
-  await t.test("the pane's Runs line reads the same query, the rail's Waiting every factory's, and the Runs page its plate off the same list", () => {
-    const pane = read('components/frame/FactoryPane.tsx');
-    assert.equal(frameRunsRead(pane), 'runs', "the pane's lines read the frame's query");
-    assert.match(pane, /runs\.counts\.waiting/);
-    const rail = read('components/frame/FrameRail.tsx');
-    assert.match(rail, /useQuery\(openRunsQuery\(\)\)/, "the rail's Waiting counts every factory");
-    assert.match(rail, /runs\.data\?\.counts\.waiting/);
-    const page = read('components/run/RunsPage.tsx');
-    assert.match(page, /useSuspenseQuery\(openRunsQuery\(at\.factory, at\.l\)\)/);
-    assert.match(page, /<Plate count=\{counts\.waiting\}/);
-  });
+  await t.test(
+    "the pane's Runs line reads the same query, the rail's Waiting every factory's, and the Runs page its plate off the same list",
+    () => {
+      const pane = read('components/frame/FactoryPane.tsx');
+      assert.equal(frameRunsRead(pane), 'runs', "the pane's lines read the frame's query");
+      assert.match(pane, /runs\.counts\.waiting/);
+      const rail = read('components/frame/FrameRail.tsx');
+      assert.match(rail, /useQuery\(openRunsQuery\(\)\)/, "the rail's Waiting counts every factory");
+      assert.match(rail, /runs\.data\?\.counts\.waiting/);
+      const page = read('components/run/RunsPage.tsx');
+      assert.match(page, /useSuspenseQuery\(openRunsQuery\(at\.factory, at\.l\)\)/);
+      assert.match(page, /<Plate count=\{counts\.waiting\}/);
+    },
+  );
   await t.test('the scan finds a reader of another query', () => {
     assert.equal(frameRunsRead('const counted = useQuery(openRunsQuery()).data;'), undefined);
   });

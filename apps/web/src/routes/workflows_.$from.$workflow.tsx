@@ -25,12 +25,5 @@ export const Route = createFileRoute('/workflows_/$from/$workflow')({
 function Page() {
   const { from, workflow } = Route.useParams();
   const { build, repo } = Route.useSearch();
-  return (
-    <WorkflowPage
-      from={from}
-      name={workflow}
-      address={{ ...(repo && { repo }) }}
-      building={build ?? false}
-    />
-  );
+  return <WorkflowPage from={from} name={workflow} address={{ ...(repo && { repo }) }} building={build ?? false} />;
 }

@@ -4,9 +4,16 @@
  * chat). Pure and level-triggered: the pane covered by the docked sheet under 1600 is read from what holds now, never written as the
  * person's fold, so it comes back as it was the moment the sheet closes.
  */
-import type { FrameAt, FrameFold, FrameFoldOf } from '../../contracts/frame-fold.contract.ts';
+import type { FrameAt, FrameFold, FrameFoldOf, PaneForm } from '../../contracts/frame-fold.contract.ts';
 
-export type { FrameFold, PaneForm } from '../../contracts/frame-fold.contract.ts';
+export type { FrameFold } from '../../contracts/frame-fold.contract.ts';
+
+/** The factory pane wider than a narrow screen: none off a factory, folded as the person keeps it, covered by the sheet under 1600. */
+const paneWide = (at: FrameAt, wanted: boolean): PaneForm => {
+  if (!at.hasPane) return 'none';
+  if (!at.paneOpen) return 'folded';
+  return at.width === 'medium' && wanted ? 'covered' : 'docked';
+};
 
 /**
  * The sheet shows what the address's `?bar=` names wherever it names one, else her chat where her face opened it off her own page, else
@@ -22,13 +29,5 @@ export const frameFold: FrameFoldOf = (at: FrameAt): FrameFold => {
   if (at.width === 'narrow') {
     return { rail: 'drawer', pane: at.hasPane ? 'drawer' : 'none', sheet: wanted ? 'modal' : 'none', shows };
   }
-  const sheet = wanted ? 'docked' : 'none';
-  const pane = !at.hasPane
-    ? 'none'
-    : !at.paneOpen
-      ? 'folded'
-      : at.width === 'medium' && wanted
-        ? 'covered'
-        : 'docked';
-  return { rail: 'docked', pane, sheet, shows };
+  return { rail: 'docked', pane: paneWide(at, wanted), sheet: wanted ? 'docked' : 'none', shows };
 };

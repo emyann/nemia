@@ -13,7 +13,6 @@ import { startedCard } from '@/lib/inbox';
 import { factoryOf } from '../nav/nav';
 import { useSeat } from '../nav/useSeat';
 
-
 /**
  * One inbox card, to read: its body rendered, then each key a card may set with its value and what it means — or, with Source, its file as
  * written. A started card says the runs it was started as, beside its run's phase (`StartedAs`), whether that run is in flight or ended.

@@ -20,7 +20,6 @@ export const everyFactory = (
   </Link>
 );
 
-
 const folder = <code className="font-mono text-body-small">workflows/</code>;
 
 /**

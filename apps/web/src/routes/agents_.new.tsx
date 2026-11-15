@@ -104,10 +104,7 @@ function Unhired({ place: { factory, workflow, step }, agent, why }: { place: Hi
       </p>
       <p className="text-body-small whitespace-pre-wrap">{why}</p>
       <p className="text-body-small">
-        <RouteLink
-          {...workflowLink({ factory }, 'yours', workflow, step)}
-          className="underline underline-offset-2"
-        >
+        <RouteLink {...workflowLink({ factory }, 'yours', workflow, step)} className="underline underline-offset-2">
           Back to the step
         </RouteLink>{' '}
         or{' '}
@@ -122,4 +119,3 @@ function Unhired({ place: { factory, workflow, step }, agent, why }: { place: Hi
 
 /** Brings the notice that the hire was refused into the window: it says so above the form, and Create is pressed at the form's foot. */
 const intoView = (notice: HTMLDivElement | null): void => notice?.scrollIntoView({ block: 'nearest' });
-

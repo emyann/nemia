@@ -20,7 +20,6 @@ import { Link } from '@tanstack/react-router';
 import { repoName } from '@/lib/factory';
 import { container, hairline } from '@/lib/meaning';
 
-
 /**
  * What the repository of the address's place offers a step (the factory its path names, `?repo=`), section by section, each thing with
  * the file it was read from; where the api reads none, why and what to do (`Unread`), and no section.

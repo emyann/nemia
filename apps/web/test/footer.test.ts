@@ -193,11 +193,8 @@ test("staleFrameHeights: no page sized as the screen less a header alone, withou
       'h-[calc(100svh-var(--frame-top)-var(--frame-lines))]',
     ]);
   });
-  await t.test("the machine bar: REFUSED, a page the screen less the head and the lines, which the bar at the foot would cover", () => {
-    assert.equal(
-      staleFrameHeights('flex h-[calc(100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot))] min-h-96').length,
-      0,
-    );
+  await t.test('the machine bar: REFUSED, a page the screen less the head and the lines, which the bar at the foot would cover', () => {
+    assert.equal(staleFrameHeights('flex h-[calc(100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot))] min-h-96').length, 0);
   });
   await t.test('the frame height: no page under the top bar is the screen less a header alone', () => {
     const app = path.join(import.meta.dirname, '..');

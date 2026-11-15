@@ -428,3 +428,12 @@ test("a factory's delegations list each agent's grants in words with a Remove, b
   const none = await routedWith(createElement(FactoryDelegations, { name: 'acme' }), [[['delegations', 'acme'], []]]);
   assert.match(none, /data-no-delegation/);
 });
+
+test("switcherLine: the switcher says its factory's repository, its template and version, and whether the store ticks, each where known", async () => {
+  const { switcherLine } = await import('../src/components/factory/FactoryPicker.tsx');
+  const template = { source: 'github:acme/templates/sdlc', version: '3.11.0', params: {}, applied: null, conditions: [] };
+  assert.equal(switcherLine(filed('kit', { repos: ['/code/app'], template }), 'ticking'), 'app · sdlc@3.11.0 · ticking');
+  assert.equal(switcherLine(filed('kit', { repos: ['/code/a', '/code/b'] }), 'paused'), 'a +1 · paused');
+  assert.equal(switcherLine(filed('kit', { repos: [] }), undefined), 'no repository', 'nothing said of what is not read');
+  assert.equal(switcherLine(undefined, 'not ticking'), 'no repository · not ticking');
+});

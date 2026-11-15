@@ -20,7 +20,7 @@ export const Route = createFileRoute('/inbox')({
 /** The Inbox, read off its address; a change of its search is written to it. */
 function Page() {
   const search = Route.useSearch();
-  
+
   const navigate = useNavigate({ from: Route.fullPath });
   return <InboxPage at={{ ...search }} onSearch={(patch) => void navigate({ search: (prev) => ({ ...prev, ...patch }) })} />;
 }

@@ -4,20 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { BackToAgents, AgentLink, SkillRefused, SkillSourceBadge } from './AgentParts';
 import { SkillForm } from './SkillForm';
-import {
-  saveSkill,
-  SkillRefusal,
-  skillQuery,
-  switchPreload,
-  type SkillDetail,
-  type SkillDraft,
-  type SkillSaved,
-} from '@/lib/api/skills';
+import { saveSkill, SkillRefusal, skillQuery, switchPreload, type SkillDetail, type SkillDraft, type SkillSaved } from '@/lib/api/skills';
 import { costWords, drawnSkill, preloadWords, reachWords } from '@/lib/skills';
 import { invalidateSkills } from '@/lib/agentWrites';
 import { FACTORY_WAY } from '@/lib/factories';
 import type { PagePlace } from '@/lib/api/workflows';
-
 
 const code = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
 

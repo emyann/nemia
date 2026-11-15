@@ -14,7 +14,7 @@ import { Button } from '../ui/ds';
 import { useBar } from '@/lib/useBar';
 
 /** What the runs page reads of its address: the factory its path names, none for every factory's, its trail and its label selector. */
-export type RunsAt = { factory?: string; older?: string; l?: string };
+type RunsAt = { factory?: string; older?: string; l?: string };
 
 /**
  * What the runs page loads before it draws, at `at`: the open runs and the finished runs' page its trail leads to, with each finished
@@ -125,11 +125,7 @@ export function RunsPage({ at, onLabel }: { at: RunsAt; onLabel: (selector: stri
   const { counts } = open;
   return (
     <Frame state="loaded">
-      <SelectorField
-        key={at.l ?? ''}
-        selector={at.l}
-        onSelect={onLabel}
-      />
+      <SelectorField key={at.l ?? ''} selector={at.l} onSelect={onLabel} />
       <Section
         name="waiting"
         plate={<Plate count={counts.waiting} title="Waiting on you" quiet={counts.waiting === 0} />}

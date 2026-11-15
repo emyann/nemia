@@ -4,8 +4,8 @@ import { stepQuery } from '../lib/api/workflows.ts';
 import { pagePlaceOf } from '../lib/factories';
 
 /**
- * The page of a workflow's step, at /factories/$factory/workflows/$from/$workflow/$step: `workflows_` and `$workflow_` draw it on its own, not
- * inside the Workflows page nor the workflow's, neither of which has an outlet for it. It is read in the factory its path names, on the
+ * The page of a workflow's step, at /factories/$factory/workflows/$from/$workflow/$step: `workflows_` and `$workflow_` draw it on its own,
+ * not inside the Workflows page nor the workflow's, neither of which has an outlet for it. It is read in the factory its path names, on the
  * repository its search names (`?repo=`).
  */
 export const Route = createFileRoute('/factories/$factory_/workflows_/$from/$workflow_/$step')({

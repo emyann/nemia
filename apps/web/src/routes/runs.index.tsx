@@ -20,12 +20,7 @@ export const Route = createFileRoute('/runs/')({
 /** The runs page, read off its address; a label picked is written to it, the trail dropped. */
 function Page() {
   const search = Route.useSearch();
-  
+
   const navigate = useNavigate({ from: Route.fullPath });
-  return (
-    <RunsPage
-      at={{ ...search }}
-      onLabel={(next) => void navigate({ search: (prev) => ({ ...prev, l: next, older: undefined }) })}
-    />
-  );
+  return <RunsPage at={{ ...search }} onLabel={(next) => void navigate({ search: (prev) => ({ ...prev, l: next, older: undefined }) })} />;
 }

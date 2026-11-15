@@ -16,7 +16,6 @@ import {
   cardLines,
   cardsEnded,
   cardsInPlay,
-  cardsSearch,
   factoryRepoOf,
   inPlay,
   newestCardsFirst,
@@ -29,9 +28,8 @@ import {
 } from '@/lib/inbox';
 import { BUTTON, BUTTON_OUTLINED } from '@/lib/classes';
 
-/** What the Inbox reads of its address: the factory its path names, none for every factory's, its label selector and which cards it lists. */
-export type InboxAt = { factory?: string; l?: string; cards?: 'ended' };
-
+/** What the Inbox reads of its address: the factory its path names (none for every factory's), its label selector and its cards' kind. */
+type InboxAt = { factory?: string; l?: string; cards?: 'ended' };
 
 /** What the Inbox says Remove does to a started card, after the runs it was started as. */
 const REMOVE_STARTED = 'Remove drops it; to run the idea again, file it again.';

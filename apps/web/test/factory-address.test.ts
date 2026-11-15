@@ -63,7 +63,11 @@ test('factoryRedirect: each address of before the factory’s paths reaches its 
   await t.test('an address that names no factory, or names one with nothing or no string, is left as it is', () => {
     for (const search of [{}, { factory: '' }, { factory: 7 }, { factory: ['kit'] }, { repo: '/r' }])
       assert.equal(factoryRedirect('/runs', search), undefined, JSON.stringify(search));
-    assert.equal(factoryRedirect('/agents/new', { factory: 'kit', workflow: 'w', step: 's' }), undefined, 'a hire’s old spelling is no page’s');
+    assert.equal(
+      factoryRedirect('/agents/new', { factory: 'kit', workflow: 'w', step: 's' }),
+      undefined,
+      'a hire’s old spelling is no page’s',
+    );
   });
   await t.test(
     'REFUSED: every route of the board given ?factory=x either reaches a page seated in factory x that is sent nowhere again, or is left',
@@ -117,7 +121,8 @@ test("REFUSED: no file of the board but factoryAddress.ts reads a page's factory
     assert.equal(factoryInAddress(' * the old `?factory=` address').length, 0, 'a comment says it, and writes nothing');
   });
   await t.test("the board's own files: none but the redirect's, and the api's own parameter under lib/api", () => {
-    const allowed = (file: string) => file === path.join(SRC, 'lib/factoryAddress.ts') || file.startsWith(path.join(SRC, 'lib/api') + path.sep);
+    const allowed = (file: string) =>
+      file === path.join(SRC, 'lib/factoryAddress.ts') || file.startsWith(path.join(SRC, 'lib/api') + path.sep);
     const found = sources(SRC)
       .filter((file) => !allowed(file) && !file.endsWith('routeTree.gen.ts'))
       .flatMap((file) => factoryInAddress(fs.readFileSync(file, 'utf8')).map((line) => `${path.relative(SRC, file)}: ${line.trim()}`));

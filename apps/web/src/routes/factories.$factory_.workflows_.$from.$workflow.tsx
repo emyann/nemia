@@ -2,9 +2,9 @@ import { createFileRoute } from '@tanstack/react-router';
 import { BackToWorkflows, loadWorkflow, WorkflowPage, workflowSearch } from '../components/workflow/WorkflowPage';
 
 /**
- * The page of a workflow, at /factories/$factory/workflows/$from/$workflow: `workflows_` draws it on its own, not inside the Workflows page, which
- * has no outlet for it. `?build=true` opens the builder of one of yours. It is read in the factory its path names, on the repository
- * its search names (`?repo=`).
+ * The page of a workflow, at /factories/$factory/workflows/$from/$workflow: `workflows_` draws it on its own, not inside the Workflows
+ * page, which has no outlet for it. `?build=true` opens the builder of one of yours. It is read in the factory its path names, on the
+ * repository its search names (`?repo=`).
  */
 export const Route = createFileRoute('/factories/$factory_/workflows_/$from/$workflow')({
   validateSearch: workflowSearch,
@@ -25,12 +25,5 @@ export const Route = createFileRoute('/factories/$factory_/workflows_/$from/$wor
 function Page() {
   const { factory, from, workflow } = Route.useParams();
   const { build, repo } = Route.useSearch();
-  return (
-    <WorkflowPage
-      from={from}
-      name={workflow}
-      address={{ factory, ...(repo && { repo }) }}
-      building={build ?? false}
-    />
-  );
+  return <WorkflowPage from={from} name={workflow} address={{ factory, ...(repo && { repo }) }} building={build ?? false} />;
 }

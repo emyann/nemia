@@ -17,16 +17,16 @@ export const StepCommands = Schema.Struct({
 export type StepCommands = typeof StepCommands.Type;
 
 /**
- * Where the board pages a run's workflow: read from the repository's `workflows/` or yours, its name, the factory it is attached to (null
- * for none) and the repository (null for yours outside a factory).
+ * Where the board pages a run's workflow: read from the repository's `workflows/` or the person's library, its name, the factory it is
+ * attached to (null for none) and the repository (null for the library's outside a factory).
  */
 export const WorkflowPageAddress = Schema.Struct({
-  from: Schema.Literals(['repo', 'yours']).annotate({
-    description: "Where the workflow is read from: the repository's workflows folder, or yours.",
+  from: Schema.Literals(['repo', 'user']).annotate({
+    description: "Where the workflow is read from: the repository's workflows folder, or the person's library (`user`).",
   }),
   workflow: Schema.String.annotate({ description: "The workflow's name." }),
   factory: Schema.NullOr(Schema.String).annotate({ description: 'The factory it is attached to; null for none.' }),
-  repo: Schema.NullOr(Schema.String).annotate({ description: 'The repository it is read from; null for yours outside a factory.' }),
+  repo: Schema.NullOr(Schema.String).annotate({ description: 'The repository it is read from; null for the library outside a factory.' }),
 }).annotate({ identifier: 'WorkflowPageAddress' });
 export type WorkflowPageAddress = typeof WorkflowPageAddress.Type;
 

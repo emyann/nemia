@@ -36,9 +36,9 @@ test("the Api's get answers a server, its list and the builtin list a page of th
   assert.deepEqual(answered('mcpservers', 'get', { ...github, status: {} }), { ...github, status: {} });
   const page = { apiVersion: API_VERSION, kind: 'McpServerList', metadata: {}, items: [builtin] };
   assert.deepEqual(answered('mcpservers', 'list', page), page);
-  assert.deepEqual(answered('builtin', 'mcpservers', page), page);
+  assert.deepEqual(answered('mcpservers', 'listLibrary', page), page);
   assert.equal(answered('mcpservers', 'get', { ...github, kind: 'Server' }), undefined);
-  assert.equal(answered('builtin', 'mcpservers', { ...page, kind: 'ServerList' }), undefined);
+  assert.equal(answered('mcpservers', 'listLibrary', { ...page, kind: 'ServerList' }), undefined);
 });
 
 test("the header mask is no value a header is sent with, and the write takes the old route's server and a server read back", () => {

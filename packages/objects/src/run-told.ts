@@ -76,7 +76,7 @@ export const StepTold = Schema.Struct({
   told: NullString.annotate({ description: 'What the step was told, whole; null where nothing was told.' }),
   layers: Schema.NullOr(ToldLayers).annotate({
     description:
-      "What it was told by layer: its agent's, yours, the factory's, the step's policy and its task; null on a record that froze none.",
+      "What it was told by layer: its agent's, the person's, the factory's, the step's policy and its task; null on a record that froze none.",
   }),
   taskParts: Schema.NullOr(List(TaskPart)).annotate({
     description:

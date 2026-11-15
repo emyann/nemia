@@ -15,10 +15,10 @@ import { AGENT_SOURCE_PLACES, DEFINITION_ORIGINS } from './words.ts';
 const Text = Schema.NullOr(Schema.String);
 
 /** Where an agent of a step is, by the place a start reads it from. */
-const AgentPlace = Schema.Literals(['repo', 'yours']);
+const AgentPlace = Schema.Literals(['repo', 'user']);
 
 /** Where a step an agent fills is read from: either place an agent is, or the tree of a factory made from a template (`factory`). */
-const FillPlace = Schema.Literals(['factory', 'repo', 'yours']);
+const FillPlace = Schema.Literals(['factory', 'repo', 'user']);
 
 /**
  * An agent as its file says it: `role:`, `description:`, its harness keys (`keys`, each line as written), `skills:` and `mcp:` as their
@@ -55,13 +55,14 @@ export type AgentSpec = typeof AgentSpec.Type;
 
 /** A step that names the agent (`usedBy`), and one it fills in the factory, hired or by its own `agent:` line (`fills`). */
 export const AgentUser = Schema.Struct({
-  from: AgentPlace.annotate({ description: 'The place the step reads the agent from: the repository or yours.' }),
+  from: AgentPlace.annotate({ description: 'The place the step reads the agent from: the repository or the user library (`user`).' }),
   workflow: Schema.String.annotate({ description: 'The workflow the step is in.' }),
   step: Schema.String.annotate({ description: "The step's name." }),
 });
 export const AgentFill = Schema.Struct({
   from: FillPlace.annotate({
-    description: 'Where the step is read from: the repository, yours, or the tree of a factory made from a template (`factory`).',
+    description:
+      'Where the step is read from: the repository, the user library (`user`), or the tree of a factory made from a template (`factory`).',
   }),
   workflow: Schema.String.annotate({ description: 'The workflow the step is in.' }),
   step: Schema.String.annotate({ description: "The step's name." }),
@@ -110,7 +111,7 @@ export const AgentStatus = Schema.Struct({
     Schema.Struct({
       why: Schema.String.annotate({ description: 'Why the agent cannot be tried.' }),
       copy: Text.annotate({
-        description: 'The command that copies it to yours, to make it one that can be tried; null where a copy does not.',
+        description: 'The command that copies it to the user library, to make it one that can be tried; null where a copy does not.',
       }),
     }),
   ).annotate({ description: 'Why the agent cannot be tried; null where nothing refuses it.' }),
@@ -149,8 +150,8 @@ export const AgentList = listOf('Agent', Agent);
 export type AgentList = typeof AgentList.Type;
 
 /**
- * An agent of yours made (`POST …/agents`, `metadata.name` its name) or written (`PUT …/agents/<name>`, `metadata.resourceVersion` the
- * version it was read at; a `metadata.name` other than the path's renames it).
+ * An agent of the person's library made (`POST …/agents`, `metadata.name` its name) or written (`PUT …/agents/<name>`,
+ * `metadata.resourceVersion` the version it was read at; a `metadata.name` other than the path's renames it).
  */
 export const AgentWrite = Schema.Struct({ metadata: WriteMeta, spec: AgentSpec });
 export type AgentWrite = typeof AgentWrite.Type;

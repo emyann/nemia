@@ -24,14 +24,14 @@ const agent = {
     instructions: 'Design.',
   },
   status: {
-    origin: 'yours',
+    origin: 'user',
     shadowedBy: 'repo',
     revision: 1,
     dir: '/store/workflows/agents',
     file: '/store/workflows/agents/architect.md',
     source: '---\nrole: Architect\n---\nDesign.\n',
-    usedBy: [{ from: 'yours', workflow: 'build', step: 'design' }],
-    fills: [{ from: 'yours', workflow: 'build', step: 'design', hired: false }],
+    usedBy: [{ from: 'user', workflow: 'build', step: 'design' }],
+    fills: [{ from: 'user', workflow: 'build', step: 'design', hired: false }],
     factories: ['mill'],
     given: [{ name: 'git', from: 'builtin', foundIn: null, entry, error: null, preload: false, cost: null }],
     copied: { source: '/repo/workflows/agents/architect.md', version: 'v', now: 'same' },
@@ -61,8 +61,8 @@ test('the write and the try the Api takes, each refused without its spec or its 
   assert.deepEqual(taken('agents', 'replace', write), write);
   assert.deepEqual(taken('agents', 'create', write), write);
   assert.equal(taken('agents', 'replace', { metadata: write.metadata }), undefined);
-  assert.deepEqual(taken('agents', 'try', { brief: 'go' }), { brief: 'go' });
-  assert.equal(taken('agents', 'try', {}), undefined);
+  assert.deepEqual(taken('agents', 'tryLibrary', { brief: 'go' }), { brief: 'go' });
+  assert.equal(taken('agents', 'tryLibrary', {}), undefined);
   const card = {
     card: {
       name: 'architect',

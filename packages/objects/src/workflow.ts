@@ -393,7 +393,7 @@ export const WorkflowSpec = Schema.Struct({
 });
 export type WorkflowSpec = typeof WorkflowSpec.Type;
 
-/** What a run of a step would be told, by layer (`ToldLayers`): its agent's, yours and the factory's, and the step's policy. */
+/** What a run of a step would be told, by layer (`ToldLayers`): its agent's, the person's and the factory's, and the step's policy. */
 export const StepLayers = Schema.Struct({
   agent: Text.annotate({ description: "The agent's layer: what its file tells the session; null for none." }),
   instructions: Text.annotate({ description: "The instructions layer: the agent's own instructions; null for none." }),
@@ -482,8 +482,8 @@ export const SchemaFile = Schema.Struct({
 export type SchemaFile = typeof SchemaFile.Type;
 
 /**
- * A workflow of yours written whole (`PUT …/workflows/<name>`): its spec, the schema files beside it, and the `resourceVersion` it was
- * read at, refused where its files now hold another.
+ * A workflow of the person's library written whole (`PUT …/workflows/<name>`): its spec, the schema files beside it, and the
+ * `resourceVersion` it was read at, refused where its files now hold another.
  */
 export const WorkflowWrite = Schema.Struct({
   metadata: Schema.optionalKey(WriteMeta),
@@ -492,7 +492,7 @@ export const WorkflowWrite = Schema.Struct({
 });
 export type WorkflowWrite = typeof WorkflowWrite.Type;
 
-/** A workflow of yours made (`POST …/workflows`): its name, and its spec, of one step. */
+/** A workflow of the person's library made (`POST …/workflows`): its name, and its spec, of one step. */
 export const WorkflowCreate = Schema.Struct({
   metadata: Schema.Struct({ name: Schema.String.annotate({ description: 'The name of the workflow to make.' }) }).annotate({
     description: 'The workflow to make, by its name.',
@@ -533,7 +533,8 @@ export type KeyField = typeof KeyField.Type;
 /**
  * What the builder's form is drawn from (`GET /api/workflows/keys`): every key a step may set, in the package's order, the default
  * harness, the keys an agent may set (`roleKeys`) and those a step's file sets as its policy over its agent (`policyKeys`), the role values
- * each agent of yours gives a step it is attached to (`agents`), and how a step names a remote A2A agent with the keys it may not set.
+ * each agent of the person's library gives a step it is attached to (`agents`), and how a step names a remote A2A agent with the keys it
+ * may not set.
  */
 export const KeyForm = Schema.Struct({
   keys: Schema.Array(KeyField).annotate({
@@ -545,7 +546,7 @@ export const KeyForm = Schema.Struct({
     description: "The keys a step's file sets as its policy over its agent.",
   }),
   agents: Schema.Record(Schema.String, StepKeys).annotate({
-    description: 'The role values each agent of yours gives a step it is attached to, by its name.',
+    description: 'The role values each agent of the user library gives a step it is attached to, by its name.',
   }),
   remote: Schema.Struct({
     prefix: Schema.String.annotate({ description: 'The prefix the harness: line gives a remote A2A agent, a2a:.' }),
@@ -573,8 +574,8 @@ export type KeyRow = typeof KeyRow.Type;
  */
 export const WorkflowStepPage = Schema.Struct({
   workflow: Schema.String.annotate({ description: 'The workflow the step is of.' }),
-  from: Schema.Literals(['repo', 'yours']).annotate({
-    description: "Where the workflow is read from: the factory's repository, or yours.",
+  from: Schema.Literals(['repo', 'user']).annotate({
+    description: "Where the workflow is read from: the factory's repository, or the person's library (`user`).",
   }),
   dir: Schema.String.annotate({ description: "The workflow's folder." }),
   step: Schema.String.annotate({ description: "The step's name." }),
@@ -588,7 +589,7 @@ export const WorkflowStepPage = Schema.Struct({
   }),
   factory: Text.annotate({ description: "The factory the page was read in, the namespace's; null for default." }),
   layers: StepLayers.annotate({
-    description: "What a run of the step would be told now, by layer: its agent's, yours, the factory's, and the step's policy.",
+    description: "What a run of the step would be told now, by layer: its agent's, the person's, the factory's, and the step's policy.",
   }),
   hired: Text.annotate({ description: 'The agent the factory hires into the step; null where it hires none.' }),
   hiredIn: Schema.Array(
@@ -614,14 +615,14 @@ export const WorkflowStepPage = Schema.Struct({
   skillsFrom: Schema.Array(
     Schema.Struct({
       name: Schema.String.annotate({ description: "The skill's name." }),
-      from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'builtin'])).annotate({
-        description: 'Where the skill is found: yours, the repository or a builtin; null where none is found.',
+      from: Schema.NullOr(Schema.Literals(['user', 'repo', 'builtin'])).annotate({
+        description: 'Where the skill is found: the user library, the repository or a builtin; null where none is found.',
       }),
       foundIn: Text.annotate({ description: 'The folder it is found in; null where none is found.' }),
     }),
   ).annotate({
     description:
-      "Where each skill of the step's layers is found: yours, the repository's or a builtin, and the folder; null where none is found.",
+      "Where each skill of the step's layers is found: the person's library, the repository's or a builtin, and the folder; null where none is found.",
   }),
   recentRuns: Schema.Array(
     Schema.Struct({

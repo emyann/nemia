@@ -176,3 +176,12 @@ export const listQuery = {
     }),
   ),
 };
+
+/** What a card's verbs refuse with: a request its reader refuses before the package is asked (400) among them. */
+export const cardErrors = [BadRequest, Missing, Conflict, Invalid];
+
+/** What every verb of a factory and of its parts refuses with, as a card's do. */
+export const objectErrors = cardErrors;
+
+/** What a definition's verbs refuse with: a part's refusals, and a write the disk failed. */
+export const definitionErrors = [...cardErrors, Failed];

@@ -162,15 +162,15 @@ export const POLICY_REACH_WORDS = {
   class: 'read',
 } as const satisfies CommandWords;
 
-/** `nemia workflows rm yours <name> --version <v>`: a workflow folder of yours removed, at the version it was read at. */
+/** `nemia workflows rm user <name> --version <v>`: a workflow folder of the person's library removed, at the version it was read at. */
 export const WORKFLOWS_RM_WORDS = {
   name: 'workflows rm',
-  served: [{ endpoint: 'workflows.delete' }],
-  usage: 'yours <name> --version <v>',
-  help: ['a workflow folder of yours removed, at the --version it was read at'],
+  served: [{ endpoint: 'workflows.deleteLibrary' }],
+  usage: 'user <name> --version <v>',
+  help: ['a workflow folder of the user library removed, at the --version it was read at'],
   spec: writerSpec(
     'workflows rm',
-    'yours <name> --version <v>',
+    'user <name> --version <v>',
     [FROM, { key: 'name', takes: 'required', kind: 'name' }],
     [versionFlag('workflows rm', 'the folder')],
   ),
@@ -178,7 +178,7 @@ export const WORKFLOWS_RM_WORDS = {
   class: 'ask',
   only: {
     side: 'cli',
-    why: "the api serves it as the Workflow's `delete` verb of `objects`' Api (`/api/namespaces/:namespace/workflows`), which calls this entry's handler: no route of its own",
+    why: "the api serves it as the Workflow's `deleteLibrary` verb of `objects`' Api (`/api/workflows/:name`, the store's library), which calls this entry's handler: no route of its own",
   },
 } as const satisfies CommandWords;
 

@@ -62,6 +62,8 @@ export {
   type AttemptEnd,
   CHECK_RESULTS,
   DEFINITION_ORIGINS,
+  LIBRARY_ADD_STATES,
+  LIBRARY_KINDS,
   EDGE_KINDS,
   ENGINE_OUTCOMES,
   type EngineOutcome,
@@ -154,6 +156,8 @@ export type {
   TryCause,
   WaitOn,
   WriteWay,
+  LibraryAddStateWord,
+  LibraryKind,
 } from './words.ts';
 export {
   CARD_KEYS,
@@ -256,6 +260,7 @@ export { headline } from './headline.ts';
 export { Answered, apiClient, type ApiClient, type ApiClientOptions, READ_BOUND_MS, timedOut } from './api-client.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';
+export { LibraryAdd, LibraryAddList, LibraryAddSpec, LibraryAddStatus } from './library.ts';
 export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';
 export {
   Api,

@@ -22,8 +22,8 @@ const skill = {
     error: null,
     preload: false,
     cost: { preload: false, listed: 10, body: 100, perTurn: 10 },
-    usedBy: [{ from: 'yours', name: 'architect' }],
-    found: 'yours',
+    usedBy: [{ from: 'user', name: 'architect' }],
+    found: 'user',
     copyHint: null,
   },
 } as const;

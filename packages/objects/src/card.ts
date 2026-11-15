@@ -177,7 +177,7 @@ export const CardFile = Schema.Struct({
   body: Schema.String.annotate({ description: "The card's idea, in markdown: its first line is its title." }),
   workflow: Schema.optionalKey(Schema.String.annotate({ description: 'The workflow that runs the card, by name.' })),
   from: Schema.optionalKey(
-    Schema.Literals(['repo', 'yours']).annotate({ description: 'Retired, read and ignored: the factory finds the workflow.' }),
+    Schema.Literals(['repo', 'yours', 'user']).annotate({ description: 'Retired, read and ignored: the factory finds the workflow.' }),
   ),
   repo: Schema.optionalKey(Schema.String.annotate({ description: "Retired and refused: the factory places the card's run." })),
   factory: Schema.optionalKey(Schema.String.annotate({ description: 'The factory the card is filed in.' })),
@@ -199,7 +199,7 @@ export const CardStart = Schema.Struct({
     Schema.String.annotate({ description: "The workflow its run is started on, by name; the card's own `workflow:` when it names none." }),
   ),
   from: Schema.optionalKey(
-    Schema.Literals(['repo', 'yours']).annotate({ description: 'Retired, read and ignored: the factory finds the workflow.' }),
+    Schema.Literals(['repo', 'yours', 'user']).annotate({ description: 'Retired, read and ignored: the factory finds the workflow.' }),
   ),
   after: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: 'The runs its first steps wait on to land, by id.' })),
   context: Schema.optionalKey(

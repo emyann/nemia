@@ -173,10 +173,6 @@ export type StepTold = {
 export type Told = StepTold & PlaceTold;
 
 /**
- * What `step` of `run`, among its `steps`, is told and denied by `place` (`landingWords`, `placeSay`), its branches named off `heads`
- * where given.
- */
-/**
  * For a judge (`route: judge`), what each workflow a node after it routes to says it is for: its README's description, read from the
  * folder beside the run's own workflow, where a team keeps its workflows. Empty for any other step, and for a workflow with no description.
  * @param run The run, whose workflow folder's siblings are read.
@@ -195,13 +191,13 @@ export function workflowTargets(run: Run, steps: readonly StepSpec[], step: Step
 }
 
 /**
- * What `step` of `run` is told by its place: the words a landing ending is told and denied (`landingWords`), the commands the place gives
- * its brief (`placeSay`), and, for a judge, what each workflow it routes to is for (`workflowTargets`).
+ * What `step` of `run`, among its `steps`, is told and denied by `place` (`landingWords`, `placeSay`), its branches named off `heads`
+ * where given, and, for a judge, what each workflow it routes to is for (`workflowTargets`).
  * @param run The run.
  * @param steps The steps the run is judged by.
  * @param step The step told.
  * @param place The run's place, whose declaration says the words.
- * @param heads The tips of the result branches as read now, by branch, or undefined to read only those recorded.
+ * @param heads Every branch of the repository and its commit, or undefined where they were not read: the recorded tips alone then.
  */
 export function placeTold(
   run: Run,

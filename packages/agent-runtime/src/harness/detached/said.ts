@@ -148,7 +148,7 @@ export const keptText = (
  * Writes `kept` over the capture `file`, known by `key`, and answers its key now; or answers nothing and leaves it whole, when the
  * file has changed since `key` or the write fails. Written beside it under this process's name, given the file's own access and
  * modification times, then renamed over it, so a reader finds the whole capture or the kept one, never a part.
- * @param file The capture, the run's `.log`.
+ * @param file The capture: the run's `.log`, or the stdout file it keeps.
  * @param key The capture's size and modification time when `kept` was worked out from it.
  * @param kept The text to write over it.
  */
@@ -181,7 +181,7 @@ const keepCapture = (
 
 /**
  * A capture `file`'s key and text, or nothing when it cannot be read.
- * @param file The capture, the run's `.log`.
+ * @param file The capture: the run's `.log`, or the stdout file it keeps.
  */
 export const captureAt = (file: string): { key: SaidKey; text: string } | undefined => {
   try {

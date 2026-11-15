@@ -237,7 +237,8 @@ export const quotaHarnesses = (): string[] => Object.keys(HARNESSES).filter((nam
  * there too, tagged with the labels its task was filed with (`stepLabels`); with its tools' inputs only when `NEMIA_TOOL_DETAILS` is
  * `1` (`sessionTelemetryOf`). Any other value is said on stderr and leaves them off (`toolDetailsRefusalOf`), as an export interval that
  * is no number is (`exportIntervalRefusalOf`).
- * @param env The environment the store and its settings are read from: `WF_ROOT`, the `WF_MEMORY_*` variables, `WF_MAX_CONCURRENT`.
+ * @param env The environment the store's settings and the telemetry's are read from: `WF_ROOT`, the `WF_MEMORY_*` variables,
+ * `WF_MAX_CONCURRENT`, `WF_CGROUP_PARENT`, `NEMIA_TOOL_DETAILS` and the export intervals (`EXPORT_INTERVALS`), as the sentences above say.
  */
 export const engine = (env: Env): Engine => {
   const root = wfRoot(env);

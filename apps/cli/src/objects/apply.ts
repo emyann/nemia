@@ -257,7 +257,8 @@ export function textOf(file: string, verb = 'apply'): string {
 }
 
 /**
- * `nemia apply -f <file|->`, on the words after `apply`: each object of the file applied, and the exit code, 2 where one was refused.
+ * `nemia apply -f <file|->`, on the words after `apply`: each object of the file applied, and the exit code, the highest of its refusals'
+ * (`Refused`): 2 for a usage refusal, 1 for a stale version (`Conflict`), 0 where none was refused.
  * @param args The words typed after `apply`: `-f` and `-n` with their values, or `--help`.
  */
 export async function apply(args: readonly string[]): Promise<number> {

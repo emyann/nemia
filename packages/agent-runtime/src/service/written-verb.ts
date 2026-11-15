@@ -81,7 +81,7 @@ type Reached<Reach> = {
 /**
  * `effect`'s failure, of any kind, as `verb`'s unsent in the words `message` gives of what failed.
  * @param verb The verb, whose `unsent` makes the failure.
- * @param message The words of what failed, from the failure.
+ * @param message What builds the unsent's words of what failed, from the value the effect failed with.
  */
 export const unsentOf =
   <Unsent>(verb: Pick<WrittenVerb<unknown, Unsent, unknown>, 'unsent'>, message: (e: unknown) => string) =>
@@ -97,7 +97,7 @@ export const unsentOf =
  * `effect`, the reach of a verb handed to a session, its failure worded as `verb`'s refusal where the harness refused it (`refused`)
  * and as its unsent, in the words `message` gives of what failed, otherwise.
  * @param verb The verb, whose `refused` and `unsent` make the failure.
- * @param message The words of what failed, from the failure's own words.
+ * @param message What builds the unsent's words of what failed, from the failure's own words.
  */
 export const handedOver =
   <Refused, Unsent>(verb: Pick<WrittenVerb<Refused, Unsent, unknown>, 'refused' | 'unsent'>, message: (words: string) => string) =>

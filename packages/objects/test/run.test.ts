@@ -211,8 +211,8 @@ test("a step's files keep the path from their step's folder, on each kind of fil
     { path: '/tmp/elsewhere.png' },
   ];
   const run = structuredClone(judged) as { status: { steps: { files: unknown[] }[] } };
-  run.status.steps[0]!.files = files;
+  run.status.steps[0].files = files;
   const decoded = Schema.decodeUnknownSync(Run)(run) as unknown as { status: { steps: { files: unknown[] }[] } };
-  assert.deepEqual(decoded.status.steps[0]!.files, files);
+  assert.deepEqual(decoded.status.steps[0].files, files);
   assert.deepEqual(Schema.encodeSync(Run)(Schema.decodeUnknownSync(Run)(run)), run);
 });

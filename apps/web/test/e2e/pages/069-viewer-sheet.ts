@@ -10,7 +10,10 @@ import { OUT, store } from '../world.ts';
 /** The sheet, open on `step`'s file `file`. */
 const sheetOn = (page: Page, step: string, file: string): Locator => page.locator(`[data-viewer-sheet="${step}/${file}"]`);
 
-/** Refuses unless the address names `step`'s file `file` as the one viewed (`?view=`), by its path from the step's folder, never the store's. */
+/**
+ * Refuses unless the address names `step`'s file `file` as the one viewed (`?view=`), by its path from the step's folder, never the
+ * store's.
+ */
 function viewing(page: Page, step: string, file: string): void {
   const view = new URL(page.url()).searchParams.get('view');
   if (view?.includes(store!))
@@ -21,10 +24,10 @@ function viewing(page: Page, step: string, file: string): void {
 export default {
   /**
    * A file a step gave opens in the viewer's sheet, a place of the address: SHAPED's `build` named a picture and a markdown note and left a
-   * JSON and a log in its artifacts folder. Its picture's thumbnail, pressed, sets `?view=build/<name>`, the picture's path from the step's folder, and the sheet draws the picture;
-   * Next goes to the step's next file, in the order the sheet steps through them (the named, then the folder's), each drawn by its kind —
-   * the note as markdown, the JSON as JSON, the log as text — the address following; and Back closes the sheet, its key gone from the
-   * address. SHAPED is written for the visit and taken back.
+   * JSON and a log in its artifacts folder. Its picture's thumbnail, pressed, sets `?view=build/<name>`, the picture's path from the
+   * step's folder, and the sheet draws the picture; Next goes to the step's next file, in the order the sheet steps through them (the
+   * named, then the folder's), each drawn by its kind — the note as markdown, the JSON as JSON, the log as text — the address following;
+   * and Back closes the sheet, its key gone from the address. SHAPED is written for the visit and taken back.
    */
   name: 'viewer-sheet',
   route: '/runs',

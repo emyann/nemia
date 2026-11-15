@@ -16,7 +16,8 @@ import { serverSignIn, serverSignInCallback, serverSignInState, serverSignOut } 
 import { writeFactoryServers } from './servers.store.ts';
 import { SHIPPED_CLIENT_SECRETS, shippedSecretOf } from './clients.ts';
 import { DEFAULT_NAMESPACE } from '../factory.ts';
-import { writeLibraryAdds } from '../../library/library.store.ts';
+import { libraryAddsFile, writeLibraryAdds } from '../../library/library.store.ts';
+import { writeFileSync } from 'node:fs';
 
 const ROOT = scratch('wf-sign-in-');
 
@@ -120,4 +121,8 @@ test("a server the factory added from the library is signed in to by its name, N
   writeLibraryAdds(home, DEFAULT_NAMESPACE, []);
   const gone = await refusal(runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', home)));
   assert.equal(gone._tag, 'Missing', 'the add taken off, nothing holds the server');
+  writeFileSync(libraryAddsFile(home, DEFAULT_NAMESPACE), '{ not json');
+  const broken = await refusal(runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', home)));
+  assert.equal(broken._tag, 'Invalid', 'a broken record of the adds is said, never read as no adds');
+  assert.deepEqual(engine.signIns, [{ name: 'github', secret: true }], 'and nothing more is signed in');
 });

@@ -8,7 +8,7 @@
  * it (`docs/features.md`).
  */
 import { Effect } from 'effect';
-import { EngineService, mcpServerOf, type McpSignInStarted, type McpSignInState } from '../../runtime-client.ts';
+import { EngineService, mcpServerOf, tried, type McpSignInStarted, type McpSignInState } from '../../runtime-client.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
 import { shippedSecretOf } from './clients.ts';
 import { factoryThere } from './servers.verb.ts';
@@ -19,7 +19,8 @@ import type { FactoryServers } from './servers.ts';
 
 /**
  * The server `server` of `factory`'s record, read through the Factory door at the store `home`, else the server of that name the factory
- * has added from the library (`addedServers`), as its sign-in is handed it; refused (`Missing`) for a factory or a server neither holds.
+ * has added from the library (`addedServers`), as its sign-in is handed it; refused (`Missing`) for a factory or a server neither holds, and
+ * (`Invalid`, naming the file and its fix) where the factory's `library.json` does not read.
  * The engine holds a sign-in by the server's name, so one sign-in to a library server serves every factory that adds it.
  */
 const recorded = (factory: string, server: string, home: string, verb: string) =>
@@ -28,15 +29,7 @@ const recorded = (factory: string, server: string, home: string, verb: string) =
       yield* factoryThere(factory, verb);
       const record = yield* door.servers.read(FactoryName.read(factory));
       const own = Object.hasOwn(record, server) ? record[server] : undefined;
-      const added: FactoryServers =
-        own === undefined
-          ? Effect.runSync(
-              Effect.orElseSucceed(
-                Effect.try(() => addedServers(home, factory)),
-                () => ({}),
-              ),
-            )
-          : {};
+      const added: FactoryServers = own === undefined ? yield* tried(() => addedServers(home, factory)) : {};
       const found = own ?? (Object.hasOwn(added, server) ? added[server] : undefined);
       if (found === undefined)
         return yield* Effect.fail(

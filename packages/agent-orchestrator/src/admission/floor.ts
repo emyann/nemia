@@ -26,7 +26,7 @@ const above = (c: FloorCall['class'], n: FloorNarrowing | null): boolean => n !=
 
 /**
  * The floor's answer for `call` under a token held as `holder`: refused out of reach (`none`), asked every time (`ask`), above the
- * token's narrowing, in a factory other than the one it is bound to, a write in a factory below the level an agent's call needs, or an
+ * token's narrowing, in a factory other than the one it is bound to or, for a write, in no factory (the library's among them), a write in a factory below the level an agent's call needs, or an
  * answer to what waits on the person that no confirmed rule lets through; else allowed.
  * @param call The request as the floor reads it: its command's class, its factory and that factory's level, the level it needs,
  *   whether it waits on the person and whether a confirmed rule lets it through.
@@ -37,6 +37,7 @@ export const floorOf: FloorOf = (call, holder) => {
   if (call.class === 'ask') return denied('asks-the-person');
   if (above(call.class, holder.narrowed)) return denied('narrowed');
   if (holder.factory !== null && call.factory !== null && call.factory !== holder.factory) return denied('other-factory');
+  if (holder.factory !== null && call.factory === null && call.class !== 'read') return denied('other-factory');
   if (call.class !== 'read' && call.level !== null && !atLeast(call.level, call.least)) return denied('below-level');
   if (call.class === 'answer' && call.waits && !call.ruled) return denied('waits-on-person');
   return { decision: 'allow' };

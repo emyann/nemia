@@ -55,7 +55,7 @@ const triedAgent = Effect.fnUntraced(function* ({ who, from, name, brief, repo, 
     );
   }
   const dir = yourAgentsDir(home);
-  const reading = yield* agentRead('yours', dir, name, { repo, home });
+  const reading = yield* agentRead('user', dir, name, { repo, home });
   if (!reading) {
     return yield* Effect.fail(
       new Missing({
@@ -65,7 +65,7 @@ const triedAgent = Effect.fnUntraced(function* ({ who, from, name, brief, repo, 
   }
   if (reading.error)
     return yield* Effect.fail(new Invalid({ message: `${name} cannot be tried while its file does not read: ${reading.error}` }));
-  const untried = untriedOf({ ...reading, from: 'yours', schemaFile: reading.schema?.file ?? null }, home);
+  const untried = untriedOf({ ...reading, from: 'user', schemaFile: reading.schema?.file ?? null }, home);
   if (untried) return yield* Effect.fail(new Invalid({ message: untried.why }));
   const found = repo ? yield* agentSkillsFound(reading.dir, repo, home) : undefined;
   const theirs = repoSkillsRefusal(name, found ? repoOnlySkills(reading, repo, found) : [], yourSkillsDir(home));

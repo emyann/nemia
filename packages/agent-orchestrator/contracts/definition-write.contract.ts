@@ -12,12 +12,10 @@
  * `definitionVersionRefusal`'s and `workflowVersionRefusal`'s, after this one lets a write through.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { DefinitionOrigin, WriteWay as ObjectsWriteWay } from 'objects';
 
-/**
- * Where a definition is read from: `objects`' `DEFINITION_ORIGINS` once its `yours` is renamed `user`; implement imports it from there
- * in place of this line, which changes no law.
- */
-export type Origin = 'factory' | 'repo' | 'user' | 'builtin';
+/** Where a definition is read from: `objects`' `DEFINITION_ORIGINS`. */
+export type Origin = DefinitionOrigin;
 
 /** Where the addressed definition is read from, or `none` where nothing is at its name. */
 export type WriteThere = Origin | 'none';
@@ -28,11 +26,8 @@ export type WriteAt = 'library' | 'factory';
 /** What a write does: makes a definition, replaces one, removes one, or runs one of its named actions (`try`, `copy`). */
 export type DefinitionWrite = 'create' | 'replace' | 'remove' | 'act';
 
-/**
- * The way a refused definition changes instead: at the store's library, or the factory's own way. `objects`' `WRITE_WAYS` once its
- * `default` is renamed `library`; implement imports it from there in place of this line, which changes no law.
- */
-export type WriteWay = 'library' | 'factory';
+/** The way a refused definition changes instead: at the store's library, or the factory's own way (`objects`' `WRITE_WAYS`). */
+export type WriteWay = ObjectsWriteWay;
 
 /**
  * A refusal: its kind, as the package's refusals are told apart, the way the definition changes instead, the factories that hold it
@@ -107,6 +102,10 @@ const definitionWriteRefusalSpec = spec<
       description: 'A replace, a removal or an action at the library where nothing is at the name is Missing',
       condition: ({ input: [at, does, there], output }) =>
         !(at === 'library' && does !== 'create' && there === 'none') || output?.kind === 'Missing',
+    },
+    usersOnAConflictAlone: {
+      description: 'A refusal names the factories that use the definition only where it is a Conflict',
+      condition: ({ output }) => output === null || output.kind === 'Conflict' || output.users === undefined,
     },
     noOtherWayAtTheLibrary: {
       description: 'A refusal at the library names no other way: the fix is at the library itself',

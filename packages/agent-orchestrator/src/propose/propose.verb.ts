@@ -13,6 +13,7 @@ import {
   AgentSpec,
   API_VERSION,
   HireSpec,
+  LibraryAddSpec,
   McpServerSpec,
   ProposalSpec,
   RESOURCE_PLURALS,
@@ -48,6 +49,7 @@ const SPECS = {
   Hire: HireSpec,
   McpServer: McpServerSpec,
   Factory: FactoryProposed,
+  LibraryAdd: LibraryAddSpec,
 } as const;
 
 /** The person's own settings of a Factory, each with what the person types to change it: no proposal carries one. */

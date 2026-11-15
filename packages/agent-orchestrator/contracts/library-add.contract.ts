@@ -17,27 +17,22 @@
  * out. Its kind is the api's answer; its words are nobody's law.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { DefinitionOrigin, LibraryAddStateWord, LibraryKind as ObjectsLibraryKind } from 'objects';
 
 /**
  * The kinds a factory adds from the library by name. A workflow is added by `nemia factory attach`, the factory's `workflows`, as today,
  * and is no add of this record.
  */
-export type LibraryKind = 'Agent' | 'Skill' | 'McpServer';
+export type LibraryKind = ObjectsLibraryKind;
 
 /** One add: the kind and the name of a library item. */
 export type LibraryRef = { readonly kind: LibraryKind; readonly name: string };
 
-/**
- * Where a definition is read from: `objects`' `DEFINITION_ORIGINS` once its `yours` is renamed `user`; implement imports it from there
- * in place of this line, which changes no law.
- */
-export type Origin = 'factory' | 'repo' | 'user' | 'builtin';
+/** Where a definition is read from: `objects`' `DEFINITION_ORIGINS`. */
+export type Origin = DefinitionOrigin;
 
-/**
- * What an add is in its factory: resolved, shadowed by the factory's own, or missing from the library. `objects`' closed word for it
- * (`LIBRARY_ADD_STATES`) once implement adds it there, imported in place of this line, which changes no law.
- */
-export type LibraryAddState = 'resolved' | 'shadowed' | 'missing';
+/** What an add is in its factory: resolved, shadowed by the factory's own, or missing from the library (`LIBRARY_ADD_STATES`). */
+export type LibraryAddState = LibraryAddStateWord;
 
 /** What an add or a removal of an add does. */
 export type LibraryAddWrite = 'add' | 'remove';
@@ -47,7 +42,7 @@ export type LibraryAddRefused = { readonly kind: 'Missing'; readonly message: st
 
 /** Whether `a` and `b` are the same adds, in the same order. */
 const sameRefs = (a: readonly LibraryRef[], b: readonly LibraryRef[]): boolean =>
-  a.length === b.length && a.every((ref, i) => ref.kind === b[i]?.kind && ref.name === b[i]?.name);
+  a.length === b.length && a.every((ref, i) => ref.kind === b.at(i)?.kind && ref.name === b.at(i)?.name);
 
 /** Whether `held` holds an origin of the library: the person's, or a builtin. */
 const inLibrary = (held: readonly Origin[]): boolean => held.includes('user') || held.includes('builtin');

@@ -88,7 +88,7 @@ export type FactoryTarget = { factory: string | undefined; treeOf: (factory: str
  * the store's; and a place that is none of them, which names those the writer takes.
  * @param who The command that writes, said in the refusal.
  * @param kind What is written: agents, skills or workflows.
- * @param from The place asked for: `yours`, `repo`, `factory` or a word that is none of them.
+ * @param from The place asked for: `user`, `repo`, `factory` or a word that is none of them.
  * @param name The name of what is written; null where none is named.
  * @param repo The repository's folder; empty where none is known, said as the placeholder `<repo>`.
  * @param home The store's root folder.
@@ -103,16 +103,16 @@ export function yoursOnlyRefusal(
   home: string,
   target?: Pick<FactoryTarget, 'factory'>,
 ): string | null {
-  if (from === 'yours' && target?.factory !== undefined)
-    return `${who}: yours is the store's, and --factory names a factory's tree: write \`${who} factory … --factory ${target.factory}\` for its tree, or leave out --factory for yours.`;
-  if (from === 'yours') return null;
+  if (from === 'user' && target?.factory !== undefined)
+    return `${who}: user is the store's library, and --factory names a factory's tree: write \`${who} factory … --factory ${target.factory}\` for its tree, or leave out --factory for the library.`;
+  if (from === 'user') return null;
   if (from === 'repo') return repoWriteRefusal(who, kind, name, repo, home);
   if (from === 'factory' && target !== undefined)
     return target.factory === undefined
       ? `${who}: \`factory\` writes the tree of a factory made from a template, and none was named: \`${who} factory … --factory <name>\`.`
       : null;
   const places = target === undefined ? '' : `, or to a factory's tree, \`factory\` with --factory <name>`;
-  return `${who}: ${kind} are read from \`repo\` or \`yours\`, and written to yours, in ${yoursOf(kind, home)}${places}. This named ${JSON.stringify(from)}: name \`yours\`.`;
+  return `${who}: ${kind} are read from \`repo\` or \`user\`, and written to the store's library, in ${yoursOf(kind, home)}${places}. This named ${JSON.stringify(from)}: name \`user\`.`;
 }
 
 /**
@@ -120,7 +120,7 @@ export function yoursOnlyRefusal(
  * (`target.treeOf`, which refuses a factory that has none). Refused (`Invalid`) as `yoursOnlyRefusal` says.
  * @param who The command that writes, said in the refusal.
  * @param kind What is written: agents, skills or workflows.
- * @param from The place asked for: `yours`, `repo`, `factory` or a word that is none of them.
+ * @param from The place asked for: `user`, `repo`, `factory` or a word that is none of them.
  * @param name The name of what is written; null where none is named.
  * @param repo The repository's folder; empty where none is known, said as the placeholder `<repo>`.
  * @param home The store's root folder.

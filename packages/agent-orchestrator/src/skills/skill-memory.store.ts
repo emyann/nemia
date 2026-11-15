@@ -20,7 +20,7 @@ import { SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
 import { skillTurnCost, type SkillsFound } from '../agents/agents.ts';
 import { lookedUp } from './skills.ts';
 import { renderSkill, skillEntryOf, withPreload, type SkillOther } from './skills.ts';
-import { BUILTIN_SKILLS, lookupOf, lookupRoots, packageSkillFolders, PLACE_SKILLS, type Places } from './read.store.ts';
+import { addedIn, BUILTIN_SKILLS, isBuiltinSkill, libraryRootOf, lookupOf, lookupRoots, packageSkillFolders, PLACE_SKILLS, type Places } from './read.store.ts';
 import { SkillDoor, skillDoorOver, type SkillLayer, type SkillPage, type SkillWhere } from './skill-door.store.ts';
 
 /** Where the stand-in says a skill's folder is: the root its paths are named under, as the files' are under the store's root. */
@@ -68,7 +68,10 @@ function foundIn(namesIn: (holder: string) => string[], dir: string, places: Pla
   const names = roots.map((root) => namesIn(path.posix.join(root, SKILLS_FOLDER)));
   const all = new Map<string, string | WorkflowError>();
   for (const name of new Set(names.flat())) {
-    const looked = lookedUp(lookupOf(roots, (at) => names[at]?.includes(name) === true));
+    const looked = lookedUp(
+      lookupOf(roots, (at) => names[at]?.includes(name) === true, libraryRootOf(places ?? {})),
+      addedIn(places ?? {}, 'skills', name),
+    );
     if (looked.kind === 'none') continue;
     const at = path.posix.join(roots[looked.at] ?? '', SKILLS_FOLDER, name);
     const again = looked.kind === 'both' ? path.posix.join(roots[looked.again] ?? '', SKILLS_FOLDER, name) : undefined;
@@ -79,7 +82,8 @@ function foundIn(namesIn: (holder: string) => string[], dir: string, places: Pla
         : new WorkflowError(`${name} is a skill in both ${at} and ${again}, one repository's two places for skills: keep one of them.`),
     );
   }
-  for (const [name, at] of packageSkillFolders()) if (!all.has(name)) all.set(name, at);
+  for (const [name, at] of packageSkillFolders())
+    if (!all.has(name) && (typeof at !== 'string' || !isBuiltinSkill(at) || addedIn(places ?? {}, 'skills', name))) all.set(name, at);
   return {
     at: { get: (name) => (name.includes(':') ? undefined : all.get(name)) },
     all,

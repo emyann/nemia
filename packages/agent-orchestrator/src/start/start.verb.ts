@@ -60,6 +60,7 @@ import {
   unattachedRefusal,
   unfilledRefusal,
   type Factory,
+  DEFAULT_NAMESPACE,
 } from '../factory/factory.ts';
 import { factoryOrNone, filedAtOnce } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
@@ -752,7 +753,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const home = yield* StoreRoot;
   const edits = yield* labelEditsOf(opts);
   const isolate = opts.isolate ?? true;
-  const places = placesOf(home, opts.repo);
+  const places = placesOf(home, opts.repo, opts.factory ?? DEFAULT_NAMESPACE);
   const factory = yield* factoryOrNone(opts.factory);
   const harnessSettings = yield* settingsAt(factory);
   const refused = yield* StartRefusal;

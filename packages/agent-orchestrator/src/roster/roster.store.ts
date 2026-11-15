@@ -75,7 +75,7 @@ export const agentSkillsFound = Effect.fn('agentSkillsFound')(function* (dir: st
  */
 export const agentPlaces = (repo: string | undefined, home: string): Array<{ from: AgentPlace; dir: string }> => [
   ...(repo === undefined ? [] : [{ from: 'repo' as const, dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) }]),
-  { from: 'yours', dir: path.join(home, 'workflows', AGENTS_FOLDER) },
+  { from: 'user', dir: path.join(home, 'workflows', AGENTS_FOLDER) },
 ];
 
 /**
@@ -163,7 +163,7 @@ export const agentRead = Effect.fn('agentRead')(function* (from: AgentPlace, dir
   const empty: AgentReading = {
     ...emptyReading(from, dir, file, name, version, usedBy),
     custom: customOf(home, name),
-    copied: from === 'yours' ? copiedOf(home, name) : null,
+    copied: from === 'user' ? copiedOf(home, name) : null,
   };
   if (linked(file)) return { ...empty, error: agent instanceof Error ? agent.message : `${AGENTS_FOLDER}/${name}.md is a link.` };
   let source: string | undefined;

@@ -504,7 +504,7 @@ const workflowHarnesses = Effect.fnUntraced(function* (home: string, f: Factory,
   const loaded = yield* Effect.exit(
     Effect.flatMap(
       tried(() => ({ dir: workflowDirAt(w.dir), fills: factoryFills(home, f, w.workflow).fills })),
-      ({ dir, fills }) => door.read(dir, placesOf(home, f.repos[0] ?? f.tree), fills),
+      ({ dir, fills }) => door.read(dir, placesOf(home, f.repos[0] ?? f.tree, f.name), fills),
     ),
   );
   return Exit.isSuccess(loaded) ? runHarnesses(loaded.value) : [];

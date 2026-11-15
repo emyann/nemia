@@ -81,7 +81,7 @@ export function stepsFilled(repo: string | undefined, home: string, factory?: Fa
   const sources: Array<{ from: FillPlace; dir: string }> = [
     ...(tree === undefined ? [] : [{ from: 'factory' as const, dir: path.join(tree, 'workflows') }]),
     ...(repo === undefined ? [] : [{ from: 'repo' as const, dir: path.join(repo, 'workflows') }]),
-    { from: 'yours', dir: path.join(home, 'workflows') },
+    { from: 'user', dir: path.join(home, 'workflows') },
   ];
   const read = new Set<string>();
   return sources.flatMap(({ from, dir }) =>

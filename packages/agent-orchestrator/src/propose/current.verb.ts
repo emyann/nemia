@@ -13,6 +13,8 @@ import type { ProposableKind } from 'objects';
 import { tried, type EngineService } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { Invalid, type Refusal } from '../refusal/refusal.ts';
+import { factoryAdds, libraryAddObject, refOf } from '../library/library.verb.ts';
+import { sameAdd } from '../library/library.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { factoryWriteOf } from '../workflows/workflows.verb.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
@@ -185,6 +187,14 @@ export const currentOf = (
       return orNone(hireObject(place.home, factory, name), servedNow);
     case 'McpServer':
       return orNone(mcpServerObject(place.home, factory, name), servedNow);
+    case 'LibraryAdd':
+      return Effect.sync(() => {
+        const ref = refOf(name);
+        const { adds, recorded } = factoryAdds(place.home, factory);
+        return ref === undefined || !adds.some((a) => sameAdd(a, ref))
+          ? NONE
+          : servedNow(libraryAddObject(place.home, factory, ref, recorded));
+      });
     case 'Factory':
       return name === factory
         ? factoryNow(place, factory)

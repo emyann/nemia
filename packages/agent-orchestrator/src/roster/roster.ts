@@ -13,7 +13,7 @@ import { AGENT_KEYS, AGENT_OWN_KEYS, isCardFile, type AgentCardShape, type RoleK
 import type { Factory } from '../factory/factory.ts';
 
 /** The two places an agent is read from: the repository's `workflows/agents`, then your store's. */
-export type AgentPlace = 'repo' | 'yours';
+export type AgentPlace = 'repo' | 'user';
 
 /** A node that names an agent: the step `step` of the workflow `workflow`, read from `from` — the agent's own place. */
 export type AgentUser = { from: AgentPlace; workflow: string; step: string };

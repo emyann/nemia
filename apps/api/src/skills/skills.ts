@@ -54,7 +54,7 @@ import type { DefinitionOrigin, SkillSpec } from 'objects';
  * Where a skill is: your library (the store's), the repository the board serves (its `.claude/skills/`, or `workflows/skills/` beside its
  * agents), or what is built into Nemia.
  */
-export type SkillSource = Extract<DefinitionOrigin, 'yours' | 'repo' | 'builtin'>;
+export type SkillSource = Extract<DefinitionOrigin, 'user' | 'repo' | 'builtin'>;
 
 /** One skill as the picker lists it. `entry` is its card entry, or null with `error` saying why no agent can be given it. */
 export type SkillRow = {
@@ -70,7 +70,7 @@ export type SkillRow = {
   /** The agents of yours that give it. */
   usedBy: string[];
   /** A builtin skill's name, where an agent of yours already finds a skill of it: in your library, or in the repository. Null elsewhere. */
-  found: Extract<SkillSource, 'yours' | 'repo'> | null;
+  found: Extract<SkillSource, 'user' | 'repo'> | null;
 };
 
 /** One place the picker lists, in the order an agent of yours finds a name, the builtin last: its skills by name. */
@@ -142,7 +142,7 @@ const inTree = (dir: string, tree: string | undefined): boolean =>
  */
 export function sourceOf(dir: string, repo: string | undefined, home: string): SkillSource | null {
   const parent = path.dirname(path.resolve(dir));
-  if (parent === librarySkills(home)) return 'yours';
+  if (parent === librarySkills(home)) return 'user';
   if (parent === BUILTIN_SKILLS) return 'builtin';
   if (repo === undefined) return null;
   if (parent === repoSkillsDir(repo) || parent === path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)) return 'repo';
@@ -250,10 +250,10 @@ export async function listSkills(
   const { dir: builtin, names: builtinNames } = yoursRead.builtin;
   const agents = yourAgentsSkills(yoursRead.agents);
   const usedBy = (name: string) => agents.filter(([, skills]) => skills.includes(name)).map(([agent]) => agent);
-  const yours: SkillPlace = { from: 'yours', dir: librarySkills(home), skills: [] };
+  const yours: SkillPlace = { from: 'user', dir: librarySkills(home), skills: [] };
   const inRepo: SkillPlace | undefined = repo === undefined ? undefined : { from: 'repo', dir: repoSkillsDir(repo), skills: [] };
   const places: SkillPlace[] = inRepo === undefined ? [yours] : [yours, inRepo];
-  const placed = (from: 'yours' | 'repo'): SkillPlace => (from === 'repo' && inRepo !== undefined ? inRepo : yours);
+  const placed = (from: 'user' | 'repo'): SkillPlace => (from === 'repo' && inRepo !== undefined ? inRepo : yours);
   const sorted = [...found.all]
     .filter(([, at]) => typeof at !== 'string' || !(isBuiltinPlace(at) || sourceOf(at, repo, home) === 'builtin'))
     .sort(([a], [b]) => a.localeCompare(b));
@@ -262,11 +262,11 @@ export async function listSkills(
       ? (skillDirIn(inRepo === undefined ? [yours.dir] : [yours.dir, inRepo.dir], name) ?? path.join(yours.dir, name))
       : at;
   const reads = await readSkills([...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))]);
-  const where = new Map<string, Extract<SkillSource, 'yours' | 'repo'>>();
+  const where = new Map<string, Extract<SkillSource, 'user' | 'repo'>>();
   for (const [name, at] of sorted) {
     const dir = dirOf([name, at]);
     if (at instanceof WorkflowError) {
-      const from = sourceOf(dir, repo, home) === 'repo' ? 'repo' : 'yours';
+      const from = sourceOf(dir, repo, home) === 'repo' ? 'repo' : 'user';
       placed(from).skills.push({
         ...skillRow(name, dir, from, readAt(reads, dir), usedBy(name)),
         entry: null,
@@ -275,7 +275,7 @@ export async function listSkills(
       where.set(name, from);
       continue;
     }
-    const from = sourceOf(at, repo, home) === 'yours' ? 'yours' : 'repo';
+    const from = sourceOf(at, repo, home) === 'user' ? 'user' : 'repo';
     placed(from).skills.push(skillRow(name, at, from, readAt(reads, dir), usedBy(name)));
     where.set(name, from);
   }
@@ -444,6 +444,6 @@ function bodyOf(file: string, text: string): string {
  * @param change The skill's change, as the table's write takes it.
  */
 export async function written(s: Served, change: SkillChange, { version, name }: { version: string | null; name?: string }): Promise<void> {
-  const input = { from: 'yours', change, ...(version !== null && { version }), ...(name !== undefined && { name }) };
+  const input = { from: 'user', change, ...(version !== null && { version }), ...(name !== undefined && { name }) };
   await s.inRequest(SKILLS_WRITE.handler(input));
 }

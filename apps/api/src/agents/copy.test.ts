@@ -1,6 +1,6 @@
 /**
- * An agent file copied into your library (`POST /api/namespaces/default/agents/copy`, `nemia agents copy`'s entry), the agent
- * files the store knows read on `GET /api/agents/sources`, and where a copy came from on `GET /api/namespaces/default/agents` — in a
+ * An agent file copied into your library (`POST /api/agents/copy`, `nemia agents copy`'s entry), the agent
+ * files the store knows read on `GET /api/agent-sources`, and where a copy came from on `GET /api/namespaces/default/agents` — in a
  * scratch store, from a
  * scratch folder. Every write is read back from disk, and every refusal is made to refuse, asserted on its words, with yours as it was.
  *
@@ -44,7 +44,7 @@ function source(name: string, keys: string[], body = 'Scout the ground.'): strin
 
 const json = { 'content-type': 'application/json' };
 const copy = (body: unknown) =>
-  app.request('/api/namespaces/default/agents/copy', {
+  app.request('/api/agents/copy', {
     method: 'POST',
     headers: json,
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -84,8 +84,8 @@ test('a person copies an agent into theirs with its skill, reads where it came f
       assert.equal(answer.record, path.join(root, 'agent-sources', 'scout.json'));
 
       const copiedOf = async () => {
-        const listed = await listedIn<LibraryAgent>(app, 'agents', 'origin=yours');
-        return listed.find((a) => a.from === 'yours' && a.name === 'scout')?.copied;
+        const listed = await listedIn<LibraryAgent>(app, 'agents', 'origin=user');
+        return listed.find((a) => a.from === 'user' && a.name === 'scout')?.copied;
       };
       const first = await copiedOf();
       assert.equal(first?.source, file);
@@ -109,14 +109,14 @@ test('a person copies an agent into theirs with its skill, reads where it came f
   );
 
   await s.test(
-    'the agent files the store knows are read on GET /api/agents/sources: yours, then the folder `path` names; a folder not there is a 404',
+    'the agent files the store knows are read on GET /api/agent-sources: yours, then the folder `path` names; a folder not there is a 404',
     async () => {
       fs.mkdirSync(AGENTS, { recursive: true });
       fs.writeFileSync(path.join(AGENTS, 'keeper.md'), '---\ndescription: Keeps the notes.\n---\nKeep them.\n');
       const folder = scratch('nemia-api-copy-sources-');
       fs.writeFileSync(path.join(folder, 'pathfinder.md'), '---\ndescription: Finds the path.\n---\nFind it.\n');
       fs.writeFileSync(path.join(folder, 'counted.md'), '---\ndescription: Counts.\nmaxTurns: 5\n---\nCount.\n');
-      const res = await app.request(`/api/agents/sources?path=${encodeURIComponent(folder)}`);
+      const res = await app.request(`/api/agent-sources?path=${encodeURIComponent(folder)}`);
       const { sources } = (await res.json()) as { sources: AgentSource[] };
       assert.equal(res.status, 200);
       const listed = sources.map((s) => `${s.place} ${s.name}`);
@@ -127,7 +127,7 @@ test('a person copies an agent into theirs with its skill, reads where it came f
         [path.join(folder, 'counted.md'), path.join(folder, 'pathfinder.md')],
       );
       assert.equal(sources.find((s) => s.name === 'counted')?.error?.includes('maxTurns'), true, 'one that does not read says why');
-      const missing = await app.request(`/api/agents/sources?path=${encodeURIComponent(path.join(folder, 'nowhere'))}`);
+      const missing = await app.request(`/api/agent-sources?path=${encodeURIComponent(path.join(folder, 'nowhere'))}`);
       assert.equal(missing.status, 404);
       assert.match(((await missing.json()) as { error: string }).error, /is not a folder/);
     },
@@ -144,7 +144,7 @@ test('a copy the store refuses — a key another harness writes, a file not ther
   );
 
   await t.test(
-    'REFUSED at shipped defaults: a file that is not there is a 404 naming `nemia agents sources`; a `keep` that is no list a 400 naming `payload.keep`; a copy outside `default` a 422 naming it',
+    'REFUSED at shipped defaults: a file that is not there is a 404 naming `nemia agents sources`; a `keep` that is no list a 400 naming `payload.keep`; a copy in a namespace no route',
     async () => {
       await refused({ file: path.join(from, 'agents', 'nobody.md') }, 404, /nemia agents sources lists the agents the store knows/);
       const before = held();
@@ -157,8 +157,7 @@ test('a copy the store refuses — a key another harness writes, a file not ther
         headers: json,
         body: JSON.stringify({ file: source('scout', ['description: x']) }),
       });
-      assert.equal(elsewhere.status, 422);
-      assert.match(((await elsewhere.json()) as { error: string }).error, /\/api\/namespaces\/default\//);
+      assert.equal(elsewhere.status, 404, 'a copy is made at the library alone: a namespace has no copy');
       assert.deepEqual(held(), before, 'nothing written');
     },
   );

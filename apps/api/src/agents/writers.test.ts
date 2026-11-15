@@ -93,21 +93,21 @@ test("each writer's route hands its handler only the keys its one spec gives a h
     keys: { model: 'sonnet' },
     instructions: 'Write it.',
   };
-  const made = await heldToSpec(t, 'agents write', 201, () => sent('POST', `${D}/agents`, { metadata: { name: 'scribe' }, spec: scribe }));
+  const made = await heldToSpec(t, 'agents write', 201, () => sent('POST', `/api/agents`, { metadata: { name: 'scribe' }, spec: scribe }));
   const put = await heldToSpec(t, 'agents write', 200, () =>
-    sent('PUT', `${D}/agents/scribe`, {
+    sent('PUT', `/api/agents/scribe`, {
       metadata: { resourceVersion: versionOf(made) },
       spec: { ...scribe, instructions: 'Write the notes.' },
     }),
   );
-  await heldToSpec(t, 'agents run', 201, () => sent('POST', `${D}/agents/scribe/try`, { brief: 'Write the notes.' }));
+  await heldToSpec(t, 'agents run', 201, () => sent('POST', `/api/agents/scribe/try`, { brief: 'Write the notes.' }));
   await heldToSpec(t, 'agents rm', 200, () =>
-    app.request(`${D}/agents/scribe?resourceVersion=${versionOf(put)}`, { method: 'DELETE', headers: json }),
+    app.request(`/api/agents/scribe?resourceVersion=${versionOf(put)}`, { method: 'DELETE', headers: json }),
   );
   const elsewhere = scratch('nemia-api-writers-copy-');
   fs.writeFileSync(path.join(elsewhere, 'clerk.md'), '---\ndescription: Use this when notes need filing.\n---\nFile them.\n');
   await heldToSpec(t, 'agents copy', 200, () =>
-    sent('POST', `${D}/agents/copy`, { file: path.join(elsewhere, 'clerk.md'), as: 'filing-clerk', keep: [] }),
+    sent('POST', `/api/agents/copy`, { file: path.join(elsewhere, 'clerk.md'), as: 'filing-clerk', keep: [] }),
   );
 
   const skill = {
@@ -118,33 +118,33 @@ test("each writer's route hands its handler only the keys its one spec gives a h
     body: 'Tidy.',
   };
   const made2 = await heldToSpec(t, 'skills write', 201, () =>
-    sent('POST', `${D}/skills`, { metadata: { name: 'tidy-notes' }, spec: skill }),
+    sent('POST', `/api/skills`, { metadata: { name: 'tidy-notes' }, spec: skill }),
   );
   await heldToSpec(t, 'skills write', 200, () =>
-    sent('PUT', `${D}/skills/tidy-notes`, { metadata: { resourceVersion: versionOf(made2) }, spec: { ...skill, body: 'Tidy them.' } }),
+    sent('PUT', `/api/skills/tidy-notes`, { metadata: { resourceVersion: versionOf(made2) }, spec: { ...skill, body: 'Tidy them.' } }),
   );
 
-  const dev = (await (await app.request(`${D}/workflows/dev?origin=yours`)).json()) as Workflow;
+  const dev = (await (await app.request(`${D}/workflows/dev?origin=user`)).json()) as Workflow;
   await heldToSpec(t, 'workflows write', 201, () =>
-    sent('POST', `${D}/workflows`, { metadata: { name: 'dev-2' }, spec: { steps: [dev.spec.steps[0]] } }),
+    sent('POST', `/api/workflows`, { metadata: { name: 'dev-2' }, spec: { steps: [dev.spec.steps[0]] } }),
   );
   const changed = await heldToSpec(t, 'workflows write', 200, () =>
-    sent('PUT', `${D}/workflows/dev`, { metadata: { resourceVersion: dev.metadata.resourceVersion }, spec: { steps: dev.spec.steps } }),
+    sent('PUT', `/api/workflows/dev`, { metadata: { resourceVersion: dev.metadata.resourceVersion }, spec: { steps: dev.spec.steps } }),
   );
   await heldToSpec(t, 'workflows rm', 200, () =>
-    app.request(`${D}/workflows/dev?resourceVersion=${versionOf(changed)}`, { method: 'DELETE', headers: json }),
+    app.request(`/api/workflows/dev?resourceVersion=${versionOf(changed)}`, { method: 'DELETE', headers: json }),
   );
 });
 
 test("a name yours has taken, a workflow or a file, is refused in workflowTaken's one sentence by the Workflow's create, which the board and nemia both send", async () => {
   fs.cpSync(path.join(TEAM, 'dev'), path.join(STORE, 'taken'), { recursive: true });
   fs.writeFileSync(path.join(STORE, 'TAKEN.txt'), 'not a workflow\n');
-  const taken = (await (await app.request(`${D}/workflows/taken?origin=yours`)).json()) as Workflow;
+  const taken = (await (await app.request(`${D}/workflows/taken?origin=user`)).json()) as Workflow;
   for (const [name, version] of [
     ['taken', taken.metadata.resourceVersion],
     ['TAKEN.txt', null],
   ] as const) {
-    const res = await sent('POST', `${D}/workflows`, { metadata: { name }, spec: { steps: [taken.spec.steps[0]] } });
+    const res = await sent('POST', `/api/workflows`, { metadata: { name }, spec: { steps: [taken.spec.steps[0]] } });
     const board = ((await res.json()) as { error: string }).error;
     assert.equal(res.status, 409, board);
     assert.equal(board, workflowTaken(path.join(STORE, name), version), name);

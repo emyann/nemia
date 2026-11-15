@@ -75,7 +75,7 @@ async function sentTo(
   headers: Record<string, string> = json,
 ) {
   const [, from, name, card] = /^\/api\/agents\/([^/]+)(?:\/([^/]+))?(\/card)?$/.exec(url) ?? [];
-  const D = '/api/namespaces/default/agents';
+  const D = method === 'GET' ? '/api/namespaces/default/agents' : '/api/agents';
   const draft = (typeof body === 'object' && body !== null && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
   const { name: named, version, body: instructions, schema, ...lines } = draft;
   const spec = { ...lines, ...(instructions !== undefined && { instructions }), ...(schema !== undefined && { output: schema }) };
@@ -149,7 +149,7 @@ test('a person reads the agents: both places listed, one read by name, the card 
     const reviewer = all.find((a) => a.from === 'repo' && a.name === 'reviewer')!;
     assert.ok(reviewer, "the repository's reviewer is listed");
     assert.ok(
-      all.find((a) => a.from === 'yours' && a.name === 'reviewer'),
+      all.find((a) => a.from === 'user' && a.name === 'reviewer'),
       'yours too',
     );
     assert.match(reviewer.description ?? '', /./);
@@ -168,8 +168,8 @@ test('a person reads the agents: both places listed, one read by name, the card 
       const res = await readAt('/api/agents/repo/implementer');
       assert.equal(res.status, 200);
       assert.equal(((await res.json()) as AgentListing).name, 'implementer');
-      await refused(readAt('/api/agents/yours/nobody'), 404, /^No definition named nobody from yours/);
-      await refused(readAt('/api/agents/yours/..%2Fdev%2Fplan'), 404, /^No definition named \.\.\/dev\/plan/);
+      await refused(readAt('/api/agents/user/nobody'), 404, /^No definition named nobody from user/);
+      await refused(readAt('/api/agents/user/..%2Fdev%2Fplan'), 404, /^No definition named \.\.\/dev\/plan/);
     },
   );
 
@@ -235,7 +235,7 @@ test('a person reads the agents: both places listed, one read by name, the card 
         );
         assert.notEqual(edited.version, courier.version, 'the SKILL.md is digested with the agent');
         await refused(
-          send('PUT', '/api/agents/yours/courier', {
+          send('PUT', '/api/agents/user/courier', {
             name: 'courier',
             description: 'Carries notes.',
             skills: 'pass-a-note',
@@ -247,7 +247,7 @@ test('a person reads the agents: both places listed, one read by name, the card 
           /changed since it was read/,
         );
 
-        const put = await send('PUT', '/api/agents/yours/courier', {
+        const put = await send('PUT', '/api/agents/user/courier', {
           name: 'courier',
           description: 'Carries notes on.',
           skills: 'pass-a-note',
@@ -264,7 +264,7 @@ test('a person reads the agents: both places listed, one read by name, the card 
         const relisted = (await listed()).find((a) => a.name === 'courier')!;
         assert.equal(relisted.description, 'Carries notes on.');
         assert.equal(saved.agent.version, relisted.version);
-        const gone = await send('DELETE', '/api/agents/yours/courier', { version: relisted.version });
+        const gone = await send('DELETE', '/api/agents/user/courier', { version: relisted.version });
         assert.equal(gone.status, 200, `and so does a removal. ${await gone.clone().text()}`);
         assert.equal(fs.existsSync(path.join(AGENTS, 'courier.md')), false);
 
@@ -278,7 +278,7 @@ test('a person reads the agents: both places listed, one read by name, the card 
         assert.equal(lost.card, null);
         assert.match(lost.cardError ?? '', /^agents\/courier\.md gives the skill `pass-a-note`, and no skills folder has it/);
         await refused(
-          readAt('/api/agents/yours/courier/card'),
+          readAt('/api/agents/user/courier/card'),
           422,
           /^agents\/courier\.md gives the skill `pass-a-note`, and no skills folder has it/,
         );
@@ -314,7 +314,7 @@ test('a person reads the agents: both places listed, one read by name, the card 
   await s.test('an agent is listed with each skill it gives, found where a start finds it, with what it costs a turn', async () => {
     const all = await listed();
     const theirs = all.find((a) => a.from === 'repo' && a.name === 'reviewer')!;
-    const yours = all.find((a) => a.from === 'yours' && a.name === 'reviewer')!;
+    const yours = all.find((a) => a.from === 'user' && a.name === 'reviewer')!;
     assert.deepEqual(
       theirs.given.map((g) => [g.name, g.from]),
       [
@@ -326,8 +326,8 @@ test('a person reads the agents: both places listed, one read by name, the card 
     assert.deepEqual(
       yours.given.map((g) => [g.name, g.from]),
       [
-        ['review-a-change', 'yours'],
-        ['ask-for-another-round', 'yours'],
+        ['review-a-change', 'user'],
+        ['ask-for-another-round', 'user'],
       ],
       'yours, from your library',
     );
@@ -339,7 +339,7 @@ test('a person reads the agents: both places listed, one read by name, the card 
         `${g.name} costs its listing, and its body when preloaded`,
       );
     }
-    assert.deepEqual(all.find((a) => a.from === 'yours' && a.name === 'broken')?.given ?? [], [], 'none for an agent that does not read');
+    assert.deepEqual(all.find((a) => a.from === 'user' && a.name === 'broken')?.given ?? [], [], 'none for an agent that does not read');
   });
 
   await s.test(
@@ -351,15 +351,15 @@ test('a person reads the agents: both places listed, one read by name, the card 
       try {
         const all = await listed();
         const { agents: read } = (await runWith(engine(process.env), AGENTS_ENTRY.handler({ repo }))) as AgentsRead;
-        assert.ok(read.find((a) => a.name === 'reviewer' && a.from === 'yours')?.custom, 'the package read the custom file');
+        assert.ok(read.find((a) => a.name === 'reviewer' && a.from === 'user')?.custom, 'the package read the custom file');
         const board = (one: object) => {
           const { given: _given, untried: _untried, fills: _fills, factories: _factories, ...rest } = one as Record<string, unknown>;
           return rest;
         };
         assert.deepEqual(all.map(board), read, 'each with the file of its custom instructions, or null, as the package read it');
-        const res = await readAt('/api/agents/yours/reviewer/card');
+        const res = await readAt('/api/agents/user/reviewer/card');
         assert.equal(res.status, 200, await res.clone().text());
-        const { card } = (await runWith(engine(process.env), CARD_ENTRY.handler({ name: 'reviewer', repo, from: 'yours' }))) as CardRead;
+        const { card } = (await runWith(engine(process.env), CARD_ENTRY.handler({ name: 'reviewer', repo, from: 'user' }))) as CardRead;
         assert.deepEqual(((await res.json()) as { card: unknown }).card, card);
       } finally {
         clearCustomInstructions(root, 'reviewer', repo);
@@ -377,10 +377,10 @@ test('a person reads the agents: both places listed, one read by name, the card 
       onRepo(home);
       const { app: own } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
       const yours = async (on: typeof app) =>
-        (await everyOrigin<AgentListing>(on, 'agents', 'default', ON_REPO)).filter((a) => a.from === 'yours').map((a) => a.name);
+        (await everyOrigin<AgentListing>(on, 'agents', 'default', ON_REPO)).filter((a) => a.from === 'user').map((a) => a.name);
       assert.deepEqual(await yours(own), ['elsewhere'], "yours, read under the layer's root");
       assert.equal((await yours(app)).includes('elsewhere'), false, "the process's app reads yours under its own root");
-      const res = await readAt('/api/agents/yours/elsewhere/card', own);
+      const res = await readAt('/api/agents/user/elsewhere/card', own);
       assert.equal(res.status, 200, await res.clone().text());
       assert.equal(((await res.json()) as { card: { description: string } }).card.description, 'Lives elsewhere.');
     },
@@ -431,12 +431,12 @@ test('the listing of an agent that does not read: its refusal, and its lines as 
   await t.test(
     'REFUSED at shipped defaults: a card for an agent that is not there, one with no description, and one whose name is not an agent’s',
     async () => {
-      await refused(readAt('/api/agents/yours/nobody/card'), 404, /^No definition named nobody from yours/);
-      await refused(readAt('/api/agents/yours/..%2Fdev%2Fplan/card'), 404, /^No definition named \.\.\/dev\/plan/);
+      await refused(readAt('/api/agents/user/nobody/card'), 404, /^No definition named nobody from user/);
+      await refused(readAt('/api/agents/user/..%2Fdev%2Fplan/card'), 404, /^No definition named \.\.\/dev\/plan/);
       fs.writeFileSync(path.join(AGENTS, 'nameless.md'), '---\nmodel: opus\n---\nDo it.\n');
       try {
         await refused(
-          readAt('/api/agents/yours/nameless/card'),
+          readAt('/api/agents/user/nameless/card'),
           422,
           /^agents\/nameless\.md has no `description:`, and the A2A protocol marks a card's description REQUIRED/,
         );
@@ -448,7 +448,7 @@ test('the listing of an agent that does not read: its refusal, and its lines as 
       }
       fs.writeFileSync(path.join(AGENTS, 'unread.md'), '---\nloop: build\n---\nWired wrong.\n');
       try {
-        const res = await readAt('/api/agents/yours/unread/card');
+        const res = await readAt('/api/agents/user/unread/card');
         assert.equal(res.status, 422, 'an agent the load refuses is there, and answered in the load’s words, not as one missing');
         assert.match(((await res.json()) as { error: string }).error, /\bunread\b/);
       } finally {
@@ -484,7 +484,7 @@ test('a former key — `disallow:`, `allow:`, a codex `permissionMode:`, `card:`
         );
 
         await refused(
-          send('PUT', '/api/agents/yours/former', {
+          send('PUT', '/api/agents/user/former', {
             name: 'former',
             description: former.description,
             keys: { disallow: 'SendMessage', allow: 'Edit(**)' },
@@ -494,7 +494,7 @@ test('a former key — `disallow:`, `allow:`, a codex `permissionMode:`, `card:`
           422,
           /^agents\/former\.md: `disallow` is `disallowedTools`'s former name, .* reload it, and save again\.$/,
         );
-        const put = await send('PUT', '/api/agents/yours/former', {
+        const put = await send('PUT', '/api/agents/user/former', {
           name: 'former',
           description: former.description,
           keys: former.keys,
@@ -547,7 +547,7 @@ test('a former key — `disallow:`, `allow:`, a codex `permissionMode:`, `card:`
         );
 
         await refused(
-          send('PUT', '/api/agents/yours/fenced', {
+          send('PUT', '/api/agents/user/fenced', {
             name: 'fenced',
             description: fenced.description,
             keys: { harness: 'codex', permissionMode: 'bypassPermissions' },
@@ -557,7 +557,7 @@ test('a former key — `disallow:`, `allow:`, a codex `permissionMode:`, `card:`
           422,
           /^agents\/fenced\.md: `permissionMode: bypassPermissions` on a step that runs on codex is the former name of `sandbox:` there, .* Send the sandbox as `sandbox:` instead: .* reload it, and save again; .* clear it, and set the sandbox\.$/,
         );
-        const put = await send('PUT', '/api/agents/yours/fenced', {
+        const put = await send('PUT', '/api/agents/user/fenced', {
           name: 'fenced',
           description: fenced.description,
           keys: fenced.keys,
@@ -585,7 +585,7 @@ test('a former key — `disallow:`, `allow:`, a codex `permissionMode:`, `card:`
         assert.match(old.error ?? '', /^agents\/old\.md: `card` names a card file/);
         assert.match(old.error ?? '', /is retired[^]*generated from its `skills:`/);
         assert.equal(old.card, null, 'nothing generated for an agent that does not read');
-        const put = await send('PUT', '/api/agents/yours/old', {
+        const put = await send('PUT', '/api/agents/user/old', {
           name: 'old',
           description: 'Had a card file.',
           keys: {},
@@ -635,7 +635,7 @@ test('a person makes an agent of theirs — with a result schema, skills, a harn
   const s = story(t);
 
   await s.test('an agent of yours is made, put back, renamed and removed, each read back from disk', async () => {
-    const made = await send('POST', '/api/agents/yours', scribe);
+    const made = await send('POST', '/api/agents/user', scribe);
     const saved = (await made.json()) as AgentSaved;
     assert.equal(made.status, 201, JSON.stringify(saved));
     assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.md')), 'scribe.md written');
@@ -644,7 +644,7 @@ test('a person makes an agent of theirs — with a result schema, skills, a harn
       '---\ndescription: Use this when a change needs its notes written.\nmodel: sonnet\neffort: low\nclaude:\n  fence:\n    tools: Read, Write\n---\nWrite the notes.\n',
     );
 
-    const put = await send('PUT', '/api/agents/yours/scribe', {
+    const put = await send('PUT', '/api/agents/user/scribe', {
       ...scribe,
       version: saved.agent.version,
       keys: { ...scribe.keys, effort: 'high', tools: null },
@@ -653,13 +653,13 @@ test('a person makes an agent of theirs — with a result schema, skills, a harn
     assert.equal(put.status, 200, JSON.stringify(edited));
     assert.deepEqual(edited.agent.keys, { model: 'sonnet', effort: 'high' });
 
-    const renamed = await send('PUT', '/api/agents/yours/scribe', { ...scribe, name: 'notary', version: edited.agent.version });
+    const renamed = await send('PUT', '/api/agents/user/scribe', { ...scribe, name: 'notary', version: edited.agent.version });
     const moved = (await renamed.json()) as AgentSaved;
     assert.equal(renamed.status, 200, JSON.stringify(moved));
     assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'scribe.md removed by the rename');
     assert.ok(fs.existsSync(path.join(AGENTS, 'notary.md')));
 
-    const gone = await send('DELETE', '/api/agents/yours/notary', { version: moved.agent.version });
+    const gone = await send('DELETE', '/api/agents/user/notary', { version: moved.agent.version });
     assert.equal(gone.status, 200);
     assert.equal(fs.existsSync(path.join(AGENTS, 'notary.md')), false);
   });
@@ -671,7 +671,7 @@ test('a person makes an agent of theirs — with a result schema, skills, a harn
       required: ['notes'],
       additionalProperties: false,
     });
-    const res = await send('POST', '/api/agents/yours', {
+    const res = await send('POST', '/api/agents/user', {
       ...scribe,
       name: 'with-schema',
       keys: { output: 'with-schema.schema.json' },
@@ -681,7 +681,7 @@ test('a person makes an agent of theirs — with a result schema, skills, a harn
     assert.equal(res.status, 201, JSON.stringify(saved));
     assert.equal(saved.agent.schema?.text, text);
     assert.equal(fs.readFileSync(path.join(AGENTS, 'with-schema.schema.json'), 'utf8'), text);
-    const gone = await send('DELETE', '/api/agents/yours/with-schema', { version: saved.agent.version });
+    const gone = await send('DELETE', '/api/agents/user/with-schema', { version: saved.agent.version });
     assert.equal(gone.status, 200);
     for (const f of ['with-schema.md', 'with-schema.schema.json']) assert.equal(fs.existsSync(path.join(AGENTS, f)), false, `${f} removed`);
   });
@@ -689,7 +689,7 @@ test('a person makes an agent of theirs — with a result schema, skills, a harn
   await s.test(
     "an agent is written and listed with the skills it is given and what becomes of Claude Code's prompt, each as its line writes it",
     async () => {
-      const made = await send('POST', '/api/agents/yours', {
+      const made = await send('POST', '/api/agents/user', {
         ...scribe,
         keys: { ...scribe.keys, tools: 'Read, Write, Skill' },
         skills: ' review-a-change,implement-a-change ',
@@ -711,7 +711,7 @@ test('a person makes an agent of theirs — with a result schema, skills, a harn
         assert.equal(Object.hasOwn(saved.agent.keys, 'skills'), false, 'not a role key: a step has no skills of its own');
         assert.equal(Object.hasOwn(saved.agent.keys, 'harnessPrompt'), false, 'not a role key: a step has no harness prompt of its own');
       } finally {
-        await send('DELETE', '/api/agents/yours/scribe', { version: saved.agent.version });
+        await send('DELETE', '/api/agents/user/scribe', { version: saved.agent.version });
       }
     },
   );
@@ -719,7 +719,7 @@ test('a person makes an agent of theirs — with a result schema, skills, a harn
   await s.test(
     'an agent is written and listed with the MCP servers its sessions load, as its line writes them, and unset by null',
     async () => {
-      const made = await send('POST', '/api/agents/yours', { ...scribe, mcp: ' playwright,docs ' });
+      const made = await send('POST', '/api/agents/user', { ...scribe, mcp: ' playwright,docs ' });
       const saved = (await made.json()) as AgentSaved;
       assert.equal(made.status, 201, JSON.stringify(saved));
       let version = saved.agent.version;
@@ -727,14 +727,14 @@ test('a person makes an agent of theirs — with a result schema, skills, a harn
         assert.match(fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8'), /^mcp: playwright,docs$/m);
         assert.equal(saved.agent.mcp, 'playwright, docs', 'listed as the parser read it');
         assert.equal(Object.hasOwn(saved.agent.keys, 'mcp'), false, 'not a role key: a step has no mcp line of its own');
-        const unset = await send('PUT', '/api/agents/yours/scribe', { ...scribe, version, mcp: null });
+        const unset = await send('PUT', '/api/agents/user/scribe', { ...scribe, version, mcp: null });
         const again = (await unset.json()) as AgentSaved;
         assert.equal(unset.status, 200, JSON.stringify(again));
         version = again.agent.version;
         assert.equal(again.agent.mcp, null);
         assert.doesNotMatch(fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8'), /^mcp:/m);
       } finally {
-        await send('DELETE', '/api/agents/yours/scribe', { version });
+        await send('DELETE', '/api/agents/user/scribe', { version });
       }
     },
   );
@@ -748,12 +748,8 @@ test('a write of an agent the api or the package refuses — the repository’s,
       '---\ndescription: The repository alone has me.\n---\nDo it.\n',
     );
     const before = snapshot(path.join(repo, 'workflows', 'agents'));
-    await refused(
-      send('PUT', '/api/agents/repo/outsider', { ...scribe, name: 'outsider', version: 'x' }),
-      422,
-      /copy the definition to yours/,
-    );
-    await refused(send('DELETE', '/api/agents/repo/outsider', { version: 'x' }), 422, /The api writes your library alone/);
+    await refused(send('PUT', '/api/agents/repo/outsider', { ...scribe, name: 'outsider', version: 'x' }), 404, /library/);
+    await refused(send('DELETE', '/api/agents/repo/outsider', { version: 'x' }), 404, /library/);
     assert.deepEqual(snapshot(path.join(repo, 'workflows', 'agents')), before);
     fs.rmSync(path.join(repo, 'workflows', 'agents', 'outsider.md'));
     assert.deepEqual(snapshot(path.join(repo, 'workflows', 'agents')), theirs);
@@ -763,58 +759,54 @@ test('a write of an agent the api or the package refuses — the repository’s,
     "refusals carry the package's words: a key, a value, a name, a name taken, a stale version, and an agent still named",
     async () => {
       await refused(
-        send('POST', '/api/agents/yours', { ...scribe, keys: { check: 'npm test' } }),
+        send('POST', '/api/agents/user', { ...scribe, keys: { check: 'npm test' } }),
         422,
         /^agents\/scribe\.md: `check` is wiring, and belongs on the step/,
       );
       await refused(
-        send('POST', '/api/agents/yours', { ...scribe, keys: { agent: 'reviewer' } }),
+        send('POST', '/api/agents/user', { ...scribe, keys: { agent: 'reviewer' } }),
         422,
         /^agents\/scribe\.md: `agent` is a step's key/,
       );
       await refused(
-        send('POST', '/api/agents/yours', { ...scribe, keys: { context: 'lots' } }),
+        send('POST', '/api/agents/user', { ...scribe, keys: { context: 'lots' } }),
         422,
         /^agents\/scribe\.md: `context: lots` is not a number of tokens/,
       );
-      await refused(send('POST', '/api/agents/yours', { ...scribe, name: 'x.md' }), 422, /`x\.md` is not an agent's name/);
-      await refused(send('POST', '/api/agents/yours', { ...scribe, keys: { model: 7 } }), 400, /does not read as its route takes it/);
-      await refused(send('POST', '/api/agents/yours', { ...scribe, name: 'reviewer' }), 409, /^agents\/reviewer\.md is there already/);
+      await refused(send('POST', '/api/agents/user', { ...scribe, name: 'x.md' }), 422, /`x\.md` is not an agent's name/);
+      await refused(send('POST', '/api/agents/user', { ...scribe, keys: { model: 7 } }), 400, /does not read as its route takes it/);
+      await refused(send('POST', '/api/agents/user', { ...scribe, name: 'reviewer' }), 409, /^agents\/reviewer\.md is there already/);
       await refused(
-        send('PUT', '/api/agents/yours/reviewer', { ...scribe, name: 'reviewer' }),
+        send('PUT', '/api/agents/user/reviewer', { ...scribe, name: 'reviewer' }),
         422,
         /takes the resourceVersion the Agent was read at/,
       );
       await refused(
-        send('PUT', '/api/agents/yours/reviewer', { ...scribe, name: 'reviewer', version: '0123456789abcdef' }),
+        send('PUT', '/api/agents/user/reviewer', { ...scribe, name: 'reviewer', version: '0123456789abcdef' }),
         409,
         /^agents\/reviewer\.md changed since it was read/,
       );
       await refused(
-        send('PUT', '/api/agents/yours/nobody', { ...scribe, name: 'nobody', version: '0123456789abcdef' }),
+        send('PUT', '/api/agents/user/nobody', { ...scribe, name: 'nobody', version: '0123456789abcdef' }),
         404,
         /^Nothing is at that name/,
       );
-      const reviewer = (await listed()).find((a) => a.from === 'yours' && a.name === 'reviewer')!;
-      const inUse = await refused(
-        send('DELETE', '/api/agents/yours/reviewer', { version: reviewer.version }),
-        409,
-        /^agents\/reviewer\.md is named by a step beside it — dev\/review — and removing it would/,
-      );
-      assert.deepEqual(inUse.users, ['dev/review']);
+      const reviewer = (await listed()).find((a) => a.from === 'user' && a.name === 'reviewer')!;
+      const inUse = await refused(send('DELETE', '/api/agents/user/reviewer', { version: reviewer.version }), 409, /default/);
+      assert.deepEqual(inUse.users, ['default'], 'the default factory resolves reviewer from the library, so its removal names it');
       await refused(
-        send('PUT', '/api/agents/yours/reviewer', { ...scribe, name: 'critic', version: reviewer.version }),
+        send('PUT', '/api/agents/user/reviewer', { ...scribe, name: 'critic', version: reviewer.version }),
         409,
         /renaming it to critic would/,
       );
-      await refused(send('DELETE', '/api/agents/yours/reviewer', {}), 422, /takes the resourceVersion the Agent was read at/);
+      await refused(send('DELETE', '/api/agents/user/reviewer', {}), 422, /takes the resourceVersion the Agent was read at/);
     },
   );
 
   await t.test(
     "REFUSED at shipped defaults: each key of a draft sent as the wrong type is a 400 in the api's words, naming the key and what to send — and nothing is written",
     async () => {
-      const post = (body: unknown) => send('POST', '/api/agents/yours', body);
+      const post = (body: unknown) => send('POST', '/api/agents/user', body);
       await refused(post([scribe]), 400, /does not read as its route takes it/);
       await refused(post({ ...scribe, name: 7 }), 400, /does not read as its route takes it/);
       await refused(post({ ...scribe, description: 7 }), 400, /does not read as its route takes it/);
@@ -824,14 +816,14 @@ test('a write of an agent the api or the package refuses — the repository’s,
       for (const schema of ['scribe.schema.json', { file: 'scribe.schema.json' }, { file: 'scribe.schema.json', text: {} }])
         await refused(post({ ...scribe, schema }), 400, /does not read as its route takes it/);
 
-      const reviewer = (await listed()).find((a) => a.from === 'yours' && a.name === 'reviewer')!;
+      const reviewer = (await listed()).find((a) => a.from === 'user' && a.name === 'reviewer')!;
       const put = (body: unknown) =>
-        send('PUT', '/api/agents/yours/reviewer', { ...scribe, version: reviewer.version, ...(body as object) });
+        send('PUT', '/api/agents/user/reviewer', { ...scribe, version: reviewer.version, ...(body as object) });
       await refused(put({ name: 7 }), 400, /does not read as its route takes it/);
       await refused(put({ name: 'x.md' }), 422, /`x\.md` is not an agent's name/);
       await refused(put({ version: 7 }), 400, /does not read as its route takes it/);
       await refused(put({ description: false }), 400, /does not read as its route takes it/);
-      await refused(send('DELETE', '/api/agents/yours/reviewer', { version: 7 }), 409, /changed since it was read/);
+      await refused(send('DELETE', '/api/agents/user/reviewer', { version: 7 }), 409, /uses it|changed since it was read/);
       assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'nothing was written');
     },
   );
@@ -839,10 +831,10 @@ test('a write of an agent the api or the package refuses — the repository’s,
   await t.test(
     "REFUSED at shipped defaults: MCP servers not written as text, in the route's words, and names the package will not read, in its own",
     async () => {
-      await refused(send('POST', '/api/agents/yours', { ...scribe, mcp: 3 }), 400, /does not read as its route takes it/);
-      await refused(send('POST', '/api/agents/yours', { ...scribe, mcp: ['a'] }), 400, /does not read as its route takes it/);
-      await refused(send('POST', '/api/agents/yours', { ...scribe, mcp: 'a, b c' }), 422, /has `b c`, which is not a server's name/);
-      await refused(send('POST', '/api/agents/yours', { ...scribe, mcp: 'a, a' }), 422, /names `a` twice/);
+      await refused(send('POST', '/api/agents/user', { ...scribe, mcp: 3 }), 400, /does not read as its route takes it/);
+      await refused(send('POST', '/api/agents/user', { ...scribe, mcp: ['a'] }), 400, /does not read as its route takes it/);
+      await refused(send('POST', '/api/agents/user', { ...scribe, mcp: 'a, b c' }), 422, /has `b c`, which is not a server's name/);
+      await refused(send('POST', '/api/agents/user', { ...scribe, mcp: 'a, a' }), 422, /names `a` twice/);
       assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'nothing was written');
     },
   );
@@ -850,17 +842,17 @@ test('a write of an agent the api or the package refuses — the repository’s,
   await t.test(
     "REFUSED at shipped defaults: skills or a harness prompt not written as text, ones the package will not read, and skills the agent's tools could not load",
     async () => {
-      await refused(send('POST', '/api/agents/yours', { ...scribe, skills: ['a'] }), 400, /does not read as its route takes it/);
-      await refused(send('POST', '/api/agents/yours', { ...scribe, harnessPrompt: 1 }), 400, /does not read as its route takes it/);
+      await refused(send('POST', '/api/agents/user', { ...scribe, skills: ['a'] }), 400, /does not read as its route takes it/);
+      await refused(send('POST', '/api/agents/user', { ...scribe, harnessPrompt: 1 }), 400, /does not read as its route takes it/);
       await refused(
-        send('POST', '/api/agents/yours', { ...scribe, harnessPrompt: 'terse' }),
+        send('POST', '/api/agents/user', { ...scribe, harnessPrompt: 'terse' }),
         422,
         /`harnessPrompt: terse` is not one of keep, no-coding, replace/,
       );
-      await refused(send('POST', '/api/agents/yours', { ...scribe, skills: 'Not A Name' }), 422, /Not A Name/);
-      await refused(send('POST', '/api/agents/yours', { ...scribe, skills: 'write-a-note' }), 422, /no `Skill`/);
+      await refused(send('POST', '/api/agents/user', { ...scribe, skills: 'Not A Name' }), 422, /Not A Name/);
+      await refused(send('POST', '/api/agents/user', { ...scribe, skills: 'write-a-note' }), 422, /no `Skill`/);
       await refused(
-        send('POST', '/api/agents/yours', { ...scribe, keys: { ...scribe.keys, harness: 'codex' }, skills: 'write-a-note' }),
+        send('POST', '/api/agents/user', { ...scribe, keys: { ...scribe.keys, harness: 'codex' }, skills: 'write-a-note' }),
         422,
         /codex/,
       );
@@ -877,9 +869,9 @@ test('a write of an agent the api or the package refuses — the repository’s,
       fs.writeFileSync(path.join(lent, 'borrow.md'), '---\nplace: git\nagent: lender\n---\nBorrow it.\n');
       const own = path.join(repo, '.claude', 'agents', 'lender.md');
       try {
-        const lender = (await listed()).find((a) => a.from === 'yours' && a.name === 'lender')!;
+        const lender = (await listed()).find((a) => a.from === 'user' && a.name === 'lender')!;
         const inUse = await refused(
-          send('DELETE', '/api/agents/yours/lender', { version: lender.version }),
+          send('DELETE', '/api/agents/user/lender', { version: lender.version }),
           409,
           new RegExp(
             `^agents/lender\\.md is named by a step of the repository ${repo} — lent/borrow — which has no lender of its own, so its workflows are given this one, and removing it would`,
@@ -887,13 +879,13 @@ test('a write of an agent the api or the package refuses — the repository’s,
         );
         assert.deepEqual(inUse.users, ['lent/borrow']);
         await refused(
-          send('PUT', '/api/agents/yours/lender', { ...scribe, name: 'giver', version: lender.version }),
+          send('PUT', '/api/agents/user/lender', { ...scribe, name: 'giver', version: lender.version }),
           409,
           /of the repository .* renaming it to giver would/,
         );
         fs.mkdirSync(path.dirname(own), { recursive: true });
         fs.writeFileSync(own, "---\ndescription: The repository's own.\n---\nDo it.\n");
-        const res = await send('DELETE', '/api/agents/yours/lender', { version: lender.version });
+        const res = await send('DELETE', '/api/agents/user/lender', { version: lender.version });
         assert.equal(
           res.status,
           200,

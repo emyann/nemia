@@ -456,7 +456,7 @@ export async function write(
       fs.writeFileSync(path.join(dir, file), text);
     }
     const input = {
-      from: 'yours',
+      from: 'user',
       name,
       draft: [...steps],
       repo,
@@ -475,7 +475,7 @@ export async function write(
   return {
     workflow: listed(
       name,
-      'yours',
+      'user',
       dir,
       loadedAt(await loadedOf(e, { placeService, config, trace }, [dir], repo, home), dir),
       await inRequest(workflowVersion(dir, places)),

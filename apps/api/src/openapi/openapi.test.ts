@@ -123,6 +123,7 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
     Event: '/api/events/{name}',
     Proposal: '/api/namespaces/{namespace}/proposals/{name}',
     Delegation: '/api/namespaces/{namespace}/delegations/{name}',
+    LibraryAdd: '/api/namespaces/{namespace}/libraryadds/{name}',
   } as const;
   for (const kind of KINDS) {
     assert.ok(doc.paths[GET_PATHS[kind]]?.get, `${kind} is got at ${GET_PATHS[kind]}`);
@@ -138,10 +139,12 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
   assert.ok(doc.paths['/api/factories']?.get, 'the factories are listed, cluster-scoped');
   for (const plural of ['mcpservers', 'schedules', 'hires', 'volumes', 'workflows', 'agents', 'skills', 'proposals', 'delegations'])
     assert.ok(doc.paths[`/api/namespaces/{namespace}/${plural}`]?.get, `the ${plural} are listed in a factory's namespace`);
-  assert.ok(doc.paths['/api/builtin/mcpservers']?.get, "Nemia's builtin servers are listed");
-  assert.ok(doc.paths['/api/namespaces/{namespace}/agents/{name}/try']?.post, 'an agent is tried');
+  for (const plural of ['mcpservers', 'workflows', 'agents', 'skills'])
+    assert.ok(doc.paths[`/api/${plural}`]?.get, `the store's library of ${plural} is listed, in no namespace`);
+  assert.equal(doc.paths['/api/builtin/mcpservers'], undefined, "Nemia's builtin servers are the library's, at /api/mcpservers");
+  assert.ok(doc.paths['/api/agents/{name}/try']?.post, 'an agent of the library is tried');
   assert.ok(doc.paths['/api/namespaces/{namespace}/agents/{name}/card']?.get, 'and its card read');
-  assert.ok(doc.paths['/api/namespaces/{namespace}/skills/{name}/copy']?.post, 'a builtin skill is copied');
+  assert.ok(doc.paths['/api/skills/{name}/copy']?.post, 'a builtin skill is copied');
   assert.ok(doc.paths['/api/namespaces/{namespace}/proposals']?.post, 'a proposal is filed');
   assert.ok(doc.paths['/api/namespaces/{namespace}/proposals/{name}/approve']?.post, 'and approved');
   assert.ok(doc.paths['/api/namespaces/{namespace}/proposals/{name}/decline']?.post, 'or declined');

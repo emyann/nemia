@@ -4,7 +4,8 @@
  * and what they and the factories' handlers share (`parts.ts`), as objects/serve.ts provides them to the mount.
  */
 export { hiresHandlers } from './hires.ts';
-export { builtinHandlers, mcpServersHandlers } from './mcp-servers.ts';
+export { mcpServersHandlers } from './mcp-servers.ts';
+export { libraryAddsHandlers } from './library-adds.ts';
 export { factoryNamed, queryOf } from './parts.ts';
 export { schedulesHandlers } from './schedules.ts';
 export { volumesHandlers } from './volumes.ts';

@@ -113,7 +113,7 @@ export async function saved(
   { draft, schema, version, name }: { draft: AgentDraft; schema: AgentSchema | null; version?: string; name?: string },
 ): Promise<void> {
   const input = {
-    from: 'yours',
+    from: 'user',
     repo: s.repo,
     draft,
     schema,

@@ -79,7 +79,11 @@ function readJson<T>(file: string, decode: (raw: unknown) => Result.Result<T, Sc
  */
 export function readLibraryAdds(home: string, name: string): readonly LibraryRef[] | undefined {
   const file = libraryAddsFile(home, name);
-  const read = readJson(file, Schema.decodeUnknownResult(AddsSchema), `remove it to read the factory's adds from its workflows again, or write it with nemia library add`);
+  const read = readJson(
+    file,
+    Schema.decodeUnknownResult(AddsSchema),
+    `remove it to read the factory's adds from its workflows again, or write it with nemia library add`,
+  );
   return read?.adds.map(({ kind, name: item }) => ({ kind, name: item }));
 }
 
@@ -130,8 +134,11 @@ export const writeLibraryServers = (home: string, servers: FactoryServers): void
  * @param home The store's root.
  */
 export const builtinCopies = (home: string): Readonly<Record<string, string>> =>
-  readJson(path.join(libraryDir(home), 'copies.json'), Schema.decodeUnknownResult(CopiesSchema), 'remove it: a copy is then no longer compared with its builtin')
-    ?.copies ?? {};
+  readJson(
+    path.join(libraryDir(home), 'copies.json'),
+    Schema.decodeUnknownResult(CopiesSchema),
+    'remove it: a copy is then no longer compared with its builtin',
+  )?.copies ?? {};
 
 /**
  * Records the digest of the builtin `key` copied now, keeping every other copy.

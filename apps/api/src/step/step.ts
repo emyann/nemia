@@ -73,7 +73,7 @@ export function workflowPageOf(
   const parent = path.dirname(dir);
   const factory = factoryNamed(run.factory);
   const repo = run.repo ? path.resolve(run.repo) : null;
-  if (parent === path.join(path.resolve(home), 'workflows')) return { from: 'yours', workflow, factory, repo: factory ? repo : null };
+  if (parent === path.join(path.resolve(home), 'workflows')) return { from: 'user', workflow, factory, repo: factory ? repo : null };
   if (repo === null || parent !== path.join(repo, 'workflows')) return null;
   if (factory) return { from: 'repo', workflow, factory, repo };
   return served !== undefined && repo === path.resolve(served) ? { from: 'repo', workflow, factory: null, repo: null } : null;

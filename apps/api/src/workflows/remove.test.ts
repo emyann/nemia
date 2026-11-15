@@ -60,19 +60,16 @@ const snapshot = (dir: string): Record<string, string> =>
   );
 
 /** A DELETE at `version`: the folder's version as it is on disk now unless one is given, as a board that has just read it sends it. */
-const remove = (name: string, version?: string | null, from = 'yours', headers: Record<string, string> = json) => {
-  const read = version === undefined ? versionOf(path.join(from === 'yours' ? STORE : path.join(repo, 'workflows'), name)) : version;
-  return app.request(
-    `/api/namespaces/default/workflows/${name}?${ON_REPO}${read === null ? '' : `&resourceVersion=${encodeURIComponent(read)}`}`,
-    {
-      method: 'DELETE',
-      headers,
-    },
-  );
+const remove = (name: string, version?: string | null, from = 'user', headers: Record<string, string> = json) => {
+  const read = version === undefined ? versionOf(path.join(from === 'user' ? STORE : path.join(repo, 'workflows'), name)) : version;
+  return app.request(`/api/workflows/${name}?${ON_REPO}${read === null ? '' : `&resourceVersion=${encodeURIComponent(read)}`}`, {
+    method: 'DELETE',
+    headers,
+  });
 };
 
 /** Whether the namespace's workflows list `name` from `from`. */
-async function listed(name: string, from = 'yours'): Promise<boolean> {
+async function listed(name: string, from = 'user'): Promise<boolean> {
   const all = await listedIn<{ name: string; from: string }>(app, 'workflows', `origin=${from}&${ON_REPO}`);
   return all.some((w) => w.name === name && w.from === from);
 }
@@ -125,14 +122,13 @@ test("a person removes a folder of theirs: refused while it is stale, unsaid, st
   );
 
   await s.test(
-    "REFUSED: the repository's workflow is not removed (422, no write of the api's), nor a name not there (404), and the folder of yours is kept",
+    "REFUSED: the repository's workflow is not removed (404, none in the library), nor a name not there (404), and the folder of yours is kept",
     async () => {
       const theirs = path.join(repo, 'workflows', 'theirs');
       write(path.join(theirs, 'implement.md'), '---\nplace: git\nmodel: opus\n---\nImplement it.\n');
       const before = snapshot(theirs);
       const res = await remove('theirs', versionOf(theirs), 'repo');
-      assert.equal(res.status, 422);
-      assert.equal(((await res.json()) as { way?: string }).way, undefined, "the repository's is copied to yours, no namespace's way");
+      assert.equal(res.status, 404, "the repository's workflow is no workflow of the library, which a removal is sent to");
       assert.deepEqual(snapshot(theirs), before);
       assert.equal(fs.existsSync(dir), true, 'yours of the same name');
       assert.equal((await remove('nowhere', 'v')).status, 404);
@@ -146,7 +142,7 @@ test("a person removes a folder of theirs: refused while it is stale, unsaid, st
       const res = await remove('done');
       assert.equal(res.status, 200, await res.clone().text());
       const answer = (await res.json()) as WorkflowRemoved;
-      assert.deepEqual([answer.metadata.name, answer.status.dir, answer.status.origin], ['done', dir, 'yours']);
+      assert.deepEqual([answer.metadata.name, answer.status.dir, answer.status.origin], ['done', dir, 'user']);
       assert.equal(fs.existsSync(dir), false);
       assert.equal(await listed('done'), false, 'listed after');
     },

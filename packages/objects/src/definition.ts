@@ -20,7 +20,7 @@ export const definitionStatus = {
     Origin.annotate({ description: 'The origin that holds its name first in the namespace; absent where none does.' }),
   ),
   revision: Schema.optionalKey(describedNumber("The ledger's number for what it holds now; absent where the ledger cannot number it.")),
-  usedBy: Schema.optionalKey(
+  factories: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
       description:
         "On a library definition read at the store's level, the factories that use it: each that has added it or fills a step with it.",

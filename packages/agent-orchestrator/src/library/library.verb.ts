@@ -7,7 +7,15 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { API_VERSION, type DefinitionOrigin, type LibraryAdd } from 'objects';
+import {
+  API_VERSION,
+  type DefinitionOrigin,
+  type LibraryAdd,
+  type LibraryAddList,
+  type McpServer,
+  type McpServerList,
+  type McpServerWrite,
+} from 'objects';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { DEFAULT_NAMESPACE, type Factory } from '../factory/factory.ts';
 import { readFactoriesAt } from '../factory/factory.store.ts';
@@ -16,12 +24,16 @@ import { frontmatterKey } from '../former/former.ts';
 import { BUILTIN_SKILLS, REPOSITORY_HOLDER } from '../skills/read.store.ts';
 import { builtinServers, BUILTIN_SERVERS } from '../factory/servers/servers.store.ts';
 import { Effect } from 'effect';
-import { Missing, type Refusal } from '../refusal/refusal.ts';
+import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
+import { objectsListed, versionOf, type ObjectQuery } from '../object/listed.verb.ts';
+import { specOf } from '../factory/object/mcp-server.verb.ts';
+import { headersKept, writeRefusal } from '../factory/servers/servers.verb.ts';
+import { factoryServerRefusal, serverNameRefusal } from '../factory/servers/servers.ts';
 import { tried } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { BuiltinServer, FactoryServer, FactoryServers } from '../factory/servers/servers.ts';
 import { addName, libraryAddRefusal, libraryAddState, libraryAddsOf, sameAdd, type LibraryKind, type LibraryRef } from './library.ts';
-import { libraryAddsFile, libraryDir, libraryServers, readLibraryAdds, writeLibraryAdds } from './library.store.ts';
+import { libraryAddsFile, libraryDir, libraryServers, readLibraryAdds, writeLibraryAdds, writeLibraryServers } from './library.store.ts';
 
 /** When the factory `name`'s adds were last recorded, or the epoch where they never were. */
 const recordedAt = (home: string, name: string): string =>
@@ -162,7 +174,9 @@ export function libraryAddObject(home: string, name: string, ref: LibraryRef, re
       name: addName(ref),
       namespace: name,
       creationTimestamp: recordedAt(home, name),
-      resourceVersion: `sha256:${createHash('sha256').update(JSON.stringify([ref.kind, ref.name, recorded])).digest('hex')}`,
+      resourceVersion: `sha256:${createHash('sha256')
+        .update(JSON.stringify([ref.kind, ref.name, recorded]))
+        .digest('hex')}`,
     },
     spec: { kind: ref.kind, name: ref.name },
     status: {
@@ -214,7 +228,11 @@ export function writeLibraryAdd(home: string, name: string, does: 'add' | 'remov
  */
 export function libraryUsers(home: string, ref: LibraryRef | { readonly kind: 'Workflow'; readonly name: string }): string[] {
   const factories = readFactoriesAt(home).filter((f): f is Factory & { file: string } => !('error' in f));
-  if (ref.kind === 'Workflow') return factories.filter((f) => f.workflows.includes(ref.name)).map((f) => f.name).sort();
+  if (ref.kind === 'Workflow')
+    return factories
+      .filter((f) => f.workflows.includes(ref.name))
+      .map((f) => f.name)
+      .sort();
   const libraryRef = ref;
   return [DEFAULT_NAMESPACE, ...factories.map((f) => f.name)]
     .filter((name) => {
@@ -298,3 +316,111 @@ export const libraryAddWritten = (
       );
     return yield* tried(() => writeLibraryAdd(home, factory, does, ref));
   });
+
+/**
+ * Where the library holds the server `name`: the user library, Nemia's builtins, or none.
+ * @param home The store's root.
+ * @param name The server's name.
+ */
+export const libraryServerThere = (home: string, name: string): 'user' | 'builtin' | 'none' => {
+  if (libraryServers(home)[name] !== undefined) return 'user';
+  return builtinServers(BUILTIN_SERVERS).some((s) => s.name === name) ? 'builtin' : 'none';
+};
+
+/**
+ * The library's MCP servers as objects, in no namespace: the user library's, each header masked, then each builtin no user server of its
+ * name shadows, each with the factories that add it.
+ * @param home The store's root.
+ */
+export function libraryServerObjects(home: string): McpServer[] {
+  const mine = libraryServers(home);
+  const filedAt = recordedAt(home, DEFAULT_NAMESPACE);
+  const own = Object.entries(mine).map(([name, server]) => serverObject(home, name, specOf(server), 'user', filedAt));
+  const builtin = builtinServers(BUILTIN_SERVERS)
+    .filter((s) => mine[s.name] === undefined)
+    .map(({ name, ...server }) => serverObject(home, name, specOf(server, false), 'builtin', filedAt));
+  return [...own, ...builtin].sort((a, b) => (a.metadata.name < b.metadata.name ? -1 : a.metadata.name > b.metadata.name ? 1 : 0));
+}
+
+/** The object of the library server `name` at `origin`, with the factories that add it. */
+const serverObject = (home: string, name: string, spec: McpServer['spec'], origin: 'user' | 'builtin', filedAt: string): McpServer => {
+  const status = { origin, factories: libraryUsers(home, { kind: 'McpServer', name }) };
+  return {
+    apiVersion: API_VERSION,
+    kind: 'McpServer',
+    metadata: { name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, status) },
+    spec,
+    status,
+  };
+};
+
+/**
+ * The library's server `name` recorded in the user library from `write`, a header sent as the mask keeping the value held, refused
+ * `Invalid` as a factory's server write is.
+ * @param home The store's root.
+ * @param name The server's name.
+ * @param write The server's write as it was sent.
+ */
+export function libraryServerWritten(home: string, name: string, write: McpServerWrite): void {
+  const bad = serverNameRefusal(name) ?? writeRefusal(write);
+  if (bad !== undefined) throw new Invalid({ message: bad });
+  const { type, ...rest } = write;
+  const server = { ...rest, type: type ?? 'http' };
+  const refused = factoryServerRefusal(server);
+  if (refused !== undefined) throw new Invalid({ message: `${refused} Nothing was recorded.` });
+  const mine = libraryServers(home);
+  writeLibraryServers(home, { ...mine, [name]: headersKept(server, mine[name]) });
+}
+
+/**
+ * The user library's server `name` taken off its record; nothing where it holds none.
+ * @param home The store's root.
+ * @param name The server's name.
+ */
+export function libraryServerRemoved(home: string, name: string): void {
+  const { [name]: _gone, ...rest } = libraryServers(home);
+  writeLibraryServers(home, rest);
+}
+
+/**
+ * A page of the library's MCP servers (`McpServerList`), cut by the list's query as every list is (`objectsListed`).
+ * @param home The store's root.
+ * @param query The list's query: its selector, limit and token.
+ */
+export const libraryServerList = Effect.fn('libraryServerList')(function* (home: string, query: ObjectQuery) {
+  const listed: McpServerList = yield* objectsListed('McpServer', libraryServerObjects(home), query, 'library server');
+  return listed;
+});
+
+/**
+ * A page of the factory `name`'s adds (`LibraryAddList`), each with its state, cut by the list's query as every list is.
+ * @param home The store's root.
+ * @param name The factory's name, `default` among them.
+ * @param query The list's query: its selector, limit and token.
+ */
+export const libraryAddList = Effect.fn('libraryAddList')(function* (home: string, name: string, query: ObjectQuery) {
+  const { recorded, adds } = factoryAdds(home, name);
+  const listed: LibraryAddList = yield* objectsListed(
+    'LibraryAdd',
+    adds.map((ref) => libraryAddObject(home, name, ref, recorded)),
+    query,
+    'library add',
+  );
+  return listed;
+});
+
+/**
+ * The factory `name`'s add `addname` (`<kind>.<name>`), with its state; `Missing` for a name that is no add of it.
+ * @param home The store's root.
+ * @param name The factory's name, `default` among them.
+ * @param addname The add's object name, `<kind>.<name>`.
+ */
+export function libraryAddNamed(home: string, name: string, addname: string): LibraryAdd {
+  const ref = refOf(addname);
+  const { recorded, adds } = factoryAdds(home, name);
+  if (ref === undefined || !adds.some((a) => sameAdd(a, ref)))
+    throw new Missing({
+      message: `${name} has no add ${addname}: list them with GET /api/namespaces/${name}/libraryadds, or add it with nemia library add.`,
+    });
+  return libraryAddObject(home, name, ref, recorded);
+}

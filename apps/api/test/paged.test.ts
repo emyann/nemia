@@ -5,7 +5,7 @@
  * as its store keeps it, in files, never through the api's writes but one delegation, cloned. Past the most (`MANY`): the cards, the
  * factories, a factory's MCP servers, proposals and delegations, the subscriptions and the feed's events. Past a default page alone
  * (`SOME`): the runs, the workflows with their hires and schedules, your agents and your skills, whose lists read each object whole on
- * every page. The builtin templates and MCP servers are as many as the package ships, fewer than a page, and the volumes none: their pages
+ * every page. The builtin templates and the library's MCP servers are as many as the package ships, fewer than a page, and the volumes none: their pages
  * are read, and not planted past one.
  */
 import { root } from './harness.ts';
@@ -163,7 +163,11 @@ const PAGES: Readonly<
   'cards.list': { url: '/api/namespaces/default/cards', planted: CARDS },
   'factories.listAll': { url: '/api/factories', planted: FACTORIES },
   'mcpservers.list': { url: `/api/namespaces/${FACTORY}/mcpservers`, planted: SERVERS },
-  'builtin.mcpservers': { url: '/api/builtin/mcpservers' },
+  'mcpservers.listLibrary': { url: '/api/mcpservers' },
+  'libraryadds.list': { url: `/api/namespaces/${FACTORY}/libraryadds` },
+  'workflows.listLibrary': { url: '/api/workflows' },
+  'agents.listLibrary': { url: '/api/agents' },
+  'skills.listLibrary': { url: '/api/skills' },
   'schedules.list': { url: `/api/namespaces/${WORKFLOW_FACTORY}/schedules`, planted: SCHEDULES },
   'hires.list': { url: `/api/namespaces/${WORKFLOW_FACTORY}/hires`, planted: HIRES },
   'volumes.list': { url: `/api/namespaces/${FACTORY}/volumes` },

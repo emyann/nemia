@@ -23,7 +23,11 @@ test("a factory's adds: derived while unrecorded, written whole by its first add
   await t.test('unrecorded, the default factory has every library agent its steps run and the skills they give', () => {
     const { recorded, adds } = factoryAdds(home, 'default');
     assert.equal(recorded, false);
-    for (const name of ['implementer', 'reviewer', 'shipper']) assert.ok(adds.some((a) => a.kind === 'Agent' && a.name === name), name);
+    for (const name of ['implementer', 'reviewer', 'shipper'])
+      assert.ok(
+        adds.some((a) => a.kind === 'Agent' && a.name === name),
+        name,
+      );
     assert.ok(adds.some((a) => a.kind === 'Skill' && a.name === 'implement-a-change'));
     assert.equal(fs.existsSync(libraryAddsFile(home, 'default')), false, 'a read writes nothing');
   });

@@ -36,11 +36,11 @@ test('each endpoint a moved verb names a repository on declares `repo` in its qu
   for (const [route, method] of [
     ['/api/namespaces/{namespace}/agents', 'get'],
     ['/api/namespaces/{namespace}/agents/{name}/card', 'get'],
-    ['/api/namespaces/{namespace}/agents/{name}', 'delete'],
+    ['/api/agents/{name}', 'delete'],
     ['/api/namespaces/{namespace}/agents/{name}/instructions', 'get'],
-    ['/api/namespaces/{namespace}/agents/{name}/instructions', 'put'],
-    ['/api/namespaces/{namespace}/agents/{name}/instructions', 'delete'],
-    ['/api/namespaces/{namespace}/workflows/{name}', 'delete'],
+    ['/api/agents/{name}/instructions', 'put'],
+    ['/api/agents/{name}/instructions', 'delete'],
+    ['/api/workflows/{name}', 'delete'],
   ] as const)
     assert.ok(declared(route, method).includes('repo'), `${method.toUpperCase()} ${route} declares ?repo=`);
 });
@@ -59,11 +59,11 @@ test('`?repo=` names the repository whose agents the listing and a card read, be
   assert.equal(body.card.name, 'outrider');
   assert.equal(body.from, 'repo');
   const yours = (await (await app.request('/api/namespaces/default/agents/archivist/card')).json()) as AgentCard;
-  assert.equal(yours.from, 'yours');
+  assert.equal(yours.from, 'user');
 });
 
 test("the listing says the file of an agent's custom instructions, where a person wrote some, and null where none", async () => {
-  const put = await app.request('/api/namespaces/default/agents/archivist/instructions', {
+  const put = await app.request('/api/agents/archivist/instructions', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ words: 'File it twice.' }),
@@ -79,13 +79,10 @@ test("the listing says the file of an agent's custom instructions, where a perso
 test('a removal answers, beside the object as it was, the files it removed (`status.removed`), which `nemia … rm` prints', async () => {
   fs.writeFileSync(path.join(root, 'workflows', 'agents', 'courier.md'), '---\ndescription: Carries it.\n---\nCarry it.\n');
   const agent = (await (await app.request('/api/namespaces/default/agents/courier')).json()) as Agent;
-  const gone = await app.request(
-    `/api/namespaces/default/agents/courier?resourceVersion=${encodeURIComponent(agent.metadata.resourceVersion ?? '')}`,
-    {
-      method: 'DELETE',
-      headers: { 'content-type': 'application/json' },
-    },
-  );
+  const gone = await app.request(`/api/agents/courier?resourceVersion=${encodeURIComponent(agent.metadata.resourceVersion ?? '')}`, {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json' },
+  });
   const removed = (await gone.json()) as Agent;
   assert.equal(gone.status, 200, JSON.stringify(removed));
   assert.deepEqual(removed.status.removed, ['courier.md']);
@@ -94,13 +91,10 @@ test('a removal answers, beside the object as it was, the files it removed (`sta
   fs.mkdirSync(path.join(root, 'workflows', 'errand'), { recursive: true });
   fs.writeFileSync(path.join(root, 'workflows', 'errand', 'go.md'), '---\nplace: git\n---\nGo.\n');
   const workflow = (await (await app.request('/api/namespaces/default/workflows/errand')).json()) as Workflow;
-  const folder = await app.request(
-    `/api/namespaces/default/workflows/errand?resourceVersion=${encodeURIComponent(workflow.metadata.resourceVersion ?? '')}`,
-    {
-      method: 'DELETE',
-      headers: { 'content-type': 'application/json' },
-    },
-  );
+  const folder = await app.request(`/api/workflows/errand?resourceVersion=${encodeURIComponent(workflow.metadata.resourceVersion ?? '')}`, {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json' },
+  });
   const dropped = (await folder.json()) as Workflow;
   assert.equal(folder.status, 200, JSON.stringify(dropped));
   assert.deepEqual(dropped.status.removed, ['go.md']);

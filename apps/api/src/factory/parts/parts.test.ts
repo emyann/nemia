@@ -25,7 +25,8 @@ test('each path answers its kind, and each list its <Kind>List', async () => {
     ['/api/factories', 'FactoryList'],
     ['/api/factories/works', 'Factory'],
     ['/api/namespaces/works/mcpservers', 'McpServerList'],
-    ['/api/builtin/mcpservers', 'McpServerList'],
+    ['/api/mcpservers', 'McpServerList'],
+    ['/api/namespaces/works/libraryadds', 'LibraryAddList'],
     ['/api/namespaces/works/schedules', 'ScheduleList'],
     ['/api/namespaces/works/hires', 'HireList'],
     ['/api/namespaces/works/hires/make.implement', 'Hire'],
@@ -41,8 +42,8 @@ test('each path answers its kind, and each list its <Kind>List', async () => {
   assert.equal(commands.attach, 'nemia factory attach works <workflow>');
 });
 
-test('the builtin servers carry no namespace', async () => {
-  const body = (await (await app.request('/api/builtin/mcpservers')).json()) as { items: Array<{ metadata: { namespace?: string } }> };
+test("the library's servers carry no namespace", async () => {
+  const body = (await (await app.request('/api/mcpservers')).json()) as { items: Array<{ metadata: { namespace?: string } }> };
   assert.ok(body.items.length > 0);
   for (const s of body.items) assert.equal(s.metadata.namespace, undefined);
 });

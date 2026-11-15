@@ -37,7 +37,7 @@ test('a folder sent as its files reads as the spec a GET of the same files in yo
   const dir = path.join(STORE, 'readback');
   fs.cpSync(path.join(TEAM, 'dev'), dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'pictures.ts'), 'process.exit(0);\n');
-  const got = await app.request('/api/namespaces/default/workflows/readback?origin=yours');
+  const got = await app.request('/api/namespaces/default/workflows/readback?origin=user');
   const workflow = (await got.json()) as Workflow;
   assert.equal(got.status, 200, JSON.stringify(workflow));
   assert.equal(workflow.status.error, null, 'the folder written to yours reads');

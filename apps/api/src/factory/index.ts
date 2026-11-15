@@ -5,5 +5,5 @@
  * off, takes `placeFor` from `place.ts` alone, so resolving a request's place loads no handler.
  */
 export { factoriesHandlers } from './factories.ts';
-export { builtinHandlers, hiresHandlers, mcpServersHandlers, schedulesHandlers, volumesHandlers } from './parts/index.ts';
+export { libraryAddsHandlers, hiresHandlers, mcpServersHandlers, schedulesHandlers, volumesHandlers } from './parts/index.ts';
 export { placeFor } from './place.ts';

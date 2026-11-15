@@ -170,5 +170,6 @@ export {
   definitionsServed,
   definitionWriteRefusal,
   type DefinitionWrite,
+  type WriteAt,
   type WriteRefused,
 } from './definition/served.ts';

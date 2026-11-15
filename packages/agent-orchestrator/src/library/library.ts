@@ -6,21 +6,9 @@
  * `libraryAddState`: an add is resolved, shadowed by the factory's own, or missing from the library. `libraryAddRefusal`: an add of a name
  * the library does not hold, or a removal of one not added, is Missing.
  */
-import type {
-  LibraryAddRefusal,
-  LibraryAddStateOf,
-  LibraryAddsOf,
-  LibraryRef,
-  Origin,
-} from '../../contracts/library-add.contract.ts';
+import type { LibraryAddRefusal, LibraryAddStateOf, LibraryAddsOf, LibraryRef, Origin } from '../../contracts/library-add.contract.ts';
 
-export type {
-  LibraryAddRefused,
-  LibraryAddState,
-  LibraryAddWrite,
-  LibraryKind,
-  LibraryRef,
-} from '../../contracts/library-add.contract.ts';
+export type { LibraryAddRefused, LibraryAddState, LibraryAddWrite, LibraryKind, LibraryRef } from '../../contracts/library-add.contract.ts';
 
 /**
  * A factory's adds: its record's, where it has one, else those its workflows resolve from the library today.
@@ -42,8 +30,7 @@ export const libraryAddState: LibraryAddStateOf = (held) => {
 };
 
 /** Nothing of that name in the library to add. */
-const NOT_HELD =
-  'The library holds no item of that name: list it (`nemia library`) for the names it holds, or make it there first.';
+const NOT_HELD = 'The library holds no item of that name: list it (`nemia library`) for the names it holds, or make it there first.';
 
 /** Nothing of that name added to take off. */
 const NOT_ADDED = 'The factory has not added that item: list its adds (`nemia library --factory <factory>`) for the names it has.';

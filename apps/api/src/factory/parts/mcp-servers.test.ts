@@ -1,6 +1,6 @@
 /**
  * A factory's MCP servers on the board as objects (mcp-servers.ts, `/api/namespaces/<factory>/mcpservers`): the record read where the
- * store keeps it, a server recorded and removed, each header masked, and Nemia's builtin servers (`/api/builtin/mcpservers`) — in a
+ * store keeps it, a server recorded and removed, each header masked, and the store's library of servers (`/api/mcpservers`), the user library's beside Nemia's builtins — in a
  * scratch store whose factory is filed with the package's own verb.
  * Every write is read back from disk, and every refusal is made to refuse, with the record as it was.
  *
@@ -26,7 +26,7 @@ addFactory({ name: 'mcpmill', repos: [scratch('nemia-api-servers-folder-')] });
 
 const FILE = path.join(root, 'factories', 'mcpmill', 'servers.json');
 const URL = '/api/namespaces/mcpmill/mcpservers';
-const BUILTIN = '/api/builtin/mcpservers';
+const BUILTIN = '/api/mcpservers';
 
 const json = { 'content-type': 'application/json' };
 const send = (method: string, url: string, body: unknown) =>
@@ -145,12 +145,32 @@ test("A person keeps a factory's MCP servers: none recorded, one recorded and re
             headers: { 'X-MCP-Toolsets': 'context,repos,issues,pull_requests,users,actions' },
             oauth: { clientId: 'Iv23liQBfm9prqhvXkuY', callbackPort: 8791 },
           },
-          undefined,
+          { origin: 'builtin', factories: [] },
         ],
       ],
       'GitHub, with its client id and its header as shipped, which names no secret, and no key that names a secret',
     );
   });
+});
+
+test("the library's servers: one recorded at the store's level, added by a factory, its removal refused naming the factory until the add is off; a builtin never removed", async () => {
+  const docs = { url: 'https://docs.example/mcp', headers: { 'X-Toolsets': 'search' } };
+  const put = await answered<McpServer>(send('PUT', `${BUILTIN}/docs`, docs));
+  assert.deepEqual([put.metadata.namespace, put.status?.origin, put.spec.headers?.['X-Toolsets']], [undefined, 'user', HEADER_MASK]);
+  const kept = JSON.parse(fs.readFileSync(path.join(root, 'workflows', 'mcpservers.json'), 'utf8')) as { servers: Record<string, unknown> };
+  assert.deepEqual(Object.keys(kept.servers), ['docs'], "kept at the store's level, its header's value with it");
+  const added = await app.request('/api/namespaces/mcpmill/libraryadds/McpServer.docs', { method: 'PUT', headers: json, body: '{}' });
+  assert.equal(added.status, 200, await added.clone().text());
+  const listed = await answered<McpServerList>(app.request(BUILTIN));
+  assert.deepEqual(listed.items.find((s) => s.metadata.name === 'docs')?.status?.factories, ['mcpmill']);
+  const inUse = await send('DELETE', `${BUILTIN}/docs`, {});
+  assert.equal(inUse.status, 409);
+  assert.deepEqual(((await inUse.json()) as { users?: string[] }).users, ['mcpmill'], 'the refusal names each factory that adds it');
+  const off = await app.request('/api/namespaces/mcpmill/libraryadds/McpServer.docs', { method: 'DELETE', headers: json, body: '{}' });
+  assert.equal(off.status, 200, await off.clone().text());
+  assert.equal((await answered<McpServer>(send('DELETE', `${BUILTIN}/docs`, {}))).metadata.name, 'docs');
+  assert.equal((await send('DELETE', `${BUILTIN}/github`, {})).status, 422, 'a builtin is never removed');
+  assert.equal((await send('PUT', '/api/mcpservers/no%20name', docs)).status, 422, 'a name the record refuses');
 });
 
 test("Nemia's builtin servers are the orchestrator package's own folder, never a folder of the checkout's team", () => {

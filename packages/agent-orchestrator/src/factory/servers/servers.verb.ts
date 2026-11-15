@@ -125,8 +125,11 @@ export type ServerAddInput = typeof ServerAddInput.Type;
 export const ServerRmInput = Schema.Struct({ factory: Schema.String, server: Schema.String });
 export type ServerRmInput = typeof ServerRmInput.Type;
 
-/** Why a server's write is refused before anything is read, beside `factoryServerRefusal`: a header with no name, a port that is none. */
-const writeRefusal = (write: McpServerWrite): string | undefined => {
+/**
+ * Why a server's write is refused before anything is read, beside `factoryServerRefusal`: a header with no name, a port that is none.
+ * @param write The server's write as it was sent.
+ */
+export const writeRefusal = (write: McpServerWrite): string | undefined => {
   if (write.headers !== undefined && Object.hasOwn(write.headers, ''))
     return 'A header is sent by its name, and one has none: give each header its name, as { "X-MCP-Toolsets": "actions,repos" }. Nothing was recorded.';
   const port = write.oauth?.callbackPort;
@@ -169,8 +172,10 @@ export const factoryThere = (name: string, verb: string): Effect.Effect<void, Re
  * `server`'s headers as a write keeps them against `stored`, the server of its name the record holds (`headerWritten`): each sent with a
  * value of its own as sent, each sent as the mask a read served as the value stored. Refused (`Invalid`) for a mask sent for a header the
  * record holds no value of, naming it and asking for its value: nothing is written.
+ * @param server The server as the write sends it.
+ * @param stored The server of its name the record holds, or undefined for none.
  */
-function headersKept(server: FactoryServers[string], stored: FactoryServers[string] | undefined): FactoryServers[string] {
+export function headersKept(server: FactoryServers[string], stored: FactoryServers[string] | undefined): FactoryServers[string] {
   if (server.headers === undefined) return server;
   const headers: Record<string, string> = {};
   for (const [header, sent] of Object.entries(server.headers)) {

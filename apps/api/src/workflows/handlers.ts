@@ -1,5 +1,5 @@
 /**
- * The workflows group's handlers (`objects`' `Api`): a namespace's workflows as objects. `default` is your library, and the repository a
+ * The workflows group's handlers (`objects`' `Api`): a namespace's workflows as objects. `default` is the person's library, and the repository a
  * `?repo=` names where a factory works on it; a factory's namespace is the workflows attached to it, its tree's first (origin `factory`)
  * in one made from a template.
  *
@@ -8,15 +8,16 @@
  * (`workflowObject`): its spec the steps as their files write them, its status the steps resolved, the typed graph (`typedGraphOf`), and
  * the ledger's number for what the folder holds now (`definitionRevision`), which a run started on it pins.
  *
- * Writes are yours, in `default` alone (`writeGoes`): made with its steps (the builder's `write`, builder.ts), written whole at the
+ * The store's library, in no namespace (`/api/workflows`): the person's workflows beside the builtins, each with the factories that attach
+ * it. Writes are the person's, at the library alone (`writeGoes`), a write sent to a namespace refused naming its way: made with its steps (the builder's `write`, builder.ts), written whole at the
  * `metadata.resourceVersion` it was read at, its `spec.files` — served as the folder's other text files, left out where it has none —
  * the whole set of them where given, so one it leaves out is removed; its `spec.needs` — served apart from the README, read off its
  * frontmatter — written back into that frontmatter where given, and kept as the README has them where left out (`readmeOf`); — a stale
  * one is a 409 — and removed at the `?resourceVersion=` it was read at
- * (`workflows rm`). The builder's refusal of a step is an `Invalid` naming the steps (`steps`).
+ * (`workflows rm`), unless a factory attaches it. The builder's refusal of a step is an `Invalid` naming the steps (`steps`).
  *
  * A step of one is read for its page (`step`, step/step.ts) in the namespace's factory, its folder the one the namespace serves of that
- * name (from `?origin=`, where one is asked); and the builder's form (`keys`), in no namespace, is read from yours' agents.
+ * name (from `?origin=`, where one is asked); and the builder's form (`keys`), in no namespace, is read from the library's agents.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -24,6 +25,7 @@ import {
   definitionRevision,
   factoryDraftIn,
   foldersIn,
+  libraryUsers,
   typedGraphOf,
   unattachedRefusal,
   WORKFLOWS_REMOVE,
@@ -66,7 +68,18 @@ import {
   type WorkflowListing,
   type WorkflowSource,
 } from './workflows.ts';
-import { listed, originIn, servedNamed, servedOf, thereOf, writeGoes, writtenAt, type Held, type Origin } from '../definitions/served.ts';
+import {
+  listed,
+  originIn,
+  servedNamed,
+  servedOf,
+  thereOf,
+  namespacedWriteRefused,
+  writeGoes,
+  writtenAt,
+  type Held,
+  type Origin,
+} from '../definitions/served.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 
 /** A folder of a workflow, where it is: the source word the api's own reads give it, and its path. */
@@ -115,7 +128,7 @@ export const heldIn = (s: Served): Held<Folder>[] => {
   return [
     ...treeWorkflowsHeld(s, 'factory'),
     ...(repo === undefined ? [] : foldersHeld(s, 'repo', 'repo', path.join(repo, 'workflows'))),
-    ...foldersHeld(s, 'yours', 'yours', path.join(s.home, 'workflows')),
+    ...foldersHeld(s, 'user', 'user', path.join(s.home, 'workflows')),
   ];
 };
 
@@ -291,6 +304,29 @@ export async function workflowAt(s: Served, namespace: string, name: string, ask
   return one;
 }
 
+/** The namespace the library is read in: the default factory with no repository, whose workflows are the person's and the builtins. */
+const LIBRARY = 'default';
+
+/** The library's list, as a refusal names it. */
+const LIBRARY_PATH = 'GET /api/workflows';
+
+/** The workflows the library holds: the person's and the builtins, at each origin. */
+const libraryHeld = (s: Served) => heldIn(s).filter((h) => h.origin === 'user' || h.origin === 'builtin');
+
+/** The library's objects of the workflows `served`, in no namespace, each with the factories that attach it. */
+const libraryObjectsOf = async (s: Served, served: Parameters<typeof workflowObjectsOf>[1]): Promise<Workflow[]> =>
+  (await workflowObjectsOf(s, served)).map((one) => ({
+    ...one,
+    status: { ...one.status, factories: libraryUsers(s.home, { kind: 'Workflow', name: one.metadata.name }) },
+  }));
+
+/** The library's workflow `name` (from `asked`, where one is), read now. */
+async function libraryAt(s: Served, name: string, asked?: Origin): Promise<Workflow> {
+  const [one] = await libraryObjectsOf(s, [servedNamed(libraryHeld(s), name, asked, LIBRARY_PATH)]);
+  if (one === undefined) throw new Error(`${name} was served and then not read.`);
+  return one;
+}
+
 /** The steps a write sends, as the builder drafts them, or the first refusal of one, thrown as the `Api`'s error. */
 const draftsOf = (steps: readonly WorkflowStep[], route: string) =>
   steps.map((step, i) => {
@@ -332,9 +368,31 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
     )
     .handle('create', ({ params: { namespace }, payload }) =>
       answeredWriteIn(namespace, async (s) => {
+        namespacedWriteRefused(namespace, 'create', thereOf(heldIn(s), payload.metadata.name));
+      }),
+    )
+    .handle('replace', ({ params: { namespace, name } }) =>
+      answeredWriteIn(namespace, async (s) => {
+        namespacedWriteRefused(namespace, 'replace', thereOf(heldIn(s), name));
+      }),
+    )
+    .handle('delete', ({ params: { namespace, name } }) =>
+      answeredWriteIn(namespace, async (s) => {
+        namespacedWriteRefused(namespace, 'remove', thereOf(heldIn(s), name));
+      }),
+    )
+    .handle('listLibrary', ({ query }) =>
+      answeredWriteIn(LIBRARY, async (s) => {
+        const { origin, ...page } = query;
+        return listed('Workflow', await libraryObjectsOf(s, servedOf(libraryHeld(s), originIn(s, origin))), queryOf(page));
+      }),
+    )
+    .handle('getLibrary', ({ params: { name }, query }) => answeredWriteIn(LIBRARY, (s) => libraryAt(s, name, originIn(s, query.origin))))
+    .handle('createLibrary', ({ payload }) =>
+      answeredWriteIn(LIBRARY, async (s) => {
         const { name } = payload.metadata;
-        const route = `POST /api/namespaces/${namespace}/workflows`;
-        writeGoes(namespace, 'create', thereOf(heldIn(s), name));
+        const route = 'POST /api/workflows';
+        writeGoes('library', 'create', thereOf(libraryHeld(s), name));
         const wrong = workflowNameRefusal(name);
         if (wrong !== undefined) throw new Invalid({ error: `${route}: ${wrong}` });
         if (payload.spec.steps.length === 0)
@@ -342,13 +400,13 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
         const steps = draftsOf(payload.spec.steps, route);
         const at = writing(s, name, false);
         builderRefused(await write(at, steps, readmeOf(at.dir, payload.spec), [], payload.spec.files));
-        return workflowAt(s, namespace, name, 'yours');
+        return libraryAt(s, name, 'user');
       }),
     )
-    .handle('replace', ({ params: { namespace, name }, payload }) =>
-      answeredWriteIn(namespace, async (s) => {
-        const route = `PUT /api/namespaces/${namespace}/workflows/${name}`;
-        writeGoes(namespace, 'replace', thereOf(heldIn(s), name));
+    .handle('replaceLibrary', ({ params: { name }, payload }) =>
+      answeredWriteIn(LIBRARY, async (s) => {
+        const route = `PUT /api/workflows/${name}`;
+        writeGoes('library', 'replace', thereOf(libraryHeld(s), name));
         const steps = draftsOf(payload.spec.steps, route);
         const schemas = schemasOf(payload.schemas, route, SHAPE);
         if ('status' in schemas) throw readerRefused(schemas);
@@ -362,20 +420,20 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
         const now = await s.inRequest(workflowVersion(at.dir, placesOf(at.repo, s.home)));
         if (now !== given) throw new Conflict({ error: workflowStale.write(at.dir, given, now) });
         builderRefused(await write(at, steps, readmeOf(at.dir, payload.spec), schemas, files));
-        return workflowAt(s, namespace, name, 'yours');
+        return libraryAt(s, name, 'user');
       }),
     )
-    .handle('delete', ({ params: { namespace, name }, query }) =>
-      answeredWriteIn(namespace, async (s) => {
-        const route = `DELETE /api/namespaces/${namespace}/workflows/${name}`;
-        writeGoes(namespace, 'remove', thereOf(heldIn(s), name));
+    .handle('deleteLibrary', ({ params: { name }, query }) =>
+      answeredWriteIn(LIBRARY, async (s) => {
+        const route = `DELETE /api/workflows/${name}`;
         const version = query.resourceVersion;
         if (!version)
           throw new Invalid({
             error: `${route} takes the \`?resourceVersion=\` the Workflow was read at, so a folder changed since is not removed unseen.`,
           });
-        const before = await workflowAt(s, namespace, name, 'yours');
-        const { removed } = await s.inRequest(WORKFLOWS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }));
+        writeGoes('library', 'remove', thereOf(libraryHeld(s), name), libraryUsers(s.home, { kind: 'Workflow', name }));
+        const before = await libraryAt(s, name, 'user');
+        const { removed } = await s.inRequest(WORKFLOWS_REMOVE.handler({ from: 'user', name, version, repo: query.repo }));
         return { ...before, status: { ...before.status, removed } };
       }),
     )

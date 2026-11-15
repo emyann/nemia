@@ -60,7 +60,10 @@ export function factoryServersFile(home: string, name: string): string {
  * @param name The factory's name.
  */
 export function readFactoryServers(home: string, name: string): FactoryServersFile | undefined {
-  return readServersAt(factoryServersFile(home, name), `add the server again with nemia factory server add ${name} <server> --url <address>`);
+  return readServersAt(
+    factoryServersFile(home, name),
+    `add the server again with nemia factory server add ${name} <server> --url <address>`,
+  );
 }
 
 /**

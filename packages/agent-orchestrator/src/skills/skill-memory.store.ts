@@ -171,6 +171,12 @@ export function skillDoorMemory(): Layer.Layer<never> {
         othersHeld.set(dir, others);
         return { dir, name, written: ['SKILL.md', ...others.map((file) => file.path)] };
       },
+      remove: (name, at) => {
+        const dir = path.posix.join(at, name);
+        held.delete(dir);
+        othersHeld.delete(dir);
+        return { dir, name };
+      },
     },
   };
   return Layer.succeed(SkillDoor)(skillDoorOver(layer));

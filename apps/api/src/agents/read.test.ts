@@ -26,7 +26,7 @@ test("an agent's file and the schema beside it read as the spec a GET of the sam
   fs.mkdirSync(AGENTS, { recursive: true });
   fs.writeFileSync(path.join(AGENTS, 'scribe.md'), SCRIBE);
   fs.writeFileSync(path.join(AGENTS, 'scribe.schema.json'), SCHEMA);
-  const got = await app.request('/api/namespaces/default/agents/scribe?origin=yours');
+  const got = await app.request('/api/namespaces/default/agents/scribe?origin=user');
   const agent = (await got.json()) as Agent;
   assert.equal(got.status, 200, JSON.stringify(agent));
   assert.equal(agent.status.error, null, 'the file written to yours reads');

@@ -30,13 +30,13 @@ const runOf = (id: string, dir: string, createdAt: string, factory?: string, tas
 
 test("a run's workflow page: yours in its factory, its repository's in its factory or on the repository the request reads, and none for a folder the board does not page", () => {
   assert.deepEqual(workflowPageOf({ workflowDir: '/store/workflows/build', repo: '/r', factory: 'nemia' }, served, home), {
-    from: 'yours',
+    from: 'user',
     workflow: 'build',
     factory: 'nemia',
     repo: '/r',
   });
   assert.deepEqual(workflowPageOf({ workflowDir: '/store/workflows/build', repo: '/r' }, served, home), {
-    from: 'yours',
+    from: 'user',
     workflow: 'build',
     factory: null,
     repo: null,
@@ -59,7 +59,7 @@ test("a run's workflow page: yours in its factory, its repository's in its facto
   );
   assert.deepEqual(
     workflowPageOf({ workflowDir: '/store/workflows/make', repo: '/r', factory: 'nemia' }, undefined, home),
-    { from: 'yours', workflow: 'make', factory: 'nemia', repo: '/r' },
+    { from: 'user', workflow: 'make', factory: 'nemia', repo: '/r' },
     'yours in its factory, whatever repository the request reads',
   );
   assert.equal(
@@ -113,7 +113,7 @@ test('the factories that hire into a step: those that attach its workflow and, f
   ];
   assert.deepEqual(hiredInOf(factories, 'build', 'implement', 'repo', '/r'), [{ factory: 'nemia', agent: 'ada' }]);
   assert.deepEqual(
-    hiredInOf(factories, 'build', 'implement', 'yours', '/r'),
+    hiredInOf(factories, 'build', 'implement', 'user', '/r'),
     [
       { factory: 'nemia', agent: 'ada' },
       { factory: 'far', agent: 'cy' },
@@ -123,7 +123,7 @@ test('the factories that hire into a step: those that attach its workflow and, f
 });
 
 /** An agent as the listing reads it, the keys `hiringOf` reads: of `from`, broken where `error` says. */
-const agentOf = (name: string, from: 'repo' | 'yours', error: string | null = null) => ({
+const agentOf = (name: string, from: 'repo' | 'user', error: string | null = null) => ({
   name,
   from,
   description: error ? null : `${name}, of ${from}`,
@@ -146,7 +146,7 @@ test("a step's hiring: the agents beside its workflow that read, by name — the
   const mill = { name: 'mill', workflows: ['build'] };
   const { read } = readerOf([
     agentOf('zed', 'repo'),
-    agentOf('ada', 'yours'),
+    agentOf('ada', 'user'),
     agentOf('ada', 'repo'),
     agentOf('bad', 'repo', 'no front matter'),
   ]);
@@ -157,7 +157,7 @@ test("a step's hiring: the agents beside its workflow that read, by name — the
       { name: 'zed', description: 'zed, of repo' },
     ],
   });
-  assert.deepEqual(await hiringOf(mill, 'build', {}, null, 'yours', read), {
+  assert.deepEqual(await hiringOf(mill, 'build', {}, null, 'user', read), {
     refused: null,
     agents: [{ name: 'ada', description: 'ada, of yours' }],
   });

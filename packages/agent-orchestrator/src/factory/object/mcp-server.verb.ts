@@ -15,8 +15,12 @@ import { FACTORY_SERVERS, type ServerListed, type ServersListing } from '../serv
 import { factoryFiled } from './factory.verb.ts';
 import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
 
-/** A server's spec, as its record holds it, each header masked where `masked`. */
-const specOf = (server: FactoryServer, masked = true): McpServer['spec'] => ({
+/**
+ * A server's spec, as its record holds it, each header masked where `masked`.
+ * @param server The server as its record holds it.
+ * @param masked Whether each header's value is served as the mask.
+ */
+export const specOf = (server: FactoryServer, masked = true): McpServer['spec'] => ({
   type: server.type,
   url: server.url,
   ...(server.headers === undefined ? {} : { headers: masked ? maskedHeaders(server.headers) : { ...server.headers } }),

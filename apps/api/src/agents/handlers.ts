@@ -23,6 +23,7 @@ import {
   AGENTS,
   AGENTS_COPY,
   AGENTS_CUSTOM,
+  libraryUsers,
   AGENTS_REMOVE,
   AGENTS_SOURCES,
   AGENTS_TRY,
@@ -57,7 +58,18 @@ import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn } from '../objects/refused.ts';
 import { wantsTable } from '../objects/table.ts';
 import { markdownNamesIn } from '../workflows/builder.ts';
-import { listed, originIn, servedNamed, servedOf, thereOf, writeGoes, writtenAt, type Held, type Origin } from '../definitions/served.ts';
+import {
+  listed,
+  originIn,
+  servedNamed,
+  servedOf,
+  thereOf,
+  namespacedWriteRefused,
+  writeGoes,
+  writtenAt,
+  type Held,
+  type Origin,
+} from '../definitions/served.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 
 /** The agents of the factory's tree, read as the repository's are, then told apart by their origin. */
@@ -191,6 +203,29 @@ async function agentAt(s: Served, namespace: string, name: string, asked?: Origi
   return one;
 }
 
+/** The namespace the library is read in: the default factory with no repository, whose agents are the person's and the builtins. */
+const LIBRARY = 'default';
+
+/** The library's list, as a refusal names it. */
+const LIBRARY_PATH = 'GET /api/agents';
+
+/** The agents the library holds: the person's and the builtins, at each origin. */
+const libraryHeld = async (s: Served) => (await heldIn(s)).filter((h) => h.origin === 'user' || h.origin === 'builtin');
+
+/** The library's objects of the agents `served`, in no namespace, each with the factories that add it. */
+const libraryObjectsOf = async (s: Served, served: ReturnType<typeof servedOf<LibraryAgent>>): Promise<Agent[]> =>
+  (await agentObjectsOf(s, served)).map((one) => ({
+    ...one,
+    status: { ...one.status, factories: libraryUsers(s.home, { kind: 'Agent', name: one.metadata.name }) },
+  }));
+
+/** The library's agent `name` (from `asked`, where one is), read now. */
+async function libraryAt(s: Served, name: string, asked?: Origin): Promise<Agent> {
+  const [one] = await libraryObjectsOf(s, [servedNamed(await libraryHeld(s), name, asked, LIBRARY_PATH)]);
+  if (one === undefined) throw new Error(`${name} was served and then not read.`);
+  return one;
+}
+
 /** A write's spec as the draft the package writes: `instructions` its body, `output` its schema. */
 const draftBodyOf = ({ output, instructions, ...lines }: AgentSpec): AgentDraftBody => ({
   ...lines,
@@ -254,20 +289,20 @@ async function instructionsRead(s: Served, name: string): Promise<AgentInstructi
 const A2A_WHY = (name: string) =>
   `Nothing here serves ${name} over A2A: this card describes the agent, and declares no interfaces and no security schemes. A2A marks \`supportedInterfaces\` REQUIRED, so it is not a card a client could call.`;
 
-/** The agent `name` tried on `brief` (`nemia agents run`'s entry): one of yours alone, any other refused with how to copy it. */
-async function triedIn(s: Served, namespace: string, name: string, brief: string | undefined): Promise<{ id: string }> {
-  const route = `POST /api/namespaces/${namespace}/agents/${name}/try`;
-  const held = await heldIn(s);
+/** The agent `name` tried on `brief` (`nemia agents run`'s entry): one of the user library alone, any other refused with how to copy it. */
+async function triedIn(s: Served, name: string, brief: string | undefined): Promise<{ id: string }> {
+  const route = `POST /api/agents/${name}/try`;
+  const held = await libraryHeld(s);
   const there = thereOf(held, name);
-  writeGoes(namespace, 'act', there);
-  if (there !== 'yours') {
-    const agent = servedNamed(held, name, undefined, listPath(namespace)).item;
+  writeGoes('library', 'act', there);
+  if (there !== 'user') {
+    const agent = servedNamed(held, name, undefined, LIBRARY_PATH).item;
     const untried = agent.untried ?? untriedOf({ from: 'repo', name, file: agent.file, keys: {}, schemaFile: null }, s.home);
     throw new Invalid({
-      error: `${route}: ${untried?.why ?? 'only an agent of yours is tried.'}${untried?.copy ? ` \`${untried.copy}\`` : ''}`,
+      error: `${route}: ${untried?.why ?? 'only an agent of the user library is tried.'}${untried?.copy ? ` \`${untried.copy}\`` : ''}`,
     });
   }
-  const { id } = await s.inRequest(AGENTS_TRY.handler({ from: 'yours', name, brief, repo: s.repo }));
+  const { id } = await s.inRequest(AGENTS_TRY.handler({ from: 'user', name, brief, repo: s.repo }));
   return { id };
 }
 
@@ -279,7 +314,7 @@ async function cardIn(s: Served, namespace: string, name: string, origin: string
     throw new Invalid({
       error: `${name} is the factory's own agent, whose card is not drawn here: its skills are \`status.card\` of GET /api/namespaces/${namespace}/agents/${name}?origin=factory.`,
     });
-  const from: 'yours' | 'repo' = served.origin === 'yours' ? 'yours' : 'repo';
+  const from: 'user' | 'repo' = served.origin === 'user' ? 'user' : 'repo';
   const { card } = await s.inRequest(AGENT_CARD.handler({ name, repo: s.repo, from }));
   return { card, servedOverA2A: false as const, why: A2A_WHY(name), from };
 }
@@ -334,61 +369,76 @@ export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
     )
     .handle('create', ({ params: { namespace }, payload }) =>
       answeredWriteIn(namespace, async (s) => {
-        const route = `POST /api/namespaces/${namespace}/agents`;
-        const name = named(route, payload.metadata.name);
-        writeGoes(namespace, 'create', thereOf(await heldIn(s), name));
-        await saved(s, agentDraftOf(draftBodyOf(payload.spec), name));
-        return agentAt(s, namespace, name, 'yours');
+        namespacedWriteRefused(namespace, 'create', thereOf(await heldIn(s), payload.metadata.name ?? ''));
       }),
     )
-    .handle('replace', ({ params: { namespace, name }, payload }) =>
+    .handle('replace', ({ params: { namespace, name } }) =>
       answeredWriteIn(namespace, async (s) => {
-        const route = `PUT /api/namespaces/${namespace}/agents/${name}`;
-        writeGoes(namespace, 'replace', thereOf(await heldIn(s), name));
+        namespacedWriteRefused(namespace, 'replace', thereOf(await heldIn(s), name));
+      }),
+    )
+    .handle('delete', ({ params: { namespace, name } }) =>
+      answeredWriteIn(namespace, async (s) => {
+        namespacedWriteRefused(namespace, 'remove', thereOf(await heldIn(s), name));
+      }),
+    )
+    .handle('listLibrary', ({ query }) =>
+      Effect.flatMap(wantsTable, (table) =>
+        answeredWriteIn(LIBRARY, async (s) => {
+          const { origin, ...page } = query;
+          const list = listed('Agent', await libraryObjectsOf(s, servedOf(await libraryHeld(s), originIn(s, origin))), queryOf(page));
+          return table ? agentTable(list) : list;
+        }),
+      ),
+    )
+    .handle('getLibrary', ({ params: { name }, query }) => answeredWriteIn(LIBRARY, (s) => libraryAt(s, name, originIn(s, query.origin))))
+    .handle('createLibrary', ({ payload }) =>
+      answeredWriteIn(LIBRARY, async (s) => {
+        const name = named('POST /api/agents', payload.metadata.name);
+        writeGoes('library', 'create', thereOf(await libraryHeld(s), name));
+        await saved(s, agentDraftOf(draftBodyOf(payload.spec), name));
+        return libraryAt(s, name, 'user');
+      }),
+    )
+    .handle('replaceLibrary', ({ params: { name }, payload }) =>
+      answeredWriteIn(LIBRARY, async (s) => {
+        const route = `PUT /api/agents/${name}`;
+        writeGoes('library', 'replace', thereOf(await libraryHeld(s), name));
         const version = versioned(route, payload.metadata.resourceVersion);
         const to = payload.metadata.name === undefined ? name : named(route, payload.metadata.name);
         const given = agentDraftOf(draftBodyOf(payload.spec), to);
         await saved(s, { ...given, version, name });
-        return agentAt(s, namespace, to, 'yours');
+        return libraryAt(s, to, 'user');
       }),
     )
-    .handle('delete', ({ params: { namespace, name }, query }) =>
-      answeredWriteIn(namespace, async (s) => {
-        const route = `DELETE /api/namespaces/${namespace}/agents/${name}`;
-        writeGoes(namespace, 'remove', thereOf(await heldIn(s), name));
+    .handle('deleteLibrary', ({ params: { name }, query }) =>
+      answeredWriteIn(LIBRARY, async (s) => {
+        const route = `DELETE /api/agents/${name}`;
         const version = versioned(route, query.resourceVersion);
-        const before = await agentAt(s, namespace, name, 'yours');
-        const { removed } = await s.inRequest(AGENTS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }));
+        writeGoes('library', 'remove', thereOf(await libraryHeld(s), name), libraryUsers(s.home, { kind: 'Agent', name }));
+        const before = await libraryAt(s, name, 'user');
+        const { removed } = await s.inRequest(AGENTS_REMOVE.handler({ from: 'user', name, version, repo: query.repo }));
         return { ...before, status: { ...before.status, removed } };
       }),
     )
-    .handle('try', ({ params: { namespace, name }, payload }) =>
-      answeredWriteIn(namespace, (s) => triedIn(s, namespace, name, payload.brief)),
-    )
+    .handle('tryLibrary', ({ params: { name }, payload }) => answeredWriteIn(LIBRARY, (s) => triedIn(s, name, payload.brief)))
+    .handle('copyLibrary', ({ payload }) => answered((s) => s.inRequest(AGENTS_COPY.handler(payload))))
     .handle('card', ({ params: { namespace, name }, query }) => answeredWriteIn(namespace, (s) => cardIn(s, namespace, name, query.origin)))
     .handle('read', ({ payload }) => answered(async () => agentReadOf(payload)))
     .handle('sources', ({ query }) => answered((s) => s.inRequest(AGENTS_SOURCES.handler(query))))
-    .handle('copy', ({ params: { namespace }, payload }) =>
-      answeredWriteIn(namespace, (s) => {
-        writeGoes(namespace, 'act', 'yours');
-        return s.inRequest(AGENTS_COPY.handler(payload));
-      }),
-    )
     .handle('instructions', ({ params: { namespace, name } }) =>
       answeredIn(namespace, (s) => instructionsRead(s, agentNamed(`GET ${instructionsPath(namespace, name)}`, name))),
     )
-    .handle('putInstructions', ({ params: { namespace, name }, payload: { words } }) =>
-      answeredWriteIn(namespace, async (s) => {
-        writeGoes(namespace, 'act', 'yours');
-        const agent = agentNamed(`PUT ${instructionsPath(namespace, name)}`, name);
-        return wordsOf(await s.inRequest(AGENTS_CUSTOM.handler({ name: agent, repo: s.repo, words })));
+    .handle('putInstructions', ({ params: { name }, query, payload: { words } }) =>
+      answered(async (s) => {
+        const agent = agentNamed(`PUT /api/agents/${name}/instructions`, name);
+        return wordsOf(await s.inRequest(AGENTS_CUSTOM.handler({ name: agent, repo: query.repo, words })));
       }),
     )
-    .handle('deleteInstructions', ({ params: { namespace, name } }) =>
-      answeredWriteIn(namespace, async (s) => {
-        writeGoes(namespace, 'act', 'yours');
-        const agent = agentNamed(`DELETE ${instructionsPath(namespace, name)}`, name);
-        return clearedOf(await s.inRequest(AGENTS_CUSTOM.handler({ name: agent, repo: s.repo, clear: true })));
+    .handle('deleteInstructions', ({ params: { name }, query }) =>
+      answered(async (s) => {
+        const agent = agentNamed(`DELETE /api/agents/${name}/instructions`, name);
+        return clearedOf(await s.inRequest(AGENTS_CUSTOM.handler({ name: agent, repo: query.repo, clear: true })));
       }),
     ),
 );

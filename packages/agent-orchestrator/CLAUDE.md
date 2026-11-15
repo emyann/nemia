@@ -228,7 +228,7 @@ of its kind, never from an older file that looks alike:
   inputs before it is served and rebuilt on a restart: a new input of a run's judgement goes into what it checks too. Beside a run's
   judgement it keeps the RunList's object built on it (`keepObject`), served exactly while that judgement is (`keptObject`); the
   object's parts no stamp watches — `onDisk`, a folder run's step files, the workflow folder's `warning` — are read on every request
-  (`diskPartsOf`, `src/object/run.verb.ts`). A new input of a run's object goes into what the informer checks, or into those parts.
+  (`diskPartsOf`, `src/object/run.verb.ts`), each step's artifacts folder by the run's own read alone: a listed object reads none. A new input of a run's object goes into what the informer checks, or into those parts.
 - **A test that starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`**: the daemon frees a finished
   run's worktrees on a sweep beside its passes (`freeOnce`, `src/forget/prune/free.verb.ts`).
 - **The daemon measures the store's disk on a sweep beside its passes** (`diskOnce`, `src/disk/disk.verb.ts`): a test daemon walks its

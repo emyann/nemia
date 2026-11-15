@@ -61,8 +61,9 @@ import { saidOf } from '../say/say.ts';
  * What `runObject` is handed beside its services: what a caller's reads keep between requests (`said`, where each blocked session's
  * conversation was last read), and `inRequest`, which runs the drift's program
  * (`driftNow`) over a request's own services, so it reads the doors the api was given; without it the drift runs over the program's own.
- * `listed` judges the run as a list says it, which a board polls: no harness asked for a blocked session's last line, and no drift
- * read through the doors, so each step's `lastLine` is null and `kinds` empty there, and the run read alone says them.
+ * `listed` judges the run as a list says it, which a board polls: no harness asked for a blocked session's last line, no drift read
+ * through the doors and no step's artifacts folder read, so each step's `lastLine` is null, `kinds` empty and `artifactsFolder` absent
+ * there, and the run read alone says them.
  */
 export type RunReads = {
   readonly memo: { readonly said: LastSaid };
@@ -175,12 +176,19 @@ function roundSpend(clock: Timeline, steps: readonly StepSpec[], total: Timeline
 /**
  * Every file a folder run's step folder holds (`folderFiles`), for a person who never opens a terminal; empty where there is no folder. A
  * folder that cannot be read answers with why instead of a list, since the board words an empty list as the step having made nothing.
- * And every file of the step's artifacts folder (`artifactsDir`), on every place, named by its closeout or not, linked under the
- * artifacts route: absent where the step has no such folder, as one not filed yet has none.
+ * And, unless `listed`, every file of the step's artifacts folder (`artifactsDir`), on every place, named by its closeout or not, linked
+ * under the artifacts route: absent where the step has no such folder, as one not filed yet has none, and on a list's item, which reads
+ * no artifacts folder: the run's own read carries it.
  */
-function filesOf(run: Run, home: string, step: string): Pick<RunStepStatus, 'files' | 'filesError' | 'artifactsFolder'> {
+function filesOf(
+  run: Run,
+  home: string,
+  step: string,
+  listed: boolean,
+): Pick<RunStepStatus, 'files' | 'filesError' | 'artifactsFolder'> {
   const dir = workFolderOf(run, step);
   const { files, error } = dir ? folderFiles(run, step, dir, 'files') : { files: [], error: null };
+  if (listed) return { files, filesError: error };
   const artifacts = artifactsDir(home, run, step);
   return {
     files,
@@ -356,7 +364,7 @@ export const runObjectOf = Effect.fnUntraced(function* (
   at: RunReading,
   reads: { readonly said: LastSaid } & Pick<RunReads, 'inRequest' | 'listed'>,
 ) {
-  return withDiskParts(yield* runObjectCore(run, at, reads), diskPartsOf(run, at.home, at.folder));
+  return withDiskParts(yield* runObjectCore(run, at, reads), diskPartsOf(run, at.home, at.folder, reads.listed ?? false));
 });
 
 /** A digest of `value`, as every other kind's `resourceVersion` is taken (`valueVersion`). */
@@ -403,8 +411,8 @@ export const runObjectCore = Effect.fnUntraced(function* (
 /**
  * The parts of a run's object that rest on the disk and on no input the informer checks, read on every request: what `nemia prune` would
  * find (`onDisk`, which a prune, the free sweep or a hand removes with no stamp moved), each step's files in a folder run's step folder
- * (`files`, `filesError`) and in its artifacts folder (`artifactsFolder`), and what the workflow folder as it loads now says against
- * the run (`warning`).
+ * (`files`, `filesError`) and in its artifacts folder (`artifactsFolder`, which a list's item leaves out), and what the workflow folder
+ * as it loads now says against the run (`warning`).
  */
 export type RunDiskParts = {
   readonly onDisk: RunStatus['onDisk'];
@@ -418,11 +426,17 @@ type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 /** The parts read on every request are exactly the inputs `RUN_INPUTS` says a request watches: one added there fails the typecheck here. */
 export const diskPartsHeld: Same<keyof RunDiskParts, InputsWatchedBy<'request'>> = true;
 
-/** The disk parts of `run` (`RunDiskParts`), off the store's root `home` and its workflow `folder` as it loads now (`workflowsOf`). */
-export const diskPartsOf = (run: Run, home: string, folder: RunReading['folder']): RunDiskParts => ({
+/**
+ * The disk parts of a run (`RunDiskParts`).
+ * @param run the run whose parts are read
+ * @param home the store's root, under which its artifacts and worktrees are
+ * @param folder its workflow folder as it loads now (`workflowsOf`)
+ * @param listed whether the object is a list's item, which reads no step's artifacts folder and lays no `artifactsFolder`
+ */
+export const diskPartsOf = (run: Run, home: string, folder: RunReading['folder'], listed: boolean): RunDiskParts => ({
   onDisk: onDiskOf(run, home),
   warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
-  files: (step) => filesOf(run, home, step),
+  files: (step) => filesOf(run, home, step, listed),
 });
 
 /**

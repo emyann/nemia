@@ -13,8 +13,8 @@ import type { READ_SHAPES } from './words.ts';
 /** What a read answers at most: `byDefault` where its count is not asked, and `most` whatever is asked, as Kubernetes' server may. */
 export type PageBounds = { readonly byDefault: number; readonly most: number };
 
-/** A list's page: 100 objects where no `limit` is asked, and never more than 500. */
-export const LIST_PAGE: PageBounds = { byDefault: 100, most: 500 };
+/** A list's page: 20 objects where no `limit` is asked, and never more than 500. */
+export const LIST_PAGE: PageBounds = { byDefault: 20, most: 500 };
 
 /** A step's conversation's page: 200 events where neither `limit` nor `last` is asked, and never more than 1,000. */
 export const TRANSCRIPT_PAGE: PageBounds = { byDefault: 200, most: 1000 };

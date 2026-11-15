@@ -36,6 +36,7 @@
     "e2e": "npm run e2e --workspace web --",
     "board:serve": "npm run board:serve --workspace web",
     "board:stop": "npm run board:stop --workspace web",
+    "storybook": "npm run storybook --workspace web",
     "release:check": "npm run typecheck && npm test"
   },
   "devDependencies": {

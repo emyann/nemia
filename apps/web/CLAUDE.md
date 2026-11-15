@@ -67,7 +67,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   e2e`, run them first, two files at a time (`LOOK_TESTS`, `e2e/look.ts`); `--pages` and `--shard` run none. A web test that needs
   no browser sits in `test/`.
 - The stories are the one place the parts are shown, in two hosts under one decorator (`.storybook/preview.tsx`: the look's ground,
-  a router of the story's own in memory, `data-at` where it stands). `npm run storybook`, from `apps/web`, is a person's, on port
+  a router of the story's own in memory, `data-at` where it stands). `npm run storybook`, from `apps/web` or the root, is a person's, on port
   6007, in no check; dark follows the system alone, so its toolbar switches nothing. The checks read the stories' page,
   `test/e2e/parts/main.tsx` (`?part=<name>`, `?story=<id>`), built into a scratch folder by `buildParts` and never by `npm run
   build`: `test/e2e/parts.test.ts` presses it (`npm run e2e -- --look`), and `node test/e2e/parts-photos.ts` pictures it, light then dark.

@@ -5,8 +5,9 @@
  * entries load, which cannot load `objects` at run time: `wordsHeld` holds each such tuple equal to these at compile time, both ways
  * (`packages/agent-orchestrator/src/object/run.model.ts`), so a word added on one side alone fails the typecheck.
  *
- * `nemia/v1` is additions only: a word is never renamed or dropped under it, and a word added is one an older reader refuses, so it is a
- * change of the version (`packages/objects/CLAUDE.md`).
+ * `nemia/v1` is additions only once it has a client besides the owner's board, CLI and MCP port: until then a word is renamed at once,
+ * the three moved with it and the break said beside the word (the origin `user`, once spelled otherwise, and the write way `library`);
+ * from then on a word is never renamed or dropped under it, and a word added is a change of the version (`packages/objects/CLAUDE.md`).
  */
 
 /**

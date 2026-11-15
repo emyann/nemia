@@ -117,7 +117,7 @@ export const AGENTS_SOURCES_WORDS = {
   class: 'read',
   only: {
     side: 'cli',
-    why: "the api serves it as the Agent's `sources` verb of `objects`' Api (`GET /api/agents/sources`), which calls this entry's handler: no route of its own",
+    why: "the api serves it as the Agent's `sources` verb of `objects`' Api (`GET /api/agent-sources`), which calls this entry's handler: no route of its own",
   },
 } as const satisfies CommandWords;
 

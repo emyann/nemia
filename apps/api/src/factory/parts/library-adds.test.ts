@@ -67,10 +67,10 @@ test('a person adds a skill of the library to a factory: listed with it, its rem
     assert.deepEqual(((await res.json()) as { users?: string[] }).users, ['shop']);
     assert.ok(fs.existsSync(path.join(root, 'workflows', 'skills', 'tidy', 'SKILL.md')));
   });
-  await s.test('REFUSED: a write of the library sent to the factory namespace is a 422 naming the way it takes', async () => {
+  await s.test("REFUSED: a skill made in a factory's namespace is a 422 naming the factory's way, a proposal", async () => {
     const res = await send('POST', '/api/namespaces/shop/skills', { metadata: { name: 'other' }, spec: tidy });
     assert.equal(res.status, 422);
-    assert.ok(['factory', 'library'].includes(((await res.json()) as { way?: string }).way ?? ''), 'the refusal names a way');
+    assert.equal(((await res.json()) as { way?: string }).way, 'factory');
   });
   await s.test('the skill gone from the library by hand, its add shows missing, with the fix', async () => {
     const kept = path.join(scratch('nemia-api-adds-kept-'), 'tidy');

@@ -516,7 +516,7 @@ export const DefinitionFiles = Schema.Struct({
 export type DefinitionFiles = typeof DefinitionFiles.Type;
 
 /**
- * One key of a step's form (`GET /api/workflows/keys`): the key, the package's line of what it means, how it is set, the words it may be
+ * One key of a step's form (`GET /api/workflow-keys`): the key, the package's line of what it means, how it is set, the words it may be
  * set to where there are some, and, for a key whose words are the harness's, those of each harness.
  */
 export const KeyField = Schema.Struct({
@@ -531,7 +531,7 @@ export const KeyField = Schema.Struct({
 export type KeyField = typeof KeyField.Type;
 
 /**
- * What the builder's form is drawn from (`GET /api/workflows/keys`): every key a step may set, in the package's order, the default
+ * What the builder's form is drawn from (`GET /api/workflow-keys`): every key a step may set, in the package's order, the default
  * harness, the keys an agent may set (`roleKeys`) and those a step's file sets as its policy over its agent (`policyKeys`), the role values
  * each agent of the person's library gives a step it is attached to (`agents`), and how a step names a remote A2A agent with the keys it
  * may not set.

@@ -202,7 +202,7 @@ export const AgentCard = Schema.Struct({
 export type AgentCard = typeof AgentCard.Type;
 
 /**
- * One agent file the store knows of (`GET /api/agents/sources`): where it was found (`place`, and `repo` for a repository's), its folder
+ * One agent file the store knows of (`GET /api/agent-sources`): where it was found (`place`, and `repo` for a repository's), its folder
  * and file, its name, what it says it is for, its version (what a copy records), and, for one that does not read, why.
  */
 export const AgentSource = Schema.Struct({

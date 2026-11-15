@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Response } from 'playwright';
+import { LIST_PAGE } from 'objects';
 import { fed, openFold, partOf, photograph, stepBar, themeOf, isRunAction } from '../board.ts';
 import { cardOf, expectClearOfEachOther, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
@@ -41,7 +42,7 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      const listed = await (await refused.request.get(new URL('/api/runs', page.url()).href)).text();
+      const listed = await (await refused.request.get(new URL(`/api/runs?limit=${LIST_PAGE.most}`, page.url()).href)).text();
       await refused.route(
         (url) => url.pathname === '/api/runs' && !url.searchParams.has('fieldSelector'),
         (route) => route.fulfill({ status: 200, contentType: 'application/json', body: listed }),

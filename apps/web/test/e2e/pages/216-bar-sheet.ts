@@ -10,7 +10,7 @@ import {
   herFaceOf,
   openChat,
   photograph,
-  railColumnOf,
+  paneOf,
   railPlace,
   startOf,
   themeOf,
@@ -28,9 +28,9 @@ const FLOOR = `/factories/${FACTORY}`;
 const OPEN = `start:${FACTORY}`;
 /** The sheet's one width, Material's most for a side sheet. */
 const SHEET = 400;
-/** The window at 1600, where the sheet docks beside an open rail. */
+/** The window at 1600, where the sheet docks beside the factory pane. */
 const WIDE = { width: 1600, height: 900 };
-/** The window at 1280, where an open rail folds for the sheet. */
+/** The window at 1280, where the sheet covers the factory pane. */
 const MEDIUM = { width: 1280, height: 800 };
 /** Her chat's stream, which the frame follows once for the visit. */
 const CHAT_STREAM = '/api/nemia/chat/stream';
@@ -54,11 +54,11 @@ async function visit(page: Page, to: string): Promise<void> {
   await idle(page);
 }
 
-/** Presses the sidebar's Start a run and waits for the bar it opens in the sheet. */
+/** Presses the pane's Start a run and waits for the bar it opens in the sheet. */
 async function openFromSidebar(page: Page): Promise<Locator> {
   await startOf(page).click();
   const bar = barOf(page);
-  await expectVisible(bar, "the sidebar's Start a run opens its bar in the frame's side sheet");
+  await expectVisible(bar, "the pane's Start a run opens its bar in the frame's side sheet");
   return bar;
 }
 
@@ -70,17 +70,16 @@ async function expectClosed(page: Page, pathname: string, assertion: string): Pr
     throw new Refused(`${assertion}: the address keeps ${pathname} and loses bar — it is ${url.pathname}${url.search}`);
 }
 
-/** Refuses unless the focus is back on the sidebar's Start a run, which opened the bar. */
+/** Refuses unless the focus is back on the pane's Start a run, which opened the bar. */
 async function expectFocusBack(page: Page, assertion: string): Promise<void> {
   if (!(await startOf(page).evaluate((el) => el === document.activeElement))) {
     const now = await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 120) ?? 'nothing');
-    throw new Refused(`${assertion}: the sidebar's Start a run holds the focus — ${now} does`);
+    throw new Refused(`${assertion}: the pane's Start a run holds the focus — ${now} does`);
   }
 }
 
-/** The rail stands `state` (`expanded`, `collapsed`). */
-const expectRail = (page: Page, state: string, assertion: string): Promise<void> =>
-  expectVisible(railColumnOf(page).and(page.locator(`[data-state="${state}"]`)), assertion);
+/** The factory pane is drawn beside the rail when `shown`, and is not drawn when not. */
+const expectPane = (page: Page, shown: boolean, assertion: string): Promise<void> => expectCount(paneOf(page), shown ? 1 : 0, assertion);
 
 /** This browser's `sidebar_state` pair: none where it was never written. */
 const railCookie = (page: Page): Promise<string | undefined> =>
@@ -113,7 +112,7 @@ async function expectDocked(page: Page, bar: Locator, assertion: string): Promis
 }
 
 /**
- * At 1600 the bar docks in the sheet beside the page and an open rail: the page narrows by the sheet's width, the address names it, and
+ * At 1600 the bar docks in the sheet beside the page and the factory pane: the page narrows by the sheet's width, the address names it, and
  * nothing floats. A picture of it.
  */
 async function docks(page: Page): Promise<void> {
@@ -125,7 +124,7 @@ async function docks(page: Page): Promise<void> {
   if (barInUrl(page) !== OPEN) throw new Refused(`the address names the bar as bar=${OPEN} — it is ${page.url()}`);
   await expectSheetShows(page, 'bar', 'the sheet shows the bar');
   await expectDocked(page, bar, 'at 1600');
-  await expectRail(page, 'expanded', 'at 1600 an open rail stays open beside the sheet');
+  await expectPane(page, true, 'at 1600 the pane stays docked beside the sheet');
   await expectNone(async () => {
     const after = (await boxOf(main, 'the page')).width;
     return Math.abs(before - after - SHEET) > 2 ? `${before} became ${after}` : null;
@@ -145,14 +144,14 @@ async function inTheAddress(page: Page): Promise<void> {
   await visit(page, `/runs?bar=${OPEN}`);
   await expectVisible(barOf(page), 'the same address opens the same bar on the Runs page');
   await expectVisible(page.locator('header', { hasText: 'Runs' }), 'with the Runs page beside it');
-  await railPlace(page, 'Inbox').click();
+  await railPlace(page, 'Agents').click();
   await idle(page);
-  await expectClosed(page, '/inbox', 'a link to another page closes the bar');
+  await expectClosed(page, '/agents', 'a link to another page closes the bar');
 }
 
 /**
  * Escape closes the bar, from inside it and from the page, in place of the history entry; so does its Close button; both give the focus
- * back to the sidebar's Start a run.
+ * back to the pane's Start a run.
  */
 async function closes(page: Page): Promise<void> {
   await visit(page, FLOOR);
@@ -257,31 +256,27 @@ async function oneAtATime(page: Page): Promise<void> {
 }
 
 /**
- * At 1280 an open rail folds while the bar's sheet is open and comes back when it closes, with no `sidebar_state` written; the menu
- * button brings it back beside the sheet. A picture of each.
+ * At 1280 the factory pane is covered while the bar's sheet is open and comes back when it closes, with no `sidebar_state` written:
+ * the person folded nothing. A picture of it covered.
  */
-async function railFolds(page: Page): Promise<void> {
+async function paneCovered(page: Page): Promise<void> {
   await page.setViewportSize(MEDIUM);
   await visit(page, FLOOR);
-  await expectRail(page, 'expanded', 'at 1280 the rail stands open before the sheet');
+  await expectPane(page, true, 'at 1280 the pane stands before the sheet');
   const cookie = await railCookie(page);
   const bar = await openFromSidebar(page);
   await expectDocked(page, bar, 'at 1280');
-  await expectRail(page, 'collapsed', 'at 1280 the open rail folds beside the bar');
-  if ((await railCookie(page)) !== cookie) throw new Refused('the fold for the sheet writes no sidebar_state');
+  await expectPane(page, false, 'at 1280 the sheet covers the pane');
+  if ((await railCookie(page)) !== cookie) throw new Refused('covering the pane writes no sidebar_state');
   await settled(page);
-  await photograph(page, path.join(OUT, `bar-sheet-folded-${await themeOf(page)}.png`));
-  await page.locator('[data-menu-button]').click();
-  await expectRail(page, 'expanded', 'the menu button brings the rail back beside the sheet');
-  await expectDocked(page, bar, 'with the rail back');
-  if ((await railCookie(page)) !== cookie) throw new Refused('asked back, the rail writes no sidebar_state');
+  await photograph(page, path.join(OUT, `bar-sheet-covered-${await themeOf(page)}.png`));
   await bar.getByRole('button', { name: 'Close' }).click();
   await expectSheetShows(page, 'none', 'Close closes the sheet');
-  await expectRail(page, 'expanded', 'and the rail stands as the person keeps it');
+  await expectPane(page, true, 'and the pane comes back');
   await openFromSidebar(page);
-  await expectRail(page, 'collapsed', 'opened again, the rail folds again: the ask was forgotten when the sheet closed');
+  await expectPane(page, false, 'opened again, the sheet covers the pane again');
   await barOf(page).getByRole('button', { name: 'Close' }).click();
-  await expectRail(page, 'expanded', 'and comes back as the sheet closes');
+  await expectPane(page, true, 'and the pane comes back as the sheet closes');
   if ((await railCookie(page)) !== cookie) throw new Refused('closing the sheet writes no sidebar_state');
 }
 
@@ -390,11 +385,11 @@ async function pagesBeside(page: Page): Promise<void> {
 export default {
   /**
    * What the address's `?bar=` names opens in the frame's one side sheet, docked at the right of the page as her chat is, opened here by
-   * the sidebar's Start a run on a factory's floor. At 1600 it is 400 wide beside an open rail and the page narrows by as much. The
+   * the pane's Start a run on a factory's floor. At 1600 it is 400 wide beside the factory pane and the page narrows by as much. The
    * address holds it, `?bar=start:<factory>`, the same on every page: a reload keeps it, Back closes it, and a link to another page
    * closes it. Escape and its Close button close it, Escape in place of its history entry, and give the focus back to what opened it;
    * Escape in a field of the page that holds text leaves the field. One sheet at a time: the bar and her chat replace each other, a bar
-   * closed after replacing her leaves no sheet, and her chat's stream is kept throughout. At 1280 an open rail folds for it without
+   * closed after replacing her leaves no sheet, and her chat's stream is kept throughout. At 1280 it covers the pane without
    * writing `sidebar_state`. On a phone it is the kit's modal sheet. Beside a run's sheet at 1280 and 1600 the Runs page's tables and the
    * floor are still read. The window's size is taken back.
    */
@@ -409,7 +404,7 @@ export default {
       await closes(page);
       await pageField(page);
       await oneAtATime(page);
-      await railFolds(page);
+      await paneCovered(page);
       await pagesBeside(page);
       await onPhone(page);
     } finally {

@@ -634,9 +634,9 @@ test('a link to a factory definition keeps its factory and repository in its add
   const { AgentLink, SkillLink } = await import('../src/components/agent/AgentParts.tsx');
   const place = { factory: 'treed', repo: '/r' };
   const agent = await routedWith(createElement(AgentLink, { from: 'factory', name: 'drafter', place }));
-  assert.match(agent, /href="\/agents\/factory\/drafter\?factory=treed&amp;repo=%2Fr"/, 'the agent link names the factory');
+  assert.match(agent, /href="\/factories\/treed\/agents\/drafter\?repo=%2Fr"/, 'the agent link names the factory');
   const skill = await routedWith(createElement(SkillLink, { from: 'factory', name: 'outline', place }));
-  assert.match(skill, /href="\/agents\/skills\/factory\/outline\?factory=treed&amp;repo=%2Fr"/, 'the skill link names the factory');
+  assert.match(skill, /href="\/factories\/treed\/skills\/outline\?repo=%2Fr"/, 'the skill link names the factory');
   const yours = await routedWith(createElement(AgentLink, { from: 'yours', name: 'drafter', place }));
   assert.match(yours, /href="\/agents\/yours\/drafter"/, 'a link of yours is read in default, with no factory');
 });
@@ -646,25 +646,25 @@ test('a link to a factory definition given no place is read in the factory of th
   const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
   const router = createRouter({
     routeTree: createRootRoute(),
-    history: createMemoryHistory({ initialEntries: ['/agents?factory=treed'] }),
+    history: createMemoryHistory({ initialEntries: ['/factories/treed/agents'] }),
   });
   await router.load();
   const html = renderToStaticMarkup(
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
     createElement(RouterContextProvider, { router, children: createElement(AgentLink, { from: 'factory', name: 'drafter' }) }),
   );
-  assert.match(html, /href="\/agents\/factory\/drafter\?factory=treed"/, "the page's factory is carried");
+  assert.match(html, /href="\/factories\/treed\/agents\/drafter"/, "the page's factory is carried");
 });
 
 test("a link to a repository's agent, or to a node of a repository's workflow, keeps the factory it is read in: the default reads no repository", async () => {
   const { AgentLink, UsedBy } = await import('../src/components/agent/AgentParts.tsx');
   const place = { factory: 'treed', repo: '/r' };
   const agent = await routedWith(createElement(AgentLink, { from: 'repo', name: 'drafter', place }));
-  assert.match(agent, /href="\/agents\/repo\/drafter\?factory=treed&amp;repo=%2Fr"/, "a repository's agent link names the factory");
+  assert.match(agent, /href="\/factories\/treed\/agents\/drafter\?from=repo&amp;repo=%2Fr"/, "a repository's agent link names the factory");
   const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
   const router = createRouter({
     routeTree: createRootRoute(),
-    history: createMemoryHistory({ initialEntries: ['/agents/repo/drafter?factory=treed'] }),
+    history: createMemoryHistory({ initialEntries: ['/factories/treed/agents/drafter?from=repo'] }),
   });
   await router.load();
   const usedBy = {
@@ -683,11 +683,15 @@ test("a link to a repository's agent, or to a node of a repository's workflow, k
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
     createElement(RouterContextProvider, { router, children: createElement(UsedBy, { listing: usedBy }) }),
   );
-  assert.match(html, /href="\/workflows\/repo\/dev\/implement\?factory=treed"/, "a repository's node, in the page's factory");
+  assert.match(html, /href="\/factories\/treed\/workflows\/repo\/dev\/implement"/, "a repository's node, in the page's factory");
   assert.match(html, /href="\/workflows\/yours\/mine\/plan"/, 'a node of yours, with none');
-  assert.match(html, /href="\/workflows\/yours\/mine\/ship\?factory=treed"/, 'a step of yours the factory hires it into, in that factory');
+  assert.match(
+    html,
+    /href="\/factories\/treed\/workflows\/yours\/mine\/ship"/,
+    'a step of yours the factory hires it into, in that factory',
+  );
   assert.equal(
-    html.match(/href="\/workflows\/factory\/build\/review\?factory=treed"/g)?.length,
+    html.match(/href="\/factories\/treed\/workflows\/factory\/build\/review"/g)?.length,
     1,
     'a step the factory fills, in its factory, once',
   );

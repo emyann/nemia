@@ -1,10 +1,12 @@
 /**
- * How the frame stands around its one side sheet (`frameFold`, src/lib/frameFold.ts), from what holds now: how wide the window is, whether
- * the person keeps the rail open (the `sidebar_state` cookie's fold, as the sidebar provider holds it), whether the address's `?bar=`
- * names a thing, whether they opened her sheet, whether they asked for the rail back while it was folded for the sheet, and whether the
- * page is her chat's own (`/chat`). One sheet at a time: what the bar names takes the sheet, and naming one closes her chat
- * (`HerSheetProvider`). Level-triggered: the rail folded for the sheet is never written as the person's fold, so it comes back as it was
- * the moment the sheet closes.
+ * How the frame stands around its one side sheet and its factory pane (`frameFold`, src/lib/frameFold.ts), from what holds now: how wide
+ * the window is, whether the page sits in a factory's pane (`seatOf`, src/components/nav/nav.ts), whether the person keeps that pane open
+ * (the `sidebar_state` cookie's fold, as the sidebar provider holds it), whether the address's `?bar=` names a thing, whether they opened
+ * her sheet, and whether the page is her chat's own (`/chat`). The rail is the store's and never folds: it is the collapsed rail at the
+ * window's left, or on a narrow screen the modal drawer. One sheet at a time: what the bar names takes the sheet, and naming one closes
+ * her chat (`HerSheetProvider`). At 1600 and wider the sheet is the third pane, beside the factory pane; narrower it opens over the
+ * factory pane, which comes back the moment it closes. Level-triggered: the pane covered by the sheet is never written as the person's
+ * fold.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
@@ -14,20 +16,26 @@ export type FrameWidth = 'narrow' | 'medium' | 'wide';
 /** What the frame's fold is decided from. */
 export type FrameAt = {
   readonly width: FrameWidth;
-  /** The rail as the person last left it (`useSidebar().open`): open, or closed by them. */
-  readonly railOpen: boolean;
+  /** The page sits in one factory's pane (`seatOf` answers the factory level), so the frame draws that pane. */
+  readonly hasPane: boolean;
+  /** The factory pane as the person last left it (`useSidebar().open`): open, or folded by them with the menu button or Ctrl+B. */
+  readonly paneOpen: boolean;
   /** The address's `?bar=` names a thing to show (`useBar().open`), on any page, hers included. */
   readonly barOpen: boolean;
   /** Her sheet was opened by her face and not closed since. */
   readonly sheetOpen: boolean;
-  /** While the rail was folded for the sheet, the person pressed the menu button to have it back; forgotten once no sheet is drawn. */
-  readonly railAsked: boolean;
   /** The page is her chat's own (`staticData.ownsChat`, `/chat`). */
   readonly ownsChat: boolean;
 };
 
-/** The rail: wide with its labels, narrow, or, on a narrow screen, the modal drawer the top bar's menu button opens. */
-export type RailForm = 'expanded' | 'collapsed' | 'drawer';
+/** The store's rail: docked at the window's left, collapsed, or, on a narrow screen, the modal drawer the menu button opens. */
+export type RailForm = 'docked' | 'drawer';
+
+/**
+ * The factory pane: not drawn, the page sitting in no factory; docked, the list pane left of the page; folded by the person; covered by
+ * the docked sheet under 1600; or, on a narrow screen, a section of the modal drawer under the rail's groups.
+ */
+export type PaneForm = 'none' | 'docked' | 'folded' | 'covered' | 'drawer';
 
 /** The sheet: not drawn, docked in the frame's layout beside the page, or the kit's modal sheet over the page. */
 export type SheetForm = 'none' | 'docked' | 'modal';
@@ -35,14 +43,12 @@ export type SheetForm = 'none' | 'docked' | 'modal';
 /** What the one sheet shows: nothing, what the address's `?bar=` names, or her chat. */
 export type SheetShows = 'none' | 'bar' | 'her';
 
-/**
- * How the frame stands, what its sheet shows, and whether the rail is narrow only for the sheet (the menu button then asks for it back).
- */
+/** How the frame stands: its rail, its factory pane, its sheet and what the sheet shows. */
 export type FrameFold = {
   readonly rail: RailForm;
+  readonly pane: PaneForm;
   readonly sheet: SheetForm;
   readonly shows: SheetShows;
-  readonly foldedForSheet: boolean;
 };
 
 /** Her chat is wanted in the sheet: her face opened it, the page is not her chat's own, and no bar's thing has taken the sheet. */
@@ -51,8 +57,11 @@ const herShown = (at: FrameAt): boolean => at.sheetOpen && !at.ownsChat && !at.b
 /** The sheet is wanted: the address names a bar's thing, or her chat is wanted in it. */
 const sheetWanted = (at: FrameAt): boolean => at.barOpen || herShown(at);
 
-/** The rail makes room for the docked sheet: between the narrow screen and 1600, and the person has not asked for it back. */
-const foldsForSheet = (at: FrameAt): boolean => at.width === 'medium' && sheetWanted(at) && !at.railAsked;
+/** The factory pane is drawn beside the page as the person keeps it: the page sits in one, the screen is not narrow, and it is open. */
+const paneKept = (at: FrameAt): boolean => at.hasPane && at.width !== 'narrow' && at.paneOpen;
+
+/** The docked sheet takes the factory pane's room: under 1600, wider than narrow, while the sheet is wanted. */
+const sheetTakesThePane = (at: FrameAt): boolean => at.width === 'medium' && sheetWanted(at);
 
 const frameFoldSpec = spec<(at: FrameAt) => FrameFold>({
   ensures: {
@@ -76,27 +85,30 @@ const frameFoldSpec = spec<(at: FrameAt) => FrameFold>({
       description: 'The sheet floats modal over the page exactly on a narrow screen; wider, it is docked beside the page',
       condition: ({ input: [at], output }) => (output.sheet === 'modal') === (sheetWanted(at) && at.width === 'narrow'),
     },
-    drawerOnlyOnANarrowScreen: {
-      description: 'The rail is the modal drawer exactly on a narrow screen',
+    theRailIsADrawerOnlyOnANarrowScreen: {
+      description: "The store's rail is the modal drawer exactly on a narrow screen, and docked at the window's left on every other",
       condition: ({ input: [at], output }) => (output.rail === 'drawer') === (at.width === 'narrow'),
     },
-    aClosedRailStaysClosed: {
-      description: 'A rail the person closed stays narrow, whether the sheet is open or not',
-      condition: ({ input: [at], output }) => (at.width !== 'narrow' && !at.railOpen ? output.rail === 'collapsed' : true),
+    noPaneOffAFactory: {
+      description: 'The factory pane is drawn in no form exactly where the page sits in no factory',
+      condition: ({ input: [at], output }) => (output.pane === 'none') === !at.hasPane,
     },
-    railFoldsBesideTheSheetBelowWide: {
+    thePaneJoinsTheDrawerOnANarrowScreen: {
+      description: "On a narrow screen a page's factory pane is a section of the modal drawer, and nowhere else is it one",
+      condition: ({ input: [at], output }) => (output.pane === 'drawer') === (at.hasPane && at.width === 'narrow'),
+    },
+    aFoldedPaneStaysFolded: {
+      description: 'A factory pane the person folded stays folded, whether the sheet is open or not, wider than a narrow screen',
+      condition: ({ input: [at], output }) => (output.pane === 'folded') === (at.hasPane && at.width !== 'narrow' && !at.paneOpen),
+    },
+    theSheetCoversThePaneUnderWide: {
+      description: 'Under 1600 the docked sheet opens over an open factory pane, whatever it shows, and the pane is back once it closes',
+      condition: ({ input: [at], output }) => (output.pane === 'covered') === (paneKept(at) && sheetTakesThePane(at)),
+    },
+    thePaneIsDockedOtherwise: {
       description:
-        'Narrower than 1600, an open rail folds while the docked sheet is open, whatever it shows, unless the person asked for it back',
-      condition: ({ input: [at], output }) => (at.railOpen && foldsForSheet(at) ? output.rail === 'collapsed' : true),
-    },
-    anOpenRailStaysOpenOtherwise: {
-      description: 'An open rail stays open at 1600 and wider, with no sheet drawn, and once the person asked for it',
-      condition: ({ input: [at], output }) =>
-        at.width !== 'narrow' && at.railOpen && !foldsForSheet(at) ? output.rail === 'expanded' : true,
-    },
-    foldedForSheetSaysTheFold: {
-      description: 'The rail is said folded for the sheet exactly where the person keeps it open and it is narrow',
-      condition: ({ input: [at], output }) => output.foldedForSheet === (at.railOpen && output.rail === 'collapsed'),
+        'An open factory pane is docked left of the page at 1600 and wider, the sheet its third pane, and narrower with no sheet',
+      condition: ({ input: [at], output }) => (output.pane === 'docked') === (paneKept(at) && !sheetTakesThePane(at)),
     },
   },
 });

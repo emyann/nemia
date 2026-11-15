@@ -11,8 +11,8 @@ import { FAKE, GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
-/** The top bar's pause: its one button. */
-const pauseOf = (page: Page) => page.locator('header[data-frame-header] button[data-pause]');
+/** The machine bar's pause: its one button. */
+const pauseOf = (page: Page) => page.locator('footer[data-machine-bar] button[data-pause]');
 
 /** The pause's popover. */
 const popoverOf = (page: Page) => page.locator('[data-pause-popover]');
@@ -20,13 +20,13 @@ const popoverOf = (page: Page) => page.locator('[data-pause-popover]');
 /** Why the page pauses all factories, given in the popover. */
 const WHY = 'merging by hand on main';
 
-/** Refuses unless the top bar's pause stands right before the gauges button. */
-async function beforeTheGauges(page: Page): Promise<void> {
+/** Refuses unless the machine bar's pause stands at its end, after the gauges button. */
+async function afterTheGauges(page: Page): Promise<void> {
   const order = await page
-    .locator('header[data-frame-header]')
+    .locator('footer[data-machine-bar]')
     .locator('[data-pause], [data-gauges-button]')
     .evaluateAll((all) => all.map((el) => ('pause' in (el as HTMLElement).dataset ? 'pause' : 'gauges')));
-  if (order.join() !== 'pause,gauges') throw new Refused(`the pause stands right before the gauges — the bar stands ${order.join(', ')}`);
+  if (order.join() !== 'gauges,pause') throw new Refused(`the pause stands after the gauges — the bar stands ${order.join(', ')}`);
 }
 
 /** Refuses unless the popover's heading is `state`: Running, Pausing or Paused. */
@@ -93,7 +93,7 @@ async function heldRun(page: Page, theme: string): Promise<void> {
   await idle(page);
 }
 
-/** Opens the popover and photographs the top bar's corner with it, as `<what>`. */
+/** Opens the popover and photographs the machine bar's corner with it, as `<what>`. */
 async function opened(page: Page, what: string): Promise<void> {
   await pauseOf(page).click();
   await expectVisible(popoverOf(page), 'the button opens its popover');
@@ -103,7 +103,7 @@ async function opened(page: Page, what: string): Promise<void> {
 
 export default {
   /**
-   * All factories paused and resumed from the top bar's one button, right before the gauges, as `wf pause` and `wf resume` do
+   * All factories paused and resumed from the machine bar's one button, after the gauges, as `wf pause` and `wf resume` do
    * (`POST` and `DELETE /api/pause`), on the Factory. The popover's heading is the state: Running, Pausing or Paused. Running, the button
    * is a pause icon; its popover says what pausing all factories does and offers Pause… beside Stop now… (`stop-now`'s page).
    * Pause… asks an optional why, and once sent the pause's file holds it and the popover says since when, by whom and why: `Pausing · N`
@@ -123,8 +123,8 @@ export default {
     const popover = popoverOf(page);
     const size = page.viewportSize();
     try {
-      await expectVisible(button.and(page.locator('[data-pause="running"]')), 'the top bar has the pause, all factories running');
-      await beforeTheGauges(page);
+      await expectVisible(button.and(page.locator('[data-pause="running"]')), 'the machine bar has the pause, all factories running');
+      await afterTheGauges(page);
       if (fs.existsSync(file)) throw new Refused(`no pause before the page puts one — ${file} is there`);
       await opened(page, 'running');
       await headed(page, 'Running');

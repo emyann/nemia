@@ -2,6 +2,7 @@ import { Link, linkOptions } from '@tanstack/react-router';
 import { workflowNameOf } from '../../lib/api/workflows.ts';
 import { type WorkflowPageAddress } from '../../lib/api/address.ts';
 import { placeOfAddress } from '../../lib/factories';
+import { workflowLink } from '../../lib/factoryAddress';
 
 const LABEL = 'text-body-small text-muted-foreground hover:text-foreground';
 
@@ -12,13 +13,7 @@ const LABEL = 'text-body-small text-muted-foreground hover:text-foreground';
  * @param page the address of the run's workflow page, null where the api gives none
  */
 export const workflowTarget = (page: WorkflowPageAddress | null) =>
-  page
-    ? linkOptions({
-        to: '/workflows/$from/$workflow',
-        params: { from: page.from, workflow: page.workflow },
-        search: placeOfAddress(page),
-      })
-    : linkOptions({ to: '/workflows' });
+  page ? workflowLink(placeOfAddress(page), page.from, page.workflow) : linkOptions({ to: '/workflows' });
 
 /**
  * The workflow a run was started from, by its folder's name, the folder in full on hover, linked where `workflowTarget` says.

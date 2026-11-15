@@ -2993,10 +2993,10 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
   const theirHome = (name: string): string => new RegExp(`<span data-home="${name}"[^]*?</span>`).exec(theirs)?.[0] ?? '';
   assert.match(
     theirHome('custom'),
-    /href="\/agents\/repo\/writer\?factory=hiring#custom-instructions"/,
+    /href="\/factories\/hiring\/agents\/writer\?from=repo#custom-instructions"/,
     "a repository's agent's page, in the factory the step is read in: the default reads no repository",
   );
-  assert.match(home('policy'), /href="\/workflows\/yours\/w\?factory=hiring&amp;build=true"/, 'one of yours: its builder, in the place');
+  assert.match(home('policy'), /href="\/factories\/hiring\/workflows\/yours\/w\?build=true"/, 'one of yours: its builder, in the place');
   assert.match(html, /data-skill="alpha"[^>]*><a[^>]*href="\/agents\/skills\/yours\/alpha"/, 'a skill found: linked to its page');
   assert.match(html, /data-skill="gamma"[^>]*>gamma</, 'a skill found nowhere: its name alone');
   assert.match(html, /data-layer="task"[^>]*>Then the task: the brief a run is started with\./);
@@ -3060,7 +3060,7 @@ test("a step's agent: the one the factory picked hires, marked hired; else its f
   assert.doesNotMatch(plain, /data-hired=/);
   assert.match(
     plain,
-    /Hired into this step by:[^]*data-hired-in="hiring"[^>]*href="\/workflows\/yours\/w\/review\?factory=hiring"[^>]*>hiring</,
+    /Hired into this step by:[^]*data-hired-in="hiring"[^>]*href="\/factories\/hiring\/workflows\/yours\/w\/review"[^>]*>hiring</,
   );
   assert.match(
     await routedWith(createElement(StepAgent, { page: await hiredPage({ factory: null, hired: null, keys: [] }) })),
@@ -3109,7 +3109,7 @@ test('hiring into a step: the agent hired with Fire; else the picker of the agen
   assert.doesNotMatch(open, /data-fire/);
   assert.match(
     open,
-    /data-new-agent[^>]*href="\/agents\/new\?factory=hiring&amp;workflow=w&amp;step=review"[^>]*>New agent, hired into this step</,
+    /data-new-agent[^>]*href="\/agents\/new\?into=hiring&amp;workflow=w&amp;step=review"[^>]*>New agent, hired into this step</,
     'New agent carries the step it comes back to hire into',
   );
   assert.doesNotMatch(open, /data-new-agent-repo/);
@@ -3180,7 +3180,7 @@ test("REFUSED: the step's bar reads in the address's factory — its folder ther
     [['workflows'], [listing(['implement'])]],
     [['factory-workflows', 'pipao', '/code/pipao'], [listing(['draft'])]],
   ];
-  const at = (factory: string) => `/?factory=${factory}&bar=spec%3Arepo%2Fdev%2Fdraft`;
+  const at = (factory: string) => `/factories/${factory}/workflows?bar=spec%3Arepo%2Fdev%2Fdraft`;
   const placed = await routedAt(at('pipao'), bar, data);
   assert.match(placed, /data-runs-on/, "the factory's folder has the step");
   assert.match(placed, /the factory&#x27;s/);
@@ -3248,7 +3248,7 @@ test("a run's step links to the step's page in the run's place, and a run whose 
   const html = await routedWith(
     createElement(StepPageLink, { page: { from: 'yours', workflow: 'w', factory: 'hiring', repo: null }, step: 'review' }),
   );
-  assert.match(html, /href="\/workflows\/yours\/w\/review\?factory=hiring"[^>]*>What it will be told now →</);
+  assert.match(html, /href="\/factories\/hiring\/workflows\/yours\/w\/review"[^>]*>What it will be told now →</);
   assert.equal(await routedWith(createElement(StepPageLink, { page: null, step: 'review' })), '');
 });
 

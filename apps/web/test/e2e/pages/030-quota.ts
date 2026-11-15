@@ -25,7 +25,7 @@ export default {
     const file = path.join(store!, QUOTA.file);
     const written = fs.readFileSync(file, 'utf8');
     const line = page.locator('[data-gauges] [data-quota]');
-    const short = page.locator('header[data-frame-header] [data-gauges-button]');
+    const short = page.locator('footer[data-machine-bar] [data-gauges-button]');
     const shoot = async (what: string) => {
       await settled(page);
       await photograph(page, path.join(OUT, `factory-quota-${what}-${await themeOf(page)}.png`), { fullPage: true });
@@ -45,8 +45,11 @@ export default {
         1,
         `the gauges button holds each window's label and percentage, marked: the week is ${QUOTA.week.used}% used`,
       );
-      await expectVisible(short.locator('[data-quota-mark]'), 'marked, the gauges button draws the money mark beside its dot');
-      await expectVisible(short.getByRole('button', { name: /, quota near its limit$/ }), 'and its name says the quota nears its limit');
+      await expectVisible(short.locator('[data-quota-line][data-quota-mark]'), 'marked, the gauges button draws its quota in money');
+      await expectVisible(
+        short.and(page.getByRole('button', { name: /^This machine: .*, quota .*, near its limit$/ })),
+        'and its name says the quota nears its limit',
+      );
       await expectTexts(
         line.locator('[data-quota-machine]'),
         ['Quota on this machine:'],

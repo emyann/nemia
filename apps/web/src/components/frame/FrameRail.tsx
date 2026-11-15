@@ -1,123 +1,149 @@
 import { useQuery } from '@tanstack/react-query';
 import { PanelLeft } from 'lucide-react';
-import { IconButton, NavigationDrawer, type NavigationItem, NavigationRail } from '@/components/ui/ds';
+import { Avatar, IconButton, NavigationDrawer, type NavigationItem, NavigationRail } from '@/components/ui/ds';
 import { useSidebar } from '@/components/ui/sidebar';
-import { factoriesQuery } from '@/lib/api/factories';
-import { inboxQuery } from '@/lib/api/inbox';
-import { factoriesShown } from '@/lib/factories';
-import { inboxBadgeTitle, notStarted } from '@/lib/inbox';
-import { cn } from '@/lib/utils';
-import { StartFab } from '../factory/FactoryStart';
+import { openRunsQuery } from '@/lib/api/runs';
 import { NemiaRailFace } from '../nemia/NemiaRailFace';
 import { useNemiaPresence } from '../nemia/useNemiaPresence';
 import { useFrameFold, useHerSheet, useOwnsChat } from './HerSheet';
-import { destinationHref, destinationOf, DESTINATIONS, frameRunsQuery, pickedOf } from '../nav/nav';
+import { FactoryPane } from './FactoryPane';
+import { litOf, RAIL_GROUPS, type RailGroup, railHref, seatOf } from '../nav/nav';
 
-/** What the Runs badge says to a screen reader: how many runs wait on you. */
-const waitingTitle = (count: number): string => `${count} ${count === 1 ? 'waits' : 'wait'} on you`;
+/** What Waiting's badge says to a screen reader: how many runs wait on you, in every factory. */
+const waitingTitle = (count: number): string => `${count} ${count === 1 ? 'waits' : 'wait'} on you in every factory`;
 
 /**
- * The rail's destinations (`DESTINATIONS`) at `path` with `search`, `picked` the factory the address picks: each a link where
- * `destinationHref` says, Runs counting the runs that wait on you and the Inbox its cards not yet started, both the api's, read as their
- * pages read them — Runs off the frame's one count of the runs (`frameRunsQuery`), which Nemia's cue reads too — and none before they
- * are read.
+ * The rail's groups (`RAIL_GROUPS`) as the kit's items, each a link where `railHref` says, Waiting counting the runs that wait on you in
+ * every factory, the api's, none before they are read.
  */
-function useRailItems(path: string, search: Record<string, unknown>): NavigationItem[] {
-  const picked = pickedOf(path, search);
-  const runs = useQuery(frameRunsQuery(path, search));
-  const inbox = useQuery(inboxQuery);
-  const factories = useQuery(factoriesQuery);
-  const first = factories.data ? factoriesShown(factories.data, false)[0]?.name : undefined;
+function useRailGroups(): { group: RailGroup; items: NavigationItem[] }[] {
+  const runs = useQuery(openRunsQuery());
   const waiting = runs.data?.counts.waiting ?? 0;
-  const cards = inbox.data ? notStarted(inbox.data, picked).length : 0;
-  const counts: Record<string, { badge: number; badgeLabel: string }> = {
-    runs: { badge: waiting, badgeLabel: waitingTitle(waiting) },
-    inbox: { badge: cards, badgeLabel: inboxBadgeTitle(cards, picked) },
-  };
-  return DESTINATIONS.map(({ id, label, icon }) => ({
-    id,
-    label,
-    icon,
-    href: destinationHref(id, picked, first),
-    ...(counts[id]?.badge ? counts[id] : {}),
+  return RAIL_GROUPS.map((group) => ({
+    group,
+    items: group.items.map(({ id, label, icon }) => ({
+      id,
+      label,
+      icon,
+      href: railHref(id),
+      ...(id === 'waiting' && waiting > 0 ? { badge: waiting, badgeLabel: waitingTitle(waiting) } : {}),
+    })),
   }));
 }
 
 /**
- * The button that opens and closes the rail, or on a narrow screen its drawer: named for what a press does. While the rail is narrow only
- * for her side sheet (`foldedForSheet`), a press asks for it back beside the sheet and writes no `sidebar_state` cookie, the person's fold
- * being open already.
+ * The button that folds and unfolds the factory pane, or on a narrow screen opens the drawer: named for what a press does. The pane the
+ * sheet covers under 1600 is said closed, and a press there folds it as the person keeps it, which the sheet closing then shows.
  */
 export function MenuButton() {
-  const { isMobile, openMobile, toggleSidebar } = useSidebar();
+  const { isMobile, openMobile, open, toggleSidebar } = useSidebar();
   const fold = useFrameFold();
-  const { askRail } = useHerSheet();
-  const shown = isMobile ? openMobile : fold.rail === 'expanded';
+  const shown = isMobile ? openMobile : fold.pane === 'docked';
+  const name = isMobile ? (shown ? 'Close the menu' : 'Open the menu') : open ? 'Fold the factory pane' : 'Unfold the factory pane';
   return (
-    <IconButton
-      data-menu-button
-      variant="standard"
-      icon={PanelLeft}
-      aria-label={shown ? 'Close the menu' : 'Open the menu'}
-      aria-expanded={shown}
-      onPress={!isMobile && fold.foldedForSheet ? askRail : toggleSidebar}
-    />
+    <IconButton data-menu-button variant="standard" icon={PanelLeft} aria-label={name} aria-expanded={shown} onPress={toggleSidebar} />
   );
 }
 
 /**
- * Nemia's face at the page at `path` with `search`, which shows her chat in the frame's side sheet, in place of what the address's
- * `?bar=` names, or closes it where the sheet shows her; it says open only while the sheet shows her (`FrameFold.shows`).
+ * Nemia's face at the page at `path`, which shows her chat in the frame's side sheet, in place of what the address's `?bar=` names, or
+ * closes it where the sheet shows her; it says open only while the sheet shows her (`FrameFold.shows`).
  */
-export function HerFace({ path, search }: { path: string; search: Record<string, unknown> }) {
+export function HerFace({ path }: { path: string }) {
   const sheet = useHerSheet();
   const fold = useFrameFold();
-  const presence = useNemiaPresence(path, search);
+  const presence = useNemiaPresence(path);
   const ownsChat = useOwnsChat();
   return <NemiaRailFace presence={presence} open={fold.shows === 'her'} ownsChat={ownsChat} onToggle={sheet.toggle} />;
 }
 
 /**
- * The frame's rail at `path` with `search`, the whole height of the window at its left: Nemia's face (`HerFace`), then the menu button
- * and the FAB that starts a run (`StartFab`) above the kit's `NavigationRail`, 97 pixels closed and 221 open, with its labels beside the
- * icons, as this browser's `sidebar_state` cookie last left it, or narrow while her side sheet is open beside a page under 1600
- * (`useFrameFold`); the destination the page lights is lit. On a narrow screen the rail leaves the page's side, and the menu button of
- * the top bar opens the same destinations in the kit's modal drawer, which a pick closes.
+ * The account, drawn as the canvas draws it and not built yet: the kit's avatar with an initial, which takes no focus and no press, on a
+ * neutral tier, since the kit's primary container is the board's `yours` and nothing here waits on the person.
+ */
+function AccountToCome() {
+  return (
+    <span data-account-to-come title="Account · to come" className="inline-flex shrink-0 cursor-default">
+      <Avatar alt="Account, not built yet" fallback="Y" size={32} className="bg-surface-container-highest text-on-surface" />
+    </span>
+  );
+}
+
+/**
+ * The store's rail at `path` with `search`, across every factory, the whole height of the window less the machine bar at its left: 80
+ * wide, collapsed, and never folding. Nemia's face (`HerFace`) first, and on a factory's page the menu button that folds its pane; then
+ * the groups, each the kit's narrow `NavigationRail` under its name — what spans factories (Factories, Waiting), yours (Agents, Skills) —
+ * and at the foot the person's (Stats, Settings) over the account, to come. The destination the page lights (`litOf`) is lit. On a
+ * narrow screen the rail leaves the page's side, and the menu button of the page's head opens the kit's modal drawer, which holds the
+ * factory pane (`FactoryPane`) on a factory's page over the same groups, and which a pick closes.
  */
 export function FrameRail({ path, search }: { path: string; search: Record<string, unknown> }) {
   const { isMobile, openMobile, setOpenMobile } = useSidebar();
-  const open = useFrameFold().rail === 'expanded';
-  const picked = pickedOf(path, search);
-  const items = useRailItems(path, search);
-  const selected = destinationOf(path)?.id ?? null;
+  const seat = seatOf(path);
+  const groups = useRailGroups();
+  const selected = litOf(seat) ?? null;
   if (isMobile)
     return (
       <NavigationDrawer
         variant="modal"
         aria-label="Places"
-        headline="Nemia"
         isOpen={openMobile}
         onClose={() => setOpenMobile(false)}
-        items={items}
+        header={
+          seat?.level === 'factory' ? (
+            <FactoryPane
+              path={path}
+              search={search}
+              factory={seat.factory}
+              lit={seat.place}
+              inDrawer
+              onPicked={() => setOpenMobile(false)}
+            />
+          ) : undefined
+        }
+        sections={groups.map(({ group, items }) => ({ headline: group.label, items }))}
         selectedKey={selected}
       />
     );
+  const top = groups.slice(0, -1);
+  const foot = groups.at(-1);
   return (
     <div
       data-frame-rail
-      data-state={open ? 'expanded' : 'collapsed'}
-      className="sticky top-0 z-30 flex h-svh shrink-0 border-r border-outline-variant bg-surface"
+      data-rail-scroll
+      className="sticky top-0 z-30 flex h-[calc(100svh-var(--frame-foot))] w-20 shrink-0 flex-col overflow-y-auto bg-surface"
     >
-      <div data-rail-scroll className="flex min-h-0 flex-col overflow-y-auto">
-        <div className={cn('flex flex-col gap-1.5 pt-2.5 pb-3.5', open ? 'items-start px-5' : 'items-center')}>
-          <span className={cn('flex pt-1 pb-2', open ? 'px-1' : 'justify-center')}>
-            <HerFace path={path} search={search} />
-          </span>
-          <MenuButton />
-          <StartFab name={picked} isExtended={open} />
-        </div>
-        <NavigationRail aria-label="Places" items={items} selectedKey={selected} isExpanded={open} className="h-auto flex-1" />
+      <div className="flex flex-col items-center gap-2 pt-3 pb-2">
+        <HerFace path={path} />
+        {seat?.level === 'factory' && <MenuButton />}
       </div>
+      {top.map(({ group, items }) => (
+        <RailGroupOf key={group.id} group={group} items={items} selected={selected} />
+      ))}
+      {foot && (
+        <div className="mt-auto flex flex-col items-center gap-2 pb-3">
+          <RailGroupOf group={foot.group} items={foot.items} selected={selected} />
+          <AccountToCome />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One group of the rail: its name over its destinations, the kit's narrow `NavigationRail`, named for a screen reader by the group. */
+function RailGroupOf({ group, items, selected }: { group: RailGroup; items: NavigationItem[]; selected: string | null }) {
+  return (
+    <div data-rail-group={group.id} className="flex w-20 flex-col items-center pt-2">
+      <span aria-hidden className="w-full px-1 text-center text-label-small text-balance text-on-surface-variant">
+        {group.label}
+      </span>
+      <NavigationRail
+        aria-label={group.label}
+        items={items}
+        selectedKey={selected}
+        isNarrow
+        className="h-auto bg-transparent [&>div:first-child]:hidden"
+      />
     </div>
   );
 }

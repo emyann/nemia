@@ -19,7 +19,7 @@ import {
   runsOf,
   factoryIn,
   namespaceOf,
-  factorySearch,
+  pagePlaceOf,
   floorPlace,
   hireOnCreate,
   hirePlaceOf,
@@ -386,22 +386,26 @@ test('namespaceOf, factoryIn, shownIn, workflowFactories, listPlace, hirePlaceOf
     },
   );
   await t.test(
-    "REFUSED: New agent's address names the step it hires into only whole — a factory, a workflow and a step, each a string not empty",
+    "REFUSED: New agent's address names the step it hires into only whole — a factory (`into`), a workflow and a step, each a string not empty",
     () => {
-      const whole = { factory: 'nemia', workflow: 'dev', step: 'implement' };
-      assert.deepEqual(hirePlaceOf(whole), whole);
-      assert.deepEqual(hirePlaceOf({ ...whole, other: 'x' }), whole);
+      const whole = { into: 'nemia', workflow: 'dev', step: 'implement' };
+      const place = { factory: 'nemia', workflow: 'dev', step: 'implement' };
+      assert.deepEqual(hirePlaceOf(whole), place);
+      assert.deepEqual(hirePlaceOf({ ...whole, other: 'x' }), place);
       assert.deepEqual(hirePlaceOf({}), {});
       assert.deepEqual(hirePlaceOf({ ...whole, step: '' }), {}, 'a step named with nothing');
-      assert.deepEqual(hirePlaceOf({ ...whole, factory: undefined }), {}, 'no factory');
+      assert.deepEqual(hirePlaceOf({ ...whole, into: undefined }), {}, 'no factory');
+      assert.deepEqual(
+        hirePlaceOf({ workflow: 'dev', step: 'implement', factory: 'nemia' }),
+        {},
+        'the factory is the hire’s `into`, never `factory`',
+      );
       assert.deepEqual(hirePlaceOf({ ...whole, workflow: 3 }), {}, 'a workflow that is no string');
     },
   );
-  await t.test("a page's address filters by the factory it names, and by none when it names none, an empty one or not one string", () => {
-    assert.deepEqual(factorySearch({ factory: 'nemia' }), { factory: 'nemia' });
-    assert.deepEqual(factorySearch({ factory: 'default', step: 'x' }), { factory: 'default' });
-    for (const none of [{}, { factory: '' }, { factory: ['nemia'] }, { factory: 7 }])
-      assert.equal(Object.hasOwn(factorySearch(none), 'factory'), false);
+  await t.test("a page's search names the repository it reads, never its factory, which is its path's", () => {
+    assert.deepEqual(pagePlaceOf({ repo: '/r', factory: 'nemia' }), { repo: '/r' });
+    for (const none of [{}, { repo: '' }, { repo: ['/r'] }, { repo: 7 }]) assert.deepEqual(pagePlaceOf(none), {});
   });
   await t.test(
     'REFUSED: an agent made from New agent is hired only when the api takes the hire — a refusal is said, in its words, never passed over',

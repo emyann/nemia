@@ -20,7 +20,7 @@ export const Route = createFileRoute('/chat')({ component: ChatPage, staticData:
 function ChatPage() {
   const chat = useNemiaChat();
   const nemia = useQuery(levelQuery).data;
-  const open = useQuery(frameRunsQuery(Route.fullPath, {})).data;
+  const open = useQuery(frameRunsQuery(Route.fullPath)).data;
   const now = new Date(useNow(30_000));
   const presence = presenceOf(chat.state.presence, chat.kept !== null, open?.counts.waiting ?? 0, chat.state.events);
 

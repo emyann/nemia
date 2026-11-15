@@ -44,14 +44,13 @@ interface Kept {
   readonly why: string;
 }
 
-const BAR = "The frame's top bar: it stands over the page column and the sheet alike, and landed with its own window layout (w9y8).";
+const HEAD = "The page's head: it holds the menu button and her face exactly where the frame is modal, a window's breakpoint (w9y8).";
+
+const FOOT = 'The machine bar: it stands across the whole window, under the rail, the pane, the page column and the sheet alike.';
 
 const KEPT: readonly Kept[] = [
-  { file: 'src/components/frame/FrameHeader.tsx', token: 'max-md:px-3', why: BAR },
-  { file: 'src/components/frame/FrameHeader.tsx', token: 'max-md:flex-1', why: BAR },
-  { file: 'src/components/frame/FrameHeader.tsx', token: 'md:shrink-0', why: BAR },
-  { file: 'src/components/frame/FrameHeader.tsx', token: 'max-md:hidden', why: BAR },
-  { file: 'src/components/factory/FactoryPicker.tsx', token: 'max-md:w-full', why: BAR },
+  { file: 'src/components/frame/FrameHeader.tsx', token: 'max-md:px-3', why: HEAD },
+  { file: 'src/components/frame/MachineBar.tsx', token: 'max-md:hidden', why: FOOT },
   {
     file: 'src/components/step/DebugPanel.tsx',
     token: 'data-[side=right]:sm:max-w-none',

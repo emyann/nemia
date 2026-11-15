@@ -23,6 +23,7 @@ const FILES = [
   'components/workflow/WorkflowLink.tsx',
   'components/run/RunClockCell.tsx',
   'components/run/RunCostCell.tsx',
+  'components/run/RunsPage.tsx',
   'components/look/Breakdown.tsx',
   'components/look/Plate.tsx',
   'components/look/Sticker.tsx',

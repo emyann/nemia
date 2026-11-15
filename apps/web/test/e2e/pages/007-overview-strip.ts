@@ -48,12 +48,12 @@ const stickerOf = (strip: Locator, label: string): Locator =>
     .locator('span')
     .last();
 
-/** Every finished run of `factory`, or of every factory, read page by page to the last, as the api answers them. */
-async function everyFinished(page: Page, factory?: string): Promise<FinishedRun[]> {
+/** Every finished run of every factory, read page by page to the last, as the api answers them. */
+async function everyFinished(page: Page): Promise<FinishedRun[]> {
   const runs: FinishedRun[] = [];
   let from: string | undefined;
   do {
-    const answered = await finishedAnswered(page, factory, from);
+    const answered = await finishedAnswered(page, undefined, from);
     runs.push(...answered.runs);
     from = answered.continue ?? undefined;
   } while (from !== undefined);
@@ -64,10 +64,10 @@ async function everyFinished(page: Page, factory?: string): Promise<FinishedRun[
  * The strip the board's rule gives for the api's own answers (the light answer and every finished run, the rule keeping today's), at the
  * page's instant and from the browser's midnight.
  */
-async function expected(page: Page, factory?: string) {
+async function expected(page: Page) {
   const [open, finished, factories, ceilings] = await Promise.all([
-    openAnswered(page, factory),
-    everyFinished(page, factory),
+    openAnswered(page),
+    everyFinished(page),
     factoriesAnswered(page),
     answer<Ceilings>(page, '/api/ceilings'),
   ]);
@@ -76,11 +76,8 @@ async function expected(page: Page, factory?: string) {
     day.setHours(0, 0, 0, 0);
     return { now: Date.now(), dayStart: day.getTime() };
   });
-  return { strip: stripOf({ open, finished, factories, ceilings, now, dayStart, factory }), dayStart };
+  return { strip: stripOf({ open, finished, factories, ceilings, now, dayStart }), dayStart };
 }
-
-/** The factory whose runs name none, read at `?factory=`: it hires no agent, where every factory hires one. */
-const DEFAULT_FACTORY = 'default';
 
 /** The agents' count as the strip says it: `1 OF 2`, the count alone with no total. */
 const agentsSaid = ({ agents }: Strip): string => `${agents.count}${agents.hired === null ? '' : ` OF ${agents.hired}`}`;
@@ -167,8 +164,7 @@ export default {
    * of it (none ticks the e2e's store), each agent's row says the agent, its step and the run's title, cut short, never wrapped, and the
    * quota, past its mark in the seed, says so. Spent opens a preview of today's tokens by kind, from the keyboard. At 1024 the
    * frames wrap by their own widths, and on a phone they stack, one under the other: at each width every heading, the readout, the
-   * agents' count and each agent's name read whole (`expectStripWhole`). At `?factory=default` the strip counts that factory's runs
-   * alone, and its agents against those of its own.
+   * agents' count and each agent's name read whole (`expectStripWhole`).
    */
   name: 'overview-strip',
   route: '/',
@@ -215,14 +211,6 @@ export default {
       await expectStripWhole(page, 'on a phone, stacked');
       await settled(page);
       await photograph(page, path.join(OUT, `overview-strip-phone-${await themeOf(page)}.png`), { fullPage: true });
-      await page.setViewportSize(WIDE);
-      await page.goto(new URL(`/?factory=${DEFAULT_FACTORY}`, page.url()).href);
-      await idle(page);
-      const { strip: theirs } = await expected(page, DEFAULT_FACTORY);
-      if (agentsSaid(theirs) === agentsSaid(want))
-        throw new Refused(`the default factory's strip differs from every factory's, for its scope to be read: both ${agentsSaid(want)}`);
-      await expectStickers(strip, theirs);
-      await expectTexts(strip.locator('[data-strip-agents]'), [agentsSaid(theirs)], "the default factory's agents, of those of its own");
     } finally {
       if (size) await page.setViewportSize(size);
     }

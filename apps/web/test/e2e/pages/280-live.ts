@@ -28,7 +28,7 @@ export default {
     const asks = path.join(store!, 'runs', `${id}.asks`);
     if (fs.existsSync(asks))
       throw new Refused(`the store is as seeded before the page approves anything — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
-    const footer = page.locator('header[data-frame-header] [data-gauges-button][data-feed]');
+    const footer = page.locator('footer[data-machine-bar] [data-gauges-button][data-feed]');
     await feedAnswered(page);
     await expectVisible(footer.and(page.locator('[data-feed="open"]')), 'the gauges button says the feed is followed (data-feed="open")');
     await idle(page);
@@ -41,7 +41,7 @@ export default {
       if (pathname === `/api/runs/${id}`) reads += 1;
     });
 
-    await railPlace(page, 'Runs').click();
+    await railPlace(page, 'Waiting').click();
     await page.waitForURL(/\/runs$/);
     await page.locator(`a[href="/runs/${id}"]`).first().click();
     await page.waitForURL(new RegExp(`/runs/${id}$`));

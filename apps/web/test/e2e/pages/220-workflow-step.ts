@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { expectKeys, expectRendered, expectSource, filesIn, sidebar, railPlace, litOf } from '../board.ts';
+import { expectKeys, expectRendered, expectSource, filesIn, placeLitOf, placeOf, sidebar } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused } from '../checks.ts';
 import { checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -16,11 +16,11 @@ export default {
   expect: async (page) => {
     const takeBack = checkoutIn(store!, [WORKFLOWS.good.name]);
     try {
-      const at = `/workflows/repo/${WORKFLOWS.good.name}/review?factory=${FACTORIES.hiring.name}`;
+      const at = `/factories/${FACTORIES.hiring.name}/workflows/repo/${WORKFLOWS.good.name}/review`;
       await page.goto(new URL(at, page.url()).href, { waitUntil: 'load' });
       await idle(page);
       await sidebar(page);
-      await expectVisible(railPlace(page, 'Workflows').and(litOf(page)), "the sidebar lights Workflows on a step's page");
+      await expectVisible(placeLitOf(page).and(placeOf(page, 'Workflows')), "the pane lights Workflows on a step's page");
       const { good } = WORKFLOWS;
       const folder = path.join(store!, 'checkout', 'workflows', good.name);
       const before = filesIn(folder);

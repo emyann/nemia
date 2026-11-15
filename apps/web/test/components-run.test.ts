@@ -359,7 +359,7 @@ test("a try's run is tagged try and names the agent it tried, linked to its page
       },
     }),
   );
-  assert.match(paged, /href="\/workflows\/yours\/notes\?factory=nemia&amp;repo=%2Fcode%2Fapp"/, paged);
+  assert.match(paged, /href="\/factories\/nemia\/workflows\/yours\/notes\?repo=%2Fcode%2Fapp"/, paged);
 });
 
 /** A run's card on the floor, inside the router its title links with, as the floor draws it: shown in the bar or not (`inspected`). */

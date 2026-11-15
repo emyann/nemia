@@ -23,19 +23,19 @@ async function visit(page: Page, to: string): Promise<void> {
   await idle(page);
 }
 
-/** The rail's Runs badge counts what `open`, the api's light answer for the factory picked, says waits; none for none. */
+/** The rail's Waiting badge counts what `open`, the api's light answer across every factory, says waits; none for none. */
 async function railCounts(page: Page, open: OpenRuns, where: string): Promise<void> {
   await expectTexts(
-    railPlace(page, 'Runs').locator('[data-slot="badge"]'),
+    railPlace(page, 'Waiting').locator('[data-slot="badge"]'),
     open.counts.waiting ? [String(open.counts.waiting)] : [],
-    `${where}: the Runs badge counts what the api says waits`,
+    `${where}: the Waiting badge counts what the api says waits`,
   );
 }
 
 export default {
   /**
    * The frame's reads, on two pages that hold no reader of the whole list, Agents and a factory's Workflows with its bar open: the rail's
-   * Runs badge, the gauges and the factory's bar are drawn, the page asked for the light answer, and it made no request for the whole
+   * Waiting badge, the gauges and the factory's bar are drawn, the page asked for the light answer, and it made no request for the whole
    * list of the runs. The Overview's strip is then heard asking for the runs finished today by the same listener, and still never for
    * the whole list: the listener is not deaf.
    */
@@ -59,8 +59,8 @@ export default {
       );
 
       const bar = barValue({ kind: 'factory', factory: FACTORY });
-      await visit(page, `/workflows?factory=${FACTORY}&bar=${encodeURIComponent(bar)}`);
-      await railCounts(page, await openAnswered(page, FACTORY), "a factory's Workflows");
+      await visit(page, `/factories/${FACTORY}/workflows?bar=${encodeURIComponent(bar)}`);
+      await railCounts(page, await openAnswered(page), "a factory's Workflows");
       const factory = (await factoriesAnswered(page)).find((one) => one.name === FACTORY);
       if (!factory) throw new Refused(`the seeded store has the factory ${FACTORY}`);
       const block = openBlockOf(factory, await openAnswered(page, FACTORY));

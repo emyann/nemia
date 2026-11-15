@@ -109,7 +109,7 @@ export default {
       await photograph(page, path.join(OUT, `step-hire-picker-${theme}.png`));
 
       await page.locator('[data-new-agent]').click();
-      await page.waitForURL((url) => url.pathname === '/agents/new' && url.searchParams.get('factory') === FACTORY, { timeout: WAIT_MS });
+      await page.waitForURL((url) => url.pathname === '/agents/new' && url.searchParams.get('into') === FACTORY, { timeout: WAIT_MS });
       await idle(page);
       await expectVisible(page.locator(`[data-hire-into="${yours.name}/plan"]`), 'the creator says it hires what it makes into the step');
       const form = page.getByRole('form', { name: 'New agent' });
@@ -120,7 +120,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `step-hire-new-agent-${theme}.png`), { fullPage: true });
       await form.getByRole('button', { name: 'Create agent' }).click();
-      await page.waitForURL((url) => url.pathname === step && url.searchParams.get('factory') === FACTORY, { timeout: WAIT_MS });
+      await page.waitForURL((url) => url.pathname === `/factories/${FACTORY}${step}`, { timeout: WAIT_MS });
       await idle(page);
       await expectVisible(page.locator(`[data-fire="${MADE.name}"]:not([disabled])`), 'back on the step, the agent made is hired into it');
       await fire(page, MADE.name);

@@ -2,20 +2,24 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { AgentForm } from '../components/agent/AgentForm';
-import { AgentRefused, RouteLink } from '../components/agent/AgentParts';
+import { AgentRefused, BackToAgents, RouteLink } from '../components/agent/AgentParts';
 import { AgentRefusal, createAgent, type AgentDraft } from '../lib/api/agents.ts';
 import { hireAgent } from '../lib/api/factories.ts';
 import { keyFormQuery } from '../lib/api/builder.ts';
 import { storeQuery } from '../lib/api/store.ts';
 import { invalidateAgents, invalidateHires } from '../lib/agentWrites';
 import { hireOnCreate, hirePlaceOf, type HirePlace } from '../lib/factories';
+import { workflowLink } from '../lib/factoryAddress';
 
 /**
- * The New agent page, at /agents/new: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. `?factory=`,
- * `?workflow=` and `?step=` name a step of one of your workflows to hire the agent into once it is written.
+ * The New agent page, at /agents/new: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. `?into=`, the
+ * factory, `?workflow=` and `?step=` name a step of one of your workflows to hire the agent into once it is written.
  */
 export const Route = createFileRoute('/agents_/new')({
-  validateSearch: hirePlaceOf,
+  validateSearch: (search: Record<string, unknown>): { into?: string; workflow?: string; step?: string } => {
+    const { factory: into, workflow, step } = hirePlaceOf(search);
+    return into === undefined ? {} : { into, workflow, step };
+  },
   loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(storeQuery), context.queryClient.prefetchQuery(keyFormQuery)]),
   component: NewAgentPage,
 });
@@ -28,7 +32,7 @@ export const Route = createFileRoute('/agents_/new')({
 function NewAgentPage() {
   const { data: keyForm } = useQuery(keyFormQuery);
   const { data: store } = useSuspenseQuery(storeQuery);
-  const { factory: hiring, workflow: into, step: intoStep } = Route.useSearch();
+  const { factory: hiring, workflow: into, step: intoStep } = hirePlaceOf(Route.useSearch());
   const hireInto = hiring && into && intoStep ? { factory: hiring, workflow: into, step: intoStep } : null;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -42,7 +46,7 @@ function NewAgentPage() {
       const made = await hireOnCreate(hireInto, saved.agent.name, hireAgent);
       await invalidateHires(queryClient);
       if (!made.hired) return setUnhired({ agent: saved.agent.name, why: made.why });
-      return navigate({ to: '/workflows/$from/$workflow/$step', params: { from: 'yours', workflow, step }, search: { factory } });
+      return navigate(workflowLink({ factory }, 'yours', workflow, step));
     },
   });
   const refused = create.error instanceof AgentRefusal ? create.error : null;
@@ -76,9 +80,7 @@ function HiredInto({ place: { factory, workflow, step } }: { place: HirePlace })
     <p data-hire-into={`${workflow}/${step}`} className="text-body-medium text-muted-foreground">
       Once created, {factory} hires it into{' '}
       <RouteLink
-        to="/workflows/$from/$workflow/$step"
-        params={{ from: 'yours', workflow, step }}
-        search={{ factory }}
+        {...workflowLink({ factory }, 'yours', workflow, step)}
         className="font-mono text-body-small text-foreground underline underline-offset-2"
       >
         {workflow}/{step}
@@ -87,9 +89,6 @@ function HiredInto({ place: { factory, workflow, step } }: { place: HirePlace })
     </p>
   );
 }
-
-/** Brings the notice that the hire was refused into the window: it says so above the form, and Create is pressed at the form's foot. */
-const intoView = (notice: HTMLDivElement | null): void => notice?.scrollIntoView({ block: 'nearest' });
 
 /** The agent written but not hired: the hire's refusal, in the package's words, and the way to the step and to the agent. */
 function Unhired({ place: { factory, workflow, step }, agent, why }: { place: HirePlace; agent: string; why: string }) {
@@ -105,12 +104,7 @@ function Unhired({ place: { factory, workflow, step }, agent, why }: { place: Hi
       </p>
       <p className="text-body-small whitespace-pre-wrap">{why}</p>
       <p className="text-body-small">
-        <RouteLink
-          to="/workflows/$from/$workflow/$step"
-          params={{ from: 'yours', workflow, step }}
-          search={{ factory }}
-          className="underline underline-offset-2"
-        >
+        <RouteLink {...workflowLink({ factory }, 'yours', workflow, step)} className="underline underline-offset-2">
           Back to the step
         </RouteLink>{' '}
         or{' '}
@@ -123,13 +117,5 @@ function Unhired({ place: { factory, workflow, step }, agent, why }: { place: Hi
   );
 }
 
-export function BackToAgents() {
-  return (
-    <RouteLink
-      to="/agents"
-      className="rounded-sm text-body-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-    >
-      ← Agents
-    </RouteLink>
-  );
-}
+/** Brings the notice that the hire was refused into the window: it says so above the form, and Create is pressed at the form's foot. */
+const intoView = (notice: HTMLDivElement | null): void => notice?.scrollIntoView({ block: 'nearest' });

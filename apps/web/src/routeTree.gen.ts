@@ -26,13 +26,25 @@ import { Route as RunsIndexRouteImport } from './routes/runs.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
 import { Route as AgentsFromAgentRouteImport } from './routes/agents_.$from.$agent'
 import { Route as AgentsSkillsNewRouteImport } from './routes/agents_.skills.new'
+import { Route as FactoriesFactoryAgentsRouteImport } from './routes/factories.$factory_.agents'
+import { Route as FactoriesFactoryInboxRouteImport } from './routes/factories.$factory_.inbox'
 import { Route as FactoriesFactorySettingsRouteImport } from './routes/factories.$factory_.settings'
+import { Route as FactoriesFactorySkillsRouteImport } from './routes/factories.$factory_.skills'
+import { Route as FactoriesFactoryWorkflowsRouteImport } from './routes/factories.$factory_.workflows'
 import { Route as LabelsKeyValueRouteImport } from './routes/labels.$key.$value'
 import { Route as WorkflowsFromWorkflowRouteImport } from './routes/workflows_.$from.$workflow'
 import { Route as AgentsSkillsFromSkillRouteImport } from './routes/agents_.skills.$from.$skill'
+import { Route as FactoriesFactoryAgentsAgentRouteImport } from './routes/factories.$factory_.agents_.$agent'
+import { Route as FactoriesFactoryInboxNameRouteImport } from './routes/factories.$factory_.inbox_.$name'
 import { Route as FactoriesFactoryProposalsNameRouteImport } from './routes/factories.$factory_.proposals.$name'
+import { Route as FactoriesFactoryRunsIndexRouteImport } from './routes/factories.$factory_.runs.index'
+import { Route as FactoriesFactoryRunsRunIdRouteImport } from './routes/factories.$factory_.runs.$runId'
+import { Route as FactoriesFactorySkillsSkillRouteImport } from './routes/factories.$factory_.skills_.$skill'
 import { Route as RunsRunIdStepsStepRouteImport } from './routes/runs.$runId_.steps.$step'
 import { Route as WorkflowsFromWorkflowStepRouteImport } from './routes/workflows_.$from.$workflow_.$step'
+import { Route as FactoriesFactoryWorkflowsFromWorkflowRouteImport } from './routes/factories.$factory_.workflows_.$from.$workflow'
+import { Route as FactoriesFactoryRunsRunIdStepsStepRouteImport } from './routes/factories.$factory_.runs.$runId_.steps.$step'
+import { Route as FactoriesFactoryWorkflowsFromWorkflowStepRouteImport } from './routes/factories.$factory_.workflows_.$from.$workflow_.$step'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -119,10 +131,31 @@ const AgentsSkillsNewRoute = AgentsSkillsNewRouteImport.update({
   path: '/agents/skills/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FactoriesFactoryAgentsRoute = FactoriesFactoryAgentsRouteImport.update({
+  id: '/factories/$factory_/agents',
+  path: '/factories/$factory/agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FactoriesFactoryInboxRoute = FactoriesFactoryInboxRouteImport.update({
+  id: '/factories/$factory_/inbox',
+  path: '/factories/$factory/inbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FactoriesFactorySettingsRoute =
   FactoriesFactorySettingsRouteImport.update({
     id: '/factories/$factory_/settings',
     path: '/factories/$factory/settings',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FactoriesFactorySkillsRoute = FactoriesFactorySkillsRouteImport.update({
+  id: '/factories/$factory_/skills',
+  path: '/factories/$factory/skills',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FactoriesFactoryWorkflowsRoute =
+  FactoriesFactoryWorkflowsRouteImport.update({
+    id: '/factories/$factory_/workflows',
+    path: '/factories/$factory/workflows',
     getParentRoute: () => rootRouteImport,
   } as any)
 const LabelsKeyValueRoute = LabelsKeyValueRouteImport.update({
@@ -140,10 +173,40 @@ const AgentsSkillsFromSkillRoute = AgentsSkillsFromSkillRouteImport.update({
   path: '/agents/skills/$from/$skill',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FactoriesFactoryAgentsAgentRoute =
+  FactoriesFactoryAgentsAgentRouteImport.update({
+    id: '/factories/$factory_/agents_/$agent',
+    path: '/factories/$factory/agents/$agent',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FactoriesFactoryInboxNameRoute =
+  FactoriesFactoryInboxNameRouteImport.update({
+    id: '/factories/$factory_/inbox_/$name',
+    path: '/factories/$factory/inbox/$name',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const FactoriesFactoryProposalsNameRoute =
   FactoriesFactoryProposalsNameRouteImport.update({
     id: '/factories/$factory_/proposals/$name',
     path: '/factories/$factory/proposals/$name',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FactoriesFactoryRunsIndexRoute =
+  FactoriesFactoryRunsIndexRouteImport.update({
+    id: '/factories/$factory_/runs/',
+    path: '/factories/$factory/runs/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FactoriesFactoryRunsRunIdRoute =
+  FactoriesFactoryRunsRunIdRouteImport.update({
+    id: '/factories/$factory_/runs/$runId',
+    path: '/factories/$factory/runs/$runId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FactoriesFactorySkillsSkillRoute =
+  FactoriesFactorySkillsSkillRouteImport.update({
+    id: '/factories/$factory_/skills_/$skill',
+    path: '/factories/$factory/skills/$skill',
     getParentRoute: () => rootRouteImport,
   } as any)
 const RunsRunIdStepsStepRoute = RunsRunIdStepsStepRouteImport.update({
@@ -155,6 +218,24 @@ const WorkflowsFromWorkflowStepRoute =
   WorkflowsFromWorkflowStepRouteImport.update({
     id: '/workflows_/$from/$workflow_/$step',
     path: '/workflows/$from/$workflow/$step',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FactoriesFactoryWorkflowsFromWorkflowRoute =
+  FactoriesFactoryWorkflowsFromWorkflowRouteImport.update({
+    id: '/factories/$factory_/workflows_/$from/$workflow',
+    path: '/factories/$factory/workflows/$from/$workflow',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FactoriesFactoryRunsRunIdStepsStepRoute =
+  FactoriesFactoryRunsRunIdStepsStepRouteImport.update({
+    id: '/factories/$factory_/runs/$runId_/steps/$step',
+    path: '/factories/$factory/runs/$runId/steps/$step',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FactoriesFactoryWorkflowsFromWorkflowStepRoute =
+  FactoriesFactoryWorkflowsFromWorkflowStepRouteImport.update({
+    id: '/factories/$factory_/workflows_/$from/$workflow_/$step',
+    path: '/factories/$factory/workflows/$from/$workflow/$step',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -176,13 +257,25 @@ export interface FileRoutesByFullPath {
   '/runs/': typeof RunsIndexRoute
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/agents/skills/new': typeof AgentsSkillsNewRoute
+  '/factories/$factory/agents': typeof FactoriesFactoryAgentsRoute
+  '/factories/$factory/inbox': typeof FactoriesFactoryInboxRoute
   '/factories/$factory/settings': typeof FactoriesFactorySettingsRoute
+  '/factories/$factory/skills': typeof FactoriesFactorySkillsRoute
+  '/factories/$factory/workflows': typeof FactoriesFactoryWorkflowsRoute
   '/labels/$key/$value': typeof LabelsKeyValueRoute
   '/workflows/$from/$workflow': typeof WorkflowsFromWorkflowRoute
   '/agents/skills/$from/$skill': typeof AgentsSkillsFromSkillRoute
+  '/factories/$factory/agents/$agent': typeof FactoriesFactoryAgentsAgentRoute
+  '/factories/$factory/inbox/$name': typeof FactoriesFactoryInboxNameRoute
   '/factories/$factory/proposals/$name': typeof FactoriesFactoryProposalsNameRoute
+  '/factories/$factory/runs/$runId': typeof FactoriesFactoryRunsRunIdRoute
+  '/factories/$factory/skills/$skill': typeof FactoriesFactorySkillsSkillRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
   '/workflows/$from/$workflow/$step': typeof WorkflowsFromWorkflowStepRoute
+  '/factories/$factory/runs/': typeof FactoriesFactoryRunsIndexRoute
+  '/factories/$factory/workflows/$from/$workflow': typeof FactoriesFactoryWorkflowsFromWorkflowRoute
+  '/factories/$factory/runs/$runId/steps/$step': typeof FactoriesFactoryRunsRunIdStepsStepRoute
+  '/factories/$factory/workflows/$from/$workflow/$step': typeof FactoriesFactoryWorkflowsFromWorkflowStepRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -202,13 +295,25 @@ export interface FileRoutesByTo {
   '/runs': typeof RunsIndexRoute
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/agents/skills/new': typeof AgentsSkillsNewRoute
+  '/factories/$factory/agents': typeof FactoriesFactoryAgentsRoute
+  '/factories/$factory/inbox': typeof FactoriesFactoryInboxRoute
   '/factories/$factory/settings': typeof FactoriesFactorySettingsRoute
+  '/factories/$factory/skills': typeof FactoriesFactorySkillsRoute
+  '/factories/$factory/workflows': typeof FactoriesFactoryWorkflowsRoute
   '/labels/$key/$value': typeof LabelsKeyValueRoute
   '/workflows/$from/$workflow': typeof WorkflowsFromWorkflowRoute
   '/agents/skills/$from/$skill': typeof AgentsSkillsFromSkillRoute
+  '/factories/$factory/agents/$agent': typeof FactoriesFactoryAgentsAgentRoute
+  '/factories/$factory/inbox/$name': typeof FactoriesFactoryInboxNameRoute
   '/factories/$factory/proposals/$name': typeof FactoriesFactoryProposalsNameRoute
+  '/factories/$factory/runs/$runId': typeof FactoriesFactoryRunsRunIdRoute
+  '/factories/$factory/skills/$skill': typeof FactoriesFactorySkillsSkillRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
   '/workflows/$from/$workflow/$step': typeof WorkflowsFromWorkflowStepRoute
+  '/factories/$factory/runs': typeof FactoriesFactoryRunsIndexRoute
+  '/factories/$factory/workflows/$from/$workflow': typeof FactoriesFactoryWorkflowsFromWorkflowRoute
+  '/factories/$factory/runs/$runId/steps/$step': typeof FactoriesFactoryRunsRunIdStepsStepRoute
+  '/factories/$factory/workflows/$from/$workflow/$step': typeof FactoriesFactoryWorkflowsFromWorkflowStepRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -229,13 +334,25 @@ export interface FileRoutesById {
   '/runs/': typeof RunsIndexRoute
   '/agents_/$from/$agent': typeof AgentsFromAgentRoute
   '/agents_/skills/new': typeof AgentsSkillsNewRoute
+  '/factories/$factory_/agents': typeof FactoriesFactoryAgentsRoute
+  '/factories/$factory_/inbox': typeof FactoriesFactoryInboxRoute
   '/factories/$factory_/settings': typeof FactoriesFactorySettingsRoute
+  '/factories/$factory_/skills': typeof FactoriesFactorySkillsRoute
+  '/factories/$factory_/workflows': typeof FactoriesFactoryWorkflowsRoute
   '/labels/$key/$value': typeof LabelsKeyValueRoute
   '/workflows_/$from/$workflow': typeof WorkflowsFromWorkflowRoute
   '/agents_/skills/$from/$skill': typeof AgentsSkillsFromSkillRoute
+  '/factories/$factory_/agents_/$agent': typeof FactoriesFactoryAgentsAgentRoute
+  '/factories/$factory_/inbox_/$name': typeof FactoriesFactoryInboxNameRoute
   '/factories/$factory_/proposals/$name': typeof FactoriesFactoryProposalsNameRoute
+  '/factories/$factory_/runs/$runId': typeof FactoriesFactoryRunsRunIdRoute
+  '/factories/$factory_/skills_/$skill': typeof FactoriesFactorySkillsSkillRoute
   '/runs/$runId_/steps/$step': typeof RunsRunIdStepsStepRoute
   '/workflows_/$from/$workflow_/$step': typeof WorkflowsFromWorkflowStepRoute
+  '/factories/$factory_/runs/': typeof FactoriesFactoryRunsIndexRoute
+  '/factories/$factory_/workflows_/$from/$workflow': typeof FactoriesFactoryWorkflowsFromWorkflowRoute
+  '/factories/$factory_/runs/$runId_/steps/$step': typeof FactoriesFactoryRunsRunIdStepsStepRoute
+  '/factories/$factory_/workflows_/$from/$workflow_/$step': typeof FactoriesFactoryWorkflowsFromWorkflowStepRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -257,13 +374,25 @@ export interface FileRouteTypes {
     | '/runs/'
     | '/agents/$from/$agent'
     | '/agents/skills/new'
+    | '/factories/$factory/agents'
+    | '/factories/$factory/inbox'
     | '/factories/$factory/settings'
+    | '/factories/$factory/skills'
+    | '/factories/$factory/workflows'
     | '/labels/$key/$value'
     | '/workflows/$from/$workflow'
     | '/agents/skills/$from/$skill'
+    | '/factories/$factory/agents/$agent'
+    | '/factories/$factory/inbox/$name'
     | '/factories/$factory/proposals/$name'
+    | '/factories/$factory/runs/$runId'
+    | '/factories/$factory/skills/$skill'
     | '/runs/$runId/steps/$step'
     | '/workflows/$from/$workflow/$step'
+    | '/factories/$factory/runs/'
+    | '/factories/$factory/workflows/$from/$workflow'
+    | '/factories/$factory/runs/$runId/steps/$step'
+    | '/factories/$factory/workflows/$from/$workflow/$step'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -283,13 +412,25 @@ export interface FileRouteTypes {
     | '/runs'
     | '/agents/$from/$agent'
     | '/agents/skills/new'
+    | '/factories/$factory/agents'
+    | '/factories/$factory/inbox'
     | '/factories/$factory/settings'
+    | '/factories/$factory/skills'
+    | '/factories/$factory/workflows'
     | '/labels/$key/$value'
     | '/workflows/$from/$workflow'
     | '/agents/skills/$from/$skill'
+    | '/factories/$factory/agents/$agent'
+    | '/factories/$factory/inbox/$name'
     | '/factories/$factory/proposals/$name'
+    | '/factories/$factory/runs/$runId'
+    | '/factories/$factory/skills/$skill'
     | '/runs/$runId/steps/$step'
     | '/workflows/$from/$workflow/$step'
+    | '/factories/$factory/runs'
+    | '/factories/$factory/workflows/$from/$workflow'
+    | '/factories/$factory/runs/$runId/steps/$step'
+    | '/factories/$factory/workflows/$from/$workflow/$step'
   id:
     | '__root__'
     | '/'
@@ -309,13 +450,25 @@ export interface FileRouteTypes {
     | '/runs/'
     | '/agents_/$from/$agent'
     | '/agents_/skills/new'
+    | '/factories/$factory_/agents'
+    | '/factories/$factory_/inbox'
     | '/factories/$factory_/settings'
+    | '/factories/$factory_/skills'
+    | '/factories/$factory_/workflows'
     | '/labels/$key/$value'
     | '/workflows_/$from/$workflow'
     | '/agents_/skills/$from/$skill'
+    | '/factories/$factory_/agents_/$agent'
+    | '/factories/$factory_/inbox_/$name'
     | '/factories/$factory_/proposals/$name'
+    | '/factories/$factory_/runs/$runId'
+    | '/factories/$factory_/skills_/$skill'
     | '/runs/$runId_/steps/$step'
     | '/workflows_/$from/$workflow_/$step'
+    | '/factories/$factory_/runs/'
+    | '/factories/$factory_/workflows_/$from/$workflow'
+    | '/factories/$factory_/runs/$runId_/steps/$step'
+    | '/factories/$factory_/workflows_/$from/$workflow_/$step'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -336,13 +489,25 @@ export interface RootRouteChildren {
   RunsIndexRoute: typeof RunsIndexRoute
   AgentsFromAgentRoute: typeof AgentsFromAgentRoute
   AgentsSkillsNewRoute: typeof AgentsSkillsNewRoute
+  FactoriesFactoryAgentsRoute: typeof FactoriesFactoryAgentsRoute
+  FactoriesFactoryInboxRoute: typeof FactoriesFactoryInboxRoute
   FactoriesFactorySettingsRoute: typeof FactoriesFactorySettingsRoute
+  FactoriesFactorySkillsRoute: typeof FactoriesFactorySkillsRoute
+  FactoriesFactoryWorkflowsRoute: typeof FactoriesFactoryWorkflowsRoute
   LabelsKeyValueRoute: typeof LabelsKeyValueRoute
   WorkflowsFromWorkflowRoute: typeof WorkflowsFromWorkflowRoute
   AgentsSkillsFromSkillRoute: typeof AgentsSkillsFromSkillRoute
+  FactoriesFactoryAgentsAgentRoute: typeof FactoriesFactoryAgentsAgentRoute
+  FactoriesFactoryInboxNameRoute: typeof FactoriesFactoryInboxNameRoute
   FactoriesFactoryProposalsNameRoute: typeof FactoriesFactoryProposalsNameRoute
+  FactoriesFactoryRunsRunIdRoute: typeof FactoriesFactoryRunsRunIdRoute
+  FactoriesFactorySkillsSkillRoute: typeof FactoriesFactorySkillsSkillRoute
   RunsRunIdStepsStepRoute: typeof RunsRunIdStepsStepRoute
   WorkflowsFromWorkflowStepRoute: typeof WorkflowsFromWorkflowStepRoute
+  FactoriesFactoryRunsIndexRoute: typeof FactoriesFactoryRunsIndexRoute
+  FactoriesFactoryWorkflowsFromWorkflowRoute: typeof FactoriesFactoryWorkflowsFromWorkflowRoute
+  FactoriesFactoryRunsRunIdStepsStepRoute: typeof FactoriesFactoryRunsRunIdStepsStepRoute
+  FactoriesFactoryWorkflowsFromWorkflowStepRoute: typeof FactoriesFactoryWorkflowsFromWorkflowStepRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -466,11 +631,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsSkillsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/factories/$factory_/agents': {
+      id: '/factories/$factory_/agents'
+      path: '/factories/$factory/agents'
+      fullPath: '/factories/$factory/agents'
+      preLoaderRoute: typeof FactoriesFactoryAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory_/inbox': {
+      id: '/factories/$factory_/inbox'
+      path: '/factories/$factory/inbox'
+      fullPath: '/factories/$factory/inbox'
+      preLoaderRoute: typeof FactoriesFactoryInboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/factories/$factory_/settings': {
       id: '/factories/$factory_/settings'
       path: '/factories/$factory/settings'
       fullPath: '/factories/$factory/settings'
       preLoaderRoute: typeof FactoriesFactorySettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory_/skills': {
+      id: '/factories/$factory_/skills'
+      path: '/factories/$factory/skills'
+      fullPath: '/factories/$factory/skills'
+      preLoaderRoute: typeof FactoriesFactorySkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory_/workflows': {
+      id: '/factories/$factory_/workflows'
+      path: '/factories/$factory/workflows'
+      fullPath: '/factories/$factory/workflows'
+      preLoaderRoute: typeof FactoriesFactoryWorkflowsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/labels/$key/$value': {
@@ -494,11 +687,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsSkillsFromSkillRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/factories/$factory_/agents_/$agent': {
+      id: '/factories/$factory_/agents_/$agent'
+      path: '/factories/$factory/agents/$agent'
+      fullPath: '/factories/$factory/agents/$agent'
+      preLoaderRoute: typeof FactoriesFactoryAgentsAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory_/inbox_/$name': {
+      id: '/factories/$factory_/inbox_/$name'
+      path: '/factories/$factory/inbox/$name'
+      fullPath: '/factories/$factory/inbox/$name'
+      preLoaderRoute: typeof FactoriesFactoryInboxNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/factories/$factory_/proposals/$name': {
       id: '/factories/$factory_/proposals/$name'
       path: '/factories/$factory/proposals/$name'
       fullPath: '/factories/$factory/proposals/$name'
       preLoaderRoute: typeof FactoriesFactoryProposalsNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory_/runs/': {
+      id: '/factories/$factory_/runs/'
+      path: '/factories/$factory/runs'
+      fullPath: '/factories/$factory/runs/'
+      preLoaderRoute: typeof FactoriesFactoryRunsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory_/runs/$runId': {
+      id: '/factories/$factory_/runs/$runId'
+      path: '/factories/$factory/runs/$runId'
+      fullPath: '/factories/$factory/runs/$runId'
+      preLoaderRoute: typeof FactoriesFactoryRunsRunIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory_/skills_/$skill': {
+      id: '/factories/$factory_/skills_/$skill'
+      path: '/factories/$factory/skills/$skill'
+      fullPath: '/factories/$factory/skills/$skill'
+      preLoaderRoute: typeof FactoriesFactorySkillsSkillRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/runs/$runId_/steps/$step': {
@@ -513,6 +741,27 @@ declare module '@tanstack/react-router' {
       path: '/workflows/$from/$workflow/$step'
       fullPath: '/workflows/$from/$workflow/$step'
       preLoaderRoute: typeof WorkflowsFromWorkflowStepRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory_/workflows_/$from/$workflow': {
+      id: '/factories/$factory_/workflows_/$from/$workflow'
+      path: '/factories/$factory/workflows/$from/$workflow'
+      fullPath: '/factories/$factory/workflows/$from/$workflow'
+      preLoaderRoute: typeof FactoriesFactoryWorkflowsFromWorkflowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory_/runs/$runId_/steps/$step': {
+      id: '/factories/$factory_/runs/$runId_/steps/$step'
+      path: '/factories/$factory/runs/$runId/steps/$step'
+      fullPath: '/factories/$factory/runs/$runId/steps/$step'
+      preLoaderRoute: typeof FactoriesFactoryRunsRunIdStepsStepRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory_/workflows_/$from/$workflow_/$step': {
+      id: '/factories/$factory_/workflows_/$from/$workflow_/$step'
+      path: '/factories/$factory/workflows/$from/$workflow/$step'
+      fullPath: '/factories/$factory/workflows/$from/$workflow/$step'
+      preLoaderRoute: typeof FactoriesFactoryWorkflowsFromWorkflowStepRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -536,13 +785,28 @@ const rootRouteChildren: RootRouteChildren = {
   RunsIndexRoute: RunsIndexRoute,
   AgentsFromAgentRoute: AgentsFromAgentRoute,
   AgentsSkillsNewRoute: AgentsSkillsNewRoute,
+  FactoriesFactoryAgentsRoute: FactoriesFactoryAgentsRoute,
+  FactoriesFactoryInboxRoute: FactoriesFactoryInboxRoute,
   FactoriesFactorySettingsRoute: FactoriesFactorySettingsRoute,
+  FactoriesFactorySkillsRoute: FactoriesFactorySkillsRoute,
+  FactoriesFactoryWorkflowsRoute: FactoriesFactoryWorkflowsRoute,
   LabelsKeyValueRoute: LabelsKeyValueRoute,
   WorkflowsFromWorkflowRoute: WorkflowsFromWorkflowRoute,
   AgentsSkillsFromSkillRoute: AgentsSkillsFromSkillRoute,
+  FactoriesFactoryAgentsAgentRoute: FactoriesFactoryAgentsAgentRoute,
+  FactoriesFactoryInboxNameRoute: FactoriesFactoryInboxNameRoute,
   FactoriesFactoryProposalsNameRoute: FactoriesFactoryProposalsNameRoute,
+  FactoriesFactoryRunsRunIdRoute: FactoriesFactoryRunsRunIdRoute,
+  FactoriesFactorySkillsSkillRoute: FactoriesFactorySkillsSkillRoute,
   RunsRunIdStepsStepRoute: RunsRunIdStepsStepRoute,
   WorkflowsFromWorkflowStepRoute: WorkflowsFromWorkflowStepRoute,
+  FactoriesFactoryRunsIndexRoute: FactoriesFactoryRunsIndexRoute,
+  FactoriesFactoryWorkflowsFromWorkflowRoute:
+    FactoriesFactoryWorkflowsFromWorkflowRoute,
+  FactoriesFactoryRunsRunIdStepsStepRoute:
+    FactoriesFactoryRunsRunIdStepsStepRoute,
+  FactoriesFactoryWorkflowsFromWorkflowStepRoute:
+    FactoriesFactoryWorkflowsFromWorkflowStepRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

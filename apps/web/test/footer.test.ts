@@ -17,6 +17,7 @@ import {
   newerReleaseWords,
   quotaShort,
   staleFrameHeights,
+  tickWord,
   versionWords,
 } from '../src/lib/footer.ts';
 import { daemon, quota } from './factory-fixtures.ts';
@@ -79,6 +80,17 @@ test('atWork and atWorkWords: the sessions at work', async (t) => {
     assert.equal(atWorkWords({ runs: 0, sessions: 3 }).text, '0 runs · 3 sessions');
     assert.match(atWorkWords({ runs: 2, sessions: 3 }).title, /2 runs in flight, and 3 sessions working or checking, across every factory/);
   });
+});
+
+test('tickWord: the machine bar says ticking, paused or not ticking', () => {
+  assert.equal(tickWord(daemonDot(daemon(), null, NOW), false), 'ticking');
+  assert.equal(tickWord(daemonDot(daemon(), null, NOW), true), 'paused');
+  for (const kind of ['none', 'stopped', 'gone', 'stalled', 'unreadable'] as const) {
+    assert.equal(tickWord(daemonDot(daemon({ kind, ticking: false }), null, NOW), false), 'not ticking', kind);
+  }
+  assert.equal(tickWord(daemonDot(daemon({ unobserved: ['a harness'] }), null, NOW), false), 'ticking, harness unread');
+  assert.equal(tickWord(daemonDot(undefined, new Error('500'), NOW), false), 'unread');
+  assert.equal(tickWord(daemonDot(undefined, null, NOW), false), 'reading');
 });
 
 test("daemonDot: the daemon's dot and its title", async (t) => {
@@ -189,7 +201,12 @@ test("staleFrameHeights: no page sized as the screen less a header alone, withou
   });
   await t.test("the frame's lines: REFUSED, a page the screen less the top bar alone, which the banner's row would overflow", () => {
     assert.deepEqual(staleFrameHeights('flex h-[calc(100svh-var(--frame-top))] min-h-96'), ['h-[calc(100svh-var(--frame-top))]']);
-    assert.equal(staleFrameHeights('flex h-[calc(100svh-var(--frame-top)-var(--frame-lines))] min-h-96').length, 0);
+    assert.deepEqual(staleFrameHeights('flex h-[calc(100svh-var(--frame-top)-var(--frame-lines))] min-h-96'), [
+      'h-[calc(100svh-var(--frame-top)-var(--frame-lines))]',
+    ]);
+  });
+  await t.test('the machine bar: REFUSED, a page the screen less the head and the lines, which the bar at the foot would cover', () => {
+    assert.equal(staleFrameHeights('flex h-[calc(100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot))] min-h-96').length, 0);
   });
   await t.test('the frame height: no page under the top bar is the screen less a header alone', () => {
     const app = path.join(import.meta.dirname, '..');
@@ -197,7 +214,7 @@ test("staleFrameHeights: no page sized as the screen less a header alone, withou
     assert.equal(
       stale.length,
       0,
-      `less the top bar and the frame's lines, 100svh-var(--frame-top)-var(--frame-lines): ${stale.map((f) => path.relative(app, f)).join(', ')}`,
+      `less the head, the frame's lines and the machine bar, 100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot): ${stale.map((f) => path.relative(app, f)).join(', ')}`,
     );
   });
 });

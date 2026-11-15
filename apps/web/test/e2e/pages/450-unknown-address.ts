@@ -19,7 +19,7 @@ const drawnOf = (page: Page): Promise<string> => page.locator('main[data-frame-p
 export default {
   /**
    * An address no route has: the frame stands around it with its destinations, none of them lit, and the top bar names no page; with a
-   * `?factory=` it draws the same, word for word, and its switcher reads All factories.
+   * `?factory=` it draws the same, word for word, the redirect leaving it where it is, and no factory pane stands beside it.
    */
   name: 'unknown-address',
   route: NOWHERE,

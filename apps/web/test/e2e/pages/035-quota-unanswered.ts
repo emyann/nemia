@@ -59,7 +59,7 @@ export default {
       const opacity = Number(await line.locator('[data-quota-last]').evaluate((el) => getComputedStyle(el).opacity));
       if (!(opacity < 1)) throw new Refused(`the last reading is dimmed, so that nobody takes it for now — its opacity is ${opacity}`);
       const short = page.locator(
-        `header[data-frame-header] [data-gauges-button][data-quota-short="5-hour ${Math.round(QUOTA.fiveHour.used)}% · week ${QUOTA.week.used}%"]`,
+        `footer[data-machine-bar] [data-gauges-button][data-quota-short="5-hour ${Math.round(QUOTA.fiveHour.used)}% · week ${QUOTA.week.used}%"]`,
       );
       await expectCount(short, 1, 'the gauges button keeps the last good reading in short');
       await expectCount(short.and(page.locator('[data-marked]')), 1, `its week, ${QUOTA.week.used}% used, still marked`);

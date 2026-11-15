@@ -88,7 +88,7 @@ export default {
 async function visit(page: Page): Promise<void> {
   {
     await sidebar(page);
-    await expectVisible(railPlace(page, 'Inbox').and(litOf(page)), 'the sidebar lights Inbox on its page');
+    await expectVisible(railPlace(page, 'Waiting').and(litOf(page)), 'the rail lights Waiting on the store’s Inbox');
     const { planned, bare, rich } = CARDS;
     const inbox = path.join(store!, 'inbox');
     const checkout = path.join(store!, 'checkout');

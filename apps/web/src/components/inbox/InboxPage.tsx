@@ -49,7 +49,6 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
  * It reads every card, its run ended or not (`inboxAllQuery`), and lists the cards still in play — not started, or whose run is pending,
  * running or waiting (`CARD_KIND`) — or, under Ended, kept in the address as `?cards=ended`, those whose run ended: each counted after the
  * factory and the label filter, and an In play that lists none offers the ended cards.
- * @param props the props: what the page reads of its address (`at`), and `onSearch`, which writes a change of it to the address
  */
 export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Partial<InboxAt>) => void }) {
   const { factory, l, cards: kind } = at;

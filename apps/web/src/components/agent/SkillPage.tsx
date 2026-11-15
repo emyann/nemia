@@ -21,7 +21,6 @@ const code = (text: string) => <code className="font-mono text-body-small break-
  * version a save or the switch brings. A write of the page is read back at once as the form's own, so its words do not read as unsaved. A
  * write refused as stale reads the skill again: a form with unsaved words keeps them and says the file moved; one without shows the file as
  * it now reads, and says beside the refusal that it has been read again since.
- * @param props the props: where the skill is read from, its name, and the place it is read in
  */
 export function SkillPage({ from, name, place }: { from: string; name: string; place: PagePlace }) {
   const { data: detail } = useSuspenseQuery(skillQuery(from, name, place));

@@ -138,7 +138,10 @@ export default {
       await reload(page);
       await dot('ticking', 'warn', "a daemon that ticks while its last pass could not read a harness warns on the gauges button's dot");
       const warned = page.locator('footer[data-machine-bar] [data-gauges-button][data-daemon-dot="ticking"]');
-      await expectVisible(warned.getByRole('button', { name: /^This machine: daemon ticking, harness unread/ }), 'and its name says so');
+      await expectVisible(
+        warned.and(page.getByRole('button', { name: /^This machine: daemon ticking, harness unread/ })),
+        'and its name says so',
+      );
       const hover = (await warned.getAttribute('title'))?.split(String.fromCharCode(10)) ?? [];
       const [said = '', ...why] = hover;
       if (!said.startsWith(`api: ticking, pid ${process.pid}`) || why.join() !== unobserved.join()) {

@@ -23,7 +23,6 @@ import { container, hairline } from '@/lib/meaning';
 /**
  * What the repository of the address's place offers a step (the factory its path names, `?repo=`), section by section, each thing with
  * the file it was read from; where the api reads none, why and what to do (`Unread`), and no section.
- * @param props the props: the place the page is read in
  */
 export function CapabilitiesPage({ place: search }: { place: PagePlace }) {
   const { data } = useSuspenseQuery(capabilitiesQuery(search));

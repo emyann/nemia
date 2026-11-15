@@ -31,10 +31,11 @@ export default {
   /**
    * The Factories at `/`: every factory a block on a canvas, and a file that does not read a block that says why; the default factory is
    * none, in the canvas or the switcher, once a factory is filed, though it holds runs. On a floor the pane's switcher lists every factory,
-   * each with its runs in flight, or that its file does not read, then a new factory to come. A block double-clicked opens its factory's floor, at `/factories/<name>`,
-   * with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — its name in the switcher, Factories lit, and a start in
-   * the pane. A name no factory has says so, answered with no 4xx, and leads back. The default factory's floor still answers its address,
-   * the switcher listing it after the others, its start asking which factory; Factories in the rail leads back.
+   * each with its runs in flight, or that its file does not read, then a new factory to come. A block double-clicked opens its factory's
+   * floor, at `/factories/<name>`, with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — its name in the
+   * switcher, Factories lit, and a start in the pane. A name no factory has says so, answered with no 4xx, and leads back. The default
+   * factory's floor still answers its address, the switcher listing it after the others, its start asking which factory; Factories in the
+   * rail leads back.
    */
   name: 'factories',
   route: '/',

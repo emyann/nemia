@@ -48,7 +48,6 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
  * the form (`keptAfterCopy`); a read that fails keeps nothing, and the page reads the agent again as after any write. Under it, your custom
  * instructions for its name, for an agent of either place, then the Try panel for an agent of yours; the repository's is not tried, since a
  * try runs with no repository, where its agents are not read.
- * @param props the props: where the agent is read from, its name, and the place it is read in
  */
 export function AgentPage({ from, name, place }: { from: string; name: string; place: PagePlace }) {
   const { data: agent } = useSuspenseQuery(agentQuery(from, name, place));

@@ -64,7 +64,7 @@ export default {
         await again.waitForURL((url) => url.pathname === `/factories/${hiring.name}/workflows/repo/${good.name}`, { timeout: WAIT_MS });
         await expectVisible(again.locator('h1', { hasText: new RegExp(`^${good.name}$`) }), "a card's name opens the workflow's page");
         await again.goBack({ waitUntil: 'load' });
-        await again.waitForURL((url) => url.pathname === '/workflows', { timeout: WAIT_MS });
+        await again.waitForURL((url) => url.pathname === `/factories/${hiring.name}/workflows`, { timeout: WAIT_MS });
         await idle(again);
       });
     } finally {

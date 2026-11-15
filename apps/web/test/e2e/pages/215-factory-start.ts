@@ -18,13 +18,18 @@ const REVIEWER = 'reviewer-e2e';
 const withHires = (text: string, hires: Record<string, string>): string =>
   JSON.stringify({ ...(JSON.parse(text) as object), hires }, null, 2);
 
-/** Open the sidebar's start on a fresh load of the floor, and the side sheet it opens. */
+/**
+ * Open the pane's start on a fresh load of the floor, with no bar open (one would cover the pane under 1600), and the side sheet it
+ * opens.
+ */
 async function openStart(page: Page): Promise<Locator> {
-  await page.goto(page.url(), { waitUntil: 'load' });
+  const floor = new URL(page.url());
+  floor.searchParams.delete('bar');
+  await page.goto(floor.href, { waitUntil: 'load' });
   await idle(page);
   await startOf(page).click();
   const bar = page.getByRole('complementary', { name: `Start a run in ${FACTORIES.hiring.name}` });
-  await expectVisible(bar, "the sidebar's Start a run opens its bar in the side sheet, naming the factory");
+  await expectVisible(bar, "the pane's Start a run opens its bar in the side sheet, naming the factory");
   return bar;
 }
 
@@ -90,7 +95,7 @@ async function severalRepos(page: Page, workflow: string, checkout: string, them
 
 export default {
   /**
-   * A run is started from a factory's floor: the sidebar's Start a run opens its bar in the side sheet on the factory's one repository,
+   * A run is started from a factory's floor: the pane's Start a run opens its bar in the side sheet on the factory's one repository,
    * fixed, listing the workflows it offers there with its hires. A workflow whose step the factory hires no one into says so in the
    * package's words and cannot be picked. Once the factory hires into it, it is picked; Escape in its brief leaves the field and keeps the
    * brief, and a second Escape closes the bar. Picked again, the start sends `?factory=` and `?repo=`: the record names both. The hires,

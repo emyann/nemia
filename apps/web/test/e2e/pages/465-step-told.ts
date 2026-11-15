@@ -158,13 +158,13 @@ export default {
       await expectHref(
         page,
         '[data-home="instructions"] a',
-        `/agents/repo/${REVIEWER}?factory=${factory}`,
+        `/factories/${factory}/agents/${REVIEWER}?from=repo`,
         "the agent's instructions live on its page, in the factory",
       );
       await expectHref(
         page,
         '[data-home="custom"] a',
-        `/agents/repo/${REVIEWER}?factory=${factory}#custom-instructions`,
+        `/factories/${factory}/agents/${REVIEWER}?from=repo#custom-instructions`,
         'your custom instructions too',
       );
       const rules = told.locator('[data-layer="factory"]');
@@ -197,29 +197,29 @@ export default {
       await onPhone(page);
 
       await recent.getByRole('link', { name: RECENT.title }).click();
-      await page.waitForURL((url) => url.pathname === `/runs/${RECENT.id}` && url.hash === '#step-review');
+      await page.waitForURL((url) => url.pathname.endsWith(`/runs/${RECENT.id}`) && url.hash === '#step-review');
       await idle(page);
-      const back = `${placed}&repo=${encodeURIComponent(checkout)}`;
+      const back = `/factories/${factory}${step}?repo=${encodeURIComponent(checkout)}`;
       await openFold(partOf(page, 'review'), 'detail');
       await expectHref(page, '[data-step-page-link="review"]', back, "the run's step links back to the step's page, in its place");
       await openFold(page.locator('section[aria-label="Receipts"]'), 'where');
       await expectHref(
         page,
         `section[aria-label="Receipts"] a[data-workflow="${good.name}"]`,
-        `/workflows/repo/${good.name}?factory=${factory}&repo=${encodeURIComponent(checkout)}`,
+        `/factories/${factory}/workflows/repo/${good.name}?repo=${encodeURIComponent(checkout)}`,
         "the run's receipt of where it ran links its workflow's page, in its place",
       );
       await settled(page);
       await photograph(page, path.join(OUT, `step-told-run-link-${theme}.png`));
 
       await page.locator('[data-step-page-link="review"]').click();
-      await page.waitForURL((url) => url.pathname === step && url.searchParams.get('factory') === factory);
+      await page.waitForURL((url) => url.pathname === `/factories/${factory}${step}`);
       await idle(page);
       await expectVisible(page.locator(`[data-hired="${factory}"]`), 'back on the step, in the run’s factory');
       await expectHref(
         page,
         'article > a',
-        `/workflows/repo/${good.name}?factory=${factory}&repo=${encodeURIComponent(checkout)}`,
+        `/factories/${factory}/workflows/repo/${good.name}?repo=${encodeURIComponent(checkout)}`,
         'whose way back to its workflow keeps the place',
       );
       await untold(page, placed, factory);

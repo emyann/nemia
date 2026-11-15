@@ -44,8 +44,6 @@ export function presenceWord(presence: Presence): string {
  * in short, a button that opens and closes its gauges in the side sheet (`GaugesBar`, `?bar=gauges`) — the daemon's dot and whether the
  * store ticks or is paused, the runs and sessions at work, the feed (`feed`), Nemia's session at the page at `path`, the quota (in money
  * while it nears its limit) and the version the api runs — then Pause every factory (`PauseButton`).
- *
- * @param props the props: the page's path and where the feed stands
  */
 export function MachineBar({ path, feed }: { path: string; feed: FeedStatus }) {
   const now = new Date(useNow(30_000));
@@ -58,7 +56,7 @@ export function MachineBar({ path, feed }: { path: string; feed: FeedStatus }) {
   const { open, toggle } = useBar();
   const dot = daemonDot(daemon.data, daemon.error, now);
   const short = quotaShort(quota.data, quota.error, now);
-  const tick = pause.data?.pause ? 'paused' : daemon.data?.ticking ? 'ticking' : dot.word;
+  const tick = pause.data?.pause ? 'paused' : dot.word;
   const parts = [
     tick,
     runs.data ? atWorkWords(atWork(runs.data)).text : undefined,
@@ -80,7 +78,7 @@ export function MachineBar({ path, feed }: { path: string; feed: FeedStatus }) {
         data-quota-short={short.text}
         data-marked={short.marked ? '' : undefined}
         aria-expanded={open?.kind === 'gauges'}
-        aria-label={`This machine: ${parts.join(', ')}, quota ${short.text}${short.marked ? ', near its limit' : ''}`}
+        aria-label={`This machine: daemon ${parts.join(', ')}, quota ${short.text}${short.marked ? ', near its limit' : ''}`}
         title={dot.title}
         onClick={() => toggle(GAUGES)}
         className="flex h-full min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-shape-small px-2 text-left outline-none hover:bg-surface-container-high focus-visible:ring-2 focus-visible:ring-ring/50"

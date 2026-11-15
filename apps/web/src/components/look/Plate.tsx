@@ -57,9 +57,9 @@ const LIT: CSSProperties = { backgroundColor: paint.alive };
 
 /**
  * A page's name in the look: the brand face in capitals, as the page's `h1`, 18 pixels over its rule; a display's size in a page's column
- * of 512 pixels or more, a headline's in a narrower one, the column beside a factory's pane at 768 among them, so a long name stays in it. The rule is a line of its own
- * nobody reads, under the name, so the name keeps a ground a contrast measure can read: lit in the hue of a session at work exactly as
- * wide as the name, whatever its length, and a hairline on to the end of the `h1`.
+ * of 512 pixels or more, a headline's in a narrower one, the column beside a factory's pane at 768 among them, so a long name stays in it.
+ * The rule is a line of its own nobody reads, under the name, so the name keeps a ground a contrast measure can read: lit in the hue of a
+ * session at work exactly as wide as the name, whatever its length, and a hairline on to the end of the `h1`.
  */
 export function PageName({ children }: { children: ReactNode }) {
   return (

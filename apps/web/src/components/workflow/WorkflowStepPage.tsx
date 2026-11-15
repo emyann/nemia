@@ -13,7 +13,6 @@ import { container } from '@/lib/meaning';
  * it can do (`skills:`), a description of the work that fences nothing; hired and fired there (`StepHire`); what a run of it will be
  * told, read now, each layer beside where it is edited; its newest runs; then its file's own words and keys (`StepWritten`). It edits and
  * starts nothing: each layer's home and its workflow's page do; a hire and a fire are the factory's.
- * @param props the props: the workflow's origin, its name and the step's, and the place it is read in
  */
 export function WorkflowStepPage({ from, workflow, step, place }: { from: string; workflow: string; step: string; place: PagePlace }) {
   const { data: page } = useSuspenseQuery(stepQuery(from, workflow, step, place));
@@ -52,7 +51,6 @@ export function WorkflowStepPage({ from, workflow, step, place }: { from: string
 
 /**
  * Back to the page of the step's workflow, in the place this page is read in.
- * @param props the props: the workflow's origin and name, and the place the page is read in
  */
 export function BackToWorkflow({ from, workflow, place }: { from: string; workflow: string; place: PagePlace }) {
   return (

@@ -59,9 +59,6 @@ function PanePlaces({ path, factory, lit, onPicked }: { path: string; factory: s
  * switcher (`FactoryPicker`) on `surface-container-high`, then Start a run (`PaneStart`); under them the factory's places (`PanePlaces`),
  * the one the page at `path` sits at lit. Docked, it stands as tall as the window less the machine bar; in the narrow screen's drawer
  * (`inDrawer`) it takes the drawer's height, and a place pressed closes the drawer (`onPicked`).
- *
- * @param props the props: the page's path and search, the factory, the place it sits at, whether the pane stands in the drawer, and what
- *   a place pressed there calls
  */
 export function FactoryPane({
   path,

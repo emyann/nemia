@@ -30,7 +30,7 @@ export default {
     try {
       fs.writeFileSync(factoryFile, JSON.stringify({ repos: [path.join(store!, 'checkout')], workflows: [] }, null, 2));
       const { problems } = watch(refused);
-      const creator = `/agents/new?factory=${FACTORY}&workflow=${yours.name}&step=plan`;
+      const creator = `/agents/new?into=${FACTORY}&workflow=${yours.name}&step=plan`;
       await refused.goto(new URL(creator, page.url()).href, { waitUntil: 'load' });
       await idle(refused);
       await expectVisible(

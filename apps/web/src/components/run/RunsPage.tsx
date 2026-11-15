@@ -59,7 +59,6 @@ export function RunsLoading() {
 
 /**
  * The page when a read failed: that it did, and the reason as it came.
- * @param props the props: the failure
  */
 export function RunsFailed({ error }: { error: unknown }) {
   return (
@@ -115,7 +114,6 @@ function Nothing({ children }: { children: string }) {
  * row; the runs in flight, a quiet table; and one page of the finished runs, the one the address' trail leads to, newest finished
  * first. Each plate says the api's own count, and under what waits a button opens the bar of what waits on you in every factory. Every
  * time on the page is a fact to the minute, said against the instant its answer was read at: nothing here counts by itself.
- * @param props the props: what the page reads of its address (`at`), and `onLabel`, which writes a label selector to the address
  */
 export function RunsPage({ at, onLabel }: { at: RunsAt; onLabel: (selector: string | undefined) => void }) {
   const { data: open } = useSuspenseQuery(openRunsQuery(at.factory, at.l));

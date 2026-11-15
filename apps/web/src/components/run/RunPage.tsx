@@ -15,7 +15,6 @@ import { useSeat } from '../nav/useSeat';
 /**
  * The page of a run, or, when the store has no run of its id as the page loads (`loadRun`), the words that say so, by its id: the
  * address of a run removed, or of none.
- * @param props the props: the run's id, from the address, and whether the store had no run of that id as the page loaded
  */
 export function RunPage({ runId, gone }: { runId: string; gone: boolean }) {
   if (gone) {

@@ -30,7 +30,7 @@ import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
 import { measure } from './contrast.ts';
 import { API, measuring, photographing, store } from './world.ts';
 
-/** The factory a page sits in, read from its path as the board reads it (`seatOf`, src/components/nav/nav.ts): none at the store's level. */
+/** The factory a page sits in, read from its path as the board reads it (`seatOf`, src/components/nav/nav.ts): none for the store's. */
 export const pickedIn = (url: URL): string | null => {
   const name = /^\/factories\/([^/]+)/.exec(url.pathname)?.[1];
   return name === undefined ? null : decodeURIComponent(name);

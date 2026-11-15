@@ -27,7 +27,6 @@ const folder = <code className="font-mono text-body-small">workflows/</code>;
  * opened on its page in its builder. With no factory picked, or the default one, every workflow the repository carries, then yours; with
  * a factory's path, what the api lists in it on its repository, from the folders the api names; and where it lists
  * nowhere — several repositories and none named, no such factory, a file that does not read — why, with the way out (`Unplaced`).
- * @param props the props: the place the list is read in, the factory its path names and the repository its search names
  */
 export function WorkflowsPage({ place: address }: { place: PagePlace }) {
   const { data: store } = useSuspenseQuery(storeQuery);

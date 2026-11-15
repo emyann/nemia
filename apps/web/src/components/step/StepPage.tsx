@@ -23,7 +23,6 @@ type Step = StepView;
 /**
  * The page of a step's session, or, when the store has no run of its id as the page loads (`loadRun`), the words that say so, by the
  * run's id: the address of a run removed, or of none.
- * @param props the props: the run's id and the step's name, from the address, and whether the store had no run of that id as the page
  * loaded
  */
 export function StepPage({ runId, name, gone }: { runId: string; name: string; gone: boolean }) {

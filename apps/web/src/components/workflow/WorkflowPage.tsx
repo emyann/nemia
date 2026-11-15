@@ -46,7 +46,6 @@ export const loadWorkflow = (client: QueryClient, place: PagePlace, from: string
  * One workflow, read in the address's place (`listPlace`): with no factory, the folder the list read with none names (`Everywhere`); in a
  * named factory, the folder the api lists in it, its own where it shadows the repository's (`InFactory`); and where the factory lists
  * nowhere, why, with the way back (`Unplaced`).
- * @param props the props: the workflow the address names, the place it is read in and whether its builder is asked for
  */
 export function WorkflowPage({ from, name, address, building }: Asked) {
   const { data: factories } = useQuery(factoriesQuery);
@@ -348,7 +347,6 @@ function NotListed({ from, name }: { from: string; name: string }) {
 
 /**
  * Back to the Workflows page, in `place`, the place this page is read in.
- * @param props the props: the place this page is read in, none at the store's level
  */
 export function BackToWorkflows({ place = {} }: { place?: PagePlace }) {
   return (

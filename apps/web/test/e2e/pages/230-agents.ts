@@ -84,7 +84,7 @@ export default {
       );
       const node = implementer.locator(`[data-used-by] a[data-node="${good.name}/implement"]`);
       await expectVisible(node, `${good.agent.name} links the node that names it, ${good.name} › implement`);
-      if ((await node.getAttribute('href')) !== `/workflows/repo/${good.name}/implement${IN}`)
+      if ((await node.getAttribute('href')) !== `/factories/${hiring.name}/workflows/repo/${good.name}/implement`)
         throw new Refused(`the node's link is its step's page in ${hiring.name} — it is ${await node.getAttribute('href')}`);
       const repoForm = page.locator(`form[data-agent-form="${good.agent.name}"]`);
       await expectVisible(repoForm, `${good.agent.name}'s form`);
@@ -130,10 +130,9 @@ export default {
       await photograph(page, path.join(OUT, `agents-repo-${await themeOf(page)}.png`), { fullPage: true });
 
       await page.locator(`[data-used-by] a[data-node="${good.name}/implement"]`).click();
-      await page.waitForURL(
-        (url) => url.pathname === `/workflows/repo/${good.name}/implement` && url.searchParams.get('factory') === hiring.name,
-        { timeout: WAIT_MS },
-      );
+      await page.waitForURL((url) => url.pathname === `/factories/${hiring.name}/workflows/repo/${good.name}/implement`, {
+        timeout: WAIT_MS,
+      });
       const back = page.locator(`[data-step-agent] a[data-agent-link="${good.agent.name}"]`);
       await expectVisible(back, `implement's page names its agent, ${good.agent.name}, as a link`);
       const small = `[data-step-agent] svg[data-agent-face="${good.agent.name}"]`;
@@ -147,7 +146,10 @@ export default {
         `and what that agent says it can do, beneath it: ${good.agent.skill.name}`,
       );
       await back.click();
-      await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
+      await page.waitForURL(
+        (url) => url.pathname === `/factories/${hiring.name}/agents/${good.agent.name}` && url.searchParams.get('from') === 'repo',
+        { timeout: WAIT_MS },
+      );
       await idle(page);
     } finally {
       takeBack();

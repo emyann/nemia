@@ -165,11 +165,11 @@ export default {
   /**
    * Her face first in the rail, her chat closed, on a page of the board (state 1); pressed, her side sheet docked beside the page at 1280,
    * the store's rail standing as it stood, writing no fold, the machine bar and the Overview's strip whole in the narrower column
-   * (`expectStripWhole`), and the panel in it with nothing said yet (state 2) — her greeting, her
-   * level, what is at work and the four chips — a draft written in it (state 3), where Shift+Enter makes a new line and Enter sends, the
-   * words then drawn as the person's own bubble. Then its Close and her face closing it; at 1600 the sheet beside the rail; on a narrow screen the kit's modal sheet from her face in the top bar; and the
-   * same panel opened as a page of its own at `/chat`, where her face says the page is hers. Her level, her task and her chat are
-   * written by the page and taken back after.
+   * (`expectStripWhole`), and the panel in it with nothing said yet (state 2) — her greeting, her level, what is at work and the four chips
+   * — a draft written in it (state 3), where Shift+Enter makes a new line and Enter sends, the words then drawn as the person's own bubble.
+   * Then its Close and her face closing it; at 1600 the sheet beside the rail; on a narrow screen the kit's modal sheet from her face in
+   * the top bar; and the same panel opened as a page of its own at `/chat`, where her face says the page is hers. Her level, her task and
+   * her chat are written by the page and taken back after.
    */
   name: 'chat',
   route: '/',

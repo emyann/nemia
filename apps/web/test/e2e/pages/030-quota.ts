@@ -47,7 +47,7 @@ export default {
       );
       await expectVisible(short.locator('[data-quota-line][data-quota-mark]'), 'marked, the gauges button draws its quota in money');
       await expectVisible(
-        short.and(page.getByRole('button', { name: /, quota near its limit$/ })),
+        short.and(page.getByRole('button', { name: /^This machine: .*, quota .*, near its limit$/ })),
         'and its name says the quota nears its limit',
       );
       await expectTexts(

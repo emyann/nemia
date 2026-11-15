@@ -367,7 +367,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       const openAt = runRecord(ROOT, open.run.id).pruned!.artifacts!.at;
       const read = await decisionOn(stage, open.run.id);
       assert.ok('touched' in read.decision, 'its decision reads it, a run still to decide');
-      const named = artifactOf(ROOT, read.run, 'implement', openShot);
+      const named = artifactOf(ROOT, read.run, 'implement', openShot, null);
       assert.ok('pruned' in named, `a file its step named reads as pruned, not as never made: ${JSON.stringify(named)}`);
       assert.equal(named.prunedAt, openAt);
       names(named.pruned, 'nemia prune --artifacts');

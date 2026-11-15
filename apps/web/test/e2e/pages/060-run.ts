@@ -336,6 +336,8 @@ export default {
       await tab.close();
     }
     const opens = await thumb.getAttribute('data-opens-view');
+    if (!opens || path.isAbsolute(opens))
+      throw new Refused(`the thumbnail opens its file by its path from the step's folder — it says ${opens}`);
     await thumb.click();
     await page.waitForURL((url) => url.searchParams.get('view') === `${FAKE.unverified}/${opens}`, { timeout: WAIT_MS });
     await expectDrawn(

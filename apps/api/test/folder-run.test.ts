@@ -202,25 +202,28 @@ test("a folder run read on the board: listed by its kind and place, its page wit
       assert.deepEqual(
         write.files,
         [
-          { path: path.join(wrote, '..hidden.md') },
+          { path: path.join(wrote, '..hidden.md'), relativePath: '..hidden.md' },
           {
             path: path.join(wrote, 'bundle.zip'),
+            relativePath: 'bundle.zip',
             name: 'bundle.zip',
             url: '/api/runs/f-notes/steps/write/files/bundle.zip',
             kind: 'other',
             size: 2,
           },
-          { path: path.join(wrote, 'link.md') },
+          { path: path.join(wrote, 'link.md'), relativePath: 'link.md' },
           {
             path: path.join(wrote, 'note.md'),
+            relativePath: 'note.md',
             name: 'note.md',
             url: '/api/runs/f-notes/steps/write/files/note.md',
             kind: 'text',
             size: 11,
           },
-          { path: path.join(wrote, 'scratch') },
+          { path: path.join(wrote, 'scratch'), relativePath: 'scratch' },
           {
             path: path.join(wrote, 'sketch.png'),
+            relativePath: 'sketch.png',
             name: 'sketch.png',
             url: '/api/runs/f-notes/steps/write/files/sketch.png',
             kind: 'image',

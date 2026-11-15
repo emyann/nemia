@@ -57,6 +57,7 @@ const PLAN: StepCloseout = {
   artifacts: [
     {
       path: '/wf/runs/r-1/artifacts/design/flag.png',
+      relativePath: 'flag.png',
       name: 'flag.png',
       url: 'https://placehold.co/480x360/png',
       kind: 'image',

@@ -1324,7 +1324,14 @@ test("the part says how its try ended and who said it, then gives each declared 
 test("a plan's approach is prose, its files a table, its steps a list; the files it named are thumbnails, each opening the viewer by the address", async () => {
   const shot = '/wf/runs/r-1/artifacts/implement/runs-light.png';
   const artifacts = [
-    { path: shot, name: 'runs-light.png', url: '/api/runs/r-1/steps/review/artifacts/runs-light.png', kind: 'image' as const, size: 2048 },
+    {
+      path: shot,
+      relativePath: 'runs-light.png',
+      name: 'runs-light.png',
+      url: '/api/runs/r-1/steps/review/artifacts/runs-light.png',
+      kind: 'image' as const,
+      size: 2048,
+    },
   ];
   const closeout = { ...planCloseout, artifacts };
   const run = runWith(null);
@@ -1340,8 +1347,8 @@ test("a plan's approach is prose, its files a table, its steps a list; the files
     ],
   );
   const thumb = /<li data-artifact="image"[\s\S]*?<\/li>/.exec(html)![0];
-  assert.match(thumb, /<a [^>]*data-opens-view="\/wf\/runs\/r-1\/artifacts\/implement\/runs-light\.png"/);
-  assert.match(thumb, /href="\/\?view=review%2F/, 'the address names the step and the file');
+  assert.match(thumb, /<a [^>]*data-opens-view="runs-light\.png"/, "the file is opened by its path from its step's folder");
+  assert.match(thumb, /href="\/\?view=review%2Fruns-light\.png"/, "the address names the step and the file, never the server's path");
   assert.match(thumb, /<img src="\/api\/runs\/r-1\/steps\/review\/artifacts\/runs-light\.png" alt="runs-light\.png"/);
 });
 

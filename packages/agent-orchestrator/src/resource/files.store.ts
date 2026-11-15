@@ -17,9 +17,9 @@ export type { ArtifactKind };
  * that moment alone, for a page that draws it as it draws every other time.
  */
 export type StepArtifact =
-  | { path: string }
-  | { path: string; name: string; url: string; kind: ArtifactKind; size: number }
-  | { path: string; pruned: string; prunedAt: string };
+  | { path: string; relativePath?: string }
+  | { path: string; relativePath?: string; name: string; url: string; kind: ArtifactKind; size: number }
+  | { path: string; relativePath?: string; pruned: string; prunedAt: string };
 
 /** A value a closeout handed on, by its name: `link` is the value where it is an http(s) address the board may link to, else null. */
 export type StepValue = { name: string; value: string; link: string | null };
@@ -93,18 +93,33 @@ function fileIn(dir: string, name: string): fs.Stats | undefined {
  * @param run The run, its id and what was pruned of it.
  * @param step The step's name.
  * @param file The path the closeout named.
+ * @param work The folder the step of a folder run works in, whose files a closeout names by absolute path; null for a repository run's.
  */
-export function artifactOf(home: string, run: Pick<Run, 'id' | 'pruned'>, step: string, file: string): StepArtifact {
+export function artifactOf(home: string, run: Pick<Run, 'id' | 'pruned'>, step: string, file: string, work: string | null): StepArtifact {
   const dir = artifactsDir(home, run, step);
   const files = run.pruned?.artifacts;
-  if (artifactPlace(file, dir) !== 'files') return { path: file };
-  if (files && !fs.existsSync(dir)) return { path: file, pruned: filesPrunedWords(files), prunedAt: files.at };
-  if (path.dirname(path.resolve(file)) !== path.resolve(dir)) return { path: file };
+  const place = artifactPlace(file, dir);
+  if (place !== 'files') return { path: file, ...relativeOf(file, place, work) };
+  const at = { path: file, relativePath: path.relative(path.resolve(dir), path.resolve(file)) };
+  if (files && !fs.existsSync(dir)) return { ...at, pruned: filesPrunedWords(files), prunedAt: files.at };
+  if (path.dirname(path.resolve(file)) !== path.resolve(dir)) return at;
   const name = path.basename(file);
   const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;
-  if (!stat) return files ? { path: file, pruned: filesPrunedWords(files), prunedAt: files.at } : { path: file };
+  if (!stat) return files ? { ...at, pruned: filesPrunedWords(files), prunedAt: files.at } : at;
   const url = `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/artifacts/${encodeURIComponent(name)}`;
-  return { path: file, name, url, kind: typeOf(name).kind, size: stat.size };
+  return { ...at, name, url, kind: typeOf(name).kind, size: stat.size };
+}
+
+/**
+ * The path from a step's folder of a file a closeout named outside its artifacts folder: a path from the workspace root as it is, since
+ * the run collects it at that path; an absolute one inside a folder run's own folder from that folder; none for any other.
+ */
+function relativeOf(file: string, place: ReturnType<typeof artifactPlace>, work: string | null): { relativePath?: string } {
+  if (place === 'workspace') return { relativePath: path.normalize(file) };
+  if (place !== 'outside' || work === null) return {};
+  const within = path.relative(path.resolve(work), path.resolve(file));
+  if (!within || within === '..' || within.startsWith(`..${path.sep}`) || path.isAbsolute(within)) return {};
+  return { relativePath: within };
 }
 
 /** Whether a path is a directory in its own right — a symlink to one is not, so a link the run did not make is listed as any link is. */
@@ -164,9 +179,9 @@ export function folderFiles(
     .map((name) => {
       const here = path.join(dir, name);
       const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;
-      if (!stat) return { path: here };
+      if (!stat) return { path: here, relativePath: name };
       const url = `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/${route}/${encodeURIComponent(name)}`;
-      return { path: here, name, url, kind: typeOf(name).kind, size: stat.size };
+      return { path: here, relativePath: name, name, url, kind: typeOf(name).kind, size: stat.size };
     });
   return { files, error: null };
 }

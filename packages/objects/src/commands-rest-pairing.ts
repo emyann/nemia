@@ -75,7 +75,7 @@ export const BOARD_LINK_WORDS = {
   writes: true,
   class: 'none',
   only: CLI_ALONE,
-  served: [{ endpoint: 'pairings.link' }],
+  served: [{ endpoint: 'links.mint' }],
 } as const satisfies CommandWords;
 
 /** The pairing commands' words, in the order the help lists them. */

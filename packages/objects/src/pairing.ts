@@ -1,25 +1,27 @@
 /**
  * Pairing and first-visit links: single-use tickets that end in a person token minted at their claim, so no token is printed for a
- * person to copy. A client asks for a pairing with no token (`POST /api/pair`), shows its short code, the person approves it from the
- * server's shell or a signed-in board (`POST /api/pairings/:code/approve`), and the client claims it with the secret it was answered
- * (`POST /api/pair/:id/claim`). A first-visit link (`POST /api/links`, `nemia board link`) needs no approval: the browser that opens it
- * claims it (`POST /api/pair/link`), which sets the board's cookie as `POST /api/session` does. `/api/pair` needs no token: each of its
- * routes judges its own secret (apps/api's `needOf`).
+ * person to copy. Each group holds both sides of its handshake. A pairing (`PairingsGroup`): a client asks for one with no token
+ * (`POST /api/pairings`), shows its short code, the person approves it from the server's shell or a signed-in board (`POST
+ * /api/pairings/approve`, the code in the body), and the client claims it with the secret it was answered (`POST
+ * /api/pairings/:id/claim`). A first-visit link (`LinksGroup`): the person mints one (`POST /api/links`, `nemia board link`), which
+ * needs no approval, and the browser that opens it claims it (`POST /api/links/claim`), which sets the board's cookie as `POST
+ * /api/session` does. The ask and the two claims need no token, each judging its own secret (apps/api's `needOf`); the list, the approval
+ * and the mint need one.
  */
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
 import { SESSION_COOKIE_STATES, TICKET_STATES } from './words.ts';
 
-/** `POST /api/pair`'s body: the client's name, which the token minted at the claim is named after. */
+/** `POST /api/pairings`' body: the client's name, which the token minted at the claim is named after. */
 export const PairingRequest = Schema.Struct({
   client: Schema.String.annotate({ description: "The client's name, which the token minted at the claim is named after." }),
 });
 export type PairingRequest = typeof PairingRequest.Type;
 
 /**
- * What `POST /api/pair` answers, once: the pairing's id, the short code the person approves it by, the secret the client claims it with,
- * and when it lapses (ISO 8601). The store keeps only digests of the code and the secret.
+ * What `POST /api/pairings` answers, once: the pairing's id, the short code the person approves it by, the secret the client claims it
+ * with, and when it lapses (ISO 8601). The store keeps only digests of the code and the secret.
  */
 export const PairingAsked = Schema.Struct({
   id: Schema.String.annotate({ description: "The pairing's id, which the claim names." }),
@@ -29,7 +31,7 @@ export const PairingAsked = Schema.Struct({
 });
 export type PairingAsked = typeof PairingAsked.Type;
 
-/** `POST /api/pair/:id/claim`'s body and `POST /api/pair/link`'s: the ticket's secret. */
+/** `POST /api/pairings/:id/claim`'s body and `POST /api/links/claim`'s: the ticket's secret. */
 export const TicketClaim = Schema.Struct({
   secret: Schema.String.annotate({ description: 'The secret the ticket was answered with.' }),
 });
@@ -66,6 +68,14 @@ export const PairingList = Schema.Struct({
 });
 export type PairingList = typeof PairingList.Type;
 
+/** `POST /api/pairings/approve`'s body: the short code the client shows. */
+export const PairingApproval = Schema.Struct({
+  code: Schema.String.annotate({
+    description: "The pairing's short code, as the client shows it, in either case, with or without its dash.",
+  }),
+});
+export type PairingApproval = typeof PairingApproval.Type;
+
 /** `POST /api/links`' body: the base the link is printed under (`--base`), the board's own address where left out. */
 export const LinkRequest = Schema.Struct({
   base: Schema.optionalKey(
@@ -81,7 +91,7 @@ export const LinkMinted = Schema.Struct({
 });
 export type LinkMinted = typeof LinkMinted.Type;
 
-/** What `POST /api/pair/link` answers: the board's cookie set, and the token's name. Never the token. */
+/** What `POST /api/links/claim` answers: the board's cookie set, and the token's name. Never the token. */
 export const LinkClaimed = Schema.Struct({
   cookie: Schema.Literals(SESSION_COOKIE_STATES).annotate({
     description: "What the claim did to the board's cookie: set it, or cleared it.",
@@ -93,9 +103,12 @@ export type LinkClaimed = typeof LinkClaimed.Type;
 /** What a claim of a ticket refuses with: an unknown ticket or a wrong secret, a 404; one claimed already or past its time, a 409. */
 const claimErrors = [BadRequest, Missing, Conflict, Failed];
 
-/** The routes a client with no token yet is let through on. */
-export class PairGroup extends HttpApiGroup.make('pair').add(
-  HttpApiEndpoint.post('ask', '/api/pair', {
+/**
+ * A pairing, both sides of its handshake: the client with no token asks for it and claims it by its secret, and the person lists the
+ * pairings and approves one by its short code. A person's token alone reaches the approval.
+ */
+export class PairingsGroup extends HttpApiGroup.make('pairings').add(
+  HttpApiEndpoint.post('ask', '/api/pairings', {
     payload: PairingRequest,
     success: PairingAsked,
     error: [BadRequest, Invalid, Failed],
@@ -103,7 +116,7 @@ export class PairGroup extends HttpApiGroup.make('pair').add(
     OpenApi.Description,
     'Asks for a pairing, with no token: a single-use ticket a person approves by its short code. Answers PairingAsked, once: its id, the short code and the secret the client claims it with.',
   ),
-  HttpApiEndpoint.post('claim', '/api/pair/:id/claim', {
+  HttpApiEndpoint.post('claim', '/api/pairings/:id/claim', {
     params: { id: Schema.String.annotate({ description: "The pairing's id, from its ask." }) },
     payload: TicketClaim,
     success: PairingClaimed,
@@ -112,32 +125,35 @@ export class PairGroup extends HttpApiGroup.make('pair').add(
     OpenApi.Description,
     'Claims an approved pairing with the secret its ask answered, minting a person token for the client. Answers PairingClaimed: its phase, and the token once this call claimed it.',
   ),
-  HttpApiEndpoint.post('claimLink', '/api/pair/link', { payload: TicketClaim, success: LinkClaimed, error: claimErrors }).annotate(
-    OpenApi.Description,
-    "Claims a first-visit link with its secret, setting the board's cookie as a sign-in does. Answers LinkClaimed, the token's name and never the token.",
-  ),
-) {}
-
-/** The person's side: the pairings listed and approved, and a first-visit link made. A person's token alone reaches the writes. */
-export class PairingsGroup extends HttpApiGroup.make('pairings').add(
   HttpApiEndpoint.get('list', '/api/pairings', { success: PairingList, error: [Failed] }).annotate(
     OpenApi.Description,
     'Lists the pairings the store keeps, newest first, never their code nor their secret. Answers PairingList.',
   ),
-  HttpApiEndpoint.post('approve', '/api/pairings/:code/approve', {
-    params: { code: Schema.String.annotate({ description: "The pairing's short code, as the client shows it." }) },
+  HttpApiEndpoint.post('approve', '/api/pairings/approve', {
+    payload: PairingApproval,
     success: Pairing,
-    error: [Missing, Conflict, Forbidden, Failed],
+    error: [BadRequest, Missing, Conflict, Forbidden, Failed],
   }).annotate(
     OpenApi.Description,
     'Approves a pairing by the short code the client shows, so the client may claim it. Answers the Pairing.',
   ),
-  HttpApiEndpoint.post('link', '/api/links', {
+) {}
+
+/**
+ * A first-visit link, both sides of its handshake: the person mints it, and the browser that opens it claims it by its secret, with no
+ * token and no approval. A person's token alone reaches the mint.
+ */
+export class LinksGroup extends HttpApiGroup.make('links').add(
+  HttpApiEndpoint.post('mint', '/api/links', {
     payload: LinkRequest,
     success: LinkMinted,
     error: [BadRequest, Invalid, Forbidden, Failed],
   }).annotate(
     OpenApi.Description,
     'Mints a single-use first-visit link the browser that opens it claims, with no approval. Answers LinkMinted, once: the link to open and when it lapses.',
+  ),
+  HttpApiEndpoint.post('claim', '/api/links/claim', { payload: TicketClaim, success: LinkClaimed, error: claimErrors }).annotate(
+    OpenApi.Description,
+    "Claims a first-visit link with its secret, setting the board's cookie as a sign-in does. Answers LinkClaimed, the token's name and never the token.",
   ),
 ) {}

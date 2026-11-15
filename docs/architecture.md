@@ -62,8 +62,8 @@ door) and read above it only through `HARNESS_DECLARATIONS` (`harnessNeedsOf`, `
 client and the board name no harness. Where a harness's program is run from is the runtime's, by the Kubernetes test (a container's
 command): `EngineOptions.harnessBin`, the tools folder's `bin`, looked in first at every spawn. The runtime adds one read, Codex's
 sign-in (`codexSignIn`), which the spawn's refusal shares. The api
-serves them and lets `/api/pair` through with no token (`PAIR_PATH`, `needOf`), each of its routes judging its own secret; it refuses
-a public or wildcard bind at its start unless acknowledged (`NEMIA_BIND_PUBLIC=1`), as `nemia service install` does.
+serves them and lets three routes through with no token, each named by its method and path (`POST /api/pairings`, `POST
+/api/pairings/:id/claim`, `POST /api/links/claim`; `needOf`), each judging its own secret; it refuses a public or wildcard bind at its start unless acknowledged (`NEMIA_BIND_PUBLIC=1`), as `nemia service install` does.
 
 **Each run's judgement is the orchestrator's, held in memory by the daemon that serves it — the informer** (`Informer`,
 `src/rest/informer.verb.ts`): a per-daemon cache of each run's judgement, filled by the tick's pass as it judges each run it reads, and

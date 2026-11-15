@@ -163,7 +163,7 @@ test('floorEntryOf: an endpoint is the entry that links it; one no entry links i
     ['runs.approve', 'POST', 'approve', 'answer'],
     ['tokens.mint', 'POST', 'token add', 'none'],
     ['runs.lines', 'GET', 'runs.lines', 'read'],
-    ['server.signIn', 'POST', 'server.signIn', 'none'],
+    ['session.signIn', 'POST', 'session.signIn', 'none'],
     ['nemia.chatSend', 'POST', 'nemia.chatSend', 'act'],
   ] as const)
     await t.test(`${method} ${endpoint}`, () => {

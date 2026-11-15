@@ -1,7 +1,8 @@
 /**
- * The board's session on this daemon (`objects`' `ServerGroup`, `signIn` and `signOut`): the token a person pastes into the board, kept
- * by the browser as an HttpOnly cookie (`TOKEN_COOKIE`) that the api sets and clears, so no script of the page ever reads it, and that
- * the browser then sends on every read, stream and write of the board's (`callerGate`, caller/caller.ts; `writeGuard`, guard.ts).
+ * The board's session on this daemon (`objects`' `SessionGroup`, `signIn` and `signOut`, served by `sessionHandlers`): the token a person
+ * pastes into the board, kept by the browser as an HttpOnly cookie (`TOKEN_COOKIE`) that the api sets and clears, so no script of the page
+ * ever reads it, and that the browser then sends on every read, stream and write of the board's (`callerGate`, caller/caller.ts;
+ * `writeGuard`, guard.ts).
  *
  * - `POST /api/session` — the token presented as `Authorization: Bearer <token>`, which the caller gate judged before any route (a token
  *   the store never minted is its 401 `unknown-token`), set as the cookie: `HttpOnly; SameSite=Strict; Path=/; Max-Age` 30 days, and
@@ -12,8 +13,9 @@
  */
 import { Duration, Effect } from 'effect';
 import { HttpEffect, type HttpServerRequest, HttpServerResponse } from 'effect/http';
-import { BadRequest, TOKEN_COOKIE, type SessionAnswer } from 'objects';
+import { Api, BadRequest, TOKEN_COOKIE, type SessionAnswer } from 'objects';
 import { bearerOf } from '../guard.ts';
+import { readsBounded } from '../objects/answer-bound.ts';
 
 /** How long the browser keeps the board's cookie: a person signs in again once a month, or as the token is removed. */
 const KEPT = Duration.days(30);
@@ -39,7 +41,7 @@ const cookieOptions = (secure: boolean) => ({ httpOnly: true, sameSite: 'strict'
 
 /**
  * The response's cookie, set to `token` or, with none, cleared, as the handler's answer is sent: what `POST /api/session` sets, and
- * `POST /api/pair/link` too (pairing/pairing.ts), each over the request `overHttps` reads.
+ * `POST /api/links/claim` too (pairing/pairing.ts), each over the request `overHttps` reads.
  * @param token The token the cookie is set to, or undefined to clear it.
  * @param secure Whether the cookie is sent only over https (overHttps).
  */
@@ -80,3 +82,7 @@ export const signOut = (
   request: HttpServerRequest.HttpServerRequest,
 ): Effect.Effect<SessionAnswer, never, HttpServerRequest.HttpServerRequest> =>
   Effect.as(cookieSent(undefined, overHttps(request)), { cookie: 'cleared' } as const);
+
+export const sessionHandlers = readsBounded(Api, 'session', (handlers) =>
+  handlers.handle('signIn', ({ request }) => signIn(request)).handle('signOut', ({ request }) => signOut(request)),
+);

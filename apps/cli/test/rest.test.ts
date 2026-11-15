@@ -154,7 +154,7 @@ test('`nemia subscribe` gives a long-lived task a subscription, a former word sa
 test('`nemia pairings approve <code>` approves the pairing a client asked for, which `pairings ls` lists; `board link` prints a link once', async () => {
   assert.equal((await typed(['pairings', 'ls'])).out, 'no pairing is kept: a client asks for one with nemia pair <url>\n');
   const asked = (await (
-    await fetch(`${store.url}/api/pair`, {
+    await fetch(`${store.url}/api/pairings`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ client: 'laptop' }),

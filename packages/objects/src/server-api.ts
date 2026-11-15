@@ -372,7 +372,7 @@ export const Subscribed = Schema.Struct({
   hints: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
       description:
-        'A sentence for each former word a selector still says, naming what it says now; empty where none does; left out by an older api.',
+        'A sentence for each former word one of its selectors still says, naming what it says now; empty where none does; left out by an older api.',
     }),
   ),
 });

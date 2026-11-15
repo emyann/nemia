@@ -157,7 +157,7 @@ const stepKeyFields = {
   workspace: Schema.optionalKey(
     Schema.NullOr(Schema.Literal('base')).annotate({
       description:
-        "base: the step runs in the repository's own checkout rather than a worktree of its own, as a workflow's last step does.",
+        "base: the step runs in the repository's own working tree rather than a worktree of its own, as a workflow's last step does.",
     }),
   ),
   writable: Schema.optionalKey(
@@ -186,7 +186,7 @@ const stepKeyFields = {
     Strings.annotate({ description: "The skills the step adds to its agent's, each a folder in a skills folder beside the agents." }),
   ),
   mcp: Schema.optionalKey(
-    Strings.annotate({ description: "The MCP servers the step adds to its agent's, each by its name in the checkout's .mcp.json." }),
+    Strings.annotate({ description: "The MCP servers the step adds to its agent's, each by its name in the repository's .mcp.json." }),
   ),
   harness: Schema.optionalKey(
     Text.annotate({ description: 'What runs the session: claude, codex, or a2a:<name>, a remote A2A agent the store declares.' }),
@@ -213,7 +213,8 @@ const stepKeyFields = {
   ),
   disallowedTools: Schema.optionalKey(
     Strings.annotate({
-      description: "What the session may not have, in Claude Code's permission rules; a deny beats an allow the checkout's settings give.",
+      description:
+        "What the session may not have, in Claude Code's permission rules; a deny beats an allow the repository's settings give.",
     }),
   ),
   allowedTools: Schema.optionalKey(

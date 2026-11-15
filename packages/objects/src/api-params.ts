@@ -50,7 +50,7 @@ export const cardListQuery = {
   fieldSelector: Schema.optionalKey(
     Schema.String.annotate({
       description:
-        "A field selector in Kubernetes' spelling that keeps the cards still in play (status.inPlay=true) or those whose run ended (status.inPlay=false); empty or absent, every card.",
+        "A fieldSelector in Kubernetes' spelling that keeps the cards still in play (status.inPlay=true) or those whose run ended (status.inPlay=false); empty or absent, every card.",
     }),
   ),
 };

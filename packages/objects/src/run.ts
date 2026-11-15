@@ -124,7 +124,7 @@ export const RunSpecStep = Schema.Struct({
   }),
   workspace: NullString.annotate({
     description:
-      "base for a step that runs in the repository's own checkout rather than a worktree of its own (workspace:); null where unset.",
+      "base for a step that runs in the repository's own working tree rather than a worktree of its own (workspace:); null where unset.",
   }),
   place: NullString.annotate({
     description: 'Where its work is (place:): folder, a folder the run makes, or git, on branches of a repository; null where unset.',

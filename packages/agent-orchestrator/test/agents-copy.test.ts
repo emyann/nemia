@@ -28,6 +28,7 @@ import { runWith as runEngine, startRun } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import { AGENTS_COPY } from '../src/sources/copy.verb.ts';
+import { AGENTS_SOURCES } from '../src/sources/sources.verb.ts';
 import { agentsRead as agentsReadAt } from '../src/roster/roster.store.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { agentSources } from '../src/sources/sources.store.ts';
@@ -234,7 +235,7 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
     assert.ok(kept !== undefined);
     fs.mkdirSync(kept.folder, { recursive: true });
     fs.cpSync(path.join(teamCopy(), 'agents', 'implementer.md'), path.join(kept.folder, 'drafter.md'));
-    const { sources } = await sourcesAt({ home });
+    const { sources } = await stage.runWith(stage.board().e, Effect.provideService(AGENTS_SOURCES.handler({}), StoreRoot, home));
     assert.deepEqual(
       sources.filter((s) => s.place === 'harness').map((s) => [s.name, s.dir]),
       [['drafter', kept.folder]],

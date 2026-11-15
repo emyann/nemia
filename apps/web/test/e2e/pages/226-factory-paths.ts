@@ -1,8 +1,8 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
-import { expectNone, idle, Refused, settled, WAIT_MS } from '../checks.ts';
-import { checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
+import { photograph, placeLitOf, placeOf, themeOf, type PANE_PLACES } from '../board.ts';
+import { expectCount, expectNone, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { checkoutIn, FACTORIES, QUEUE, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -15,17 +15,21 @@ const { name: WORKFLOW, agent: AGENT } = WORKFLOWS.good;
 /** The factory's path. */
 const AT = `/factories/${FACTORY}`;
 
-/** Each old address, as a link of before the factory's paths wrote it, beside the path and search it reaches. */
-const OLD: ReadonlyArray<[string, string]> = [
-  [`/?factory=${FACTORY}`, AT],
-  [`/runs?factory=${FACTORY}&l=a%3Db`, `${AT}/runs?l=a%3Db`],
-  [`/inbox?factory=${FACTORY}`, `${AT}/inbox`],
-  [`/workflows?factory=${FACTORY}`, `${AT}/workflows`],
-  [`/workflows/repo/${WORKFLOW}?factory=${FACTORY}`, `${AT}/workflows/repo/${WORKFLOW}`],
-  [`/workflows/repo/${WORKFLOW}/review?factory=${FACTORY}`, `${AT}/workflows/repo/${WORKFLOW}/review`],
-  [`/capabilities?factory=${FACTORY}`, `${AT}/skills`],
-  [`/agents?factory=${FACTORY}`, `${AT}/agents`],
-  [`/agents/repo/${AGENT.name}?factory=${FACTORY}`, `${AT}/agents/${AGENT.name}?from=repo`],
+/**
+ * Each old address, as a link of before the factory's paths wrote it, beside the path and search it reaches and the pane's place lit
+ * there.
+ */
+const OLD: ReadonlyArray<[string, string, (typeof PANE_PLACES)[number]]> = [
+  [`/?factory=${FACTORY}`, AT, 'Floor'],
+  [`/runs?factory=${FACTORY}&l=a%3Db`, `${AT}/runs?l=a%3Db`, 'Runs'],
+  [`/inbox?factory=${FACTORY}`, `${AT}/inbox`, 'Inbox'],
+  [`/inbox/${QUEUE.first.name}`, `${AT}/inbox/${QUEUE.first.name}`, 'Inbox'],
+  [`/workflows?factory=${FACTORY}`, `${AT}/workflows`, 'Workflows'],
+  [`/workflows/repo/${WORKFLOW}?factory=${FACTORY}`, `${AT}/workflows/repo/${WORKFLOW}`, 'Workflows'],
+  [`/workflows/repo/${WORKFLOW}/review?factory=${FACTORY}`, `${AT}/workflows/repo/${WORKFLOW}/review`, 'Workflows'],
+  [`/capabilities?factory=${FACTORY}`, `${AT}/skills`, 'Skills'],
+  [`/agents?factory=${FACTORY}`, `${AT}/agents`, 'Agents'],
+  [`/agents/repo/${AGENT.name}?factory=${FACTORY}`, `${AT}/agents/${AGENT.name}?from=repo`, 'Agents'],
 ];
 
 /** Every page under the factory's path, each place of its pane and the pages beneath them. */
@@ -54,12 +58,22 @@ const here = (page: Page): string => {
   return `${url.pathname}${url.search}`;
 };
 
-/** Each old address reaches its page under the factory's path, its other keys kept. */
+/**
+ * Each old address reaches its page under the factory's path, its other keys kept, with the pane drawn and its place lit; the old address
+ * is replaced in the history, so Back from where it led returns to the page before it, never to it.
+ */
 async function oldLinks(page: Page): Promise<void> {
-  for (const [from, to] of OLD) {
+  for (const [from, to, lit] of OLD) {
+    await visit(page, AT);
     await visit(page, from);
     await page.waitForURL(() => here(page) === to, { timeout: WAIT_MS }).catch(() => undefined);
     if (here(page) !== to) throw new Refused(`${from} reaches ${to} — it is at ${here(page)}`);
+    await expectVisible(placeOf(page, lit).and(placeLitOf(page)), `${from} reaches its page with the pane drawn and ${lit} lit`);
+    await expectCount(placeLitOf(page), 1, `and ${lit} alone lit`);
+    await page.goBack({ waitUntil: 'load' });
+    await page.waitForURL(() => here(page) === AT, { timeout: WAIT_MS }).catch(() => undefined);
+    if (here(page) !== AT) throw new Refused(`Back from where ${from} led returns to ${AT}, the page before it — it is at ${here(page)}`);
+    await idle(page);
   }
 }
 
@@ -99,8 +113,9 @@ async function inColumn(page: Page): Promise<void> {
 export default {
   /**
    * A factory's places under its path: every link of before the paths, `?factory=` on a store page's address, reaches its page under
-   * `/factories/<name>/`, its other keys kept; and at 768 wide no page under the path lays out past its column. The checkout's `dev` is
-   * offered in the factory for the page's length, and taken back after.
+   * `/factories/<name>/`, its other keys kept, with the pane drawn and its place lit, and Back returns past it; a card of the factory
+   * opened at the store's `/inbox/<name>` reaches its page under the path; and at 768 wide no page under the path lays out past its
+   * column. The checkout's `dev` is offered in the factory for the page's length, and taken back after.
    */
   name: 'factory-paths',
   route: AT,

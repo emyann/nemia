@@ -46,9 +46,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 /**
  * The frame of every page, the layout of a list-detail frame in its regions: the store's rail at the left (`FrameRail`), across every
  * factory, collapsed and never folding, a modal drawer on a narrow screen; on a factory's page (`seatOf`) the factory pane beside it
- * (`FrameFactoryPane`), folded where the person folds it (the menu button, Ctrl+B, this browser's `sidebar_state` cookie, `sidebarOpenOf`)
- * and covered by the docked sheet under 1600 (`frameFold`); then the page's column: its head (`FrameHeader`), as tall as `--frame-top`,
- * naming the page, then the frame's lines: the line saying a newer release is out where one is (`NewerRelease`), the line saying a run
+ * (`FrameFactoryPane`), folded where the person folds it (the menu button, Ctrl+B on a factory's page alone, which has the pane, this
+ * browser's `sidebar_state` cookie, `sidebarOpenOf`) and covered by the docked sheet under 1600 (`frameFold`); then the page's column: its
+ * head (`FrameHeader`), as tall as `--frame-top`, naming the page, then the frame's lines:
+ * the line saying a newer release is out where one is (`NewerRelease`), the line saying a run
  * waits on a piece the server misses, linking to Setup (`SetupBanner`), and a first-visit link refused on a board that asks no token
  * (`LinkRefusal`). The lines are measured as they come and go into `--frame-lines`, which a page that fills the window takes off its
  * height beside `--frame-top` and `--frame-foot`, so no page's height assumes they are not there. Then the page, under the strip of
@@ -82,7 +83,11 @@ function Root() {
     <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
       <NemiaChatProvider>
         <HerSheetProvider>
-          <SidebarProvider defaultOpen={sidebarOpenOf(document.cookie)} className="flex-col">
+          <SidebarProvider
+            defaultOpen={sidebarOpenOf(document.cookie)}
+            keyboardShortcut={seatOf(path)?.level === 'factory'}
+            className="flex-col"
+          >
             <div data-frame-row className="flex min-h-[calc(100svh-var(--frame-foot))] w-full">
               <FrameRail path={path} search={search} />
               <FrameFactoryPane path={path} search={search} />

@@ -572,7 +572,11 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
             </div>
           </div>
         ) : (
-          <Empty factory={factory.name} anyRuns={light.counts.waiting + light.counts.inFlight + light.counts.finished > 0} queued={queued.length} />
+          <Empty
+            factory={factory.name}
+            anyRuns={light.counts.waiting + light.counts.inFlight + light.counts.finished > 0}
+            queued={queued.length}
+          />
         )}
       </div>
     </div>

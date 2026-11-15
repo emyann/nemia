@@ -12,6 +12,7 @@ import {
   RAIL_PLACES,
   railColumnOf,
   railPlace,
+  sidebar,
   themeOf,
   topBarOf,
 } from '../board.ts';
@@ -97,8 +98,9 @@ async function sheetTo(page: Page, open: boolean): Promise<void> {
 }
 
 /**
- * At `width`, the frame plain then with her sheet open: the pane docked at 1600 and wider whatever the sheet, under 1600 covered by the
- * sheet; the column never under `COLUMN_AT_768` beside the pane; each pictured.
+ * At `width`, the frame plain then with her sheet open: plain, the rail's destinations in their order and the pane's switcher reading the
+ * factory (`sidebar`); the pane docked at 1600 and wider whatever the sheet, under 1600 covered by the sheet; the column never under
+ * `COLUMN_AT_768` beside the pane; each pictured.
  */
 async function atWidth(page: Page, width: number): Promise<void> {
   const size = page.viewportSize();
@@ -106,6 +108,7 @@ async function atWidth(page: Page, width: number): Promise<void> {
   await sheetTo(page, false);
   await expectPane(page, true, `${width} wide, the sheet closed`);
   await inRow(page, width, true, false);
+  await sidebar(page);
   const column = await boxOf(columnOf(page), "the page's column");
   if (column.width < COLUMN_AT_768 - 1) throw new Refused(`${width} wide, the column keeps ${COLUMN_AT_768} — it is ${column.width}`);
   await settled(page);
@@ -118,7 +121,7 @@ async function atWidth(page: Page, width: number): Promise<void> {
   await sheetTo(page, false);
 }
 
-/** The menu button folds the pane and unfolds it, and so does Ctrl+B; each state outlives a reload. */
+/** The menu button folds the pane and unfolds it, and so does Ctrl+B, but on a store's page; each state outlives a reload. */
 async function folds(page: Page): Promise<void> {
   await expectPane(page, true, 'unfolded as this browser left it');
   await expectVisible(menuOf(page).and(page.getByRole('button', { name: 'Fold the factory pane' })), 'unfolded, the menu button folds it');
@@ -137,6 +140,13 @@ async function folds(page: Page): Promise<void> {
   await page.reload({ waitUntil: 'load' });
   await idle(page);
   await expectPane(page, true, 'unfolded, it stays unfolded across a reload');
+  await page.goto(new URL('/stats', page.url()).href, { waitUntil: 'load' });
+  await idle(page);
+  await page.locator('body').click({ position: { x: 600, y: 300 } });
+  await page.keyboard.press('Control+b');
+  await page.goto(new URL(`/factories/${FACTORY}`, page.url()).href, { waitUntil: 'load' });
+  await idle(page);
+  await expectPane(page, true, 'Ctrl+B on a store page, which has no pane, folds nothing');
 }
 
 /** On a phone's screen the rail and the pane leave the page's side: the menu button opens a drawer that holds both, which a pick closes. */

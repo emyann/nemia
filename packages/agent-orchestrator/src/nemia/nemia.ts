@@ -156,13 +156,15 @@ export type TrustNotGiven = { harness: string; folder: string; file: string; nev
 const NEXT_BEAT = 'the keeper gives the trust at its next beat, and files her session';
 
 /**
- * The runtime's words `refused` without the hand step they end on (running the harness in her folder once and accepting its prompt),
- * which the keeper takes in the person's place. Pure.
+ * The runtime's words `refused` without the hand step they end on (running the harness in her folder once, at its prompt), which the
+ * keeper takes in the person's place: cut with the `: ` or `, or ` before it. Pure.
  */
 const withoutHandStep = (refused: string, not: TrustNotGiven): string => {
-  const hand = `run ${not.harness} in ${not.folder} once and accept its prompt`;
-  const tail = [`: ${hand}`, `, or ${hand}`].find((one) => refused.endsWith(one));
-  return tail === undefined ? refused : refused.slice(0, -tail.length);
+  const at = refused.lastIndexOf(`run ${not.harness} in ${not.folder} once `);
+  if (at < 0) return refused;
+  const head = refused.slice(0, at);
+  const cut = [': ', ', or '].find((one) => head.endsWith(one));
+  return cut === undefined ? refused : head.slice(0, -cut.length);
 };
 
 /**

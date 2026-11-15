@@ -1,0 +1,480 @@
+/**
+ * Group `factories`: the factories, which no namespace holds, listed, read, removed, exported whole and filed from another store's export,
+ * and each one's sub-resources — its rules and its instruction, read, written and cleared, the lines a person types for it (`commands`),
+ * its cost line per workflow, its revisions policy, its places trusted again, a workflow attached and detached, and a harness setting set
+ * and taken off; and the writes that name a template or a folder: a factory filed, a volume mounted and taken off, a factory made from a
+ * template, a hand-made one taken over by one, either previewed, an upgrade filed and a conflict's choice. The factory's parts are each
+ * in the factory's namespace: group `mcpservers`, its MCP servers, read, recorded and taken off, and signed in to; group `builtin`, the
+ * servers Nemia offers, in no namespace; groups `schedules` and `hires`, read, written and taken back; and group `volumes`, read alone.
+ * Cut from `api.ts`, which adds them to `Api`.
+ */
+import { Schema } from 'effect';
+import { HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
+import { Table } from './table.ts';
+import {
+  Factory,
+  FactoryAdopted,
+  FactoryAdoptWrite,
+  FactoryApplied,
+  FactoryApplyWrite,
+  FactoryCommands,
+  FactoryCreate,
+  FactoryCreated,
+  FactoryDiffWrite,
+  FactoryPlan,
+  FactoryResolved,
+  FactoryResolveWrite,
+  FactoryUpgraded,
+  FactoryUpgradeWrite,
+  VolumeAdded,
+  VolumeRemoved,
+  VolumeWrite,
+  FactoryCostLineWrite,
+  FactoryInstruction,
+  FactoryInstructionWords,
+  FactoryInstructionWrite,
+  FactoryList,
+  FactoryRemoved,
+  FactoryRevisionsWrite,
+  FactoryRules,
+  FactoryRulesWrite,
+  FactoryAttachWrite,
+  FactorySettingWrite,
+  FactoryTrusted,
+} from './factory.ts';
+import { FactoryExport, FactoryImported, FactoryImportWrite, MOVE_CARDS } from './factory-move.ts';
+import { Hire, HireList, HireWrite } from './hire.ts';
+import { McpServer, McpServerList, McpServerWrite, SignInCallback, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
+import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
+import { Volume, VolumeList } from './volume.ts';
+import { listQuery, objectErrors } from './api-errors.ts';
+import { cardParams, namespaceParams, factoryParams, factoryWorkflowParams, factorySettingParams, factoryOwnParams } from './api-params.ts';
+
+/** The factory's kinds and a page of each, named so that the document holds each as a component. */
+const FactoryObject = Factory.annotate({ identifier: 'Factory' });
+const FactoryListObject = FactoryList.annotate({ identifier: 'FactoryList' });
+const FactoryCommandsObject = FactoryCommands.annotate({ identifier: 'FactoryCommands' });
+const FactoryTrustedObject = FactoryTrusted.annotate({ identifier: 'FactoryTrusted' });
+const FactoryRemovedObject = FactoryRemoved.annotate({ identifier: 'FactoryRemoved' });
+const McpServerObject = McpServer.annotate({ identifier: 'McpServer' });
+const McpServerListObject = McpServerList.annotate({ identifier: 'McpServerList' });
+const ScheduleObject = Schedule.annotate({ identifier: 'Schedule' });
+const ScheduleListObject = ScheduleList.annotate({ identifier: 'ScheduleList' });
+const HireObject = Hire.annotate({ identifier: 'Hire' });
+const HireListObject = HireList.annotate({ identifier: 'HireList' });
+const VolumeObject = Volume.annotate({ identifier: 'Volume' });
+const VolumeListObject = VolumeList.annotate({ identifier: 'VolumeList' });
+/** The factories and a factory's MCP servers, each a page or the same page as a `Table` where the request asks for one, as the cards. */
+const FactoryListOrTable = [FactoryListObject, Table] as const;
+const McpServerListOrTable = [McpServerListObject, Table] as const;
+
+/**
+ * The factories, which no namespace holds, and each one's rules, instruction, command lines and cost lines; filed, made from a template,
+ * taken over by one, previewed, upgraded and resolved, and its volumes mounted and taken off.
+ */
+export class FactoriesGroup extends HttpApiGroup.make('factories').add(
+  HttpApiEndpoint.get('listAll', '/api/factories', { query: listQuery, success: FactoryListOrTable, error: objectErrors }).annotate(
+    OpenApi.Description,
+    'Lists the factories, which no namespace holds, a page at a time, the default first; ?labelSelector= keeps those whose labels match. Answers a FactoryList, or the same page as a Table where the request asks for one.',
+  ),
+  HttpApiEndpoint.get('get', '/api/factories/:name', { params: factoryParams, success: FactoryObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    'Reads one factory by its name: its repositories, workflows, places, settings and status. Answers the Factory.',
+  ),
+  HttpApiEndpoint.get('rules', '/api/factories/:name/rules', {
+    params: factoryParams,
+    success: FactoryRules,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Reads a factory's rules: the file they are kept in, their words, and why that file does not read where it does not. Answers FactoryRules.",
+  ),
+  HttpApiEndpoint.put('putRules', '/api/factories/:name/rules', {
+    params: factoryParams,
+    payload: FactoryRulesWrite,
+    success: FactoryRules,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, "Writes a factory's rules from the words the body sends. Answers FactoryRules as they are now."),
+  HttpApiEndpoint.delete('deleteRules', '/api/factories/:name/rules', {
+    params: factoryParams,
+    success: FactoryRules,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, "Clears a factory's rules. Answers FactoryRules, with whether there were any to remove."),
+  HttpApiEndpoint.get('instruction', '/api/factories/:name/instruction', {
+    params: factoryParams,
+    success: FactoryInstruction,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Reads a factory's instruction: where it is kept, its words, why the file there does not read, and whether the store keeps text for it. Answers FactoryInstruction.",
+  ),
+  HttpApiEndpoint.put('putInstruction', '/api/factories/:name/instruction', {
+    params: factoryParams,
+    payload: FactoryInstructionWrite,
+    success: FactoryInstruction,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Places a factory's instruction: at the path the body names, or in the store's own keeping. Answers FactoryInstruction as it is now.",
+  ),
+  HttpApiEndpoint.delete('deleteInstruction', '/api/factories/:name/instruction', {
+    params: factoryParams,
+    success: FactoryInstruction,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, "Clears where a factory's instruction is kept. Answers FactoryInstruction as it is now."),
+  HttpApiEndpoint.put('putInstructionWords', '/api/factories/:name/instruction/words', {
+    params: factoryParams,
+    payload: FactoryInstructionWords,
+    success: FactoryInstruction,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, "Writes the words the store keeps as a factory's instruction. Answers FactoryInstruction as it is now."),
+  HttpApiEndpoint.delete('deleteInstructionWords', '/api/factories/:name/instruction/words', {
+    params: factoryParams,
+    success: FactoryInstruction,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Takes off the words the store keeps as a factory's instruction, leaving where it is placed. Answers FactoryInstruction, with whether there was any text to remove.",
+  ),
+  HttpApiEndpoint.get('commands', '/api/factories/:name/commands', {
+    params: factoryParams,
+    success: FactoryCommandsObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Reads the command lines a person types for a factory, built off the command table: each of its verbs with the factory's name filled in, and the line that takes back each schedule and volume. Answers FactoryCommands.",
+  ),
+  HttpApiEndpoint.put('putCostLine', '/api/factories/:name/costlines/:workflow', {
+    params: factoryWorkflowParams,
+    payload: FactoryCostLineWrite,
+    success: FactoryObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Sets the cost line of one of a factory's workflows, the dollars a run of it should stay under. Answers the Factory as it reads after, with the file written and what it replaced.",
+  ),
+  HttpApiEndpoint.delete('deleteCostLine', '/api/factories/:name/costlines/:workflow', {
+    params: factoryWorkflowParams,
+    success: FactoryObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Takes back the cost line of one of a factory's workflows. Answers the Factory as it reads after, with the file written and what it replaced.",
+  ),
+  HttpApiEndpoint.delete('delete', '/api/factories/:name', {
+    params: factoryParams,
+    success: FactoryRemovedObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Removes a factory: its file, and the folder of the instruction and rules the store kept for it; a trust given to its places is left. Answers FactoryRemoved.',
+  ),
+  HttpApiEndpoint.put('setRevisions', '/api/factories/:name/revisions', {
+    params: factoryParams,
+    payload: FactoryRevisionsWrite,
+    success: FactoryObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Sets a factory's revisions policy: whether its runs follow merged revisions of their workflow or keep the one they started on. Answers the Factory as it reads after, with the file written and what it replaced.",
+  ),
+  HttpApiEndpoint.post('trust', '/api/factories/:name/trust', {
+    params: factoryParams,
+    success: FactoryTrustedObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Trusts a factory's places again where the store runs, asking each harness that keeps a trust. Answers FactoryTrusted, what was asked for each place.",
+  ),
+  HttpApiEndpoint.put('attach', '/api/factories/:name/workflows/:workflow', {
+    params: factoryWorkflowParams,
+    payload: FactoryAttachWrite,
+    success: FactoryObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Attaches a workflow to a factory, on the repository the body names where it has several. Answers the Factory as it reads after, with the file written.',
+  ),
+  HttpApiEndpoint.delete('detach', '/api/factories/:name/workflows/:workflow', {
+    params: factoryWorkflowParams,
+    success: FactoryObject,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, 'Detaches a workflow from a factory. Answers the Factory as it reads after, with the file written.'),
+  HttpApiEndpoint.put('putSetting', '/api/factories/:name/settings/:setting', {
+    params: factorySettingParams,
+    payload: FactorySettingWrite,
+    success: FactoryObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Sets one harness setting of a factory to the value the body sends. Answers the Factory as it reads after, with the file written and what it replaced.',
+  ),
+  HttpApiEndpoint.delete('deleteSetting', '/api/factories/:name/settings/:setting', {
+    params: factorySettingParams,
+    success: FactoryObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Takes one harness setting off a factory. Answers the Factory as it reads after, with the file written and what it replaced.',
+  ),
+  HttpApiEndpoint.post('create', '/api/factories', { payload: FactoryCreate, success: FactoryCreated, error: objectErrors }).annotate(
+    OpenApi.Description,
+    'Files a new factory on the repositories the body names, each a folder of this machine by its whole path or a git URL it clones, its places trusted unless the body says not to. Answers FactoryCreated.',
+  ),
+  HttpApiEndpoint.post('addVolume', '/api/factories/:factory/volumes', {
+    params: factoryOwnParams,
+    payload: VolumeWrite,
+    success: VolumeAdded,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Mounts a folder of this machine, by its whole path and its mark, into a factory's runs. Answers VolumeAdded.",
+  ),
+  HttpApiEndpoint.delete('removeVolume', '/api/factories/:factory/volumes', {
+    params: factoryOwnParams,
+    query: {
+      path: Schema.String.annotate({
+        description: 'The folder of the machine the api runs on whose volume is taken off, as it was mounted.',
+      }),
+    },
+    success: VolumeRemoved,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, 'Takes the volume mounted at ?path= off a factory. Answers VolumeRemoved.'),
+  HttpApiEndpoint.post('apply', '/api/factories/:name/apply', {
+    params: factoryParams,
+    payload: FactoryApplyWrite,
+    success: FactoryApplied,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Makes a factory from the template the body sends or names, on the repositories it names, the template kept under the store once the factory is filed. Answers FactoryApplied: the factory, its file, its template and what was asked for its places' trust.",
+  ),
+  HttpApiEndpoint.get('export', '/api/factories/:name/export', {
+    params: factoryParams,
+    query: {
+      cards: Schema.optionalKey(
+        Schema.Literals(MOVE_CARDS).annotate({
+          description: "Whether the factory's cards follow it to another store (follow, the default) or stay on the source (stay).",
+        }),
+      ),
+    },
+    success: FactoryExport,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Reads a factory whole for another store to file, its cards following it unless ?cards=stay; nothing of the source is written. Answers FactoryExport.',
+  ),
+  HttpApiEndpoint.post('import', '/api/factories/:name/import', {
+    params: factoryParams,
+    payload: FactoryImportWrite,
+    success: FactoryImported,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Files a factory exported from another store under the name in the path, its repositories and volumes given as this machine's folders or git URLs. Answers FactoryImported, with the places a harness does not trust yet.",
+  ),
+  HttpApiEndpoint.post('adopt', '/api/factories/:factory/adopt', {
+    params: factoryOwnParams,
+    payload: FactoryAdoptWrite,
+    success: FactoryAdopted,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Takes over a hand-made factory by the template the body sends, following the plan its preview printed. Answers FactoryAdopted: its file, the template it is now made from and the tree it runs from.',
+  ),
+  HttpApiEndpoint.post('diff', '/api/factories/:factory/diff', {
+    params: factoryOwnParams,
+    payload: FactoryDiffWrite,
+    success: FactoryPlan,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Previews a factory's upgrade or takeover by the template the body sends: what would change, with nothing written and nothing sent kept. Answers FactoryPlan.",
+  ),
+  HttpApiEndpoint.post('upgrade', '/api/factories/:factory/upgrade', {
+    params: factoryOwnParams,
+    payload: FactoryUpgradeWrite,
+    success: FactoryUpgraded,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Files a factory's upgrade onto a newer version of its template, from the template the body sends where it sends one. Answers FactoryUpgraded: the versions, its file, the parameters it drops and how many conflicts wait for a choice.",
+  ),
+  HttpApiEndpoint.post('resolve', '/api/factories/:factory/resolve', {
+    params: factoryOwnParams,
+    payload: FactoryResolveWrite,
+    success: FactoryResolved,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Records the choice for one conflict of a factory's upgrade, proposed by the caller as an owner's resolution. Answers FactoryResolved, with the proposals the merge waits on.",
+  ),
+) {}
+
+/** A factory's MCP servers, in its namespace, and their sign-in. */
+export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/mcpservers', {
+    params: namespaceParams,
+    query: listQuery,
+    success: McpServerListOrTable,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Lists a factory's MCP servers in its namespace, a page at a time, each header's value masked; ?labelSelector= keeps those whose labels match. Answers an McpServerList, or the same page as a Table where the request asks for one.",
+  ),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/mcpservers/:name', {
+    params: cardParams,
+    success: McpServerObject,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, "Reads one of a factory's MCP servers by its name, each header's value masked. Answers the McpServer."),
+  HttpApiEndpoint.put('put', '/api/namespaces/:namespace/mcpservers/:name', {
+    params: cardParams,
+    payload: McpServerWrite,
+    success: McpServerObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Records an MCP server in a factory under the name in the path, a header sent as the mask keeping the value stored. Answers the McpServer as it reads after, with the file written and the address it replaced.',
+  ),
+  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/mcpservers/:name', {
+    params: cardParams,
+    success: McpServerObject,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, 'Takes an MCP server off a factory. Answers the McpServer as it was, with the file written.'),
+  HttpApiEndpoint.post('signIn', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
+    params: cardParams,
+    success: SignInStarted,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Starts signing a factory's MCP server in for the harness, written to the harness's own store. Answers SignInStarted, the address a person opens to sign in.",
+  ),
+  HttpApiEndpoint.get('signInState', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
+    params: cardParams,
+    success: SignInState,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, "Reads where signing a factory's MCP server in stands. Answers SignInState."),
+  HttpApiEndpoint.post('signInCallback', '/api/namespaces/:namespace/mcpservers/:name/sign-in/callback', {
+    params: cardParams,
+    payload: SignInCallback,
+    success: SignInState,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Completes signing a factory's MCP server in with the address the person's browser landed on, which no answer or log carries. Answers SignInState.",
+  ),
+  HttpApiEndpoint.delete('signOut', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
+    params: cardParams,
+    success: SignedOut,
+    error: objectErrors,
+  }).annotate(OpenApi.Description, "Signs a factory's MCP server out of the harness's store. Answers SignedOut."),
+) {}
+
+/** The MCP servers Nemia offers a factory: a page whose items carry their spec alone, in no namespace. */
+export class BuiltinGroup extends HttpApiGroup.make('builtin').add(
+  HttpApiEndpoint.get('mcpservers', '/api/builtin/mcpservers', {
+    query: listQuery,
+    success: McpServerListObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Lists the MCP servers Nemia offers a factory, in no namespace, each its spec alone. Answers an McpServerList.',
+  ),
+) {}
+
+/** A factory's schedules, in its namespace, each named by its workflow. */
+export class SchedulesGroup extends HttpApiGroup.make('schedules').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/schedules', {
+    params: namespaceParams,
+    query: listQuery,
+    success: ScheduleListObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Lists a factory's schedules in its namespace, a page at a time, each with the runs it fired. Answers a ScheduleList.",
+  ),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/schedules/:name', {
+    params: cardParams,
+    success: ScheduleObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of a factory's schedules by its workflow's name, with the runs it fired. Answers the Schedule.",
+  ),
+  HttpApiEndpoint.put('put', '/api/namespaces/:namespace/schedules/:name', {
+    params: cardParams,
+    payload: ScheduleWrite,
+    success: ScheduleObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Writes a factory's schedule of the workflow named in the path, the cron the body sends. Answers the Schedule as it reads after, with the file written and the cron it replaced.",
+  ),
+  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/schedules/:name', {
+    params: cardParams,
+    success: ScheduleObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Takes back a factory's schedule of the workflow named in the path. Answers the Schedule as it was, with the file written.",
+  ),
+) {}
+
+/** A factory's hires, in its namespace, one per step it offers, each named `<workflow>.<step>`. */
+export class HiresGroup extends HttpApiGroup.make('hires').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/hires', {
+    params: namespaceParams,
+    query: listQuery,
+    success: HireListObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Lists a factory's hires in its namespace, a page at a time, one per step it offers, each named <workflow>.<step>. Answers a HireList.",
+  ),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/hires/:name', {
+    params: cardParams,
+    success: HireObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of a factory's hires, by <workflow>.<step>: the step and the agent hired into it. Answers the Hire.",
+  ),
+  HttpApiEndpoint.put('put', '/api/namespaces/:namespace/hires/:name', {
+    params: cardParams,
+    payload: HireWrite,
+    success: HireObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Hires the agent the body names into the step. Answers the Hire as it reads after, with the file written and the agent it replaced.',
+  ),
+  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/hires/:name', {
+    params: cardParams,
+    success: HireObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Fires the agent hired into the step. Answers the Hire as it reads after, with the file written and the agent it fired.',
+  ),
+) {}
+
+/** A factory's volumes, in its namespace, by their stored names: read alone over the api. */
+export class VolumesGroup extends HttpApiGroup.make('volumes').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/volumes', {
+    params: namespaceParams,
+    query: listQuery,
+    success: VolumeListObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Lists a factory's volumes in its namespace, a page at a time, each with the runs in play that mount it. Answers a VolumeList.",
+  ),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/volumes/:name', {
+    params: cardParams,
+    success: VolumeObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of a factory's volumes by its stored name, with the runs in play that mount it. Answers the Volume.",
+  ),
+) {}

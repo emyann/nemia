@@ -1,6 +1,7 @@
 /**
- * What the api answers a refusal with, an object with one key, `error`, the sentence that says what to do next, each at its status; and
- * the query every list of the `Api` takes. Shared by every group (`api.ts`, `run-api.ts`).
+ * What the api answers a refusal with, an object with one key, `error`, the sentence that says what to do next, each at its status; the
+ * lists of refusals an object's verbs and a definition's answer with; and the query every list of the `Api` takes. Shared by every group
+ * (`api.ts`, `run-api.ts`, `card-api.ts`, …).
  */
 import { Schema } from 'effect';
 import {
@@ -176,3 +177,12 @@ export const listQuery = {
     }),
   ),
 };
+
+/**
+ * What every verb of an object's group refuses with: a request its reader refuses before the package is asked (400), nothing by that
+ * name (404), a thing held by something else (409) and a request the package refuses as it is said (422).
+ */
+export const objectErrors = [BadRequest, Missing, Conflict, Invalid];
+
+/** What a definition's verbs refuse with: an object's refusals, and a write the disk failed. */
+export const definitionErrors = [...objectErrors, Failed];

@@ -7,7 +7,7 @@
  * (`apps/api/src/steps/steps.ts`).
  */
 import { Schema } from 'effect';
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { BadRequest, Gone, Invalid, Missing, ReadFailed, Unjudged } from './api-errors.ts';
 import { StepLog } from './run.ts';
 import { StepTries, StepTry, TryCloseout } from './run-tries.ts';
@@ -245,52 +245,79 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
     query: closeoutQuery,
     success: StepTries,
     error: subResourceErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads a run's step's tries, earliest first and the current one last, each with its task, where it stands, its attempts, check and closeout, the closeout's output narrowed to the fields asked. Answers StepTries.",
+  ),
   HttpApiEndpoint.get('try', '/api/runs/:runId/steps/:step/tries/:try', {
     params: tryParams,
     query: closeoutQuery,
     success: StepTry,
     error: subResourceErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one try of a run's step whole: its round, its task, where it stands, its attempts, its check, its closeout or why that does not read, and a person's answer to it. Answers StepTry.",
+  ),
   HttpApiEndpoint.get('closeout', '/api/runs/:runId/steps/:step/tries/:try/closeout', {
     params: tryParams,
     query: closeoutQuery,
     success: TryCloseout,
     error: subResourceErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads what one try of a run's step signed off with, its output narrowed to the fields asked and its body a page at a time, or why it does not read. Answers TryCloseout.",
+  ),
   HttpApiEndpoint.get('told', '/api/runs/:runId/steps/:step/told', {
     params: stepParams,
     success: StepTold,
     error: subResourceErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads what a run's step was told: its own body in the workflow, its brief by layer, and its task by part. Answers StepTold.",
+  ),
   HttpApiEndpoint.get('log', '/api/runs/:runId/steps/:step/log', {
     params: stepParams,
     query: { tail: Schema.optionalKey(Schema.String.annotate({ description: 'How many of its last lines to answer.' })) },
     success: StepLog,
     error: [Missing, Invalid, ReadFailed],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads the end of a run's step's session output, its last lines as tail asks. Answers StepLog, with whether there were more.",
+  ),
   HttpApiEndpoint.get('artifact', '/api/runs/:runId/steps/:step/artifacts/:file', {
     params: fileParams,
     success: StepFile,
     error: [BadRequest, Missing, Gone],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads a file a run's step left in its files directory, by its name, as the bytes on disk with the headers that serve an agent's file safely. Answers the file, or Gone where a prune removed it.",
+  ),
   HttpApiEndpoint.get('file', '/api/runs/:runId/steps/:step/files/:file', {
     params: fileParams,
     success: StepFile,
     error: [BadRequest, Missing],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads a file of a folder step's own folder, by its name, as the bytes on disk with the headers that serve an agent's file safely. Answers the file.",
+  ),
   HttpApiEndpoint.get('path', '/api/runs/:runId/steps/:step/path', {
     params: stepParams,
     query: { try: Schema.optionalKey(Schema.String.annotate({ description: "The try's number, from 1; the latest where not given." })) },
     success: StepPath,
     error: engineReadErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads the path one try of a run's step walked through the runtime's lifecycle, the latest try where none is asked. Answers StepPath: its task, the task's path and the lifecycle it walks.",
+  ),
   HttpApiEndpoint.get('transcript', '/api/runs/:runId/steps/:step/transcript', {
     params: stepParams,
     query: transcriptQuery,
     success: StepTranscript,
     error: [...engineReadErrors, Invalid],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads a page of a run's step's conversation from a cursor, the first or the last events after it, of the kinds asked. Answers StepTranscript: the events, the cursor to read on from, and whether the task still runs or may say more.",
+  ),
   HttpApiEndpoint.get('transcriptStream', '/api/runs/:runId/steps/:step/transcript/stream', {
     params: stepParams,
     query: { after: Schema.optionalKey(Schema.String.annotate({ description: 'The cursor to stream on from.' })) },
@@ -304,5 +331,8 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
       'cache-control': Schema.Literal('no-cache'),
     }),
     error: [...engineReadErrors, Invalid],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Follows a run's step's conversation from a cursor as server-sent events, each event said once as it is written. Answers a stream of StepStreamEvent; a refused cursor or a lost task is refused before the stream opens.",
+  ),
 ) {}

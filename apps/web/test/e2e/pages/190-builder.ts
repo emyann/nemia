@@ -128,7 +128,7 @@ export default {
       await idle(p);
     };
     const puts = (name: string) => (r: Response) =>
-      r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/namespaces/default/workflows/${name}`;
+      r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/workflows/${name}`;
 
     const mineDir = path.join(store!, 'workflows', yours.name);
     const before = filesIn(mineDir);
@@ -394,7 +394,7 @@ export default {
       await form.getByRole('radio', { name: /^On a repository's branches/ }).check();
       await photograph(form, path.join(OUT, `builder-new-chosen-${await themeOf(page)}.png`));
       const [created] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/namespaces/default/workflows', {
+        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/workflows', {
           timeout: WAIT_MS,
         }),
         make.click(),

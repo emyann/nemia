@@ -10,7 +10,7 @@ import { FACTORY_WAY, fromWord, type ListPlace } from '../../lib/factories';
 import { repoName } from '../../lib/factory';
 import { container } from '../../lib/meaning';
 
-/** Where a workflow is read from, read in `factory` (`fromWord`): yours, this repository's, or the factory's. */
+/** Where a workflow is read from, read in `factory` (`fromWord`): the user library, this repository's, or the factory's. */
 export function FromBadge({ from, factory }: { from: WorkflowListing['from']; factory?: string }) {
   return (
     <span

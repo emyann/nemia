@@ -33,10 +33,9 @@ export default {
       const section = refused.locator(`article[aria-label="Workflow ${NEEDED}"]`);
       await section.getByRole('button', { name: 'Remove…' }).click();
       const [answered] = await Promise.all([
-        refused.waitForResponse(
-          (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/namespaces/default/workflows/${NEEDED}`,
-          { timeout: WAIT_MS },
-        ),
+        refused.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/workflows/${NEEDED}`, {
+          timeout: WAIT_MS,
+        }),
         section.getByRole('button', { name: 'Remove', exact: true }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };

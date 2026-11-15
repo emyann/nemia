@@ -187,9 +187,7 @@ export const createSkill = async (draft: SkillDraft): Promise<SkillSaved> =>
  * @param draft What it now holds, whole.
  */
 export const saveSkill = async (name: string, version: string, draft: SkillDraft): Promise<SkillSaved> =>
-  skillDetailOf(
-    await served.replace(name, { metadata: { resourceVersion: version }, spec: specOfDraft(draft) }, refused),
-  );
+  skillDetailOf(await served.replace(name, { metadata: { resourceVersion: version }, spec: specOfDraft(draft) }, refused));
 
 /**
  * A skill of yours loaded every turn, or named for a session to load: its `preload:` line alone, at the version it was read at.

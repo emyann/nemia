@@ -259,8 +259,8 @@ export default {
         await again.goto(new URL(`/workflows/user/${yours.name}`, again.url()).href, { waitUntil: 'load' });
         await idle(again);
         await expectVisible(
-          again.locator('article').getByText('yours', { exact: true }),
-          `${yours.name}, under workflows/ in the store, is marked as yours`,
+          again.locator('article').getByText('the user library', { exact: true }),
+          `${yours.name}, under workflows/ in the store, is marked as the user library's`,
         );
         await expectVisible(again.getByRole('region', { name: 'README' }).getByText('No README'), 'one with no README says so');
         await expectCount(again.locator('.react-flow__node'), yours.steps.length, `${yours.name}'s graph has its one step`);

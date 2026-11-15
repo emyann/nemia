@@ -272,7 +272,7 @@ export default {
       await goto(page, '/workflows');
       await expectCount(card(OWN.name), 0, "with no factory picked, the tree's own workflow is not listed");
       await expectCount(card(good.name), 0, `nor the checkout's ${good.name}: the default factory works on no repository`);
-      await expectVisible(card(yours.name).getByText('yours', { exact: true }), `and ${yours.name}, yours, is`);
+      await expectVisible(card(yours.name).getByText('the user library', { exact: true }), `and ${yours.name}, yours, is`);
     } finally {
       takeBack();
     }

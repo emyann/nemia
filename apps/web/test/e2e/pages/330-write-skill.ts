@@ -60,7 +60,7 @@ export default {
       await form.getByRole('textbox', { name: 'Description', exact: true }).fill(SKILL.description);
       await form.getByRole('textbox', { name: 'Instructions', exact: true }).fill(SKILL.body);
       const [answered] = await Promise.all([
-        wrote(refused, 'POST', '/api/namespaces/default/skills'),
+        wrote(refused, 'POST', '/api/skills'),
         form.getByRole('button', { name: 'Create skill' }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };
@@ -114,10 +114,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `write-skill-new-${await themeOf(page)}.png`), { fullPage: true });
 
-      const [created] = await Promise.all([
-        wrote(page, 'POST', '/api/namespaces/default/skills'),
-        form.getByRole('button', { name: 'Create skill' }).click(),
-      ]);
+      const [created] = await Promise.all([wrote(page, 'POST', '/api/skills'), form.getByRole('button', { name: 'Create skill' }).click()]);
       if (created.status() !== 201)
         throw new Refused(`the api writes the skill — it answered ${created.status()}: ${await created.text()}`);
       const written = fs.readFileSync(skillFile, 'utf8');
@@ -156,7 +153,7 @@ export default {
       const toggle = page.getByRole('switch', { name: /Load it every turn/ });
       await expectVisible(page.getByRole('switch', { name: /Load it every turn/, checked: false }), 'the switch is off');
       const [switched] = await Promise.all([
-        wrote(page, 'PUT', `/api/namespaces/default/skills/${SKILL.name}`),
+        wrote(page, 'PUT', `/api/skills/${SKILL.name}`),
         preload.locator('label', { hasText: 'Load it every turn' }).click(),
       ]);
       if (switched.status() !== 200) throw new Refused(`the api switches it — it answered ${switched.status()}: ${await switched.text()}`);
@@ -179,7 +176,7 @@ export default {
       await edit.getByRole('textbox', { name: 'Description', exact: true }).fill(SKILL.edited);
       if (!(await toggle.isDisabled())) throw new Refused('the switch waits while the form holds unsaved words');
       const [saved] = await Promise.all([
-        wrote(page, 'PUT', `/api/namespaces/default/skills/${SKILL.name}`),
+        wrote(page, 'PUT', `/api/skills/${SKILL.name}`),
         edit.getByRole('button', { name: 'Save' }).click(),
       ]);
       if (saved.status() !== 200) throw new Refused(`the api saves the skill — it answered ${saved.status()}: ${await saved.text()}`);
@@ -207,7 +204,7 @@ export default {
         const byHand = `${fs.readFileSync(skillFile, 'utf8')}${SKILL.byHand}\n`;
         fs.writeFileSync(skillFile, byHand);
         const [answered] = await Promise.all([
-          wrote(stale, 'PUT', `/api/namespaces/default/skills/${SKILL.name}`),
+          wrote(stale, 'PUT', `/api/skills/${SKILL.name}`),
           form.getByRole('button', { name: 'Save' }).click(),
         ]);
         const { error } = (await answered.json()) as { error?: string };
@@ -254,7 +251,7 @@ export default {
 
       await page.getByRole('link', { name: '← Agents' }).click();
       await page.waitForURL((url) => url.pathname === '/agents', { timeout: WAIT_MS });
-      const mine = page.locator('section[data-skill-place="yours"]');
+      const mine = page.locator('section[data-skill-place="user"]');
       await expectVisible(
         mine.locator(`[data-skill-row="${SKILL.name}"]`, { hasText: SKILL.edited }),
         `the Agents page lists ${SKILL.name} under your library, with what it does`,
@@ -267,7 +264,7 @@ export default {
     await page.reload({ waitUntil: 'load' });
     await idle(page);
     await expectTexts(
-      page.locator('section[data-skill-place="yours"] [data-skill-row]').locator('a'),
+      page.locator('section[data-skill-place="user"] [data-skill-row]').locator('a'),
       had,
       'the page takes its skill back: your library lists what was seeded',
     );

@@ -99,8 +99,8 @@ function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: bo
   if (agents.length === 0)
     return (
       <p data-hire-none className="text-body-small text-muted-foreground">
-        {page.from === 'user' ? 'None of your agents reads' : `None of ${whose(page)} agents reads`}, so there is no agent to hire into
-        this step in {page.factory}.
+        {page.from === 'user' ? 'None of your agents reads' : `None of ${whose(page)} agents reads`}, so there is no agent to hire into this
+        step in {page.factory}.
       </p>
     );
   return (

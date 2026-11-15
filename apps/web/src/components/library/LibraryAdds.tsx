@@ -5,14 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  addable,
-  addToFactory,
-  type AddableItem,
-  libraryAddsQuery,
-  libraryQuery,
-  removeFromFactory,
-} from '../../lib/api/storeLibrary.ts';
+import { addable, addToFactory, type AddableItem, libraryAddsQuery, libraryQuery, removeFromFactory } from '../../lib/api/storeLibrary.ts';
 
 /** What a person asks of a factory's adds: an item of the library added, or an add taken off. */
 type Change = { kind: 'add'; item: AddableItem } | { kind: 'remove'; name: string };
@@ -23,7 +16,6 @@ const STATE_WORDS: Record<LibraryAdd['status']['state'], string> = {
   shadowed: 'shadowed',
   missing: 'missing',
 };
-
 
 /** The key an addable item is picked by, `<kind>.<name>`, as its add is named. */
 const keyOf = (change: Change): string => (change.kind === 'add' ? `${change.item.kind}.${change.item.name}` : change.name);

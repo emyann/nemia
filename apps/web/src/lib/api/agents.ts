@@ -250,10 +250,7 @@ export const createAgent = async (draft: AgentDraft): Promise<AgentSaved> => ({
  */
 export const saveAgent = async (name: string, version: string, draft: AgentDraft): Promise<AgentSaved> => ({
   agent: agentViewOf(
-    await served.replace(name,
-      { metadata: { name: draft.name, resourceVersion: version }, spec: specOfDraft(draft) },
-      refused,
-    ),
+    await served.replace(name, { metadata: { name: draft.name, resourceVersion: version }, spec: specOfDraft(draft) }, refused),
   ),
 });
 
@@ -337,9 +334,6 @@ export const writeCustomInstructions = (name: string, words: string, repo?: stri
  */
 export const clearCustomInstructions = (name: string, repo?: string): Promise<CustomInstructionsCleared> =>
   call(
-    (c) =>
-      name === NEMIA
-        ? c.nemia.clearInstructions()
-        : c.agents.deleteInstructions({ params: { name }, query: repoQuery(repo) }),
+    (c) => (name === NEMIA ? c.nemia.clearInstructions() : c.agents.deleteInstructions({ params: { name }, query: repoQuery(repo) })),
     write(AgentInstructionsClearedAnswer, CUSTOM_WRITTEN),
   );

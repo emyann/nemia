@@ -523,7 +523,8 @@ export const mcpServers = {
  * adds; and each kind's items with the factories that add each, every page.
  */
 export const library = {
-  mcpServers: (): Promise<McpServerList> => everyPage((asked) => call((c) => c.mcpservers.listLibrary({ query: asked }), read(McpServerList))),
+  mcpServers: (): Promise<McpServerList> =>
+    everyPage((asked) => call((c) => c.mcpservers.listLibrary({ query: asked }), read(McpServerList))),
   skills: (): Promise<Skill[]> =>
     everyPage((asked) => call((c) => c.skills.listLibrary({ query: asked }).pipe(Effect.flatMap(listed)), read(SkillList))).then((l) => [
       ...l.items,
@@ -691,10 +692,7 @@ export const agents = {
   replace: (name: string, body: AgentWrite, refuse?: Refuse): Promise<Agent> =>
     call((c) => c.agents.replaceLibrary({ params: { name }, payload: body }), write(Agent, AGENT_WRITTEN, undefined, refuse)),
   delete: (name: string, resourceVersion: string, refuse?: Refuse): Promise<Agent> =>
-    call(
-      (c) => c.agents.deleteLibrary({ params: { name }, query: { resourceVersion } }),
-      write(Agent, AGENT_WRITTEN, undefined, refuse),
-    ),
+    call((c) => c.agents.deleteLibrary({ params: { name }, query: { resourceVersion } }), write(Agent, AGENT_WRITTEN, undefined, refuse)),
   /** A try of the agent `name` on `brief`: the run it started. */
   try: (name: string, brief: string, refuse?: Refuse): Promise<AgentTried> =>
     call(

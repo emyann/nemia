@@ -310,7 +310,8 @@ export const saveWorkflow = async (
   save: { version: string; steps: readonly StepWritten[]; schemas: readonly SchemaFile[]; readme?: string },
 ): Promise<WorkflowListing> =>
   workflowViewOf(
-    await served.replace(name,
+    await served.replace(
+      name,
       {
         metadata: { resourceVersion: save.version },
         spec: { steps: save.steps.map(writtenStepOf), ...(save.readme === undefined ? {} : { readme: save.readme }) },

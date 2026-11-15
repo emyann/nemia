@@ -48,7 +48,7 @@ export const pickedIn = (url: URL): string | null =>
   (LISTINGS.includes(url.pathname) || PICKING.test(url.pathname) ? url.searchParams.get('factory') || null : null);
 
 /** The rail's destinations, in its order, one column from the top. */
-export const RAIL_PLACES = ['Overview', 'Runs', 'Inbox', 'Factories', 'Agents', 'Workflows', 'Stats', 'Nemia', 'Settings'];
+export const RAIL_PLACES = ['Overview', 'Runs', 'Inbox', 'Factories', 'Agents', 'Workflows', 'Library', 'Stats', 'Nemia', 'Settings'];
 
 /** The frame's rail at the left of a wide window: the menu button and the FAB above the kit's navigation rail. */
 export const railColumnOf = (page: Page): Locator => page.locator('[data-frame-rail]');

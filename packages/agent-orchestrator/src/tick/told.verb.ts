@@ -63,6 +63,7 @@ import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import type { FactoryServers } from '../factory/servers/index.ts';
+import { addedServers } from '../library/library.verb.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { NeedsMemory, runNeeds } from '../needs/needs.verb.ts';
@@ -281,7 +282,7 @@ export const filedAt = (
 });
 
 /**
- * The MCP servers the factory `factory` records, each through `mcpServerOf` — the runtime's one producer of the bytes a harness sees,
+ * The MCP servers the factory `factory` records, beside the library's it has added (its own winning a name), each through `mcpServerOf` — the runtime's one producer of the bytes a harness sees,
  * applied here and nowhere else on this road, so a session is handed the spelling a state read was handed and finds the sign-in filed
  * under it. `{}` for a factory that records none — and `{}`, silently here, for a record that does not read: this is spread into
  * every filing, and a throw would be a defect that stops the whole pass over one bad file. The pass refuses the step itself and says
@@ -290,8 +291,10 @@ export const filedAt = (
  */
 const recordedServers = (factory: string | undefined, home: string): FactoryServers => {
   try {
-    const record = doorAtOnce(home, (door) => door.servers.read(FactoryName.read(factory ?? DEFAULT_NAMESPACE)));
-    return Object.fromEntries(Object.entries(record).map(([name, server]) => [name, mcpServerOf(server)]));
+    const name = factory ?? DEFAULT_NAMESPACE;
+    const own = doorAtOnce(home, (door) => door.servers.read(FactoryName.read(name)));
+    const record = { ...addedServers(home, name), ...own };
+    return Object.fromEntries(Object.entries(record).map(([server, at]) => [server, mcpServerOf(at)]));
   } catch {
     return {};
   }

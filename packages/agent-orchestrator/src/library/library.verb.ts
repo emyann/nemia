@@ -16,6 +16,7 @@ import { frontmatterKey } from '../former/former.ts';
 import { BUILTIN_SKILLS, REPOSITORY_HOLDER } from '../skills/read.store.ts';
 import { builtinServers, BUILTIN_SERVERS } from '../factory/servers/servers.store.ts';
 import { Missing } from '../refusal/refusal.ts';
+import type { BuiltinServer, FactoryServer, FactoryServers } from '../factory/servers/servers.ts';
 import { addName, libraryAddRefusal, libraryAddState, libraryAddsOf, sameAdd, type LibraryKind, type LibraryRef } from './library.ts';
 import { libraryAddsFile, libraryDir, libraryServers, readLibraryAdds, writeLibraryAdds } from './library.store.ts';
 
@@ -222,3 +223,26 @@ export function libraryUsers(home: string, ref: LibraryRef | { readonly kind: 'W
     })
     .sort();
 }
+
+/**
+ * The library's MCP servers the factory `name` has added, by name: the person's record of each, else Nemia's builtin of that name. None
+ * for a factory with no record of its adds, since the library held no server before adds were recorded.
+ * @param home The store's root.
+ * @param name The factory's name, `default` among them.
+ */
+export function addedServers(home: string, name: string): FactoryServers {
+  const adds = readLibraryAdds(home, name) ?? [];
+  const mine = libraryServers(home);
+  const builtin = builtinServers(BUILTIN_SERVERS);
+  const out: Record<string, FactoryServer> = {};
+  for (const ref of adds) {
+    if (ref.kind !== 'McpServer') continue;
+    const shipped = builtin.find((s) => s.name === ref.name);
+    const server = mine[ref.name] ?? (shipped === undefined ? undefined : withoutName(shipped));
+    if (server !== undefined) out[ref.name] = server;
+  }
+  return out;
+}
+
+/** A builtin server as a record holds it: its fields but its name. */
+const withoutName = ({ name: _name, ...server }: BuiltinServer): FactoryServer => server;

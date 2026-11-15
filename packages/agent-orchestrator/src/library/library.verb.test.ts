@@ -8,8 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { TEAM } from '../../test/team.ts';
-import { factoryAdds, libraryAddObject, libraryUsers, writeLibraryAdd } from './library.verb.ts';
-import { libraryAddsFile, readLibraryAdds, writeLibraryAdds } from './library.store.ts';
+import { addedServers, factoryAdds, libraryAddObject, libraryUsers, writeLibraryAdd } from './library.verb.ts';
+import { libraryAddsFile, readLibraryAdds, writeLibraryAdds, writeLibraryServers } from './library.store.ts';
 
 /** A store whose library is a copy of the tests' team. */
 const store = (): string => {
@@ -64,4 +64,19 @@ test("library.json reads as undefined where absent, keeps a newer tick's keys, a
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { later: 1, adds: [{ kind: 'Agent', name: 'scribe' }] });
   fs.writeFileSync(file, JSON.stringify({ adds: [{ kind: 'Workflow', name: 'x' }] }));
   assert.throws(() => readLibraryAdds(home, 'acme'), { _tag: 'Invalid' });
+});
+
+test("a factory's added library servers: the person's record of each, else Nemia's builtin, and none while it is unrecorded", () => {
+  const home = scratch('wf-library-servers-');
+  writeLibraryServers(home, { notes: { type: 'http', url: 'https://notes.example/mcp' } });
+  assert.deepEqual(addedServers(home, 'acme'), {}, 'unrecorded');
+  writeLibraryAdds(home, 'acme', [
+    { kind: 'McpServer', name: 'notes' },
+    { kind: 'McpServer', name: 'github' },
+    { kind: 'McpServer', name: 'gone' },
+  ]);
+  const servers = addedServers(home, 'acme');
+  assert.deepEqual(servers.notes, { type: 'http', url: 'https://notes.example/mcp' });
+  assert.equal(typeof servers.github?.url, 'string', "Nemia's builtin github, by name");
+  assert.equal(servers.gone, undefined, 'an add the library no longer holds hands nothing to a run');
 });

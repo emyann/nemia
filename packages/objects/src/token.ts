@@ -5,7 +5,7 @@
  * caller it was made by, which the board shows beside it (`actorWords`). Plain Schemas of JSON. Pure.
  */
 import { Schema } from 'effect';
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
+import { HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
 import { CALLER_KINDS, FLOOR_NARROWINGS, TOKEN_HOLDERS } from './words.ts';
 
@@ -107,15 +107,21 @@ export type TokenMinted = typeof TokenMinted.Type;
  * one that presents none.
  */
 export class TokensGroup extends HttpApiGroup.make('tokens').add(
-  HttpApiEndpoint.get('list', '/api/tokens', { success: TokenList, error: [Forbidden, Failed] }),
+  HttpApiEndpoint.get('list', '/api/tokens', { success: TokenList, error: [Forbidden, Failed] }).annotate(
+    OpenApi.Description,
+    'Lists the standing tokens the store keeps by name, each with who holds it, the factory it is bound to and its narrowing; never the token. Answers TokenList.',
+  ),
   HttpApiEndpoint.post('mint', '/api/tokens', {
     payload: TokenMint,
     success: TokenMinted.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: [BadRequest, Invalid, Conflict, Forbidden, Failed],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Mints a standing token for the person under a device's name, or for an agent, bound to a factory or store-wide and maybe narrowed. Answers TokenMinted with a 201, the token itself once, which the store keeps only the digest of.",
+  ),
   HttpApiEndpoint.delete('retire', '/api/tokens/:name', {
     params: { name: Schema.String.annotate({ description: 'The name of the token to retire.' }) },
     success: Token,
     error: [Missing, Forbidden, Failed],
-  }),
+  }).annotate(OpenApi.Description, 'Retires a standing token by its name, so it is refused from then on. Answers the Token retired.'),
 ) {}

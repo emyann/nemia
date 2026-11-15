@@ -3,7 +3,7 @@
  * namespace, added to the one `Api` (`api.ts`) beside the others.
  */
 import { Schema } from 'effect';
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
+import { HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
 import { Conflict, Failed, Forbidden, Invalid, listQuery, Missing, Unauthorized } from './api-errors.ts';
 import { Proposal, ProposalCreate, ProposalList } from './proposal.ts';
 import { Delegation, DelegationList, DelegationWrite } from './delegation.ts';
@@ -37,28 +37,40 @@ export class ProposalsGroup extends HttpApiGroup.make('proposals').add(
     query: listQuery,
     success: ProposalListObject,
     error: proposalErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a factory's proposals in its namespace, a page at a time, read by anyone. Answers a ProposalList.",
+  ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/proposals/:name', {
     params: cardParams,
     success: ProposalObject,
     error: proposalErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of a factory's proposals by its name: the change of its definitions or wiring it proposes, who proposed it and where it stands. Answers the Proposal.",
+  ),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/proposals', {
     params: namespaceParams,
     payload: ProposalCreate,
     success: ProposalObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: proposalErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Proposes a change of a factory's definitions or wiring, from any caller of the factory, who is read off the request's session token and never off the body. Answers the Proposal with a 201.",
+  ),
   HttpApiEndpoint.post('approve', '/api/namespaces/:namespace/proposals/:name/approve', {
     params: cardParams,
     success: ProposalObject,
     error: proposalErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Approves a factory's proposal, by the person or by an agent at auto within its delegation and under a confirmed rule, and applies it at once where it is due. Answers the Proposal as it stands after.",
+  ),
   HttpApiEndpoint.post('decline', '/api/namespaces/:namespace/proposals/:name/decline', {
     params: cardParams,
     success: ProposalObject,
     error: proposalErrors,
-  }),
+  }).annotate(OpenApi.Description, "Declines a factory's proposal, by the person alone. Answers the Proposal as it stands after."),
 ) {}
 
 /** A factory's delegations, in its namespace, each named by its agent: listed, read, written whole and removed, by the person alone. */
@@ -68,21 +80,33 @@ export class DelegationsGroup extends HttpApiGroup.make('delegations').add(
     query: listQuery,
     success: DelegationListObject,
     error: proposalErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a factory's delegations in its namespace, a page at a time, each named by its agent, read by anyone. Answers a DelegationList.",
+  ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/delegations/:name', {
     params: cardParams,
     success: DelegationObject,
     error: proposalErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of a factory's delegations by its agent's name: what that agent may approve of the factory's proposals at auto. Answers the Delegation.",
+  ),
   HttpApiEndpoint.put('put', '/api/namespaces/:namespace/delegations/:name', {
     params: cardParams,
     payload: DelegationWrite,
     success: DelegationObject,
     error: proposalErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Writes a factory's delegation to an agent whole, by the person alone; an agent's session is Forbidden. Answers the Delegation as it is now.",
+  ),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/delegations/:name', {
     params: cardParams,
     success: DelegationObject,
     error: proposalErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Removes a factory's delegation to an agent, by the person alone; an agent's session is Forbidden whether or not one is there. Answers the Delegation it removed.",
+  ),
 ) {}

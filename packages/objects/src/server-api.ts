@@ -12,7 +12,7 @@
 import { Schema } from 'effect';
 import { Actor } from './token.ts';
 import { describedNumber, describedOne } from './meta.ts';
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Invalid, Missing } from './api-errors.ts';
 import { Ceilings, Daemon, Metrics, PassesRead, Quota, SeriesRead } from './server-machine.ts';
 import { FEED_STREAM_EVENTS, FINISHING_KINDS, SESSION_COOKIE_STATES, INTERRUPT_KINDS, STATS_BY } from './words.ts';
@@ -461,49 +461,116 @@ const readErrors = [Invalid, Failed];
 
 /** The server, the machine, the store's pause and the feed followed. */
 export class ServerGroup extends HttpApiGroup.make('server').add(
-  HttpApiEndpoint.get('health', '/api/health', { success: Health }),
-  HttpApiEndpoint.get('version', '/api/version', { success: VersionAnswer, error: readErrors }),
-  HttpApiEndpoint.post('signIn', '/api/session', { success: SessionAnswer, error: [BadRequest] }),
-  HttpApiEndpoint.delete('signOut', '/api/session', { success: SessionAnswer }),
+  HttpApiEndpoint.get('health', '/api/health', { success: Health }).annotate(
+    OpenApi.Description,
+    'Says the api answers, and the version it runs where it knows it. Answers Health.',
+  ),
+  HttpApiEndpoint.get('version', '/api/version', { success: VersionAnswer, error: readErrors }).annotate(
+    OpenApi.Description,
+    'Reads the release the api runs, the code it was built from, and the newest release the daemon knows of. Answers VersionAnswer.',
+  ),
+  HttpApiEndpoint.post('signIn', '/api/session', { success: SessionAnswer, error: [BadRequest] }).annotate(
+    OpenApi.Description,
+    "Signs the board in with the bearer the request carries, setting it as the board's HttpOnly cookie, which no script of the page can read. Answers SessionAnswer, that it did, never the token.",
+  ),
+  HttpApiEndpoint.delete('signOut', '/api/session', { success: SessionAnswer }).annotate(
+    OpenApi.Description,
+    'Signs the board out, clearing its cookie. Answers SessionAnswer, that it did.',
+  ),
   HttpApiEndpoint.get('capabilities', '/api/capabilities', {
     query: placeQuery,
     success: CapabilitiesWithSteps,
     error: [Missing, ...readErrors],
-  }),
-  HttpApiEndpoint.get('repository', '/api/repository', { query: placeQuery, success: RepositoryAnswer, error: [Missing, ...readErrors] }),
-  HttpApiEndpoint.get('store', '/api/store', { success: YourStore, error: readErrors }),
-  HttpApiEndpoint.get('ceilings', '/api/ceilings', { success: Ceilings, error: readErrors }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads what the repository the request's ?factory= and ?repo= resolve offers a step: its skills, agents, MCP servers and permission rules, the read-only commands, and what each step of each workflow gets. Answers the capabilities, or why no repository was read.",
+  ),
+  HttpApiEndpoint.get('repository', '/api/repository', {
+    query: placeQuery,
+    success: RepositoryAnswer,
+    error: [Missing, ...readErrors],
+  }).annotate(
+    OpenApi.Description,
+    "Reads the repository a start runs in, as the request's ?factory= and ?repo= resolve it. Answers RepositoryAnswer.",
+  ),
+  HttpApiEndpoint.get('store', '/api/store', { success: YourStore, error: readErrors }).annotate(
+    OpenApi.Description,
+    "Reads your store's folders of workflows, agents and skills, the line that files a factory in it and the line that turns Nemia on. Answers YourStore.",
+  ),
+  HttpApiEndpoint.get('ceilings', '/api/ceilings', { success: Ceilings, error: readErrors }).annotate(
+    OpenApi.Description,
+    "Reads the run slots: what the daemon's last pass ran with, the cap on runs in flight, the runs that count against it and those it holds, and what the last pass cost. Answers Ceilings.",
+  ),
   HttpApiEndpoint.get('passes', '/api/passes', {
     query: { last: Schema.optionalKey(Schema.String.annotate({ description: 'How many of the recent passes to read.' })) },
     success: PassesRead,
     error: readErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads the daemon's recent passes, oldest first, with the histogram of their lengths, their phases and a summary. Answers PassesRead.",
+  ),
   HttpApiEndpoint.get('series', '/api/series', {
     query: {
       range: Schema.optionalKey(Schema.String.annotate({ description: 'The range the series are read over: 24h, 7d, 30d or all.' })),
     },
     success: SeriesRead,
     error: readErrors,
-  }),
-  HttpApiEndpoint.get('metrics', '/api/metrics', { success: Metrics, error: readErrors }),
-  HttpApiEndpoint.get('daemon', '/api/daemon', { success: Daemon, error: readErrors }),
-  HttpApiEndpoint.get('quota', '/api/quota', { success: Quota, error: readErrors }),
-  HttpApiEndpoint.get('stats', '/api/stats', { query: StatsQuery, success: Stats, error: readErrors }),
-  HttpApiEndpoint.get('paused', '/api/pause', { success: Paused, error: [Missing, ...readErrors] }),
-  HttpApiEndpoint.get('pauseNow', '/api/pause/now', { success: PauseNowRead, error: [Missing, ...readErrors] }),
-  HttpApiEndpoint.get('pauseTimeout', '/api/pause/timeout', { success: PauseTimeoutAnswer, error: readErrors }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads the floor's series over a range (24h, 7d, 30d or all), each series and label set's points in time. Answers SeriesRead.",
+  ),
+  HttpApiEndpoint.get('metrics', '/api/metrics', { success: Metrics, error: readErrors }).annotate(
+    OpenApi.Description,
+    "Reads every metric of the api's runtime, by name and then attributes. Answers the list of metrics.",
+  ),
+  HttpApiEndpoint.get('daemon', '/api/daemon', { success: Daemon, error: readErrors }).annotate(
+    OpenApi.Description,
+    "Reads the store's daemon as its file says itself: where it stands, who started it, where it serves and when it last moved. Answers Daemon.",
+  ),
+  HttpApiEndpoint.get('quota', '/api/quota', { success: Quota, error: readErrors }).annotate(
+    OpenApi.Description,
+    "Reads the subscription's quota as the board is given it: its windows when fresh, or why there are none. Answers Quota.",
+  ),
+  HttpApiEndpoint.get('stats', '/api/stats', { query: StatsQuery, success: Stats, error: readErrors }).annotate(
+    OpenApi.Description,
+    "Reads the flow numbers of every run in the store over the range and filters asked: each group's, the runs that did not read, and the system's health. Answers Stats.",
+  ),
+  HttpApiEndpoint.get('paused', '/api/pause', { success: Paused, error: [Missing, ...readErrors] }).annotate(
+    OpenApi.Description,
+    "Reads the store's pause, or null where none stands, with each task still finishing under it and each session, landing and check it holds. Answers Paused.",
+  ),
+  HttpApiEndpoint.get('pauseNow', '/api/pause/now', { success: PauseNowRead, error: [Missing, ...readErrors] }).annotate(
+    OpenApi.Description,
+    'Reads what a pause at once would cut, each task at work but a landing, and what that costs. Answers PauseNowRead.',
+  ),
+  HttpApiEndpoint.get('pauseTimeout', '/api/pause/timeout', { success: PauseTimeoutAnswer, error: readErrors }).annotate(
+    OpenApi.Description,
+    "Reads the store's pause timeout in force, how long a tool call in flight is given to end when the store is paused or restarted before it is cut. Answers PauseTimeoutAnswer.",
+  ),
   HttpApiEndpoint.put('setPauseTimeout', '/api/pause/timeout', {
     payload: PauseTimeoutWrite,
     success: PauseTimeoutAnswer,
     error: [BadRequest, Invalid, Failed],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Sets the store's pause timeout from the body. Answers PauseTimeoutAnswer, the timeout in force and that this call wrote it.",
+  ),
   HttpApiEndpoint.post('pause', '/api/pause', {
     payload: PauseWrite,
     success: PauseAnswer,
     error: [BadRequest, Conflict, Invalid, Failed],
-  }),
-  HttpApiEndpoint.delete('resume', '/api/pause', { success: Resumed, error: [Missing, Failed] }),
-  HttpApiEndpoint.get('wait', '/api/feed/wait', { query: FeedWaitQuery, success: FeedWait, error: [BadRequest, Invalid] }),
+  }).annotate(
+    OpenApi.Description,
+    'Pauses the store: no pass starts new work, and each session parks at the end of its tool call, a call still in flight past the timeout cut; with now, the work in flight is cut at once. Answers the pause put, with what it cut and left, or that an earlier pause was kept.',
+  ),
+  HttpApiEndpoint.delete('resume', '/api/pause', { success: Resumed, error: [Missing, Failed] }).annotate(
+    OpenApi.Description,
+    "Lifts the store's pause: each parked session goes on as the same try, and the next pass files what waits. Answers Resumed, the pause lifted.",
+  ),
+  HttpApiEndpoint.get('wait', '/api/feed/wait', { query: FeedWaitQuery, success: FeedWait, error: [BadRequest, Invalid] }).annotate(
+    OpenApi.Description,
+    'Waits on the feed for lines the label queries take, from a cursor, up to a bound. Answers FeedWait: why it ended, the lines as Events, and the cursor the next wait starts from.',
+  ),
   HttpApiEndpoint.get('feed', '/api/feed/stream', {
     query: FeedQuery,
     headers: {
@@ -513,5 +580,8 @@ export class ServerGroup extends HttpApiGroup.make('server').add(
     },
     success: HttpApiSchema.StreamSse({ events: FeedStreamEvent }),
     error: [BadRequest, Invalid],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Follows the feed as server-sent events from a cursor or the last event id: each line as it is written, bookmarks and hints. Answers a stream of FeedStreamEvent.',
+  ),
 ) {}

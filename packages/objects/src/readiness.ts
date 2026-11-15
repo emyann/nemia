@@ -5,7 +5,7 @@
  * that serves them is `ReadinessGroup`.
  */
 import { Schema } from 'effect';
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
 import { describedNumber } from './meta.ts';
 import { NeedAsk } from './workflow.ts';
@@ -200,16 +200,28 @@ const fixParams = { id: Schema.String.annotate({ description: "The fix's id." })
 
 /** The readiness read and its fixes. */
 export class ReadinessGroup extends HttpApiGroup.make('readiness').add(
-  HttpApiEndpoint.get('read', '/api/readiness', { success: Readiness, error: [Invalid, Failed] }),
+  HttpApiEndpoint.get('read', '/api/readiness', { success: Readiness, error: [Invalid, Failed] }).annotate(
+    OpenApi.Description,
+    'Reads every piece the server needs to run its factories, each in place, missing or not activated, what it costs while missing, and the fix that puts it there. Answers Readiness.',
+  ),
   HttpApiEndpoint.post('fix', '/api/readiness/fixes', {
     payload: FixStart,
     success: Fix,
     error: [BadRequest, Invalid, Missing, Conflict, Forbidden, Failed],
-  }),
-  HttpApiEndpoint.get('fixOf', '/api/readiness/fixes/:id', { params: fixParams, success: Fix, error: [Missing, Failed] }),
+  }).annotate(
+    OpenApi.Description,
+    "Starts one of a missing piece's fixes on the server, with the answers its asks were given. Answers the Fix started: its id, what it fixes and its phase.",
+  ),
+  HttpApiEndpoint.get('fixOf', '/api/readiness/fixes/:id', { params: fixParams, success: Fix, error: [Missing, Failed] }).annotate(
+    OpenApi.Description,
+    'Reads a fix the server runs, by its id: its phase, the tail of what it printed, and its exit code once it ended. Answers the Fix.',
+  ),
   HttpApiEndpoint.get('fixOutput', '/api/readiness/fixes/:id/output', {
     params: fixParams,
     success: HttpApiSchema.StreamSse({ events: FixStreamEvent }),
     error: [Missing],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Follows a fix's output as server-sent events while it runs, until it ends. Answers a stream of FixStreamEvent.",
+  ),
 ) {}

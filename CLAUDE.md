@@ -115,7 +115,8 @@ holds what every change needs.
   and what it is for, in the signature's order, and no tag for a name it has not (`tools/guards/test/params.test.ts`); `@returns` is
   asked of nobody, the signature's type says it. A field of a served object says what it is on its Schema, `.annotate({ description
   })`, since the document a client, the reference page and the MCP port's tools read holds no comment
-  (`packages/objects/test/described.test.ts`). Each has a baseline of what was written before, which only shrinks: a file you change
+  (`packages/objects/test/described.test.ts`), and an endpoint says what it does on itself, `OpenApi.Description`
+  (`packages/objects/test/described-endpoints.test.ts`). Each has a baseline of what was written before, which only shrinks: a file you change
   is left owing less. A comment inside a body is still refused (`comments/no-code-comments`).
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
   transition is wrong after a restart.

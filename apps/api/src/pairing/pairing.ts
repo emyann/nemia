@@ -4,8 +4,8 @@
  * `pairingApproved`, `linkMinted`, `linkClaimed`), at the store's root, at the time the clock reads once for the request (`nowMs`), each
  * refusal answered by the one map (`answeredWrite`, objects/refused.ts). No answer carries a token but a pairing's claim, once.
  *
- * Three routes a client with no token yet reaches, exposed or not, each named by its method and path (`OPEN_ROUTES`, caller/paths.ts;
- * `needOf`, caller/caller.ts): each judges the secret it is sent, and none answers with the store's data.
+ * Three routes a client with no token yet reaches, exposed or not, each named by its method and path (`openRoute` and `needOf`,
+ * caller/caller.ts, over the paths of caller/paths.ts): each judges the secret it is sent, and none answers with the store's data.
  * - `POST /api/pairings` — a pairing asked for the client it names: its id, the short code the person approves, the secret its claim
  *   sends and when it lapses. 422 (`Invalid`) for a client's name out of its form.
  * - `POST /api/pairings/:id/claim` — the pairing claimed with its secret: `{ phase: 'waiting' }` while no person approved it, the client

@@ -326,7 +326,7 @@ async function hold(dir: string): Promise<void> {
       fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
   });
   const { serveStore, servers, startServers, stopOnTheWayOut, stopServers } = await import('./served.ts');
-  const { seatToken } = await import('./world.ts');
+  const world = await import('./world.ts');
   const store = path.join(dir, 'store');
   fs.mkdirSync(store);
   stopOnTheWayOut('board');
@@ -339,6 +339,11 @@ async function hold(dir: string): Promise<void> {
     await stopServers();
     at = await startServers(seat, dist);
   }
+  const token = world.seatToken;
+  if (!token)
+    throw new Error(
+      'the seeded store minted no token for the person (seatToken, served.ts), so the served board would open on its token page: read what seedStore said above, and serve again',
+    );
   const tree = process.env.BOARD_SERVE_TREE ?? '';
   const stories = await serveStories(path.join(dir, 'stories'));
   const served: ServedBoard = {
@@ -347,7 +352,7 @@ async function hold(dir: string): Promise<void> {
     api: `http://127.0.0.1:${at.apiPort}`,
     stories: stories.at,
     tree,
-    token: seatToken ?? '',
+    token,
   };
   fs.writeFileSync(path.join(dir, 'served.json.new'), `${JSON.stringify(served)}\n`);
   fs.renameSync(path.join(dir, 'served.json.new'), path.join(dir, 'served.json'));

@@ -124,7 +124,7 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/runs/:name', { params: runParams, success: Run, error: runReadErrors }).annotate(
     OpenApi.Description,
-    'Reads one run by its name in its namespace, judged into the run object. Answers the Run; a run in another namespace is Missing, and one a task of which does not read is Unjudged.',
+    'Reads one run by its name in its namespace, judged into the run object. Answers the Run; a run in another namespace is Missing, and one whose tasks do not all read is Unjudged.',
   ),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/runs', {
     params: namespaceParams,
@@ -238,7 +238,7 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
   ),
   HttpApiEndpoint.get('show', '/api/runs/:name', { params: nameParams, success: Run, error: runReadErrors }).annotate(
     OpenApi.Description,
-    'Reads one run by its name in any namespace, judged into the run object. Answers the Run; one a task of which does not read is Unjudged.',
+    'Reads one run by its name in any namespace, judged into the run object. Answers the Run; one whose tasks do not all read is Unjudged.',
   ),
   HttpApiEndpoint.get('lines', '/api/runs/:name/lines', { params: nameParams, success: RunLines, error: [Missing] }).annotate(
     OpenApi.Description,

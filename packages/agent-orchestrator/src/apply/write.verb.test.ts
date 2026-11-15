@@ -2,7 +2,8 @@
  * A LibraryAdd proposal applied (`objectWritten`, `write.verb.ts`): the factory's record of its adds written as the proposal says, and the
  * proposal's read of what is there now (`currentOf`) agreeing with it, an add made and then taken off. A Workflow proposal applied writes
  * its README as the api's write does: its needs kept where it leaves them out, written where it gives them, a readme with a frontmatter of
- * its own written as given; and the spec it will hold once written (`mergedSpec`) shows the needs so, beside what is there now.
+ * its own written as given; the spec it will hold once written (`mergedSpec`) shows them so in its README, beside what is there now;
+ * and an undo, which proposes the spec read before, writes the README back byte for byte.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +16,7 @@ import { TEAM } from '../../test/team.ts';
 import { objectWritten } from './write.verb.ts';
 import { currentOf } from '../propose/current.verb.ts';
 import { mergedSpec } from '../propose/propose.verb.ts';
-import { workflowNeeds, workflowReadme } from '../folder/folder.store.ts';
+import { needsDeclaredIn, workflowNeeds, workflowReadme } from '../folder/folder.store.ts';
 import { readLibraryAdds } from '../library/library.store.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -106,6 +107,9 @@ async function servedDev(home: string): Promise<{ version: string; spec: Record<
   return { version: now.version ?? '', spec: { ...rest, readme: workflowReadme(dir), needs: workflowNeeds(dir) } };
 }
 
+/** The spec `object` will hold once written over `now` (`mergedSpec`), its README read: its needs are declared there, never apart. */
+const previewOf = (object: ProposedObject, now: unknown) => mergedSpec(object, now) as { readme?: string; needs?: unknown };
+
 /** `dev` proposed back as an update at `version` with `spec`. */
 const devProposed = (version: string, spec: ProposedObject['spec']): ProposedObject => ({
   kind: 'Workflow',
@@ -120,11 +124,7 @@ test('a Workflow read as the api serves it, proposed back with its needs left ou
   const { needs: _needs, ...left } = spec;
   const object = devProposed(version, left);
   const now = await nowIn(home);
-  assert.deepEqual(
-    (mergedSpec(object, now.spec) as { needs?: unknown }).needs,
-    (now.spec as { needs?: unknown }).needs,
-    'the preview shows no change to the needs',
-  );
+  assert.equal(previewOf(object, now.spec).readme, (now.spec as { readme?: string }).readme, 'the preview shows the README unchanged');
   await ran(objectWritten({ home }, FACTORY, object));
   assert.deepEqual(workflowNeeds(path.dirname(readme)), NEEDS, 'the needs are still declared');
   assert.match(fs.readFileSync(readme, 'utf8'), /^---\nowner: team\n/, "the frontmatter's other key is kept");
@@ -140,7 +140,7 @@ test('a Workflow proposed with other needs writes those, and with needs [] write
       const { version, spec } = await servedDev(home);
       const object = devProposed(version, { ...spec, needs });
       const now = await nowIn(home);
-      assert.deepEqual((mergedSpec(object, now.spec) as { needs?: unknown }).needs, needs, 'the preview shows the needs given');
+      assert.deepEqual(needsDeclaredIn(previewOf(object, now.spec).readme ?? '').needs, needs, 'the preview shows the needs given');
       await ran(objectWritten({ home }, FACTORY, object));
       assert.deepEqual(workflowNeeds(path.dirname(readme)), needs);
       assert.equal(workflowReadme(path.dirname(readme)), '# dev\n\nBuild it.\n', 'the instruction is kept');
@@ -155,7 +155,21 @@ test('a Workflow whose readme carries its own frontmatter is written as given, a
   const given = '---\nneeds:\n  - name: gh\n    message: GitHub CLI\n    check: gh --version\n---\n# dev\n\nComposed.\n';
   const object = devProposed(version, { ...left, readme: given });
   const now = await nowIn(home);
-  assert.deepEqual((mergedSpec(object, now.spec) as { needs?: unknown }).needs, [NEEDS[0]], "the preview reads the readme's own needs");
+  assert.equal(previewOf(object, now.spec).readme, given, 'the preview shows the readme as given');
   await ran(objectWritten({ home }, FACTORY, object));
   assert.equal(fs.readFileSync(readme, 'utf8'), given);
+});
+
+test("an undo of a Workflow proposal writes the README back byte for byte, its frontmatter's comment and order kept", async () => {
+  const { home, readme } = plantedNeeds('wf-apply-needs-undo-');
+  const was = `---\n# who runs it\nneeds:\n  - name: gh\n    message: "GitHub CLI"\n    check: gh --version\nowner: team\n---\n# dev\n\nBuild it.\n`;
+  fs.writeFileSync(readme, was);
+  const before = await nowIn(home);
+  assert.equal((before.spec as { needs?: unknown }).needs, undefined, 'the current read says the needs in the README alone');
+  const { version, spec } = await servedDev(home);
+  await ran(objectWritten({ home }, FACTORY, devProposed(version, { ...spec, needs: [] })));
+  assert.notEqual(fs.readFileSync(readme, 'utf8'), was, 'the proposal changed the README');
+  const after = await nowIn(home);
+  await ran(objectWritten({ home }, FACTORY, devProposed(after.version ?? '', before.spec)));
+  assert.equal(fs.readFileSync(readme, 'utf8'), was, 'the undo, which proposes the spec read before, puts the bytes back');
 });

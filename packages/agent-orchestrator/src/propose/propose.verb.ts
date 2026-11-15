@@ -31,7 +31,6 @@ import { brokenBy } from '../door/door.store.ts';
 import { mayPropose } from '../approval/index.ts';
 import { accessChange, accessOf } from './access.ts';
 import { readmeComposed } from '../folder/folder.ts';
-import { needsDeclaredIn } from '../folder/folder.store.ts';
 import { currentOf, type ProposalNeeds, type ProposalPlace } from './current.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { proposerOf, type ProposalCaller } from '../caller/index.ts';
@@ -213,9 +212,10 @@ const recordOf = (value: unknown): Readonly<Record<string, unknown>> | undefined
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
 
 /**
- * A Workflow's `spec` as its apply writes it over `now`, the spec its folder holds (`currentOf`): its README composed as the write composes
- * it (`readmeComposed`), its `readme` under a frontmatter of its `needs`, each `now`'s where left out, and the needs that README declares,
- * so a proposal that leaves its needs out shows none changed and one that gives others shows them.
+ * A Workflow's `spec` as its apply writes it over `now`, the spec its folder holds (`currentOf`), in `now`'s shape: its `readme` the
+ * README the write composes (`readmeComposed`), its `readme` under a frontmatter of its `needs`, each `now`'s where left out, and no
+ * `needs` apart, since that README declares them. A proposal that leaves its needs out so shows `now`'s frontmatter as it is, and one that
+ * gives others shows them in it.
  */
 const workflowAsWritten = (spec: Readonly<Record<string, unknown>>, now: Readonly<Record<string, unknown>> | undefined): unknown => {
   const was = typeof now?.readme === 'string' ? now.readme : undefined;
@@ -223,9 +223,7 @@ const workflowAsWritten = (spec: Readonly<Record<string, unknown>>, now: Readonl
   const needs = Array.isArray(spec.needs) ? (spec.needs as readonly Need[]) : undefined;
   const readme = readmeComposed(was ?? '', body, needs) ?? was;
   const { needs: _given, readme: _readme, ...rest } = spec;
-  if (readme === undefined) return rest;
-  const declared = needsDeclaredIn(readme);
-  return { ...rest, readme, ...(declared.why === undefined && { needs: declared.needs }) };
+  return readme === undefined ? rest : { ...rest, readme };
 };
 
 /**

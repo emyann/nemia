@@ -120,8 +120,8 @@ export const runListOf = Effect.fn('runListOf')(function* <R extends Listed, E, 
 
 /**
  * A page of the store's runs (`runListOf`), listed once through the informer `how.memo` (`storeRunsListed`), the page judged through that
- * one read in one batch (`informedJudgements`), then each run of the page answered as a list says
- * it (`listed`: no harness asked, no drift read). A run's object built on the judgement the informer holds is kept beside it
+ * one read in one batch (`informedJudgements`), then each run of the page answered as a list says it (`listed`: no harness asked, no
+ * drift read, no step's artifacts folder read). A run's object built on the judgement the informer holds is kept beside it
  * (`keepObject`) and served while that judgement is (`keptObject`), its disk parts read now (`diskPartsOf`), each workflow folder loaded
  * once a request (`folderReader`). An object built on a read that failed (`readFailed`) is not kept. Under `how.verify`, an object
  * served from memory is built afresh too, and one that differs dies. A program over the engine, the place, the informer and the
@@ -152,10 +152,11 @@ export const runList = Effect.fn('runList')(function* (e: Engine, how: SummaryHo
 const notJudged = (run: Pick<Run, 'id'>) => Effect.die(new Error(`Run ${run.id} was handed to its judgement and not judged.`));
 
 /**
- * How a run's listed object is answered (`listed`: no harness asked, no drift read) off its `judgement`: the
- * object kept beside that judgement (`keptObject`), before its disk parts (`runObjectCore`), with them read now and laid over
- * (`withDiskParts`), or one built and its core kept (`keepObject`) where none is and its read did not fail (`readFailed`). Under `verify`,
- * one served from memory is built afresh too, and one that differs dies. Each workflow folder is loaded once a request (`folderReader`).
+ * How a run's listed object is answered (`listed`: no harness asked, no drift read, no step's artifacts folder read) off its `judgement`:
+ * the object kept beside that judgement (`keptObject`), before its disk parts (`runObjectCore`), with them read now and laid over
+ * (`withDiskParts`), or one built and its core kept (`keepObject`) where none is and its read did not fail (`readFailed`). Under
+ * `verify`, one served from memory is built afresh too, and one that differs dies. Each workflow folder is loaded once a request
+ * (`folderReader`).
  */
 const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verify: boolean, git: BranchReader) => {
   const folders = folderReader(home);
@@ -164,14 +165,14 @@ const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verif
       const steps = yield* stepsReadingOf(e, home, run, one, folders(run), git);
       if ('unjudged' in steps) return { core: undefined, answer: steps, failed: false };
       const core = yield* runObjectCore(run, runReadingOf(steps), { said: reads.memo.said, listed: true });
-      return { core, answer: withDiskParts(core, diskPartsOf(run, home, folders(run))), failed: readFailed(steps) };
+      return { core, answer: withDiskParts(core, diskPartsOf(run, home, folders(run), true)), failed: readFailed(steps) };
     });
   return (run: Run, judgement: Judgement) =>
     Effect.gen(function* () {
       const kept = keptObject(memo, run.id, judgement);
       if (kept !== undefined) {
         memo.objectHits++;
-        const parts = diskPartsOf(run, home, folders(run));
+        const parts = diskPartsOf(run, home, folders(run), true);
         if (verify) {
           const fresh = yield* built(run, { judgement });
           if (!isDeepStrictEqual(withDiskParts(kept, parts), fresh.answer))

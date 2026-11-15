@@ -5,15 +5,16 @@
 import type { Refusal } from './fence.ts';
 
 /**
- * The six reads, the run's object counted twice, the old list of summaries beside the RunList (its yardstick), the list, an open run
- * and the inbox read again after a pass, and her chat's three (its history, the old beat's whole re-projection and the fold of one
- * moment of her session), and the factory's reads the board polls (the list, one factory, its commands, its schedules, hires, volumes
- * and MCP servers) and the ceilings: `measures`' keys.
+ * The six reads, the run list asked again at the old default page of 100, the run's object counted twice, the old list of summaries
+ * beside the RunList (its yardstick), the list, an open run and the inbox read again after a pass, and her chat's three (its history, the
+ * old beat's whole re-projection and the fold of one moment of her session), and the factory's reads the board polls (the list, one
+ * factory, its commands, its schedules, hires, volumes and MCP servers) and the ceilings: `measures`' keys.
  */
 export const MEASURES = [
   'tickPass',
   'tickPassInformed',
   'runList',
+  'runListHundred',
   'runSummaries',
   'stats',
   'finishedRun',
@@ -43,8 +44,11 @@ export type MeasureKey = (typeof MEASURES)[number];
 /** One read's cost: the median of its calls in milliseconds, and the median heap it left held after a collection, in megabytes. */
 export type Timed = { ms: number; heapMb: number };
 
-/** A read cold and warm, and the median count of run records (`runs/<id>.json`) one call read, where it was counted. */
-export type Measured = { cold: Timed; warm: Timed; records?: { cold: number; warm: number } };
+/**
+ * A read cold and warm, the median count of run records (`runs/<id>.json`) one call read, where it was counted, and the length of its
+ * answer's JSON in bytes, where it was measured (a baseline before it has none).
+ */
+export type Measured = { cold: Timed; warm: Timed; records?: { cold: number; warm: number }; bytes?: number };
 /** What the report says, as `--json` writes it and `--compare` reads it. */
 export type StoreMeasure = {
   /** `load` is the machine's five-minute load average as the measure ends: numbers taken under another's load are not a baseline. */
@@ -89,6 +93,7 @@ export type StoreMeasure = {
 
 const ms = (n: number) => n.toFixed(1);
 const mb = (n: number) => (n / 1e6).toFixed(1);
+const kb = (m: Measured | null | undefined) => (m?.bytes !== undefined ? (m.bytes / 1e3).toFixed(1) : '—');
 
 /** The report as markdown. */
 export function rendered(report: StoreMeasure): string {
@@ -96,8 +101,8 @@ export function rendered(report: StoreMeasure): string {
   const row = (key: MeasureKey) => {
     const m = report.measures[key];
     return m === null
-      ? `| ${key} | — | — | — | — | — |`
-      : `| ${key} | ${ms(m.cold.ms)} | ${m.cold.heapMb.toFixed(1)} | ${ms(m.warm.ms)} | ${m.warm.heapMb.toFixed(1)} | ${m.records ? `${m.records.cold} / ${m.records.warm}` : '—'} |`;
+      ? `| ${key} | — | — | — | — | — | — |`
+      : `| ${key} | ${ms(m.cold.ms)} | ${m.cold.heapMb.toFixed(1)} | ${ms(m.warm.ms)} | ${m.warm.heapMb.toFixed(1)} | ${m.records ? `${m.records.cold} / ${m.records.warm}` : '—'} | ${kb(m)} |`;
   };
   return [
     `store measure of ${report.from} (${report.engine}), copied: ${report.copy.files} files, ${mb(report.copy.bytes)} MB in ${(report.copy.ms / 1000).toFixed(0)} s, without ${report.copy.leftOut.join(', ') || 'nothing'}`,
@@ -105,8 +110,8 @@ export function rendered(report: StoreMeasure): string {
     `${report.machine.cpu}, ${report.machine.cores} cores, ${mb(report.machine.memoryBytes)} MB, node ${report.machine.node}, load ${report.machine.load}; commit ${report.commit.slice(0, 12)}; ${report.date}; median of ${report.repeat}`,
     `runs read: finished ${report.asked.finishedRun ?? '—'}, open ${report.asked.openRun ?? '—'}; feed from byte ${report.asked.feedCursor}, ${report.asked.feedLinesRead} lines; her chat: task ${report.asked.chat?.task ?? '—'}, ${report.asked.chat?.events ?? 0} events listed, cursor ${report.asked.chat?.cursor ?? '—'}`,
     '',
-    '| read | cold ms | cold heap MB | warm ms | warm heap MB | run records read, cold / warm |',
-    '| --- | ---: | ---: | ---: | ---: | ---: |',
+    '| read | cold ms | cold heap MB | warm ms | warm heap MB | run records read, cold / warm | answer KB |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...MEASURES.map(row),
     '',
     `spawned: ${
@@ -130,11 +135,11 @@ export function comparedWith(now: StoreMeasure, baseline: StoreMeasure): string 
   return [
     `against ${baseline.commit.slice(0, 12)} of ${baseline.date}: ${now.counts.runs} runs now, ${baseline.counts.runs} then; ${now.counts.tasks} tasks now, ${baseline.counts.tasks} then; ${now.counts.cards.listed} cards now, ${baseline.counts.cards?.listed ?? '—'} then`,
     '',
-    '| read | cold ms | baseline | ratio | warm ms | baseline | ratio | records read now | baseline |',
-    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+    '| read | cold ms | baseline | ratio | warm ms | baseline | ratio | records read now | baseline | answer KB now | baseline |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...MEASURES.map(
       (key) =>
-        `| ${key} | ${cell(now.measures[key], baseline.measures?.[key], 'cold')} | ${cell(now.measures[key], baseline.measures?.[key], 'warm')} | ${records(now.measures[key])} | ${records(baseline.measures?.[key])} |`,
+        `| ${key} | ${cell(now.measures[key], baseline.measures?.[key], 'cold')} | ${cell(now.measures[key], baseline.measures?.[key], 'warm')} | ${records(now.measures[key])} | ${records(baseline.measures?.[key])} | ${kb(now.measures[key])} | ${kb(baseline.measures?.[key])} |`,
     ),
   ].join('\n');
 }

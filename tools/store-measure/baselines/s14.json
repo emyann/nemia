@@ -1,0 +1,402 @@
+{
+  "machine": {
+    "cpu": "AMD EPYC-Genoa Processor",
+    "cores": 8,
+    "memoryBytes": 16366510080,
+    "node": "v24.16.0",
+    "platform": "linux",
+    "load": 2.91
+  },
+  "commit": "5b40d6d391366e2faf18154bab65c9fb63d0161d",
+  "date": "2026-11-15T00:32:06.237Z",
+  "repeat": 5,
+  "from": "~/.agent-workflows",
+  "engine": "~/.agent-workflows/runs/api-a-list-of-runs-answers-i-5guq/artifacts/implement/scratch/ae-empty",
+  "copy": {
+    "files": 559173,
+    "bytes": 9448979476,
+    "ms": 119419.42155599999,
+    "leftOut": [
+      "daemon.json",
+      "engine/a2a",
+      "worktrees"
+    ]
+  },
+  "counts": {
+    "runs": 105,
+    "finishedRuns": 101,
+    "openRuns": 4,
+    "tasks": 742,
+    "journalBytes": 8698443,
+    "feedLines": 3694,
+    "cards": {
+      "listed": 159,
+      "started": 91
+    },
+    "unreadable": {
+      "runs": 0,
+      "passLines": 0
+    },
+    "invariantRefusals": 0
+  },
+  "asked": {
+    "factory": "design-system",
+    "finishedRun": "api-a-factory-s-own-agent-sh-tk5p",
+    "openRun": "api-a-served-file-names-its-vu11",
+    "feedCursor": 1379780,
+    "feedLinesRead": 1000,
+    "chat": {
+      "task": "nemia-20261114075533831",
+      "events": 1,
+      "cursor": "0.0.0.1.0.0.0.0.0"
+    }
+  },
+  "measures": {
+    "runList": {
+      "cold": {
+        "ms": 521.0803549999982,
+        "heapMb": 21.688192
+      },
+      "warm": {
+        "ms": 167.06714199999988,
+        "heapMb": 0.75664
+      },
+      "records": {
+        "cold": 106,
+        "warm": 88
+      },
+      "bytes": 426923
+    },
+    "runListHundred": {
+      "cold": {
+        "ms": 1810.563558000009,
+        "heapMb": 81.408728
+      },
+      "warm": {
+        "ms": 183.5304420000175,
+        "heapMb": 2.90168
+      },
+      "records": {
+        "cold": 106,
+        "warm": 11
+      },
+      "bytes": 1943247
+    },
+    "runSummaries": {
+      "cold": {
+        "ms": 1498.9050399999833,
+        "heapMb": 80.965944
+      },
+      "warm": {
+        "ms": 117.01952299999539,
+        "heapMb": 0.1938
+      },
+      "records": {
+        "cold": 106,
+        "warm": 6
+      },
+      "bytes": 73425
+    },
+    "stats": {
+      "cold": {
+        "ms": 7088.612406,
+        "heapMb": 53.888144
+      },
+      "warm": {
+        "ms": 333.8458779999928,
+        "heapMb": 0.254712
+      },
+      "records": {
+        "cold": 105,
+        "warm": 4
+      },
+      "bytes": 47289
+    },
+    "finishedRun": {
+      "cold": {
+        "ms": 112.4528799999971,
+        "heapMb": 1.069168
+      },
+      "warm": {
+        "ms": 98.75658600000315,
+        "heapMb": 0.117648
+      },
+      "records": {
+        "cold": 1,
+        "warm": 1
+      },
+      "bytes": 30239
+    },
+    "openRun": {
+      "cold": {
+        "ms": 137.24530199999572,
+        "heapMb": 0.512808
+      },
+      "warm": {
+        "ms": 118.11866500001634,
+        "heapMb": 0.099784
+      },
+      "records": {
+        "cold": 107,
+        "warm": 107
+      },
+      "bytes": 10745
+    },
+    "feedFromCursor": {
+      "cold": {
+        "ms": 38.027911999990465,
+        "heapMb": 0.156472
+      },
+      "warm": {
+        "ms": 36.82303200001479,
+        "heapMb": 0.077032
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      }
+    },
+    "tickPass": {
+      "cold": {
+        "ms": 1274.772277000011,
+        "heapMb": 0.286776
+      },
+      "warm": {
+        "ms": 228.94905799999833,
+        "heapMb": 0.326352
+      }
+    },
+    "tickPassInformed": {
+      "cold": {
+        "ms": 2413.318603999971,
+        "heapMb": 4.998856
+      },
+      "warm": {
+        "ms": 308.181734999991,
+        "heapMb": 0.350472
+      }
+    },
+    "runListAfterPass": {
+      "cold": {
+        "ms": 145.9300140000123,
+        "heapMb": 1.2768
+      },
+      "warm": {
+        "ms": 49.225138999987394,
+        "heapMb": 0.687624
+      },
+      "records": {
+        "cold": 1,
+        "warm": 0
+      },
+      "bytes": 426923
+    },
+    "openRunAfterPass": {
+      "cold": {
+        "ms": 141.20809400000144,
+        "heapMb": 0.137384
+      },
+      "warm": {
+        "ms": 24.01061500000651,
+        "heapMb": 0.06576
+      },
+      "records": {
+        "cold": 107,
+        "warm": 1
+      },
+      "bytes": 10745
+    },
+    "inbox": {
+      "cold": {
+        "ms": 1501.6685590000125,
+        "heapMb": 81.726336
+      },
+      "warm": {
+        "ms": 183.3351729999995,
+        "heapMb": 1.183672
+      },
+      "records": {
+        "cold": 106,
+        "warm": 6
+      },
+      "bytes": 518241
+    },
+    "inboxAfterPass": {
+      "cold": {
+        "ms": 228.06870199996047,
+        "heapMb": 2.303256
+      },
+      "warm": {
+        "ms": 106.07229300000472,
+        "heapMb": 1.118496
+      },
+      "records": {
+        "cold": 1,
+        "warm": 0
+      },
+      "bytes": 518241
+    },
+    "chatHistory": {
+      "cold": {
+        "ms": 1429.2454060000018,
+        "heapMb": 0.287608
+      },
+      "warm": {
+        "ms": 95.27215999999316,
+        "heapMb": 0.123336
+      }
+    },
+    "chatBeatBefore": {
+      "cold": {
+        "ms": 1388.2420789999887,
+        "heapMb": 0.369744
+      },
+      "warm": {
+        "ms": 93.02312099997653,
+        "heapMb": 0.109272
+      }
+    },
+    "chatFoldStep": null,
+    "factoryList": {
+      "cold": {
+        "ms": 68.48659400001634,
+        "heapMb": 0.05124
+      },
+      "warm": {
+        "ms": 74.17527200002223,
+        "heapMb": 0.021048
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 8829
+    },
+    "factoryGet": {
+      "cold": {
+        "ms": 24.730802999984007,
+        "heapMb": 0.020176
+      },
+      "warm": {
+        "ms": 24.442619999987073,
+        "heapMb": 0.011168
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 2221
+    },
+    "factoryCommands": {
+      "cold": {
+        "ms": 4.108227000047918,
+        "heapMb": -0.00276
+      },
+      "warm": {
+        "ms": 2.8480250000138767,
+        "heapMb": -0.0138
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 378
+    },
+    "scheduleList": {
+      "cold": {
+        "ms": 90.95753199997125,
+        "heapMb": 0.103552
+      },
+      "warm": {
+        "ms": 7.993949000025168,
+        "heapMb": 0.001064
+      },
+      "records": {
+        "cold": 105,
+        "warm": 0
+      },
+      "bytes": 94
+    },
+    "hireList": {
+      "cold": {
+        "ms": 40.02422799996566,
+        "heapMb": 0.18284
+      },
+      "warm": {
+        "ms": 33.37117200001376,
+        "heapMb": 0.120448
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 13465
+    },
+    "volumeList": {
+      "cold": {
+        "ms": 91.55715299997246,
+        "heapMb": 0.026232
+      },
+      "warm": {
+        "ms": 88.08258600003319,
+        "heapMb": 0.04396
+      },
+      "records": {
+        "cold": 105,
+        "warm": 105
+      },
+      "bytes": 92
+    },
+    "mcpServerList": {
+      "cold": {
+        "ms": 3.633205000020098,
+        "heapMb": 0.01908
+      },
+      "warm": {
+        "ms": 3.15091999998549,
+        "heapMb": 0.00124
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 95
+    },
+    "ceilings": {
+      "cold": {
+        "ms": 87.97129899996798,
+        "heapMb": 0.025416
+      },
+      "warm": {
+        "ms": 85.68674999999348,
+        "heapMb": 0.032208
+      },
+      "records": {
+        "cold": 105,
+        "warm": 105
+      },
+      "bytes": 1174
+    },
+    "ceilingsAfterPass": {
+      "cold": {
+        "ms": 88.15415899996879,
+        "heapMb": -0.381056
+      },
+      "warm": {
+        "ms": 84.87416399997892,
+        "heapMb": 0.030264
+      },
+      "records": {
+        "cold": 105,
+        "warm": 105
+      },
+      "bytes": 1173
+    }
+  },
+  "spawned": {
+    "git read (read)": 138,
+    "git read (pass)": 50
+  },
+  "placeRefused": {},
+  "refusals": []
+}

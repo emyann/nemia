@@ -8,11 +8,12 @@
  *
  * `runListOf` is the RunList (`GET /api/runs`), plain and its first page (`LIST_PAGE`) unless a query says otherwise: its items are
  * `Run` objects, a run read by `metadata.name`, `spec.*` and `status.*`, and beside them the runs it leaves unjudged (`unjudged`, each
- * with why). `listedOf` is one run of the plain list, `unjudgedOf` why the list leaves one unjudged, and `framedOf` one run as a list
- * asked by state has it, with the board's frame parts (`status.state`, `wallMs`, `clock`, …).
+ * with why). `listedRuns` is every run of the plain list, on a page of the most a list answers where the query asks no `limit`,
+ * `listedOf` one run of it, `unjudgedOf` why the list leaves one unjudged, and `framedOf` one run as a list asked by state has it,
+ * with the board's frame parts (`status.state`, `wallMs`, `clock`, …).
  */
 import type { RunObject } from 'agent-orchestrator';
-import type { Run, RunList } from 'objects';
+import { LIST_PAGE, type Run, type RunList } from 'objects';
 import type { Run as RunAnswer, RunLines as RunLinesAnswer } from 'objects';
 
 /** What a test reads through: the app, or anything that answers a request as it does. */
@@ -73,22 +74,26 @@ export const linesOf = async (app: Asked, id: string): Promise<RunLinesAnswer> =
   (await ok(app, `/api/runs/${encodeURIComponent(id)}/lines`)) as RunLinesAnswer;
 
 /**
- * The RunList `GET /api/runs` answers with `query` (`labelSelector=`, `fieldSelector=`, … without its `?`): its first page, a hundred
- * runs, where it says no limit.
+ * The RunList `GET /api/runs` answers with `query` (`labelSelector=`, `fieldSelector=`, … without its `?`): its first
+ * page, `LIST_PAGE.byDefault` runs, where it says no limit.
  */
 export const runListOf = async (app: Asked, query = ''): Promise<RunList> =>
   (await ok(app, `/api/runs${query === '' ? '' : `?${query.replace(/^\?/, '')}`}`)) as RunList;
 
-/** Every run the plain RunList judges (`items`), in its order: none of those it leaves unjudged. */
-export const listedRuns = async (app: Asked, query = ''): Promise<Run[]> => [...(await runListOf(app, query)).items];
+/** `query` asking a page of the most a list answers (`LIST_PAGE.most`) where it asks no `limit` of its own: every run of a test's store. */
+const everyRun = (query: string): string =>
+  /(^|[?&])limit=/.test(query) ? query : [query.replace(/^\?/, ''), `limit=${LIST_PAGE.most}`].filter(Boolean).join('&');
+
+/** Every run the plain RunList judges (`items`), in its order, on a page of the most a list answers: none of those it leaves unjudged. */
+export const listedRuns = async (app: Asked, query = ''): Promise<Run[]> => [...(await runListOf(app, everyRun(query))).items];
 
 /** Why the plain RunList leaves the run `name` unjudged (its `unjudged` entry's `error`); null where it has no such entry. */
 export const unjudgedOf = async (app: Asked, name: string): Promise<string | null> =>
-  (await runListOf(app)).unjudged?.find((entry) => entry.name === name)?.error ?? null;
+  (await runListOf(app, everyRun(''))).unjudged?.find((entry) => entry.name === name)?.error ?? null;
 
 /** The run `name` as the plain RunList judges it, thrown where the list does not hold it judged. */
 export async function listedOf(app: Asked, name: string): Promise<Run> {
-  const list = await runListOf(app);
+  const list = await runListOf(app, everyRun(''));
   const run = list.items.find((item) => item.metadata.name === name);
   if (run) return run;
   const unjudged = list.unjudged?.find((entry) => entry.name === name);

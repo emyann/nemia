@@ -16,7 +16,9 @@
  *   read of git, a write outside the copy and a signal (`installFence`). What the pass files lands in the copy's journals and goes no
  *   further.
  * - `runList`, `stats`: `GET /api/runs` and `GET /api/stats`, asked of the api in this process (`app.request`), over an app built
- *   afresh for each cold call (its `ReadMemo` new) and kept for the warm ones.
+ *   afresh for each cold call (its `ReadMemo` new) and kept for the warm ones. `runListHundred`: `GET /api/runs?limit=100`, the same
+ *   way, the page the list answered by default before it answered 20, so a `--compare` against a baseline before tells the page's cut
+ *   from the item's.
  * - `runSummaries`: the board's frame read, the RunList asked by state (`GET /api/runs?fieldSelector=status.state!=finished`), which
  *   judges every run to count it, over apps as `runList` is, kept under the key the baselines timed `GET /api/runs-summaries` by, the
  *   read it replaced, so a `--compare` reads the frame's time against the old summaries' on one store.
@@ -42,8 +44,9 @@
  *   before her chat was followed. `chatBeatBefore` is `followChat`'s `first` from the cursor that history gave, its follow none: the same
  *   reads and the same answer as the old stream's beat, the whole re-projection it paid every 2 s per open stream. `chatFoldStep` is
  *   what a follower pays now for one moment of her session (`chatFold`): `followChat`'s `rest`, after a listing not timed, run until the
- *   first thing it sends, its follow handing one `events` moment of one new event; null where no session of hers is filed. Its time holds
- *   the rest's start too (the follow of the feed, the look at the files), so it bounds the fold from above.
+ *   first thing it sends, its follow handing one `events` moment of one new event; null where no session of hers is filed, or where
+ *   the task her level file names has no journal in the copy (pruned), since a follow of a task the engine lacks sends nothing. Its
+ *   time holds the rest's start too (the follow of the feed, the look at the files), so it bounds the fold from above.
  *
  * - `factoryList`, `factoryGet`, `factoryCommands`, `scheduleList`, `hireList`, `volumeList`, `mcpServerList`: `GET /api/factories`,
  *   and of the copy's first factory but the default by name, `GET /api/factories/:name`, `…/commands` and
@@ -51,7 +54,9 @@
  *   factory of its own. `ceilings`: `GET /api/ceilings`, the same way, and `ceilingsAfterPass` the same asked after a pass has filled the
  *   app's informer, as `runListAfterPass` is.
  *
- * Each read over apps carries the run records (`runs/<id>.json`) one call read, cold and warm (`records`), counted on a call of its own.
+ * Each read over apps carries the run records (`runs/<id>.json`) one call read, cold and warm (`records`), counted on a call of its own,
+ * and the length of that call's answer as JSON (`bytes`). The runs the reads pick, the cards and the factories are listed at the most a
+ * page answers (`limit=500`), so the default page cuts none of them.
  *
  * Beside the numbers: the runs, finished and open, the inbox's cards and those a run was started from, the runtime's tasks and their
  * journals' bytes, the runs whose tasks did not read and the pass's unreadable lines, and `invariantRefusals`, the records the Run model
@@ -252,7 +257,7 @@ async function overApps(fresh: () => Promise<Built>, read: (app: App) => Promise
     await runtime.dispose();
   }
   const counted = await fresh();
-  const coldRecords = (await recordsReadBy(() => read(counted.app))).records;
+  const { value: answered, records: coldRecords } = await recordsReadBy(() => read(counted.app));
   await counted.runtime.dispose();
   const { app, runtime } = await fresh();
   await read(app);
@@ -260,7 +265,8 @@ async function overApps(fresh: () => Promise<Built>, read: (app: App) => Promise
   for (let i = 0; i < repeat; i++) warm.push(await timed(() => read(app)));
   const warmRecords = (await recordsReadBy(() => read(app))).records;
   await runtime.dispose();
-  return { cold: medianOf(cold), warm: medianOf(warm), records: { cold: coldRecords, warm: warmRecords } };
+  const bytes = answered === undefined ? {} : { bytes: Buffer.byteLength(JSON.stringify(answered)) };
+  return { cold: medianOf(cold), warm: medianOf(warm), records: { cold: coldRecords, warm: warmRecords }, ...bytes };
 }
 
 /** Where the feed's read starts and ends, and how many lines the last read of it took. */
@@ -379,8 +385,8 @@ const passedOver = (orch: Orchestrator, place: Place, fence: Fence, env: CopyEnv
   return built;
 };
 
-/** The inbox, every card: the route ignores `all` where it does not read it, and lists every card then too. */
-const INBOX_URL = '/api/cards';
+/** The inbox, every card: a page of the most a list answers, so a default page smaller than the store's cards cuts none. */
+const INBOX_URL = '/api/cards?limit=500';
 
 /** How long `chatFold` waits for the moment it hands to be sent: a fold that sends nothing (no session of hers to fold into) is null. */
 const FOLD_BOUND_MS = 10_000;
@@ -460,12 +466,13 @@ async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, env:
     return { cold: medianOf(cold), warm: medianOf(warm) };
   };
   const task = orch.nemiaChatPlace(root).task ?? null;
+  const journalled = task !== null && fs.existsSync(path.join(root, 'engine', 'tasks', `${task}.jsonl`));
   return {
     asked: { task, events: listed.events.length, cursor: listed.cursor },
     measures: {
       chatHistory: await over(history),
       chatBeatBefore: await over(async (at) => (await followed(at, none)).first),
-      chatFoldStep: task === null ? null : await foldOver(),
+      chatFoldStep: journalled ? await foldOver() : null,
     },
   };
 }
@@ -504,11 +511,11 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   const fresh = () => appOver(api, orch, place, env);
   const { repeat } = asked;
   const first = await fresh();
-  const { runs: listing, unjudged } = listedOf(await get(first.app, '/api/runs'));
+  const { runs: listing, unjudged } = listedOf(await get(first.app, '/api/runs?limit=500'));
   const finishedRun = newestOf(listing, true);
   const openRun = newestOf(listing, false);
   const cards = ((await get(first.app, INBOX_URL)) as { items: { status: { runs: readonly string[] } }[] }).items;
-  const factory = ((await get(first.app, '/api/factories')) as { items: { metadata: { name: string } }[] }).items
+  const factory = ((await get(first.app, '/api/factories?limit=500')) as { items: { metadata: { name: string } }[] }).items
     .map((f) => f.metadata.name)
     .find((name) => name !== 'default');
   await first.runtime.dispose();
@@ -520,6 +527,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     id === null ? null : overApps(over, (app) => get(app, `/api/runs/${encodeURIComponent(id)}`), repeat);
   const measures: Record<MeasureKey, Measured | null> = {
     runList: await overApps(fresh, (app) => get(app, '/api/runs'), repeat),
+    runListHundred: await overApps(fresh, (app) => get(app, '/api/runs?limit=100'), repeat),
     runSummaries: await overApps(fresh, (app) => get(app, '/api/runs?fieldSelector=status.state!%3Dfinished'), repeat),
     stats: await overApps(fresh, (app) => get(app, '/api/stats'), repeat),
     finishedRun: await objectOf(finishedRun),
@@ -534,7 +542,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     chatHistory: null,
     chatBeatBefore: null,
     chatFoldStep: null,
-    factoryList: await overApps(fresh, (app) => get(app, '/api/factories'), repeat),
+    factoryList: await overApps(fresh, (app) => get(app, '/api/factories?limit=500'), repeat),
     factoryGet: await ofFactory((f) => `/api/factories/${f}`),
     factoryCommands: await ofFactory((f) => `/api/factories/${f}/commands`),
     scheduleList: await ofFactory((f) => `/api/namespaces/${f}/schedules`),

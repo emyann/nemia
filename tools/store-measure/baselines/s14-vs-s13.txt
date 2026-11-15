@@ -1,0 +1,31 @@
+s14 (the list's page of 20, a list item without each step's artifacts folder) against the measure taken minutes before on the same copy, at b798ca9cc (the base with only the measure's own changes): ~/.agent-workflows of 105 runs (101 finished, 4 open), 738 tasks, 159 cards; this machine has no ~/.agent-engine, so --engine named an empty folder (the journals are under the workflows' store). Load 6.7 before, 2.91 after; median of 5. runListHundred is GET /api/runs?limit=100, the old default page, so its ratio is the item's cut alone and runList's the page's and the item's together. s13 (296 runs, 2026-11-06) is another store, so the before-measure is the like-for-like baseline: its JSON is handed over beside this run's artifacts.
+
+against b798ca9cc61b of 2026-11-15T00:08:37.660Z: 105 runs now, 105 then; 742 tasks now, 738 then; 159 cards now, 159 then
+
+| read | cold ms | baseline | ratio | warm ms | baseline | ratio | records read now | baseline | answer KB now | baseline |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| tickPass | 1274.8 | 1343.4 | ×0.95 | 228.9 | 225.9 | ×1.01 | — | — | — | — |
+| tickPassInformed | 2413.3 | 2510.4 | ×0.96 | 308.2 | 305.9 | ×1.01 | — | — | — | — |
+| runList | 521.1 | 1981.7 | ×0.26 | 167.1 | 248.1 | ×0.67 | 106 / 88 | 106 / 11 | 426.9 | 2408.6 |
+| runListHundred | 1810.6 | 1973.4 | ×0.92 | 183.5 | 249.7 | ×0.73 | 106 / 11 | 106 / 11 | 1943.2 | 2408.6 |
+| runSummaries | 1498.9 | 1614.0 | ×0.93 | 117.0 | 144.8 | ×0.81 | 106 / 6 | 106 / 6 | 73.4 | 78.1 |
+| stats | 7088.6 | 7078.9 | ×1.00 | 333.8 | 344.4 | ×0.97 | 105 / 4 | 105 / 4 | 47.3 | 47.3 |
+| finishedRun | 112.5 | 114.4 | ×0.98 | 98.8 | 97.8 | ×1.01 | 1 / 1 | 1 / 1 | 30.2 | 30.2 |
+| openRun | 137.2 | 127.8 | ×1.07 | 118.1 | 122.7 | ×0.96 | 107 / 107 | 107 / 107 | 10.7 | 10.7 |
+| feedFromCursor | 38.0 | 37.7 | ×1.01 | 36.8 | 36.2 | ×1.02 | 0 / 0 | 0 / 0 | — | — |
+| runListAfterPass | 145.9 | 539.6 | ×0.27 | 49.2 | 146.9 | ×0.34 | 1 / 0 | 1 / 0 | 426.9 | 2408.6 |
+| openRunAfterPass | 141.2 | 156.4 | ×0.90 | 24.0 | 25.1 | ×0.96 | 107 / 1 | 107 / 1 | 10.7 | 10.7 |
+| inbox | 1501.7 | 1682.9 | ×0.89 | 183.3 | 177.7 | ×1.03 | 106 / 6 | 106 / 6 | 518.2 | 518.2 |
+| inboxAfterPass | 228.1 | 247.8 | ×0.92 | 106.1 | 110.9 | ×0.96 | 1 / 0 | 1 / 0 | 518.2 | 518.2 |
+| chatHistory | 1429.2 | 1771.6 | ×0.81 | 95.3 | 138.6 | ×0.69 | — | — | — | — |
+| chatBeatBefore | 1388.2 | 1679.6 | ×0.83 | 93.0 | 112.6 | ×0.83 | — | — | — | — |
+| chatFoldStep | — | — | — | — | — | — | — | — | — | — |
+| factoryList | 68.5 | 93.3 | ×0.73 | 74.2 | 89.3 | ×0.83 | 0 / 0 | 0 / 0 | 8.8 | 8.8 |
+| factoryGet | 24.7 | 28.0 | ×0.88 | 24.4 | 31.6 | ×0.77 | 0 / 0 | 0 / 0 | 2.2 | 2.2 |
+| factoryCommands | 4.1 | 3.6 | ×1.15 | 2.8 | 2.8 | ×1.00 | 0 / 0 | 0 / 0 | 0.4 | 0.4 |
+| scheduleList | 91.0 | 93.2 | ×0.98 | 8.0 | 9.4 | ×0.85 | 105 / 0 | 105 / 0 | 0.1 | 0.1 |
+| hireList | 40.0 | 39.9 | ×1.00 | 33.4 | 36.2 | ×0.92 | 0 / 0 | 0 / 0 | 13.5 | 13.5 |
+| volumeList | 91.6 | 92.8 | ×0.99 | 88.1 | 91.0 | ×0.97 | 105 / 105 | 105 / 105 | 0.1 | 0.1 |
+| mcpServerList | 3.6 | 4.1 | ×0.89 | 3.2 | 3.5 | ×0.91 | 0 / 0 | 0 / 0 | 0.1 | 0.1 |
+| ceilings | 88.0 | 88.7 | ×0.99 | 85.7 | 84.2 | ×1.02 | 105 / 105 | 105 / 105 | 1.2 | 1.2 |
+| ceilingsAfterPass | 88.2 | 86.4 | ×1.02 | 84.9 | 98.2 | ×0.86 | 105 / 105 | 105 / 105 | 1.2 | 1.2 |

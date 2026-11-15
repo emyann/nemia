@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { notStarted } from '../../../src/lib/inbox.ts';
-import type { CardList } from 'objects';
+import { type CardList, LIST_PAGE } from 'objects';
 import { entriesOf } from '../../../src/lib/api/inbox.ts';
 import { openAnswered, pick, photograph, railPlace, sectionsOf, sidebar, startOf, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
@@ -43,7 +43,7 @@ async function answer<T>(page: Page, pathname: string): Promise<T> {
  */
 async function countsAre(page: Page, picked: string | undefined, where: string): Promise<void> {
   const open = await openAnswered(page, picked || undefined);
-  const cards = notStarted(entriesOf(await answer<CardList>(page, '/api/cards')), picked).length;
+  const cards = notStarted(entriesOf(await answer<CardList>(page, `/api/cards?limit=${LIST_PAGE.most}`)), picked).length;
   await expectTexts(
     badgeOf(page, 'Runs'),
     open.counts.waiting ? [String(open.counts.waiting)] : [],

@@ -63,7 +63,7 @@ const described = (field: Node | boolean | undefined, schemas: Readonly<Record<s
   return Boolean(referred?.description?.trim());
 };
 
-/** The schemas a node holds that are no field of their own: an array's items, a record's values, a union's or an intersection's branches. */
+/** The schemas a node holds that are no field of their own: an array's items, a record's values, a union's branches. */
 const held = (node: Node): (Node | boolean | undefined)[] => [
   node.items,
   ...(node.prefixItems ?? []),

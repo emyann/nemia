@@ -203,7 +203,7 @@ const PLANTED = HttpApi.make('planted').add(
 );
 
 test('a key that is an identified schema whole is said by its words, and each member of a union payload by its own', () => {
-  const entry = { usage: '', help: ['a probe'], class: 'write' as const };
+  const entry = { usage: '', help: ['a probe'], class: 'read' as const };
   const [weigh, either] = portTools(
     [],
     [

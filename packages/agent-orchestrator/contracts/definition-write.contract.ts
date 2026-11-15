@@ -91,7 +91,7 @@ const definitionWriteRefusalSpec = spec<
         !(at === 'library' && does === 'replace' && there === 'builtin') || output === null,
     },
     builtinNeverRemoved: {
-      description: 'A removal of a builtin is Invalid: what Nemia ships is never removed from the library',
+      description: 'A removal of a builtin is Invalid: a builtin is never removed from the library',
       condition: ({ input: [at, does, there], output }) =>
         !(at === 'library' && does === 'remove' && there === 'builtin') || output?.kind === 'Invalid',
     },

@@ -214,7 +214,7 @@ async function libraryObjectsOf(s: Served, served: ReturnType<typeof servedOf<Ro
   );
 }
 
-/** The version of Nemia's builtin skill `name` now, or undefined where it ships none. */
+/** The version of Nemia's builtin skill `name` now, or undefined where Nemia builds in none. */
 const builtinVersion = async (s: Served, name: string): Promise<string | undefined> =>
   skillFoldersIn(BUILTIN_SKILLS).includes(name)
     ? ((await skillShownAt(s, path.join(BUILTIN_SKILLS, name))).version ?? undefined)

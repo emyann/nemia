@@ -77,9 +77,9 @@ const LIBRARYS_WAY =
 /** Nothing of that name to change. */
 const NONE = 'Nothing is at that name in the library: list it (`GET /api/<kind>`) for the names it holds, or make it with a POST there.';
 
-/** What Nemia ships is never removed. */
+/** A builtin is never removed. */
 const BUILTIN_KEPT =
-  "What Nemia ships is never removed from the library: write the person's copy of it instead (`PUT /api/<kind>/<name>`), which shadows it.";
+  "A builtin is never removed from the library: write the person's copy of it instead (`PUT /api/<kind>/<name>`), which shadows it.";
 
 /**
  * A library definition a factory uses is not removed.

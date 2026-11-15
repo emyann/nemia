@@ -24,19 +24,20 @@ import { frontmatterKey } from '../former/former.ts';
 import { BUILTIN_SKILLS, REPOSITORY_HOLDER } from '../skills/read.store.ts';
 import { builtinServers, BUILTIN_SERVERS } from '../factory/servers/servers.store.ts';
 import { Effect } from 'effect';
-import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
-import { objectsListed, versionOf, type ObjectQuery } from '../object/listed.verb.ts';
-import { specOf } from '../factory/object/mcp-server.verb.ts';
-import { headersKept, writeRefusal } from '../factory/servers/servers.verb.ts';
-import { factoryServerRefusal, serverNameRefusal } from '../factory/servers/servers.ts';
+import { Missing, type Refusal } from '../refusal/refusal.ts';
+import { objectsListed, type ObjectQuery } from '../object/listed.verb.ts';
 import { tried } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { BuiltinServer, FactoryServer, FactoryServers } from '../factory/servers/servers.ts';
 import { addName, libraryAddRefusal, libraryAddState, libraryAddsOf, sameAdd, type LibraryRef } from './library.ts';
-import { libraryAddsFile, libraryDir, libraryServers, readLibraryAdds, writeLibraryAdds, writeLibraryServers } from './library.store.ts';
+import { libraryAddsFile, libraryDir, libraryServers, readLibraryAdds, writeLibraryAdds } from './library.store.ts';
 
-/** When the factory `name`'s adds were last recorded, or the epoch where they never were. */
-const recordedAt = (home: string, name: string): string =>
+/**
+ * When the factory `name`'s adds were last recorded, or the epoch where they never were.
+ * @param home The store's root.
+ * @param name The factory's name, `default` among them.
+ */
+export const recordedAt = (home: string, name: string): string =>
   (fs.statSync(libraryAddsFile(home, name), { throwIfNoEntry: false })?.mtime ?? new Date(0)).toISOString();
 
 /** A factory's adds, and whether they are its record's (`recorded`) or derived from what its workflows resolve today. */
@@ -264,8 +265,8 @@ export function addedServers(home: string, name: string): FactoryServers {
   const out: Record<string, FactoryServer> = {};
   for (const ref of adds) {
     if (ref.kind !== 'McpServer') continue;
-    const shipped = builtin.find((s) => s.name === ref.name);
-    const server = mine[ref.name] ?? (shipped === undefined ? undefined : withoutName(shipped));
+    const given = builtin.find((s) => s.name === ref.name);
+    const server = mine[ref.name] ?? (given === undefined ? undefined : withoutName(given));
     if (server !== undefined) out[ref.name] = server;
   }
   return out;
@@ -322,81 +323,6 @@ export const libraryAddWritten = (
       );
     return yield* tried(() => writeLibraryAdd(home, factory, does, ref));
   });
-
-/**
- * Where the library holds the server `name`: the user library, Nemia's builtins, or none.
- * @param home The store's root.
- * @param name The server's name.
- */
-export const libraryServerThere = (home: string, name: string): 'user' | 'builtin' | 'none' => {
-  if (libraryServers(home)[name] !== undefined) return 'user';
-  return builtinServers(BUILTIN_SERVERS).some((s) => s.name === name) ? 'builtin' : 'none';
-};
-
-/**
- * The library's MCP servers as objects, in no namespace: the user library's, each header masked, then each builtin no user server of its
- * name shadows, each with the factories that add it.
- * @param home The store's root.
- */
-export function libraryServerObjects(home: string): McpServer[] {
-  const mine = libraryServers(home);
-  const filedAt = recordedAt(home, DEFAULT_NAMESPACE);
-  const own = Object.entries(mine).map(([name, server]) => serverObject(home, name, specOf(server), 'user', filedAt));
-  const builtin = builtinServers(BUILTIN_SERVERS)
-    .filter((s) => mine[s.name] === undefined)
-    .map(({ name, ...server }) => serverObject(home, name, specOf(server, false), 'builtin', filedAt));
-  return [...own, ...builtin].sort((a, b) => (a.metadata.name < b.metadata.name ? -1 : a.metadata.name > b.metadata.name ? 1 : 0));
-}
-
-/** The object of the library server `name` at `origin`, with the factories that add it. */
-const serverObject = (home: string, name: string, spec: McpServer['spec'], origin: 'user' | 'builtin', filedAt: string): McpServer => {
-  const status = { origin, factories: libraryUsers(home, { kind: 'McpServer', name }) };
-  return {
-    apiVersion: API_VERSION,
-    kind: 'McpServer',
-    metadata: { name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, status) },
-    spec,
-    status,
-  };
-};
-
-/**
- * The library's server `name` recorded in the user library from `write`, a header sent as the mask keeping the value held, refused
- * `Invalid` as a factory's server write is.
- * @param home The store's root.
- * @param name The server's name.
- * @param write The server's write as it was sent.
- */
-export function libraryServerWritten(home: string, name: string, write: McpServerWrite): void {
-  const bad = serverNameRefusal(name) ?? writeRefusal(write);
-  if (bad !== undefined) throw new Invalid({ message: bad });
-  const { type, ...rest } = write;
-  const server = { ...rest, type: type ?? 'http' };
-  const refused = factoryServerRefusal(server);
-  if (refused !== undefined) throw new Invalid({ message: `${refused} Nothing was recorded.` });
-  const mine = libraryServers(home);
-  writeLibraryServers(home, { ...mine, [name]: headersKept(server, mine[name]) });
-}
-
-/**
- * The user library's server `name` taken off its record; nothing where it holds none.
- * @param home The store's root.
- * @param name The server's name.
- */
-export function libraryServerRemoved(home: string, name: string): void {
-  const { [name]: _gone, ...rest } = libraryServers(home);
-  writeLibraryServers(home, rest);
-}
-
-/**
- * A page of the library's MCP servers (`McpServerList`), cut by the list's query as every list is (`objectsListed`).
- * @param home The store's root.
- * @param query The list's query: its selector, limit and token.
- */
-export const libraryServerList = Effect.fn('libraryServerList')(function* (home: string, query: ObjectQuery) {
-  const listed: McpServerList = yield* objectsListed('McpServer', libraryServerObjects(home), query, 'library server');
-  return listed;
-});
 
 /**
  * A page of the factory `name`'s adds (`LibraryAddList`), each with its state, cut by the list's query as every list is.

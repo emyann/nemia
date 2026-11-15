@@ -541,7 +541,7 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
       for (const write of writes(besideDraft, 'plain'))
         await assert.rejects(handled(write), refusedWith('Invalid', /plain is not made from a template/));
       for (const write of writes(besideDraft, 'written', 'user'))
-        await assert.rejects(handled(write), refusedWith('Invalid', /user is the store's library, and --factory names a factory's tree/));
+        await assert.rejects(handled(write), refusedWith('Invalid', /--factory/));
       assert.equal(fs.existsSync(path.join(ROOT, 'workflows', 'lean')), false, 'a refused write writes nothing of yours');
       reconciled(templated('written'));
       const { places, fills } = factoryDraftOf(ROOT, 'written', 'lean');

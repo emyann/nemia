@@ -610,13 +610,15 @@ export {
   libraryAddWritten,
   libraryOrigin,
   libraryUsers,
+  refOf,
+  type FactoryAdds,
+} from './library/library.verb.ts';
+export {
   libraryServerList,
   libraryServerObjects,
   libraryServerRemoved,
   libraryServerThere,
   libraryServerWritten,
-  refOf,
-  type FactoryAdds,
-} from './library/library.verb.ts';
+} from './library/library-servers.verb.ts';
 export { builtinCopies, libraryServers, recordBuiltinCopy, writeLibraryServers } from './library/library.store.ts';
 export { addName, type LibraryRef } from './library/library.ts';

@@ -2,7 +2,6 @@ import { Blobatar } from '@blobatar/react';
 import { useGaze } from '@blobatar/react/gaze';
 import type { Expression } from 'blobatar';
 import type { ReactNode } from 'react';
-import { useRouterState } from '@tanstack/react-router';
 import { Link as AriaLink } from 'react-aria-components';
 import { sourceOf, type AgentSkill, type GivenSkill, type SkillSource } from '../../lib/api/library.ts';
 import { type AgentFill, type AgentListing, type AgentUser } from '../../lib/api/agents.ts';
@@ -10,6 +9,8 @@ import { type PagePlace } from '../../lib/api/workflows.ts';
 import { costWords, SOURCE_BADGES } from '../../lib/skills';
 import { cn } from '../../lib/utils';
 import { routeLink } from '../nav/routeLink';
+import { usePagePlace } from '../nav/useSeat';
+import { definitionLink, workflowLink } from '../../lib/factoryAddress';
 import { container, hairline } from '../../lib/meaning';
 import { focusRing } from '../ui/ds/utils';
 
@@ -46,12 +47,10 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
  * step of yours a factory hires it into, in the factory and repository the page is in, the default factory reading no repository.
  */
 function NodeLink({ user }: { user: AgentUser | AgentFill }) {
-  const here = usePlaceHere();
+  const here = usePagePlace();
   return (
     <RouteLink
-      to="/workflows/$from/$workflow/$step"
-      params={{ from: user.from, workflow: user.workflow, step: user.step }}
-      search={user.from === 'yours' && !('hired' in user && user.hired) ? {} : here}
+      {...workflowLink(user.from === 'yours' && !('hired' in user && user.hired) ? {} : here, user.from, user.workflow, user.step)}
       data-node={`${user.workflow}/${user.step}`}
       className={cn('font-mono text-body-small text-foreground', LINK)}
     >
@@ -211,28 +210,8 @@ function FollowingFace({ name, size, plate, expression, className }: Omit<FacePr
 }
 
 /**
- * The search a link to a definition's page carries: for a factory's own or a repository's, which only a factory serves — the default one
- * reading no repository — the place it is read in, `place`, else the one the page is in (`here`); none for yours or Nemia's, which
- * `default` serves whatever factory the link is drawn in.
- */
-const definitionSearch = (from: string, place: PagePlace | undefined, here: PagePlace = {}): PagePlace => {
-  if (from !== 'factory' && from !== 'repo') return {};
-  const { factory, repo } = place ?? here;
-  return { ...(factory !== undefined && { factory }), ...(repo !== undefined && { repo }) };
-};
-
-/** The factory and repository the page is in, read off its address, for a link given no place (`definitionSearch`). */
-function usePlaceHere(): PagePlace {
-  const search: { factory?: unknown; repo?: unknown } = useRouterState({ select: (state) => state.location.search });
-  return {
-    ...(typeof search.factory === 'string' && { factory: search.factory }),
-    ...(typeof search.repo === 'string' && { repo: search.repo }),
-  };
-}
-
-/**
  * A link to an agent's page, by name, its face beside it: what a node's form and a step's page link its agent with, in `place` where the
- * agent is a factory's own or a repository's (`definitionSearch`).
+ * agent is a factory's own or a repository's (`definitionLink`), else the place the page is in.
  */
 export function AgentLink({
   from,
@@ -245,14 +224,12 @@ export function AgentLink({
   className?: string;
   place?: PagePlace;
 }) {
-  const here = usePlaceHere();
+  const here = usePagePlace();
   return (
     <span className="inline-flex items-center gap-1.5 align-middle">
       <AgentFace name={name} size={16} />
       <RouteLink
-        to="/agents/$from/$agent"
-        params={{ from, agent: name }}
-        search={definitionSearch(from, place, here)}
+        {...definitionLink('agent', from, name, place ?? here)}
         data-agent-link={name}
         className={cn('font-mono', LINK, className)}
       >
@@ -306,15 +283,13 @@ export function SkillRefused({ message }: { message: string }) {
 
 /**
  * A link to a skill's page, by its origin and name: what an agent's skills and the Agents page's skills link a skill with, in `place` where
- * the skill is a factory's own or a repository's (`definitionSearch`).
+ * the skill is a factory's own or a repository's (`definitionLink`), else the place the page is in.
  */
 export function SkillLink({ from, name, className, place }: { from: SkillSource; name: string; className?: string; place?: PagePlace }) {
-  const here = usePlaceHere();
+  const here = usePagePlace();
   return (
     <RouteLink
-      to="/agents/skills/$from/$skill"
-      params={{ from, skill: name }}
-      search={definitionSearch(from, place, here)}
+      {...definitionLink('skill', from, name, place ?? here)}
       data-skill-link={name}
       className={cn('font-mono', LINK, className)}
     >
@@ -402,5 +377,17 @@ export function GivenSkills({
         </li>
       ))}
     </ul>
+  );
+}
+
+/** The way back to the Agents page. */
+export function BackToAgents() {
+  return (
+    <RouteLink
+      to="/agents"
+      className="rounded-sm text-body-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+    >
+      ← Agents
+    </RouteLink>
   );
 }

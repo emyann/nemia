@@ -1,5 +1,5 @@
 /**
- * The words of the machine's gauges (`GaugesButton`, `GaugesBar`): what is at work, the daemon's dot, whether the board follows the feed,
+ * The words of the machine's gauges (`MachineBar`, `GaugesBar`): what is at work, the daemon's dot, whether the board follows the feed,
  * the quota in short; the pause says its own (`pauseWords`). Each short form fits one line, and its whole sentence is its `title`. Pure:
  * the time is handed in, the browser's own on the page.
  */
@@ -172,12 +172,15 @@ export function quotaShort(
 
 /**
  * Each place in `source` that sizes a page as the screen less a header alone, a line break inside or not: the old header
- * (`100svh-3rem`), or the top bar without the frame's lines under it (`100svh-var(--frame-top))`). Under the top bar and the lines (a
- * newer release, the setup banner, a refused link) a page is the screen less both, `100svh-var(--frame-top)-var(--frame-lines)`.
+ * (`100svh-3rem`), or the frame's heights without the machine bar's at the foot (`100svh-var(--frame-top)…` with no
+ * `var(--frame-foot)`). Under the page's head and the lines (a newer release, the setup banner, a refused link), and over the machine bar,
+ * a page is the screen less the three, `100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot)`.
  * @param source A source file's text.
  */
 export const staleFrameHeights = (source: string): string[] =>
-  [...source.matchAll(/h-\[calc\(100svh-\s*(?:3rem|var\(--frame-top\))\)\]/g)].map((m) => m[0]);
+  [...source.matchAll(/h-\[calc\(100svh-\s*(3rem|var\(--frame-top\)[^\]]*)\)\]/g)]
+    .filter((m) => m[1] === '3rem' || !m[1]?.includes('var(--frame-foot)'))
+    .map((m) => m[0]);
 
 /**
  * The line that says a newer release is out, where the api read one newer than the release it runs (`latest.newer`): the release, and

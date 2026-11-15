@@ -1,42 +1,23 @@
-import { Bot, ChartColumn, Factory, House, Inbox, List, type LucideIcon, MessageCircle, Settings, Waypoints } from 'lucide-react';
+import { defaultStringifySearch } from '@tanstack/react-router';
+import { BookOpen, Bot, ChartColumn, Factory, Hourglass, type LucideIcon, Settings } from 'lucide-react';
 import { openRunsQuery } from '../../lib/api/runs.ts';
-import { factorySearch } from '../../lib/factories.ts';
 
 /** Whether `path` is `to` or a page under it: `/agents/new` is under `/agents`, `/agentsx` is not. */
 const under = (to: string) => (path: string) => path === to || path.startsWith(`${to}/`);
 
-/** The factory whose own page `path` is, its floor or its settings, `/factories/<name>/settings`; none for any other page. */
-const ownerOf = (path: string): string | undefined => /^\/factories\/([^/]+)(?:\/settings)?$/.exec(path)?.[1];
+/** A destination of the store's rail, by its key. */
+export type RailId = 'factories' | 'waiting' | 'agents' | 'skills' | 'stats' | 'settings';
+
+/** A place of a factory's pane, by its key: the factory's floor, then its lists, then its settings. */
+export type PanePlace = 'floor' | 'runs' | 'inbox' | 'workflows' | 'agents' | 'skills' | 'settings';
 
 /**
- * The pages whose list reads `?factory=` and narrows to the one it names: the Inbox, Runs and Workflows, and Capabilities, which reads
- * the repository of the factory it names.
+ * Where a page sits in the frame: at the store's level, under a destination of the rail or her face (`nemia`, her chat's own page); or at
+ * one factory's level, under a place of its pane.
  */
-const LISTINGS = ['/inbox', '/runs', '/workflows', '/capabilities'] as const;
-
-/** A page of `LISTINGS`. */
-type Listing = (typeof LISTINGS)[number];
-
-/** Whether `path` is the page of a list that reads `?factory=`, itself and not a page under it. */
-const isListing = (path: string): path is Listing => LISTINGS.some((to) => to === path);
-
-/** A workflow's page or a step's, at `path`: its `from`, its workflow and its step, none for a workflow's page; none for any other page. */
-const workflowPageAt = (path: string): { from: string; workflow: string; step?: string } | undefined => {
-  const match = /^\/workflows\/([^/]+)\/([^/]+)(?:\/([^/]+))?$/.exec(path);
-  if (!match) return undefined;
-  const [from, workflow, step] = match.slice(1).map((part) => (part === undefined ? part : decodeURIComponent(part)));
-  return step === undefined ? { from, workflow } : { from, workflow, step };
-};
-
-/**
- * A factory's own agent or skill, at `path`: its name, and the route of its page; none for any other page, and none for a definition of
- * another origin, which is read in `default` whatever factory is picked.
- */
-const ownDefinitionAt = (path: string): { kind: 'agent' | 'skill'; name: string } | undefined => {
-  const match = /^\/agents\/(skills\/)?factory\/([^/]+)$/.exec(path);
-  if (!match) return undefined;
-  return { kind: match[1] ? 'skill' : 'agent', name: decodeURIComponent(match[2] ?? '') };
-};
+export type Seat =
+  | { readonly level: 'store'; readonly rail: RailId | 'nemia' }
+  | { readonly level: 'factory'; readonly factory: string; readonly place: PanePlace };
 
 /**
  * The tabs of Settings, in their order: what is set for the whole store, what the repository offers a step, what the server needs
@@ -60,139 +41,172 @@ type SettingsTab = (typeof SETTINGS_TABS)[number];
 export const tabsOf = (path: string): readonly SettingsTab[] | undefined =>
   SETTINGS_TABS.some((tab) => tab.to === path) ? SETTINGS_TABS : undefined;
 
-/** A destination of the rail: its key, its name, its icon, and which pages light it. */
-export type Destination = { id: string; label: string; icon: LucideIcon; lights: (path: string) => boolean };
+/** The store's pages, each with the rail destination it sits under, in the order they are read: the first that holds the path wins. */
+const STORE_SEATS: readonly { lights: (path: string) => boolean; rail: RailId | 'nemia' }[] = [
+  { lights: (path) => path === '/', rail: 'factories' },
+  { lights: (path) => under('/runs')(path) || under('/labels')(path) || under('/inbox')(path), rail: 'waiting' },
+  { lights: under('/agents/skills'), rail: 'skills' },
+  { lights: (path) => under('/agents')(path) || under('/workflows')(path), rail: 'agents' },
+  { lights: under('/stats'), rail: 'stats' },
+  { lights: (path) => SETTINGS_TABS.some((tab) => under(tab.to)(path)), rail: 'settings' },
+  { lights: under('/chat'), rail: 'nemia' },
+];
+
+/** The pane's place each first segment under a factory's path opens, its floor being the path itself. */
+const PLACE_OF_SEGMENT: Readonly<Record<string, PanePlace>> = {
+  runs: 'runs',
+  inbox: 'inbox',
+  workflows: 'workflows',
+  agents: 'agents',
+  skills: 'skills',
+  settings: 'settings',
+  proposals: 'settings',
+};
 
 /**
- * The rail's destinations, in their order: Overview, the factories' canvas at `/`; Runs, the Inbox, Factories (a factory's floor and its
- * settings), Agents and Workflows, each lit on its page and under it; Stats; Nemia, her chat as a page of its own, which her docked face
- * also opens; and Settings, lit on each of its tabs (`SETTINGS_TABS`). A label's page lights Runs.
+ * Where the page at `path` sits: under `/factories/<name>`, that factory's level, at the pane's place its next segment names (its floor
+ * for none); every other page of the board, the store's level, under the rail's destination that holds it; none for an address no route
+ * has. The path alone decides: no page's search names its level.
+ *
+ * @param path the address of the page
  */
-export const DESTINATIONS: readonly Destination[] = [
-  { id: 'overview', label: 'Overview', icon: House, lights: (path) => path === '/' },
-  { id: 'runs', label: 'Runs', icon: List, lights: (path) => under('/runs')(path) || under('/labels')(path) },
-  { id: 'inbox', label: 'Inbox', icon: Inbox, lights: under('/inbox') },
-  { id: 'factories', label: 'Factories', icon: Factory, lights: under('/factories') },
-  { id: 'agents', label: 'Agents', icon: Bot, lights: under('/agents') },
-  { id: 'workflows', label: 'Workflows', icon: Waypoints, lights: under('/workflows') },
-  { id: 'stats', label: 'Stats', icon: ChartColumn, lights: under('/stats') },
-  { id: 'nemia', label: 'Nemia', icon: MessageCircle, lights: under('/chat') },
-  { id: 'settings', label: 'Settings', icon: Settings, lights: (path) => SETTINGS_TABS.some((tab) => under(tab.to)(path)) },
+export function seatOf(path: string): Seat | undefined {
+  const factory = /^\/factories\/([^/]+)(?:\/([^/]+))?/.exec(path);
+  if (factory) {
+    const place = factory[2] === undefined ? 'floor' : PLACE_OF_SEGMENT[factory[2]];
+    return place && { level: 'factory', factory: decodeURIComponent(factory[1] ?? ''), place };
+  }
+  const store = STORE_SEATS.find((seat) => seat.lights(path));
+  return store && { level: 'store', rail: store.rail };
+}
+
+/**
+ * The factory a seat sits in: its own on a factory's page, none at the store's level or for no seat.
+ *
+ * @param seat where the page sits
+ */
+export const factoryOf = (seat: Seat | undefined): string | undefined => (seat?.level === 'factory' ? seat.factory : undefined);
+
+/** A destination of the rail: its key, its name and its icon. */
+export type RailDestination = { readonly id: RailId; readonly label: string; readonly icon: LucideIcon };
+
+/** A group of the rail: its name, said to a screen reader and drawn over its destinations, and its destinations in their order. */
+export type RailGroup = { readonly id: 'across' | 'yours' | 'you'; readonly label: string; readonly items: readonly RailDestination[] };
+
+/**
+ * The store rail's groups, under Nemia's face: what spans factories (Factories, the canvas of them all, and Waiting, what waits on the
+ * person in every factory); the person's own library (their agents and their skills); and at the foot the person's (Stats and Settings).
+ */
+export const RAIL_GROUPS: readonly RailGroup[] = [
+  {
+    id: 'across',
+    label: 'Across factories',
+    items: [
+      { id: 'factories', label: 'Factories', icon: Factory },
+      { id: 'waiting', label: 'Waiting', icon: Hourglass },
+    ],
+  },
+  {
+    id: 'yours',
+    label: 'Yours',
+    items: [
+      { id: 'agents', label: 'Agents', icon: Bot },
+      { id: 'skills', label: 'Skills', icon: BookOpen },
+    ],
+  },
+  {
+    id: 'you',
+    label: 'You',
+    items: [
+      { id: 'stats', label: 'Stats', icon: ChartColumn },
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ],
+  },
+];
+
+/** Where each destination of the rail leads: Skills to its section of the Agents page, the nearest page there is until the Library. */
+const RAIL_HREF: Readonly<Record<RailId, string>> = {
+  factories: '/',
+  waiting: '/runs',
+  agents: '/agents',
+  skills: '/agents#skills',
+  stats: '/stats',
+  settings: '/settings',
+};
+
+/**
+ * Where the rail's destination `id` leads.
+ *
+ * @param id the destination's key
+ */
+export const railHref = (id: RailId): string => RAIL_HREF[id];
+
+/**
+ * The rail's destination lit at `seat`: its own on a store page, Factories on any factory's page, none on her chat's page (her face says
+ * it) and for no seat.
+ *
+ * @param seat where the page sits
+ */
+export function litOf(seat: Seat | undefined): RailId | undefined {
+  if (seat === undefined) return undefined;
+  if (seat.level === 'factory') return 'factories';
+  return seat.rail === 'nemia' ? undefined : seat.rail;
+}
+
+/** A place of the pane: its key and its name. */
+export type PanePlaceItem = { readonly id: PanePlace; readonly label: string };
+
+/** The factory pane's places, in their order: the floor, its runs, its inbox, its workflows, its agents, its skills and its settings. */
+export const PANE_PLACES: readonly PanePlaceItem[] = [
+  { id: 'floor', label: 'Floor' },
+  { id: 'runs', label: 'Runs' },
+  { id: 'inbox', label: 'Inbox' },
+  { id: 'workflows', label: 'Workflows' },
+  { id: 'agents', label: 'Agents' },
+  { id: 'skills', label: 'Skills' },
+  { id: 'settings', label: 'Settings' },
 ];
 
 /**
- * Every destination of `table` that the page at `path` lights: one for each of the board's routes.
+ * The address of `place` in `factory`'s pane, its name escaped: its floor at `/factories/<name>`, every other place under it.
+ *
+ * @param place the pane's place
+ * @param factory the factory's name
+ */
+export const placeHref = (place: PanePlace, factory: string): string =>
+  `/factories/${encodeURIComponent(factory)}${place === 'floor' ? '' : `/${place}`}`;
+
+/**
+ * The open runs the frame counts at `path`: the run list of the factory the page sits in (`seatOf`), every factory's at the store's
+ * level — the one query the pane's Runs line and Nemia's cue read their `counts.waiting` from, and the Runs page's own when no label
+ * selector narrows it, so the three say one number and are read again together.
  *
  * @param path the address of the page
- * @param table the destinations to read, the rail's by default
  */
-export const destinationsLit = (path: string, table: readonly Destination[] = DESTINATIONS): Destination[] =>
-  table.filter((destination) => destination.lights(path));
+export const frameRunsQuery = (path: string) => openRunsQuery(factoryOf(seatOf(path)));
+
+/** The pane's places whose page reads one object by the next segment, a run or a card, which a pick sends to the place's list. */
+const OBJECT_PLACES: ReadonlySet<string> = new Set(['runs', 'inbox']);
 
 /**
- * The one destination the page at `path` lights, none for an address no route has.
- *
- * @param path the address of the page
- */
-export const destinationOf = (path: string): Destination | undefined => {
-  const lit = destinationsLit(path);
-  return lit.length === 1 ? lit[0] : undefined;
-};
-
-/** A factory's floor as an address, its name escaped. */
-const floorHref = (factory: string): string => `/factories/${encodeURIComponent(factory)}`;
-
-/**
- * Where the destination `id` leads with `picked` the factory the address picks and `first` the first factory listed: a list of the Inbox,
- * Runs or Workflows narrowed to `picked`, every factory's under none; Factories to the floor of `picked`, else of `first`, else Overview;
- * any other its own page.
- *
- * @param id the destination's key
- * @param picked the factory the address picks, none for All factories
- * @param first the first factory listed, none where there is none
- */
-export function destinationHref(id: string, picked: string | undefined, first: string | undefined): string {
-  if (id === 'factories') {
-    const factory = picked ?? first;
-    return factory === undefined ? '/' : floorHref(factory);
-  }
-  if (id === 'overview') return '/';
-  const to = `/${id}`;
-  return isListing(to) && picked !== undefined ? `${to}?factory=${encodeURIComponent(picked)}` : to;
-}
-
-/**
- * The factory the address at `path` with `search` picks, from the address alone: the name of a factory's own page, its floor or its
- * settings, else the `?factory=` of a section's page — the Inbox, Runs, Workflows or Capabilities — or of a workflow's page or a step's,
- * which read in it, and of a factory's own agent or skill, and of no other page under them; none, All factories, on every other page.
+ * Where picking `factory` takes the page at `path` with `search`, as an address: on a factory's page, the same place in the picked
+ * factory, every key of its search kept but `repo`, the repository of the factory left — a workflow's page, a step's, an agent's or a
+ * skill's the same name read there, a run's or a card's page the place's list, and a proposal the picked factory's settings; on the
+ * store's Capabilities, the picked factory's Skills; on any other page of the store's level, the picked factory's floor.
  *
  * @param path the address of the page
  * @param search the page's search
+ * @param factory the factory picked
  */
-export function pickedOf(path: string, search: Record<string, unknown>): string | undefined {
-  return ownerOf(path) ?? (isListing(path) || workflowPageAt(path) || ownDefinitionAt(path) ? factorySearch(search).factory : undefined);
-}
-
-/**
- * The open runs the frame counts at `path` with `search`: the run list of the factory the address picks (`pickedOf`), every factory's
- * under none — the one query the rail's Runs badge and Nemia's cue read their `counts.waiting` from, and the Runs page's own when no
- * label selector narrows it, so the three say one number and are read again together.
- *
- * @param path the address of the page
- * @param search the page's search
- */
-export const frameRunsQuery = (path: string, search: Record<string, unknown>) => openRunsQuery(pickedOf(path, search));
-
-/** `search` without its `repo`. */
-const withoutRepo = ({ repo: _repo, ...kept }: Record<string, unknown>): Record<string, unknown> => kept;
-
-/**
- * Where a pick goes: a section's page with its search, a workflow's page or a step's in the picked factory, a factory's floor, or Overview.
- */
-type PickTarget =
-  | { to: Listing; search: Record<string, unknown> }
-  | { to: '/workflows/$from/$workflow'; params: { from: string; workflow: string }; search: Record<string, unknown> }
-  | { to: '/workflows/$from/$workflow/$step'; params: { from: string; workflow: string; step: string }; search: Record<string, unknown> }
-  | { to: '/agents/$from/$agent'; params: { from: 'factory'; agent: string }; search: Record<string, unknown> }
-  | { to: '/agents/skills/$from/$skill'; params: { from: 'factory'; skill: string }; search: Record<string, unknown> }
-  | { to: '/agents' }
-  | { to: '/factories/$factory'; params: { factory: string } }
-  | { to: '/' };
-
-/**
- * Where picking `factory` (none for All factories) takes the page at `path` with `search`: on a section's page, the same page with every
- * other key of its search kept and `factory` set or dropped — but its `repo`, dropped too, which is the repository of the factory left;
- * on a workflow's page or a step's, the same page read in the picked factory, on the repository it reads, its `repo` dropped likewise; on
- * a factory's own page, its floor or its settings, the picked factory's floor, or Overview for All factories; on a factory's own agent or
- * skill, the same name read in the picked factory, or the Agents page for All factories; on any other page, the picked
- * factory's floor, and nowhere for All factories, which that page already shows.
- *
- * @param path the address of the page
- * @param search the page's search
- * @param factory the factory picked, none for All factories
- */
-export function pickTo(path: string, search: Record<string, unknown>, factory: string | undefined): PickTarget | null {
-  if (isListing(path)) {
-    const { factory: _dropped, ...rest } = search;
-    const kept = withoutRepo(rest);
-    return { to: path, search: factory === undefined ? kept : { ...kept, factory } };
-  }
-  const page = workflowPageAt(path);
-  if (page) {
-    const { factory: _factory, repo: _repo, ...kept } = search;
-    const picked = factory === undefined ? kept : { ...kept, factory };
-    const { step, ...workflow } = page;
-    return step === undefined
-      ? { to: '/workflows/$from/$workflow', params: workflow, search: picked }
-      : { to: '/workflows/$from/$workflow/$step', params: { ...workflow, step }, search: picked };
-  }
-  const own = ownDefinitionAt(path);
-  if (own) {
-    if (factory === undefined) return { to: '/agents' };
-    return own.kind === 'agent'
-      ? { to: '/agents/$from/$agent', params: { from: 'factory', agent: own.name }, search: { factory } }
-      : { to: '/agents/skills/$from/$skill', params: { from: 'factory', skill: own.name }, search: { factory } };
-  }
-  if (factory !== undefined) return { to: '/factories/$factory', params: { factory } };
-  return ownerOf(path) === undefined ? null : { to: '/' };
+export function pickTo(path: string, search: Record<string, unknown>, factory: string): string {
+  const seat = seatOf(path);
+  const floor = placeHref('floor', factory);
+  if (seat?.level !== 'factory') return path === '/capabilities' ? placeHref('skills', factory) : floor;
+  if (seat.place === 'floor') return floor;
+  if (seat.place === 'settings') return placeHref('settings', factory);
+  const rest = path.split('/').slice(4);
+  const { repo: _repo, ...kept } = search;
+  if (rest.length > 0 && OBJECT_PLACES.has(seat.place)) return placeHref(seat.place, factory);
+  const tail = rest.length > 0 ? `/${rest.join('/')}` : '';
+  return `${placeHref(seat.place, factory)}${tail}${defaultStringifySearch(kept)}`;
 }

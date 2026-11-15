@@ -1,0 +1,33 @@
+import { createFileRoute, redirect } from '@tanstack/react-router';
+import { BackToRuns } from '../components/run/RunPage';
+import { StepPage } from '../components/step/StepPage';
+import { loadRun } from '../lib/runView';
+import { objectHome } from '../lib/factoryAddress';
+
+/**
+ * The page of a step's session, at /factories/$factory/runs/$runId/steps/$step: `$runId_` draws it on its own, not inside the run's page, which has no
+ * outlet for it. A run of another factory, or of the default one, is loaded again at the address it belongs at (`objectHome`), its search kept.
+ */
+export const Route = createFileRoute('/factories/$factory_/runs/$runId_/steps/$step')({
+  loader: async ({ context, params, location }) => {
+    const loaded = await loadRun(context.queryClient, params.runId);
+    const rest = `/runs/${encodeURIComponent(params.runId)}/steps/${encodeURIComponent(params.step)}`;
+    const home = loaded.gone ? undefined : objectHome(rest, loaded.namespace, params.factory);
+    if (home) throw redirect({ href: `${home}${location.searchStr}`, replace: true });
+    return loaded;
+  },
+  staticData: { fullBleed: true },
+  component: Page,
+  errorComponent: ({ error }) => (
+    <div className="space-y-3 p-4">
+      <BackToRuns />
+      <p className="text-body-medium text-failure">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
+    </div>
+  ),
+});
+
+/** The step's page, read off its address. */
+function Page() {
+  const { runId, step } = Route.useParams();
+  return <StepPage runId={runId} name={step} gone={Route.useLoaderData().gone} />;
+}

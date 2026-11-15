@@ -1,159 +1,31 @@
-import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
-import type { ReactNode } from 'react';
-import { FinishedTable } from '../components/run/FinishedTable';
-import { FlightTable } from '../components/run/FlightTable';
-import { WaitingCard } from '../components/run/WaitingCard';
-import { SelectorField } from '../components/field/SelectorField';
-import { finishedRunsQuery, openRunsQuery } from '../lib/api/runs.ts';
+import { loadRuns, RunsFailed, RunsLoading, RunsPage } from '../components/run/RunsPage';
 import { labelSearch } from '../lib/api/labels.ts';
-import { runLinesQuery } from '../lib/api/run.ts';
-import { ReadRefusal } from '../lib/api/read';
-import { finishedSearch, trailOf, trailSearch } from '../lib/finished';
-import { ink } from '../lib/meaning';
-import { Plate, ScanLines } from '../components/look';
-import { Button } from '../components/ui/ds';
-import { useBar } from '../lib/useBar';
+import { finishedSearch, trailSearch } from '../lib/finished';
 
+/** The runs of every factory, the page's trail through the finished runs and its label selector in its search. */
 export const Route = createFileRoute('/runs/')({
   validateSearch: (search: Record<string, unknown>) => ({ ...finishedSearch(search), ...labelSearch(search) }),
-  loaderDeps: ({ search }) => ({ factory: search.factory, older: finishedSearch(search).older, l: search.l }),
+  loaderDeps: ({ search }) => ({ older: search.older, l: search.l }),
   loader: ({ context, deps }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(openRunsQuery(deps.factory, deps.l)),
-      context.queryClient
-        .ensureQueryData(finishedRunsQuery(deps.factory, trailOf(deps), deps.l))
-        .then((page) => Promise.all(page.runs.map((run) => context.queryClient.prefetchQuery(runLinesQuery(run.id)))))
-        .catch((error: unknown) => {
-          if (deps.older !== undefined && error instanceof ReadRefusal && error.status === 422)
-            throw redirect({ to: '/runs', search: (prev) => trailSearch(prev, []), replace: true });
-          throw error;
-        }),
-    ]),
-  component: Runs,
+    loadRuns(context.queryClient, { ...deps, factory: undefined }, () => {
+      throw redirect({ to: '/runs', search: (prev) => trailSearch(prev, []), replace: true });
+    }),
+  component: Page,
   staticData: { fullBleed: true },
-  pendingComponent: Loading,
-  errorComponent: Failed,
+  pendingComponent: RunsLoading,
+  errorComponent: RunsFailed,
 });
 
-/** The page's frame, as wide as the window lets it, over the look's ground: what it holds; the top bar names it. */
-function Page({ state, children }: { state: string; children: ReactNode }) {
-  return (
-    <ScanLines className="min-h-full px-4 py-6 @md/page:px-8">
-      <article data-runs-page={state} className="mx-auto flex w-full max-w-[1360px] flex-col gap-10">
-        {children}
-      </article>
-    </ScanLines>
-  );
-}
-
-/** The page while its two reads are on their way. */
-function Loading() {
-  return (
-    <Page state="loading">
-      <p role="status" className="m-0 text-body-medium text-on-surface-variant">
-        Loading the runs…
-      </p>
-    </Page>
-  );
-}
-
-/** The page when a read failed: that it did, and the reason as it came. */
-function Failed({ error }: { error: unknown }) {
-  return (
-    <Page state="error">
-      <div role="alert" className="flex flex-col gap-1">
-        <p className={`m-0 text-body-medium ${ink.failure}`}>The runs could not be loaded.</p>
-        <p data-error-reason className="m-0 text-body-small break-words text-on-surface-variant">
-          {error instanceof Error ? error.message : String(error)}
-        </p>
-      </div>
-    </Page>
-  );
-}
-
-/** A section of the page: its plate, alone on its line, then what it holds, and under it what opens more of it (`foot`). */
-function Section({ name, plate, foot, children }: { name: string; plate: ReactNode; foot?: ReactNode; children: ReactNode }) {
-  return (
-    <section data-section={name} className="flex flex-col gap-4">
-      <div className="flex items-center">{plate}</div>
-      {children}
-      {foot && <div className="flex">{foot}</div>}
-    </section>
-  );
-}
-
-/** The button under the runs that wait on you that opens, and closes, the bar of the runs that wait on you in every factory. */
-function AcrossFactories() {
-  const { open, toggle } = useBar();
-  return (
-    <Button
-      data-waiting-opener
-      variant="outlined"
-      size="small"
-      aria-expanded={open?.kind === 'waiting'}
-      onPress={() => toggle({ kind: 'waiting' })}
-    >
-      Waiting in every factory
-    </Button>
-  );
-}
-
-/** What a section says when it holds nothing. */
-function Nothing({ children }: { children: string }) {
-  return (
-    <p data-nothing className="m-0 text-body-medium text-on-surface-variant">
-      {children}
-    </p>
-  );
-}
-
-/**
- * The runs, in three parts, by two reads the api filters by the address' factory: what waits on a person, a card a run and never a
- * row; the runs in flight, a quiet table; and one page of the finished runs, the one the address' trail leads to, newest finished
- * first. Each plate says the api's own count, and under what waits a button opens the bar of what waits on you in every factory. Every
- * time on the page is a fact to the minute, said against the instant its answer was read at: nothing here counts by itself.
- */
-function Runs() {
+/** The runs page, read off its address; a label picked is written to it, the trail dropped. */
+function Page() {
   const search = Route.useSearch();
-  const { data: open } = useSuspenseQuery(openRunsQuery(search.factory, search.l));
-  const trail = trailOf(finishedSearch(search));
-  const { data: finished } = useSuspenseQuery(finishedRunsQuery(search.factory, trail, search.l));
-  const navigate = useNavigate({ from: '/runs/' });
-  const asOf = new Date(open.asOf);
-  const { counts } = open;
+  
+  const navigate = useNavigate({ from: Route.fullPath });
   return (
-    <Page state="loaded">
-      <SelectorField
-        key={search.l ?? ''}
-        selector={search.l}
-        onSelect={(next) => void navigate({ search: (prev) => ({ ...prev, l: next, older: undefined }) })}
-      />
-      <Section
-        name="waiting"
-        plate={<Plate count={counts.waiting} title="Waiting on you" quiet={counts.waiting === 0} />}
-        foot={<AcrossFactories />}
-      >
-        {open.waiting.length === 0 ? (
-          <Nothing>Nothing waits on you.</Nothing>
-        ) : (
-          <div data-cards className="grid grid-cols-1 gap-4 @5xl/page:grid-cols-2">
-            {open.waiting.map((run) => (
-              <WaitingCard key={run.id} run={run} asOf={asOf} />
-            ))}
-          </div>
-        )}
-      </Section>
-      <Section name="in-flight" plate={<Plate count={counts.inFlight} title="In flight" hue="alive" quiet={counts.inFlight === 0} />}>
-        {open.inFlight.length === 0 ? <Nothing>Nothing is in flight.</Nothing> : <FlightTable runs={open.inFlight} asOf={asOf} />}
-      </Section>
-      <Section name="finished" plate={<Plate count={counts.finished} title="Finished" hue="grey" quiet={counts.finished === 0} />}>
-        {finished.total === 0 && finished.runs.length === 0 ? (
-          <Nothing>No run has finished yet.</Nothing>
-        ) : (
-          <FinishedTable page={finished} trail={trail} />
-        )}
-      </Section>
-    </Page>
+    <RunsPage
+      at={{ ...search }}
+      onLabel={(next) => void navigate({ search: (prev) => ({ ...prev, l: next, older: undefined }) })}
+    />
   );
 }

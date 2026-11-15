@@ -1,5 +1,5 @@
 /**
- * A run's start: the rail's FAB that opens it in the frame's side sheet (`BarPanel`), and what the bar then shows — with no
+ * A run's start: the factory pane's button that opens it in the frame's side sheet (`BarPanel`), and what the bar then shows — with no
  * factory yet, the factories to start it in; then the repository the run starts on — the factory's one, or, where it has several, the
  * one its wiring gives the workflow picked (`startRepo`), said and never picked — the workflows the factory offers there, each that
  * cannot start saying why, and `StartRun` in the factory for the one picked, as the CLI's `start --factory` starts it.
@@ -21,32 +21,25 @@ import { FIELD } from '../workflow/WorkflowOptions';
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 const path = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
 
-/** The factory a run is started in from the rail with `name` picked: the picked one when its floor starts runs, else none yet. */
-function startIn(factories: readonly Factory[] | undefined, name: string | undefined): string | null {
+/** The factory a run is started in from the pane of `name`: that one when its floor starts runs, else none yet. */
+function startIn(factories: readonly Factory[] | undefined, name: string): string | null {
   const factory = factories?.find((f) => f.name === name);
   return factory && floorPlace(factory) ? factory.name : null;
 }
 
 /**
- * The rail's FAB, 'Start a run': the kit's FAB, its plus alone on a closed rail and named in words beside it on an open one (`isExtended`).
- * A press opens the bar on the start of a run in the factory `name`, or, where the picked factory starts none from its floor or none is
- * picked, on the question which; it runs `onPress` first.
+ * The factory pane's Start a run: the kit's tonal button, never yellow, which says nothing waits on the person. A press opens the bar on
+ * the start of a run in the factory `name`, or, where it starts none from its floor, on the question which.
  */
-export function StartFab({ name, isExtended, onPress }: { name?: string; isExtended: boolean; onPress?: () => void }) {
+export function PaneStart({ name }: { name: string }) {
   const factories = useQuery(factoriesQuery);
   const { open, show } = useBar();
   const factory = startIn(factories.data, name);
-  const press = () => {
-    onPress?.();
-    show({ kind: 'start', factory });
-  };
   const expanded = open?.kind === 'start' && open.factory === factory;
-  return isExtended ? (
-    <KitButton variant="fab" icon={PlusIcon} aria-expanded={expanded} onPress={press}>
+  return (
+    <KitButton variant="tonal" icon={PlusIcon} data-pane-start aria-expanded={expanded} onPress={() => show({ kind: 'start', factory })} className="w-full">
       Start a run
     </KitButton>
-  ) : (
-    <KitButton variant="fab" icon={PlusIcon} aria-label="Start a run" aria-expanded={expanded} onPress={press} />
   );
 }
 

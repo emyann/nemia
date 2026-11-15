@@ -5,7 +5,7 @@ import { SkillForm } from '../components/agent/SkillForm';
 import { createSkill, type SkillDraft } from '../lib/api/skills.ts';
 import { storeQuery } from '../lib/api/store.ts';
 import { invalidateSkills } from '../lib/agentWrites';
-import { BackToAgents } from './agents_.new';
+import { BackToAgents } from '../components/agent/AgentParts';
 
 /** The New skill page, at /agents/skills/new: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. */
 export const Route = createFileRoute('/agents_/skills/new')({

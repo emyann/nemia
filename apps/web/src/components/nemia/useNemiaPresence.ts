@@ -11,13 +11,12 @@ import type { Presence } from '@/lib/presence';
 import { useNemiaChat } from '@/lib/useNemiaChat';
 
 /**
- * Her presence at the page at `path` with `search`.
+ * Her presence at the page at `path`.
  *
  * @param path the address of the page
- * @param search the page's search
  */
-export function useNemiaPresence(path: string, search: Record<string, unknown>): Presence {
+export function useNemiaPresence(path: string): Presence {
   const chat = useNemiaChat();
-  const counted = useQuery(frameRunsQuery(path, search)).data;
+  const counted = useQuery(frameRunsQuery(path)).data;
   return presenceOf(chat.state.presence, chat.kept !== null, counted?.counts.waiting ?? 0, chat.state.events);
 }

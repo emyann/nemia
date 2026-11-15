@@ -1,4 +1,5 @@
 import { RouteLink, AgentLink } from '../agent/AgentParts';
+import { workflowLink } from '../../lib/factoryAddress';
 import { Markdown } from '../markdown/Markdown';
 import { StepHire } from './StepHire';
 import { Skills } from './Told';
@@ -31,9 +32,7 @@ function StepRow({ step, workflow, place, hiring }: { step: ListedStep; workflow
     <li data-step-row={step.name} className="min-w-0 space-y-1.5 p-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <RouteLink
-          to="/workflows/$from/$workflow/$step"
-          params={{ from: workflow.from, workflow: workflow.name, step: step.name }}
-          search={place}
+          {...workflowLink(place, workflow.from, workflow.name, step.name)}
           className={LINK}
         >
           {step.name}

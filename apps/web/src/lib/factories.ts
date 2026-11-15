@@ -341,11 +341,12 @@ export const FACTORY_WAY = "they change the factory's way, its tree written from
 export type HirePlace = { factory: string; workflow: string; step: string };
 
 /**
- * The New agent page's search, the step it hires into: all three parts where the address names each by a string not empty, else none.
+ * The New agent page's search, the step it hires into: the factory (`?into=`), the workflow and the step, all three where the address names
+ * each by a string not empty, else none.
  * @param search The page's search, as the router parsed it.
  */
 export const hirePlaceOf = (search: Record<string, unknown>): Partial<HirePlace> => {
-  const { factory, workflow, step } = search;
+  const { into: factory, workflow, step } = search;
   return typeof factory === 'string' && factory && typeof workflow === 'string' && workflow && typeof step === 'string' && step
     ? { factory, workflow, step }
     : {};
@@ -372,14 +373,12 @@ export const hireOnCreate = (
   );
 
 /**
- * The place a workflow's page or a step's is read in, from its address: `?factory=` as `factorySearch` reads it, and `?repo=` where it
- * names a repository by a string that is not empty.
+ * The repository a factory's page is read on, from its address's search: `?repo=` where it names one by a string that is not empty. The
+ * factory is its path's (`seatOf`).
  * @param search The page's search, as the router parsed it.
  */
-export const pagePlaceOf = (search: Record<string, unknown>): PagePlace => ({
-  ...factorySearch(search),
-  ...(typeof search.repo === 'string' && search.repo ? { repo: search.repo } : {}),
-});
+export const pagePlaceOf = (search: Record<string, unknown>): { repo?: string } =>
+  typeof search.repo === 'string' && search.repo ? { repo: search.repo } : {};
 
 /** The place a run's workflow page is read in, from the address the api gave it: its factory and its repository where it names them. */
 export const placeOfAddress = ({ factory, repo }: WorkflowPageAddress): PagePlace => ({
@@ -387,9 +386,3 @@ export const placeOfAddress = ({ factory, repo }: WorkflowPageAddress): PagePlac
   ...(repo ? { repo } : {}),
 });
 
-/**
- * The factory a page's address filters by, `?factory=<name>`: none when it names none, or names it with nothing, or with no string.
- * @param search The page's search, as the router parsed it.
- */
-export const factorySearch = (search: Record<string, unknown>): { factory?: string } =>
-  typeof search.factory === 'string' && search.factory ? { factory: search.factory } : {};

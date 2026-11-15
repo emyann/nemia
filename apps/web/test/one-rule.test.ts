@@ -68,7 +68,8 @@ test("REFUSED: no reader of the frame applies the whole list's rule to the light
   const frame = [
     'lib/footer.ts',
     'lib/bell.ts',
-    'components/frame/GaugesButton.tsx',
+    'components/frame/MachineBar.tsx',
+    'components/frame/FactoryPane.tsx',
     'components/frame/GaugesBar.tsx',
     'components/frame/FrameHeader.tsx',
     'components/frame/FrameRail.tsx',
@@ -91,17 +92,17 @@ test("REFUSED: no reader of the frame applies the whole list's rule to the light
   assert.deepEqual(wholeListRule('inFlight: open.counts.inFlight, more: block.waitsOnYou > 0, inFlight?: number'), []);
 });
 
-/** The name `text` binds to the data of `useQuery(frameRunsQuery(path, search))`, where it reads that query. */
-const frameRunsRead = (text: string): string | undefined =>
-  /const (\w+) = useQuery\(\s*frameRunsQuery\(path, search\)\s*\)\.data;/.exec(text)?.[1];
+/** The name `text` binds to the data of `useQuery(frameRunsQuery(path))`, where it reads that query. */
+const frameRunsRead = (text: string): string | undefined => /const (\w+) = useQuery\(\s*frameRunsQuery\(path\)\s*\)\.data;/.exec(text)?.[1];
 
-test("REFUSED: Nemia's cue, the rail's Runs badge and the Runs page's plate count the runs waiting off one query", async (t) => {
+test("REFUSED: Nemia's cue, the pane's Runs line and the Runs page's plate count the runs waiting off one query", async (t) => {
   const read = (file: string) => fs.readFileSync(path.join(SRC, file), 'utf8');
-  await t.test("the frame's query at a page is the Runs page's own, every factory's or the one it picks", () => {
-    assert.deepEqual(frameRunsQuery('/runs', {}).queryKey, openRunsQuery(undefined, undefined).queryKey, 'All factories');
-    assert.deepEqual(frameRunsQuery('/runs', { factory: 'kit' }).queryKey, openRunsQuery('kit', undefined).queryKey, 'one factory');
-    assert.deepEqual(frameRunsQuery('/', {}).queryKey, openRunsQuery().queryKey, 'a page that picks none counts every factory');
-    assert.notDeepEqual(frameRunsQuery('/runs', { factory: 'kit' }).queryKey, openRunsQuery().queryKey, 'a key that tells them apart');
+  await t.test("the frame's query at a page is the Runs page's own, every factory's at the store's level or the factory it sits in", () => {
+    assert.deepEqual(frameRunsQuery('/runs').queryKey, openRunsQuery(undefined, undefined).queryKey, 'every factory');
+    assert.deepEqual(frameRunsQuery('/factories/kit/runs').queryKey, openRunsQuery('kit', undefined).queryKey, 'one factory');
+    assert.deepEqual(frameRunsQuery('/factories/kit/inbox/c').queryKey, openRunsQuery('kit').queryKey, 'any page of the factory');
+    assert.deepEqual(frameRunsQuery('/').queryKey, openRunsQuery().queryKey, 'a store page counts every factory');
+    assert.notDeepEqual(frameRunsQuery('/factories/kit/runs').queryKey, openRunsQuery().queryKey, 'a key that tells them apart');
   });
   await t.test("her cue's runs are that query's counts.waiting, never her presence's own number", () => {
     const dock = read('components/nemia/useNemiaPresence.ts');
@@ -110,12 +111,15 @@ test("REFUSED: Nemia's cue, the rail's Runs badge and the Runs page's plate coun
     assert.match(dock, new RegExp(`presenceOf\\(\\s*chat\\.state\\.presence,[^,]+,\\s*${counted}\\?\\.counts\\.waiting\\b`));
     assert.doesNotMatch(dock, /presence\.waitsOnYou/, "the api's own sum is no part of the cue");
   });
-  await t.test("the rail's badge reads the same query, and the Runs page its plate off the same list", () => {
+  await t.test("the pane's Runs line reads the same query, the rail's Waiting every factory's, and the Runs page its plate off the same list", () => {
+    const pane = read('components/frame/FactoryPane.tsx');
+    assert.equal(frameRunsRead(pane), 'runs', "the pane's lines read the frame's query");
+    assert.match(pane, /runs\.counts\.waiting/);
     const rail = read('components/frame/FrameRail.tsx');
-    assert.match(rail, /useQuery\(frameRunsQuery\(path, search\)\)/);
+    assert.match(rail, /useQuery\(openRunsQuery\(\)\)/, "the rail's Waiting counts every factory");
     assert.match(rail, /runs\.data\?\.counts\.waiting/);
-    const page = read('routes/runs.index.tsx');
-    assert.match(page, /useSuspenseQuery\(openRunsQuery\(search\.factory, search\.l\)\)/);
+    const page = read('components/run/RunsPage.tsx');
+    assert.match(page, /useSuspenseQuery\(openRunsQuery\(at\.factory, at\.l\)\)/);
     assert.match(page, /<Plate count=\{counts\.waiting\}/);
   });
   await t.test('the scan finds a reader of another query', () => {

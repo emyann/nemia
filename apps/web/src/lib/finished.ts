@@ -3,7 +3,6 @@
  * `continue` of a page that led Older, what Newer and Older lead to, and what the pager says. The first page has no trail, so an
  * address never spells one for it. Pure.
  */
-import { factorySearch } from './factories.ts';
 
 /** What joins the tokens of the trail in the address: no token of the api's holds it. */
 const JOIN = '~';
@@ -27,13 +26,13 @@ function olderOf(value: unknown): string | undefined {
 }
 
 /**
- * What a page of the finished runs reads of its address: `?factory=` as `factorySearch` reads it, and `?older=` where it holds a trail.
+ * What a page of the finished runs reads of its address: `?older=` where it holds a trail.
  * The first page is the address without one.
  * @param search The page's search, as the router parsed it.
  */
-export function finishedSearch(search: Record<string, unknown>): { factory?: string; older?: string } {
+export function finishedSearch(search: Record<string, unknown>): { older?: string } {
   const older = olderOf(search.older);
-  return { ...factorySearch(search), ...(older === undefined ? {} : { older }) };
+  return older === undefined ? {} : { older };
 }
 
 /**

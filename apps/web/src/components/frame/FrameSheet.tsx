@@ -1,6 +1,6 @@
 /**
  * The frame's one side sheet: the kit's standard side sheet, 400 wide, docked in the frame's row at the right of the page, the page
- * narrowing beside it, or on a narrow screen the kit's modal sheet over the page. It shows one thing at a time (`FrameFold.shows`): what
+ * narrowing beside it — at 1600 and wider the third pane beside the factory pane, narrower in the factory pane's room — or on a narrow screen the kit's modal sheet over the page. It shows one thing at a time (`FrameFold.shows`): what
  * the address's `?bar=` names (`OpenBar`), on every page, or else Nemia's chat (`HerPanel`) where her face opened it, off her own page
  * (`/chat`), which is the panel itself. Each holds its own header, so the kit's sheet is given no title and draws no header of its own.
  */
@@ -18,8 +18,8 @@ import { HerPanel, useFrameFold, useHerSheet } from './HerSheet';
  */
 const MODAL_AT_THE_RIGHT = 'ml-auto min-w-0';
 
-/** The frame's sheet at the page at `path` with `search`, the gauges a bar shows saying `feed`. */
-export function FrameSheet({ path, search, feed }: { path: string; search: Record<string, unknown>; feed: FeedStatus }) {
+/** The frame's sheet at the page at `path`, the gauges a bar shows saying `feed`. */
+export function FrameSheet({ path, feed }: { path: string; feed: FeedStatus }) {
   const her = useHerSheet();
   const bar = useBar();
   const fold = useFrameFold();
@@ -29,7 +29,7 @@ export function FrameSheet({ path, search, feed }: { path: string; search: Recor
     fold.shows === 'bar' ? (
       <OpenBar feed={feed} />
     ) : fold.shows === 'her' ? (
-      <HerPanel path={path} search={search} onClose={her.close} />
+      <HerPanel path={path} onClose={her.close} />
     ) : null;
   if (narrow)
     return (
@@ -44,11 +44,11 @@ export function FrameSheet({ path, search, feed }: { path: string; search: Recor
       </SideSheet>
     );
   return (
-    <div data-frame-sheet={fold.sheet} data-sheet-shows={fold.shows} className="sticky top-0 z-30 h-svh shrink-0 self-start">
+    <div data-frame-sheet={fold.sheet} data-sheet-shows={fold.shows} className="sticky top-0 z-30 h-[calc(100svh-var(--frame-foot))] shrink-0 self-start">
       <SideSheet
         variant="standard"
         isOpen={fold.sheet === 'docked'}
-        className="h-svh w-[400px] min-w-[400px] rounded-none border-l border-outline-variant bg-surface"
+        className="h-[calc(100svh-var(--frame-foot))] w-[400px] min-w-[400px] rounded-none bg-surface"
       >
         {fold.sheet === 'docked' && content}
       </SideSheet>

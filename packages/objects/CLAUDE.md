@@ -29,6 +29,10 @@ orchestrator, the api, the board and the client import it through its one entry,
   prints today's). A nullable field is described on its `NullOr`, an optional one inside `Schema.optionalKey(…)` or on
   `Schema.optional(…)` whole, and a `Schema.fromJsonString(…)` field by `Schema.annotateEncoded`: the document drops a description set
   inside them.
+- **An endpoint says what it does on itself**: `.annotate(OpenApi.Description, '…')` on the `HttpApiEndpoint` where its group defines
+  it, one or two sentences in the api's words — what it reads or changes, and what it answers — never a command's help, which the api's
+  page shows under it on its own (`apps/api/src/openapi/openapi.ts`). `test/described-endpoints.test.ts` refuses an endpoint with none
+  and one that copies a help line of a command that links it; its baseline, `test/described-endpoints.baseline.json`, only shrinks.
 
 - **`nemia/v1` is additions only once it has a client besides the owner's board, CLI and MCP port.** Until then a break is done at
   once, with no alias, the three moved in the same change, and said beside the word it breaks (the origin `user`, once spelled

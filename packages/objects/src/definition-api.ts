@@ -105,37 +105,55 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
     query: { ...listQuery, ...originQuery },
     success: WorkflowListObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a namespace's workflows, a page at a time: in default, the api's repository and your library; in a factory's, the workflows attached to it. Each name is served once, the first origin that holds it, unless ?origin= reads one origin's. Answers a WorkflowList.",
+  ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/workflows/:name', {
     params: cardParams,
     query: originQuery,
     success: WorkflowObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of a namespace's workflows by its name: its steps as their files write them, the steps resolved, its typed graph and the revision a run started on it pins. Answers the Workflow.",
+  ),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/workflows', {
     params: namespaceParams,
     payload: WorkflowCreate,
     success: WorkflowMade,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Makes a workflow in your library, in default alone, with its steps, from the WorkflowCreate body. Answers the Workflow with a 201; a step the builder refuses is Invalid, naming the steps.',
+  ),
   HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/workflows/:name', {
     params: cardParams,
     payload: WorkflowWrite,
     success: WorkflowObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Writes one of your workflows whole, in default alone, at the resourceVersion it was read at: its steps, its other files (one left out is removed) and its needs. Answers the Workflow as it is now; a stale write is a Conflict.',
+  ),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/workflows/:name', {
     params: cardParams,
     query: { ...removeQuery, ...repoQuery },
     success: WorkflowObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Removes one of your workflows, in default alone, at the ?resourceVersion= it was read at. Answers the Workflow as it was.',
+  ),
   HttpApiEndpoint.get('step', '/api/namespaces/:namespace/workflows/:name/steps/:step', {
     params: { ...cardParams, step: stepName },
     query: originQuery,
     success: WorkflowStepPage,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one step of a workflow for its page, in the namespace's factory: what it would be told by layer, the agent hired into it and the factories that hire into it, where each of its skills is found, and its newest runs. Answers WorkflowStepPage.",
+  ),
   HttpApiEndpoint.get('keys', '/api/workflow-keys', { success: KeyForm, error: definitionErrors }).annotate(
     OpenApi.Description,
     "The builder's form: every key a step takes, with its kind and what it means.",
@@ -145,7 +163,10 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
     payload: DefinitionFiles,
     success: WorkflowCreate,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads a workflow's files as a person keeps them into the spec a create or a replace would send, its steps filled as a run in the ?factory= named would read them; nothing is written. Answers WorkflowCreate.",
+  ),
 ) {}
 
 /**
@@ -225,37 +246,55 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
     query: { ...listQuery, ...originQuery, ...repoQuery },
     success: AgentListOrTable,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a namespace's agents, a page at a time: the repository's, yours and, in a factory made from a template, its tree's, each with the steps that name it and the hires that fill a step with it. ?origin= reads one origin's. Answers an AgentList, or the same page as a Table where the request asks for one.",
+  ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/agents/:name', {
     params: cardParams,
     query: originQuery,
     success: AgentObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of a namespace's agents by its name, with the steps that name it, the hires and factories that use it, and the revision its file holds now. Answers the Agent.",
+  ),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/agents', {
     params: namespaceParams,
     payload: AgentWrite,
     success: AgentMade,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Makes an agent in your library, in default alone, from the AgentWrite body. Answers the Agent with a 201.',
+  ),
   HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/agents/:name', {
     params: cardParams,
     payload: AgentWrite,
     success: AgentObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Writes one of your agents, in default alone, at the resourceVersion it was read at; a metadata.name other than the path's renames it. Answers the Agent as it is now.",
+  ),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/agents/:name', {
     params: cardParams,
     query: { ...removeQuery, ...repoQuery },
     success: AgentObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Removes one of your agents, in default alone, at the ?resourceVersion= it was read at; one a step still names is a Conflict, naming the steps. Answers the Agent as it was.',
+  ),
   HttpApiEndpoint.get('card', '/api/namespaces/:namespace/agents/:name/card', {
     params: cardParams,
     query: { ...originQuery, ...repoQuery },
     success: AgentCard,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Reads an agent as an A2A Agent Card, with the truth about it: it is not served over A2A, and why says what the card leaves out. Answers AgentCard.',
+  ),
   HttpApiEndpoint.get('sources', '/api/agent-sources', {
     query: {
       path: Schema.optionalKey(
@@ -275,8 +314,14 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
     query: instructionsQuery,
     success: AgentInstructions,
     error: definitionErrors,
-  }),
-  HttpApiEndpoint.post('read', '/api/agents/read', { payload: DefinitionFiles, success: AgentDrafted, error: definitionErrors }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads a person's custom instructions for an agent's name, told to whichever agent of that name a run finds: its file, its words, and why the file does not read where it does not. Answers AgentInstructions.",
+  ),
+  HttpApiEndpoint.post('read', '/api/agents/read', { payload: DefinitionFiles, success: AgentDrafted, error: definitionErrors }).annotate(
+    OpenApi.Description,
+    "Reads an agent's file as a person keeps it into the spec a create or a replace would send, in no namespace; nothing is written. Answers AgentDrafted.",
+  ),
 ) {}
 
 /**
@@ -341,30 +386,45 @@ export class SkillsGroup extends HttpApiGroup.make('skills').add(
     query: { ...listQuery, ...originQuery },
     success: SkillListOrTable,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a namespace's skills, a page at a time: the factory's tree's, the repository's, yours and Nemia's builtin, each name served once, the first origin that holds it, unless ?origin= reads one origin's. Answers a SkillList, or the same page as a Table where the request asks for one.",
+  ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/skills/:name', {
     params: cardParams,
     query: originQuery,
     success: SkillObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of a namespace's skills by its name: its SKILL.md as a draft and the folder's other text files. Answers the Skill.",
+  ),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/skills', {
     params: namespaceParams,
     payload: SkillWrite,
     success: SkillMade,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Makes a skill in your library, in default alone, from the SkillWrite body. Answers the Skill with a 201.',
+  ),
   HttpApiEndpoint.put('replace', '/api/namespaces/:namespace/skills/:name', {
     params: cardParams,
     payload: SkillWrite,
     success: SkillObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    'Writes one of your skills whole, or its preload alone, in default alone, at the resourceVersion it was read at; a file of the folder the body leaves out is removed. Answers the Skill as it is now.',
+  ),
   HttpApiEndpoint.get('files', '/api/namespaces/:namespace/skills/:name/files', {
     params: cardParams,
     query: originQuery,
     success: SkillFiles,
     error: definitionErrors,
-  }),
-  HttpApiEndpoint.post('read', '/api/skills/read', { payload: DefinitionFiles, success: SkillDrafted, error: definitionErrors }),
+  }).annotate(OpenApi.Description, "Lists the files of a skill's folder by their path in it, SKILL.md among them. Answers SkillFiles."),
+  HttpApiEndpoint.post('read', '/api/skills/read', { payload: DefinitionFiles, success: SkillDrafted, error: definitionErrors }).annotate(
+    OpenApi.Description,
+    "Reads a skill's files as a person keeps them into the spec a create or a replace would send, in no namespace; nothing is written. Answers SkillDrafted.",
+  ),
 ) {}

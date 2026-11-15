@@ -16,6 +16,7 @@ import { runObject, runsAtOnce } from 'agent-orchestrator';
 import { OpenApi } from 'effect/http-api';
 import { Api, KINDS } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
+import { EQUIVALENTS_HEADING, NO_EQUIVALENT } from './openapi.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -101,12 +102,6 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
     unworded(JSON.parse(JSON.stringify(OpenApi.fromApi(Api)))),
     'the document is OpenApi.fromApi(Api), as JSON, but for what each operation is said as',
   );
-  const listed = (doc.paths['/api/runs']?.get ?? {}) as { summary?: string; description?: string };
-  assert.equal(listed.summary, 'nemia ls', "an operation a command links takes the command's line");
-  assert.ok(listed.description?.includes('`ls`'), 'and names its tool on the MCP port under it');
-  const direct = (doc.paths['/api/namespaces/{namespace}/runs']?.get ?? {}) as { summary?: string; description?: string };
-  assert.equal(direct.summary, 'runs.list', 'one no command links keeps its id');
-  assert.equal(direct.description, undefined);
   const GET_PATHS = {
     Run: '/api/runs/{name}',
     Card: '/api/namespaces/{namespace}/cards/{name}',
@@ -155,6 +150,33 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
   assert.match(JSON.stringify(doc.paths['/api']?.get), /APIResourceList/, 'GET /api is discovery, answering the APIResourceList');
   assert.ok(doc.components.schemas['APIResourceList'], 'APIResourceList is a component');
   assert.match(JSON.stringify(doc.paths['/api/cards']?.get), /"name":"watch"/, 'a list takes `watch`');
+});
+
+test('each operation is named by its id, says what it does in its own words, and under them its CLI and MCP equivalents', async () => {
+  type Said = { operationId?: string; summary?: string; description?: string };
+  const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as { paths: Record<string, Record<string, Said>> };
+  const bare = OpenApi.fromApi(Api) as unknown as { paths: Record<string, Record<string, Said>> };
+  const byId = (document: { paths: Record<string, Record<string, Said>> }): Map<string, Said> =>
+    new Map(Object.values(document.paths).flatMap((item) => Object.values(item).map((op) => [op.operationId ?? '?', op] as const)));
+  const ops = byId(doc);
+  const own = byId(bare);
+  assert.ok(ops.size > 100, 'the document holds every operation');
+  for (const [id, op] of ops) {
+    assert.equal(op.summary, id, `${id} is named by its id, never a command's line`);
+    const words = own.get(id)?.description ?? '';
+    assert.ok(words.length > 0 && op.description?.startsWith(words), `${id} opens on what the endpoint says of itself`);
+    assert.ok(op.description?.includes(EQUIVALENTS_HEADING), `${id} has its CLI and MCP section`);
+  }
+  const section = (id: string): string => ops.get(id)?.description?.split(EQUIVALENTS_HEADING)[1] ?? '';
+  assert.ok(section('runs.listAll').includes('`nemia ls'), 'a command that links the endpoint is named');
+  assert.ok(section('runs.listAll').includes('`ls`'), 'with its tool on the MCP port');
+  assert.ok(section('runs.listAll').includes('an agent reads it'), 'and who answers for it when an agent calls it');
+  assert.ok(section('factories.listAll').includes('`nemia factory`'), 'an endpoint two commands link names the one');
+  assert.ok(section('factories.listAll').includes('`nemia factory ls`'), 'and the other');
+  assert.ok(section('runs.unhold').includes('`nemia hold'), "a command's second tool names the command");
+  assert.ok(section('runs.unhold').includes('`unhold`'), 'and the tool it is');
+  assert.ok(!section('runs.hold').includes('`unhold`'), 'and only on its own endpoint');
+  assert.equal(section('runs.list').trim(), NO_EQUIVALENT, 'an endpoint no command links says so, in one line');
 });
 
 test("the card's labels are a POST whose body is a LabelEdit and whose answer a Labelled, and a run's labels an object of strings", async () => {

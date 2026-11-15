@@ -4,7 +4,7 @@
  * own agent, one per store — so her routes sit at the cluster's paths, as they always did. What each takes and answers is in nemia.ts.
  */
 import { Schema } from 'effect';
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { Conflict, Failed, Invalid, Missing } from './api-errors.ts';
 import {
   ChatAnswer,
@@ -74,73 +74,125 @@ const NemiaInstructionsObject = NemiaInstructions.annotate({ identifier: 'NemiaI
  *   written (`{ words }`: 422 for blank words or a frontmatter block) and cleared; her open session is told at her keeper's next beat.
  */
 export class NemiaGroup extends HttpApiGroup.make('nemia').add(
-  HttpApiEndpoint.get('level', '/api/level', { success: NemiaLevelObject, error: [Invalid] }),
+  HttpApiEndpoint.get('level', '/api/level', { success: NemiaLevelObject, error: [Invalid] }).annotate(
+    OpenApi.Description,
+    "Reads where Nemia is: the store's level and since when, her task and its session, how a person reaches her, what her ended sessions cost, and each factory's level. Answers NemiaLevel.",
+  ),
   HttpApiEndpoint.put('setLevel', '/api/level', {
     payload: NemiaLevelSet,
     success: NemiaLevelObject,
     error: [Missing, Conflict, Invalid, Failed],
-  }),
-  HttpApiEndpoint.get('memory', '/api/nemia/memory', { success: NemiaMemoryObject, error: [Missing] }),
+  }).annotate(
+    OpenApi.Description,
+    "Sets the store's level, or a factory's default, raised for a stretch or its raise ended, as the body says. Answers NemiaLevel, where she is after.",
+  ),
+  HttpApiEndpoint.get('memory', '/api/nemia/memory', { success: NemiaMemoryObject, error: [Missing] }).annotate(
+    OpenApi.Description,
+    'Reads the facts Nemia keeps: the folder they are in and their names. Answers NemiaMemory.',
+  ),
   HttpApiEndpoint.get('fact', '/api/nemia/memory/:fact', {
     params: { fact: Schema.String.annotate({ description: 'The name of the fact asked.' }) },
     success: NemiaMemoryObject,
     error: [Missing],
-  }),
+  }).annotate(OpenApi.Description, 'Reads one of the facts Nemia keeps, by its name, with its words. Answers NemiaMemory.'),
   HttpApiEndpoint.get('policy', '/api/policy/:name', {
     params: policyParams,
     success: PolicyListObject,
     error: [Missing, Invalid],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads an agent's rules for auto: the person's list, the rules in force, what the agent proposed, its custom instruction, and the builtin rule. Answers PolicyList.",
+  ),
   HttpApiEndpoint.put('confirmRule', '/api/policy/:name/rules/:id', {
     params: ruleParams,
     payload: PolicyRuleConfirm,
     success: PolicyListObject,
     error: [Missing, Conflict, Invalid, Failed],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Puts in force a rule the agent proposed, as the person read it, by the words the body sends, which must be the rule's. Answers PolicyList as it is after.",
+  ),
   HttpApiEndpoint.delete('dropRule', '/api/policy/:name/rules/:id', {
     params: ruleParams,
     success: PolicyListObject,
     error: [Missing, Conflict, Invalid, Failed],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Takes a rule of an agent's out of force, the builtin one among them. Answers PolicyList as it is after.",
+  ),
   HttpApiEndpoint.put('propose', '/api/policy/:name/proposal', {
     params: policyParams,
     payload: PolicyProposal,
     success: PolicyListObject,
     error: [Missing, Invalid, Failed],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Records what an agent proposes from its custom instruction, the rules and the guidance the body's words hold, over what it proposed before. Answers PolicyList as it is after.",
+  ),
   HttpApiEndpoint.get('reach', '/api/policy/:name/reach', {
     params: policyParams,
     query: PolicyReachQuery,
     success: PolicyReachObject,
     error: [Missing, Conflict, Invalid],
-  }),
-  HttpApiEndpoint.get('chat', '/api/nemia/chat', { query: ChatHistoryQuery, success: ChatHistoryObject, error: [Invalid] }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads how far an agent's rules in force reach in a factory: how many of the steps at their gate they reach, a row for each, the rules suggested for the rest, and the whole proposal to propose them by. Answers PolicyReach.",
+  ),
+  HttpApiEndpoint.get('chat', '/api/nemia/chat', { query: ChatHistoryQuery, success: ChatHistoryObject, error: [Invalid] }).annotate(
+    OpenApi.Description,
+    "Reads a page of Nemia's chat, oldest first, older pages by the id given, with the cursor a stream resumes from and where she is. Answers ChatHistory.",
+  ),
   HttpApiEndpoint.get('chatStream', '/api/nemia/chat/stream', {
     query: ChatStreamQuery,
     headers: ChatStreamHeaders,
     success: HttpApiSchema.StreamSse({ events: ChatStreamEvent }),
     error: [Invalid],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Follows Nemia's chat as server-sent events from a cursor: each event new or changed, and where she is as it changes. Answers a stream of ChatStreamEvent.",
+  ),
   HttpApiEndpoint.post('chatSend', '/api/nemia/chat/send', {
     payload: ChatSend,
     success: ChatSent.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: [Conflict, Invalid, Failed],
-  }),
-  HttpApiEndpoint.post('chatStop', '/api/nemia/chat/stop', { success: ChatStop, error: [Conflict, Failed] }),
+  }).annotate(
+    OpenApi.Description,
+    "Sends words to Nemia's chat, from the person or from the agent the caller's token names, kept in her outbox for her session. Answers ChatSent with a 201.",
+  ),
+  HttpApiEndpoint.post('chatStop', '/api/nemia/chat/stop', { success: ChatStop, error: [Conflict, Failed] }).annotate(
+    OpenApi.Description,
+    "Stops Nemia's turn in progress. Answers ChatStop: when, and the attempt she was in.",
+  ),
   HttpApiEndpoint.post('chatAnswer', '/api/nemia/chat/answer', {
     payload: ChatAnswerWrite,
     success: ChatAnswer,
     error: [Missing, Conflict, Invalid, Failed],
-  }),
-  HttpApiEndpoint.post('chatRead', '/api/nemia/chat/read', { payload: ChatReadWrite, success: ChatReadMark, error: [Missing, Failed] }),
-  HttpApiEndpoint.get('instructions', '/api/nemia/instructions', { success: NemiaInstructionsObject, error: [Missing, Invalid] }),
+  }).annotate(
+    OpenApi.Description,
+    "Answers an ask of Nemia's with the person's pick for each of its questions. Answers ChatAnswer, as her chat keeps it.",
+  ),
+  HttpApiEndpoint.post('chatRead', '/api/nemia/chat/read', {
+    payload: ChatReadWrite,
+    success: ChatReadMark,
+    error: [Missing, Failed],
+  }).annotate(OpenApi.Description, "Moves the person's read mark in Nemia's chat to the event the body names. Answers ChatReadMark."),
+  HttpApiEndpoint.get('instructions', '/api/nemia/instructions', { success: NemiaInstructionsObject, error: [Missing, Invalid] }).annotate(
+    OpenApi.Description,
+    "Reads Nemia's custom instructions: the file they are kept in, their words, and why the file does not read where it does not. Answers NemiaInstructions.",
+  ),
   HttpApiEndpoint.put('writeInstructions', '/api/nemia/instructions', {
     payload: NemiaInstructionsWrite,
     success: NemiaInstructionsObject,
     error: [Missing, Invalid, Failed],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Writes Nemia's custom instructions, the words she is told after her own. Answers NemiaInstructions as they are now.",
+  ),
   HttpApiEndpoint.delete('clearInstructions', '/api/nemia/instructions', {
     success: NemiaInstructionsCleared,
     error: [Missing, Invalid, Failed],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Clears Nemia's custom instructions. Answers NemiaInstructionsCleared, with whether there were words to remove.",
+  ),
 ) {}

@@ -1,47 +1,24 @@
 /**
  * The one definition of what the api serves of the objects (`Api`): the handlers the api builds from it, the clients that read through
- * it and the OpenAPI document it writes (`OpenApi.fromApi(Api)`) are all made from this, so no layer keeps a shape of its own.
+ * it and the OpenAPI document it writes (`OpenApi.fromApi(Api)`) are all made from this, so no layer keeps a shape of its own. Each
+ * endpoint says what it does on itself (`OpenApi.Description`), in the api's words.
  *
- * Group `runs`: the run object, listed across namespaces and in one (a run's namespace is its factory, `default` for one that names none),
- * read in its namespace and across all by its id, its four sub-resources at the paths the api has always answered them on, and its named
- * actions, each in its namespace alone: started, removed, refreshed, pruned, labelled, held and lifted, and a step of it tried again,
- * approved and said words to. Group `cards`: the inbox's
- * cards as objects, listed across namespaces or in one (a card's namespace is its factory, `default` for one that names none), read in
- * its namespace and across all by its name (each read of one carrying the card's file as written), filed, written whole, dropped,
- * started, queued and taken off the queue, and their labels edited. Every refusal is an object with one key, `error`, the
- * sentence that says what to do next, as the api's other routes answer one; a Conflict carries the `users` that hold the thing too.
+ * Its groups each live in the file of their concept: `runs` (`run-api.ts`), `steps` (`step-api.ts`), `cards` (`card-api.ts`), the
+ * factory and its parts (`factory-api.ts`), the definitions (`definition-api.ts`), `proposals` and `delegations`
+ * (`proposal-api.ts`), and the machine's (`server-api.ts`, `nemia-api.ts`, `readiness.ts`, `upgrade.ts`, `pairing.ts`, `token.ts`).
+ * Every refusal is an object with one key, `error`, the sentence that says what to do next; a Conflict carries the `users` that hold
+ * the thing too.
  *
- * Group `factories`: the factories, which no namespace holds, listed, read, removed, exported whole and filed from another store's export,
- * and each one's sub-resources — its rules and its instruction, read, written and cleared, the lines a person types for it (`commands`),
- * its cost line per workflow, its revisions policy, its places trusted again, a workflow attached and detached, and a harness setting set
- * and taken off; and the writes that name a template or a folder: a factory filed, a volume mounted and taken off, a factory made from a
- * template, a hand-made one taken over by one, either previewed, an upgrade filed and a conflict's choice, a template in the body as
- * `TemplateGiven`. The factory's parts are each in the factory's namespace: group `mcpservers`, its MCP servers, read, recorded and taken
- * off, and signed in to, and at the store's level, in no namespace, the library's servers — the person's beside those Nemia offers —
- * listed, read, recorded and taken off; groups `schedules`, `hires` and `libraryadds` (the library items a factory has added), read,
- * written and taken back; and group `volumes`, read alone.
- *
- * The definitions, each in a factory's namespace as the factory resolves it: groups `workflows`, `agents` and `skills`, each listed with
- * `?origin=` for one origin's, shadowed or not, and read; and at the store's level, in no namespace, the library — the person's
- * definitions beside the builtins — listed with who uses each, read, and the person's made, written whole and removed, an agent tried, a
- * builtin skill copied to the person's and a skill's files listed by path. A write sent to a namespace is refused, naming the way the
- * definition changes: the library's, or the factory's. And, in no namespace, each kind's files as a person keeps them read into its
- * spec (`read`), which writes nothing — a Kubernetes `*Review`'s way: the client reads a person's files, the api reads them by the
- * orchestrator's readers, and the client writes the spec through `create` or `replace`, the board's one write path.
- *
- * Cluster-scoped, beside the factories: group `templates`, the templates Nemia builds in, and each one's documents as the definitions'
- * Schemas; group `subscriptions`, the feed's subscriptions, read alone here. Group `events`, the feed's lines, each in the namespace of
- * the factory it names, a daemon's and the store's that name none in no namespace. Group `discovery`, `GET /api`: every resource the
- * groups above serve, its scope and verbs.
- *
- * In each factory's namespace, groups `proposals` and `delegations` (`proposal-api.ts`): a change of the factory's definitions proposed,
- * approved, declined and listed, and what the person lets an agent approve unasked.
+ * Here, cluster-scoped beside the factories: group `templates`, the templates Nemia builds in, and each one's documents as the
+ * definitions' Schemas; group `subscriptions`, the feed's subscriptions; group `events`, the feed's lines, each in the namespace of the
+ * factory it names, a daemon's and the store's that name none in no namespace; and group `discovery`, `GET /api`: every resource the
+ * groups serve, its scope and verbs.
  *
  * The runs, the cards, the factories, a factory's MCP servers, the agents and the skills are each listed as their `<Kind>List`, or as
  * the same page's `Table` where the request asks for one (`TABLE_ACCEPT`): two successes of one status. A watch answers no Table.
  */
 import { Schema } from 'effect';
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
+import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
 import { Template, TemplateList } from './template.ts';
 import {
   BadRequest,
@@ -57,7 +34,7 @@ import {
   Unjudged,
   WriteFailed,
 } from './api-errors.ts';
-import { cardParams, namespaceParams, templateParams, documentParams, subscriptionParams, eventNameParams } from './api-params.ts';
+import { namespaceParams, cardParams, templateParams, documentParams, subscriptionParams, eventNameParams } from './api-params.ts';
 import { DelegationsGroup, ProposalsGroup } from './proposal-api.ts';
 import { RunsGroup } from './run-api.ts';
 import { StepsGroup } from './step-api.ts';
@@ -124,41 +101,59 @@ const EventListObject = EventList.annotate({ identifier: 'EventList' });
  * rendered with its parameters' defaults and served in the Schemas a namespace serves them in, with origin `builtin`.
  */
 export class TemplatesGroup extends HttpApiGroup.make('templates').add(
-  HttpApiEndpoint.get('listAll', '/api/templates', { query: listQuery, success: TemplateListObject, error: objectErrors }),
-  HttpApiEndpoint.get('get', '/api/templates/:name', { params: templateParams, success: TemplateObject, error: objectErrors }),
+  HttpApiEndpoint.get('listAll', '/api/templates', { query: listQuery, success: TemplateListObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    'Lists the templates Nemia builds in, which no namespace holds, a page at a time. Answers a TemplateList.',
+  ),
+  HttpApiEndpoint.get('get', '/api/templates/:name', { params: templateParams, success: TemplateObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Reads one of Nemia's templates by its name: its version, the instruction and rules it gives a factory, its parameters and the agent it hires into each step. Answers the Template.",
+  ),
   HttpApiEndpoint.get('workflows', '/api/templates/:name/workflows', {
     params: templateParams,
     query: listQuery,
     success: WorkflowListObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a template's workflows, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers a WorkflowList.",
+  ),
   HttpApiEndpoint.get('workflow', '/api/templates/:name/workflows/:doc', {
     params: documentParams,
     success: WorkflowObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one workflow of a template, rendered with its parameters' defaults, its steps filled by the template's hires as in a factory applied from it. Answers the Workflow.",
+  ),
   HttpApiEndpoint.get('agents', '/api/templates/:name/agents', {
     params: templateParams,
     query: listQuery,
     success: AgentListObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a template's agents, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers an AgentList.",
+  ),
   HttpApiEndpoint.get('agent', '/api/templates/:name/agents/:doc', {
     params: documentParams,
     success: AgentObject,
     error: definitionErrors,
-  }),
+  }).annotate(OpenApi.Description, "Reads one agent of a template, rendered with its parameters' defaults. Answers the Agent."),
   HttpApiEndpoint.get('skills', '/api/templates/:name/skills', {
     params: templateParams,
     query: listQuery,
     success: SkillListObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a template's skills, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers a SkillList.",
+  ),
   HttpApiEndpoint.get('skill', '/api/templates/:name/skills/:doc', {
     params: documentParams,
     success: SkillObject,
     error: definitionErrors,
-  }),
+  }).annotate(OpenApi.Description, "Reads one skill of a template, rendered with its parameters' defaults. Answers the Skill."),
 ) {}
 
 /**
@@ -166,23 +161,32 @@ export class TemplatesGroup extends HttpApiGroup.make('templates').add(
  * away (`nemia unsubscribe`).
  */
 export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
-  HttpApiEndpoint.get('listAll', '/api/subscriptions', { query: listQuery, success: SubscriptionListObject, error: objectErrors }),
+  HttpApiEndpoint.get('listAll', '/api/subscriptions', { query: listQuery, success: SubscriptionListObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Lists the feed's subscriptions, which no namespace holds, a page at a time. Answers a SubscriptionList.",
+  ),
   HttpApiEndpoint.get('get', '/api/subscriptions/:name', {
     params: subscriptionParams,
     success: SubscriptionObject,
     error: objectErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of the feed's subscriptions by its name: the long-lived task it feeds and what of the feed it carries. Answers the Subscription.",
+  ),
   HttpApiEndpoint.post('subscribe', '/api/subscriptions/:name', {
     params: subscriptionParams,
     payload: SubscriptionWrite,
     success: Subscribed.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: [...objectErrors, Failed],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Gives a long-lived task a subscription to the feed under the name in the path: the lines its selectors and level keep, said to it from the feed's end, in digests where asked. Answers Subscribed with a 201, the subscription as written.",
+  ),
   HttpApiEndpoint.delete('unsubscribe', '/api/subscriptions/:name', {
     params: subscriptionParams,
     success: Unsubscribed,
     error: [...objectErrors, Failed],
-  }),
+  }).annotate(OpenApi.Description, 'Takes a subscription away, removing its file. Answers Unsubscribed, its name.'),
 ) {}
 
 /**
@@ -190,24 +194,39 @@ export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
  * its name, the byte its line starts at — a daemon's or the store's that names no factory in no namespace.
  */
 export class EventsGroup extends HttpApiGroup.make('events').add(
-  HttpApiEndpoint.get('listAll', '/api/events', { query: listQuery, success: EventListObject, error: objectErrors }),
+  HttpApiEndpoint.get('listAll', '/api/events', { query: listQuery, success: EventListObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Lists the feed's lines as events, every one, in the order they were written, a page at a time; with watch=true and a resourceVersion, a stream from that byte. Answers an EventList.",
+  ),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/events', {
     params: namespaceParams,
     query: listQuery,
     success: EventListObject,
     error: objectErrors,
-  }),
-  HttpApiEndpoint.get('getAll', '/api/events/:name', { params: eventNameParams, success: EventObject, error: objectErrors }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists the feed's lines as events in one namespace, those naming its factory, in the order they were written, a page at a time. Answers an EventList.",
+  ),
+  HttpApiEndpoint.get('getAll', '/api/events/:name', { params: eventNameParams, success: EventObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Reads one of the feed's lines as an event by its name, the byte its line starts at, a daemon's or the store's that names no factory among them. Answers the Event.",
+  ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/events/:name', {
     params: cardParams,
     success: EventObject,
     error: objectErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of the feed's lines as an event by its name, the byte its line starts at, in the namespace of the factory it names. Answers the Event.",
+  ),
 ) {}
 
 /** The api's discovery: every resource it serves, read off this definition (Kubernetes' `/api`, for Nemia's one group version). */
 export class DiscoveryGroup extends HttpApiGroup.make('discovery').add(
-  HttpApiEndpoint.get('resources', '/api', { success: APIResourceList.annotate({ identifier: 'APIResourceList' }) }),
+  HttpApiEndpoint.get('resources', '/api', { success: APIResourceList.annotate({ identifier: 'APIResourceList' }) }).annotate(
+    OpenApi.Description,
+    "Reads every resource the api serves, read off its own definition: each one's name, singular, kind, scope and verbs, as Kubernetes' /api says them. Answers APIResourceList.",
+  ),
 ) {}
 
 /**

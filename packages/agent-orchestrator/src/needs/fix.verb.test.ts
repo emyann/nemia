@@ -5,9 +5,11 @@
  * refused (`Invalid`); the store's own `tools` need is found by its name and filed in the store's folder (its command, run, in
  * `src/release/nemia-link.boundary.test.ts`); an answer left out, a need no place declares and a fix of a workflow of a
  * factory whose places are not trusted are refused, nothing filed; a repository need named by its factory alone is filed in that
- * factory's repository once its places are trusted, and refused, naming the trust, before; and the fix's phase, output and exit code
- * are read off its task as it settles. The test's store is its own, at `ROOT`, given as `ENV`, and the harness's trust file a folder of
- * its own, so no place is trusted until a test trusts it.
+ * factory's repository once its places are trusted, and refused, naming the trust, before; a workflow's own need of `scope: repository`
+ * is filed in its factory's repository with the workflow's folders, where one with no scope is filed in the store's, and refused for a
+ * factory with no repository (`ownRepository`, which the store's files never hold); and the fix's
+ * phase, output and exit code are read off its task as it settles. The test's store is its own, at `ROOT`, given as `ENV`, and the
+ * harness's trust file a folder of its own, so no place is trusted until a test trusts it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +30,7 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import { trustPlaces } from '../trust/trust.verb.ts';
 import { DEFAULT_HARNESS } from 'agent-runtime/vocabulary';
 import { signInNeedOf } from './harness.ts';
-import { answerVariable, fixOf, followFix, startFix } from './fix.verb.ts';
+import { answerVariable, fixOf, followFix, ownRepository, startFix } from './fix.verb.ts';
 import { toolsNeed } from '../release/nemia-link.store.ts';
 import type { Env } from '../config/config.store.ts';
 
@@ -178,4 +180,44 @@ test("a repository need named by its factory alone runs in the factory's reposit
   assert.equal(fix.workflow, undefined);
   const machine = await refusedBy(startFix({ need: 'toolchain' }));
   assert.ok(machine instanceof Missing, 'a repository need is no need of the machine alone');
+});
+
+test("a workflow's need of scope repository is fixed in its factory's repository with its folders, where one with no scope is fixed in the store's", async () => {
+  const repo = scratch('wf-fix-scoped-');
+  stand().world.repository(repo, { 'a.txt': 'one\n' });
+  const dir = path.join(repo, 'workflows', 'dev');
+  fs.mkdirSync(dir, { recursive: true });
+  const need = (name: string, ...scope: string[]) => [
+    `  - name: ${name}`,
+    '    message: the tool',
+    '    check: exit 1',
+    ...scope,
+    '    fixes:',
+    '      - command: echo installed',
+    '        message: install it',
+  ];
+  fs.writeFileSync(
+    path.join(dir, 'README.md'),
+    ['---', 'needs:', ...need('inside', '    scope: repository'), ...need('outside'), '---', ''].join('\n'),
+  );
+  createFactoryAt(ROOT, { name: 'scoped', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  await run(trustPlaces([repo]));
+  const inside = engine().tasks.get((await run(startFix({ need: 'inside', factory: 'scoped', workflow: 'dev' }))).id)?.spec;
+  assert.ok(inside);
+  assert.equal(inside.cwd, repo);
+  const env = (inside.config as { env: Record<string, string> }).env;
+  assert.equal(env.WF_WORKFLOW_FILES, dir);
+  assert.ok(env.WF_CARRIED_FILES, 'told the carried files, as the check is');
+  const outside = engine().tasks.get((await run(startFix({ need: 'outside', factory: 'scoped', workflow: 'dev' }))).id)?.spec;
+  assert.equal(outside?.cwd, ROOT);
+});
+
+test("a workflow's need of scope repository is fixed in its factory's repository, and refused where the factory has none; one with no scope in none", () => {
+  const scoped: Need = { name: 'inside', message: 'the tool', check: 'exit 1', scope: 'repository' };
+  const unscoped: Need = { name: 'outside', message: 'the tool', check: 'exit 1' };
+  const w = { factory: 'f', workflow: 'dev', dir: '/w' };
+  assert.deepEqual(ownRepository(scoped, { ...w, repository: '/r' }), { repository: '/r' });
+  assert.deepEqual(ownRepository(unscoped, { ...w, repository: '/r' }), {}, 'a need that says no scope is fixed in the store');
+  assert.throws(() => ownRepository(scoped, w), Invalid, 'a factory with no repository');
+  assert.deepEqual(ownRepository(unscoped, w), {});
 });

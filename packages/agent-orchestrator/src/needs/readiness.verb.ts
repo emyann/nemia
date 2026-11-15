@@ -26,7 +26,6 @@ import { placesOf } from '../folder/lookup.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
-import { carriedDirOf } from '../frozen/frozen.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { tried, trustedFolder } from '../runtime-client.ts';
 import { nemiaDir, readUntrusted } from '../nemia/level.store.ts';
@@ -63,6 +62,8 @@ import {
   needsMemo,
   NeedsMemory,
   needsOnce,
+  noRepositoryMessage,
+  workflowCheckOf,
   type FactoryWorkflow,
   type NeedsMemo,
 } from './needs.verb.ts';
@@ -629,7 +630,8 @@ function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts, wan
 /**
  * The places' needs, then each factory's workflows' own: a need that fills a place's is said under its workflow as the place's need, its
  * fixes first, the place's after, as `startFix` finds them; a workflow whose needs do not read says why, and a need of a factory whose
- * places are not trusted (`untrusted`) is `unknown`, its check never run, with the command that trusts them.
+ * places are not trusted (`untrusted`) is `unknown`, its check never run, with the command that trusts them. A workflow's need of
+ * `scope: repository` is read in its factory's repository (`workflowCheckOf`), and is missing, saying why, where the factory has none.
  */
 function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[], untrusted: ReadonlySet<string>): ReadinessPiece[] {
   const place = memo.placeNeeds.filter((need) => !isRepositoryNeed(need));
@@ -658,12 +660,26 @@ function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[], untr
         );
         continue;
       }
-      const key = checkKey({ check: need.check, workflowFiles: w.dir, carriedFiles: carriedDirOf(w.dir) });
-      out.push(needPiece(need, 'workflow', memo.readings.get(key), at));
+      out.push(workflowNeedPiece(memo, w, need));
     }
   }
   return out;
 }
+
+/**
+ * The piece of a factory's workflow's own `need`, as `memo` read it where it is checked (`workflowCheckOf`): in the store's folder, or in
+ * the factory's repository for a need of `scope: repository`; where the factory has none, which the store's files never hold (a factory's
+ * file names one at least) and a factory's type allows, missing, saying why (`noRepositoryMessage`), with no fix offered.
+ * @param memo The process's memory of its needs' readings.
+ * @param w The factory's workflow, with its live folder and its factory's repository.
+ * @param need The need the workflow declares.
+ */
+export const workflowNeedPiece = (memo: NeedsMemo, w: FactoryWorkflow, need: Need): ReadinessPiece => {
+  const at = { factory: w.factory, workflow: w.workflow };
+  const checked = workflowCheckOf(w, need);
+  if (checked === undefined) return needPiece(need, 'workflow', 'missing', at, [], {}, noRepositoryMessage(need));
+  return needPiece(need, 'workflow', memo.readings.get(checkKey(checked)), at);
+};
 
 /**
  * The places' repository needs (`scope: repository`), one piece each per factory, area `repository`, read in the factory's repository

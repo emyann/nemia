@@ -26,12 +26,12 @@ spec:
         - message: "set git's name and email from the GitHub account gh is signed in to: its name (its login where it has none) and its noreply address, <id>+<login>@users.noreply.github.com; where gh is not signed in, take the next fix, which asks for a name and an email"
           command: "node \"$WF_CARRIED_FILES/needs.ts\" identity"
     - name: browser
-      message: "a Chromium that Playwright finds, which the steps' browser tools look at the web app with"
-      check: "ls -d \"${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}\"/chromium-* \"$HOME/Library/Caches/ms-playwright\"/chromium-* 2>/dev/null | grep -q ."
+      message: "the Chromium build the steps' browser tools launch, which they look at the web app with"
+      scope: repository
+      check: "node \"$WF_CARRIED_FILES/needs.ts\" browser"
       fixes:
-        - message: "install Chromium where Playwright looks, with the installer of the Playwright your browser tools run, as the user the daemon runs as"
-          command: "playwright install chromium"
-          kind: typed
+        - message: "install the Chromium build your browser tools' Playwright launches, with that Playwright's own installer, in the repository, as the user the daemon runs as"
+          command: "node \"$WF_CARRIED_FILES/needs.ts\" browser --install"
   steps:
     - name: implement
       place: git

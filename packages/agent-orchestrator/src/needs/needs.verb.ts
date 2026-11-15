@@ -37,8 +37,9 @@ const AT_ONCE = 4;
 
 /**
  * Where a check runs: its command, the folders a workflow's check is told as a step's is — its workflow's (`WF_WORKFLOW_FILES`) and
- * its carried files' (`WF_CARRIED_FILES`) — none for a place's, the folder it runs in (`cwd`: a factory's repository for a need of
- * `scope: repository`, the store's folder where left out), and whether the default harness's kept token is in its environment (`token`).
+ * its carried files' (`WF_CARRIED_FILES`) — none for a place's, the folder it runs in (`cwd`: a factory's repository for a place's or a
+ * workflow's need of `scope: repository`, the store's folder where left out), and whether the default harness's kept token is in its
+ * environment (`token`).
  */
 export type CheckAt = {
   readonly check: string;
@@ -233,8 +234,16 @@ const repositoryChecks = (memo: NeedsMemo, factories: readonly FactoryListing[])
     return memo.placeNeeds.filter(isRepositoryNeed).map((need) => repositoryCheckOf(need, repository));
   });
 
-/** A factory's workflow: its factory, its folder's name, and the folder its live files are in. */
-export type FactoryWorkflow = { readonly factory: string; readonly workflow: string; readonly dir: string };
+/**
+ * A factory's workflow: its factory, its folder's name, the folder its live files are in, and its factory's first repository
+ * (`factoryRepository`), where its needs of `scope: repository` are checked and fixed, absent for a factory with none.
+ */
+export type FactoryWorkflow = {
+  readonly factory: string;
+  readonly workflow: string;
+  readonly dir: string;
+  readonly repository?: string;
+};
 
 /**
  * The workflows of `factories` as their files are now, each with its folder: under the factory's tree where it was made from a template,
@@ -246,7 +255,13 @@ export const factoryWorkflows = (factories: readonly FactoryListing[]): FactoryW
     if ('error' in f) return [];
     const root = f.tree ?? f.repos[0];
     if (root === undefined) return [];
-    return f.workflows.map((workflow) => ({ factory: f.name, workflow, dir: path.join(root, 'workflows', workflow) }));
+    const repository = factoryRepository(f);
+    return f.workflows.map((workflow) => ({
+      factory: f.name,
+      workflow,
+      dir: path.join(root, 'workflows', workflow),
+      ...(repository === undefined ? {} : { repository }),
+    }));
   });
 
 /**
@@ -264,7 +279,43 @@ export const trustedOf = Effect.fnUntraced(function* (factories: readonly Factor
  * @param needs The needs the workflow declares.
  */
 export const workflowChecks = (w: FactoryWorkflow, needs: readonly Need[]): CheckAt[] =>
-  needs.map((need) => ({ check: need.check, workflowFiles: w.dir, carriedFiles: carriedDirOf(w.dir) }));
+  needs.flatMap((need) => {
+    const at = workflowCheckOf(w, need);
+    return at === undefined ? [] : [at];
+  });
+
+/**
+ * Where a factory's workflow's `need` is checked (`ownCheckOf`): with the workflow's live folders, and in its factory's first repository
+ * for a need of `scope: repository`; undefined for such a need of a factory with no repository, which is never run and reads unmet.
+ * @param w The factory's workflow, with its live folder and its factory's repository.
+ * @param need The need the workflow declares.
+ */
+export const workflowCheckOf = (w: FactoryWorkflow, need: Need): CheckAt | undefined =>
+  ownCheckOf(need, { workflowFiles: w.dir, carriedFiles: carriedDirOf(w.dir) }, w.repository);
+
+/**
+ * Where a workflow's own `need` is checked: with the workflow's `folders` as a step is told them, in the store's folder where it says
+ * no scope, and in `repository` where it says `scope: repository`, as a place's repository need is (`repositoryCheckOf`); undefined
+ * for a repository need where there is no repository, which is never run and reads unmet (`noRepositoryMessage`).
+ * @param need The workflow's need.
+ * @param folders The workflow's folders the check is told: its own, and its carried files' where it has them.
+ * @param repository The repository a need of `scope: repository` is checked in, absent where there is none.
+ */
+export const ownCheckOf = (
+  need: Need,
+  folders: { readonly workflowFiles: string; readonly carriedFiles?: string },
+  repository: string | undefined,
+): CheckAt | undefined => {
+  if (!isRepositoryNeed(need)) return { check: need.check, ...folders };
+  return repository === undefined ? undefined : { check: need.check, ...folders, cwd: repository };
+};
+
+/**
+ * What a workflow's need of `scope: repository` says where there is no repository to check it in: unmet, and why.
+ * @param need The workflow's repository need.
+ */
+export const noRepositoryMessage = (need: Need): string =>
+  `${need.message}: unmet, since it is checked in its factory's repository and there is none: file the factory on a repository, then nemia doctor reads it`;
 
 /**
  * One sweep over the needs of the store `memo` reads for: every check of the builtin places, of every declared harness (the default
@@ -364,7 +415,8 @@ export const runNeedNames = (
  * A workflow's or a place's machine check the memory has no reading of is run now, once (`checkRan`), and kept, and its key asked for
  * again on the next sweep, so a run started between two sweeps is held on its first pass. A harness's check and a repository need's
  * (checked in the run's repository) are read off the memory alone, which every sweep fills: one not read yet is `unknown`, and holds
- * nothing, so a process that never sweeps holds no run on a harness.
+ * nothing, so a process that never sweeps holds no run on a harness. A workflow's own need of `scope: repository` is checked in the run's
+ * repository (`ownCheckOf`), and reads missing for a run in none, saying so (`noRepositoryMessage`).
  */
 export const runNeeds = Effect.fnUntraced(function* (memo: NeedsMemo | undefined, run: Run, steps: readonly StepSpec[] = []) {
   if (memo === undefined || run.workflowFiles === undefined || !heldOnNeeds(run)) return [] as NeedHeld[];
@@ -385,10 +437,26 @@ export const runNeeds = Effect.fnUntraced(function* (memo: NeedsMemo | undefined
       held.push({ name: need.name, state, message: need.message, fix: fixWords(need, true, fixAt) });
       continue;
     }
-    const state = yield* readOrCheck(memo, fromPlace ? { check: need.check } : { check: need.check, workflowFiles, ...carriedFiles });
-    held.push({ name: need.name, state, message: need.message, fix: fixWords(need, fromPlace, workflow) });
+    held.push(
+      yield* checkedHeld(
+        memo,
+        need,
+        fromPlace ? { check: need.check } : ownCheckOf(need, { workflowFiles, ...carriedFiles }, repository),
+        fixWords(need, fromPlace, workflow),
+      ),
+    );
   }
   return held;
+});
+
+/**
+ * A run's `need` read where it is checked (`at`, through `readOrCheck`), with the words of its `fix`; missing, saying why, where it has
+ * no place to be checked: a workflow's need of `scope: repository` of a run in no repository (`noRepositoryMessage`).
+ */
+const checkedHeld = Effect.fnUntraced(function* (memo: NeedsMemo, need: Need, at: CheckAt | undefined, fix: string) {
+  if (at === undefined)
+    return { name: need.name, state: 'missing', message: noRepositoryMessage(need), fix: noRepositoryMessage(need) } satisfies NeedHeld;
+  return { name: need.name, state: yield* readOrCheck(memo, at), message: need.message, fix } satisfies NeedHeld;
 });
 
 /**

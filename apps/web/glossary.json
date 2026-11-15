@@ -210,6 +210,29 @@
       "term": "Viewer",
       "meaning": "what draws a step's file in a sheet with an address of its own (`?view=<step>/<path>`, `apps/web/src/lib/viewAddress.ts`), which Back closes: a picture, markdown, JSON or text, by the kind the api serves it as and its extension, never its bytes, and none for a file it cannot draw, offered by its link (`viewerOf`, `apps/web/src/lib/viewers.ts`, proved by `apps/web/contracts/artifact-viewer.contract.ts`).",
       "type": "Viewer"
+    },
+    {
+      "term": "Store rail",
+      "meaning": "the frame's rail, 80 wide at the window's left on every page: her face, then the destinations that span the store in three groups — Across factories (Factories, Waiting), Yours (Agents, Skills), You (Stats, Settings) — then the account, to come (`RAIL_GROUPS`, `apps/web/src/components/nav/nav.ts`; drawn by `apps/web/src/components/frame/FrameRail.tsx`). Waiting carries the count of the runs that wait on the person in every factory. Under 768 pixels it is a drawer the menu button opens.",
+      "type": "RailGroup"
+    },
+    {
+      "term": "Factory pane",
+      "meaning": "one factory's pane, 360 wide beside the rail on a page under its path: the switcher and Start a run at its head, then its places, Floor, Runs, Inbox, Workflows, Agents, Skills and Settings (`PANE_PLACES`, `apps/web/src/components/frame/FactoryPane.tsx`). How it stands — docked, folded by the menu button or Ctrl+B and kept in the `sidebar_state` cookie, covered by the side sheet under 1600 pixels, or in the drawer under 768 — is `frameFold`'s `pane` (`apps/web/src/lib/frameFold.ts`, proved by `apps/web/contracts/frame-fold.contract.ts`).",
+      "type": "PaneForm"
+    },
+    {
+      "term": "Machine bar",
+      "meaning": "the frame's foot, across the window under the rail, the pane, the page and the sheet: the machine's gauges button (the daemon, the runs and sessions, the feed, Nemia's presence and the quota in short), the version, then the pause (`apps/web/src/components/frame/MachineBar.tsx`). It holds what the top bar held; the page's head holds the page's name alone."
+    },
+    {
+      "term": "Seat",
+      "meaning": "where a page sits in the frame, read from its path alone by `seatOf` (`apps/web/src/components/nav/nav.ts`): at the store's level under a destination of the rail, or at a factory's under a place of its pane; it says what the rail and the pane light, and the page's name (`pageNameOf`).",
+      "type": "Seat"
+    },
+    {
+      "term": "Factory path",
+      "meaning": "the address of a factory's place, `/factories/<name>/<place>`, a run's, a step's and a card's page included: the factory is a segment of the path, never a key of the search. Every old address that named it as `?factory=` is sent to its path, its other keys kept (`factoryRedirect`, `apps/web/src/lib/factoryAddress.ts`, in the root's `beforeLoad`), and a run's or a card's page to where its namespace says (`objectHome`)."
     }
   ]
 }

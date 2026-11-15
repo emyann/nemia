@@ -36,10 +36,11 @@ export function finishedSearch(search: Record<string, unknown>): { older?: strin
 }
 
 /**
- * The trail a search read by `finishedSearch` holds: its tokens in the order they were followed, none for the first page.
+ * The trail a search holds: its tokens in the order they were followed, none for the first page, nor for an `older` that is no trail
+ * (`olderOf`): a route's search carries its parent's keys as the address wrote them, unread by `finishedSearch`.
  * @param search The search, by its `older`; absent on the first page.
  */
-export const trailOf = (search: { older?: string }): string[] => (search.older ? search.older.split(JOIN) : []);
+export const trailOf = (search: { older?: unknown }): string[] => olderOf(search.older)?.split(JOIN) ?? [];
 
 /**
  * `prev`, the address's search, at `trail`: every other key kept, `older` set for a trail and dropped for none.

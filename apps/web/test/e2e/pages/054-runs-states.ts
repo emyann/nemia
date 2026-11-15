@@ -55,7 +55,7 @@ export default {
    * pair of either is under 4.5:1 in either scheme. Writes nothing.
    */
   name: 'runs-states',
-  route: `/runs?factory=${EMPTY}`,
+  route: `/factories/${EMPTY}/runs`,
   expect: async (page) => {
     await expectTexts(
       page.locator('[data-plate="quiet"] [data-plate-count]'),

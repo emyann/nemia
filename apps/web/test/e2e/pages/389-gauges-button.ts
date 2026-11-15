@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { atWork, atWorkWords, versionWords } from '../../../src/lib/footer.ts';
 import type { Version } from '../../../src/lib/api/version.ts';
-import { gaugesButtonOf, openAnswered, photograph, themeOf, topBarOf } from '../board.ts';
+import { gaugesButtonOf, openAnswered, photograph, themeOf, machineBarOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, feedAnswered, idle, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -12,21 +12,21 @@ import { OUT } from '../world.ts';
 const lane = (page: Page): Locator => page.getByRole('complementary', { name: 'Queued cards' });
 
 /** The gauges button's own box, which carries what its dot and mark say. */
-const markOf = (page: Page): Locator => topBarOf(page).locator('[data-gauges-button]');
+const markOf = (page: Page): Locator => machineBarOf(page).locator('[data-gauges-button]');
 
 /** What the api answers at `pathname`, read as the board reads it. */
 async function answer<T>(page: Page, pathname: string): Promise<T> {
   return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
 }
 
-/** The button's dot says the daemon's tone, its mark the quota near its limit, and its name both; the feed is followed; no bottom bar. */
+/** The button's dot says the daemon's tone, its quota in money that it nears its limit, and its name both; the feed is followed. */
 async function says(page: Page): Promise<void> {
   await expectCount(page.locator('footer[data-frame-footer]'), 0, 'no bottom bar: the gauges button holds its facts');
   await expectVisible(markOf(page).and(page.locator('[data-daemon-dot="none"][data-tone="down"]')), "the dot: the e2e's api ticks nothing");
-  await expectVisible(markOf(page).locator('[data-quota-mark]'), 'the money mark: the week is past the mark');
+  await expectVisible(markOf(page).locator('[data-quota-line][data-quota-mark]'), 'the quota in money: the week is past the mark');
   await expectVisible(
-    topBarOf(page).getByRole('button', { name: 'This machine: daemon none, quota near its limit', exact: true }),
-    'its name says the daemon and the quota',
+    machineBarOf(page).getByRole('button', { name: /^This machine: none, .*, quota .*, near its limit$/ }),
+    'its name says the daemon, what is at work and the quota',
   );
   await feedAnswered(page);
   await expectVisible(markOf(page).and(page.locator('[data-feed="open"]')), 'and that the board follows the feed');
@@ -67,7 +67,7 @@ async function opens(page: Page): Promise<void> {
 
 export default {
   /**
-   * The top bar's gauges button, on the Factory: its dot in the daemon's tone, a money mark while the quota nears its limit, its name
+   * The machine bar's gauges button, on the Factory: its dot in the daemon's tone, its quota in money while it nears its limit, its name
    * saying both; it opens the machine's gauges in the frame's side sheet, which hold what the bottom bar held, and closes them. The pause
    * is its own page's (`480-pause.ts`).
    */

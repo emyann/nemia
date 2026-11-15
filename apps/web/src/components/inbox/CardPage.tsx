@@ -10,7 +10,7 @@ import { labelCard } from '@/lib/api/labels';
 import { workflowNameOf } from '@/lib/api/workflows';
 import { startedCard } from '@/lib/inbox';
 
-import { factoryOf } from '../nav/nav';
+import { seatFactory } from '../nav/nav';
 import { useSeat } from '../nav/useSeat';
 
 /**
@@ -75,7 +75,7 @@ export function CardPage({ name }: { name: string }) {
 
 /** The way back to the Inbox: the factory's, on a page under its path, else every factory's. */
 export function BackToInbox() {
-  const factory = factoryOf(useSeat());
+  const factory = seatFactory(useSeat());
   const className = 'text-body-medium text-muted-foreground hover:text-foreground';
   return factory === undefined ? (
     <Link to="/inbox" className={className}>

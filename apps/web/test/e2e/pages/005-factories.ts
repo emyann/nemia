@@ -1,23 +1,25 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { litOf, photograph, pick, pickerOf, railPlace, sectionsOf, sidebar, startOf, themeOf } from '../board.ts';
+import { litOf, photograph, pickerOf, railPlace, sidebar, startOf, themeOf } from '../board.ts';
 import { cardOf, showFinished } from '../canvas.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, FOLDER, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
-/** The factories the open picker lists after All factories, by name, in its order. */
+/** The factories the open picker lists, by name, in its order. */
 const pickedFrom = (page: Page) =>
   page
     .getByRole('listbox')
     .locator('[data-factory]')
     .evaluateAll((items) => items.map((item) => item.getAttribute('data-factory')));
 
-/** Opens the sidebar's picker, and refuses unless it lists All factories first, then `names`, in their order. */
+/** Opens the pane's switcher, and refuses unless it lists `names`, in their order, then a new factory to come, which it does not offer. */
 async function pickerLists(page: Page, names: readonly string[], assertion: string): Promise<void> {
   await pickerOf(page).locator('button').first().click();
-  await expectVisible(page.getByRole('option').first().getByText('All factories', { exact: true }), `${assertion}: All factories first`);
+  const last = page.getByRole('option').last();
+  await expectVisible(last.getByText('New factory · to come', { exact: true }), `${assertion}: a new factory to come last`);
+  if ((await last.getAttribute('aria-disabled')) !== 'true') throw new Refused(`${assertion}: the new factory is not offered yet`);
   const listed = await pickedFrom(page);
   if (listed.join() !== names.join()) throw new Refused(`${assertion}: ${names.join(', ')} — it lists ${listed.join(', ')}`);
 }
@@ -28,18 +30,18 @@ const LISTED = [FACTORIES.broken, ...FACTORIES.others.slice(0, 2), FACTORIES.hir
 export default {
   /**
    * The Factories at `/`: every factory a block on a canvas, and a file that does not read a block that says why; the default factory is
-   * none, in the canvas or the switcher, once a factory is filed, though it holds runs. The picker lists All factories, then every factory,
-   * each with its runs in flight, or that its file does not read. A block double-clicked opens its factory's floor, at `/factories/<name>`,
-   * with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — its name in the picker, Factories lit, and a start in
-   * the rail. A name no factory has says so, answered with no 4xx, and leads back. The default factory's floor still answers its address,
-   * the picker listing it after the others, its FAB asking which factory; All factories picked there leads to the Overview.
+   * none, in the canvas or the switcher, once a factory is filed, though it holds runs. On a floor the pane's switcher lists every factory,
+   * each with its runs in flight, or that its file does not read, then a new factory to come. A block double-clicked opens its factory's floor, at `/factories/<name>`,
+   * with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — its name in the switcher, Factories lit, and a start in
+   * the pane. A name no factory has says so, answered with no 4xx, and leads back. The default factory's floor still answers its address,
+   * the switcher listing it after the others, its start asking which factory; Factories in the rail leads back.
    */
   name: 'factories',
   route: '/',
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(railPlace(page, 'Overview').and(litOf(page)), 'the rail lights Overview at /');
-    await expectCount(sectionsOf(page).and(litOf(page)), 0, 'and no list');
+    await expectVisible(railPlace(page, 'Factories').and(litOf(page)), 'the rail lights Factories at /');
+    await expectCount(page.locator('[data-factory-pane]'), 0, 'and no factory pane, the page being the store’s');
     const blocks = page.locator('.react-flow__node [data-factory]');
     await expectCount(blocks, LISTED.length, 'a block for each factory filed');
     await expectTexts(
@@ -65,6 +67,17 @@ export default {
     if (!why.includes(`${FACTORIES.broken}.json`) || !why.includes('repos'))
       throw new Refused(`the broken block says which file and why, whole on hover — its title is ${JSON.stringify(why)}`);
 
+    await settled(page);
+    await photograph(page, path.join(OUT, `factories-canvas-${await themeOf(page)}.png`));
+
+    await hiring.dblclick();
+    await page.waitForURL((url) => url.pathname === `/factories/${FACTORIES.hiring.name}`, { timeout: WAIT_MS });
+    await idle(page);
+    await sidebar(page);
+    await expectVisible(
+      railPlace(page, 'Factories').and(litOf(page)),
+      `the block opens ${FACTORIES.hiring.name}'s floor, named in the switcher, Factories lit`,
+    );
     await pickerLists(page, LISTED, 'the picker lists every factory, the default none');
     const brokenItem = page.getByRole('listbox').locator(`[data-factory="${FACTORIES.broken}"]`);
     await expectVisible(
@@ -82,17 +95,7 @@ export default {
     await photograph(page, path.join(OUT, `factories-picker-${await themeOf(page)}.png`));
     await page.keyboard.press('Escape');
     await expectCount(page.getByRole('listbox'), 0, 'Escape closes the picker');
-    await settled(page);
-    await photograph(page, path.join(OUT, `factories-canvas-${await themeOf(page)}.png`));
 
-    await hiring.dblclick();
-    await page.waitForURL((url) => url.pathname === `/factories/${FACTORIES.hiring.name}`, { timeout: WAIT_MS });
-    await idle(page);
-    await sidebar(page);
-    await expectVisible(
-      railPlace(page, 'Factories').and(litOf(page)),
-      `the block opens ${FACTORIES.hiring.name}'s floor, named in the switcher, Factories lit`,
-    );
     await showFinished(page);
     await expectCount(
       page.locator('.react-flow__node'),
@@ -107,7 +110,7 @@ export default {
         `the card says where its steps work on hover, not in a row of its own, ending in runs/${FOLDER.id}/work — it says ${JSON.stringify(where)}`,
       );
     }
-    await expectVisible(startOf(page), `and the rail offers a start in ${FACTORIES.hiring.name}`);
+    await expectVisible(startOf(page), `and the pane offers a start in ${FACTORIES.hiring.name}`);
     await settled(page);
     await photograph(page, path.join(OUT, `factories-floor-${await themeOf(page)}.png`));
 
@@ -138,8 +141,8 @@ export default {
     await page.getByRole('complementary').getByRole('button', { name: 'Close' }).click();
     await pickerLists(page, [...LISTED, 'default'], 'on its floor, the picker lists the default factory after the others');
     await page.keyboard.press('Escape');
-    await pick(page, 'All factories');
+    await railPlace(page, 'Factories').click();
     await page.waitForURL((url) => url.pathname === '/', { timeout: WAIT_MS });
-    await expectCount(blocks, LISTED.length, 'and All factories picked on a floor leads to the Overview');
+    await expectCount(blocks, LISTED.length, 'and Factories in the rail leads back to every factory');
   },
 } satisfies PageSpec;

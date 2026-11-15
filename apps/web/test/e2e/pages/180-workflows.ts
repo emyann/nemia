@@ -18,7 +18,7 @@ export default {
   route: '/workflows',
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(railPlace(page, 'Workflows').and(litOf(page)), 'the sidebar lights Workflows on its page');
+    await expectVisible(railPlace(page, 'Agents').and(litOf(page)), 'the rail lights Agents on the store’s Workflows');
     const { good, broken, yours } = WORKFLOWS;
     const card = (name: string) => page.locator(`section[aria-label="Workflow ${name}"]`);
     await expectCount(page.locator('section[aria-label^="Workflow "]'), 1, 'with no factory, a card for yours alone');
@@ -56,12 +56,12 @@ export default {
         ['yours', yours.name],
       ] as const) {
         const href = await card(name).getByRole('heading').getByRole('link').getAttribute('href');
-        const to = `/workflows/${from}/${name}?factory=${hiring.name}`;
+        const to = `/factories/${hiring.name}/workflows/${from}/${name}`;
         if (href !== to) throw new Refused(`${name}'s card links its page in ${hiring.name}, ${to} — it goes to ${href}`);
       }
       await nextVisit(page, async (again) => {
         await again.locator(`section[aria-label="Workflow ${good.name}"]`).getByRole('heading').getByRole('link').click();
-        await again.waitForURL((url) => url.pathname === `/workflows/repo/${good.name}`, { timeout: WAIT_MS });
+        await again.waitForURL((url) => url.pathname === `/factories/${hiring.name}/workflows/repo/${good.name}`, { timeout: WAIT_MS });
         await expectVisible(again.locator('h1', { hasText: new RegExp(`^${good.name}$`) }), "a card's name opens the workflow's page");
         await again.goBack({ waitUntil: 'load' });
         await again.waitForURL((url) => url.pathname === '/workflows', { timeout: WAIT_MS });

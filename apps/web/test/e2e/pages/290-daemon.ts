@@ -51,7 +51,7 @@ export default {
     if (fs.existsSync(file)) throw new Refused(`the seeded store has no daemon.json — ${file} is there`);
     const line = page.locator('[data-gauges] [data-daemon]');
     const dot = (kind: string, tone: string, why: string) =>
-      expectCount(page.locator(`header[data-frame-header] [data-gauges-button][data-daemon-dot="${kind}"][data-tone="${tone}"]`), 1, why);
+      expectCount(page.locator(`footer[data-machine-bar] [data-gauges-button][data-daemon-dot="${kind}"][data-tone="${tone}"]`), 1, why);
     const shoot = async (what: string) => {
       await settled(page);
       await photograph(page, path.join(OUT, `daemon-${what}-${await themeOf(page)}.png`), { fullPage: true });
@@ -137,7 +137,7 @@ export default {
       fs.writeFileSync(stats, JSON.stringify({ ...JSON.parse(seeded), at: new Date().toISOString(), unobserved }, null, 2));
       await reload(page);
       await dot('ticking', 'warn', "a daemon that ticks while its last pass could not read a harness warns on the gauges button's dot");
-      const warned = page.locator('header[data-frame-header] [data-gauges-button][data-daemon-dot="ticking"]');
+      const warned = page.locator('footer[data-machine-bar] [data-gauges-button][data-daemon-dot="ticking"]');
       await expectVisible(warned.getByRole('button', { name: /^This machine: daemon ticking, harness unread/ }), 'and its name says so');
       const hover = (await warned.getAttribute('title'))?.split(String.fromCharCode(10)) ?? [];
       const [said = '', ...why] = hover;

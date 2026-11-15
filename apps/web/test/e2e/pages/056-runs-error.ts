@@ -41,7 +41,7 @@ export default {
         "under the page's name, in the top bar",
       );
       await expectCount(other.locator('[data-plate], [data-run]'), 0, 'and draws no part');
-      await expectVisible(other.locator('header[data-frame-header] [data-gauges-button]'), 'the frame around it stands');
+      await expectVisible(other.locator('footer[data-machine-bar] [data-gauges-button]'), 'the frame around it stands');
       await settled(other);
       await photographBothWidths(other, OUT, 'runs-error', 'error');
       await contrastHolds(other, ['[role="alert"] p:first-child', '[data-error-reason]']);

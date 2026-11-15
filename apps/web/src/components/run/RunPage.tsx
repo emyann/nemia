@@ -9,7 +9,7 @@ import { Receipts } from './Receipts';
 import { KindsBehind } from './KindsBehind';
 import { readGone } from '@/lib/api/gone';
 import { useRunView, type RunDetail } from '@/lib/runView';
-import { factoryOf } from '../nav/nav';
+import { seatFactory } from '../nav/nav';
 import { useSeat } from '../nav/useSeat';
 
 /**
@@ -85,7 +85,7 @@ function Run({ run }: { run: RunDetail }) {
 
 /** The way back to the runs: the factory's, on a page under its path, else every factory's. */
 export function BackToRuns() {
-  const factory = factoryOf(useSeat());
+  const factory = seatFactory(useSeat());
   const className = 'text-body-medium text-muted-foreground hover:text-foreground';
   return factory === undefined ? (
     <Link to="/runs" className={className}>

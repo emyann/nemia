@@ -117,14 +117,6 @@ test('the setup banner is raised by a missing piece a run waits on alone, says w
   });
 });
 
-test("seatName: the page's head names the place of its factory's pane, the rail's destination it sits under, or Nemia", async () => {
-  const { seatName } = await import('../src/components/frame/FrameHeader.tsx');
-  assert.equal(seatName({ level: 'factory', factory: 'kit', place: 'runs' }), 'Runs');
-  assert.equal(seatName({ level: 'store', rail: 'waiting' }), 'Waiting');
-  assert.equal(seatName({ level: 'store', rail: 'nemia' }), 'Nemia');
-  assert.equal(seatName(undefined), undefined, 'an address no route has is named nothing');
-});
-
 test("presenceWord: the machine bar says Nemia's session in a word, down first, then answering, then what she asks", async () => {
   const { presenceWord } = await import('../src/components/frame/MachineBar.tsx');
   const here = { runsWaiting: 0, asksWaiting: 0, notSent: false, down: false, answering: false, unread: 0 };

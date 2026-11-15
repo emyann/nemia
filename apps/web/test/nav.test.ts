@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { litOf, PANE_PLACES, pickTo, placeHref, RAIL_GROUPS, railHref, seatOf, tabsOf } from '../src/components/nav/nav.ts';
+import { litOf, pageNameOf, PANE_PLACES, pickTo, placeHref, RAIL_GROUPS, railHref, seatOf, tabsOf } from '../src/components/nav/nav.ts';
 
 test("RAIL_GROUPS and PANE_PLACES: the store rail's groups and the factory pane's places, in their order", async (t) => {
   await t.test('the rail holds what spans factories, then yours, then the person’s, each group its destinations in order', () => {
@@ -97,6 +97,26 @@ test('litOf, railHref and placeHref: what the rail lights, and where the rail an
     for (const place of PANE_PLACES)
       assert.deepEqual(seatOf(placeHref(place.id, 'kit')), { level: 'factory', factory: 'kit', place: place.id });
   });
+});
+
+test("pageNameOf: a page's head names its factory's place, else the store's page itself, else nothing", () => {
+  const rows: [string, string | undefined][] = [
+    ['/factories/kit/runs/r-1', 'Runs'],
+    ['/factories/kit', 'Floor'],
+    ['/factories/kit/proposals/p', 'Settings'],
+    ['/', 'Factories'],
+    ['/runs', 'Runs'],
+    ['/labels/k/v', 'Runs'],
+    ['/inbox/card', 'Inbox'],
+    ['/workflows/repo/dev', 'Workflows'],
+    ['/agents/yours/a', 'Agents'],
+    ['/agents/skills/new', 'Skills'],
+    ['/stats', 'Stats'],
+    ['/tokens', 'Settings'],
+    ['/chat', 'Nemia'],
+    ['/nowhere', undefined],
+  ];
+  for (const [path, name] of rows) assert.equal(pageNameOf(path), name, path);
 });
 
 test("tabsOf: a tab's page has the tabs of Settings, in their order, and any other page none", () => {

@@ -88,7 +88,7 @@ export function MachineBar({ path, feed }: { path: string; feed: FeedStatus }) {
         <span aria-hidden className={`size-2 shrink-0 rounded-full ${DOT[dot.tone]}`} />
         <span className="min-w-0 truncate">{parts.join(' · ')}</span>
         <span aria-hidden>·</span>
-        <span data-quota-line className={cn('shrink-0', short.marked && ink.money)}>
+        <span data-quota-line data-quota-mark={short.marked ? '' : undefined} className={cn('shrink-0', short.marked && ink.money)}>
           {short.text}
         </span>
         {version.data && (

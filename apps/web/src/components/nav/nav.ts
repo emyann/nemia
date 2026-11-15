@@ -42,14 +42,16 @@ export const tabsOf = (path: string): readonly SettingsTab[] | undefined =>
   SETTINGS_TABS.some((tab) => tab.to === path) ? SETTINGS_TABS : undefined;
 
 /** The store's pages, each with the rail destination it sits under, in the order they are read: the first that holds the path wins. */
-const STORE_SEATS: readonly { lights: (path: string) => boolean; rail: RailId | 'nemia' }[] = [
-  { lights: (path) => path === '/', rail: 'factories' },
-  { lights: (path) => under('/runs')(path) || under('/labels')(path) || under('/inbox')(path), rail: 'waiting' },
-  { lights: under('/agents/skills'), rail: 'skills' },
-  { lights: (path) => under('/agents')(path) || under('/workflows')(path), rail: 'agents' },
-  { lights: under('/stats'), rail: 'stats' },
-  { lights: (path) => SETTINGS_TABS.some((tab) => under(tab.to)(path)), rail: 'settings' },
-  { lights: under('/chat'), rail: 'nemia' },
+const STORE_SEATS: readonly { lights: (path: string) => boolean; rail: RailId | 'nemia'; name: string }[] = [
+  { lights: (path) => path === '/', rail: 'factories', name: 'Factories' },
+  { lights: (path) => under('/runs')(path) || under('/labels')(path), rail: 'waiting', name: 'Runs' },
+  { lights: under('/inbox'), rail: 'waiting', name: 'Inbox' },
+  { lights: under('/agents/skills'), rail: 'skills', name: 'Skills' },
+  { lights: under('/agents'), rail: 'agents', name: 'Agents' },
+  { lights: under('/workflows'), rail: 'agents', name: 'Workflows' },
+  { lights: under('/stats'), rail: 'stats', name: 'Stats' },
+  { lights: (path) => SETTINGS_TABS.some((tab) => under(tab.to)(path)), rail: 'settings', name: 'Settings' },
+  { lights: under('/chat'), rail: 'nemia', name: 'Nemia' },
 ];
 
 /** The pane's place each first segment under a factory's path opens, its floor being the path itself. */
@@ -85,7 +87,7 @@ export function seatOf(path: string): Seat | undefined {
  *
  * @param seat where the page sits
  */
-export const factoryOf = (seat: Seat | undefined): string | undefined => (seat?.level === 'factory' ? seat.factory : undefined);
+export const seatFactory = (seat: Seat | undefined): string | undefined => (seat?.level === 'factory' ? seat.factory : undefined);
 
 /** A destination of the rail: its key, its name and its icon. */
 type RailDestination = { readonly id: RailId; readonly label: string; readonly icon: LucideIcon };
@@ -183,7 +185,7 @@ export const placeHref = (place: PanePlace, factory: string): string =>
  *
  * @param path the address of the page
  */
-export const frameRunsQuery = (path: string) => openRunsQuery(factoryOf(seatOf(path)));
+export const frameRunsQuery = (path: string) => openRunsQuery(seatFactory(seatOf(path)));
 
 /** The pane's places whose page reads one object by the next segment, a run or a card, which a pick sends to the place's list. */
 const OBJECT_PLACES: ReadonlySet<string> = new Set(['runs', 'inbox']);
@@ -209,4 +211,17 @@ export function pickTo(path: string, search: Record<string, unknown>, factory: s
   if (rest.length > 0 && OBJECT_PLACES.has(seat.place)) return placeHref(seat.place, factory);
   const tail = rest.length > 0 ? `/${rest.join('/')}` : '';
   return `${placeHref(seat.place, factory)}${tail}${defaultStringifySearch(kept)}`;
+}
+
+/**
+ * The name a page's head gives the page at `path`: under a factory's path its pane's place, at the store's level the page's own, the
+ * rail's destination it sits under holding several (Waiting the runs and the inbox, Agents the agents and the workflows); none for an
+ * address no route has.
+ *
+ * @param path the address of the page
+ */
+export function pageNameOf(path: string): string | undefined {
+  const seat = seatOf(path);
+  if (seat?.level === 'factory') return PANE_PLACES.find((place) => place.id === seat.place)?.label;
+  return seat && STORE_SEATS.find((one) => one.lights(path))?.name;
 }

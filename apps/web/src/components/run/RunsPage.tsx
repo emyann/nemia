@@ -30,7 +30,7 @@ export const loadRuns = (client: QueryClient, at: RunsAt, firstPage: () => never
       .ensureQueryData(finishedRunsQuery(at.factory, trailOf(at), at.l))
       .then((page) => Promise.all(page.runs.map((run) => client.prefetchQuery(runLinesQuery(run.id)))))
       .catch((error: unknown) => {
-        if (at.older !== undefined && error instanceof ReadRefusal && error.status === 422) firstPage();
+        if (trailOf(at).length > 0 && error instanceof ReadRefusal && error.status === 422) firstPage();
         throw error;
       }),
   ]);

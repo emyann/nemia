@@ -62,7 +62,9 @@ test('finishedSearch, trailOf, newerOf, olderTrailOf, pageSaid and rowsSaid: the
   await t.test('REFUSED: a trail that is no string of tokens, or holds an empty one, is no trail', () => {
     for (const older of ['', '~', 'f.a~', '~f.a', 'f.a~~f.b', 3, null, undefined, ['f.a']]) {
       assert.deepEqual(finishedSearch({ older }), {}, JSON.stringify(older));
+      assert.deepEqual(trailOf({ older }), [], `read unvalidated, ${JSON.stringify(older)} is the first page too`);
     }
+    assert.deepEqual(trailOf({ older: 'bogus' }), [], 'a search that carries its parent’s raw `older` sends no token that is none');
   });
   await t.test("Older puts the page's continue on the trail, Newer takes the last off: none at each end", () => {
     const first = { trail: [], next: 'f.a', count: 9 };

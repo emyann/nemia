@@ -190,3 +190,29 @@ test('REFUSED: a step, a try and a run served with codes nothing makes together,
     assert.throws(() => Schema.encodeUnknownSync(Run)(bad), `${what}, encoded`);
   }
 });
+
+test("a step's files keep the path from their step's folder, on each kind of file, and one served without it still decodes", () => {
+  const files = [
+    {
+      path: '/store/runs/r-1/artifacts/build/shot.png',
+      relativePath: 'shot.png',
+      name: 'shot.png',
+      url: '/api/runs/r-1/steps/build/artifacts/shot.png',
+      kind: 'image',
+      size: 3,
+    },
+    {
+      path: '/store/runs/r-1/artifacts/build/notes.md',
+      relativePath: 'notes.md',
+      pruned: 'removed by a prune',
+      prunedAt: '2026-11-15T00:00:00.000Z',
+    },
+    { path: '/store/runs/r-1/artifacts/build/sub', relativePath: 'sub' },
+    { path: '/tmp/elsewhere.png' },
+  ];
+  const run = structuredClone(judged) as { status: { steps: { files: unknown[] }[] } };
+  run.status.steps[0]!.files = files;
+  const decoded = Schema.decodeUnknownSync(Run)(run) as unknown as { status: { steps: { files: unknown[] }[] } };
+  assert.deepEqual(decoded.status.steps[0]!.files, files);
+  assert.deepEqual(Schema.encodeSync(Run)(Schema.decodeUnknownSync(Run)(run)), run);
+});

@@ -280,10 +280,19 @@ export const StepFiled = Schema.Struct({
   }),
 });
 
+/** A file's path from the step's folder that holds it, never the server's: what a client keys, matches and addresses a file by. */
+const relativePath = Schema.optionalKey(
+  Schema.String.annotate({
+    description:
+      "The file's path from its step's folder that holds it: its artifacts folder, or a folder run's own folder; absent for a file in neither.",
+  }),
+);
+
 /** A file a closeout named, or a step's folder holds (`StepArtifact`, files.store.ts): served, pruned, or only its path. */
 export const StepArtifact = Schema.Union([
   Schema.Struct({
     path: Schema.String.annotate({ description: 'The path of the file.' }),
+    relativePath,
     name: Schema.String.annotate({ description: "The file's name." }),
     url: Schema.String.annotate({ description: 'Where the file is served.' }),
     kind: Schema.Literals(ARTIFACT_KINDS).annotate({
@@ -293,10 +302,14 @@ export const StepArtifact = Schema.Union([
   }),
   Schema.Struct({
     path: Schema.String.annotate({ description: 'The path of the file.' }),
+    relativePath,
     pruned: Schema.String.annotate({ description: 'What a prune of the run said of it, in words.' }),
     prunedAt: Schema.String.annotate({ description: 'When it was pruned, an ISO 8601 time.' }),
   }),
-  Schema.Struct({ path: Schema.String.annotate({ description: 'The path of the file, where nothing more is known of it.' }) }),
+  Schema.Struct({
+    path: Schema.String.annotate({ description: 'The path of the file, where nothing more is known of it.' }),
+    relativePath,
+  }),
 ]);
 
 /**

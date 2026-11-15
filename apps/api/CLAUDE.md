@@ -12,8 +12,9 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   `Object.hasOwn` guard put in front of it: that changes what a prototype key reads. The tests' own `test/tsconfig.json` leaves the
   flag off.
 - **The one surface is browsed, and tried, from a page a person starts**: `npm run api:page [-- <url>]` serves the reference page alone
-  on this machine's loopback (`bin/page.ts` over `src/openapi/browse.ts`, port 8790, `PORT` moves it), each operation a command links
-  named `nemia <command>` with its MCP tool, who answers for it when an agent calls it, and its help. Its request client is on, where
+  on this machine's loopback (`bin/page.ts` over `src/openapi/browse.ts`, port 8790, `PORT` moves it), each operation named by its id
+  with the endpoint's own description, and under it a *CLI and MCP* section (`EQUIVALENTS_HEADING`, `src/openapi/openapi.ts`): each
+  command that links it, its help, its MCP tool and who answers for it when an agent calls it, or a line saying none does. Its request client is on, where
   the api's own page keeps it off: a request tried on the page is sent to the page (`REFERENCE_PROXY_PATH`), which forwards it to the
   address set on the page under Server — the api at `<url>` to begin with, this machine's daemon where none is given — with the token
   typed under Authentication — selected for every request, and kept by the browser for that page, so it is typed once — and no other

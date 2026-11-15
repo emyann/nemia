@@ -179,7 +179,6 @@ test("Nemia's folder the keeper could not trust: under the switch, the refusal's
     since: '2026-10-05T12:00:00.000Z',
     task: 'nemia-1',
     untrusted: UNTRUSTED,
-    trustLineOf,
   });
   assert.equal(trustAt(html), 'level', 'the refusal is plain beside the switch that reads Semi-auto');
   assert.match(html, /data-nemia-trust[\s\S]*\/home\/me\/\.claude\.json did not take the trust of her folder/);

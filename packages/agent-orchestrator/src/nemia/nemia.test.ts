@@ -23,6 +23,7 @@ import {
   nemiaState,
   nemiaTaskId,
   toldCustom,
+  folderUnmade,
   trustRefused,
   type HerSubscription,
   type HerTask,
@@ -263,19 +264,43 @@ test('a nemia she types starts no daemon beside the one that keeps her, with a b
   });
 });
 
-test("`trustRefused`: each refusal of her folder's trust names what to mend, and offers no command to run the harness by hand", async (t) => {
-  const not = { harness: 'Claude Code', folder: '/store/nemia', file: '/home/me/.claude.json', never: null };
+test("`trustRefused` and `folderUnmade`: each refusal of her folder's trust names what to mend, and offers no command to run the harness by hand", async (t) => {
+  const not = { harness: 'Claude Code', folder: '/store/nemia', file: '/home/me/.claude.json', never: null, refused: null };
+  const hand = 'run Claude Code in /store/nemia once and accept its prompt';
   const rows: [string, string][] = [
-    ['a file that did not take the trust', trustRefused(not)],
+    [
+      'a file that did not read',
+      trustRefused({ ...not, refused: `/home/me/.claude.json was left as it is, since it is not JSON: ${hand}` }),
+    ],
+    [
+      'a file whose projects entry is no object',
+      trustRefused({ ...not, refused: `/home/me/.claude.json was left as it is, since its \`projects\` is no object: ${hand}` }),
+    ],
+    [
+      'a file that changed under every write',
+      trustRefused({
+        ...not,
+        refused: `/home/me/.claude.json changed under each of 5 writes and was left as it is: ask again, or ${hand}`,
+      }),
+    ],
+    ['a file that did not take the trust, the runtime saying nothing', trustRefused(not)],
     ['a write that threw', trustRefused(not, 'EACCES: permission denied')],
     ['a folder the harness never keeps a trust of', trustRefused({ ...not, never: 'Claude Code keeps no trust of a home directory' })],
+    ['her folder that could not be made', folderUnmade('/store/nemia', 'EACCES: permission denied, mkdir')],
   ];
   for (const [row, words] of rows)
     await t.test(row, () => {
       assert.ok(words.includes('/store/nemia'), 'her folder named');
-      assert.doesNotMatch(words, /&&|\bcd |mkdir|accept its prompt|in a terminal/, 'no command to run by hand');
+      assert.doesNotMatch(words, /&&|\bcd |mkdir -p|accept its prompt|in a terminal/, 'no command to run by hand');
     });
-  assert.ok(rows[0]?.[1].includes(not.file) && rows[1]?.[1].includes(not.file), "the harness's file named where it is what to mend");
-  assert.ok(rows[1]?.[1].includes('EACCES'), 'what the write threw said');
-  assert.ok(rows[2]?.[1].includes('WF_ROOT'), 'the store moved, where her folder is the home directory');
+  assert.ok(rows[0]?.[1].includes('it is not JSON'), "the runtime's reason carried");
+  assert.ok(rows[1]?.[1].includes('`projects` is no object'), 'a file that parses but whose entry is no object says so');
+  assert.ok(rows[2]?.[1].includes('changed under each of 5 writes'), 'a file that changed under every write says so');
+  assert.ok(
+    rows.slice(0, 5).every(([, words]) => words.includes(not.file)),
+    "the harness's file named where it is what to mend",
+  );
+  assert.ok(rows[4]?.[1].includes('EACCES'), 'what the write threw said');
+  assert.ok(rows[5]?.[1].includes('WF_ROOT'), 'the store moved, where her folder is the home directory');
+  assert.ok(!rows[6]?.[1].includes(not.file), "her folder unmade sends no one to the harness's file");
 });

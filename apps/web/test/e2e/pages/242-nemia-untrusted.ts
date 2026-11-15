@@ -20,7 +20,7 @@ export default {
     const levelFile = path.join(nemia, 'level.json');
     const record = path.join(nemia, 'untrusted.json');
     const config = path.join(store!, 'claude', '.claude.json');
-    const refused = `Claude Code's file ${config} did not take the trust of her folder ${nemia} and was left as it is: make it read as a JSON object again, or move it aside; the keeper gives the trust at its next beat, and files her session`;
+    const refused = `Claude Code did not take the trust of her folder ${nemia}: ${config} was left as it is, since it is not JSON. Where that is a file that does not read, make it read as a JSON object again, or move it aside; the keeper gives the trust at its next beat, and files her session`;
     try {
       await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
       await idle(page);

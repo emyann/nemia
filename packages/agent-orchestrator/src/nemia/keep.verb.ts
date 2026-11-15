@@ -65,6 +65,7 @@ import {
   nemiaSettings,
   nemiaState,
   toldCustom,
+  folderUnmade,
   trustRefused,
   type HerSubscription,
   type HerTask,
@@ -246,8 +247,9 @@ const threwWords = (err: unknown): string => (err instanceof Error ? err.message
 
 /**
  * Her folder made, where it is not yet, and her harness's trust given to it (`trustFolder`), which is safe since the folder is Nemia's
- * own: the store makes it and only Nemia writes it. Why it is not given, where the write left it so or threw, recorded for the person
- * (`writeUntrusted`, `trustRefused`), and the record taken away once it is. Answers whether her folder is trusted now, counted where so.
+ * own: the store makes it and only Nemia writes it. Why it is not given, where making the folder threw (`folderUnmade`) or the write
+ * left it so or threw (`trustRefused`), recorded for the person (`writeUntrusted`), and the record taken away once it is. Answers whether
+ * her folder is trusted now, counted where so.
  */
 const trustHer = (home: string) =>
   Effect.gen(function* () {
@@ -255,11 +257,18 @@ const trustHer = (home: string) =>
     const refused = ((): string | undefined => {
       try {
         fs.mkdirSync(dir, { recursive: true });
+      } catch (err) {
+        return folderUnmade(dir, threwWords(err));
+      }
+      try {
         const given = trustFolder(DEFAULT_HARNESS, dir);
         return given === undefined || given.trusted ? undefined : trustRefused(given);
       } catch (err) {
         const asked = folderTrust(DEFAULT_HARNESS, dir);
-        return trustRefused(asked ?? { harness: DEFAULT_HARNESS, folder: dir, file: '', never: null }, threwWords(err));
+        return trustRefused(
+          { ...(asked ?? { harness: DEFAULT_HARNESS, folder: dir, file: '', never: null }), refused: null },
+          threwWords(err),
+        );
       }
     })();
     writeUntrusted(home, refused);

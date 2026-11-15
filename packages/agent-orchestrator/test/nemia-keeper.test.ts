@@ -191,6 +191,7 @@ test("Nemia kept and let go: trusted late, filed long-lived in auto with the dae
       assert.equal(fs.readFileSync(config, 'utf8'), '{ not json', "the harness's file left as it was");
       const words = (await level({})).untrusted;
       assert.ok(words !== null && words.includes(config), `the refusal names the file to mend: ${String(words)}`);
+      assert.match(words, /not JSON/, "and the runtime's reason");
       assert.doesNotMatch(words, /&&|\bcd |mkdir|accept its prompt/, 'no command to run the harness by hand');
       fs.rmSync(config);
       assert.deepEqual(await beat(), ['trust', 'file'], 'mended: trusted and filed at the next beat, with no second level set');

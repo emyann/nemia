@@ -146,24 +146,49 @@ export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscrib
   return subscribed !== undefined && subscribed.task === keeping.task && subscribed.scoped && subscribed.selected ? 'kept' : 'filed';
 }
 
-/** What the keeper reads of a trust its write left not given: the harness, the folder, the harness's file, and why it is never kept. */
-export type TrustNotGiven = { harness: string; folder: string; file: string; never: string | null };
+/**
+ * What the keeper reads of a trust its write left not given: the harness, the folder, the harness's file, why it is never kept, and why
+ * the write did not take it (`refused`, the runtime's words, null where none were said).
+ */
+export type TrustNotGiven = { harness: string; folder: string; file: string; never: string | null; refused: string | null };
+
+/** What the keeper says once its next beat may give the trust. */
+const NEXT_BEAT = 'the keeper gives the trust at its next beat, and files her session';
+
+/**
+ * The runtime's words `refused` without the hand step they end on (running the harness in her folder once and accepting its prompt),
+ * which the keeper takes in the person's place. Pure.
+ */
+const withoutHandStep = (refused: string, not: TrustNotGiven): string => {
+  const hand = `run ${not.harness} in ${not.folder} once and accept its prompt`;
+  const tail = [`: ${hand}`, `, or ${hand}`].find((one) => refused.endsWith(one));
+  return tail === undefined ? refused : refused.slice(0, -tail.length);
+};
 
 /**
  * Why the keeper's write of her harness's trust left her folder not trusted, and what a person does so the next beat gives it, in words
- * that offer no command to run the harness by hand: a folder the harness never keeps a trust of (`never`), or a file of the harness's
- * that did not take the trust (`not`) or that the write threw on (`threw`, its words). Pure.
+ * that offer no command to run the harness by hand: a folder the harness never keeps a trust of (`never`), a write that threw (`threw`,
+ * its words), or a file of the harness's that did not take the trust, with the runtime's reason (`refused`). Pure.
  * @param not The trust as it reads after the write.
  * @param threw The words of the error the write threw, or undefined where it answered.
  */
 export function trustRefused(not: TrustNotGiven, threw?: string): string {
-  const next = 'the keeper gives the trust at its next beat, and files her session';
   if (threw !== undefined)
-    return `${not.harness}'s trust of her folder ${not.folder} could not be written in ${not.file} (${threw}): make that file readable and writable by the user the store runs as; ${next}`;
+    return `${not.harness}'s trust of her folder ${not.folder} could not be written in ${not.file} (${threw}): make that file readable and writable by the user the store runs as; ${NEXT_BEAT}`;
   if (not.never !== null)
-    return `her folder ${not.folder} is the home directory, and ${not.never}: run the store (WF_ROOT) where its nemia folder is not the home directory; ${next}`;
-  return `${not.harness}'s file ${not.file} did not take the trust of her folder ${not.folder} and was left as it is: make it read as a JSON object again, or move it aside; ${next}`;
+    return `her folder ${not.folder} is the home directory, and ${not.never}: run the store (WF_ROOT) where its nemia folder is not the home directory; ${NEXT_BEAT}`;
+  const why = not.refused === null ? `${not.file} was left as it is` : withoutHandStep(not.refused, not);
+  return `${not.harness} did not take the trust of her folder ${not.folder}: ${why}. Where that is a file that does not read, make it read as a JSON object again, or move it aside; ${NEXT_BEAT}`;
 }
+
+/**
+ * Why the keeper could not make her folder, which it trusts only once it is there, and what a person does so the next beat makes it:
+ * the folder, and the words of what its making threw. Pure.
+ * @param folder Her folder in the store.
+ * @param threw The words of the error making it threw.
+ */
+export const folderUnmade = (folder: string, threw: string): string =>
+  `her folder ${folder} could not be made (${threw}): make the store's folder writable by the user the store runs as; the keeper makes her folder at its next beat, gives it the trust and files her session`;
 
 /**
  * What the keeper owes on a beat, in order: at `due`, file; at `untrusted`, trust her folder, then file, in the same beat, the filing

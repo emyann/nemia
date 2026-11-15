@@ -18,7 +18,7 @@
  * the same page's `Table` where the request asks for one (`TABLE_ACCEPT`): two successes of one status. A watch answers no Table.
  */
 import { Schema } from 'effect';
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
+import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
 import { Template, TemplateList } from './template.ts';
 import {
   BadRequest,
@@ -92,41 +92,59 @@ const EventListObject = EventList.annotate({ identifier: 'EventList' });
  * rendered with its parameters' defaults and served in the Schemas a namespace serves them in, with origin `builtin`.
  */
 export class TemplatesGroup extends HttpApiGroup.make('templates').add(
-  HttpApiEndpoint.get('listAll', '/api/templates', { query: listQuery, success: TemplateListObject, error: objectErrors }),
-  HttpApiEndpoint.get('get', '/api/templates/:name', { params: templateParams, success: TemplateObject, error: objectErrors }),
+  HttpApiEndpoint.get('listAll', '/api/templates', { query: listQuery, success: TemplateListObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    'Lists the templates Nemia builds in, which no namespace holds, a page at a time. Answers a TemplateList.',
+  ),
+  HttpApiEndpoint.get('get', '/api/templates/:name', { params: templateParams, success: TemplateObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Reads one of Nemia's templates by its name: its version, the instruction and rules it gives a factory, its parameters and the agent it hires into each step. Answers the Template.",
+  ),
   HttpApiEndpoint.get('workflows', '/api/templates/:name/workflows', {
     params: templateParams,
     query: listQuery,
     success: WorkflowListObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a template's workflows, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers a WorkflowList.",
+  ),
   HttpApiEndpoint.get('workflow', '/api/templates/:name/workflows/:doc', {
     params: documentParams,
     success: WorkflowObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one workflow of a template, rendered with its parameters' defaults, its steps filled by the template's hires as in a factory applied from it. Answers the Workflow.",
+  ),
   HttpApiEndpoint.get('agents', '/api/templates/:name/agents', {
     params: templateParams,
     query: listQuery,
     success: AgentListObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a template's agents, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers an AgentList.",
+  ),
   HttpApiEndpoint.get('agent', '/api/templates/:name/agents/:doc', {
     params: documentParams,
     success: AgentObject,
     error: definitionErrors,
-  }),
+  }).annotate(OpenApi.Description, "Reads one agent of a template, rendered with its parameters' defaults. Answers the Agent."),
   HttpApiEndpoint.get('skills', '/api/templates/:name/skills', {
     params: templateParams,
     query: listQuery,
     success: SkillListObject,
     error: definitionErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists a template's skills, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers a SkillList.",
+  ),
   HttpApiEndpoint.get('skill', '/api/templates/:name/skills/:doc', {
     params: documentParams,
     success: SkillObject,
     error: definitionErrors,
-  }),
+  }).annotate(OpenApi.Description, "Reads one skill of a template, rendered with its parameters' defaults. Answers the Skill."),
 ) {}
 
 /**
@@ -134,23 +152,32 @@ export class TemplatesGroup extends HttpApiGroup.make('templates').add(
  * away (`nemia unsubscribe`).
  */
 export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
-  HttpApiEndpoint.get('listAll', '/api/subscriptions', { query: listQuery, success: SubscriptionListObject, error: objectErrors }),
+  HttpApiEndpoint.get('listAll', '/api/subscriptions', { query: listQuery, success: SubscriptionListObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Lists the feed's subscriptions, which no namespace holds, a page at a time. Answers a SubscriptionList.",
+  ),
   HttpApiEndpoint.get('get', '/api/subscriptions/:name', {
     params: subscriptionParams,
     success: SubscriptionObject,
     error: objectErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of the feed's subscriptions by its name: the long-lived task it feeds and what of the feed it carries. Answers the Subscription.",
+  ),
   HttpApiEndpoint.post('subscribe', '/api/subscriptions/:name', {
     params: subscriptionParams,
     payload: SubscriptionWrite,
     success: Subscribed.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: [...objectErrors, Failed],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Gives a long-lived task a subscription to the feed under the name in the path: the lines its selectors and level keep, said to it from the feed's end, in digests where asked. Answers Subscribed with a 201, the subscription as written.",
+  ),
   HttpApiEndpoint.delete('unsubscribe', '/api/subscriptions/:name', {
     params: subscriptionParams,
     success: Unsubscribed,
     error: [...objectErrors, Failed],
-  }),
+  }).annotate(OpenApi.Description, 'Takes a subscription away, removing its file. Answers Unsubscribed, its name.'),
 ) {}
 
 /**
@@ -158,24 +185,39 @@ export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
  * its name, the byte its line starts at — a daemon's or the store's that names no factory in no namespace.
  */
 export class EventsGroup extends HttpApiGroup.make('events').add(
-  HttpApiEndpoint.get('listAll', '/api/events', { query: listQuery, success: EventListObject, error: objectErrors }),
+  HttpApiEndpoint.get('listAll', '/api/events', { query: listQuery, success: EventListObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Lists the feed's lines as events, every one, in the order they were written, a page at a time; with watch=true and a resourceVersion, a stream from that byte. Answers an EventList.",
+  ),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/events', {
     params: namespaceParams,
     query: listQuery,
     success: EventListObject,
     error: objectErrors,
-  }),
-  HttpApiEndpoint.get('getAll', '/api/events/:name', { params: eventNameParams, success: EventObject, error: objectErrors }),
+  }).annotate(
+    OpenApi.Description,
+    "Lists the feed's lines as events in one namespace, those naming its factory, in the order they were written, a page at a time. Answers an EventList.",
+  ),
+  HttpApiEndpoint.get('getAll', '/api/events/:name', { params: eventNameParams, success: EventObject, error: objectErrors }).annotate(
+    OpenApi.Description,
+    "Reads one of the feed's lines as an event by its name, the byte its line starts at, a daemon's or the store's that names no factory among them. Answers the Event.",
+  ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/events/:name', {
     params: cardParams,
     success: EventObject,
     error: objectErrors,
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of the feed's lines as an event by its name, the byte its line starts at, in the namespace of the factory it names. Answers the Event.",
+  ),
 ) {}
 
 /** The api's discovery: every resource it serves, read off this definition (Kubernetes' `/api`, for Nemia's one group version). */
 export class DiscoveryGroup extends HttpApiGroup.make('discovery').add(
-  HttpApiEndpoint.get('resources', '/api', { success: APIResourceList.annotate({ identifier: 'APIResourceList' }) }),
+  HttpApiEndpoint.get('resources', '/api', { success: APIResourceList.annotate({ identifier: 'APIResourceList' }) }).annotate(
+    OpenApi.Description,
+    "Reads every resource the api serves, read off its own definition: each one's name, singular, kind, scope and verbs, as Kubernetes' /api says them. Answers APIResourceList.",
+  ),
 ) {}
 
 /**

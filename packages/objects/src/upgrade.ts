@@ -5,7 +5,7 @@
  * upgrade. The group that serves them is `UpgradesGroup`.
  */
 import { Schema } from 'effect';
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
 import { describedNumber } from './meta.ts';
 import { UPGRADE_PHASES, UPGRADE_STREAM_EVENTS } from './words.ts';
@@ -78,16 +78,28 @@ const upgradeParams = { id: Schema.String.annotate({ description: "The upgrade's
 
 /** The server's upgrades: the read, a start, one upgrade, and its output followed. */
 export class UpgradesGroup extends HttpApiGroup.make('upgrades').add(
-  HttpApiEndpoint.get('read', '/api/upgrades', { success: UpgradesRead, error: [Failed] }),
+  HttpApiEndpoint.get('read', '/api/upgrades', { success: UpgradesRead, error: [Failed] }).annotate(
+    OpenApi.Description,
+    "Reads the release going back would go to and the store's last upgrade. Answers UpgradesRead.",
+  ),
   HttpApiEndpoint.post('start', '/api/upgrades', {
     payload: UpgradeStart,
     success: Upgrade,
     error: [BadRequest, Invalid, Conflict, Forbidden, Failed],
-  }),
-  HttpApiEndpoint.get('upgradeOf', '/api/upgrades/:id', { params: upgradeParams, success: Upgrade, error: [Missing, Failed] }),
+  }).annotate(
+    OpenApi.Description,
+    "Starts the server's upgrade to the release the body's tag names, run as a job of the engine that outlives the daemon it restarts. Answers the Upgrade started.",
+  ),
+  HttpApiEndpoint.get('upgradeOf', '/api/upgrades/:id', { params: upgradeParams, success: Upgrade, error: [Missing, Failed] }).annotate(
+    OpenApi.Description,
+    'Reads an upgrade by its id: the tag it upgrades to, the release it started from, its phase, the tail of what it printed and its exit code once it ended. Answers the Upgrade.',
+  ),
   HttpApiEndpoint.get('output', '/api/upgrades/:id/output', {
     params: upgradeParams,
     success: HttpApiSchema.StreamSse({ events: UpgradeStreamEvent }),
     error: [Missing],
-  }),
+  }).annotate(
+    OpenApi.Description,
+    "Follows an upgrade's output as server-sent events while it runs, and again once the daemon is back. Answers a stream of UpgradeStreamEvent.",
+  ),
 ) {}

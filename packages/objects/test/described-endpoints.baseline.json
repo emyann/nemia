@@ -1,18 +1,1 @@
-{
-  "agents": 13,
-  "delegations": 4,
-  "discovery": 1,
-  "events": 4,
-  "nemia": 18,
-  "pair": 3,
-  "pairings": 3,
-  "proposals": 5,
-  "readiness": 4,
-  "server": 22,
-  "skills": 7,
-  "subscriptions": 4,
-  "templates": 8,
-  "tokens": 3,
-  "upgrades": 4,
-  "workflows": 8
-}
+{}

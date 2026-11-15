@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { TEAM } from '../../test/team.ts';
-import { addedServers, factoryAdds, libraryAddObject, libraryUsers, writeLibraryAdd } from './library.verb.ts';
+import { addedServers, addTemplateBuiltins, factoryAdds, libraryAddObject, libraryUsers, writeLibraryAdd } from './library.verb.ts';
 import { addedOf, libraryAddsFile, readLibraryAdds, writeLibraryAdds, writeLibraryServers } from './library.store.ts';
 
 /** A store whose library is a copy of the tests' team. */
@@ -101,4 +101,26 @@ test("an unrecorded factory's adds hold a library skill a step names on its own 
   assert.ok(factoryAdds(home, 'default').adds.some((a) => a.kind === tidy.kind && a.name === tidy.name), 'derived from the step');
   writeLibraryAdd(home, 'default', 'add', { kind: 'Skill', name: 'create-an-agent' });
   assert.ok(readLibraryAdds(home, 'default')?.some((a) => a.kind === tidy.kind && a.name === tidy.name), 'kept by the first add');
+});
+
+test("a template's tree whose agent names a builtin skill: added to a recorded factory's adds, once; an unrecorded factory left unwritten", () => {
+  const home = scratch('wf-library-template-');
+  const tree = scratch('wf-library-tree-');
+  fs.mkdirSync(path.join(tree, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(tree, 'workflows', 'agents', 'helper.md'), '---\nskills: grilling, own-skill\n---\nHelp.\n');
+  fs.mkdirSync(path.join(tree, 'workflows', 'skills', 'own-skill'), { recursive: true });
+  fs.writeFileSync(path.join(tree, 'workflows', 'skills', 'own-skill', 'SKILL.md'), '---\nname: own-skill\ndescription: Its own.\n---\n');
+  addTemplateBuiltins(home, 'acme', tree);
+  assert.equal(readLibraryAdds(home, 'acme'), undefined, 'unrecorded: its adds are derived, nothing written');
+  writeLibraryAdds(home, 'acme', [{ kind: 'Agent', name: 'scribe' }]);
+  addTemplateBuiltins(home, 'acme', tree);
+  addTemplateBuiltins(home, 'acme', tree);
+  assert.deepEqual(
+    readLibraryAdds(home, 'acme'),
+    [
+      { kind: 'Agent', name: 'scribe' },
+      { kind: 'Skill', name: 'grilling' },
+    ],
+    "the builtin added once, the tree's own skill not",
+  );
 });

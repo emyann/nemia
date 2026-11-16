@@ -122,7 +122,7 @@ export async function pick(page: Page, choice: string): Promise<void> {
  */
 export async function pickIn(page: Page, select: Locator, word: string): Promise<void> {
   await select.locator('[data-slot="select-trigger"]').click();
-  await page.getByRole('option', { name: word, exact: true }).click();
+  await page.locator('[data-slot="select-popover"]').getByRole('option', { name: word, exact: true }).click();
 }
 
 /**

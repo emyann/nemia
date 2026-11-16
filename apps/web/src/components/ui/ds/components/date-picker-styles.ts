@@ -115,8 +115,10 @@ export const datePickerStyles = tv({
     },
     range: {
       false: {
-        day: "group-data-selected/dpi:border-0 group-data-selected/dpi:bg-primary group-data-selected/dpi:text-on-primary",
-        dayStateLayer: "group-data-selected/dpi:bg-on-primary",
+        // Today chosen: its `primary` text would be the disc's own colour.
+        // The doubled variant outranks today's.
+        day: "group-data-selected/dpi:border-0 group-data-selected/dpi:bg-primary group-data-selected/dpi:text-on-primary group-data-today/dpi:group-data-selected/dpi:text-on-primary",
+        dayStateLayer: "group-data-selected/dpi:bg-on-primary group-data-today/dpi:group-data-selected/dpi:bg-on-primary",
       },
       true: {
         band: [
@@ -129,10 +131,18 @@ export const datePickerStyles = tv({
           "group-data-selected/dpi:text-on-secondary-container",
           "group-data-selection-start/dpi:border-0 group-data-selection-start/dpi:bg-primary group-data-selection-start/dpi:text-on-primary",
           "group-data-selection-end/dpi:border-0 group-data-selection-end/dpi:bg-primary group-data-selection-end/dpi:text-on-primary",
+          // Today in a range: in the band it takes the band's text and
+          // loses its outline's colour clash; at an end, the disc's.
+          "group-data-today/dpi:group-data-selected/dpi:text-on-secondary-container",
+          "group-data-today/dpi:group-data-selected/dpi:group-data-selection-start/dpi:text-on-primary",
+          "group-data-today/dpi:group-data-selected/dpi:group-data-selection-end/dpi:text-on-primary",
         ],
         dayStateLayer: [
           "group-data-selected/dpi:bg-on-primary-container",
           "group-data-selection-start/dpi:bg-on-primary group-data-selection-end/dpi:bg-on-primary",
+          "group-data-today/dpi:group-data-selected/dpi:bg-on-primary-container",
+          "group-data-today/dpi:group-data-selected/dpi:group-data-selection-start/dpi:bg-on-primary",
+          "group-data-today/dpi:group-data-selected/dpi:group-data-selection-end/dpi:bg-on-primary",
         ],
       },
     },

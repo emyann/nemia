@@ -28,8 +28,11 @@ export type SkeletonProps = {
  * A `text` skeleton is one line: it takes the line height of the text
  * around it and draws a bar the height of its letters, so it stands where
  * the line will. Put it inside the type primitive it replaces
- * (`<Title><Skeleton className="w-32" /></Title>`) and the row keeps its
- * height. `rectangle` takes the medium corner, `circle` is round.
+ * (`<Title component="div"><Skeleton className="w-32" /></Title>`) and the
+ * row keeps its height: as a `div`, since a heading that holds only a
+ * placeholder is an empty heading. `rectangle` takes the medium corner, `circle` is round; another
+ * corner is a `className` too: `rounded-shape-full` for what stands for a
+ * button or a tag, `rounded-none` for a picture that runs to a card's edges.
  *
  * It is hidden from a screen reader: a row of grey bars says nothing. Wrap
  * the placeholders of one region in `SkeletonGroup`, which says "Loading"
@@ -37,9 +40,9 @@ export type SkeletonProps = {
  * where the shape of what loads is known; where it is not, or for an action
  * in progress, use `LoadingIndicator` or `ProgressIndicator`.
  *
- * Material 3 does not describe this component. Its colour is
- * `surface-container-highest`, the kit's choice: a quiet fill that reads on
- * `surface` and on the lower surface containers.
+ * Material 3 does not describe this component. Its colour is `on-surface`
+ * at 12%, the kit's choice: a quiet fill that reads on `surface` and on
+ * every surface container, a filled `Card` among them.
  */
 export function Skeleton({ shape = "text", className }: SkeletonProps) {
   return (
@@ -48,7 +51,7 @@ export function Skeleton({ shape = "text", className }: SkeletonProps) {
       data-shape={shape}
       aria-hidden="true"
       className={cn(
-        "bg-surface-container-highest block motion-safe:animate-pulse",
+        "bg-on-surface/12 block motion-safe:animate-pulse",
         shape === "text" &&
           "rounded-shape-extra-small my-[0.25lh] h-[0.5lh] w-full",
         shape === "rectangle" && "rounded-shape-medium w-full",

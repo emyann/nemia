@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
 import { policyQuery, type PolicyList } from '@/lib/api/policy';
 import { PolicyRules } from './PolicyRules';
-import { policyList } from '../../../.storybook/fixtures/agents';
+import { policyList, RETRY_RULE } from '../../../.storybook/fixtures/agents';
 import { seeded } from '../../../.storybook/fixtures/proposals';
 
 /**
@@ -45,6 +45,6 @@ export const Proposed: Story = {
 export const Confirmed: Story = over({
   ...policyList,
   isDefault: false,
-  rules: [{ ...policyList.proposed!.rules[0]!, from: 'proposed' }],
-  proposed: { ...policyList.proposed!, rules: [{ ...policyList.proposed!.rules[0]!, confirmed: true }] },
+  rules: [{ ...RETRY_RULE, from: 'proposed' }],
+  proposed: policyList.proposed && { ...policyList.proposed, rules: [{ ...RETRY_RULE, confirmed: true }] },
 });

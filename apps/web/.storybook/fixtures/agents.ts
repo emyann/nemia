@@ -146,6 +146,15 @@ const DEFAULT_RULE: PolicyRule = {
   words: 'Approve a gate once its check passed.',
 };
 
+/** The rule she proposed: try implement again once its check is in. */
+export const RETRY_RULE: PolicyRule = {
+  id: 'retry-implement',
+  answer: 'retry',
+  steps: ['implement'],
+  when: ['checked'],
+  words: 'Try implement again.',
+};
+
 /** Nemia's rules for Auto: the default in force, and one she proposed, not yet confirmed. */
 export const policyList: PolicyList = {
   agent: 'nemia',
@@ -157,9 +166,7 @@ export const policyList: PolicyList = {
   proposed: {
     file: '/store/auto/nemia.proposed.json',
     at: '2026-11-15T12:00:00.000Z',
-    rules: [
-      { id: 'retry-implement', answer: 'retry', steps: ['implement'], when: ['checked'], words: 'Try implement again.', confirmed: false },
-    ],
+    rules: [{ ...RETRY_RULE, confirmed: false }],
     proposalRules: [],
     guidance: ['Write to me in French.'],
     stale: false,

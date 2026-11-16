@@ -159,6 +159,7 @@ const r1 = (n: number): number => Math.round(n * 10) / 10;
  * @param gates The steps a person approves before they run.
  * @param cancelled Whether somebody called the run off: no step is live then.
  * @param width How wide the graph is drawn, in pixels.
+ * @param fold How many columns it shows before it folds the rest (`GRAPH_SLOTS`); a graph that names its steps folds none.
  */
 export function graphOf(
   names: readonly string[],
@@ -167,10 +168,11 @@ export function graphOf(
   gates: readonly string[],
   cancelled: boolean,
   width = 188,
+  fold = GRAPH_SLOTS,
 ): StepGraphLayout {
   const { columns, error } = columnsOf(names, graph);
   const stateAt = stateReader(steps);
-  const { start, end } = windowOf(columns.length, liveColumn(columns, stateAt, cancelled));
+  const { start, end } = windowOf(columns.length, liveColumn(columns, stateAt, cancelled), Math.max(fold, 1));
   const boxOf = boxer(stateAt, cancelled);
   const slots: Box[][] = [];
   if (start > 0) slots.push([boxOf('fold', columns.slice(0, start).flat())]);

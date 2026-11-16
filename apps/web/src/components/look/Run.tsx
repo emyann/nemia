@@ -14,7 +14,7 @@ import { ENDED, OPENS } from '@/lib/words';
 import { CutButton } from './CutButton';
 import { cutRing } from './cut';
 import { CutFrame, FRAMED_ROW, type FrameHue } from './CutFrame';
-import { runRecipe, type RunTone } from './run.recipe';
+import { runRecipe, type RunTone } from './run.recipe.ts';
 import { RunClock, RunCost } from './RunFigures';
 import { Chip, Fan, Pips, Ring, RunMark, Words } from './RunMarks';
 import { RunMeta } from './RunMeta';
@@ -232,7 +232,11 @@ function RunRow({ run, asOf, among = [], wrap, still, look }: RunProps & { look:
             <NowMarks look={look} />
             <WordsSaid run={run} look={look} among={among} />
             <span className={look.s.end()}>
-              {waiters > 0 && <Fan count={waiters} {...saying('waitedBy')} />}
+              {waiters > 0 && (
+            <span {...saying('waitedBy')} className="inline-flex">
+              <Fan count={waiters} />
+            </span>
+          )}
               {look.now.budget && (
                 <span {...saying('budget')} className="inline-flex">
                   <Ring budget={look.now.budget} />
@@ -315,7 +319,11 @@ function RunCard({ run, asOf, among, wrap, titleEnd, ringed, still, children, cl
       <span className={s.head()}>
         <Eyebrow run={run} />
         <span className="inline-flex shrink-0 items-center gap-2 tracking-normal normal-case">
-          {waiters > 0 && <Fan count={waiters} {...saying('waitedBy')} />}
+          {waiters > 0 && (
+            <span {...saying('waitedBy')} className="inline-flex">
+              <Fan count={waiters} />
+            </span>
+          )}
           <span {...saying('id')} className={cn(s.id(), 'text-label-small')}>
             {run.id.slice(-4)}
           </span>
@@ -361,7 +369,11 @@ function RunBig(props: RunProps & { look: Look; among: readonly PartRun[] }) {
         <NowMarks look={look} words={xl} />
         <WordsSaid run={run} look={look} among={among} />
         <span className={s.end()}>
-          {!xl && waiters > 0 && <Fan count={waiters} {...saying('waitedBy')} />}
+          {!xl && waiters > 0 && (
+            <span {...saying('waitedBy')} className="inline-flex">
+              <Fan count={waiters} />
+            </span>
+          )}
           {now.budget && (
             <span {...saying('budget')} className="inline-flex">
               <Ring budget={now.budget} words={xl} />

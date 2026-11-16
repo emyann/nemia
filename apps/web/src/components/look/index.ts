@@ -16,7 +16,7 @@ export { Run, type RunProps } from './Run';
 export { RunClock, RunCost } from './RunFigures';
 export { QuietLabels, RunMeta } from './RunMeta';
 export { type PanelRead } from './RunPanel';
-export { runRecipe } from './run.recipe';
+export { runRecipe } from './run.recipe.ts';
 export { StepGraph } from './StepGraph';
 export { ScanLines } from './ScanLines';
 export { StatTile } from './StatTile';

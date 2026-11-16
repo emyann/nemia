@@ -189,6 +189,7 @@ export function StepGraph({
     run.gates,
     cancelled,
     width,
+    named ? Infinity : undefined,
   );
   const at = new Map(drawn.map((step, i) => [step.name, { step, mark: stepMark(step.state, waitsNow(drawn, i, held)) }]));
   const lanes = new Map<number, number>();

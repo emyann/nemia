@@ -7,8 +7,8 @@
  * router's plugin, as Storybook is (`.storybook/router.ts`): the addon applies Storybook's `viteFinal` to a bare config, not to this
  * one, and the plugin would write `src/routeTree.gen.ts` again on every run. It runs one story file at a time (`maxWorkers: 1`): each
  * worker is a Chromium page of its own, about a gigabyte summed over its renderers, and the default of one a core took the run's whole
- * tree to 7.9 GiB on an eight-core machine where one at a time takes 3.7 GiB, of which the Vite server holds 1.7, for 52 s against 42
- * (measured 2026-11-16, the RSS summed over the run and every process under it, Chromium's included).
+ * tree to 7.9 GiB on an eight-core machine where one at a time takes 3.7 GiB, of which the Vite server holds 1.7, for 50 s against 42
+ * (the RSS summed over the run and every process under it, Chromium's included).
  */
 import { defineConfig, mergeConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';

@@ -73,7 +73,10 @@ const checkoutWaits = async (page: HTMLElement, ends: Array<keyof typeof TARGET_
     page.querySelector<HTMLElement>(`[data-section="in-flight"] [data-run="${TARGET_RUNS[end].metadata.name}"]`)!;
   await expect(within(row('lgll')).getByRole('img', { name: NOW_WORDS.waitedBy(2) })).toHaveTextContent('2');
   for (const end of ends) {
-    await expect(within(row(end)).getByRole('link', { name: 'lgll' })).toHaveAttribute('href', `/runs/${TARGET_RUNS.lgll.metadata.name}`);
+    await expect(within(row(end)).getByRole('link', { name: /^lgll: / })).toHaveAttribute(
+      'href',
+      `/runs/${TARGET_RUNS.lgll.metadata.name}`,
+    );
     await expect(row(end).querySelector('[data-now-words]')).toHaveTextContent(`${NOW_WORDS.waitsOn} lgll ${NOW_WORDS.theCheckout}`);
   }
 };
@@ -177,7 +180,7 @@ export const EveryState: Story = {
     await expect(row('wov8').getByText('over its $6')).toBeVisible();
     await expect(row('1sw7').getByRole('img', { name: 'round 2 of 3' })).toBeVisible();
     await expect(row('1sw7').getByRole('img', { name: 'a run waits on it' })).toHaveTextContent('1');
-    await expect(row('649a').getByRole('link', { name: 'lgll' })).toBeVisible();
+    await expect(row('649a').getByRole('link', { name: /^lgll: / })).toBeVisible();
     await checkoutWaits(page, ['5zt1']);
     for (const card of page.querySelectorAll('[data-section="waiting"] article[data-run]'))
       await expect(card.querySelectorAll('[data-cut-button]').length).toBe(1);

@@ -148,7 +148,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
  * step not filed, no session of its task started (`sessionToRead`), or nothing in it the engine can read, each of which the family's
  * empty shell carries (`SessionQuiet`); while it is still being read, the shape of its turns (`SessionReading`).
  */
-function SessionBody({ step, following, turns }: { step: Step; following: Following; turns: Turn[] }) {
+export function SessionBody({ step, following, turns }: { step: Step; following: Following; turns: Turn[] }) {
   if (!step.taskId) return <SessionQuiet words="Not filed yet, so there is no session to show." />;
   if (!sessionToRead(step)) return <SessionQuiet words="No session of it has started yet, so there is no conversation to show." />;
   if (following.loading) return <SessionReading words="Reading the conversation…" />;

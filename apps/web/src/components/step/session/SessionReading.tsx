@@ -4,8 +4,8 @@
  */
 import { TalkReading } from '@/components/conversation/TalkReading';
 
-/** The prefix every data mark of a step's session is written under, which its pages read. */
-export const MARKS = 'session';
+/** The prefix every data mark of a step's session is written under, which its pages read: `SessionTalk`'s own. */
+const MARKS = 'session';
 
 /**
  * The talk's place while the conversation is first read: the family's shell in the shape of its turns (`TalkReading`), named by

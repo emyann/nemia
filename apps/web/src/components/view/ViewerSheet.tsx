@@ -19,6 +19,7 @@ import { Sheet, SheetDescription, SheetHeader, SheetTitle } from '@/components/u
 import { Markdown } from '../markdown/Markdown';
 import { Json } from '../step/Outcome';
 import { bytesWord } from '../run/Artifacts';
+import { Reading, ReadingLines } from '@/components/look';
 
 /** A file the api serves: its name, its link and its kind. */
 type Served = Extract<StepArtifact, { url: string }>;
@@ -77,7 +78,9 @@ function Viewed({ run, step: name, path }: { run: string; step: string; path: st
       </SheetHeader>
       <div className="min-h-0 flex-1 overflow-auto p-4">
         {!view ? (
-          <p className="text-body-medium text-on-surface-variant">Reading the run…</p>
+          <Reading label="Reading the run…">
+            <ReadingLines widths={['w-full', 'w-11/12', 'w-5/6', 'w-full', 'w-2/3', 'w-3/4']} className="gap-1 text-body-medium" />
+          </Reading>
         ) : !file ? (
           <p data-viewer="missing" className="text-body-medium text-failure">
             {name} has no file {path} on this try: open it again from its step's part.

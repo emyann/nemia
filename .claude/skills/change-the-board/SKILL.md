@@ -41,7 +41,9 @@ applies: ["apps/web/**"]
    with a cut corner, `CutButton` for the filled cut button that is a link to a route and `CutPress` for the one that is pressed,
    `CutCue` for a cue in a small cut frame beside a face or in a header, `CutField` for a box that holds a field, whose edge lights round its cut when the focus is in it, and `cutShape`, `cutRing` and `cutPoints` for a new part that takes the cut; `Plate` for a section's heading and `PageName` for
    a page's name; `Sticker` for a tile that carries a number and `StatTile` for one over its breakdown; `BreakdownRows` for a breakdown's rows and
-   `BreakdownPreview` for one hung off a focusable trigger of your own; `RunSteps` for a run's rail;
+   `BreakdownPreview` for one hung off a focusable trigger of your own; `RunSteps` for a run's rail; `Reading` for what a page or a part
+   draws while its first read is out, the kit's `SkeletonGroup` named by the line it replaces around the kit's `Skeleton`s in the shape of
+   what is coming, held back a moment so a fast read draws nothing (`reading.css`), and `ReadingLines` for its lines of text;
    `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`. Each is shown in its stories beside it
    (`<Part>.stories.tsx`): `npm run storybook`, from `apps/web`, serves them to a person on port 6007, and a step looks at them
    through `storybook dev` on a port of its own (item 10). A new part of the look gets its stories in the same change, and its name

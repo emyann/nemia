@@ -6,6 +6,8 @@ import { policyQuery, confirmRule, dropRule, type PolicyList } from '../../lib/a
 import { clockWord } from '../../lib/quota';
 import { useNow } from '../../lib/useNow';
 import { CustomInstructions, SESSION } from '../step/CustomInstructions';
+import { Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /** A write of a rule: `confirm` puts it in force as its `words` read, `drop` takes it out. */
 type RuleAsk = { verb: 'confirm'; id: string; words: string } | { verb: 'drop'; id: string };
@@ -45,10 +47,13 @@ export function PolicyRules({ agent }: { agent: string }) {
       <CustomInstructions name={agent} reach={SESSION} />
       {data ? (
         <PolicyParts list={data} pending={write.isPending} onAsk={ask} />
+      ) : error instanceof Error ? (
+        <p className="text-body-medium text-muted-foreground">Could not read her rules: {error.message}</p>
       ) : (
-        <p className="text-body-medium text-muted-foreground">
-          {error instanceof Error ? `Could not read her rules: ${error.message}` : 'Reading her rules…'}
-        </p>
+        <Reading label="Reading her rules…" className="flex flex-col gap-2">
+          <Skeleton className="w-32 text-title-small" />
+          <ReadingLines widths={['w-full', 'w-5/6', 'w-3/4']} className="gap-1.5 text-body-medium" />
+        </Reading>
       )}
       {write.error && (
         <div data-auto-refused className="flex flex-col gap-1 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">

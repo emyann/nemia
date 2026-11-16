@@ -12,6 +12,7 @@ import { useNow } from '@/lib/useNow';
 import type { Actor as ActorRead } from 'objects';
 import { POPOVER } from '../../lib/classes';
 import { Actor } from '../actor/Actor';
+import { Reading, ReadingLines } from '@/components/look';
 
 /** The popover's heading: the pause's state. */
 const HEADINGS: Record<PauseState, string> = {
@@ -86,7 +87,7 @@ function Lines({ lines, data, className }: { lines: readonly string[]; data: str
  * whose session or check it stops, or that it stops nothing, and what an interrupted step costs, in the api's words. It asks why only
  * where no pause stands (`standing`): one that stands is kept as it was. `onPut` sends the why; `onClose` puts nothing.
  */
-function NowForm({
+export function NowForm({
   standing,
   onPut,
   onClose,
@@ -107,10 +108,16 @@ function NowForm({
         onPut(standing ? '' : why.trim());
       }}
     >
-      {!read.data ? (
+      {read.error && !read.data ? (
         <p data-pause-now-reading className="text-body-small text-muted-foreground">
-          {read.error ? `What runs could not be read: ${read.error.message}` : 'Reading what runs.'}
+          What runs could not be read: {read.error.message}
         </p>
+      ) : !read.data ? (
+        <div data-pause-now-reading>
+          <Reading label="Reading what runs.">
+            <ReadingLines widths={['w-full', 'w-1/2']} className="text-body-small" />
+          </Reading>
+        </div>
       ) : (
         <>
           <p className="text-body-small text-muted-foreground">

@@ -12,6 +12,8 @@ import { openRunsQuery } from '@/lib/api/runs';
 import { offerOf, openBlockOf, runsOf, type FactoryBlock } from '@/lib/factories';
 import { BarPanel } from '../frame/BarPanel';
 import { FactoryTrust } from './FactoryTrust';
+import { Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /**
  * The bar for the factory `factory`, titled by its name, `default` badged for the default factory, with its repositories under the title.
@@ -52,7 +54,13 @@ export function FactoryBar({ factory: name }: { factory: string }) {
 function Unread({ name, error, read }: { name: string; error: Error | null; read: boolean }) {
   if (error) return <p className="text-body-medium text-failure">Could not read the factories and their runs: {error.message}</p>;
   if (read) return <p className="text-body-medium text-yours">No factory is named {name}.</p>;
-  return <p className="text-body-small text-muted-foreground">Reading the factories…</p>;
+  return (
+    <Reading label="Reading the factories…" className="flex flex-col gap-4">
+      <Skeleton className="w-40 text-title-medium" />
+      <ReadingLines widths={['w-full', 'w-2/3']} className="text-body-medium" />
+      <Skeleton shape="rectangle" className="h-24 rounded-none" />
+    </Reading>
+  );
 }
 
 /**

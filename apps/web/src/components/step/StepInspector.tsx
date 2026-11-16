@@ -85,9 +85,7 @@ export function ActivityTail({ run, step, following }: { run: RunDetail; step: S
         </Suspense>
       ) : (
         !following.error && (
-          <p className="text-muted-foreground">
-            {following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}
-          </p>
+          <p className="text-muted-foreground">{following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}</p>
         )
       )}
     </>

@@ -14,6 +14,8 @@ import {
   type FactoryInstruction as Instruction,
 } from '../../lib/api/factories.ts';
 import { Markdown } from '../markdown/Markdown';
+import { Reading } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /** What a person asks of a factory's instruction: its words saved or cleared in the store, or the place it is read from changed. */
 type Change = { kind: 'save'; words: string } | { kind: 'clear' } | { kind: 'store' } | { kind: 'path'; path: string } | { kind: 'reset' };
@@ -70,10 +72,13 @@ export function FactoryInstruction({ name }: { name: string }) {
       </div>
       {data ? (
         <Kept data={data} pending={change.isPending} onChange={ask} />
+      ) : error instanceof Error ? (
+        <p className="text-body-medium text-muted-foreground">Could not read the instruction: {error.message}</p>
       ) : (
-        <p className="text-body-medium text-muted-foreground">
-          {error instanceof Error ? `Could not read the instruction: ${error.message}` : 'Reading the instruction…'}
-        </p>
+        <Reading label="Reading the instruction…" className="flex flex-col gap-2">
+          <Skeleton shape="rectangle" className="h-32 rounded-none" />
+          <Skeleton shape="rectangle" className="h-10 w-24 rounded-none" />
+        </Reading>
       )}
       {change.isSuccess && said && (
         <p data-instruction-done className="text-body-medium text-muted-foreground">

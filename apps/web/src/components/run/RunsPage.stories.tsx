@@ -6,6 +6,7 @@ import { everyState, noRuns, nothingWaits, oneWaits, REFUSED_WORDS, refused, TAR
 import { ENDED, NOW_WORDS } from '@/lib/words';
 import type { RunOutcome } from '@/lib/api/runs';
 import { atRest, tipInRow } from '../../../.storybook/play';
+import { saysReading } from '../../../.storybook/unread';
 
 /** What holds the page as its route does: the loading page while its reads are out, the failed page when one is refused. */
 class Routed extends Component<{ children: ReactNode }, { error: unknown }> {
@@ -205,4 +206,10 @@ export const ReadRefused: Story = {
     await expect(await page.findByRole('alert')).toBeVisible();
     await expect(page.getByText(REFUSED_WORDS)).toBeVisible();
   },
+};
+
+/** The page while its two reads are out, as its route draws it: the shape of its three parts, beside the page drawn above. */
+export const Loading: Story = {
+  render: () => <RunsLoading />,
+  play: saysReading('Loading the runs…'),
 };

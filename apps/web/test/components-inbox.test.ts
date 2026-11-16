@@ -69,7 +69,11 @@ test('REFUSED: a card that names a workflow and no factory says it has no Queue 
 
 test('REFUSED: the box says the factories are being read until they are, and never that the store has none', async () => {
   const html = await routedWith(createElement(FileCard, { shown: 'solo' }), [STORE_ANSWER]);
-  assert.match(html, /data-reading-factories="true"[^>]*>Reading the factories…<\/p>/);
+  assert.match(
+    html,
+    /<div data-reading-factories="true"><div data-slot="skeleton-group" role="status"[^>]*><span class="sr-only">Reading the factories…<\/span><div[^>]*><span data-slot="skeleton"/,
+    'the shape of its line, the line itself said to a screen reader alone',
+  );
   assert.doesNotMatch(html, /data-no-factory/);
   const read = await routedWith(createElement(FileCard, { shown: 'solo' }), [[['factories'], LISTED], STORE_ANSWER]);
   assert.doesNotMatch(read, /data-reading-factories/);

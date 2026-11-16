@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { Readiness } from 'objects';
-import { ReadinessList } from './ReadinessList';
+import { ReadinessList, ReadinessReading } from './ReadinessList';
+import { saysReading } from '../../../.storybook/unread';
 
 /** The readiness read as the Setup page draws it: pieces missing, in place and unknown, with fixes typed and started. */
 const meta: Meta = { title: 'Store/ReadinessList' };
@@ -141,4 +142,15 @@ export const Ready: StoryObj = {
       <ReadinessList readiness={READY} onStart={() => undefined} />
     </div>
   ),
+};
+
+/** The list while what the server has in place is read, as Setup's route draws it: the shape of its areas and pieces. */
+export const Reading: StoryObj = {
+  args: {},
+  render: () => (
+    <div style={{ width: 760 }}>
+      <ReadinessReading />
+    </div>
+  ),
+  play: saysReading('Reading what this server has in place…'),
 };

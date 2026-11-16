@@ -7,21 +7,22 @@
  * Nothing of a step's session goes unread: a person reads it by opening it, and no read mark is posted, so the talk is given no `newAt`
  * and nothing readable.
  *
- * Where there is no conversation to draw — the step not filed, no session of its task started, nothing in it the engine can read —
- * the step's own words stand in the family's empty shell (`TalkEmpty`), which carries the mark a page selects the empty state by; while
- * it is first read, the family's skeleton of it stands there (`TalkReading`).
+ * Where there is no conversation to draw — the step not filed, no session of its task started, the conversation still being read,
+ * nothing in it the engine can read — the step's own words stand in the family's empty shell (`TalkEmpty`), which carries the mark a
+ * page selects the empty state by.
  */
 import { Talk, TalkEmpty } from '@/components/conversation/Talk';
 import { sessionItems } from '@/lib/sessionItems';
 import type { Turn } from '@/lib/transcript';
 import { SessionOwn } from './SessionOwn';
-import { MARKS } from './SessionReading';
 
+/** The prefix every data mark of a step's session is written under, which its pages read. */
+const MARKS = 'session';
 
 /** What a reader is told the talk is, at its latest and read back. */
 const [LABEL, BACK] = ["The step's conversation", "Earlier in the step's conversation"];
 
-/** A quiet line in the talk's place: why there is no conversation to draw. */
+/** A quiet line in the talk's place: why there is no conversation to draw, or that it is being read. */
 export function SessionQuiet({ words }: { words: string }) {
   return (
     <TalkEmpty marks={MARKS}>

@@ -49,14 +49,12 @@ export default {
       await expectCount(card.locator(`[data-gate-line="${gated}"]`), 0, 'nor says what approving would do');
       await expectCount(card.getByText('waiting on you', { exact: true }), 0, 'and does not say it waits on you');
       await expectVisible(card.getByText('held', { exact: true }), 'its badge says held');
-      await expectVisible(card.locator(`ul[aria-label="Steps"] [data-step="${gated}"][data-state="held"]`), `${gated}'s pill is held`);
+      await expectVisible(card.locator(`[data-run-steps] [data-step="${gated}"][data-state="held"]`), `${gated}'s node is held`);
       for (const step of GATED.steps.filter((name) => name !== gated)) {
-        const pill = card.locator(`ul[aria-label="Steps"] [data-step="${step}"][data-state="waiting"]`);
+        const pill = card.locator(`[data-run-steps] [data-step="${step}"][data-state="waiting"]`);
         await expectVisible(pill, `${step}, not filed, is drawn as any step to come`);
-        if (!(await pill.getAttribute('title'))?.includes('holds the run'))
-          throw new Refused(
-            `${step}'s pill says on hover that it waits on the hold — it says ${JSON.stringify(await pill.getAttribute('title'))}`,
-          );
+        if ((await pill.getAttribute('data-mark')) === 'yours')
+          throw new Refused(`${step}, held, is drawn as not started, never as waiting on you — its mark is yours`);
       }
       await expectCount(edge, 1, `an edge comes into ${id}'s card from ${until}'s, which it is held until`);
       if ((await edge.locator('path').count()) < 1)

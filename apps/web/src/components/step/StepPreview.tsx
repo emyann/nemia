@@ -18,11 +18,11 @@ import { StepPart } from './part/StepPart';
 /** The run a rail belongs to, as its row on the list gives it. */
 type RailRun = Pick<RunView, 'id' | 'cancelledAt' | 'holding' | 'steps'>;
 
-/** A bar of the rail as the rail hands it: its step's name and state. */
+/** A node of the graph as the graph hands it: its step's name, state and wait. */
 type RailStep = { name: string; state: StepState; on: WaitOn | null };
 
-/** A bar's button: 32 pixels tall, its 8-pixel bar drawn in its middle, pulled in so that the rail keeps its height. */
-const BAR_BUTTON = cn('-my-3 grid h-8 w-full cursor-pointer content-center outline-none', focusRing());
+/** A node's button: the whole of its holder on the graph, 24 pixels square on a row, its mark drawn in its middle. */
+const BAR_BUTTON = cn('grid size-full cursor-pointer place-items-center outline-none', focusRing());
 
 /**
  * The card of a step, its part at M, read once it opens: the run's own answer (one read a run, held by the query's cache) and the agents,
@@ -135,7 +135,7 @@ function BarPreview(props: { run: RailRun; step: RailStep; asOf: Date; children:
 }
 
 /**
- * What wraps each bar of `run`'s rail (`RunSteps`' `wrap`): a button that opens its step's card, its times said at `asOf`.
+ * What wraps each node of `run`'s graph (`StepGraph`'s `wrap`): a button that opens its step's card, its times said at `asOf`.
  *
  * @param run the run whose rail it is
  * @param asOf the instant its times are said at

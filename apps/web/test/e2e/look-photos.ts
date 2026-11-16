@@ -180,7 +180,9 @@ async function closeUps(browser: Browser, theme: 'light' | 'dark'): Promise<void
   await onStory(browser, 'look-cutbutton--disabled-press', theme, (page) =>
     enlarged(page, CARD_GROUND, 6, `parts-cut-press-disabled-${theme}.png`),
   );
-  await onStory(browser, 'look-runsteps--done', theme, (page) => enlarged(page, '[data-rail]', 4, `parts-rail-done-${theme}.png`));
+  await onStory(browser, 'look-stepgraph--at-work', theme, (page) =>
+    enlarged(page, '[data-run-steps]', 4, `parts-graph-at-work-${theme}.png`),
+  );
   await onStory(browser, 'look-plate--name-of-a-page', theme, (page) =>
     enlarged(page, '[data-story-ground]', 2, `parts-page-name-${theme}.png`),
   );

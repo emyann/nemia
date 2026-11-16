@@ -1,13 +1,14 @@
 /**
  * A run's steps as its card on the Factory draws them, without React: a small flowchart, left to right. Pure.
  *
- * At rest the card holds a rail (`railOf`): a pill per step, laid out by the run's own layering (`layers`), so a fan-out is two
- * lanes and a fan-in meets to the right of its parents, with an arrow between pills for each `after` edge — an arc over the row
- * for one that skips a column, and under the row for a `loop` edge back. The card is narrow, so the rail holds at most
- * `RAIL_SLOTS` columns: the ones around where the run is now, the columns before and after them folded into a pill that counts
- * them. A column holds at most `RAIL_LANES` pills, the last of them counting the steps it leaves out.
+ * At rest a run's steps are its workflow's graph drawn small (`graphOf`, which `StepGraph` draws on the floor's card, the runs page's row
+ * and the waiting card): a point per step, laid out by the run's own layering (`layers`), so a fan-out is two lanes and a fan-in meets to
+ * the right of its parents, with a line between points for each `after` edge and a right-angled one under the row for a `loop` edge
+ * back. A row is narrow, so the graph holds at most `GRAPH_SLOTS` columns: the ones around where the run is now, the columns before and
+ * after them folded into a point that counts them. A column holds at most `RAIL_LANES` points, the last of them counting the steps it
+ * leaves out.
  *
- * Opened, the card grows to the right and holds every step as a tile (`tilesOf`), on the same layering with nothing folded.
+ * Opened, the floor's card grows to the right and holds every step as a tile (`tilesOf`), on the same layering with nothing folded.
  */
 import type { RunGraph } from './api/graph.ts';
 import type { Frozen } from './frozen.ts';
@@ -15,6 +16,7 @@ import type { RunView } from './api/judged.ts';
 import { edgesOf, loopPath, movingInto, type EdgeState, type EdgeStep } from './canvas.ts';
 import { layers, stepsOf, type Point } from './layout.ts';
 import { waitsAtGate, settledState, stepState, type StepState } from './status.ts';
+import { stepMark } from './stepMark.ts';
 
 /**
  * One box of a flow. `step`, a step of the run; `fold`, the columns before or after the ones the rail shows, each step of them;
@@ -55,15 +57,10 @@ type Arrow = {
 /** A flow laid out: its boxes and arrows, the room they take, and why it has no arrows when the steps' `after` go round in a cycle. */
 export type Flow = { pills: Pill[]; arrows: Arrow[]; width: number; height: number; error: string | null };
 
-/** The most columns the rail shows, fold pills counted: four boxes and their arrows across a card. */
-const RAIL_SLOTS = 4;
-/** The most pills a column of the rail shows, the one counting the rest included. */
+/** The most columns the graph shows, fold points counted: six columns of 32 pixels or more across its 188, a gate's tick between two. */
+export const GRAPH_SLOTS = 6;
+/** The most points a column of the graph shows, the one counting the rest included. */
 const RAIL_LANES = 3;
-/** How wide the rail may be: the card's inside (`CARD_WIDTH`, `w-88`, less its padding). */
-export const RAIL_WIDTH = 328;
-
-/** The rail's pills: at most `box` wide, narrower when more columns share the card, with an arrow's room between. */
-const RAIL = { box: 110, height: 20, gap: 16, lane: 6, over: 12, under: 14 };
 /** The open card's tiles (`w-44`), the arrow's room between columns and between lanes, and the room over and under for arcs. */
 export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under: 22 };
 
@@ -71,7 +68,11 @@ export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under
  * A run's steps as its flow reads them, off the list's record of it: each one's name, its state, its note and whether its round is due.
  * @param run The run: its steps, when it was called off, and its hold where it has one.
  */
-export const flowSteps = (run: Pick<RunView, 'steps' | 'cancelledAt'> & { holding?: RunView['holding'] }): EdgeStep[] =>
+export const flowSteps = (run: {
+  steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'note' | 'roundDue'>>;
+  cancelledAt: string | null;
+  holding?: RunView['holding'];
+}): EdgeStep[] =>
   run.steps.map((step) => ({
     name: step.name,
     state: stepState(step, run.cancelledAt !== null, run.holding != null),
@@ -115,9 +116,9 @@ function liveColumn(columns: readonly string[][], stateOf: (name: string) => Ste
  * never holds a single column: a column takes the slot the fold would.
  * @param n How many columns the layering has.
  * @param live The index of the column the rail is centred on.
- * @param slots How many slots the rail has, fold pills counted: `RAIL_SLOTS` by default.
+ * @param slots How many slots the rail has, fold points counted: `GRAPH_SLOTS` by default.
  */
-export function windowOf(n: number, live: number, slots = RAIL_SLOTS): { start: number; end: number } {
+export function windowOf(n: number, live: number, slots = GRAPH_SLOTS): { start: number; end: number } {
   if (n <= slots) return { start: 0, end: n - 1 };
   const used = (s: number, e: number) => (s > 0 ? 1 : 0) + (e - s + 1) + (e < n - 1 ? 1 : 0);
   let start = Math.max(0, Math.min(live, n - 1) - 1);
@@ -129,26 +130,6 @@ export function windowOf(n: number, live: number, slots = RAIL_SLOTS): { start: 
 
 type Box = Omit<Pill, 'x' | 'y' | 'width' | 'height'>;
 type Sizes = { width: number; height: number; gap: number; lane: number; over: number; under: number };
-
-/**
- * The rail a card holds at rest: the columns around where the run is, each of at most `RAIL_LANES` pills.
- * @param names The run's steps by name, in the run's order.
- * @param graph The run's graph of steps, whose edges lay them out; a run listed without one has each step a column.
- * @param steps Each step's state as the flow reads it (`flowSteps`).
- * @param cancelled Whether somebody called the run off: no step is live then.
- */
-export function railOf(names: readonly string[], graph: Frozen<RunGraph>, steps: readonly EdgeStep[], cancelled: boolean): Flow {
-  const { columns, error } = columnsOf(names, graph);
-  const stateOf = stateReader(steps);
-  const { start, end } = windowOf(columns.length, liveColumn(columns, stateOf, cancelled));
-  const boxOf = boxer(stateOf, cancelled);
-  const slots: Box[][] = [];
-  if (start > 0) slots.push([boxOf('fold', columns.slice(0, start).flat())]);
-  for (const column of columns.slice(start, end + 1)) slots.push(capped(column, boxOf, stateOf, cancelled));
-  if (end < columns.length - 1) slots.push([boxOf('fold', columns.slice(end + 1).flat())]);
-  const width = Math.min(RAIL.box, (RAIL_WIDTH - (slots.length - 1) * RAIL.gap) / slots.length);
-  return arrange(slots, { ...RAIL, width }, graph, steps, error);
-}
 
 /**
  * The tiles an open card holds: every step, on the layering, nothing folded.
@@ -167,6 +148,127 @@ export function tilesOf(names: readonly string[], graph: Frozen<RunGraph>, steps
     steps,
     error,
   );
+}
+
+/**
+ * A point of a run's graph drawn small (`graphOf`): a box (`Pill`'s kind, names, label, state, live and done) at its centre, `x`, `y`;
+ * `r` the half-width its mark is drawn at, a step at work or waiting on a person a size larger; `route` where its node is a condition.
+ */
+export type GraphPoint = Box & { x: number; y: number; r: number; route: boolean };
+
+/**
+ * A line of the graph between two points: `path` drawn straight between them, or under the row at right angles for a `loop`, with its
+ * arrowhead `head`; `state` as `Arrow`'s; `untaken` a route its condition did not take; `taken` a loop the run has gone round.
+ */
+export type GraphLine = {
+  id: string;
+  from: string;
+  to: string;
+  loop: boolean;
+  state: EdgeState;
+  untaken: boolean;
+  taken: boolean;
+  path: string;
+  head: string | null;
+};
+
+/** A run's graph laid out small: its points, its lines, a tick before each gated step, the room they take, and why it has no lines. */
+export type StepGraphLayout = {
+  points: GraphPoint[];
+  lines: GraphLine[];
+  gates: Array<{ step: string; x: number; y: number }>;
+  width: number;
+  height: number;
+  error: string | null;
+};
+
+/** The graph's geometry: its room at each end, the row's line, the lanes' spacing, the rows' height, and a loop's depth under a step. */
+const GRAPH = { pad: 14, line: 8, top: 2, lane: 13, height: 24, under: 15, nest: 4, gate: 12 };
+
+/** A point's half-width by its state: a step at work or waiting on a person a size larger, a failure between, a route passed by smaller. */
+function radiusOf(state: StepState | null): number {
+  const mark = state === null ? 'todo' : stepMark(state, false);
+  return mark === 'alive' || mark === 'yours' ? 6.6 : mark === 'failure' ? 5.6 : mark === 'off' ? 4 : 5;
+}
+
+const r1 = (n: number): number => Math.round(n * 10) / 10;
+
+/**
+ * A run's steps as its workflow's graph drawn small, `width` wide: the columns around where the run is (`windowOf`, `GRAPH_SLOTS`),
+ * each of at most `RAIL_LANES` points, spread evenly across the width; a line between points for each edge (`joinedOf`), each loop under
+ * the row at right angles, the deeper the more loops there are; and a tick before each step of `gates` drawn.
+ * @param names The run's steps by name, in the run's order.
+ * @param graph The run's graph of steps, whose edges lay them out; a run listed without one has each step a column.
+ * @param steps Each step's state as the flow reads it (`flowSteps`).
+ * @param gates The steps a person approves before they run.
+ * @param cancelled Whether somebody called the run off: no step is live then.
+ * @param width How wide the graph is drawn, in pixels.
+ */
+export function graphOf(
+  names: readonly string[],
+  graph: Frozen<RunGraph>,
+  steps: readonly EdgeStep[],
+  gates: readonly string[],
+  cancelled: boolean,
+  width = 188,
+): StepGraphLayout {
+  const { columns, error } = columnsOf(names, graph);
+  const stateAt = stateReader(steps);
+  const { start, end } = windowOf(columns.length, liveColumn(columns, stateAt, cancelled));
+  const boxOf = boxer(stateAt, cancelled);
+  const slots: Box[][] = [];
+  if (start > 0) slots.push([boxOf('fold', columns.slice(0, start).flat())]);
+  for (const column of columns.slice(start, end + 1)) slots.push(capped(column, boxOf, stateAt, cancelled));
+  if (end < columns.length - 1) slots.push([boxOf('fold', columns.slice(end + 1).flat())]);
+  const conditions = new Set((graph?.nodes ?? []).filter((node) => node.kind === 'condition').map((node) => node.name));
+  const lanes = Math.max(1, ...slots.map((slot) => slot.length));
+  const middle = lanes === 1 ? GRAPH.line : GRAPH.top + ((lanes - 1) * GRAPH.lane) / 2;
+  const gap = slots.length > 1 ? (width - 2 * GRAPH.pad) / (slots.length - 1) : 0;
+  const points = slots.flatMap((slot, s) =>
+    slot.map((box, lane): GraphPoint => ({
+      ...box,
+      x: r1(GRAPH.pad + s * gap),
+      y: r1(middle + (lane - (slot.length - 1) / 2) * GRAPH.lane),
+      r: radiusOf(box.state),
+      route: box.kind === 'step' && conditions.has(box.names[0]),
+    })),
+  );
+  const at = new Map(points.map((point) => [point.id, point]));
+  const lowest = Math.max(GRAPH.line, ...points.map((point) => point.y));
+  let loops = 0;
+  const lines = [...joinedOf(slots, graph, steps, error)].map(([id, { from, to, loop, states, skip, untaken, label }]): GraphLine => {
+    const [a, b] = [at.get(from.id)!, at.get(to.id)!];
+    const state = stateOf(states);
+    const line = { id, from: from.id, to: to.id, loop, state, untaken: !loop && untaken, taken: loop && label !== null };
+    if (loop) {
+      const bottom = lowest + GRAPH.under + GRAPH.nest * loops++;
+      const tip = b.y + b.r + 2.2;
+      return {
+        ...line,
+        path: `M${r1(a.x)},${r1(a.y + a.r + 2.2)} V${r1(bottom)} H${r1(b.x)} V${r1(tip + 0.4)}`,
+        head: `M${r1(b.x - 3)},${r1(tip + 3.4)} L${r1(b.x)},${r1(tip)} L${r1(b.x + 3)},${r1(tip + 3.4)}`,
+      };
+    }
+    if (skip) {
+      const top = Math.min(a.y, b.y) - GRAPH.line - 1;
+      return { ...line, path: `M${r1(a.x)},${r1(a.y - a.r - 2)} V${r1(top)} H${r1(b.x)} V${r1(b.y - b.r - 2)}`, head: null };
+    }
+    const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const [ux, uy] = [(b.x - a.x) / length, (b.y - a.y) / length];
+    return {
+      ...line,
+      path: `M${r1(a.x + ux * (a.r + 3))},${r1(a.y + uy * (a.r + 3))} L${r1(b.x - ux * (b.r + 3))},${r1(b.y - uy * (b.r + 3))}`,
+      head: null,
+    };
+  });
+  const drawn = new Map(points.filter((point) => point.kind === 'step').map((point) => [point.names[0], point]));
+  const ticks = gates.flatMap((step) => {
+    const point = drawn.get(step);
+    return point ? [{ step, x: r1(point.x - GRAPH.gate), y: point.y }] : [];
+  });
+  const rows = lanes <= 2 ? GRAPH.height : GRAPH.height + (lanes - 2) * GRAPH.lane;
+  const under = loops > 0 ? lowest + GRAPH.under + GRAPH.nest * (loops - 1) + 1 : 0;
+  return { points, lines, gates: ticks, width, height: Math.max(rows, under), error };
 }
 
 const stateReader = (steps: readonly EdgeStep[]) => {
@@ -216,6 +318,43 @@ function capped(
   ];
 }
 
+/** Edges of the run joined onto the boxes that stand for their ends (`joinedOf`): each edge once, none inside a box. */
+type Joined = Map<
+  string,
+  { from: Box; to: Box; loop: boolean; states: EdgeState[]; skip: boolean; label: string | null; untaken: boolean }
+>;
+
+/**
+ * The run's edges (`edgesOf`) between the boxes that stand for their ends, each drawn once, none inside a box: a `loop` edge only between
+ * two steps' own boxes, since back into a fold it would say nothing a person could follow; `skip` where it passes over a column; `untaken`
+ * where every route it stands for is off the route its condition took.
+ */
+function joinedOf(slots: readonly Box[][], graph: Frozen<RunGraph>, steps: readonly EdgeStep[], error: string | null): Joined {
+  const boxOf = new Map(slots.flatMap((slot, s) => slot.flatMap((box) => box.names.map((name) => [name, { box, slot: s }] as const))));
+  const joined: Joined = new Map();
+  if (error !== null) return joined;
+  for (const edge of edgesOf(graph, steps)) {
+    const from = boxOf.get(edge.source);
+    const to = boxOf.get(edge.target);
+    const loop = edge.kind === 'loop';
+    if (!from || !to || from.box === to.box || (loop && (from.box.kind !== 'step' || to.box.kind !== 'step'))) continue;
+    const id = `${loop ? 'loop:' : ''}${from.box.id}->${to.box.id}`;
+    const one = joined.get(id) ?? {
+      from: from.box,
+      to: to.box,
+      loop,
+      states: [],
+      skip: !loop && to.slot - from.slot > 1,
+      label: edge.label,
+      untaken: true,
+    };
+    one.states.push(edge.state);
+    one.untaken = one.untaken && edge.untaken;
+    joined.set(id, one);
+  }
+  return joined;
+}
+
 /**
  * The boxes put down, column by column, each column centred on the tallest; and the arrows between them, off the run's edges
  * (`edgesOf`), each edge drawn once between the boxes that stand for its ends, and none inside a box. A `loop` edge only between
@@ -223,27 +362,7 @@ function capped(
  * over it, and under it only when a loop does.
  */
 function arrange(slots: readonly Box[][], size: Sizes, graph: Frozen<RunGraph>, steps: readonly EdgeStep[], error: string | null): Flow {
-  const boxOf = new Map(slots.flatMap((slot, s) => slot.flatMap((box) => box.names.map((name) => [name, { box, slot: s }] as const))));
-  const joined = new Map<string, { from: Box; to: Box; loop: boolean; states: EdgeState[]; skip: boolean; label: string | null }>();
-  if (error === null) {
-    for (const edge of edgesOf(graph, steps)) {
-      const from = boxOf.get(edge.source);
-      const to = boxOf.get(edge.target);
-      const loop = edge.kind === 'loop';
-      if (!from || !to || from.box === to.box || (loop && (from.box.kind !== 'step' || to.box.kind !== 'step'))) continue;
-      const id = `${loop ? 'loop:' : ''}${from.box.id}->${to.box.id}`;
-      const one = joined.get(id) ?? {
-        from: from.box,
-        to: to.box,
-        loop,
-        states: [],
-        skip: !loop && to.slot - from.slot > 1,
-        label: edge.label,
-      };
-      one.states.push(edge.state);
-      joined.set(id, one);
-    }
-  }
+  const joined = joinedOf(slots, graph, steps, error);
   const over = [...joined.values()].some((a) => a.skip) ? size.over : 0;
   const under = [...joined.values()].some((a) => a.loop) ? size.under : 0;
   const lanes = Math.max(1, ...slots.map((slot) => slot.length));

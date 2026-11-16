@@ -97,7 +97,9 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   dark, at the head (`story-<id>-<theme>.png`), and again at the merge base drawn from a `git archive` on this machine, writing
   `before-`, `after-` and `diff-` for each story whose pixels differ, and `stories.json`; a changed part no story reaches is refused,
   exit 1, named. `--list` prints the touched ids and bare parts as JSON and launches no browser; `--changed <path>…` names the paths
-  instead of git. It builds Storybook twice: a few minutes, about 2.6 GB.
+  instead of git. It builds Storybook twice: a few minutes, about 2.6 GB. `--targets <dir>` sets each `target-<story id>[-light|-dark].png`
+  there beside its story at the head, one height, captioned, as `match-<id>-<theme>.png` (`e2e/stories/targets.ts`), listed in
+  `stories.json`'s `matched` and `matches`.
 - What a person does to a part — a press, the keyboard, the focus, where a link leads, what a press opens — is its story's play
   function (`play`, its helpers `.storybook/play.ts`), run by `npm run stories`. What needs the browser's own input or reads pixels
   stays a browser test under `test/e2e/` (`cuts.test.ts`, `bars.test.ts`, `motion.test.ts`, `secondary.test.ts`), each story opened

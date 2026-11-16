@@ -2,7 +2,8 @@
  * The story pictures' tool (`e2e/stories/shoot.ts`) with no browser, on a planted git tree: a story importing a part importing a lib
  * file. What a change touches is read along the first parent, so what a merged branch changed is not the work's; `--list` prints
  * Storybook's ids and launches nothing; a changed part no story reaches is refused, exit 1, named; what every story is drawn in (the
- * preview, what it imports, the stylesheets those import) reaches every story. Each case a row.
+ * preview, what it imports, the stylesheets those import) reaches every story. A person's targets (`--targets`) are read off their
+ * folder's names and paired with their stories, a target naming no story refused. Each case a row.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,6 +11,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { matchesOf, targetsOf, type Match } from './e2e/stories/targets.ts';
 
 const SHOOT = path.join(import.meta.dirname, 'e2e', 'stories', 'shoot.ts');
 
@@ -150,4 +152,68 @@ test("a change to one part touches only the stories that reach it, though the pr
   const { root } = planted();
   assert.deepEqual(listed(root, '--changed', CARD).said?.stories, CARD_STORIES, 'a part a story imports');
   assert.deepEqual(listed(root, '--changed', LONE), { status: 1, said: { stories: [], bare: [LONE] } }, 'a part behind the door');
+});
+
+/** `shoot.ts --list --targets` over a folder holding `names`, beside the planted board, with `args`: its exit, matches and stderr. */
+const targeted = (root: string, names: readonly string[], ...args: string[]) => {
+  const dir = path.join(root, 'targets');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const name of names) fs.writeFileSync(path.join(dir, name), 'png');
+  const ran = spawnSync(process.execPath, [SHOOT, '--list', '--targets', dir, ...args], {
+    cwd: path.join(root, 'apps', 'web'),
+    encoding: 'utf8',
+    env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: path.join(root, 'no-browsers') },
+  });
+  const said = ran.stdout.trim();
+  return {
+    status: ran.status,
+    said: said === '' ? undefined : (JSON.parse(said) as { stories: string[]; matches: Match[] }),
+    stderr: ran.stderr,
+  };
+};
+
+/** Each match's story, theme and target, in order. */
+const pairsOf = (matches: readonly Match[] | undefined) => (matches ?? []).map((m) => `${m.id} ${m.theme} ${m.target}`);
+
+test('a target is matched in both themes when it names none, in its own when it names one, the named one winning', () => {
+  const { matches, unknown } = matchesOf(
+    targetsOf(['target-run-card--wide.png', 'target-run-card--narrow-one-dark.png', 'target-run-card--wide-dark.png']),
+    CARD_STORIES,
+  );
+  assert.deepEqual(unknown, []);
+  assert.deepEqual(pairsOf(matches), [
+    'run-card--narrow-one dark target-run-card--narrow-one-dark.png',
+    'run-card--wide light target-run-card--wide.png',
+    'run-card--wide dark target-run-card--wide-dark.png',
+  ]);
+  assert.deepEqual(
+    matches.map((m) => [m.story, m.match]),
+    [
+      ['story-run-card--narrow-one-dark.png', 'match-run-card--narrow-one-dark.png'],
+      ['story-run-card--wide-light.png', 'match-run-card--wide-light.png'],
+      ['story-run-card--wide-dark.png', 'match-run-card--wide-dark.png'],
+    ],
+    'the head picture it is set beside, and the match it writes',
+  );
+});
+
+test('a file not named target-*.png is ignored', () => {
+  assert.deepEqual(targetsOf(['notes.md', 'run-card--wide.png', 'target-run-card--wide.jpg', 'before-run-card--wide-light.png']), []);
+});
+
+test('a target for a story the change does not touch is still matched', () => {
+  const { root } = planted();
+  const ran = targeted(root, ['target-look-tag--plain-light.png', 'README.md'], '--changed', MONEY);
+  assert.equal(ran.status, 0);
+  assert.deepEqual(ran.said?.stories, CARD_STORIES, 'the touched stories are the change’s alone');
+  assert.deepEqual(pairsOf(ran.said?.matches), ['look-tag--plain light target-look-tag--plain-light.png']);
+});
+
+test('REFUSED: a target naming no story id, exit 1, naming its file and the nearest id', () => {
+  const { root } = planted();
+  const ran = targeted(root, ['target-run-card--wid.png'], '--changed', MONEY);
+  assert.equal(ran.status, 1);
+  assert.equal(ran.said, undefined, 'nothing listed');
+  assert.ok(ran.stderr.includes('target-run-card--wid.png'), 'the file named');
+  assert.ok(ran.stderr.includes('run-card--wide'), 'the nearest id named');
 });

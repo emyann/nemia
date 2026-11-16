@@ -16,8 +16,13 @@
  * light, then dark (`story-<id>-<theme>.png`); then the same of the merge base, a `git archive` of its `apps/web` extracted into a
  * scratch folder over this checkout's `node_modules`, so both sides are drawn on one machine; and for each story whose pixels differ
  * writes `before-`, `after-` and `diff-<id>-<theme>.png`. Last, `stories.json`: `{ head, base, touched, changed, fresh, baseRendered,
- * baseWhy }` — `fresh` the touched stories the base has none of, `baseRendered` false where the base would not build, with why. No
- * picture goes into git: `--out` is the step's files or a scratch folder.
+ * baseWhy, matched, matches }` — `fresh` the touched stories the base has none of, `baseRendered` false where the base would not build,
+ * with why. No picture goes into git: `--out` is the step's files or a scratch folder.
+ *
+ * With `--targets <dir>`, each `target-<id>[-light|-dark].png` there (`targets.ts`) is set beside its story's picture at the head, in
+ * the theme it names or both, as `match-<id>-<theme>.png`; a target's story the change does not touch is pictured at the head too, and
+ * a target naming no story's id is refused, exit 1, naming the file and the nearest ids. `stories.json`'s `matched` lists the stories
+ * matched, and `matches` each match's files; `--list` prints the matches too, and composes nothing.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -29,6 +34,7 @@ import { importsIn } from 'test-kit/imports';
 import type { StoryReach } from '../../../contracts/touched-stories.contract.ts';
 import { storyModuleOf } from '../../stories.ts';
 import { buildStorybook, builtIds, serveBuilt } from './built.ts';
+import { composeMatch, matchesOf, targetsOf, THEMES, type Match } from './targets.ts';
 import { owesAStory, storiesTouched } from './touched.ts';
 
 /** The board's folder, from the workspace root. */
@@ -145,6 +151,27 @@ export const idsOf = (source: string): string[] => {
   return title === null ? [] : module.stories.map((story) => toId(title, storyNameFromExport(story.name)));
 };
 
+/** Every story id of the workspace at `root`, read off its story files. */
+const knownIds = (root: string): string[] => storyFiles(root).flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8')));
+
+/**
+ * The matches the targets in `dir` ask for; refuses where `dir` is no folder, or a target names no story of the workspace at `root`.
+ * @param root The workspace root.
+ * @param dir The targets' folder.
+ */
+const matchesIn = (root: string, dir: string): Match[] => {
+  if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory())
+    throw new Refusal(`--targets ${dir} is no folder: name the folder the targets are in`);
+  const { matches, unknown } = matchesOf(targetsOf(fs.readdirSync(dir)), knownIds(root));
+  if (unknown.length > 0)
+    throw new Refusal(
+      `${unknown.length} target${unknown.length === 1 ? '' : 's'} name no story: ` +
+        unknown.map((target) => `${target.file} (the nearest ids: ${target.nearest.join(', ')})`).join('; ') +
+        '; rename each target-<story id>[-light|-dark].png after a story the board holds',
+    );
+  return matches;
+};
+
 /** The story files of the workspace at `root`, in path order. */
 const storyFiles = (root: string): string[] =>
   git(root, ['ls-files', '--cached', '--others', '--exclude-standard', '--', BOARD])
@@ -165,9 +192,6 @@ export const touchedOf = (root: string, changed: readonly string[]): { stories: 
   const touched = storiesTouched(changed, reach, owing);
   return { stories: touched.stories.flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8'))), bare: [...touched.bare] };
 };
-
-/** The themes a story is pictured in, in order. */
-const THEMES = ['light', 'dark'] as const;
 
 /** Serves the built Storybook at `dir` on loopback while `use` runs, handing it the address: MSW's worker needs a secure origin. */
 async function served<T>(dir: string, use: (at: string) => Promise<T>): Promise<T> {
@@ -271,8 +295,8 @@ async function boardAt(root: string, commit: string): Promise<string> {
 
 /** The words of `--help`, and of a refusal of the arguments. */
 const USAGE =
-  'usage, from apps/web: node test/e2e/stories/shoot.ts --base <ref> --out <dir> [--changed <path>…] [--list]; ' +
-  '--list prints the touched story ids and bare parts as JSON and pictures nothing';
+  'usage, from apps/web: node test/e2e/stories/shoot.ts --base <ref> --out <dir> [--targets <dir>] [--changed <path>…] [--list]; ' +
+  '--list prints the touched story ids, bare parts and matches as JSON and pictures nothing';
 
 /** The arguments `argv` gives: the flags, and the paths after `--changed`, which takes every path after it; refuses an unknown flag. */
 function argsOf(argv: readonly string[]) {
@@ -282,6 +306,7 @@ function argsOf(argv: readonly string[]) {
       options: {
         base: { type: 'string' },
         out: { type: 'string' },
+        targets: { type: 'string' },
         changed: { type: 'string', multiple: true },
         list: { type: 'boolean', default: false },
       },
@@ -301,7 +326,10 @@ async function main(): Promise<number> {
   const named = values.changed === undefined ? undefined : [...values.changed, ...positionals];
   const changed = named ?? changedSince(root, mergeBase ?? 'HEAD');
   const { stories, bare } = touchedOf(root, changed);
-  if (values.list) process.stdout.write(`${JSON.stringify({ stories, bare })}\n`);
+  const targetsDir = values.targets === undefined ? undefined : path.resolve(values.targets);
+  const matches = targetsDir === undefined ? [] : matchesIn(root, targetsDir);
+  const matched = [...new Set(matches.map((match) => match.id))];
+  if (values.list) process.stdout.write(`${JSON.stringify(targetsDir === undefined ? { stories, bare } : { stories, bare, matches })}\n`);
   if (bare.length > 0)
     throw new Refusal(
       `${bare.length} changed part${bare.length === 1 ? '' : 's'} no story reaches: ` +
@@ -320,8 +348,11 @@ async function main(): Promise<number> {
     fresh: [] as string[],
     baseRendered: false,
     baseWhy: null as string | null,
+    matched,
+    matches,
   };
-  if (stories.length > 0) {
+  const pictured = [...stories, ...matched.filter((id) => !stories.includes(id))];
+  if (pictured.length > 0) {
     const { chromium } = await import('playwright');
     const browser = await chromium.launch();
     try {
@@ -329,15 +360,34 @@ async function main(): Promise<number> {
       const why = await buildStorybook(root, path.join(root, BOARD), headBuilt);
       if (why !== undefined) throw new Refusal(why);
       const held = new Set(builtIds(headBuilt));
-      const unbuilt = stories.filter((id) => !held.has(id));
+      const unbuilt = pictured.filter((id) => !held.has(id));
       if (unbuilt.length > 0)
         throw new Refusal(
           `Storybook built no story of the ids read off the story files, ${unbuilt.join(', ')}: idsOf has drifted from Storybook's ` +
             "id rule; compare it with the build's index.json",
         );
-      const shot = await shootAll(browser, headBuilt, stories, out, 'story-');
+      const pictures = await shootAll(browser, headBuilt, pictured, out, 'story-');
+      const shot = pictures.filter((id) => stories.includes(id));
       console.log(`stories: ${shot.length} touched stor${shot.length === 1 ? 'y' : 'ies'} pictured, light and dark, in ${out}`);
-      if (mergeBase === undefined) report.baseWhy = 'no --base was named, so the base was not drawn';
+      if (targetsDir !== undefined && matches.length > 0) {
+        const short = git(root, ['rev-parse', '--short', 'HEAD']).trim();
+        const css = fs.readFileSync(path.join(root, BOARD, 'theme', 'theme.css'), 'utf8');
+        for (const match of matches) {
+          const png = await composeMatch(browser, {
+            target: path.join(targetsDir, match.target),
+            story: path.join(out, match.story),
+            theme: match.theme,
+            head: short,
+            css,
+          });
+          fs.writeFileSync(path.join(out, match.match), png);
+        }
+        console.log(
+          `stories: ${matches.length} target${matches.length === 1 ? '' : 's'} set beside ${matched.length === 1 ? 'its story' : 'their stories'}, match-<id>-<theme>.png`,
+        );
+      }
+      if (shot.length === 0) report.baseWhy = 'the change touches no story, so the base was not drawn';
+      else if (mergeBase === undefined) report.baseWhy = 'no --base was named, so the base was not drawn';
       else {
         const baseBuilt = path.join(await scratch('nemia-stories-built-base-'), 'static');
         const baseWhy = await buildStorybook(root, await boardAt(root, mergeBase), baseBuilt);

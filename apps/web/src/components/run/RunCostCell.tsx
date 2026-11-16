@@ -5,7 +5,7 @@ import { cn, focusRing } from '@/components/ui/ds/utils';
 import { BreakdownPreview } from '../look';
 
 /** The words in the cell, mono and on one line. */
-const WORDS = 'font-mono text-body-small whitespace-nowrap';
+const WORDS = 'font-mono text-body-medium whitespace-nowrap';
 
 /**
  * What a run's Cost column says in either runs table: the cost as the api words it, nothing where none was measured. The words are a

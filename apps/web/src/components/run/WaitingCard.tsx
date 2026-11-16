@@ -63,7 +63,7 @@ function UnjudgedCard({ run }: { run: UnjudgedRun }) {
           {run.unjudged}
         </p>
         <div data-foot className="mt-2 flex flex-wrap items-end justify-between gap-4">
-          <CutButton to="/runs/$runId" params={{ runId: run.id }} className="ml-auto">
+          <CutButton to="/runs/$runId" params={{ runId: run.id }} quiet className="ml-auto">
             {OPENS}
           </CutButton>
         </div>
@@ -109,7 +109,7 @@ function JudgedCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
           <span data-cost className={`font-mono text-body-small whitespace-nowrap ${ink.money}`}>
             <RunCostCell run={run} />
           </span>
-          <CutButton to="/runs/$runId" params={{ runId: run.id }} className="ml-auto">
+          <CutButton to="/runs/$runId" params={{ runId: run.id }} quiet className="ml-auto">
             {OPENS}
           </CutButton>
         </div>

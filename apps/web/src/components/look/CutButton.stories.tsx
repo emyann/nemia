@@ -5,7 +5,7 @@ import { atRest, tabStops, tabTo } from '../../../.storybook/play';
 import { CutButton, CutPress } from './CutButton';
 import { ON_CARD } from './stories.fixtures';
 
-/** The look's filled button with two cut corners: a link to a route, a button that is pressed, and a press that is disabled. */
+/** The look's filled button with two cut corners: a link to a route, quiet, a button that is pressed, and a press that is disabled. */
 const meta: Meta = { title: 'Look/CutButton' };
 export default meta;
 
@@ -18,6 +18,23 @@ export const Link: StoryObj = {
       </CutButton>
     </div>
   ),
+};
+
+/** The button as a link, quiet: no ground, the surface's ink inside a hairline, as a waiting card's one button. */
+export const Quiet: StoryObj<typeof CutButton> = {
+  args: { quiet: true },
+  render: (args) => (
+    <div style={ON_CARD}>
+      <CutButton {...args} to="." search={{ read: 'button' } as never}>
+        Open the run
+      </CutButton>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const link = canvasElement.querySelector('[data-cut-button="link"]')!;
+    await expect(link.getAttribute('data-quiet')).toBe('true');
+    await expect(getComputedStyle(link.querySelector('[data-cut-shape]')!).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  },
 };
 
 /** A press on a card, which counts on its ground how many times it was pressed (`data-presses`). */

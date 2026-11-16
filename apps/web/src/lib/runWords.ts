@@ -152,6 +152,9 @@ export function openWord(row: OpenedRow): string {
   return wait ? wordsOf(wait.kind).open(wait, readAt(row, wait.step)) : OPENS;
 }
 
+/** Where a step stands that has started, so that its agent is named: at work, failed, or at rest. */
+const STARTED: readonly NowStands[] = ['atWork', 'failed', 'atRest'];
+
 /** A part of what NOW says: a word, or a run it names, which the row links by its id. */
 export type NowPart = string | { run: string };
 
@@ -197,7 +200,7 @@ function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn 
 
 /**
  * What a run does now: the step its wait on a person names, else its first step not done, with the colour of its chip (`chipTone` of
- * where it stands, `nowStandsOf`, and whether the row waits on a person), its agent as the run froze it, its round of its rounds, its
+ * where it stands, `nowStandsOf`, and whether the row waits on a person), its agent as the run froze it where the step has started or waits on a person, its round of its rounds, its
  * budget and what it spent, and the few words of its wait: on a person, the wait's tag (`waitTag`); on no person, `waitWords`. None for
  * a run whose every step is done. It says no duration: the row's Clock column says how long the run has been at work.
  * @param row The run's row: its steps with their codes, spec, try, budget and spend, its calling off, its hold and its waits.
@@ -218,7 +221,7 @@ export function nowOf(row: NowRow): Now | null {
   return {
     step: drawn.name,
     tone: chipTone({ stands, yours }),
-    agent: step.spec ? agentOf({ spec: step.spec }) : null,
+    agent: step.spec && (yours || STARTED.includes(stands)) ? agentOf({ spec: step.spec }) : null,
     round: rounds !== null && step.current ? { at: step.current.round, of: rounds } : null,
     budget: step.budget ? { spent: step.spent?.usd ?? 0, cap: step.budget.usd, capSaid: step.budget.said, over: step.budget.over } : null,
     words: yours ? [wait ? waitTag(row) : stateWordsOf(drawn.state, drawn.on, held).rail] : waitWords(row, stands, drawn.state, drawn.on),

@@ -396,6 +396,8 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
     assert.deepEqual(nowOf(base)?.words, [NOW_WORDS.checkout]);
     const slot = summary([['implement', 'waiting for a run slot']]);
     assert.deepEqual(nowOf(slot)?.words, [NOW_WORDS.slot]);
+    const given = { ...slot, steps: [{ ...slot.steps[0], spec: givenAgent('Grace') }] };
+    assert.equal(nowOf(given)?.agent, null, 'a step not started names no agent: nobody works on it yet');
     assert.equal(nowOf(slot)?.tone, 'waits');
     const hold = { at: '2026-11-01T00:00:00.000Z', word: '', advice: '', waitingOnYou: false };
     const held = summary([['design', 'waiting']], {

@@ -49,7 +49,7 @@ function UnjudgedRow({ run }: { run: UnjudgedRun }) {
 }
 
 /**
- * The runs in flight, as the kit's dense table in the look's cut frame, in the hue of a session at work: each run's title as a link
+ * The runs in flight, as the kit's dense table in the look's cut frame, quiet: each run's title as a link
  * over its meta line (`RunMeta`: its id's end with a copy control, its factory and workflow, its own labels); what it does now in marks
  * (`RunNow`: one chip in the colour of its state, its agent, its round, its words, how many of `among` wait on it and its budget), its
  * steps' rail under them, each bar a button that opens its step's card; its time at work at `asOf`, a preview over it breaking that
@@ -66,7 +66,7 @@ export function FlightTable({
   asOf: Date;
 }) {
   return (
-    <CutFrame hue="alive" size={24}>
+    <CutFrame size={24}>
       <div data-table-box className={cn(FRAMED_BOX, FRAMED_END)}>
         <Table aria-label="Runs in flight" density="dense" className={cn('min-w-[880px] table-fixed', FRAMED_TABLE)}>
           <TableHeader>

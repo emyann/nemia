@@ -17,13 +17,14 @@ const NOT_STARTED: ReadonlySet<StepState> = new Set(['waiting', 'waiting-for-slo
 
 /**
  * A step's bar, by its state and whether it waits on something now (`waits`): done filled whether a check says so or its own word
- * does; at work filled in its hue, its glow breathing on a layer of its own (`Breath`); one that waits on a person filled in yellow,
- * one that failed filled in red; one not started a dashed outline where it waits on a run, a slot or a hold, and a quiet fill where it
- * only waits its turn; every other as its state is drawn on every page (`stateClass`).
+ * does; at work, or its check at work, filled in its hue, a session's glow breathing on a layer of its own (`Breath`); one that
+ * waits on a person filled in yellow, one that failed filled in red; one not started a dashed outline where it waits on a run, a slot
+ * or a hold, and a quiet fill where it only waits its turn; every other as its state is drawn on every page (`stateClass`).
  */
 function barClass(state: StepState, waits: boolean): string {
   const { hue } = stateDrawn[state];
   if (state === 'working') return cn('relative', filled.alive);
+  if (state === 'checking') return filled.alive;
   if (hue === 'yours') return filled.yours;
   if (hue === 'failure') return filled.failure;
   if (NOT_STARTED.has(state)) return waits ? dashed.grey : 'bg-surface-container-highest';

@@ -29,7 +29,7 @@ const FILES = [
   'components/look/Breakdown.tsx',
   'components/look/Plate.tsx',
   'components/look/Sticker.tsx',
-  'components/look/RunSteps.tsx',
+  'components/look/StepGraph.tsx',
   'components/look/Pager.tsx',
   'components/look/TextLink.tsx',
   'components/look/CutFrame.tsx',

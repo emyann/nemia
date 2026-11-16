@@ -25,7 +25,7 @@ after(async () => {
   served?.close();
 });
 
-/** What moves on each rail of the page: where, whether on the breath's own layer, and how. */
+/** What moves on each graph of the page: where, whether on the pulse's own layer, and how. */
 const animated = (page: Page) =>
   page.locator('[data-run-steps]').evaluateAll((rails) =>
     rails.flatMap((rail) =>
@@ -33,8 +33,8 @@ const animated = (page: Page) =>
         .map((element) => ({ element, style: getComputedStyle(element) }))
         .filter(({ style }) => style.animationName !== 'none')
         .map(({ element, style }) => ({
-          at: element.closest('[data-step]')?.getAttribute('data-state') ?? 'the rail',
-          layer: element.hasAttribute('data-step-breath'),
+          at: element.closest('[data-step]')?.getAttribute('data-state') ?? 'the graph',
+          layer: element.hasAttribute('data-step-pulse'),
           name: style.animationName,
           duration: style.animationDuration,
           count: style.animationIterationCount,
@@ -44,11 +44,11 @@ const animated = (page: Page) =>
   );
 
 test(
-  "REFUSED: the step at work's glow breathes on a layer of its own, and nothing else on a rail moves, nor it under reduced motion",
+  'REFUSED: the step at work, or its check, pulses on a layer of its own, and nothing else on a graph moves, nor it under reduced motion',
   WAITED,
   async () => {
-    const rails = ids.filter((id) => id.startsWith('look-runsteps--'));
-    assert.ok(rails.length >= 2, `the rail's stories are built: ${rails.join(' ')}`);
+    const rails = ids.filter((id) => id.startsWith('look-stepgraph--'));
+    assert.ok(rails.length >= 2, `the graph's stories are built: ${rails.join(' ')}`);
     const states: (string | null)[] = [];
     const moving: Awaited<ReturnType<typeof animated>> = [];
     const still: Awaited<ReturnType<typeof animated>> = [];
@@ -67,16 +67,18 @@ test(
       }
     }
     assert.ok(states.includes('awaiting-approval') && states.includes('failed-check'), `the stories draw other states: ${states}`);
-    const breath = {
-      at: 'working',
+    const pulse = (at: string) => ({
+      at,
       layer: true,
-      name: 'step-breath',
-      duration: '2.6s',
+      name: 'step-pulse',
+      duration: '2.4s',
       count: 'infinite',
       easing: 'cubic-bezier(0.2, 0, 0, 1)',
-    };
-    assert.deepEqual(moving, [breath, breath], 'the two rails at work breathe, each on its layer alone');
-    assert.deepEqual(still, [], 'under reduced motion, nothing on a rail moves');
+    });
+    const at = states.filter((state) => state === 'working' || state === 'checking');
+    assert.ok(at.includes('working') && at.includes('checking'), `the stories draw a step at work and one checked: ${states}`);
+    assert.deepEqual(moving, at.map(pulse), 'each step at work or checked pulses, on its layer alone, and nothing else moves');
+    assert.deepEqual(still, [], 'under reduced motion, nothing on a graph moves');
   },
 );
 

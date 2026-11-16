@@ -36,9 +36,9 @@ export function onTheFloor(page: Page): {
   const card = page.locator(`.react-flow__node[data-id="${FAKE.id}"]`);
   return {
     card,
-    pills: card.locator('ul[aria-label="Steps"] [data-step]'),
+    pills: card.locator('[data-run-steps] [data-step]'),
     tiles: card.locator('[data-tile]'),
-    pill: (name) => card.locator(`ul[aria-label="Steps"] [data-step="${name}"]`),
+    pill: (name) => card.locator(`[data-run-steps] [data-step="${name}"]`),
     tile: (name) => card.locator(`[data-tile="${name}"]`),
   };
 }

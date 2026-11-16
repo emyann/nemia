@@ -3,7 +3,7 @@
  * (`waitingWords`, `harnessWaitLine`), a denial's (`deniedWords`), a person's (`onYouWords`). Pure.
  */
 import { gated, hasStarted, waitWord, type Wait } from '../wait/wait.ts';
-import { slotWord, type RunSlot } from '../cap/cap.ts';
+import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
 import { waitingOnNeedsWord, type NeedWaited } from '../needs/index.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, unrunEnding, type ToDecide } from '../ending/ending.ts';
 import type { StepSpec } from '../step/step.ts';
@@ -51,7 +51,8 @@ export type Listing = {
    * (`ranOnWords`), which `nemia ls` prints in the note beside them (`shownNote`) and the board shows off the run object. `roundDue`,
    * only on a looping step whose next round is due (`roundsDue`) and which no retry takes first: what its note words as
    * `roundDueNote`. `asks`, only on a step waiting on a person whose closeout asks questions: how many (`askedQuestions`), which
-   * `nemia ls` counts in the note and `nemia decide` prints whole.
+   * `nemia ls` counts in the note and `nemia decide` prints whole. `baseHeldBy`, only on a step waiting on the checkout (`on: base`): the
+   * run whose ending has it and that ending (`CheckoutHold`), which its message says in words (`checkoutWord`).
    *
    * `reason` and `phase` are where the step stands as codes (`StepReason`, `StepPhase`), with `on`, what a `Waiting` step waits on, and
    * `via`, where an `AwaitingAnswer` step's answer is asked (`CodedStep`), set here from the facts the row's word is built from and never
@@ -71,6 +72,7 @@ export type Listing = {
       ranOn?: string;
       roundDue?: true;
       asks?: number;
+      baseHeldBy?: CheckoutHold;
     }
   >;
   /**
@@ -445,7 +447,7 @@ function listedSteps(
     const stands: StepStatus = !taskId && routed.get(name) === 'awaiting approval' ? 'awaiting approval' : stoodAs;
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       if (checkout && waitsOnCheckout(steps, name, checkout) && !waitingAgain.has(name))
-        return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'base' }), branch };
+        return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'base' }), baseHeldBy: checkout, branch };
       return { name, ...unfiled(step, waiting, held, assessed.waitingOnNeeds), branch };
     }
     if (waitingAgain.has(name)) return { name, message: 'pending', ...coded({ reason: 'Pending' }), branch };

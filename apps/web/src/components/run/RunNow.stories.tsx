@@ -80,12 +80,14 @@ export const WaitsOnARun: Story = {
   },
 };
 
-/** Waiting on the checkout: the outlined chip, and the words, the run that holds it not named until the api says which. */
+/** Waiting on the checkout: the outlined chip, and the run whose ending has it by its id's end, a link to its page, then the checkout. */
 export const WaitsOnTheCheckout: Story = {
   args: { run: listed(TARGET_RUNS['649a']) },
   play: async ({ canvasElement }) => {
     await expect(chipOf(canvasElement)).toEqual({ tone: 'waits', word: 'land' });
-    await expect(within(canvasElement).getByText(NOW_WORDS.checkout)).toBeVisible();
+    const link = within(canvasElement).getByRole('link', { name: 'lgll' });
+    await expect(link).toHaveAttribute('href', `/runs/${TARGET_RUNS.lgll.metadata.name}`);
+    await expect(within(canvasElement).getByText(NOW_WORDS.theCheckout, { exact: false })).toBeVisible();
   },
 };
 

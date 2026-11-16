@@ -69,6 +69,13 @@ export const STEP_CODES = Schema.makeFilter((step: StepCodes) => stepCodesLegal(
 const TRY_CODES = Schema.makeFilter((tried: TryCodes) => tryCodesLegal(tried) || codesRefused('a try', tried));
 const RUN_CODES = Schema.makeFilter((run: RunCodes) => runCodesLegal(run) || codesRefused('a run', run));
 
+/** The check that a step names the run whose ending holds the base (`baseHeldBy`) exactly when it waits on it (`on: base`). */
+const BASE_HELD = Schema.makeFilter(
+  (step: { on: (typeof WAIT_ON)[number] | null; baseHeldBy?: unknown }) =>
+    (step.on === 'base') === (step.baseHeldBy !== undefined) ||
+    `a step is served ${step.on === 'base' ? 'waiting on the base with no baseHeldBy' : `with a baseHeldBy while it waits on ${String(step.on)}`}: set baseHeldBy, the run whose ending holds the base, exactly where on is base.`,
+);
+
 const StepStatusWord = Schema.Literals(STEP_STATUSES);
 const StepPhase = Schema.Literals(STEP_PHASES);
 const StepReason = Schema.Literals(STEP_REASONS);
@@ -231,6 +238,21 @@ export const StepRaise = Schema.Struct({
 export type StepRaise = typeof StepRaise.Type;
 
 /**
+ * The run whose ending step works on the base branch in the repository's own working tree now, and that step (`CheckoutHold`, cap.ts):
+ * what an ending of a run waits on while it waits on the base (`WAIT_ON`'s `base`), on the step that waits (`RunStepStatus`'s
+ * `baseHeldBy`) and on its decision (`Decidable`'s).
+ */
+export const BaseHold = Schema.Struct({
+  run: Schema.String.annotate({ description: "The run whose ending holds the base branch in the repository's own working tree." }),
+  step: Schema.String.annotate({ description: 'Its ending step that works there now.' }),
+}).annotate({
+  identifier: 'BaseHold',
+  description:
+    "The run whose ending step works on the base branch in the repository's own working tree now, which an ending of this run waits on: present only while it waits on the base (on: base), absent otherwise.",
+});
+export type BaseHold = typeof BaseHold.Type;
+
+/**
  * A step now: where it stands as codes and in its word, the raise of its cap the package takes (null where none), its tries on the clock
  * (`TimelineTry`), the short of its current try (null while it has none); then all the board shows of it but its tries whole and what
  * it was told (its sub-resources) — its task and place, its folder's files, its note, what it needs of a person, its gate, what was said
@@ -248,6 +270,8 @@ export const RunStepStatus = Schema.Struct({
   via: Schema.NullOr(Schema.Literals(ANSWER_VIA)).annotate({
     description: 'Where an awaited answer is asked, set only when its reason is AwaitingAnswer: session or closeout. Null otherwise.',
   }),
+  /** The run whose ending holds the base the step waits on, and that ending (`BaseHold`): present exactly when `on` is `base`. */
+  baseHeldBy: Schema.optionalKey(BaseHold),
   message: Schema.String.annotate({ description: 'Where the step stands, in the sentence a person reads.' }),
   verdict: Schema.NullOr(CheckVerdict).annotate({
     description: "Its current try's check verdict, a result and the exit; null where it has none.",
@@ -349,7 +373,7 @@ export const RunStepStatus = Schema.Struct({
     }),
   ),
 })
-  .check(STEP_CODES)
+  .check(STEP_CODES, BASE_HELD)
   .annotate({ identifier: 'RunStepStatus' });
 export type RunStepStatus = typeof RunStepStatus.Type;
 

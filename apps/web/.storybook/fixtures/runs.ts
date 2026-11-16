@@ -262,6 +262,12 @@ const LGLL = staged({
   status: IN_FLIGHT_STATE,
 });
 
+/** A land waiting on the checkout lgll's land holds, said and named (`baseHeldBy`). */
+const onLgll = (): RunStepStatus => ({
+  ...waitingOn('land', 'base', `waiting on the checkout (${LGLL.metadata.name}'s land has it)`),
+  baseHeldBy: { run: LGLL.metadata.name, step: 'land' },
+});
+
 /** The two runs whose land waits on the checkout, which lgll's land holds. */
 const ON_THE_CHECKOUT = [
   staged({
@@ -269,7 +275,7 @@ const ON_THE_CHECKOUT = [
     brief: 'api: the daemon’s event loop answers a read within a few hundred milliseconds while its pass runs',
     workflow: 'quick',
     labels: { area: 'api', work: 'fix' },
-    now: { land: waitingOn('land', 'base', "waiting on the checkout (lgll's land has it)") },
+    now: { land: onLgll() },
     minutes: 94,
     usd: 12.46,
     status: IN_FLIGHT_STATE,
@@ -279,7 +285,7 @@ const ON_THE_CHECKOUT = [
     brief: 'board: the parts page goes; its tests run on Storybook’s stories, and a step looks through `storybook dev`',
     workflow: 'quick',
     labels: { area: 'board', initiative: 'visual', work: 'feature' },
-    now: { land: waitingOn('land', 'base', "waiting on the checkout (lgll's land has it)") },
+    now: { land: onLgll() },
     minutes: 93,
     usd: 18.51,
     status: IN_FLIGHT_STATE,
@@ -487,8 +493,11 @@ export const nothingWaits = answering([LGLL, ...ON_THE_CHECKOUT], { waiting: 0, 
 /** The same, with one run waiting on you, its land failed its check. */
 export const oneWaits = answering([VQVD, LGLL, ...ON_THE_CHECKOUT], { waiting: 1, inFlight: 3, finished: FINISHED_COUNT });
 
-/** A row in each state in flight, and a card of each kind of wait on you: one that asks questions, one whose check failed. */
+/**
+ * A row in each state in flight, one waiting on lgll and one on the checkout lgll holds among them, and a card of each kind of wait on
+ * you: one that asks questions, one whose check failed.
+ */
 export const everyState = answering(
-  [ASKS, VQVD, AT_WORK, OVER_ITS_CAP, LGLL, ON_A_RUN, FOR_A_SLOT, HELD],
-  { waiting: 2, inFlight: 6, finished: FINISHED_COUNT },
+  [ASKS, VQVD, AT_WORK, OVER_ITS_CAP, LGLL, ON_A_RUN, ON_THE_CHECKOUT[1], FOR_A_SLOT, HELD],
+  { waiting: 2, inFlight: 7, finished: FINISHED_COUNT },
 );

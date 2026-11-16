@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery, type QueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { AgentForm } from './AgentForm';
 import { BackToAgents, AgentFace, AgentRefused, FromBadge, personOf, UsedBy } from './AgentParts';
 import { CustomInstructions } from '../step/CustomInstructions';
@@ -204,7 +204,7 @@ function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: bo
   const beside = [agent.keys.output].filter((file): file is string => Boolean(file));
   if (!asking)
     return (
-      <Button variant="outline" className="ml-auto" onPress={() => setAsking(true)} isDisabled={pending}>
+      <Button variant="outlined" className="ml-auto" onPress={() => setAsking(true)} isDisabled={pending}>
         Remove…
       </Button>
     );
@@ -224,10 +224,10 @@ function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: bo
         </>
       )}
       ?
-      <Button variant="destructive" onPress={onRemove} isDisabled={pending}>
+      <Button color="error" onPress={onRemove} isDisabled={pending}>
         {pending ? 'Removing…' : 'Remove'}
       </Button>
-      <Button variant="ghost" onPress={() => setAsking(false)} isDisabled={pending}>
+      <Button variant="text" onPress={() => setAsking(false)} isDisabled={pending}>
         Keep it
       </Button>
     </span>

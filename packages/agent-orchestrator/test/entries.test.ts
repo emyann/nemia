@@ -723,6 +723,7 @@ const PINNED: Record<string, string[]> = {
     'runDecision',
     'SESSION_VARIABLES',
     'SERVING_VARIABLES',
+    'servedNamesOf',
     'StoreConfig',
     'factoriesDirAt',
     'filedAtOnce',

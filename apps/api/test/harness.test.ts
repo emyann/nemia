@@ -172,6 +172,7 @@ test("REFUSED under the daemon's per-session and serving variables: a test file 
     WF_CGROUP_PARENT: 'sessions.slice',
     NEMIA_BIND: '100.126.244.0',
     WF_EXPOSED: '1',
+    WF_SERVED_NAMES: 'nemia.example.ts.net',
   };
   const names = Object.keys(daemons);
   assert.deepEqual(names, [...SESSION_VARIABLES, ...SERVING_VARIABLES]);

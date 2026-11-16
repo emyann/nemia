@@ -179,6 +179,7 @@ const DAEMONS: Record<(typeof SESSION_VARIABLES)[number] | (typeof SERVING_VARIA
   WF_CGROUP_PARENT: 'sessions.slice',
   NEMIA_BIND: '100.126.244.0',
   WF_EXPOSED: '1',
+  WF_SERVED_NAMES: 'nemia.example.ts.net',
 };
 
 test("REFUSED under the daemon's per-session and serving variables: a test file sees none of them, and without the hook it would", () => {

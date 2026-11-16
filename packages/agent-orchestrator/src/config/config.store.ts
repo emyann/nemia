@@ -322,6 +322,41 @@ export const defaultFactoryStarts = (env: Env): boolean => env.WF_DEFAULT_FACTOR
  */
 export const exposedStore = (env: Env): boolean => env.WF_EXPOSED === '1';
 
+/** A name a store may be served at: a DNS name, as a URL's host writes one, its trailing dot allowed, or an IPv6 address in brackets. */
+const SERVED_NAME = /^(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*\.?|\[[0-9a-f:.]+\])$/i;
+
+/**
+ * `WF_SERVED_NAMES`, the names besides the loopback and the bound address (`NEMIA_BIND`) that a store marked exposed is reached at — a
+ * Tailscale MagicDNS name, a proxy's — each a host with no port, separated by commas or white space, read in lower case without a trailing
+ * dot: the names a write that presents no token may be addressed to there (the api's write guard), a pairing asked from another device
+ * among them. None where it is unset or blank. A value that is no such list is refused rather than read as none, which would refuse
+ * every pairing asked at the name the person meant.
+ * @param env The environment the variable is read from, as `process.env` holds it.
+ */
+export const servedNames = (env: Env): readonly string[] => {
+  const value = env.WF_SERVED_NAMES ?? '';
+  const names = value.split(/[\s,]+/).filter((name) => name !== '');
+  if (names.every((name) => SERVED_NAME.test(name))) return names.map((name) => name.toLowerCase().replace(/\.$/, ''));
+  throw new Invalid({
+    message: `WF_SERVED_NAMES=${value} is not a list of names this store is reached at. Give each host as a browser's address bar names it, with no scheme, port or wildcard, separated by commas: WF_SERVED_NAMES=nemia.example.ts.net — or unset it, for none besides the loopback and NEMIA_BIND.`,
+  });
+};
+
+/**
+ * The names a store is served at besides the loopback, which a write with no token may be addressed to (the api's write guard) and
+ * `nemia doctor` says: on a store marked exposed, the address it binds (`bound`, `NEMIA_BIND`, an IPv6 one in brackets) but every
+ * interface, which names none a browser reaches, and the names the person declares it reached by (`declared`, `WF_SERVED_NAMES`); none
+ * on a store not marked exposed.
+ * @param exposed Whether the store is marked exposed.
+ * @param bound The address the api listens on.
+ * @param declared The names the person declares the store reached by.
+ */
+export const servedNamesOf = (exposed: boolean, bound: string, declared: readonly string[]): readonly string[] => {
+  if (!exposed) return [];
+  if (bound === '' || bound === '0.0.0.0' || bound === '::') return declared;
+  return [bound.includes(':') ? `[${bound.toLowerCase()}]` : bound, ...declared];
+};
+
 /**
  * `WF_SESSION_TOKEN`, the token of the session a command runs in, which says who calls a verb that proposes in its place
  * (`sessionCaller`; `nemia factory resolve`): undefined, the person, where it is unset or empty.
@@ -343,11 +378,12 @@ export const SESSION_VARIABLES = [
 ] as const;
 
 /**
- * The daemon's serving variables: where its api listens (`NEMIA_BIND`) and whether its store is marked exposed (`WF_EXPOSED`), which a
+ * The daemon's serving variables: where its api listens (`NEMIA_BIND`), whether its store is marked exposed (`WF_EXPOSED`) and the names
+ * it is reached at besides (`WF_SERVED_NAMES`), which a
  * service bound beyond its machine sets in its unit and so every session and check it runs inherits. A test seat drops them, so an api a
  * test starts listens on the loopback and the store it made reads as not exposed, as on CI; a test that means one sets it itself.
  */
-export const SERVING_VARIABLES = ['NEMIA_BIND', 'WF_EXPOSED'] as const;
+export const SERVING_VARIABLES = ['NEMIA_BIND', 'WF_EXPOSED', 'WF_SERVED_NAMES'] as const;
 
 /** Every `WF_` setting a program reads besides the root, each as its reader answers it. */
 export type Settings = {
@@ -364,6 +400,7 @@ export type Settings = {
   readonly defaultFactoryStarts: boolean;
   readonly sessionToken: string | undefined;
   readonly exposed: boolean;
+  readonly servedNames: readonly string[];
   readonly releaseCheck: boolean;
 };
 
@@ -411,6 +448,9 @@ export const settingsOf = (env: Env): Settings => ({
   },
   get exposed() {
     return exposedStore(env);
+  },
+  get servedNames() {
+    return servedNames(env);
   },
   get releaseCheck() {
     return releaseCheck(env);

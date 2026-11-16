@@ -45,3 +45,24 @@ const LOOPBACK_HOST = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i;
  * @param host A host, with or without its port, as a request or a setting names it.
  */
 export const loopback = (host: string): boolean => LOOPBACK_HOST.test(host.trim());
+
+/**
+ * The name `host` addresses, its port and the white space around it left out, in lower case, without a trailing dot: an IPv6 address
+ * kept in its brackets.
+ * @param host A host, with or without its port, as a request's `Host` names it.
+ */
+export const nameOf = (host: string): string => {
+  const text = host.trim().toLowerCase();
+  const name = text.startsWith('[') ? text.slice(0, text.indexOf(']') + 1) : text.replace(/:\d{1,5}$/, '');
+  return name.replace(/\.$/, '');
+};
+
+/**
+ * Whether `host` names one of `names`, the names a store marked exposed is served at besides the loopback, on any port, in any case.
+ * @param host A host, with or without its port, as a request's `Host` names it.
+ * @param names The names the store is served at, each in lower case with no port, an IPv6 address in brackets.
+ */
+export const servedAt = (host: string, names: readonly string[]): boolean => {
+  const name = nameOf(host);
+  return name !== '' && names.includes(name);
+};

@@ -24,6 +24,10 @@
  * another origin, which the browser never hands the cookie, and a board reached at a private network's address names that address. Not
  * the site: a cookie is the browser's to send, scoped by host and not by port, and `SameSite=Strict` by site, so a page on another port
  * of the same host carries it; only the board's own page, `same-origin`, or no browser, writes by it.
+ *
+ * On a store marked exposed, a name it is served at (`served`: the address it binds, `NEMIA_BIND`, or a name the person declares it
+ * reached by, `WF_SERVED_NAMES`) is this machine as the loopback is: a browser on another device that opens the board at that name asks a
+ * pairing there. A site whose name points here is still another name, and still refused.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import { loopback } from '../src/address/address.ts';
@@ -31,8 +35,9 @@ import { saysForm, saysJson } from '../src/media/media.ts';
 
 /**
  * A request as the guard reads it: its method, its `Host`, `Sec-Fetch-Site` and `Content-Type` headers, each absent where not sent,
- * whether it presents a bearer token (`bearer`), and whether it presents a token by the board's cookie alone (`cookie`, `TOKEN_COOKIE`,
- * with no bearer beside it).
+ * whether it presents a bearer token (`bearer`), whether it presents a token by the board's cookie alone (`cookie`, `TOKEN_COOKIE`,
+ * with no bearer beside it), and whether its `Host` names a name the store marked exposed is served at (`served`), which no store not
+ * marked exposed has.
  */
 export type WriteRequest = {
   readonly method: string;
@@ -41,6 +46,7 @@ export type WriteRequest = {
   readonly contentType: string | undefined;
   readonly bearer: boolean;
   readonly cookie: boolean;
+  readonly served: boolean;
 };
 
 /** Which refusal a write meets: another host, another site, or a body that is not JSON. */
@@ -60,8 +66,10 @@ export const formType = assume(saysForm, { pure: true });
 /** The methods that write nothing, which the guard never stands in front of. */
 const reads = (method: string): boolean => method === 'GET' || method === 'HEAD';
 
-/** Whether `host` names this machine's loopback, on any port; an absent one is this machine. */
-const here = (host: string | undefined): boolean => host === undefined || loopback(host);
+/**
+ * Whether a request is addressed to this machine: its `Host` absent, the loopback on any port, or a name the exposed store is served at.
+ */
+const here = (r: WriteRequest): boolean => r.host === undefined || loopback(r.host) || r.served;
 
 /** Whether `site` is the board's own page or no browser at all. */
 const ours = (site: string | undefined): boolean => site === undefined || site === 'same-origin';
@@ -82,7 +90,7 @@ const byCookie = (r: WriteRequest): boolean => r.cookie;
  * Whether a write may come from where it says it does: this machine, from no other site; with the board's cookie, from no other site at
  * whatever host; or with a bearer token, from anywhere.
  */
-const fromWhereItMay = (r: WriteRequest): boolean => r.bearer || ((here(r.host) || byCookie(r)) && ours(r.site));
+const fromWhereItMay = (r: WriteRequest): boolean => r.bearer || ((here(r) || byCookie(r)) && ours(r.site));
 
 const writeRefusedSpec = spec<(request: WriteRequest) => WriteRefusal | null>({
   ensures: {
@@ -92,13 +100,16 @@ const writeRefusedSpec = spec<(request: WriteRequest) => WriteRefusal | null>({
     },
     anotherHostIsRefused: {
       description: 'A write with no token addressed to a name that is not this machine is refused for its host, before anything else',
-      condition: ({ input: [r], output }) => reads(r.method) || r.bearer || byCookie(r) || here(r.host) || output === 'host',
+      condition: ({ input: [r], output }) => reads(r.method) || r.bearer || byCookie(r) || here(r) || output === 'host',
     },
     anotherSiteIsRefused: {
       description:
         'A write with no bearer token, to this machine or by the board’s cookie, made by a page on another site, same-site included, is refused for its site',
-      condition: ({ input: [r], output }) =>
-        reads(r.method) || r.bearer || !(here(r.host) || byCookie(r)) || ours(r.site) || output === 'site',
+      condition: ({ input: [r], output }) => reads(r.method) || r.bearer || !(here(r) || byCookie(r)) || ours(r.site) || output === 'site',
+    },
+    aServedNamePassesTheHost: {
+      description: 'A write addressed to a name the exposed store is served at is never refused for its host',
+      condition: ({ input: [r], output }) => !r.served || output !== 'host',
     },
     aCookiePassesTheHost: {
       description: 'A write that presents the board’s cookie is never refused for its host',

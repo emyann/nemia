@@ -124,6 +124,17 @@ test('the read says each area in order, each harness as two pieces, and a place 
   assert.equal(got.pieces.find((p) => p.area === 'bind')?.addressKind, 'loopback');
 });
 
+test('the bind of an exposed store says the names a sign-in with no token is taken at; one not exposed none; a WF_SERVED_NAMES set wrong is missing', async () => {
+  const bindOf = async (env: Record<string, string>) =>
+    (await read(facts({ PATH: '/usr/bin:/bin', ...env }), identity('exit 0'))).pieces.find((p) => p.area === 'bind');
+  const served = await bindOf({ NEMIA_BIND: '100.64.0.7', WF_EXPOSED: '1', WF_SERVED_NAMES: 'nemia.taile26745.ts.net' });
+  assert.deepEqual([served?.state, served?.servedNames], ['met', ['100.64.0.7', 'nemia.taile26745.ts.net']]);
+  const none = await bindOf({ NEMIA_BIND: '100.64.0.7', WF_SERVED_NAMES: 'nemia.taile26745.ts.net' });
+  assert.deepEqual([none?.state, none?.servedNames], ['met', undefined]);
+  const wrong = await bindOf({ NEMIA_BIND: '100.64.0.7', WF_EXPOSED: '1', WF_SERVED_NAMES: 'http://nemia.taile26745.ts.net' });
+  assert.deepEqual([wrong?.state, wrong?.servedNames], ['missing', undefined]);
+});
+
 test('a harness in place says whether its version is the pin and offers its removal; one signed out offers each typed fix, none startable', async () => {
   fs.rmSync(SIGNED_IN, { force: true });
   const untested = await read(facts({ PATH: '/usr/bin:/bin' }, {}, '0.0.1'), identity('exit 0'));

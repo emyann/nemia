@@ -103,6 +103,17 @@ browser in once, and the board keeps the token in a cookie no script reads. `nem
 `--base` and the address your browser uses, it prints the link under that name, since a browser keeps one cookie per host name. Or
 press _Pair this browser_ on the board's sign-in, and approve the code it shows with `nemia pairings approve <code>` on the server.
 
+A browser with no token signs in only at a name the store takes: the loopback, the address it binds, and on a store marked exposed the
+names you declare it reached by. Your tailnet name is not the bound address, so declare it in the service's environment, beside
+`WF_EXPOSED=1`, several separated by commas, with no port:
+
+```bash
+nemia service install --bind <address> --env WF_SERVED_NAMES=nemia.<tailnet>.ts.net
+```
+
+`nemia doctor` says the names it takes. A pairing or a first-visit link opened at any other name is refused, so that a site whose name
+points at your server cannot sign in through it.
+
 The browser marks the page as "Not secure" because the board speaks plain HTTP. The traffic between your machines is still encrypted,
 because Tailscale tunnels it.
 

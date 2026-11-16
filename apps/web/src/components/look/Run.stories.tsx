@@ -46,7 +46,6 @@ const PANELS: Array<[string, keyof typeof READS]> = [
 ];
 
 const COLUMN: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
-const HEADING: CSSProperties = { fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.8 };
 const BOARD: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 32, padding: 32 };
 const WRAP: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' };
 
@@ -54,7 +53,7 @@ const WRAP: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 24, alignI
 function Headed({ name, width, children }: { name: string; width?: number; children: ReactNode }) {
   return (
     <div style={{ ...COLUMN, width }}>
-      <span style={HEADING}>{name}</span>
+      <span className="text-label-small text-on-surface-variant uppercase">{name}</span>
       {children}
     </div>
   );

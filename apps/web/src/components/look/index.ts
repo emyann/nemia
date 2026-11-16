@@ -15,6 +15,7 @@ export { PageName, Plate, type PlateHue } from './Plate';
 export { Run, type RunProps } from './Run';
 export { RunClock, RunCost } from './RunFigures';
 export { QuietLabels, RunMeta } from './RunMeta';
+export { RunMark } from './RunMarks';
 export { type PanelRead } from './RunPanel';
 export { runRecipe } from './run.recipe.ts';
 export { StepGraph } from './StepGraph';

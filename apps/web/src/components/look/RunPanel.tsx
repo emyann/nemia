@@ -55,7 +55,7 @@ function namedSteps(run: PanelRun, read: PanelRead | null, now: number): Readonl
 function Fact({ name, value, under }: { name: string; value: ReactNode; under?: string | null }) {
   return (
     <span data-fact={name.toLowerCase()} className="flex min-w-0 flex-col gap-0.5">
-      <span className="text-label-small tracking-[0.1em] text-on-surface-variant uppercase">{name}</span>
+      <span className="text-label-small text-on-surface-variant uppercase">{name}</span>
       <span className="font-mono text-body-large text-on-surface">{value}</span>
       {under && <span className="text-body-small text-on-surface-variant">{under}</span>}
     </span>
@@ -111,7 +111,7 @@ const waitsOnOf = (run: PanelRun): string[] => [
 function RunsLine({ name, ids, among }: { name: string; ids: readonly string[]; among: readonly NamedRun[] }) {
   return (
     <span data-runs={name} className="grid grid-cols-[120px_1fr] items-baseline gap-3">
-      <span className="text-label-small tracking-[0.1em] text-on-surface-variant uppercase">{name}</span>
+      <span className="text-label-small text-on-surface-variant uppercase">{name}</span>
       {ids.length === 0 ? (
         <span className="text-body-medium text-on-surface-variant">no run</span>
       ) : (

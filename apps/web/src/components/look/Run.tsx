@@ -138,13 +138,14 @@ function Title({ run, look, still, end, heading }: { run: PartRun; look: Look; s
 
 /** The run's clock: how long it has waited on you this time, in yellow, where the list dates that wait; else its time at work. */
 function ClockSaid({ run, look, asOf }: { run: PartRun; look: Look; asOf: Date }) {
-  const waited = look.now.tone === 'yours' && run.waitingSince ? presentWait({ waitingSince: run.waitingSince }, asOf) : null;
-  if (waited !== null)
+  if (look.now.tone === 'yours' && run.waitingSince) {
+    const waited = presentWait({ waitingSince: run.waitingSince }, asOf);
     return (
       <span data-waited {...saying('clock')} className={cn(look.s.clock(), ink.yours)}>
         waited {waited}
       </span>
     );
+  }
   return (
     <span {...saying('clock')} className="inline-flex">
       <RunClock run={{ ...run, clock: run.clock ?? null }} asOf={asOf} finished={look.finished} className={look.s.clock()} />

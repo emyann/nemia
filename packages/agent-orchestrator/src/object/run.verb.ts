@@ -260,6 +260,12 @@ const asksOf = (judged: RunReading['judged'], name: string): Pick<RunStepStatus,
   return asks ? { asks } : {};
 };
 
+/** The run whose ending holds the checkout the step waits on (`Judged`'s `beside`), where it waits on it. */
+const baseHeldByOf = (judged: RunReading['judged'], name: string): Pick<RunStepStatus, 'baseHeldBy'> => {
+  const hold = judged.beside.get(name)?.baseHeldBy;
+  return hold ? { baseHeldBy: { run: hold.run, step: hold.step } } : {};
+};
+
 /**
  * One step's status (`RunStepStatus`), off what `runObject` read once for the run (`StepAt`), its current try's short read off its tries.
  * One more observation for a blocked session's last line (`lastLineOf`).
@@ -304,6 +310,7 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
     used: taskId ? usedOf(used[name], judgedContext) : null,
     ...costOf(run, name, at),
     ...asksOf(judged, name),
+    ...baseHeldByOf(judged, name),
   };
   return status;
 });

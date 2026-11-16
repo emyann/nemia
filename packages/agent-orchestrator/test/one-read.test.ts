@@ -168,6 +168,12 @@ const checksOn = (steps: Record<string, readonly { try: number; check: { at: str
     .sort()
     .flatMap((name) => (steps[name] ?? []).flatMap((t) => (t.check ? [`${name}:${t.try}:${t.check.at}`] : [])));
 
+/** The run whose ending holds the checkout a step of the object waits on (`baseHeldBy`), said only where a step waits on it (`on: base`). */
+const onTheCheckout = (steps: readonly { on: string | null; baseHeldBy?: { run: string } }[]): { checkout?: string | null } => {
+  const waits = steps.find((s) => s.on === 'base');
+  return waits ? { checkout: waits.baseHeldBy?.run ?? null } : {};
+};
+
 /**
  * What each reader says of the run `id`, the tick's pass first, after a pass wrote where the branches stand; with `pass: false`, off
  * what the last pass wrote, a person's hand on the repository since read by none.
@@ -241,6 +247,7 @@ const readers = async (id: string, { pass: passFirst = true } = {}): Promise<Rec
             waitingOn: sorted((object.status.waiting?.runs ?? []).map((w) => w.run)),
             tries: triesOn(Object.fromEntries(object.status.steps.map((s) => [s.name, s.timeline]))),
             checks: checksOn(Object.fromEntries(object.status.steps.map((s) => [s.name, s.timeline]))),
+            ...onTheCheckout(object.status.steps),
           },
         }),
     ...(pruned.facts?.decided ? { prune: { running: pruned.facts.decided === 'running' } } : {}),

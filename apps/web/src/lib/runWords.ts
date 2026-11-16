@@ -200,9 +200,10 @@ function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn 
 
 /**
  * What a run does now: the step its wait on a person names, else its first step not done, with the colour of its chip (`chipTone` of
- * where it stands, `nowStandsOf`, and whether the row waits on a person), its agent as the run froze it where the step has started or waits on a person, its round of its rounds, its
- * budget and what it spent, and the few words of its wait: on a person, the wait's tag (`waitTag`); on no person, `waitWords`. None for
- * a run whose every step is done. It says no duration: the row's Clock column says how long the run has been at work.
+ * where it stands, `nowStandsOf`, and whether the row waits on a person), its agent as the run froze it where the step has started or
+ * waits on a person, its round of its rounds, its budget and what it spent, and the few words of its wait: on a person, the wait's tag
+ * (`waitTag`); on no person, `waitWords`. None for a run whose every step is done. It says no duration: the row's Clock column says
+ * how long the run has been at work.
  * @param row The run's row: its steps with their codes, spec, try, budget and spend, its calling off, its hold and its waits.
  */
 export function nowOf(row: NowRow): Now | null {

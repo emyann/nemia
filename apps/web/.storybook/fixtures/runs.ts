@@ -168,7 +168,7 @@ const frozen = (name: string, agent: string, rounds: number | null = null): RunS
 });
 
 /** The agent each step of the targets' workflows is given, as the factory's team gives it. */
-const AGENTS: Record<string, string> = { design: 'Seldon', implement: 'Grace', review: 'Agora', land: 'Otto' };
+const AGENTS: Record<string, string> = { design: 'Designer', implement: 'Implementer', review: 'Reviewer', land: 'Shipper' };
 
 /** How many rounds each looping step may run. */
 const ROUNDS: Record<string, number> = { implement: 3, review: 2 };
@@ -222,7 +222,7 @@ const staged = ({ name, brief, workflow, labels, now, minutes, usd, status }: St
     spec: {
       ...base.spec,
       workflowDir: `/code/nemia/workflows/${workflow}`,
-      steps: STEPS_OF[workflow].map((step) => frozen(step, AGENTS[step] ?? 'Grace', ROUNDS[step] ?? null)),
+      steps: STEPS_OF[workflow].map((step) => frozen(step, AGENTS[step] ?? 'Implementer', ROUNDS[step] ?? null)),
     },
   };
 };

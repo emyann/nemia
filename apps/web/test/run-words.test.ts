@@ -351,14 +351,10 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
     const DURATION = /\b\d+[dhms]\b|under (a minute|1m)/;
     assert.match(`implement, 2m`, DURATION, 'the pattern finds a duration');
     for (const row of [working, checking, queued, paused])
-      assert.doesNotMatch(
-        nowOf(row)!.words.join(' '),
-        DURATION,
-        'REFUSED: a duration in NOW, which stood beside the Clock column and read as one word with it',
-      );
+      assert.doesNotMatch(nowOf(row)!.words.join(' '), DURATION, 'REFUSED: a duration in NOW, read as one with the Clock');
   });
   await t.test("NOW's marks: the step's agent, its round of its rounds, and its budget against what it spent", () => {
-    const spec = { ...givenAgent('Grace'), rounds: 3 };
+    const spec = { ...givenAgent('Implementer'), rounds: 3 };
     const at = summary([['implement', 'running (working)']]);
     const step = {
       ...at.steps[0],
@@ -368,12 +364,12 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       spent: { usd: 2.4, measured: 1, unmeasured: 0, said: '$2.40' },
     } as const;
     const now = nowOf({ ...at, steps: [step] });
-    assert.equal(now?.agent, 'Grace');
+    assert.equal(now?.agent, 'Implementer');
     assert.deepEqual(now?.round, { at: 2, of: 3 });
     assert.deepEqual(now?.budget, { spent: 2.4, cap: 12, capSaid: '$12', over: false });
     const over = nowOf({ ...at, steps: [{ ...step, budget: { ...step.budget, over: true }, spent: { ...step.spent, usd: 13 } }] });
     assert.deepEqual(over?.budget, { spent: 13, cap: 12, capSaid: '$12', over: true });
-    assert.equal(nowOf({ ...at, steps: [{ ...step, spec: givenAgent('Grace') }] })?.round, null, 'a step with no rounds: no pips');
+    assert.equal(nowOf({ ...at, steps: [{ ...step, spec: givenAgent('Implementer') }] })?.round, null, 'a step with no rounds: no pips');
     assert.equal(nowOf({ ...at, steps: [{ ...step, budget: null }] })?.budget, null, 'a step with no budget: no ring');
     assert.equal(nowOf({ ...at, steps: [{ ...step, spent: null }] })?.budget?.spent, 0, 'nothing measured yet: none spent');
   });
@@ -396,7 +392,7 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
     assert.deepEqual(nowOf(base)?.words, [NOW_WORDS.checkout]);
     const slot = summary([['implement', 'waiting for a run slot']]);
     assert.deepEqual(nowOf(slot)?.words, [NOW_WORDS.slot]);
-    const given = { ...slot, steps: [{ ...slot.steps[0], spec: givenAgent('Grace') }] };
+    const given = { ...slot, steps: [{ ...slot.steps[0], spec: givenAgent('Implementer') }] };
     assert.equal(nowOf(given)?.agent, null, 'a step not started names no agent: nobody works on it yet');
     assert.equal(nowOf(slot)?.tone, 'waits');
     const hold = { at: '2026-11-01T00:00:00.000Z', word: '', advice: '', waitingOnYou: false };

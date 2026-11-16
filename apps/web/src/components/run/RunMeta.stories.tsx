@@ -10,7 +10,7 @@ const meta: Meta<typeof RunMeta> = {
     run: {
       id: 'board-the-parts-page-goes-5zt1',
       factory: 'nemia',
-      workflowDir: '/code/nemia/workflows/quick',
+      workflowDir: '/code/acme/flows/quick',
       labels: { factory: 'nemia', workflow: 'quick', area: 'board', initiative: 'visual', work: 'feature' },
     },
   },
@@ -30,7 +30,7 @@ export const WithLabels: Story = {
     const line = within(canvasElement);
     await expect(line.getByText('5zt1')).toBeVisible();
     await expect(line.getByText('nemia')).toBeVisible();
-    await expect(line.getByText('quick')).toHaveAttribute('title', '/code/nemia/workflows/quick');
+    await expect(line.getByText('quick')).toHaveAttribute('title', '/code/acme/flows/quick');
     await expect(line.getAllByRole('link').map((link) => link.getAttribute('aria-label'))).toEqual([
       'area=board',
       'initiative=visual',
@@ -42,7 +42,7 @@ export const WithLabels: Story = {
 
 /** A run with no labels of its own: the id and the path alone, no divider and no mark. */
 export const NoLabels: Story = {
-  args: { run: { id: 'r-k2rq', factory: null, workflowDir: '/code/app/workflows/build', labels: { workflow: 'build' } } },
+  args: { run: { id: 'r-k2rq', factory: null, workflowDir: '/code/acme/flows/build', labels: { workflow: 'build' } } },
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByText('default')).toBeVisible();
     await expect(canvasElement.querySelector('[data-tag-mark]')).toBeNull();

@@ -95,7 +95,7 @@ test("REFUSED: no reader of the frame applies the whole list's rule to the light
 /** The name `text` binds to the data of `useQuery(frameRunsQuery(path))`, where it reads that query. */
 const frameRunsRead = (text: string): string | undefined => /const (\w+) = useQuery\(\s*frameRunsQuery\(path\)\s*\)\.data;/.exec(text)?.[1];
 
-test("REFUSED: Nemia's cue, the pane's Runs line and the Runs page's plate count the runs waiting off one query", async (t) => {
+test("REFUSED: Nemia's cue, the pane's Runs line and the Runs page's count chip count the runs waiting off one query", async (t) => {
   const read = (file: string) => fs.readFileSync(path.join(SRC, file), 'utf8');
   await t.test("the frame's query at a page is the Runs page's own, every factory's at the store's level or the factory it sits in", () => {
     assert.deepEqual(frameRunsQuery('/runs').queryKey, openRunsQuery(undefined, undefined).queryKey, 'every factory');
@@ -112,7 +112,7 @@ test("REFUSED: Nemia's cue, the pane's Runs line and the Runs page's plate count
     assert.doesNotMatch(dock, /presence\.waitsOnYou/, "the api's own sum is no part of the cue");
   });
   await t.test(
-    "the pane's Runs line reads the same query, the rail's Waiting every factory's, and the Runs page its plate off the same list",
+    "the pane's Runs line reads the same query, the rail's Waiting every factory's, and the Runs page its count chip off the same list",
     () => {
       const pane = read('components/frame/FactoryPane.tsx');
       assert.equal(frameRunsRead(pane), 'runs', "the pane's lines read the frame's query");
@@ -122,7 +122,7 @@ test("REFUSED: Nemia's cue, the pane's Runs line and the Runs page's plate count
       assert.match(rail, /runs\.data\?\.counts\.waiting/);
       const page = read('components/run/RunsPage.tsx');
       assert.match(page, /useSuspenseQuery\(openRunsQuery\(at\.factory, at\.l\)\)/);
-      assert.match(page, /<Plate count=\{counts\.waiting\}/);
+      assert.match(page, /<CountChip count=\{counts\.waiting\}/);
     },
   );
   await t.test('the scan finds a reader of another query', () => {

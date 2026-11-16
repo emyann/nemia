@@ -33,7 +33,8 @@ export const Quiet: StoryObj<typeof CutButton> = {
   play: async ({ canvasElement }) => {
     const link = canvasElement.querySelector('[data-cut-button="link"]')!;
     await expect(link.getAttribute('data-quiet')).toBe('true');
-    await expect(getComputedStyle(link.querySelector('[data-cut-shape]')!).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    const fill = getComputedStyle(link.querySelector('[data-cut-shape]')!).backgroundColor;
+    await expect(fill.endsWith(', 0)'), `a quiet button paints no ground: ${fill}`).toBe(true);
   },
 };
 

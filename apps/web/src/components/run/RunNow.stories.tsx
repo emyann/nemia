@@ -43,7 +43,7 @@ export const AtWork: Story = {
   play: async ({ canvasElement }) => {
     await expect(chipOf(canvasElement)).toEqual({ tone: 'alive', word: 'implement' });
     const now = within(canvasElement);
-    await expect(now.getByText('Grace')).toBeVisible();
+    await expect(now.getByText('Implementer')).toBeVisible();
     await expect(now.getByRole('img', { name: 'round 2 of 3' })).toBeVisible();
     await expect(now.getByRole('img', { name: 'its step: $2.40 of its $12 cap' })).toBeVisible();
     await expect(now.getByRole('img', { name: 'a run waits on it' })).toHaveTextContent('1');
@@ -112,7 +112,7 @@ export const WaitsOnYou: Story = {
   args: { run: listed(TARGET_RUNS.vqvd) },
   play: async ({ canvasElement }) => {
     await expect(chipOf(canvasElement)).toEqual({ tone: 'yours', word: 'land' });
-    await expect(within(canvasElement).getByText('Otto')).toBeVisible();
+    await expect(within(canvasElement).getByText('Shipper')).toBeVisible();
   },
 };
 

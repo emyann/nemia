@@ -171,7 +171,7 @@ export type StepSpec = {
    * `memory: 4Gi`: the most memory the step's sessions may use, a container's `resources.limits.memory` — a Kubernetes quantity the
    * runtime reads (`8Gi`, `512Mi`, `4G`, `1073741824`), refused at load where it reads none. Filed as each session's
    * `resources.limits.memory`: its harness and every child it starts run in a cgroup of their own under it, and a process that passes it
-   * is killed there alone. Its check takes the engine's default (`WF_MEMORY_LIMIT`), never this. Absent: the engine's default, else no
+   * is killed there alone. Its check takes the engine's default limit (`WF_MEMORY_LIMIT`), never this, and asks `checkMemory:`. Absent: the engine's default, else no
    * limit. Refused on a remote agent, whose process is not ours.
    */
   memory?: string;
@@ -190,6 +190,13 @@ export type StepSpec = {
    * workflow the run froze, never from a checkout the step can edit.
    */
   check?: string;
+  /**
+   * `checkMemory: 256Mi`: the memory the step's `check:` asks of the machine, a container's `resources.requests.memory` — a Kubernetes
+   * quantity the runtime reads, refused at load where it reads none, and refused without a `check:`. Filed as the check's request alone:
+   * the runtime admits the check by it and gives it the engine's default limit beside it, as a LimitRange's default limit lands on a
+   * container that names a request alone. Absent: the engine's default request (`WF_MEMORY_REQUEST`).
+   */
+  checkMemory?: string;
   /** How many times the run re-files the step after its check refuses it. Absent means none. */
   retries?: number;
   /**
@@ -410,6 +417,7 @@ export const STEP_KEYS: typeof SERVED_STEP_KEYS = [
   'memory',
   'budget',
   'check',
+  'checkMemory',
   'retries',
   'checkFailurePolicy',
   'gate',
@@ -511,9 +519,11 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
     '`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` only',
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
   memory:
-    "the most memory each session of the step may use, a container's limit — `4Gi`, `512Mi`: a process past it is killed in the session's own scope alone; its check takes the daemon's default (`WF_MEMORY_LIMIT`)",
+    "the most memory each session of the step may use, a container's limit — `4Gi`, `512Mi`: a process past it is killed in the session's own scope alone; its check keeps the daemon's default limit (`WF_MEMORY_LIMIT`) and asks `checkMemory:`",
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
+  checkMemory:
+    "the memory the step's check asks of the machine, a container's request — `256Mi`: the check is admitted by it and keeps the daemon's default limit; unset asks the daemon's default (`WF_MEMORY_REQUEST`)",
   retries: COUNTS.retries.counts,
   checkFailurePolicy:
     'which exit codes of its check a person answers: `{ rules: [ { action: FailStep, onExitCodes: { operator: In, values: [78] } } ] }`, read in order, the first that holds deciding — on `FailStep` the run tries nothing on its own and waits on you',

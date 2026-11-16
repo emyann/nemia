@@ -817,6 +817,13 @@ export function budgetUsdFor(cap: number | undefined, spent: Spend = NOTHING_SPE
 export const MOMENTUM = 1;
 
 /**
+ * The momentum of a landing's check, one above `MOMENTUM`: an ending's check holds the repository's checkout from its filing, queued or
+ * not, so every other run's landing waits behind it while it waits for room. Filed above the sessions of the runs in flight, it is
+ * admitted before them when room frees, and so lets the checkout go sooner. Read at admission and nowhere else, as `MOMENTUM` is.
+ */
+export const LANDING_MOMENTUM = MOMENTUM + 1;
+
+/**
  * The momentum a step's own filing has, filed as its `priority` (`MOMENTUM`): none — 0 — for a run's first steps, which wait on nothing and
  * are filed as the run starts, so a newer run never goes before one in flight; `MOMENTUM` for a step after another. A try, a round and a
  * check are never a run's first filing, and carry `MOMENTUM` whatever step they are of.

@@ -98,7 +98,6 @@ export const BASELINE = {
     'apps/web/src/components/run/RunPage.tsx',
     'apps/web/src/components/run/RunResult.tsx',
     'apps/web/src/components/run/RunWait.tsx',
-    'apps/web/src/components/run/StartRun.tsx',
     'apps/web/src/components/run/Timeline.tsx',
     'apps/web/src/components/run/TryTag.tsx',
     'apps/web/src/components/run/WaitingBar.tsx',

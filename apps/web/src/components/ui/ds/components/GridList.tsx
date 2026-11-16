@@ -9,7 +9,7 @@ import {
 } from "react-aria-components";
 import { DragIndicatorIcon } from "../icons";
 import { composeTailwindRenderProps } from "../render-props";
-import { focusRing, tv } from "../utils";
+import { tv } from "../utils";
 import IconButton from "./IconButton";
 
 // What a drag shows. The place between two rows where the drop will land is
@@ -29,6 +29,12 @@ const droppedOnto =
  * With `dragAndDropHooks` it shows where a drop will land: a `primary` line
  * between two rows, and a `primary` outline with its tint on a row, or on
  * the list, that is dropped onto.
+ *
+ * Escape clears the selection, React Aria's default, and the key goes no
+ * further. Where the selection is where the app is (the folder that is
+ * open, the row a pane shows) and is never cleared, pass
+ * `escapeKeyBehavior="none"`: left as it is, Escape would never reach the
+ * dialog or the sheet around the list, and never close it.
  *
  * Spec: https://m3.material.io/components/lists/{overview,specs,guidelines,accessibility}
  */
@@ -51,7 +57,16 @@ export function GridList<T extends object>({
 }
 
 const itemStyles = tv({
-  base: [focusRing(), "group/grid-list-item", droppedOnto],
+  // The ring is drawn inside the row: a row fills its list, and the list
+  // scrolls, so it cuts what is drawn outside it. And it is drawn over the
+  // row's content, by a pseudo-element: an outline of the row itself would
+  // lie under what the row holds, a selected item's colour for one.
+  base: [
+    "relative outline-none",
+    "data-focus-visible:after:pointer-events-none data-focus-visible:after:absolute data-focus-visible:after:inset-0 data-focus-visible:after:z-10 data-focus-visible:after:rounded-[inherit] data-focus-visible:after:outline-3 data-focus-visible:after:-outline-offset-3 data-focus-visible:after:outline-ring data-focus-visible:after:outline-solid data-focus-visible:after:content-['']",
+    "group/grid-list-item",
+    droppedOnto,
+  ],
 });
 
 /**

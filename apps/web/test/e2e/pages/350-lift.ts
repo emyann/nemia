@@ -56,7 +56,7 @@ export default {
       await dialog.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(dialog, 0, 'the second press lifts, and the popover closes');
       lifted('the card');
-      await expectCount(card.locator('[data-now-words]'), 0, 'the card says no hold');
+      await expectCount(wordsSaying(card, word), 0, 'the card says no hold');
       await expectCount(edge, 0, 'and no hold edge comes into it');
       await expectCount(page.locator('[data-lift]'), 0, 'and offers no lift');
       await expectVisible(card.locator('[data-answer="Approve"]'), `and offers ${gated}'s gate again`);

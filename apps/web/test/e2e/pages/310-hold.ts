@@ -96,7 +96,7 @@ export default {
     await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     await expectVisible(card.locator('[data-answer="Approve"]'), `and on the Factory, ${id}'s card offers its gate again`);
-    await expectCount(card.locator('[data-now-words]'), 0, 'and says no hold');
+    await expectCount(wordsSaying(card, word), 0, 'and says no hold');
     await expectCount(edge, 0, 'and no hold edge comes into it');
     await heldWithWords(page);
     await heldNotStarted(page);

@@ -5,7 +5,8 @@
  * Three axes. `size` is how much it says, each size all the one under it says and more (`says`, `lib/runSays.ts`). `layout` is its
  * shape at md, where the runs list draws a row and the floor a card of the same things. `tone` is its state's meaning, the one colour
  * it carries (`ChipTone`, `lib/nowChip.ts`): on its chip, its words and, as a card, its edge and its ground — the surface mixed with
- * that tone's role, two roles and nothing else.
+ * that tone's role, two roles and nothing else; in light, yours and failure keep the card's own ground, where their inks would fall under
+ * 4.5:1 on the mix.
  */
 import { tv } from '@/components/ui/ds/utils';
 import type { ChipTone } from '@/lib/nowChip';
@@ -59,10 +60,10 @@ export const runRecipe = tv({
     tone: {
       alive: { ground: 'bg-[color-mix(in_srgb,var(--md-sys-color-secondary-container)_22%,var(--md-sys-color-surface-container-low))]' },
       yours: {
-        ground: 'bg-[color-mix(in_srgb,var(--md-sys-color-primary)_6%,var(--md-sys-color-surface-container-low))]',
+        ground: 'bg-card dark:bg-[color-mix(in_srgb,var(--md-sys-color-primary)_6%,var(--md-sys-color-surface-container-low))]',
         clock: 'text-yours',
       },
-      failure: { ground: 'bg-[color-mix(in_srgb,var(--md-sys-color-error)_8%,var(--md-sys-color-surface-container-low))]' },
+      failure: { ground: 'bg-card dark:bg-[color-mix(in_srgb,var(--md-sys-color-error)_8%,var(--md-sys-color-surface-container-low))]' },
       waits: { ground: 'bg-card' },
       rest: { ground: 'bg-[color-mix(in_srgb,var(--md-sys-color-inverse-surface)_4%,var(--md-sys-color-surface-container-low))]' },
     },

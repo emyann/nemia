@@ -217,7 +217,7 @@ export default {
       `a failed run whose session still runs is in flight: its card is on the Factory by default (${NEIGHBOUR.id})`,
     );
     await expectVisible(
-      beside.locator('[data-clock-words]', { hasText: /^\d+(?:h|m|s)\b/ }),
+      beside.locator('[data-clock-words]', { hasText: /^(?:under 1m|(?:\d+h )?\d{1,2}m)$/ }),
       'its card counts its time at work, as a card in flight does',
     );
     await settled(page);
@@ -272,8 +272,8 @@ export default {
     for (const run of [running, orphan])
       await expectCount(cardOf(page, run.id).locator('[data-ghost-run]'), 0, `${run.id}'s card is no ghost: it started, or waits on you`);
     await expectVisible(
-      cardOf(page, running.id).locator('[data-clock-words]', { hasText: /^\d+m \d{2}s$/ }),
-      `${running.id}'s card counts its time at work from its first filing, bare, as the runs table's row does`,
+      cardOf(page, running.id).locator('[data-clock-words]', { hasText: /^(?:under 1m|(?:\d+h )?\d{1,2}m)$/ }),
+      `${running.id}'s card counts its time at work from its first filing, to the minute, as the runs table's row does`,
     );
     const object = (await (await page.request.get(new URL(`/api/runs/${running.id}`, page.url()).href)).json()) as {
       metadata: { creationTimestamp: string };

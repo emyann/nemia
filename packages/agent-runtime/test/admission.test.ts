@@ -497,16 +497,16 @@ test("a task queued under one default and admitted under a smaller one counts at
   );
 });
 
-test("a task that asks 64Mi is admitted while the room is under the engine's default request, one with none of its own waits for memory, and the small one starts under its request and the engine's default limit, as a LimitRange's default limit lands on a container that names a request alone", async (t) => {
+test("a task that asks 64Mi is admitted while the room is under the engine's default request, one with none of its own waits for memory, judged after it in id order within the millisecond, and the small one starts under its request and the engine's default limit, as a LimitRange's default limit lands on a container that names a request alone", async (t) => {
   const s = story(t);
   const journal = memoryJournal();
   const sessions = new Map<string, Sighting>();
   const machine = { totalBytes: 16 * GI, availableBytes: 2 * GI };
   const b = resizedBoard(journal, sessions, machine, { limit: '8Gi', request: '2560Mi' });
   const small = await Effect.runPromise(
-    b.engine.file({ brief: 'receipt', cwd: '/r', queued: true, resources: { requests: { memory: '64Mi' } } }),
+    b.engine.file({ id: 'a-receipt', brief: 'receipt', cwd: '/r', queued: true, resources: { requests: { memory: '64Mi' } } }),
   );
-  const plain = await Effect.runPromise(b.engine.file({ brief: 'session', cwd: '/r', queued: true }));
+  const plain = await Effect.runPromise(b.engine.file({ id: 'b-session', brief: 'session', cwd: '/r', queued: true }));
 
   await s.test(
     'on 1Gi of room, the one asking 64Mi is admitted, and the one with none waits for memory, told 2560Mi on the 960Mi the small one leaves',

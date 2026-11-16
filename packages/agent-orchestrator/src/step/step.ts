@@ -171,8 +171,8 @@ export type StepSpec = {
    * `memory: 4Gi`: the most memory the step's sessions may use, a container's `resources.limits.memory` — a Kubernetes quantity the
    * runtime reads (`8Gi`, `512Mi`, `4G`, `1073741824`), refused at load where it reads none. Filed as each session's
    * `resources.limits.memory`: its harness and every child it starts run in a cgroup of their own under it, and a process that passes it
-   * is killed there alone. Its check takes the engine's default limit (`WF_MEMORY_LIMIT`), never this, and asks `checkMemory:`. Absent: the engine's default, else no
-   * limit. Refused on a remote agent, whose process is not ours.
+   * is killed there alone. Its check takes the engine's default limit (`WF_MEMORY_LIMIT`), never this, and asks `checkMemory:`. Absent:
+   * the engine's default, else no limit. Refused on a remote agent, whose process is not ours.
    */
   memory?: string;
   /**

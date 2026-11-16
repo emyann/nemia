@@ -175,7 +175,7 @@ export default {
         await expectCount(card.locator(`[data-named="${name}"]`).getByTitle(name, { exact: true }), 1, `and under it, whole on hover`);
       }
       await expectVisible(
-        card.locator(`[data-need="approve"][data-step="${ending}"]`, { hasText: `approve ${ending} to run it` }),
+        card.locator(`[data-gate-line="${ending}"][title^="approve to run ${ending}"]`),
         'the opened card says approving the ending runs it',
       );
       await expectClearOfEachOther(page);

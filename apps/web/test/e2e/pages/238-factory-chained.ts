@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { photograph, themeOf } from '../board.ts';
-import { cardOf, photographCard } from '../canvas.ts';
+import { cardOf, photographCard, wordsSaying } from '../canvas.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { CHAINED, DIAMOND, FACTORIES, onSeveralRepos, QUEUE, QUEUED_IN, refusedWhy, seedChained } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -75,7 +75,7 @@ export default {
         card.locator('[data-ghost-run]'),
         `${CHAINED.id}, waiting on ${parent}, is on ${CHAINED.factory}'s floor as a ghost`,
       );
-      await expectVisible(card.locator('[data-now-words]', { hasText: CHAINED.word }), `its line says ${CHAINED.word}, in wf ls's words`);
+      await expectVisible(wordsSaying(card, CHAINED.word), `its line says ${CHAINED.word} on hover, in wf ls's words`);
       await expectVisible(
         card.locator(`a[data-run-mark="${parent}"][href="/runs/${parent}"]`),
         `${parent}, which it waits on, is a link to that run's page`,

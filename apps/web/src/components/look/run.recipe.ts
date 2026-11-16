@@ -68,7 +68,7 @@ export const runRecipe = tv({
     },
   },
   compoundVariants: [
-    { size: 'md', layout: 'row', class: { title: 'block truncate text-body-large' } },
+    { size: 'md', layout: 'row', class: { title: 'static z-auto block truncate text-body-large' } },
     {
       size: 'md',
       layout: 'card',

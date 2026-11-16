@@ -11,7 +11,7 @@ import { judged, type RunRow, type UnjudgedRun } from '@/lib/api/judged';
 import { TryTag } from './TryTag';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
-import { clockCounts, toDecideOf, waitsOnRuns, waitsOnYou } from '@/lib/factory';
+import { clockCounts, panelWidth, toDecideOf, waitsOnRuns, waitsOnYou } from '@/lib/factory';
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
 import { namespaceOf } from '@/lib/factories';
@@ -130,7 +130,7 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
   const said = taken && stamp === (taken.next ?? taken.stamp) ? taken.said : null;
   const asOf = new Date(now);
   return (
-    <div {...look.marks} className={open ? 'w-fit min-w-120' : 'w-88'}>
+    <div {...look.marks} className={open ? undefined : 'w-88'} style={open ? { width: panelWidth(run.steps.length) } : undefined}>
       <Run
         run={run}
         size={open ? 'xl' : 'md'}

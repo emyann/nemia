@@ -25,7 +25,7 @@ const floorOf = (page: Page) => page.locator('.react-flow').first();
 const runBar = (page: Page) => page.locator(`aside[data-bar="run:${RUN}"]`);
 
 /** RUN's card, pressed on its body: its time, which is no link and no button. */
-const bodyOf = (page: Page) => cardOf(page, RUN).locator('time').first();
+const bodyOf = (page: Page) => cardOf(page, RUN).locator('[data-run-where]').first();
 
 /** What the address's search holds for `bar`, or null. */
 const barInUrl = (page: Page) => new URL(page.url()).searchParams.get('bar');
@@ -133,7 +133,7 @@ async function contents(page: Page): Promise<void> {
   await expectNoBar(page, 'Escape closes it');
 
   const { id, ending } = ENDING;
-  await cardOf(page, id).locator('time').first().click();
+  await cardOf(page, id).locator('[data-run-where]').first().click();
   const decide = page.locator(`aside[data-bar="run:${id}"]`);
   await expectVisible(decide, `a click on ${id}'s card shows that run in the bar`);
   await decide.locator(`section[aria-label="Asks of you"] button[data-ask-link="${ending}"]`).click();

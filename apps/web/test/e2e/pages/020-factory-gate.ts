@@ -97,8 +97,8 @@ export default {
     const node = card.locator(`[data-tile="${ending}"]`);
     await expectVisible(node, `the card opens into its steps, ${ending} among them`);
     await expectVisible(
-      node.locator('[data-need="approve"]', { hasText: `approve ${ending} to run it` }),
-      `${ending}'s tile says approving runs it`,
+      card.locator(`[data-gate-line="${ending}"]`, { hasText: `approve to run ${ending}` }),
+      `the opened card's gate says approving runs ${ending}`,
     );
     await node.click();
     const inspector = stepBar(page, id, ending);

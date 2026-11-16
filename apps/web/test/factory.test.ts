@@ -24,6 +24,7 @@ import {
   parentsWanted,
   ONE_CELL,
   openSpan,
+  panelWidth,
   placeRuns,
   repoName,
   runEdges,
@@ -239,6 +240,13 @@ test('openSpan, toggleOpen and unfoldingNow: the cells an open card spans, and w
     assert.deepEqual(openSpan(7), { columns: 3, rows }, 'seven reach past it');
     assert.deepEqual(openSpan(13), { columns: 4, rows }, 'wider than the grid');
     assert.deepEqual(openSpan(0), { columns: 2, rows }, 'a run with no steps still opens its panel');
+    for (const steps of [0, 1, 4, 6, 7, 13])
+      assert.ok(
+        panelWidth(steps) <= openSpan(steps).columns * CELL_WIDTH - gap,
+        `the panel drawn for ${steps} steps is no wider than the cells it claims, less the gap past them`,
+      );
+    assert.equal(panelWidth(4), RUN_PANEL.width, "build's four steps draw the panel's own width");
+    assert.ok(panelWidth(7) > RUN_PANEL.width, 'seven draw it wider');
   });
   await t.test('a click opens a run, last in the order runs claim cells; another click closes it', () => {
     assert.deepEqual(toggleOpen([], 'a'), ['a']);

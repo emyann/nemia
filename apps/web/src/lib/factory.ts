@@ -434,13 +434,20 @@ export type Span = { columns: number; rows: number };
 export const ONE_CELL: Span = { columns: 1, rows: 1 };
 
 /**
- * The cells an open run takes: its panel's (`RUN_PANEL`), as many to the right as its width reaches and as many rows down as its
+ * How wide an open run's panel is drawn: `RUN_PANEL`'s width, or room for each step under its graph and the panel's frame where that is
+ * wider. From the count of its steps alone, so the card and the cells it claims (`openSpan`) agree.
+ * @param steps How many steps the run has.
+ */
+export const panelWidth = (steps: number): number => Math.max(RUN_PANEL.width, steps * STEP_ROOM + PANEL_FRAME);
+
+/**
+ * The cells an open run takes: its panel's (`RUN_PANEL`, `panelWidth`), as many to the right as its width reaches and as many rows down as its
  * height, with a gap's room past them. From the count of its steps alone, never their words, so a refetch that moves a status moves no
  * card. Never less than the card's own cell.
  * @param steps How many steps the run has.
  */
 export function openSpan(steps: number): Span {
-  const width = Math.max(RUN_PANEL.width, steps * STEP_ROOM + PANEL_FRAME);
+  const width = panelWidth(steps);
   return {
     columns: Math.max(1, Math.ceil((width + GAP) / CELL_WIDTH)),
     rows: Math.max(1, Math.ceil((RUN_PANEL.height + GAP) / CELL_HEIGHT)),

@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { waitsOnYou } from '../../../src/lib/factory.ts';
 import { fed, openRunMenu, partOf, photograph, themeOf, isRunAction, rowsAnswered } from '../board.ts';
-import { cardOf } from '../canvas.ts';
+import { cardOf, wordsSaying } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -67,10 +67,7 @@ export default {
       await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       const card = cardOf(page, id);
-      await expectVisible(
-        card.locator('[data-now-words]').filter({ hasText: new RegExp(`^${literal(word)}$`) }),
-        `GATED's card says ${word}, in grey`,
-      );
+      await expectVisible(wordsSaying(card, word), `GATED's card says ${word}, in grey`);
       await expectCount(card.locator('[data-answer="Approve"]'), 0, 'and offers no Approve');
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);

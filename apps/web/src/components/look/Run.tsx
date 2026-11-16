@@ -118,8 +118,8 @@ export function Run(props: RunProps) {
 }
 
 /**
- * The run's title, a link to its page, raised over the copy control's target; whole in the kit's tooltip where it is cut to a line; a
- * card's heading where `heading`.
+ * The run's title, a link to its page, on a card raised over the copy control's target (a row's leaves it the control's); whole in the
+ * kit's tooltip where it is cut to a line; a card's heading where `heading`.
  */
 function Title({ run, look, still, end, heading }: { run: PartRun; look: Look; still?: string; end?: ReactNode; heading?: boolean }) {
   const Holder = heading ? 'h3' : 'span';
@@ -184,18 +184,22 @@ function NowMarks({ look, small = false, words = false }: { look: Look; small?: 
   );
 }
 
-/** The few words of the run's wait, on its line, cut to it on a card with the whole on hover. */
+/**
+ * The few words of the run's wait, on its line, cut to it on a card, with on hover what `nemia ls` says of its wait or hold, else the words
+ * whole, and the advice.
+ */
 function WordsSaid({ run, look, among, cut }: { run: PartRun; look: Look; among: readonly PartRun[]; cut?: boolean }) {
   const words = look.now.words;
   if (words.length === 0) return null;
   const whole = words.map((part) => (typeof part === 'string' ? part : part.run)).join(' ');
+  const said = run.waiting?.word || run.holding?.word;
   return (
     <span {...saying('words')} className={cn('min-w-0', cut && 'truncate')}>
       <Words
         words={words}
         tone={look.now.tone}
         among={among.filter((other) => other.id !== run.id)}
-        title={cut ? [whole, run.waiting?.advice || run.holding?.advice].filter(Boolean).join('\n') : undefined}
+        title={cut ? [said || whole, run.waiting?.advice || run.holding?.advice].filter(Boolean).join('\n') : undefined}
         className={cn(cut && 'text-body-small')}
       />
     </span>

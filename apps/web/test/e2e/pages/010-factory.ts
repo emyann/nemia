@@ -25,6 +25,7 @@ import {
   said,
   samePlace,
   showFinished,
+  wordsSaying,
 } from '../canvas.ts';
 import {
   expectApart,
@@ -215,7 +216,10 @@ export default {
       beside,
       `a failed run whose session still runs is in flight: its card is on the Factory by default (${NEIGHBOUR.id})`,
     );
-    await expectVisible(beside.getByText(/ at work$/), 'its card counts its time at work, as a card in flight does');
+    await expectVisible(
+      beside.locator('[data-clock-words]', { hasText: /^\d+(?:h|m|s)\b/ }),
+      'its card counts its time at work, as a card in flight does',
+    );
     await settled(page);
     await expectClearOfPanels(page, 'on first load');
 
@@ -243,8 +247,8 @@ export default {
     await expectCount(page.locator('.react-flow__edge-path[data-state="done"]'), 0, 'and no edge between cards is drawn solid');
     await expectLeftOf(cardOf(page, running.id), cardOf(page, bottom.id), `${running.id} is left of ${bottom.id}, which waits on it`);
     await expectVisible(
-      cardOf(page, bottom.id).locator('[data-now-words]', { hasText: DIAMOND.words.bottom }),
-      `the bottom's card says ${DIAMOND.words.bottom}, in wf ls's words: the side that landed is waited on no more`,
+      wordsSaying(cardOf(page, bottom.id), DIAMOND.words.bottom),
+      `the bottom's card says ${DIAMOND.words.bottom} on hover, in wf ls's words: the side that landed is waited on no more`,
     );
     await expectCount(
       cardOf(page, bottom.id).getByText('waiting on you', { exact: true }),
@@ -268,8 +272,8 @@ export default {
     for (const run of [running, orphan])
       await expectCount(cardOf(page, run.id).locator('[data-ghost-run]'), 0, `${run.id}'s card is no ghost: it started, or waits on you`);
     await expectVisible(
-      cardOf(page, running.id).locator(`time[title*="${DIAMOND.words.running}"]`, { hasText: /^\d+m \d{2}s at work$/ }),
-      `${running.id}'s card counts its time at work from its first filing, and says on hover that it ${DIAMOND.words.running}`,
+      cardOf(page, running.id).locator('[data-clock-words]', { hasText: /^\d+m \d{2}s$/ }),
+      `${running.id}'s card counts its time at work from its first filing, bare, as the runs table's row does`,
     );
     const object = (await (await page.request.get(new URL(`/api/runs/${running.id}`, page.url()).href)).json()) as {
       metadata: { creationTimestamp: string };
@@ -304,7 +308,7 @@ export default {
       page.locator(`.react-flow__node[data-id]${ids.map((id) => `:not([data-id="${id}"])`).join('')}`);
     await expectMovedAlone(
       cardOf(page, running.id),
-      () => dragBy(page, cardOf(page, running.id).locator('time'), { x: 60, y: 30 }, `the card of ${running.id}`),
+      () => dragBy(page, cardOf(page, running.id).locator('[data-run-where]'), { x: 60, y: 30 }, `the card of ${running.id}`),
       `${running.id} dragged moves alone — ${bottom.id}, which waits on it, stays, and so does every other card`,
       everyOther(running.id),
     );
@@ -416,7 +420,7 @@ export default {
       `a run started in the factory ${FOLDER.factory} is on its floor, not the default factory's, finished runs shown (${FOLDER.id})`,
     );
     await expectVisible(
-      cardOf(page, orphan.id).locator('[data-now-words]', { hasText: DIAMOND.words.orphan }),
+      wordsSaying(cardOf(page, orphan.id), DIAMOND.words.orphan),
       `${orphan.id}'s card says ${DIAMOND.words.orphan}, as a wait on a person`,
     );
     await expectVisible(cardOf(page, orphan.id).getByText('waiting on you', { exact: true }), `${orphan.id} waits on you`);
@@ -569,8 +573,8 @@ export default {
     const size = page.viewportSize();
     await page.setViewportSize({ width: 1600, height: 1100 });
     await settled(page);
-    await expectUncovered(card.locator('time'), "the open card's grip stands clear of the floor's panels, to be dragged by");
-    const [from, onto, grip] = [await card.boundingBox(), await beside.boundingBox(), await card.locator('time').boundingBox()];
+    await expectUncovered(card.locator('[data-run-where]'), "the open card's grip stands clear of the floor's panels, to be dragged by");
+    const [from, onto, grip] = [await card.boundingBox(), await beside.boundingBox(), await card.locator('[data-run-where]').boundingBox()];
     if (!from || !onto || !grip) throw new Refused('the cards to drag and drop onto — one of them is not on the page');
     await expectMovedAlone(
       card,

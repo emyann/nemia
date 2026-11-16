@@ -41,10 +41,6 @@ function LibraryCount() {
   );
 }
 
-/**
- * What the repository of the address's place offers a step (the factory its path names, `?repo=`), section by section, each thing with
- * the file it was read from; where the api reads none, why and what to do (`Unread`), and no section.
- */
 /** The rows each section of the page is drawn with while it is read: skills, agents, MCP servers. */
 const SECTIONS_READ = [3, 2, 2];
 
@@ -72,6 +68,10 @@ export function CapabilitiesReading() {
   );
 }
 
+/**
+ * What the repository of the address's place offers a step (the factory its path names, `?repo=`), section by section, each thing with
+ * the file it was read from; where the api reads none, why and what to do (`Unread`), and no section.
+ */
 export function CapabilitiesPage({ place: search }: { place: PagePlace }) {
   const { data } = useSuspenseQuery(capabilitiesQuery(search));
   const { repo, unread, skills, agents, mcp, denied, asked, warnings, measured, readOnly, steps } = data;

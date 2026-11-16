@@ -133,11 +133,14 @@ function Drawn({ file }: { file: StepArtifact }) {
         .
       </p>
     );
-  return <Text file={file} viewer={viewer} />;
+  return <TextFile file={file} viewer={viewer} />;
 }
 
-/** A text file, read, drawn as markdown, as JSON (as it came where it does not parse), or as it is. */
-function Text({ file, viewer }: { file: Served; viewer: Exclude<Viewer, 'picture' | 'none'> }) {
+/**
+ * A text file, read, drawn as markdown, as JSON (as it came where it does not parse), or as it is; while its read is out, the shape of
+ * its lines under a status that says it is read.
+ */
+export function TextFile({ file, viewer }: { file: Served; viewer: Exclude<Viewer, 'picture' | 'none'> }) {
   const read = useQuery(stepFileQuery(file.url));
   if (read.error)
     return (
@@ -145,7 +148,12 @@ function Text({ file, viewer }: { file: Served; viewer: Exclude<Viewer, 'picture
         Could not read {file.name}: {read.error.message}
       </p>
     );
-  if (read.data === undefined) return <p className="text-body-medium text-on-surface-variant">Reading {file.name}…</p>;
+  if (read.data === undefined)
+    return (
+      <Reading label={`Reading ${file.name}…`}>
+        <ReadingLines widths={['w-1/2', 'w-full', 'w-11/12', 'w-5/6', 'w-full', 'w-2/3']} className="gap-1 text-body-medium" />
+      </Reading>
+    );
   if (viewer === 'markdown')
     return (
       <div data-viewer="markdown">

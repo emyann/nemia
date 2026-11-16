@@ -144,12 +144,15 @@ export function NowForm({
  */
 function PauseFacts({
   words,
+  unread,
   actor,
   onAsk,
   onResume,
   isPending,
 }: {
   words: PauseWords;
+  /** Whether the pause is still out on its first read, its sentence then drawn as the kit's skeletons under a status that says it. */
+  unread: boolean;
   /** Who put the pause, where its file says. */
   actor: ActorRead | undefined;
   onAsk: (asking: Asking) => void;
@@ -158,9 +161,15 @@ function PauseFacts({
 }) {
   return (
     <>
-      <p data-pause-line className="text-body-small text-muted-foreground">
-        {words.line}
-      </p>
+      {unread ? (
+        <Reading label={words.line}>
+          <ReadingLines widths={['w-full', 'w-2/3']} className="text-body-small" />
+        </Reading>
+      ) : (
+        <p data-pause-line className="text-body-small text-muted-foreground">
+          {words.line}
+        </p>
+      )}
       {words.state !== 'running' && <Actor actor={actor} />}
       <Lines lines={words.finishing} data="data-pause-finishing" />
       <Lines lines={words.parked} data="data-pause-parked" />
@@ -268,6 +277,7 @@ export function PauseButton() {
           {asking === null && (
             <PauseFacts
               words={words}
+              unread={words.state === 'reading' && !read.error}
               actor={read.data?.pause?.actor}
               onAsk={setAsking}
               onResume={() => act.mutate(null)}

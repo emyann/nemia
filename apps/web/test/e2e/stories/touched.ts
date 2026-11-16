@@ -22,11 +22,7 @@ export const owesAStory = (file: string): boolean =>
  * @param reach Each story file and every file of `src` its imports reach, itself among them.
  * @param owing The changed paths that owe a story.
  */
-export const storiesTouched: StoriesTouched = (changed, reach, owing) => {
-  const touched = new Set(changed);
-  const reached = new Set(reach.flatMap((one) => one.reaches));
-  return {
-    stories: reach.filter((one) => one.reaches.some((file) => touched.has(file))).map((one) => one.story),
-    bare: owing.filter((file, at) => owing.indexOf(file) === at && !reached.has(file)),
-  };
-};
+export const storiesTouched: StoriesTouched = (changed, reach, owing) => ({
+  stories: reach.filter((one) => one.reaches.some((file) => changed.includes(file))).map((one) => one.story),
+  bare: owing.filter((file) => reach.every((one) => !one.reaches.includes(file))),
+});

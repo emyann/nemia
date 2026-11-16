@@ -16,5 +16,5 @@
       "@/*": ["../../src/*"]
     }
   },
-  "include": ["*.ts", "pages/*.ts", "parts/*.ts", "parts/*.tsx", "../e2e-*.test.ts"]
+  "include": ["*.ts", "pages/*.ts", "parts/*.ts", "parts/*.tsx", "stories/*.ts", "../e2e-*.test.ts"]
 }

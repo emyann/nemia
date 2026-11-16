@@ -9,6 +9,7 @@ import { afterFor } from '../../lib/inbox';
 import { usePickerRuns } from '../../lib/pickerRuns.ts';
 import { ContextPicker, ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
+import { pastLimit, StartInputs } from './StartInputs';
 
 /**
  * A brief, the runs the new run waits on, the runs it reads as context (`ContextPicker`), and the button that starts a run of the
@@ -27,6 +28,11 @@ import { runsMoved } from '@/lib/runWrites';
  * branch to wait on: no picker is drawn and nothing about a repository, and the start sends what the workflow takes of the picks
  * (`afterFor`), none for such a team. A start reads the list of runs again alone (`exact`): a prefix would reach every run's decision,
  * which is keyed by the run's state and read again under a key of its own.
+ *
+ * Files the run is handed (`StartInputs`), as the client hands a start its inputs, are uploaded when Start is pressed, one after another,
+ * into the namespace the start goes to, then named among its inputs by their ids (`startRun`, `startCard`); the button says how many
+ * are sent. A file past the files api's limit keeps the form from starting. The ids of those uploaded are kept while the form lives, so a
+ * start refused for another reason sends none of them again; a start the api took clears them with the brief.
  *
  * A card's inbox is read again after any answer to its start. Taken, the card stays in it, `started`; refused, it may have left or
  * started behind the page's back — a 404 for a card dropped, a 409 for one started — and this form with it. So the caller given
@@ -52,14 +58,19 @@ export function StartRun({
   const [brief, setBrief] = useState(card?.body ?? '');
   const [after, setAfter] = useState<string[]>([]);
   const [context, setContext] = useState<string[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploaded] = useState(() => new Map<File, string>());
+  const [sentCount, setSentCount] = useState(0);
   const inFolders = workflow.folderTeam;
   const start = useMutation({
-    mutationFn: (asked: { brief: string; after: string[]; context: string[] }) => {
+    mutationFn: (asked: { brief: string; after: string[]; context: string[]; files: File[] }) => {
+      setSentCount(0);
       const start = {
         workflow: workflow.name,
         brief: asked.brief,
         ...(asked.after.length ? { after: asked.after } : {}),
         ...(asked.context.length ? { context: asked.context } : {}),
+        ...(asked.files.length ? { files: { listed: asked.files, sent: uploaded, onSent: setSentCount } } : {}),
       };
       return card ? startCard(card, start, place?.factory) : startRun({ ...start, from: workflow.from }, place);
     },
@@ -69,6 +80,8 @@ export function StartRun({
         setBrief('');
         setAfter([]);
         setContext([]);
+        setFiles([]);
+        uploaded.clear();
       }
       void runsMoved(queryClient);
       onStarted?.(started);
@@ -86,7 +99,7 @@ export function StartRun({
       className={card ? 'space-y-2' : 'space-y-2 border-t border-outline-variant pt-4'}
       onSubmit={(event) => {
         event.preventDefault();
-        start.mutate({ brief, after: afterFor(workflow, after), context });
+        start.mutate({ brief, after: afterFor(workflow, after), context, files });
       }}
     >
       <label htmlFor={field} className="block text-body-medium font-medium">
@@ -100,15 +113,26 @@ export function StartRun({
         placeholder="What to do: the brief each step is told, under “What was asked for”."
         className="block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none"
       />
+      <StartInputs
+        files={files}
+        onChange={setFiles}
+        sent={sentCount}
+        uploading={start.isPending && files.length > 0}
+        isDisabled={start.isPending}
+      />
       {!inFolders && <AfterPicker selected={after} onChange={setAfter} repo={repo} />}
       <ContextPicker selected={context} onChange={setContext} />
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
-          disabled={!brief.trim() || start.isPending}
+          disabled={!brief.trim() || start.isPending || files.some(pastLimit)}
           className="rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
         >
-          {start.isPending ? 'Starting…' : 'Start'}
+          {!start.isPending
+            ? 'Start'
+            : files.length > 0 && sentCount < files.length
+              ? `Uploading ${sentCount + 1} of ${files.length}…`
+              : 'Starting…'}
         </button>
         <Where workflow={workflow} repo={repo} factory={place?.factory} card={!!card} />
       </div>

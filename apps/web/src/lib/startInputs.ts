@@ -10,7 +10,7 @@ import type { InputAdded, ListedInput } from '../../contracts/start-inputs.contr
  * @param listed The files the form lists, each name once.
  * @param added The file dropped or picked.
  */
-export function inputAdded<T extends ListedInput>(listed: readonly T[], added: T): T[] {
+function inputAdded<T extends ListedInput>(listed: readonly T[], added: T): T[] {
   return listed.some((f) => f.name === added.name) ? listed.map((f) => (f.name === added.name ? added : f)) : [...listed, added];
 }
 

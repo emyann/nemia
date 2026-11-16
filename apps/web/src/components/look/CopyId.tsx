@@ -20,7 +20,8 @@ const [COPY, COPIED] = [glyphOf(Copy), glyphOf(Check)];
 
 /**
  * The control pulled in around its glyph: three pixels over the id, so the glyph stands seven from it, and eight up and down, so the
- * line that holds it is as tall as the id's own. Its box and its target keep their size, and reach over what is around it.
+ * line that holds it is as tall as the id's own. Its box and its target keep their size, and reach over what is around it, but for the
+ * short id, which stands over them (`relative z-1`) so that the pointer anywhere on it rests on it and opens its tooltip.
  */
 const PULLED = '-my-2 -ml-0.75';
 
@@ -50,7 +51,7 @@ export function CopyId({ id, short = false, room }: { id: string; short?: boolea
               // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the whole id's tooltip by focusing it
               tabIndex={0}
               style={room ? { minWidth: `${room}ch` } : undefined}
-              className={cn(ID, copied && ink.alive, focusRing())}
+              className={cn(ID, 'relative z-1', copied && ink.alive, focusRing())}
             >
               {id.slice(-4)}
             </span>

@@ -99,7 +99,15 @@ const RUN: WaitingRun = {
   atWork: null,
   tokens: null,
   steps: [step('design', VERIFIED, 0), step('implement', VERIFIED, 1), step('review', VERIFIED, 2), step('land', APPROVAL, 3)],
-  graph: { roots: [], edges: [] },
+  graph: {
+    roots: ['design'],
+    edges: [
+      { from: 'design', to: 'implement', kind: 'after' },
+      { from: 'implement', to: 'review', kind: 'after' },
+      { from: 'review', to: 'land', kind: 'after' },
+      { from: 'review', to: 'implement', kind: 'loop', rounds: 3 },
+    ],
+  },
   waitingOnYou: ['land'],
   waitingOnYouWords: ['approve land'],
   toDecide: null,
@@ -151,6 +159,8 @@ export const Narrow: StoryObj = {
     await document.fonts.ready;
     await expect(footOf(canvasElement), 'the button under the graph, at the right').toEqual({ beside: false, fromRight: 0 });
     await expect(canvasElement.querySelectorAll('[data-cut-button]').length, 'one button').toBe(1);
+    await expect(canvasElement.querySelectorAll('[data-step]').length, 'its four steps, laid out by their edges').toBe(4);
+    await expect(canvasElement.querySelector('[data-fold]'), 'none folded').toBeNull();
   },
   render: () => (
     <div data-card-box style={NARROW}>

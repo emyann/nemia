@@ -21,7 +21,7 @@ import { stepMark } from './stepMark.ts';
  * `more`, the steps of a column past the lanes it shows. `live`: a step of it is at work or waits on a person — where the run is.
  * `done`: every step of it is settled (`settledState`: done, or passed by its route). `state` is a step's own, and null for the other two.
  */
-export type Pill = {
+type Pill = {
   id: string;
   kind: 'step' | 'fold' | 'more';
   names: string[];

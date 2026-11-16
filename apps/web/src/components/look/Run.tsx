@@ -114,10 +114,11 @@ export function Run(props: RunProps) {
   return <RunBig {...props} look={look} among={among} />;
 }
 
-/** The run's title, a link to its page, raised over the copy control's target; whole in the kit's tooltip where it is cut to a line. */
-function Title({ run, look, still, end }: { run: PartRun; look: Look; still?: string; end?: ReactNode }) {
+/** The run's title, a link to its page, raised over the copy control's target; whole in the kit's tooltip where it is cut to a line; a card's heading where `heading`. */
+function Title({ run, look, still, end, heading }: { run: PartRun; look: Look; still?: string; end?: ReactNode; heading?: boolean }) {
+  const Holder = heading ? 'h3' : 'span';
   return (
-    <span {...saying('title')} className="flex min-w-0 items-start gap-1">
+    <Holder {...saying('title')} className="m-0 flex min-w-0 items-start gap-1">
       <TooltipTrigger delay={300}>
         <TextLink to="/runs/$runId" params={{ runId: run.id }} className={cn(look.s.title(), still)}>
           {look.title}
@@ -125,7 +126,7 @@ function Title({ run, look, still, end }: { run: PartRun; look: Look; still?: st
         <Tooltip>{look.title}</Tooltip>
       </TooltipTrigger>
       {end}
-    </span>
+    </Holder>
   );
 }
 
@@ -329,7 +330,7 @@ function RunCard({ run, asOf, among, wrap, titleEnd, ringed, still, children, cl
           </span>
         </span>
       </span>
-      <Title run={run} look={look} still={still} end={titleEnd} />
+      <Title run={run} look={look} still={still} end={titleEnd} heading />
       <span className={s.now()}>
         <NowMarks look={look} small />
         <WordsSaid run={run} look={look} among={among} cut />
@@ -364,7 +365,7 @@ function RunBig(props: RunProps & { look: Look; among: readonly PartRun[] }) {
       <span {...saying('id', 'where', 'labels')} className={cn(s.head(), 'flex')}>
         <RunMeta run={run} whole={xl} />
       </span>
-      <Title run={run} look={look} still={still} end={titleEnd} />
+      <Title run={run} look={look} still={still} end={titleEnd} heading />
       <span className={s.now()}>
         <NowMarks look={look} words={xl} />
         <WordsSaid run={run} look={look} among={among} />

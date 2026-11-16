@@ -7,7 +7,7 @@
  * it carries (`ChipTone`, `lib/nowChip.ts`): on its chip, its words and, as a card, its edge and its ground — the surface mixed with
  * that tone's role, two roles and nothing else.
  */
-import { tv, type VariantProps } from '@/components/ui/ds/utils';
+import { tv } from '@/components/ui/ds/utils';
 import type { ChipTone } from '@/lib/nowChip';
 
 /** A run's tone: its state's meaning, the chip's colour. */
@@ -85,6 +85,3 @@ export const runRecipe = tv({
   ],
   defaultVariants: { size: 'md', layout: 'card', tone: 'alive' },
 });
-
-/** The recipe's variants: the props a run takes beside its data. */
-export type RunRecipe = VariantProps<typeof runRecipe>;

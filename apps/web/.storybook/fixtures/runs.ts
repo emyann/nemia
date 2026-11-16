@@ -62,6 +62,15 @@ type Shape = {
   status: Partial<Run['status']> & Pick<Run['status'], 'status' | 'phase' | 'reason' | 'moving'>;
 };
 
+/** The graph build's workflow freezes on a run of `names`: a chain in their order, review looping back to implement for three rounds. */
+const chainOf = (names: readonly string[]): Run['status']['graph'] => ({
+  roots: names.slice(0, 1),
+  edges: [
+    ...names.slice(1).map((to, i) => ({ from: names[i]!, to, kind: 'after' as const })),
+    ...(names.includes('review') && names.includes('implement') ? [{ from: 'review', to: 'implement', kind: 'loop' as const, rounds: 3 }] : []),
+  ],
+});
+
 /** A run of the `factory` factory as a list asked by state answers it. */
 const run = ({ name, brief, createdAt, steps, status }: Shape): Run => ({
   apiVersion: 'nemia/v1',
@@ -91,7 +100,7 @@ const run = ({ name, brief, createdAt, steps, status }: Shape): Run => ({
     waiting: null,
     holding: null,
     toDecide: null,
-    graph: { roots: ['design'], edges: [] },
+    graph: chainOf(steps.map((step) => step.name)),
     timeline: {
       rounds: [],
       run: {
@@ -189,19 +198,7 @@ const STEPS_OF = { quick: ['implement', 'review', 'land'], build: ['design', 'im
 
 /** Each workflow's graph, as the api answers it: a chain in its order, review looping back to implement for three rounds. */
 const GRAPH_OF = Object.fromEntries(
-  (Object.keys(STEPS_OF) as Array<keyof typeof STEPS_OF>).map((workflow) => {
-    const names = STEPS_OF[workflow];
-    return [
-      workflow,
-      {
-        roots: [names[0]],
-        edges: [
-          ...names.slice(1).map((to, i) => ({ from: names[i], to, kind: 'after' as const })),
-          { from: 'review', to: 'implement', kind: 'loop' as const, rounds: 3 },
-        ],
-      },
-    ];
-  }),
+  (Object.keys(STEPS_OF) as Array<keyof typeof STEPS_OF>).map((workflow) => [workflow, chainOf(STEPS_OF[workflow])]),
 ) as Record<keyof typeof STEPS_OF, Run['status']['graph']>;
 
 /** Each workflow's gates: build's design and land; quick's none. */

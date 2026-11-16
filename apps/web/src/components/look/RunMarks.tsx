@@ -17,7 +17,7 @@ import { TextLink } from './TextLink';
 export type NamedRun = Pick<RunView, 'id' | 'brief' | 'steps' | 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou' | 'toDecide'>;
 
 /** The ink of NOW's words by the chip's colour: yellow where the run waits on you, red where it failed, quiet for every other. */
-export const WORDS_INK: Record<ChipTone, string> = {
+const WORDS_INK: Record<ChipTone, string> = {
   yours: ink.yours,
   failure: ink.failure,
   alive: 'text-on-surface-variant',

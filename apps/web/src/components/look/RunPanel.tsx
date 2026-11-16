@@ -38,7 +38,7 @@ const tookOf = (attempts: PanelRead['steps'][number]['attempts'], live: boolean,
  * Each step as the panel names it under its node: its agent as the run froze it, and once read its latest attempt's time and its cost
  * to the minute, and what its tries spent, said at `now`.
  */
-export function namedSteps(run: PanelRun, read: PanelRead | null, now: number): ReadonlyMap<string, StepNamed> {
+function namedSteps(run: PanelRun, read: PanelRead | null, now: number): ReadonlyMap<string, StepNamed> {
   const drawn = railStates(run.steps, run.cancelledAt !== null, run.holding != null);
   const reads = new Map(read?.steps.map((step) => [step.name, step]));
   return new Map(

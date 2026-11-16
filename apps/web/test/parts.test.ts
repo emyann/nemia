@@ -452,7 +452,7 @@ async function inTable(row: ReactElement): Promise<ReactElement> {
 
 test('Run: each size draws what its ladder says and no more, in its tone, and only a card at lg or xl that waits on you glows', async (t) => {
   const { Run } = await import('../src/components/look/Run.tsx');
-  const { says } = await import('../src/lib/runSays.ts');
+  const { says, smallestSize } = await import('../src/lib/runSays.ts');
   const { nowOf } = await import('../src/lib/runWords.ts');
   const { runViewOf } = await import('../src/lib/api/judged.ts');
   const { TARGET_RUNS, READS } = await import('../.storybook/fixtures/runs.ts');
@@ -478,6 +478,20 @@ test('Run: each size draws what its ladder says and no more, in its tone, and on
       const html = await drawn(size === 'md' && layout === 'row' ? await inTable(element) : element);
       assert.deepEqual(said(html), [...says(size, layout)].filter((thing) => !none.has(thing)).sort());
     });
+  await t.test('each thing a card says is drawn first at its smallest size, and at every size above it', async () => {
+    const ladder = ['xs', 'sm', 'md', 'lg', 'xl'] as const;
+    const drawings = await Promise.all(
+      ladder.map(async (size) => said(await drawn(createElement(Run, { run, size, layout: 'card', asOf, among, read: READS['1sw7'] })))),
+    );
+    for (const thing of new Set(drawings.flat())) {
+      const first = ladder.indexOf(smallestSize(thing as Parameters<typeof smallestSize>[0], 'card'));
+      assert.deepEqual(
+        ladder.filter((_, at) => drawings[at]!.includes(thing)),
+        ladder.slice(first),
+        thing,
+      );
+    }
+  });
   await t.test('its words where it has some: 649a waits on a run, by its mark', async () => {
     const waits = among.find((one) => one.id.endsWith('649a'))!;
     const html = await drawn(createElement(Run, { run: waits, size: 'md', layout: 'card', asOf, among }));

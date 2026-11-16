@@ -15,11 +15,24 @@ import { composeTailwindRenderProps } from "../render-props";
 import { focusRing, tv } from "../utils";
 import { Checkbox } from "./Checkbox";
 
+// What a drag shows, as in `GridList`: a 2dp `primary` line where a drop
+// will land between two rows, and the drop zone's outline and tint on a row
+// or a tree that is dropped onto.
+const dropLine =
+  "[&_.react-aria-DropIndicator[data-drop-target]]:outline-1 [&_.react-aria-DropIndicator[data-drop-target]]:outline-solid [&_.react-aria-DropIndicator[data-drop-target]]:outline-primary";
+const droppedOnto =
+  "data-drop-target:outline-2 data-drop-target:-outline-offset-2 data-drop-target:outline-solid data-drop-target:outline-primary data-drop-target:bg-primary/8";
+
 const styles = tv({
   slots: {
-    tree: "relative flex flex-col overflow-auto outline-none",
+    tree: [
+      "relative flex flex-col overflow-auto outline-none",
+      dropLine,
+      droppedOnto,
+    ],
     item: [
       focusRing(),
+      droppedOnto,
       "group/tree-item relative flex cursor-default items-center text-on-surface -outline-offset-2",
       "data-[href]:cursor-pointer data-selected:bg-secondary-container data-selected:text-on-secondary-container",
       "data-disabled:text-on-surface/38",

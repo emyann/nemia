@@ -30,6 +30,7 @@ export {
 
 // Primitives
 export { Display, Headline, Title, Body, Label } from "./primitives/Typography";
+export type { TextElement } from "./primitives/Typography";
 export {
   default as StateLayer,
   type StateLayerColor,
@@ -128,6 +129,12 @@ export {
   type CellProps,
 } from "./components/Table";
 export { Avatar, type AvatarProps } from "./components/Avatar";
+export {
+  Skeleton,
+  SkeletonGroup,
+  type SkeletonProps,
+  type SkeletonGroupProps,
+} from "./components/Skeleton";
 export {
   GridList,
   GridListItem,

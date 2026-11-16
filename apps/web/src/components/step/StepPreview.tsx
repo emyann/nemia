@@ -82,6 +82,7 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
   const bar = useRef<HTMLButtonElement>(null);
   const [side, setSide] = useState<PreviewSide>('end top');
   const warm = useACardOpen();
+  const said = barSaid(step.name, step.state, step.on, run.holding != null);
   useEffect(() => () => cardOpened(id, false), [id]);
   const opened = (open: boolean): void => {
     cardOpened(id, open);
@@ -90,18 +91,12 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
   };
   return (
     <PreviewTrigger delay={warm ? 0 : undefined} onOpenChange={opened}>
-      <Button
-        ref={bar}
-        aria-label={barSaid(step.name, step.state, step.on, run.holding != null)}
-        data-step-bar={step.name}
-        data-step-preview="card"
-        className={BAR_BUTTON}
-        onKeyDown={intoTheCard}
-      >
+      <Button ref={bar} aria-label={said} data-step-bar={step.name} data-step-preview="card" className={BAR_BUTTON} onKeyDown={intoTheCard}>
         {children}
       </Button>
       <ByTheRail>
         <PreviewCard
+          aria-label={said}
           placement={side}
           offset={0}
           className="max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-none bg-transparent p-3 shadow-none"

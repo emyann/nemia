@@ -22,7 +22,9 @@ const styles = tv({
   slots: {
     // Full window width up to 640dp; above a 640dp window, 56dp side margins.
     base: [
-      "bg-surface-container-low shadow-elevation-1 rounded-t-shape-extra-large",
+      // An outlined field's label is cut into its outline with the colour
+      // of what is behind it: here, the sheet's.
+      "[--md3-field-notch:var(--md-sys-color-surface-container-low)] bg-surface-container-low shadow-elevation-1 rounded-t-shape-extra-large",
       "mx-auto flex w-full max-w-[640px] flex-col min-[641px]:w-[calc(100%-112px)]",
       "outline-hidden",
     ],
@@ -185,7 +187,8 @@ const DEFAULT_HEIGHTS: readonly BottomSheetHeight[] = ["partial", "expanded"];
  * as Material asks of a full-screen sheet.
  *
  * Accessibility: the drag handle is a button named by `dragHandleLabel`
- * ("Drag handle" by default), the sheet's first tab stop.
+ * ("Drag handle" by default), the sheet's first tab stop. With two heights
+ * it carries `aria-expanded`, so the height it moved the sheet to is said.
  *
  * Deviations, each recorded:
  *
@@ -346,6 +349,9 @@ export default function BottomSheet(props: BottomSheetProps) {
           <AriaButton
             data-slot="bottom-sheet-drag-handle"
             aria-label={dragHandleLabel}
+            // With two heights the handle is what moves between them, and
+            // says which one the sheet is at.
+            aria-expanded={heights.length > 1 ? expanded : undefined}
             onPress={(e) => {
               if (dragged.current && e.pointerType !== "keyboard") {
                 dragged.current = false;

@@ -29,7 +29,11 @@ const styles = tv({
         // from drawing a focus outline around the whole sheet. (This is also
         // why the slots no longer extend `focusRing`: its focus-visible outline
         // would land on the sheet container, not on anything inside it.)
-        base: "h-[var(--visual-viewport-height)] w-[calc(100%-56px)] sm:w-[560px] outline-hidden",
+        // Its width is the window's less 56dp, in `vw`: the box around it
+        // takes its own width from the sheet, so a share of that box is a
+        // share of nothing, and the sheet fell back on its 360dp minimum,
+        // against the wrong edge. No minimum here: a phone may be narrower.
+        base: "h-[var(--visual-viewport-height)] w-[calc(100vw-56px)] min-w-0 sm:w-[560px] outline-hidden",
       },
     },
     align: {

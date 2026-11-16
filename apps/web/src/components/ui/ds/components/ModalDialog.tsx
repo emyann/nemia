@@ -23,6 +23,9 @@ export type ModalDialogProps = BaseModalDialogProps & DialogProps;
  *
  * While an action of `actions` is loading, nothing dismisses the dialog:
  * not the scrim, not Escape. Close it when the request ends.
+ * That holds with content of its own too: give `children` and `actions`
+ * together, and the form or the list sits between the headline and the two
+ * buttons (see `DialogContent`).
  *
  * The basic dialog keeps 16dp from the window's edges and is at most 560dp
  * wide, Material's maximum; `className` gives another (`max-w-sm`).

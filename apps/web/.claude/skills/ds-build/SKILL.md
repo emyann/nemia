@@ -197,8 +197,35 @@ opacity follows the state.
   `MenuItem`, `Tag`, `Badge`, `Divider`, `TopAppBar`, `EmptyState`,
   `Skeleton`, `DialogContent` and the type primitives render on the server.
 - Content that is loading and whose shape is known: `Skeleton`, in a
-  `SkeletonGroup` that says "Loading" once. An action in progress:
-  `LoadingIndicator` or `ProgressIndicator`.
+  `SkeletonGroup` that says "Loading" once. Its size is a `className`, and
+  so is another corner (`rounded-shape-full` for what stands for a button).
+  An action in progress: `LoadingIndicator` or `ProgressIndicator`.
+- A button whose action runs takes `isLoading`: it takes no second press
+  and says "Loading" to a screen reader, or its `loadingLabel` ("Saving").
+  What comes of the action is the page's to say: a snackbar, or a
+  `role="status"` line.
+- A dialog that holds a form or a list is still a `ModalDialog` with
+  `actions`: give it `children` too, and they sit between the headline and
+  the two buttons. `type: "submit"` and `form: "<the form's id>"` on the
+  confirm make it submit the form; while it `isLoading` the dialog is not
+  dismissed.
+
+## Where the focus goes
+
+React Aria returns the focus to what opened an overlay. The rest is the
+page's, and a page that leaves it out drops the focus on the document's
+body, where the next Tab starts from the top:
+
+- **What was pressed is gone or disabled** (a row deleted, a filter chip
+  removed, "Clear" that empties the list it sat in, Next at the last page):
+  give the focus to what follows it, to the list, or to the heading of what
+  took its place (`tabIndex={-1}`, a ref, `focusRing`).
+- **The page changed** (a route, a step, a tab of the app): give the focus
+  to the new page's heading, and say its name in a `role="status"` line.
+- **A sticky bar** hides what takes the focus beneath it: give the scrolling
+  box `scroll-pt-*` of the bar's height.
+- **A snackbar** is drawn over the window's bottom edge: place its region
+  above a bottom bar, a FAB or a sheet's actions with `className`.
 - Icons are any component taking `{ size, className }`. The kit ships no icon
   library.
 

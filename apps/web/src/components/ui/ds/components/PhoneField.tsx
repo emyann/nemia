@@ -1,6 +1,11 @@
 "use client";
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type ReactNode,
+} from "react";
 import {
   Button,
   FieldError,
@@ -164,7 +169,26 @@ export function PhoneField(props: PhoneFieldProps) {
           onChange?.(next);
         }}
         onBlur={onBlur}
-        onFocus={onFocus}
+        onFocus={(event: FocusEvent<HTMLElement>) => {
+          onFocus?.(event as FocusEvent<HTMLInputElement>);
+          // Tab selects a field's text, and here that text may be the
+          // country's calling code alone: the first digit typed would
+          // replace it. Put the caret after the code instead.
+          const input = event.target;
+          if (!(input instanceof HTMLInputElement)) return;
+          requestAnimationFrame(() => {
+            const whole =
+              input.selectionStart === 0 &&
+              input.selectionEnd === input.value.length;
+            if (
+              document.activeElement === input &&
+              whole &&
+              /^\+\d{1,4}\s?$/.test(input.value)
+            ) {
+              input.setSelectionRange(input.value.length, input.value.length);
+            }
+          });
+        }}
         international
         defaultCountry={defaultCountry}
         countries={countries}

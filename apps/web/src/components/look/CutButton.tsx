@@ -13,6 +13,9 @@ const [GAP, RING] = [2, 3];
 /** What the element that is the button wears, a link or a press alike: clipped by nothing, its ring and its shape laid inside it. */
 const HOLDER = 'group/cut relative inline-flex outline-none';
 
+/** The quiet form's ground and ink: no ground, the surface's ink, inside a hairline in the outline's colour. */
+const QUIET = 'text-on-surface ring-1 ring-outline ring-inset';
+
 /** The ground and the ink of a press that is disabled, as Material draws a disabled filled button: 12 % and 38 % of the surface's ink. */
 const DISABLED = 'bg-on-surface/12 text-on-surface/38';
 
@@ -20,9 +23,10 @@ const DISABLED = 'bg-on-surface/12 text-on-surface/38';
  * What the look's filled button draws inside the element that is the button, a link or a press alike: its focus ring, a band in the
  * cut shape around it, as wide and as far as the kit's ring and shown with the keyboard on it; then its words on a shape of its own,
  * the top-right and bottom-left corners cut, exactly the button's box, in the hue of what waits on a person, with a state layer in
- * its ink. `disabled` draws the shape in the disabled ground and ink, with no state layer and no ring.
+ * its ink. `quiet` draws it smaller, with no ground, in the surface's ink inside a hairline, for a button beside what already says
+ * the wait; `disabled` draws the shape in the disabled ground and ink, with no state layer and no ring.
  */
-function Body({ disabled = false, children }: { disabled?: boolean; children: string }) {
+function Body({ disabled = false, quiet = false, children }: { disabled?: boolean; quiet?: boolean; children: string }) {
   return (
     <>
       {!disabled && (
@@ -36,8 +40,9 @@ function Body({ disabled = false, children }: { disabled?: boolean; children: st
       <span
         data-cut-shape
         className={cn(
-          'relative inline-flex h-10 items-center px-6 text-label-large whitespace-nowrap uppercase',
-          disabled ? DISABLED : filled.yours,
+          'relative inline-flex items-center text-label-large whitespace-nowrap uppercase',
+          quiet ? 'h-8 px-4' : 'h-10 px-6',
+          disabled ? DISABLED : quiet ? QUIET : filled.yours,
         )}
         style={{ clipPath: cutShape(CUT) }}
       >
@@ -53,16 +58,24 @@ function Body({ disabled = false, children }: { disabled?: boolean; children: st
   );
 }
 
-/** React Aria's link drawn as the look's filled button (`Body`); the link itself is clipped by nothing. */
-function Cut({ className, children, ...props }: Omit<LinkProps, 'className' | 'children'> & { className?: string; children: string }) {
+/** React Aria's link drawn as the look's filled button (`Body`), or its quiet form; the link itself is clipped by nothing. */
+function Cut({
+  className,
+  quiet = false,
+  children,
+  ...props
+}: Omit<LinkProps, 'className' | 'children'> & { className?: string; quiet?: boolean; children: string }) {
   return (
-    <AriaLink {...props} data-cut-button="link" className={cn(HOLDER, className)}>
-      <Body>{children}</Body>
+    <AriaLink {...props} data-cut-button="link" data-quiet={quiet || undefined} className={cn(HOLDER, className)}>
+      <Body quiet={quiet}>{children}</Body>
     </AriaLink>
   );
 }
 
-/** The look's filled button with two cut corners, as a link to a route (`routeLink`): pressed, or Enter on it, it navigates once. */
+/**
+ * The look's filled button with two cut corners, as a link to a route (`routeLink`): pressed, or Enter on it, it navigates once; with
+ * `quiet`, drawn with no ground inside a hairline.
+ */
 export const CutButton = routeLink(Cut);
 
 /**

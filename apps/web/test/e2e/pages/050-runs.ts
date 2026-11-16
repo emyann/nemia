@@ -20,8 +20,8 @@ import { workflowNameOf } from '../../../src/lib/api/workflows.ts';
 import { runClock, titleOf } from '../../../src/lib/factory.ts';
 import { tokensBreakdown } from '../../../src/lib/breakdown.ts';
 import { durationWords } from '../../../src/lib/duration.ts';
-import { agoWords, openWord, presentWait, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
-import { ENDED } from '../../../src/lib/words.ts';
+import { agoWords, nowOf, presentWait } from '../../../src/lib/runWords.ts';
+import { ENDED, OPENS } from '../../../src/lib/words.ts';
 import {
   answered,
   fed,
@@ -36,10 +36,10 @@ import {
   openAnswered,
   runListPath,
 } from '../board.ts';
-import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, literal, Refused, WAIT_MS } from '../checks.ts';
+import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
 import { agosRefused } from '../runs-times.ts';
 import { contrastHolds } from '../runs-contrast.ts';
-import { COSTLY, ENDING, GATED, REGATED, regatedFiles, writeRegated } from '../seed.ts';
+import { COSTLY, REGATED, regatedFiles, writeRegated } from '../seed.ts';
 import { seated } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, photographing, store } from '../world.ts';
@@ -106,30 +106,27 @@ const cardOf = (page: Page, id: string): Locator => section(page, 'waiting').loc
 
 /**
  * The three parts as the api counts them: a card for every run that waits and no row of it, a row for every run in flight, a page of
- * the finished, each under a plate that says the api's count and stands alone on its line; and nothing of the list the page was.
+ * the finished, each under a count chip that says the api's count in the section's colour, quiet at zero, and stands alone on its
+ * line; and nothing of the list the page was.
  */
 async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
   await expectTexts(page.getByRole('heading', { level: 1 }), ['Runs'], "the page's header is its name");
-  await expectTexts(
-    page.getByRole('heading', { level: 2 }),
-    ['Waiting on you', 'In flight', 'Finished'],
-    'its three sections, what waits on you first',
-  );
-  for (const [name, count] of [
-    ['waiting', open.counts.waiting],
-    ['in-flight', open.counts.inFlight],
-    ['finished', open.counts.finished],
+  const heads = (await page.getByRole('heading', { level: 2 }).allTextContents()).map((head) => head.replace(/^\d+/, '').trim());
+  if (heads.join('|') !== 'Waiting on you|In flight|Finished')
+    throw new Refused(`its three sections, what waits on you first, each headed by its count — ${heads.join(', ')}`);
+  for (const [name, count, tone] of [
+    ['waiting', open.counts.waiting, 'yours'],
+    ['in-flight', open.counts.inFlight, 'alive'],
+    ['finished', open.counts.finished, 'rest'],
   ] as const) {
-    await expectTexts(section(page, name).locator('[data-plate-count]'), [String(count)], `the plate of ${name} says the api's count`);
-    await expectCount(
-      section(page, name).locator('[data-plate="loud"] [data-plate-barcode]'),
-      1,
-      `the plate of ${name} counts runs, so it carries its barcode`,
-    );
-    const beside = await section(page, name)
-      .locator('[data-plate]')
-      .evaluate((plate) => [...plate.parentElement!.children].filter((other) => other !== plate).map((other) => other.outerHTML));
-    if (beside.length) throw new Refused(`the plate of ${name} stands alone on its line, no rule beside it — ${beside.join(' ')}`);
+    const chip = section(page, name).locator('[data-count-chip]');
+    const said = await chip.evaluate((tag) => `${tag.getAttribute('data-count-chip')} ${tag.getAttribute('data-count-tone')}`);
+    if (said !== `${count} ${count === 0 ? 'quiet' : tone}`)
+      throw new Refused(`the count chip of ${name} says the api's count, ${count}, in its colour, ${tone} — it says ${said}`);
+    const beside = await chip
+      .locator('xpath=ancestor::h2/..')
+      .evaluate((line) => [...line.children].filter((other) => other.tagName !== 'H2').map((other) => other.outerHTML));
+    if (name !== 'waiting' && beside.length) throw new Refused(`the count chip of ${name} stands alone on its line — ${beside.join(' ')}`);
   }
   if (open.counts.waiting < 2 || open.counts.inFlight < 2 || open.counts.finished < 2)
     throw new Refused(`the seed holds runs of each part — ${JSON.stringify(open.counts)}`);
@@ -151,9 +148,7 @@ async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage): P
     0,
     'no switch, nothing to decide from the list',
   );
-  const said = (
-    await page.locator('[data-sentence], [data-wait-tag], [data-now-word], [data-now-note], th, [data-ended], [data-pager]').allInnerTexts()
-  ).join('\n');
+  const said = (await page.locator('[data-now-word], [data-now-words], th, [data-ended], [data-pager]').allInnerTexts()).join('\n');
   const told = /\bgit\b|\bbranch|\bmerge|\bcommit|worktree|--|\bnemia [a-z]+ /i.exec(said);
   if (told) throw new Refused(`the page's own words say nothing of git and repeat no command — it says "${told[0]}"`);
   if (/\d+s\b/.test(await section(page, 'in-flight').innerText()))
@@ -169,7 +164,7 @@ const waitsSaid = (run: WaitingRun, asOf: string): Set<string> => {
   const [from, now] = [Date.parse(asOf) - 90_000, Date.now()];
   for (let at = from; at - 30_000 <= now; at += 30_000) {
     const wait = presentWait(run, new Date(at));
-    if (wait !== null) said.add(`waiting ${wait}`);
+    if (wait !== null) said.add(`waited ${wait}`);
   }
   return said;
 };
@@ -192,8 +187,8 @@ const minutesIn = (said: string): number => {
 };
 
 /**
- * REGATED, at its second gate: its card says the present wait, minutes long, while the row of its Clock tile's tooltip keeps every wait
- * on a person summed, over twenty minutes. A card that read the sum would say the row's figure. The open tooltip is photographed.
+ * REGATED, at its second gate: its card says the present wait, minutes long, while the api keeps every wait on a person summed, over
+ * twenty minutes. A card that read the sum would say the sum's figure.
  */
 async function secondGate(page: Page, open: OpenRuns): Promise<void> {
   const run = open.waiting.filter(judged).find((waiting) => waiting.id === REGATED.id);
@@ -207,93 +202,76 @@ async function secondGate(page: Page, open: OpenRuns): Promise<void> {
     (await card.locator('[data-waited]').innerText())
       .trim()
       .toLowerCase()
-      .replace(/^waiting /, ''),
+      .replace(/^waited /, ''),
   );
   if (waited < 1 || waited >= 10)
     throw new Refused(`the card of ${REGATED.id} says its wait at the second gate, a few minutes — it says ${waited} minutes`);
-  await card.locator('[data-stat-tile="clock"]').focus();
-  await expectVisible(tooltip(page), "its Clock tile's tooltip opens on focus");
-  const row = (await tooltip(page).locator('[data-breakdown-row="Waiting on you"] dd').innerText()).trim();
-  await photograph(page, path.join(OUT, `runs-tooltip-second-gate-${await themeOf(page)}.png`));
-  await page.keyboard.press('Escape');
-  await expectCount(tooltip(page), 0, 'Escape closes it');
-  if (minutesIn(row) < 20)
-    throw new Refused(`the tooltip's row keeps the run's whole time waiting on a person, both gates summed — it says "${row}"`);
+  await photograph(card, path.join(OUT, `runs-card-second-gate-${await themeOf(page)}.png`));
 }
 
 /**
- * A waiting run's card says its tag, its factory, its title as a link, its id, one sentence, its steps by name, and on its one button
- * what there is to read, by the kind of its wait (`openWord`); the button opens its page.
+ * A waiting run's card says its meta line (its id's end, its whole id on hover), its title as a link, the yellow chip of the step it
+ * waits on you at and the words of what is asked (`nowOf`), its own steps as a short rail, each bar a button that opens its step's
+ * card, and one quiet button, which opens the run's page.
  */
 async function cardSays(page: Page, run: WaitingRun): Promise<void> {
   const card = cardOf(page, run.id);
   const open = `[href="/runs/${run.id}"]`;
-  await expectTexts(card.locator('[data-wait-tag]'), [waitTag(run)], `the card of ${run.id} says what is asked of you`);
-  await expectTexts(card.locator('[data-sentence]'), [waitSentence(run)], 'one plain sentence');
+  const now = nowOf(run);
+  if (!now) throw new Refused(`${run.id}, which waits on you, has a step it is on now`);
+  const chip = await card.locator('[data-now-word]').evaluate((tag) => `${tag.textContent} ${tag.getAttribute('data-tone')}`);
+  if (chip !== `${now.step} yours`) throw new Refused(`the card of ${run.id} draws its step in the yellow chip — it draws ${chip}`);
+  await expectTexts(
+    card.locator('[data-now-words]'),
+    [now.words.map((part) => (typeof part === 'string' ? part : part.run.slice(-4))).join(' ')],
+    `the card of ${run.id} says what is asked of you`,
+  );
   await expectTexts(card.getByRole('heading', { level: 3 }).locator(`a${open}`), [titleOf(run)], "the run's title, a link to its page");
-  await expectTexts(card.locator('[data-run-id]'), [run.id], 'its id');
-  await expectTexts(
-    card.locator('[data-step-name]'),
-    run.steps.map((step) => step.name),
-    'a rail of its own steps, each by its name',
-  );
-  await expectTexts(card.locator('[data-sticker] > span:first-child'), ['Clock', 'Cost', 'Tokens'], 'three tiles');
-  await expectTexts(
-    card.locator(`a[data-cut-button]${open}`),
-    [openWord(run)],
-    "one filled button, which says what there is to read and opens the run's page",
-  );
+  await expectTexts(card.locator(`[data-run-id][title="${run.id}"]`), [run.id.slice(-4)], "its id's end, the whole id on hover");
+  await expectCount(card.locator('[data-run-steps] [data-step]'), run.steps.length, 'a rail of its own steps');
+  await expectCount(card.locator('[data-step-name]'), 0, 'a short rail, with no names under its bars');
+  await expectTexts(card.locator(`a[data-cut-button]${open}`), [OPENS], "one quiet button, which opens the run's page");
+  await expectCount(card.locator('[data-cut-button]'), 1, 'and only one');
   await expectCount(card.locator('button[data-step-bar]'), run.steps.length, "each bar of its rail a button that opens its step's card");
   await expectCount(
     card.locator('button:not([data-step-bar])'),
-    1,
-    'and one control more, the copy of its id: nothing is decided from the list',
+    1 + (run.cost && run.tokens ? 1 : 0),
+    'and no control more than the copy of its id and the preview of its cost: nothing is decided from the list',
   );
 }
 
-/** The seed's two gates name what a person reads there: the step that waits, and the review done before a landing not yet filed. */
-async function gatesSay(page: Page): Promise<void> {
-  for (const [id, words, why] of [
-    [GATED.id, `Read the ${GATED.gated}`, 'a gate on a step that has run names that step'],
-    [ENDING.id, 'Read the review', 'a gate held before its step is filed names the step done before it'],
-  ] as const)
-    await expectTexts(cardOf(page, id).locator('a[data-cut-button]'), [words], why);
-}
-
-/** Where a card's button stands against its tiles: under them or beside them, and how far its right edge is from the foot's. */
-const footOf = (card: Locator): Promise<{ under: boolean; beside: boolean; fromRight: number }> =>
+/** Where a card's button stands against its rail, and how far its right edge is from the foot's. */
+const footOf = (card: Locator): Promise<{ beside: boolean; fromRight: number }> =>
   card.locator('[data-foot]').evaluate((foot) => {
-    const [tiles, button] = ['[data-tiles]', '[data-cut-button]'].map((part) => foot.querySelector(part)!.getBoundingClientRect());
+    const [rail, button] = ['[data-run-steps]', '[data-cut-button]'].map((part) => foot.querySelector(part)!.getBoundingClientRect());
     return {
-      under: button.top >= tiles.bottom,
-      beside: button.top < tiles.bottom && button.bottom > tiles.top,
+      beside: button.top < rail.bottom && button.bottom > rail.top,
       fromRight: Math.round(foot.getBoundingClientRect().right - button.right),
     };
   });
 
-/** The window a card holds its tiles and its button side by side in. */
+/** A window wider than the visit's, where the cards stand two side by side. */
 const WIDE = 1680;
 
 /**
- * The button of `run`'s card stands at the card's right: under the tiles in the window the visit is in, where the card does not hold
- * both, and beside them in a window `WIDE` across, where it does; and so does every other card's, wherever its button falls. The foot
- * is photographed at each width, and the window put back.
+ * The button of every card stands at the card's right, beside its rail, in the window the visit is in and in one `WIDE` across. The
+ * foot of `run`'s card is photographed at each width, and the window put back.
  */
 async function footAtRight(page: Page, open: OpenRuns, run: WaitingRun): Promise<void> {
   const size = page.viewportSize() ?? { width: 1280, height: 800 };
   try {
     for (const [width, place] of [
-      [size.width, 'under'],
-      [WIDE, 'beside'],
+      [size.width, 'visit'],
+      [WIDE, 'wide'],
     ] as const) {
       await page.setViewportSize({ width, height: size.height });
       await expectNone(async () => {
         const at = await footOf(cardOf(page, run.id));
-        return at[place] && at.fromRight === 0 ? null : JSON.stringify(at);
-      }, `${width} wide, the button of ${run.id}'s card is ${place} its tiles, at the card's right`);
+        return at.beside && at.fromRight === 0 ? null : JSON.stringify(at);
+      }, `${width} wide, the button of ${run.id}'s card is beside its rail, at the card's right`);
       for (const other of open.waiting) {
         const at = await footOf(cardOf(page, other.id));
-        if (at.fromRight !== 0 || at.under === at.beside)
+        if (at.fromRight !== 0)
           throw new Refused(`${width} wide, the button of ${other.id}'s card is at the card's right — ${JSON.stringify(at)}`);
       }
       const foot = cardOf(page, run.id).locator('[data-foot]');
@@ -318,8 +296,8 @@ const copyOf = (holder: Locator): Promise<{ glyph: string; gap: number; line: nu
   });
 
 /**
- * The copy control as the canvas draws it, on a card and in each table: its glyph 12 pixels across, 7 from the id; and on a card the
- * line of the whole id 16 pixels tall, 4 under the title.
+ * The copy control as the canvas draws it, on a card and in each table: its glyph 12 pixels across, 7 from the id; and on a card its
+ * line, the meta line, 16 pixels tall, over the title.
  */
 async function copyDrawn(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
   const card = cardOf(page, open.waiting[0].id);
@@ -333,22 +311,21 @@ async function copyDrawn(page: Page, open: OpenRuns, finished: FinishedPage): Pr
     if (drawn.glyph !== '12 by 12' || drawn.gap !== 7)
       throw new Refused(`the copy control of ${where} draws its glyph 12 pixels across, 7 from the id — ${JSON.stringify(drawn)}`);
   }
-  const under = await card.locator('[data-copy-id]').evaluate((copy) => {
+  const over = await card.locator('[data-copy-id]').evaluate((copy) => {
     const title = copy.closest('article')!.querySelector('h3')!.getBoundingClientRect();
-    return Math.round(copy.getBoundingClientRect().top - title.bottom);
+    return Math.round(title.top - copy.getBoundingClientRect().bottom);
   });
   const { line } = await copyOf(holders[0][0]);
-  if (line !== 16 || under !== 4)
-    throw new Refused(`on a card the whole id's line is 16 pixels tall, 4 under the title — ${line} tall, ${under} under`);
+  if (line !== 16 || over < 0) throw new Refused(`on a card the id's line is 16 pixels tall, over the title — ${line} tall, ${over} over`);
 }
 
-/** A title long enough to run over the copy control under it, and short enough to stay on one line of a card. */
-const OVER = 'A title that runs over the copy control';
+/** A title long enough to run under the copy control over it, and short enough to stay on one line of a card. */
+const OVER = 'A title that runs under the copy control';
 
 /**
- * A press on a card's title opens the run, on its lowest row too, which the copy control's target reaches: with a title that runs
- * over the control written into the first card and taken out again, the point a pixel inside the title's lower edge, above the
- * control's centre, is within the target's reach and answers the title's link.
+ * A press on a card's title opens the run, on its highest row too, nearest the copy control's target: with a title that runs under
+ * the control written into the first card and taken out again, the point a pixel inside the title's upper edge, under the control's
+ * centre, answers the title's link.
  */
 async function titleKeepsItsBox(page: Page, open: OpenRuns): Promise<void> {
   const card = cardOf(page, open.waiting[0].id);
@@ -362,12 +339,12 @@ async function titleKeepsItsBox(page: Page, open: OpenRuns): Promise<void> {
       const button = article.querySelector('[data-copy-id] button')!.getBoundingClientRect();
       const [x, cy] = [button.left + button.width / 2, button.top + button.height / 2];
       const rows = [...link.getClientRects()];
-      const row = rows.at(-1)!;
-      const at = document.elementFromPoint(x, row.bottom - 1);
+      const row = rows[0];
+      const at = document.elementFromPoint(x, row.top + 1);
       return {
         rows: rows.length,
-        over: x > row.left && x < row.right,
-        above: Math.round(cy - row.bottom),
+        under: x > row.left && x < row.right,
+        below: Math.round(row.top - cy),
         title: at?.closest('a') === link,
         tag: at?.tagName ?? 'nothing',
       };
@@ -375,10 +352,10 @@ async function titleKeepsItsBox(page: Page, open: OpenRuns): Promise<void> {
       text.nodeValue = was;
     }
   }, OVER);
-  if (hit.rows !== 1 || !hit.over || hit.above >= 24)
-    throw new Refused(`the title written runs over the copy control, within its target's reach — ${JSON.stringify(hit)}`);
+  if (hit.rows !== 1 || !hit.under || hit.below >= 24)
+    throw new Refused(`the title written runs under the copy control, near its target — ${JSON.stringify(hit)}`);
   if (!hit.title)
-    throw new Refused(`a press on the lowest row of a card's title, over the copy control, opens the run — it lands on ${hit.tag}`);
+    throw new Refused(`a press on the highest row of a card's title, under the copy control, opens the run — it lands on ${hit.tag}`);
 }
 
 /** The element the keyboard is on. */
@@ -388,9 +365,9 @@ const focused = (page: Page): Locator => page.locator(':focus');
 const tooltip = (page: Page): Locator => page.locator('[data-slot="tooltip"]');
 
 /**
- * The keyboard's path over COSTLY's card: from its title, Tab reaches the copy control, which Enter presses, then the rail's bars;
- * from the last bar each tile in turn, whose tooltip opens on focus with its breakdown and closes on Escape, asking the api nothing;
- * then the button. Each tooltip is photographed.
+ * The keyboard's path over COSTLY's card: its copy control, which Enter presses; from its title, Tab reaches the rail's bars; from the
+ * last bar its cost, whose preview opens on focus with the run's tokens and closes on Escape, asking the api nothing; then the button.
+ * The preview is photographed.
  */
 async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
   const card = cardOf(page, run.id);
@@ -398,55 +375,40 @@ async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   const asked: string[] = [];
   const hear = (request: { url(): string }) => void (request.url().includes(`/api/runs/${run.id}`) && asked.push(request.url()));
-  await card.getByRole('heading', { level: 3 }).locator('a').focus();
-  await page.keyboard.press('Tab');
-  await expectVisible(card.locator('[data-copy-id] button:focus'), 'Tab from the title reaches the copy control');
+  await card.locator('[data-copy-id] button').focus();
   await page.keyboard.press('Enter');
-  await expectVisible(card.locator('[data-copy-id][data-copied]'), 'Enter on it copies, and the control says so');
+  await expectVisible(card.locator('[data-copy-id][data-copied]'), 'Enter on the copy control copies, and the control says so');
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   if (copied !== run.id) throw new Refused(`the copy control copies the run's whole id, ${run.id} — the clipboard holds "${copied}"`);
   await expectTexts(card.locator('[data-copy-id] [role="status"]'), ['Copied'], 'and says it to a screen reader');
-  await page.keyboard.press('Tab');
-  await expectVisible(card.locator('button[data-step-bar]').first().locator(':scope:focus'), "then Tab reaches the rail's first bar");
+  await card.getByRole('heading', { level: 3 }).locator('a').focus();
+  for (let pressed = 0; pressed < 6 && !(await card.locator('button[data-step-bar]:focus').count()); pressed += 1)
+    await page.keyboard.press('Tab');
+  await expectVisible(
+    card.locator('button[data-step-bar]').first().locator(':scope:focus'),
+    "Tab from the title reaches the rail's first bar",
+  );
   await card.locator('button[data-step-bar]').last().focus();
   await page.keyboard.press('Escape');
   await expectCount(page.locator('[data-slot="preview-card"]'), 0, "Escape on the rail's last bar leaves no step's card open");
 
-  const heads: Record<string, RegExp> = {
-    clock: /^(?:not started|not judged|under 1m|\d+[dhm](?: \d+[hm])?)$/,
-    cost: new RegExp(`^${literal(COSTLY.cost)} so far, by step$`),
-    tokens: new RegExp(`^${COSTLY.tokens.said.replace(' tokens', '')} counted, `),
-  };
   page.on('request', hear);
-  for (const tile of ['clock', 'cost', 'tokens'] as const) {
-    await page.keyboard.press('Tab');
-    await expectVisible(card.locator(`[data-stat-tile="${tile}"]:focus`), `Tab reaches the ${tile} tile`);
-    await expectVisible(tooltip(page), `and its tooltip opens on focus, with no pointer`);
-    const head = (await tooltip(page).locator('[data-slot="tooltip-headline"]').innerText()).trim();
-    if (!heads[tile].test(head)) throw new Refused(`the ${tile} tooltip is headed as ${heads[tile]} — it says "${head}"`);
-    if (tile === 'cost')
-      await expectTexts(
-        tooltip(page).locator('dt'),
-        (run.stepCosts ?? []).map((step) => step.step),
-        'the cost is broken down by step, in the run’s order',
-      );
-    else if ((await tooltip(page).locator('[data-breakdown-row]').count()) < 2) throw new Refused(`the ${tile} tooltip has its rows`);
-    if (tile === 'clock') {
-      const foot = (await tooltip(page).locator('[data-breakdown-foot]').innerText()).trim();
-      if (!/^Wall time .+, from .+\.$/.test(foot))
-        throw new Refused(`the clock's tooltip says the wall time its rows add up to, in its foot — it says "${foot}"`);
-    }
-    const described = await focused(page).getAttribute('aria-describedby');
-    if (!described) throw new Refused(`the ${tile} tile is described by its tooltip while it shows`);
-    await photograph(page, path.join(OUT, `runs-tooltip-${tile}-${await themeOf(page)}.png`));
-    await page.keyboard.press('Escape');
-    await expectCount(tooltip(page), 0, 'Escape closes it');
-  }
+  await page.keyboard.press('Tab');
+  await expectVisible(card.locator('[data-cost] button[data-cost-words]:focus'), 'Tab from the last bar reaches the cost');
+  await expectVisible(tooltip(page), 'and its preview opens on focus, with no pointer');
+  const head = (await tooltip(page).locator('[data-slot="tooltip-headline"]').innerText()).trim();
+  if (!head.startsWith(COSTLY.cost)) throw new Refused(`the cost's preview is headed by the cost, ${COSTLY.cost} — it says "${head}"`);
+  if ((await tooltip(page).locator('[data-breakdown-row]').count()) < 2) throw new Refused("the cost's preview has the tokens' rows");
+  const described = await focused(page).getAttribute('aria-describedby');
+  if (!described) throw new Refused('the cost is described by its preview while it shows');
+  await photograph(page, path.join(OUT, `runs-tooltip-cost-${await themeOf(page)}.png`));
+  await page.keyboard.press('Escape');
+  await expectCount(tooltip(page), 0, 'Escape closes it');
   page.off('request', hear);
   await page.keyboard.press('Tab');
   await expectVisible(card.locator('a[data-cut-button]:focus'), 'then Tab reaches the button that opens the run');
   if (asked.length)
-    throw new Refused(`a tooltip opens with no request: the light answer carries its rows — the page asked ${asked.join(', ')}`);
+    throw new Refused(`a preview opens with no request: the light answer carries its rows — the page asked ${asked.join(', ')}`);
 }
 
 /**
@@ -475,10 +437,10 @@ async function tableByKeyboard(page: Page, finished: FinishedPage): Promise<void
   await expectVisible(row.locator('[data-copy-id][data-copied]'), 'Enter on the copy control of a finished row copies its id');
   const edges = await page
     .locator('section[data-section="finished"] [data-run-id]')
-    .evaluateAll((all) => all.map((id) => `${id.closest('[data-copied]') ? 'copied' : 'rest'} ${getComputedStyle(id).borderTopColor}`));
+    .evaluateAll((all) => all.map((id) => `${id.closest('[data-copied]') ? 'copied' : 'rest'} ${getComputedStyle(id).color}`));
   const [lit, rest] = [edges.filter((edge) => edge.startsWith('copied')), new Set(edges.filter((edge) => edge.startsWith('rest')))];
   if (lit.length !== 1 || rest.size !== 1 || rest.has(lit[0].replace('copied', 'rest')))
-    throw new Refused(`the box of the id just copied takes another colour than the others, for a moment — ${edges.join(' | ')}`);
+    throw new Refused(`the id just copied takes another colour than the others, for a moment — ${edges.join(' | ')}`);
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   if (copied !== run.id)
     throw new Refused(`a finished row shows its id's end and copies it whole, ${run.id} — the clipboard holds "${copied}"`);
@@ -504,14 +466,14 @@ const missed = (control: Locator, across: number, up: number, down: number): Pro
   );
 
 /**
- * What the page guarantees a finger on a copy control: 48 pixels across everywhere; on a card from the title's lower edge, 12 above
- * its centre, to 24 below it; in a table 40 down, from 24 above its centre to 16 below, where the target of the next row's control
+ * What the page guarantees a finger on a copy control: 48 pixels across everywhere; on a card from 24 above its centre to 12 below
+ * it, where the title under it begins; in a table 40 down, from 24 above its centre to 16 below, where the target of the next row's control
  * begins. Probed a pixel inside each edge, the pointer away so that no step's card stands open; and the probe refuses a control whose
  * target something clips.
  */
 async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
   const controls: Array<[Locator, number, number, string]> = [
-    [cardOf(page, open.waiting[0].id).locator('[data-copy-id] button'), 11, 23, 'a card'],
+    [cardOf(page, open.waiting[0].id).locator('[data-copy-id] button'), 23, 11, 'a card'],
     [section(page, 'in-flight').locator('tr[data-run] [data-copy-id] button').first(), 23, 15, 'a row in flight'],
     [section(page, 'finished').locator(`tr[data-run="${finished.runs[1].id}"] [data-copy-id] button`), 23, 15, 'a finished row'],
   ];
@@ -746,32 +708,54 @@ function finishedDrawn(page: Page): { last: () => FinishedPage | undefined; stop
   return { last: () => last, stop: () => page.off('response', seen) };
 }
 
-/** A row in flight and a finished row say their plain facts: the factory, the steps, what it does now; how it ended, and when. */
+/**
+ * A row in flight and a finished row say their plain facts: the id's end, the factory and workflow; in flight
+ * the chip of what it does now in the tone `nowOf` gives it, its words never cut, and its rail; finished, how it ended, red only when it
+ * failed, and when.
+ */
 async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given: () => FinishedPage | undefined): Promise<void> {
   const flying = open.inFlight.filter(judged)[0];
   const row = section(page, 'in-flight').locator(`tr[data-run="${flying.id}"]`);
   await expectTexts(row.locator(`a[href="/runs/${flying.id}"]`), [titleOf(flying)], 'a row in flight says its title, a link to the run');
-  await expectTexts(row.locator('[data-run-id]'), [flying.id], 'its id');
+  await expectTexts(row.locator(`[data-run-id][title="${flying.id}"]`), [flying.id.slice(-4)], "its id's end, the whole id on hover");
   await expectCount(row.locator('[data-run-steps] [data-step]'), flying.steps.length, 'its own steps as a rail');
-  await expectVisible(row.locator('[data-now-word]'), 'and what it does now');
-  await expectTexts(
-    section(page, 'in-flight').locator('th'),
-    ['Run', 'Steps', 'Now', 'Clock', 'Cost'],
-    'the table in flight has its columns',
-  );
+  const flights = open.inFlight.filter(judged);
+  const tones = await section(page, 'in-flight')
+    .locator('tr[data-run]:has([data-now]) [data-now-word]')
+    .evaluateAll((all) => all.map((chip) => `${chip.textContent} ${chip.getAttribute('data-tone')}`));
+  const toned = flights.flatMap((run) => {
+    const now = nowOf(run);
+    return now ? [`${now.step} ${now.tone}`] : [];
+  });
+  if (tones.join('|') !== toned.join('|'))
+    throw new Refused(
+      `each row in flight draws its step in one chip, in its tone — expected ${toned.join(', ')}, found ${tones.join(', ')}`,
+    );
+  const cut = await section(page, 'in-flight')
+    .locator('[data-now-words], [data-now-word]')
+    .evaluateAll((all) => all.filter((words) => words.scrollWidth > words.clientWidth + 1).map((words) => words.textContent));
+  if (cut.length) throw new Refused(`what a run does now is never cut — ${cut.join(', ')}`);
+  await expectTexts(section(page, 'in-flight').locator('th'), ['Run', 'Now', 'Clock', 'Cost'], 'the table in flight has its columns');
   await expectTexts(
     section(page, 'finished').locator('th'),
-    ['Run', 'Factory', 'Workflow', 'Created', 'Finished', 'Clock', 'Cost', 'Outcome', 'Id'],
+    ['Run', 'Finished', 'Clock', 'Cost', 'Outcome'],
     'the finished table has its columns',
   );
-  await expectVisible(page.locator('section[data-section="finished"] [data-plate-hue="grey"]'), 'the Finished plate is at rest, in grey');
+  const inks = await section(page, 'finished')
+    .locator('tr[data-run] [data-ended]')
+    .evaluateAll((all) => all.map((ended) => `${ended.closest('tr')!.getAttribute('data-outcome')}|${getComputedStyle(ended).color}`));
+  const [failedInk, restInk] = [inks.filter((ink) => ink.startsWith('failed|')), inks.filter((ink) => !ink.startsWith('failed|'))].map(
+    (side) => new Set(side.map((ink) => ink.split('|')[1])),
+  );
+  if (restInk.size > 1 || failedInk.size > 1 || [...failedInk].some((ink) => restInk.has(ink)))
+    throw new Refused(`an outcome is a plain word, red only when the run failed — ${inks.join(', ')}`);
   const heads = await page.locator('[data-runs-page] th').evaluateAll((all) =>
     all.map((th) => {
       const style = getComputedStyle(th);
       return `${style.textTransform} ${style.fontSize} ${style.fontWeight}`;
     }),
   );
-  if (heads.length !== 14 || heads.some((head) => head !== 'uppercase 11px 600'))
+  if (heads.length !== 9 || heads.some((head) => head !== 'uppercase 11px 600'))
     throw new Refused(
       `every heading of the two tables is in the look's small caps, the small label role in capitals — ${heads.join(', ')}`,
     );
@@ -789,12 +773,12 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
     const last = given();
     if (!last) return 'the page was given no first page of the finished RunList to draw its rows against';
     const asOf = new Date(last.asOf);
-    const whens = finished.runs.map((run) => [run.createdAt, run.finishedAt].map((at) => agoWords(new Date(at), asOf)).join('|'));
+    const whens = finished.runs.map((run) => agoWords(new Date(run.finishedAt), asOf));
     const said = await section(page, 'finished')
       .locator('tr[data-run]')
       .evaluateAll((rows) => rows.map((row) => [...row.querySelectorAll('time')].map((time) => time.textContent).join('|')));
     return said.join() === whens.join() ? null : `expected ${whens.join(', ')}, found ${said.join(', ')}`;
-  }, 'a finished row says how long ago it was created and how long ago it finished, as `agoWords` writes it');
+  }, 'a finished row says how long ago it finished, as `agoWords` writes it');
   const titles = await section(page, 'finished')
     .locator('tr[data-run] time')
     .evaluateAll((all) => all.map((time) => time.getAttribute('title') ?? ''));
@@ -848,7 +832,7 @@ const addressParts = (href: string): { path: string; search: Record<string, stri
  * comes back to Runs.
  */
 async function workflowsSay(page: Page, finished: FinishedPage): Promise<void> {
-  const links = section(page, 'finished').locator('tr[data-run] td a[data-workflow]');
+  const links = section(page, 'finished').locator('tr[data-run] a[data-workflow]');
   await expectTexts(
     links,
     finished.runs.map((run) => workflowNameOf(run.workflowDir)),
@@ -871,7 +855,7 @@ async function workflowsSay(page: Page, finished: FinishedPage): Promise<void> {
   });
   if (wrong.length) throw new Refused(`each workflow is whole on hover and links to its page — ${wrong.join('; ')}`);
   const titled = await section(page, 'finished')
-    .locator('tr[data-run] th a, tr[data-run] td:first-child a')
+    .locator('tr[data-run] a[href^="/runs/"]')
     .evaluateAll((all) => all.map((link) => link.getAttribute('title') ?? ''));
   if (titled.join('|') !== finished.runs.map(titleOf).join('|'))
     throw new Refused(`and each run's title, a link cut to its room, is whole on hover — ${titled.join(', ')}`);
@@ -915,7 +899,7 @@ async function expectDrawn(page: Page, marks: string, fact: 'tracking' | 'cut', 
 
 const TAG_CUT = 'polygon(0px 0px, calc(100% - 7px) 0px, 100% 7px, 100% 100%, 0px 100%)';
 
-/** What the browser draws of a run's titles, the short ids' boxes, the rule under the page's name and the bars of steps done. */
+/** What the browser draws of a run's titles, the short ids with no box, the rule under the page's name and the bars of steps done. */
 async function lookRules(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
   const titles = await page
@@ -924,14 +908,9 @@ async function lookRules(page: Page): Promise<void> {
   if (!titles.length || titles.some((line) => line !== 'none'))
     throw new Refused(`a run's title carries no line at rest — ${titles.join(', ') || 'no title'}`);
   const ids = await page
-    .locator('section[data-section="finished"] [data-run-id]')
+    .locator('[data-runs-page] [data-run-id]')
     .evaluateAll((all) => all.map((id) => `${getComputedStyle(id).borderTopWidth} ${getComputedStyle(id).paddingLeft}`));
-  if (!ids.length || ids.some((box) => box !== '1px 6px')) throw new Refused(`a short id stands in its box — ${ids.join(', ') || 'no id'}`);
-  const whole = await page
-    .locator('section[data-section="waiting"] [data-run-id]')
-    .evaluateAll((all) => all.map((id) => getComputedStyle(id).borderTopWidth));
-  if (!whole.length || whole.some((width) => width !== '0px'))
-    throw new Refused(`a card's whole id stands in no box — ${whole.join(', ')}`);
+  if (!ids.length || ids.some((box) => box !== '0px 0px')) throw new Refused(`a short id stands in no box — ${ids.join(', ') || 'no id'}`);
   const rule = await page.locator('[data-page-name]').evaluate((name) => {
     const text = document.createRange();
     text.selectNodeContents(name.querySelector('[data-page-name-text]')!.firstChild!);
@@ -959,26 +938,21 @@ async function lookRules(page: Page): Promise<void> {
 }
 
 /**
- * The details of the look, as the browser draws them: each label role's tracking where it is written, the two tags that say a state
- * cut and the factory's whole, a barcode of its own on each plate, the pager's buttons in the face of a heading, and the rail's lit bars.
+ * The details of the look, as the browser draws them: each label role's tracking where it is written, the chips that say a state or a
+ * count cut, the pager's buttons in the face of a heading, and only the step at work alive with a glow.
  */
 async function lookDetails(page: Page): Promise<void> {
   await expectDrawn(page, 'th', 'tracking', '1.1px', 'a heading is the small label, tracked by a tenth of its 11 pixels');
-  await expectDrawn(page, '[data-step-name]', 'tracking', '1.1px', "a rail's name is tracked by a tenth of its 11 pixels");
-  await expectDrawn(
-    page,
-    '[data-wait-tag] span, [data-now-word] span, article [data-factory] span',
-    'tracking',
-    '0.72px',
-    'a tag is tracked by six hundredths of its 12 pixels',
-  );
+  await expectDrawn(page, '[data-now-word] span', 'tracking', '0.72px', 'a chip is tracked by six hundredths of its 12 pixels');
   await expectDrawn(page, '[data-cut-button] [data-cut-shape]', 'tracking', '0.84px', 'the cut button, by six hundredths of its 14');
   await expectDrawn(page, '[data-pager-newer], [data-pager-older]', 'tracking', '0.84px', "the pager's buttons, as the cut button");
-  await expectDrawn(page, '[data-wait-tag], [data-now-word]', 'cut', TAG_CUT, 'a tag that says a state has its top-right corner cut');
-  await expectDrawn(page, 'article [data-factory]', 'cut', 'none', "a factory's tag is whole");
-  const bars = (await drawnOf(page, '[data-plate-barcode]')).map((drawn) => drawn.bars);
-  if (bars.length !== 3 || new Set(bars).size !== 3 || bars.some((image) => !image.startsWith('repeating-linear-gradient')))
-    throw new Refused(`each of the three plates carries a barcode of its own — ${bars.join(' | ')}`);
+  await expectDrawn(
+    page,
+    '[data-now-word], [data-count-chip]',
+    'cut',
+    TAG_CUT,
+    'a chip that says a state or a count has its top-right corner cut',
+  );
   const [head] = await drawnOf(page, 'th');
   const buttons = await drawnOf(page, '[data-pager-newer], [data-pager-older]');
   const [count] = await drawnOf(page, '[data-pager-rows]');
@@ -986,18 +960,12 @@ async function lookDetails(page: Page): Promise<void> {
     throw new Refused(
       `the pager's buttons are in the face of a heading, not the mono of its counts — ${buttons.map((b) => b.face).join(' | ')}; a heading ${head.face}; a count ${count.face}`,
     );
-  for (const [state, lit, what] of [
-    ['working', ' [data-step-breath]', 'the step at work glows, on a layer of its own'],
-    ['awaiting-approval', '', 'the step that waits on a person is edged in its hue and glows'],
-  ] as const) {
-    const glows = (await drawnOf(page, `[data-step][data-state="${state}"]${lit}`)).map((drawn) => drawn.glow);
-    if (!glows.length || glows.some((glow) => glow === 'none' || (state !== 'working' && !glow.includes('inset'))))
-      throw new Refused(`${what} — ${glows.join(' | ') || `no step ${state} in a rail`}`);
-  }
+  const glows = (await drawnOf(page, '[data-step][data-state="working"] [data-step-breath]')).map((drawn) => drawn.glow);
+  if (!glows.length || glows.includes('none'))
+    throw new Refused(`the step at work glows, on a layer of its own — ${glows.join(' | ') || 'no step at work'}`);
   await lookRules(page);
-  const rest = (await drawnOf(page, '[data-step]:not([data-state="working"])')).map((drawn) => drawn.glow);
-  if (!rest.includes('none') || rest.some((glow) => glow !== 'none' && !glow.includes('inset')))
-    throw new Refused(`a step that neither works nor waits on a person carries no glow — ${rest.join(' | ')}`);
+  const rest = (await drawnOf(page, '[data-step]')).map((drawn) => drawn.glow);
+  if (rest.some((glow) => glow !== 'none')) throw new Refused(`no bar but the breath of the step at work glows — ${rest.join(' | ')}`);
 }
 
 /** The parts of the page this change draws, each as a picture of its own, three times the size: `runs-<what>-<theme>.png`. */
@@ -1139,7 +1107,6 @@ async function withRegated(page: Page, drawn: () => FinishedPage | undefined): P
     await cardSays(page, run);
     await waitSaid(page, run, open.asOf);
   }
-  await gatesSay(page);
   const costly = open.waiting.filter(judged).find((run) => run.id === COSTLY.id);
   if (!costly?.clock || !costly.stepCosts) throw new Refused(`${COSTLY.id} waits on you, and the api breaks its clock and its cost down`);
   await photographBothWidths(page, OUT, 'runs', 'page');
@@ -1157,7 +1124,7 @@ async function withRegated(page: Page, drawn: () => FinishedPage | undefined): P
   await flightAligned(page);
   await lookDetails(page);
   await narrow(page);
-  await contrastHolds(page, ['[data-sentence]']);
+  await contrastHolds(page, ['[data-now-words]']);
 
   await enterOnPlace(page, 'Agents', '/agents');
   await expectVisible(railPlace(page, 'Agents').and(litOf(page)), 'reached with Enter, Agents is lit in the rail');

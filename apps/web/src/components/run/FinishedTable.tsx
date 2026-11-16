@@ -2,19 +2,16 @@ import { Cell, Column, Row, Table, TableBody, TableHeader } from '@/components/u
 import { useQuery } from '@tanstack/react-query';
 import { FINISHED_SIZE, type FinishedPage } from '@/lib/api/runs';
 import { runLinesQuery } from '@/lib/api/run';
-import { workflowNameOf } from '@/lib/api/workflows';
-import { namespaceOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
 import { agoWords } from '@/lib/runWords';
 import { ENDED } from '@/lib/words';
 import { instantWhole } from '@/lib/instant';
 import { cn } from '@/components/ui/ds/utils';
-import { LabelTags } from '../field/Labels';
 import { RunClockCell } from './RunClockCell';
 import { RunCostCell } from './RunCostCell';
-import { workflowTarget } from '../workflow/WorkflowLink';
-import { CopyId, CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, Pager, TextLink } from '../look';
+import { RunMeta } from './RunMeta';
+import { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, Pager, TextLink } from '../look';
 
 /** A column's heading, in the look's small caps. */
 const HEAD = 'text-label-small uppercase';
@@ -23,7 +20,7 @@ const HEAD = 'text-label-small uppercase';
 const FACT = 'font-mono text-body-small whitespace-nowrap';
 
 /** How long ago a column says something was (`agoWords`), cut to the column's room with the whole instant on hover. */
-const WHEN = 'text-body-small';
+const WHEN = 'text-body-medium';
 
 /** How long ago `at` was at `asOf`, in a `<time>` whose hover says the whole instant. */
 const Ago = ({ at, asOf }: { at: string; asOf: Date }) => (
@@ -33,37 +30,29 @@ const Ago = ({ at, asOf }: { at: string; asOf: Date }) => (
 );
 
 /**
- * One finished run's row: its title as a link, then its facts, each plain. Times are said against `asOf`; its workflow's page is its lines'
- * (`runLinesQuery`), which the route's loader read.
+ * One finished run's row: its title as a link over its meta line (`RunMeta`, its workflow linked to its page, which is its lines'
+ * `runLinesQuery` the route's loader read), when it finished, its time at work, its cost and how it ended, a plain word, red only where
+ * it failed. Times are said against `asOf`.
  */
 function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: Date }) {
   const ended = ENDED[run.outcome];
   const workflowPage = useQuery(runLinesQuery(run.id)).data?.workflowPage ?? null;
   return (
     <Row id={run.id} data-run={run.id} data-outcome={run.outcome} className={FRAMED_ROW}>
-      <Cell>
-        <TextLink to="/runs/$runId" params={{ runId: run.id }} title={titleOf(run)} className="block truncate text-body-medium">
-          {titleOf(run)}
-        </TextLink>
-        <LabelTags labels={run.labels} />
+      <Cell className="py-2.5">
+        <span className="flex min-w-0 flex-col gap-1">
+          <TextLink
+            to="/runs/$runId"
+            params={{ runId: run.id }}
+            title={titleOf(run)}
+            className="block truncate text-body-large font-medium"
+          >
+            {titleOf(run)}
+          </TextLink>
+          <RunMeta run={run} workflowPage={workflowPage} />
+        </span>
       </Cell>
-      <Cell truncate data-factory={namespaceOf(run.factory)} className="text-label-small uppercase text-on-surface-variant">
-        {namespaceOf(run.factory)}
-      </Cell>
-      <Cell data-workflow-cell>
-        <TextLink
-          {...workflowTarget(workflowPage)}
-          title={run.workflowDir}
-          data-workflow={workflowNameOf(run.workflowDir)}
-          className="block truncate font-mono text-body-small"
-        >
-          {workflowNameOf(run.workflowDir)}
-        </TextLink>
-      </Cell>
-      <Cell data-created className={cn(WHEN, 'text-on-surface-variant')}>
-        <Ago at={run.createdAt} asOf={asOf} />
-      </Cell>
-      <Cell data-finished className={WHEN}>
+      <Cell data-finished className={cn(WHEN, 'text-on-surface-variant')}>
         <Ago at={run.finishedAt} asOf={asOf} />
       </Cell>
       <Cell data-clock>
@@ -73,12 +62,13 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
         <RunCostCell run={run} />
       </Cell>
       <Cell>
-        <span data-ended title={ended.title} className={cn('text-label-small uppercase', ink[ended.hue])}>
+        <span
+          data-ended
+          title={ended.title}
+          className={cn('text-label-small uppercase', run.outcome === 'failed' ? ink.failure : 'text-on-surface-variant')}
+        >
           {ended.word}
         </span>
-      </Cell>
-      <Cell>
-        <CopyId id={run.id} short />
       </Cell>
     </Row>
   );
@@ -86,10 +76,10 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
 
 /**
  * One page of the finished runs, newest finished first, as the kit's dense table in the look's cut frame, quiet: each run's title as a
- * link, its factory, the workflow it ran by its folder's name with the folder whole on hover, linked to the workflow's page as
- * `WorkflowLink` links it (`workflowTarget`), how long ago it was created and how long ago it finished, each with the whole instant on
- * hover, its time at work with a preview over it breaking that clock down (`RunClockCell`), its cost with a preview of its tokens by kind
- * (`RunCostCell`), how it ended, and its id's end with a copy control, the last row with no line under it; then the pager, under a line
+ * link over its meta line, its id's end with a copy control, its factory and the workflow it ran, linked to the workflow's page as
+ * `WorkflowLink` links it (`workflowTarget`), and its own labels; how long ago it finished, the whole instant on hover; its time at work
+ * with a preview over it breaking that clock down (`RunClockCell`); its cost with a preview of its tokens by kind (`RunCostCell`); and
+ * how it ended, the last row with no line under it; then the pager, under a line
  * of its own, which stands on the address' trail (`trail`). A page that holds no row draws no table and no line, and the pager says why.
  * Narrower than its columns, the table scrolls sideways inside its frame.
  */
@@ -99,34 +89,22 @@ export function FinishedTable({ page, trail }: { page: FinishedPage; trail: read
     <CutFrame size={24}>
       {page.runs.length > 0 && (
         <div data-table-box className={FRAMED_BOX}>
-          <Table aria-label="Finished runs" density="dense" className={cn('min-w-[1032px] table-fixed', FRAMED_TABLE)}>
+          <Table aria-label="Finished runs" density="dense" className={cn('min-w-[880px] table-fixed', FRAMED_TABLE)}>
             <TableHeader>
               <Column id="run" isRowHeader className={HEAD}>
                 Run
               </Column>
-              <Column id="factory" className={cn(HEAD, 'w-24')}>
-                Factory
-              </Column>
-              <Column id="workflow" className={cn(HEAD, 'w-28')}>
-                Workflow
-              </Column>
-              <Column id="created" className={cn(HEAD, 'w-32')}>
-                Created
-              </Column>
-              <Column id="finished" className={cn(HEAD, 'w-32')}>
+              <Column id="finished" className={cn(HEAD, 'w-[150px]')}>
                 Finished
               </Column>
-              <Column id="clock" align="end" className={cn(HEAD, 'w-32')}>
+              <Column id="clock" align="end" className={cn(HEAD, 'w-[144px]')}>
                 Clock
               </Column>
-              <Column id="cost" align="end" className={cn(HEAD, 'w-20')}>
+              <Column id="cost" align="end" className={cn(HEAD, 'w-[96px]')}>
                 Cost
               </Column>
-              <Column id="outcome" className={cn(HEAD, 'w-24')}>
+              <Column id="outcome" className={cn(HEAD, 'w-[110px]')}>
                 Outcome
-              </Column>
-              <Column id="id" align="end" className={cn(HEAD, 'w-28')}>
-                Id
               </Column>
             </TableHeader>
             <TableBody>

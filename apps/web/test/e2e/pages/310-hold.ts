@@ -188,7 +188,11 @@ async function heldNotStarted(page: Page): Promise<void> {
     );
     await expectCount(rail.locator('[data-state="held"]'), 0, 'and none of its steps is drawn held');
     await expectVisible(
-      page.locator(`[data-runs-page] [data-run="${id}"] [data-now-word]`, { hasText: /^held$/i }),
+      page.locator(`[data-runs-page] [data-run="${id}"] [data-now-word]`, { hasText: /^implement$/ }),
+      'its chip names the step the hold keeps from starting',
+    );
+    await expectVisible(
+      page.locator(`[data-runs-page] [data-run="${id}"] [data-now-words]`, { hasText: /^held\b/i }),
       'and what it does now is the hold, said by the run',
     );
     await settled(page);

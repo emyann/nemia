@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunView } from '../src/lib/api/judged.ts';
 import type { StepState } from '../src/lib/status.ts';
-import { ENDED, PAUSED, PERSON } from '../src/lib/words.ts';
+import { ENDED, NOW_WORDS, PAUSED, PERSON } from '../src/lib/words.ts';
 import {
   agoWords,
   barSaid,
@@ -24,7 +24,7 @@ import {
   whenWords,
   type WaitKind,
 } from '../src/lib/runWords.ts';
-import { summary, type Word } from './run-fixtures.ts';
+import { givenAgent, summary, type Word } from './run-fixtures.ts';
 
 /** A command, as the api's advice can carry one: no sentence repeats it. */
 const COMMAND = 'nemia approve r-1 land --message "go" && git merge wf/r-1/land';
@@ -223,8 +223,8 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
     for (const kind of WAIT_KINDS) assert.doesNotMatch(waitSentence(ROWS[kind].row), words, kind);
     for (const kind of WAIT_KINDS) assert.doesNotMatch(waitTag(ROWS[kind].row), words, `the tag of ${kind}`);
     for (const kind of WAIT_KINDS) {
-      const now = nowOf(ROWS[kind].row);
-      assert.doesNotMatch(`${now?.word} ${now?.note}`, words, `the note of ${kind}`);
+      const said = (nowOf(ROWS[kind].row)?.words ?? []).map((part) => (typeof part === 'string' ? part : part.run)).join(' ');
+      assert.doesNotMatch(said, words, `the words of ${kind}`);
     }
     const unknown = summary([['plan', 'running']], { waitingOnYou: ['plan'] });
     assert.doesNotMatch(`${waitSentence(unknown)} ${waitTag(unknown)}`, words);
@@ -336,38 +336,83 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       'a held run whose steps have not started: each said as any step to come, the run itself saying it is held',
     );
   });
-  await t.test('what a run in flight does now: its first step not done and its place among its steps, and no duration at all', () => {
+  await t.test('what a run in flight does now: the step it is on, its tone, and no duration at all', () => {
     const working = summary([...DONE.slice(0, 1), ['implement', 'running (working)'], ['review', 'waiting'], ['land', 'waiting']]);
-    assert.deepEqual(nowOf(working), { word: 'at work', note: 'implement (2 of 4)' });
+    assert.deepEqual(nowOf(working), { step: 'implement', tone: 'alive', agent: null, round: null, budget: null, words: [] });
     const checking = summary([...DONE.slice(0, 1), ['implement', 'checking']]);
-    assert.deepEqual(nowOf(checking), { word: 'being checked', note: 'implement (2 of 2)' });
+    assert.deepEqual(nowOf(checking)?.words, [PERSON.checking.rail]);
+    assert.equal(nowOf(checking)?.tone, 'alive');
     const queued = summary([['design', 'waiting']]);
-    assert.deepEqual(nowOf(queued), { word: 'to come', note: 'design (1 of 1)' });
-    assert.deepEqual(
-      nowOf({
-        ...queued,
-        holding: {
-          at: '2026-11-01T00:00:00.000Z',
-          runs: [],
-          word: 'held until r-0 lands',
-          advice: 'wf hold r-1 --off',
-          waitingOnYou: false,
-        },
-      }),
-      { word: PERSON.held.rail, note: 'design (1 of 1)' },
-      'a held run nothing of which has started says the hold, its step drawn as to come',
-    );
+    assert.deepEqual(nowOf(queued), { step: 'design', tone: 'waits', agent: null, round: null, budget: null, words: [] });
     const paused = summary([...DONE.slice(0, 1), ['implement', 'waiting on the pause']]);
-    assert.equal(nowOf(paused)?.word, PAUSED.rail, 'a check the pause holds says so, as its chip does');
+    assert.deepEqual(nowOf(paused)?.words, [PAUSED.rail], 'a check the pause holds says so, as its chip does');
+    assert.equal(nowOf(paused)?.tone, 'rest');
     assert.equal(nowOf(summary([...DONE])), null, 'every step done: nothing to say');
     const DURATION = /\b\d+[dhms]\b|under (a minute|1m)/;
-    assert.match(`implement (2 of 4), 2m`, DURATION, 'the pattern finds the duration the note used to carry');
-    for (const row of [working, checking, queued])
-      assert.doesNotMatch(
-        nowOf(row)!.note,
-        DURATION,
-        'REFUSED: a duration in the note, which stood beside the Clock column and read as one word with it',
-      );
+    assert.match(`implement, 2m`, DURATION, 'the pattern finds a duration');
+    for (const row of [working, checking, queued, paused])
+      assert.doesNotMatch(nowOf(row)!.words.join(' '), DURATION, 'REFUSED: a duration in NOW, read as one with the Clock');
+  });
+  await t.test("NOW's marks: the step's agent, its round of its rounds, and its budget against what it spent", () => {
+    const spec = { ...givenAgent('Implementer'), rounds: 3 };
+    const at = summary([['implement', 'running (working)']]);
+    const step = {
+      ...at.steps[0],
+      spec,
+      current: { try: 1, round: 2, phase: 'running', reason: 'Running', outcome: null, verdict: null },
+      budget: { usd: 12, said: '$12', of: '$2.40 of $12', over: false },
+      spent: { usd: 2.4, measured: 1, unmeasured: 0, said: '$2.40' },
+    } as const;
+    const now = nowOf({ ...at, steps: [step] });
+    assert.equal(now?.agent, 'Implementer');
+    assert.deepEqual(now?.round, { at: 2, of: 3 });
+    assert.deepEqual(now?.budget, { spent: 2.4, cap: 12, capSaid: '$12', over: false });
+    const over = nowOf({ ...at, steps: [{ ...step, budget: { ...step.budget, over: true }, spent: { ...step.spent, usd: 13 } }] });
+    assert.deepEqual(over?.budget, { spent: 13, cap: 12, capSaid: '$12', over: true });
+    assert.equal(nowOf({ ...at, steps: [{ ...step, spec: givenAgent('Implementer') }] })?.round, null, 'a step with no rounds: no pips');
+    assert.equal(nowOf({ ...at, steps: [{ ...step, budget: null }] })?.budget, null, 'a step with no budget: no ring');
+    assert.equal(nowOf({ ...at, steps: [{ ...step, spent: null }] })?.budget?.spent, 0, 'nothing measured yet: none spent');
+  });
+  await t.test('what a wait says in NOW: the run it waits on, the checkout, a run slot, a hold until a run lands', () => {
+    const onRun = summary([['land', 'waiting on r-0']], {
+      waiting: {
+        runs: [
+          { run: 'r-gone', missing: true, cancelledAt: null, gone: [] },
+          { run: 'r-0', missing: false, cancelledAt: null, gone: [] },
+        ],
+        word: '',
+        advice: '',
+        waitingOnYou: false,
+      },
+    });
+    assert.deepEqual(nowOf(onRun)?.words, [NOW_WORDS.waitsOn, { run: 'r-0' }], 'the first run it waits on the store has');
+    assert.equal(nowOf(onRun)?.tone, 'waits');
+    const onBase = summary([['land', 'waiting on r-0']]);
+    const base = { ...onBase, steps: [{ ...onBase.steps[0], on: 'base' as const }] };
+    assert.deepEqual(nowOf(base)?.words, [NOW_WORDS.checkout]);
+    const slot = summary([['implement', 'waiting for a run slot']]);
+    assert.deepEqual(nowOf(slot)?.words, [NOW_WORDS.slot]);
+    const given = { ...slot, steps: [{ ...slot.steps[0], spec: givenAgent('Implementer') }] };
+    assert.equal(nowOf(given)?.agent, null, 'a step not started names no agent: nobody works on it yet');
+    assert.equal(nowOf(slot)?.tone, 'waits');
+    const hold = { at: '2026-11-01T00:00:00.000Z', word: '', advice: '', waitingOnYou: false };
+    const held = summary([['design', 'waiting']], {
+      holding: { ...hold, runs: [{ run: 'r-9', missing: false, cancelledAt: null, gone: [], landed: false }] },
+    });
+    assert.deepEqual(nowOf(held)?.words, [PERSON.held.rail, NOW_WORDS.until, { run: 'r-9' }, NOW_WORDS.lands]);
+    assert.equal(nowOf(held)?.tone, 'waits', 'a held run is drawn as not started, never grey');
+    const landed = summary([['design', 'waiting']], {
+      holding: { ...hold, runs: [{ run: 'r-9', missing: false, cancelledAt: null, gone: [], landed: true }] },
+    });
+    assert.deepEqual(nowOf(landed)?.words, [PERSON.held.rail], 'a hold whose run landed names none');
+  });
+  await t.test('a row that waits on you says its wait, in the yellow tone, and a failure its word, in red', () => {
+    assert.deepEqual(nowOf(ROWS.check.row)?.words, [waitTag(ROWS.check.row)]);
+    assert.equal(nowOf(ROWS.check.row)?.tone, 'yours');
+    assert.equal(nowOf(ROWS.check.row)?.step, 'land');
+    const failed = summary([['implement', 'failed']]);
+    assert.deepEqual(nowOf(failed)?.words, [PERSON.failed.rail]);
+    assert.equal(nowOf(failed)?.tone, 'failure');
   });
   await t.test("a bar as a button says its step's name and the rail's word for its state", () => {
     assert.equal(barSaid('implement', 'working', null, false), 'implement, at work');

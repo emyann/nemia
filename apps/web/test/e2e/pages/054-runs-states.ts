@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 import { photographBothWidths } from '../board.ts';
-import { expectCount, expectTexts, expectVisible, idle, settled } from '../checks.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { contrastHolds } from '../runs-contrast.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -35,12 +35,12 @@ async function loading(page: Page): Promise<void> {
       ['Runs'],
       "under the page's name, in the top bar",
     );
-    await expectCount(other.locator('[data-plate]'), 0, 'and draws no part yet');
+    await expectCount(other.locator('[data-count-chip]'), 0, 'and draws no part yet');
     await settled(other);
     await photographBothWidths(other, OUT, 'runs-states', 'loading');
     await contrastHolds(other, ['[role="status"]']);
     release();
-    await expectCount(other.locator('[data-runs-page="loaded"] [data-plate]'), 3, 'let go, it draws its three parts');
+    await expectCount(other.locator('[data-runs-page="loaded"] [data-count-chip]'), 3, 'let go, it draws its three parts');
     await idle(other);
   } finally {
     release();
@@ -50,19 +50,18 @@ async function loading(page: Page): Promise<void> {
 
 export default {
   /**
-   * The states nobody drew, built plain: with nothing to show, a factory that holds no run, each part says so under a quiet plate that
-   * counts none; and while its reads are on their way the page says it is loading. Each pictured at 1280 and at 390 wide, and no text
+   * The states nobody drew, built plain: with nothing to show, a factory that holds no run, each part says so under a quiet count chip
+   * that counts none; and while its reads are on their way the page says it is loading. Each pictured at 1280 and at 390 wide, and no text
    * pair of either is under 4.5:1 in either scheme. Writes nothing.
    */
   name: 'runs-states',
   route: `/factories/${EMPTY}/runs`,
   expect: async (page) => {
-    await expectTexts(
-      page.locator('[data-plate="quiet"] [data-plate-count]'),
-      ['0', '0', '0'],
-      'a factory with no run: three quiet plates, each counting none',
-    );
-    await expectCount(page.locator('[data-plate-barcode]'), 0, 'a quiet plate has no barcode');
+    const chips = await page
+      .locator('[data-count-chip]')
+      .evaluateAll((all) => all.map((chip) => `${chip.getAttribute('data-count-chip')} ${chip.getAttribute('data-count-tone')}`));
+    if (chips.join('|') !== '0 quiet|0 quiet|0 quiet')
+      throw new Refused(`a factory with no run: three quiet count chips, each counting none — ${chips.join(', ')}`);
     await expectTexts(
       page.locator('[data-nothing]'),
       ['Nothing waits on you.', 'Nothing is in flight.', 'No run has finished yet.'],

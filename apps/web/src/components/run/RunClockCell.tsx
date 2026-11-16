@@ -12,7 +12,7 @@ type Clocked = Pick<ListedRun, 'createdAt' | 'startedAt' | 'cancelledAt' | 'wait
 };
 
 /** The words in the cell, mono and on one line. */
-const WORDS = 'font-mono text-body-small whitespace-nowrap';
+const WORDS = 'font-mono text-body-medium whitespace-nowrap';
 
 /**
  * What a run's Clock column says in either runs table: the time at work, to the minute, said against `asOf` — the sessions and the

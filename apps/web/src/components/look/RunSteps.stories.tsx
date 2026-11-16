@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { RunSteps } from './RunSteps';
-import { AT_WORK, DONE, GATE, ON_CARD, REFUSED } from './stories.fixtures';
+import { AT_WORK, DONE, GATE, ON_CARD, REFUSED, TO_COME_ALL } from './stories.fixtures';
 
 /** A run's steps as a rail, one bar a step: at its gate, done, at work and refused, with the steps' names and without. */
 const meta: Meta = { title: 'Look/RunSteps' };
@@ -16,7 +16,7 @@ function Rail({ steps, names = true, wrap }: { steps: typeof GATE; names?: boole
   );
 }
 
-/** A run at its gate: the last bar hollow and lit, in the hue of what waits on a person. */
+/** A run at its gate: the last bar filled in the hue of what waits on a person. */
 export const AtItsGate: StoryObj = { render: () => <Rail steps={GATE} /> };
 
 /** A run whose steps are done: each filled, whether a check says so or the step's own word does. */
@@ -25,8 +25,27 @@ export const Done: StoryObj = { render: () => <Rail steps={DONE} /> };
 /** A run at work: the step at work filled in its hue, its glow breathing, still where reduced motion is asked for. */
 export const AtWork: StoryObj = { render: () => <Rail steps={AT_WORK} /> };
 
-/** A run whose step failed its check. */
+/** A run whose step failed its check: its bar filled in red, the step after it dashed. */
 export const Refused: StoryObj = { render: () => <Rail steps={REFUSED} /> };
+
+/** A rail on a card as a row draws it, with no names: short bars side by side. */
+const short = (args: Parameters<typeof RunSteps>[0]) => (
+  <div data-rail style={{ ...ON_CARD, display: 'block', width: 420 }}>
+    <RunSteps {...args} />
+  </div>
+);
+
+/** A run nothing of which has started: each bar a quiet fill, short, as a row draws it. */
+export const ToCome: StoryObj<typeof RunSteps> = {
+  args: { steps: TO_COME_ALL, cancelled: false, held: false, names: false },
+  render: short,
+};
+
+/** A held run nothing of which has started: its first bar a dashed outline, the hold stopping it, the rest quiet. */
+export const Held: StoryObj<typeof RunSteps> = {
+  args: { steps: TO_COME_ALL, cancelled: false, held: true, names: false },
+  render: short,
+};
 
 /** A rail with no names under its bars, as a table's row draws it. */
 export const WithoutNames: StoryObj = { render: () => <Rail steps={AT_WORK} names={false} /> };

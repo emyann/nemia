@@ -228,13 +228,8 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
       assert.match(tagWith(html, 'data-step-name="review"'), /text-failure/);
       assert.match(tagWith(html, 'data-step-name="design"'), /text-on-surface-variant/);
       const [gate, atWork] = [tagWith(html, 'data-step="land"'), tagWith(html, 'data-step="implement"')];
-      assert.match(gate, /bg-transparent/, 'the step that waits on a person is hollow');
-      assert.doesNotMatch(gate, /bg-yours/);
-      assert.match(
-        gate,
-        /box-shadow:inset 0 0 0 1\.5px var\(--meaning-yours\), 0 0 10px color-mix\(in srgb, var\(--meaning-yours\) 45%, transparent\)/,
-        'edged in its hue, and glowing',
-      );
+      assert.match(gate, /bg-yours /, 'the step that waits on a person is filled in its hue');
+      assert.doesNotMatch(gate, /box-shadow/, 'and casts no glow: only the step at work is lit');
       assert.doesNotMatch(atWork, /box-shadow/, "the step at work's bar carries no glow of its own");
       assert.match(
         tagWith(html, 'data-step-breath'),
@@ -247,7 +242,8 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
         assert.doesNotMatch(tagWith(html, `data-step="${dark}"`), /box-shadow/, `${dark} neither waits nor works: no glow`);
       assert.match(tagWith(html, 'data-step="implement"'), /bg-alive /, 'the step at work is the lit bar, in its hue itself');
       assert.doesNotMatch(tagWith(html, 'data-step="implement"'), /bg-alive-container/);
-      assert.match(tagWith(html, 'data-step="review"'), /bg-failure-container/, 'every other bar is drawn as its state is on every page');
+      assert.match(tagWith(html, 'data-step="review"'), /bg-failure /, 'the step that failed is filled in red');
+      assert.doesNotMatch(tagWith(html, 'data-step="review"'), /bg-failure-container/);
       const bare = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: true }));
       assert.doesNotMatch(bare, /data-step-name/, 'no names unless asked');
       assert.match(tagWith(bare, 'data-step="land"'), /data-state="held"/, "a held run's gate is drawn held");
@@ -275,7 +271,7 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
     },
   );
   await t.test(
-    'a step done is filled in the rail whether a check says so or its own word does, and a step to come stays hollow',
+    'a step done is filled in the rail whether a check says so or its own word does, one to come is quiet, one that waits dashed',
     async () => {
       const steps = [
         { name: 'design', ...coded('unverified') },
@@ -288,6 +284,18 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
       assert.equal(classOf('design'), classOf('implement'), 'done on its own word is drawn as done on a check');
       assert.match(classOf('design') ?? '', /bg-sage /, 'filled');
       assert.notEqual(classOf('review'), classOf('design'), 'a step to come is not drawn as one done');
+      assert.match(classOf('review') ?? '', /bg-surface-container-highest/, 'a step that only waits its turn is a quiet fill');
+      const waiting = await drawn(
+        createElement(RunSteps, { steps: [{ name: 'land', ...coded('waiting on r-0') }], cancelled: false, held: false }),
+      );
+      assert.match(tagWith(waiting, 'data-step="land"'), /border-dashed/, 'a step that waits on a run is a dashed outline');
+      const held = await drawn(createElement(RunSteps, { steps, cancelled: false, held: true }));
+      assert.match(
+        tagWith(held, 'data-step="review"'),
+        /border-dashed/,
+        "a held run's first step not started is dashed: the hold stops it",
+      );
+      assert.match(tagWith(html, 'data-run-steps'), /grid-template-columns:repeat\(3, 30px\)/, 'with no names, short bars side by side');
       assert.match(html, /aria-label="design done, implement verified, review to come"/, 'read aloud, a check is told from a word');
     },
   );

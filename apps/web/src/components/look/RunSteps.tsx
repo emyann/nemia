@@ -1,7 +1,7 @@
 import type { RunView } from '@/lib/api/judged';
 import type { WaitOn } from 'objects';
-import { Fragment, type CSSProperties, type ReactNode } from 'react';
-import { filled, ink, paint } from '@/lib/meaning';
+import { Fragment, type ReactNode } from 'react';
+import { dashed, filled, ink, paint } from '@/lib/meaning';
 import { railSaid, railStates } from '@/lib/runWords';
 import { stateClass, stateDrawn, type StepState } from '@/lib/status';
 import { cn } from '@/components/ui/ds/utils';
@@ -12,25 +12,33 @@ function nameInk(state: StepState): string {
   return hue === 'yours' || hue === 'failure' ? ink[hue] : 'text-on-surface-variant';
 }
 
-/** Whether a state waits on a person's word: the rail draws its bar hollow and lit, whatever form every other page gives it. */
-const isLitGate = (state: StepState): boolean => stateDrawn[state].hue === 'yours';
+/** The states of a step not started. */
+const NOT_STARTED: ReadonlySet<StepState> = new Set(['waiting', 'waiting-for-slot', 'held']);
 
 /**
- * A step's bar: its state's drawing on every page (`stateClass`), but three. A step done is filled whether a check says so or its own
- * word does, the step at work is filled in its hue, and the step that waits on a person's word is hollow, edged in its hue;
- * `barGlow` lights the gate, and `Breath` the step at work.
+ * A step's bar, by its state and whether it waits on something now (`waits`): done filled whether a check says so or its own word
+ * does; at work, or its check at work, filled in its hue, a session's glow breathing on a layer of its own (`Breath`); one that
+ * waits on a person filled in yellow, one that failed filled in red; one not started a dashed outline where it waits on a run, a slot
+ * or a hold, and a quiet fill where it only waits its turn; every other as its state is drawn on every page (`stateClass`).
  */
-function barClass(state: StepState): string {
+function barClass(state: StepState, waits: boolean): string {
+  const { hue } = stateDrawn[state];
   if (state === 'working') return cn('relative', filled.alive);
-  if (isLitGate(state)) return 'bg-transparent';
+  if (state === 'checking') return filled.alive;
+  if (hue === 'yours') return filled.yours;
+  if (hue === 'failure') return filled.failure;
+  if (NOT_STARTED.has(state)) return waits ? dashed.grey : 'bg-surface-container-highest';
   return stateClass[state === 'unverified' ? 'verified' : state];
 }
 
-/** What lights a bar of its own: the gate's edge and its still glow, and nothing for any other. */
-function barGlow(state: StepState): CSSProperties | undefined {
-  if (isLitGate(state))
-    return { boxShadow: `inset 0 0 0 1.5px ${paint.yours}, 0 0 10px color-mix(in srgb, ${paint.yours} 45%, transparent)` };
-  return undefined;
+/**
+ * Whether the step of `drawn` at `at` waits on something now, not only its turn: a run slot or a hold by its state, a thing it names
+ * (`on`), or, on a held run, the first step not started, which the hold stops.
+ */
+function waitsNow(drawn: ReadonlyArray<{ state: StepState; on: WaitOn | null }>, at: number, held: boolean): boolean {
+  const { state, on } = drawn[at];
+  if (state !== 'waiting') return NOT_STARTED.has(state);
+  return on !== null || (held && drawn.findIndex((step) => NOT_STARTED.has(step.state)) === at);
 }
 
 /**
@@ -49,10 +57,10 @@ function Breath() {
 }
 
 /**
- * A run's own steps as a rail: one bar a step, in the run's order, each drawn by its state (`barClass`, `barGlow`, `Breath`), and under
- * the bars, with `names`, each step's name. Read aloud as one picture, each step and its word (`railSaid`). `cancelled` and `held` are
- * the run's, as `stepState` takes them. With `wrap`, each bar is put inside what it gives (a button that opens the step), and the rail
- * is a group named by `railSaid`, each bar its own step.
+ * A run's own steps as a rail: one bar a step, in the run's order, each drawn by its state (`barClass`, `Breath`), short bars side by
+ * side, or, with `names`, bars that share the rail's width with each step's name under its own. Read aloud as one picture, each step
+ * and its word (`railSaid`). `cancelled` and `held` are the run's, as `stepState` takes them. With `wrap`, each bar is put inside
+ * what it gives (a button that opens the step), and the rail is a group named by `railSaid`, each bar its own step.
  */
 export function RunSteps({
   steps,
@@ -73,17 +81,16 @@ export function RunSteps({
       role={wrap ? 'group' : 'img'}
       aria-label={railSaid(steps, cancelled, held)}
       data-run-steps
-      className="grid gap-1.5 text-label-small uppercase"
-      style={{ gridTemplateColumns: `repeat(${Math.max(1, drawn.length)}, minmax(0, 1fr))` }}
+      className={cn('grid text-label-small uppercase', names ? 'gap-1.5' : 'w-fit gap-[3px]')}
+      style={{ gridTemplateColumns: `repeat(${Math.max(1, drawn.length)}, ${names ? 'minmax(0, 1fr)' : '30px'})` }}
     >
-      {drawn.map((step) => {
+      {drawn.map((step, at) => {
         const bar = (
           <span
             key={step.name}
             data-step={step.name}
             data-state={step.state}
-            className={cn('block h-2', barClass(step.state))}
-            style={barGlow(step.state)}
+            className={cn('block', names ? 'h-2' : 'h-[5px]', barClass(step.state, waitsNow(drawn, at, held)))}
           >
             {step.state === 'working' && <Breath />}
           </span>

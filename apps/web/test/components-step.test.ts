@@ -546,7 +546,7 @@ const panelMarkup = async (run: RunView, selected: string | null = null): Promis
   const { Run } = await import('../src/components/look/Run.tsx');
   return routedWith(
     createElement(Run, {
-      run: { labels: {}, factory: null, workflowDir: '/code/app/workflows/build', gates: ['theme'], ...run },
+      run: Object.assign({ labels: {}, factory: null, workflowDir: '/code/app/workflows/build', gates: ['theme'] }, run),
       size: 'xl',
       asOf: new Date('2026-10-12T11:00:00.000Z'),
       read: null,

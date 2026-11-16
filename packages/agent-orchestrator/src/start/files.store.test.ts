@@ -17,7 +17,9 @@ const NOW = Date.parse('2026-11-16T00:00:00.000Z');
 const uploaded = (home: string, namespace: string, bytes: Buffer, name = 'shot.png') => {
   const begun = fileBegun(home, namespace, NOW);
   assert.ok(begun, `a file is begun in ${namespace}`);
-  fs.writeFileSync(begun.part, bytes);
+  begun.write(bytes.subarray(0, 2));
+  begun.write(bytes.subarray(2));
+  begun.close();
   return fileKept(home, namespace, {
     id: begun.id,
     name,
@@ -66,7 +68,8 @@ test('a file let go of on its way leaves nothing, and its id finds nothing', () 
   const home = scratch('nemia-files-');
   const begun = fileBegun(home, 'acme', NOW);
   assert.ok(begun);
-  fs.writeFileSync(begun.part, 'half');
+  begun.write(Buffer.from('half'));
+  begun.close();
   fileDropped(home, 'acme', begun.id);
   assert.deepEqual(fs.readdirSync(filesDir(home, 'acme')), []);
   assert.equal(fileAt(home, 'acme', begun.id), undefined);

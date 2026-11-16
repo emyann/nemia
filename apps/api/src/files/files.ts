@@ -6,11 +6,10 @@
  * cap is `TooLarge`, a 413 naming it; a form with no file part, a second part or a file with no name, `Invalid`; one that does not parse,
  * `BadRequest`. What was written of a file refused is let go of (`fileDropped`).
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { ByteSize, Cause, Effect, Exit, Stream } from 'effect';
 import { Multipart } from 'effect/http';
-import { fileBegun, fileDropped, fileKept } from 'agent-orchestrator';
+import { type FileBegun, fileBegun, fileDropped, fileKept } from 'agent-orchestrator';
 import { Api, BadRequest, FILE_LIMIT, type FileObject, Invalid, TooLarge } from 'objects';
 import { readsBounded } from '../objects/answer-bound.ts';
 import { answeredWriteIn } from '../objects/refused.ts';
@@ -43,35 +42,31 @@ const refusalOf = (failure: unknown): TooLarge | Invalid | BadRequest => {
 type Sent = { readonly name: string; readonly mediaType: string };
 
 /**
- * The form `parts`' one file written to `part` as its bytes come: what it was sent as and how many bytes were written. Fails with the
- * form's own error, or `NotOneFile` for a part that is no file named `file`, a second one, or a file with no name.
+ * The form `parts`' one file written to the file `begun` as its bytes come, its part closed once the form ends however it ends: what it
+ * was sent as and how many bytes were written. Fails with the form's own error, `PastCap` for bytes past `FILE_LIMIT`, or `NotOneFile`
+ * for a part that is no file named `file`, a second one, or a file with no name.
  */
-const written = (parts: Stream.Stream<Multipart.Part, Multipart.MultipartError>, part: string) =>
-  Effect.acquireUseRelease(
-    Effect.sync(() => fs.openSync(part, 'w')),
-    (fd) =>
-      Effect.gen(function* () {
-        let sent: Sent | undefined;
-        let size = 0;
-        yield* Stream.runForEach(parts, (each) => {
-          if (!Multipart.isFile(each) || each.key !== 'file')
-            return Effect.fail(new NotOneFile(`takes the file as the form's part \`file\`, and was sent the part \`${each.key}\`.`));
-          if (sent !== undefined) return Effect.fail(new NotOneFile('takes one file a request, and was sent two.'));
-          const name = path.basename(each.name.replaceAll('\\', '/'));
-          if (name === '' || name === '.' || name === '..')
-            return Effect.fail(new NotOneFile("names each file by its own name, and this part's file has none."));
-          sent = { name, mediaType: each.contentType || 'application/octet-stream' };
-          return Stream.runForEach(each.content, (chunk) => {
-            size += chunk.length;
-            if (size > Number(FILE_LIMIT)) return Effect.fail(new PastCap());
-            return Effect.sync(() => fs.writeSync(fd, chunk));
-          });
-        });
-        if (sent === undefined) return yield* Effect.fail(new NotOneFile('was sent a form with no file in it.'));
-        return { ...sent, size };
-      }),
-    (fd) => Effect.sync(() => fs.closeSync(fd)),
-  );
+const written = (parts: Stream.Stream<Multipart.Part, Multipart.MultipartError>, begun: FileBegun) =>
+  Effect.gen(function* () {
+    let sent: Sent | undefined;
+    let size = 0;
+    yield* Stream.runForEach(parts, (each) => {
+      if (!Multipart.isFile(each) || each.key !== 'file')
+        return Effect.fail(new NotOneFile(`takes the file as the form's part \`file\`, and was sent the part \`${each.key}\`.`));
+      if (sent !== undefined) return Effect.fail(new NotOneFile('takes one file a request, and was sent two.'));
+      const name = path.basename(each.name.replaceAll('\\', '/'));
+      if (name === '' || name === '.' || name === '..')
+        return Effect.fail(new NotOneFile("names each file by its own name, and this part's file has none."));
+      sent = { name, mediaType: each.contentType || 'application/octet-stream' };
+      return Stream.runForEach(each.content, (chunk) => {
+        size += chunk.length;
+        if (size > Number(FILE_LIMIT)) return Effect.fail(new PastCap());
+        return Effect.sync(() => begun.write(chunk));
+      });
+    });
+    if (sent === undefined) return yield* Effect.fail(new NotOneFile('was sent a form with no file in it.'));
+    return { ...sent, size };
+  }).pipe(Effect.ensuring(Effect.sync(() => begun.close())));
 
 /**
  * The file the form `parts` sends, kept in `namespace`'s files and answered as its file object; refused as `refusalOf` says, what was
@@ -87,8 +82,8 @@ const uploaded = (namespace: string, parts: Stream.Stream<Multipart.Part, Multip
       return yield* Effect.fail(
         new Invalid({ error: `${ROUTE} keeps files for a factory, and \`${namespace}\` names none: upload it to a namespace nemia factory ls lists, or to default.` }),
       );
-    const { id, part } = begun.at;
-    const exit = yield* Effect.exit(written(parts, part));
+    const { id } = begun.at;
+    const exit = yield* Effect.exit(written(parts, begun.at));
     if (Exit.isFailure(exit)) {
       fileDropped(begun.home, namespace, id);
       const failure = exit.cause.reasons.find((r) => r._tag === 'Fail');

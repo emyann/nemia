@@ -1,7 +1,7 @@
 /**
  * The files a factory keeps for a start to hand its run's steps (`objects`' `FileObject`, uploaded by `POST
  * /api/namespaces/<namespace>/files`): each under the store's `files/<namespace>/`, its bytes as `<id>` and what it was sent as beside
- * them, `<id>.json`. A file is written first as `<id>.part`, as its bytes come (`fileBegun`), then kept whole (`fileKept`) or let go of
+ * them, `<id>.json`. A file is written first as `<id>.part`, as its bytes come (`fileBegun`, its `write`), then kept whole (`fileKept`) or let go of
  * (`fileDropped`); a start finds one by its id in its own namespace (`fileAt`). Every file is let go of `FILE_KEPT_FOR` after it was
  * last written (`filesPruned`, which each upload asks first): a run copies what it is handed into its own `inputs/`, so a file let go of takes
  * nothing from a run.
@@ -48,22 +48,39 @@ export function filesPruned(home: string, now: number): string[] {
   return gone;
 }
 
+/** A file begun: its id, the bytes written to its part as they come (`write`), and its part closed once they have all come (`close`). */
+export type FileBegun = {
+  readonly id: string;
+  readonly write: (chunk: Uint8Array) => void;
+  readonly close: () => void;
+};
+
 /**
- * A new file of `namespace` begun, the files kept past their day let go of first (`filesPruned`): its id, and the path its bytes are
- * written to as they come, `<id>.part`, which `fileKept` makes the file. Undefined for a namespace the store keeps no files under.
+ * A new file of `namespace` begun, the files kept past their day let go of first (`filesPruned`): its id, and its part, `<id>.part`,
+ * open for its bytes as they come, which `fileKept` makes the file once it is closed. Undefined for a namespace the store keeps no files
+ * under.
  * @param home The store's root.
  * @param namespace The namespace it is uploaded to.
  * @param now The time it is now, in milliseconds.
  */
-export function fileBegun(home: string, namespace: string, now: number): { id: string; part: string } | undefined {
+export function fileBegun(home: string, namespace: string, now: number): FileBegun | undefined {
   if (!namespaceKept(namespace)) return undefined;
   filesPruned(home, now);
   const dir = filesDir(home, namespace);
   fs.mkdirSync(dir, { recursive: true });
   const id = `${FILE_ID_PREFIX}${crypto.randomBytes(16).toString('hex')}`;
-  const part = path.join(dir, `${id}.part`);
-  fs.writeFileSync(part, '', { flag: 'wx' });
-  return { id, part };
+  const fd = fs.openSync(path.join(dir, `${id}.part`), 'wx');
+  let open = true;
+  return {
+    id,
+    write: (chunk) => {
+      fs.writeSync(fd, chunk);
+    },
+    close: () => {
+      if (open) fs.closeSync(fd);
+      open = false;
+    },
+  };
 }
 
 /**

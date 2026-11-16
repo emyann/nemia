@@ -373,14 +373,14 @@ async function main(): Promise<number> {
         const short = git(root, ['rev-parse', '--short', 'HEAD']).trim();
         const css = fs.readFileSync(path.join(root, BOARD, 'theme', 'theme.css'), 'utf8');
         for (const match of matches) {
-          const png = await composeMatch(browser, {
+          await composeMatch(browser, {
             target: path.join(targetsDir, match.target),
             story: path.join(out, match.story),
             theme: match.theme,
             head: short,
             css,
+            out: path.join(out, match.match),
           });
-          fs.writeFileSync(path.join(out, match.match), png);
         }
         console.log(
           `stories: ${matches.length} match${matches.length === 1 ? '' : 'es'} of a target and its story written, match-<id>-<theme>.png, in ${out}`,

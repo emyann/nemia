@@ -89,15 +89,17 @@ const GAP = 24;
 const CAPTION = 28;
 
 /**
- * The match of `target` and `story` as one PNG: both scaled to the lower of their two heights, so neither is enlarged, the target on the
+ * Writes the match of `target` and `story` as one PNG, `out`, by the e2e's `photograph`: both scaled to the lower of their two heights, so neither is enlarged, the target on the
  * left captioned `target` and the story on the right captioned `after · <head>`, on the board's ground in `theme`.
  * @param browser The Chromium the pictures are taken in.
- * @param pair The target's file, the story's picture, the theme, the short head the story was drawn at, and the board's theme stylesheet.
+ * @param pair The target's file, the story's picture, the theme, the short head the story was drawn at, the board's theme stylesheet,
+ * and the match's file.
  */
 export async function composeMatch(
   browser: Browser,
-  pair: { target: string; story: string; theme: Theme; head: string; css: string },
-): Promise<Buffer> {
+  pair: { target: string; story: string; theme: Theme; head: string; css: string; out: string },
+): Promise<void> {
+  const { photograph } = await import('../board.ts');
   const pictures = [pair.target, pair.story].map((file) => fs.readFileSync(file));
   const sizes = pictures.map(sizeOf);
   const height = Math.min(...sizes.map((size) => size.height));
@@ -121,7 +123,7 @@ export async function composeMatch(
         `</style></head><body>${figures}</body></html>`,
       { waitUntil: 'load' },
     );
-    return await page.screenshot({ fullPage: true, animations: 'disabled' });
+    await photograph(page, pair.out, { fullPage: true, always: true });
   } finally {
     await page.close();
   }

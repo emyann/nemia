@@ -33,6 +33,7 @@ export const ROOTS = [
   'apps/web/src/lib/api/runs.ts',
   'apps/web/src/lib/brought.ts',
   'apps/web/src/lib/fieldWidget.ts',
+  'apps/web/src/lib/nowChip.ts',
   'apps/web/src/lib/proposals.ts',
   'apps/web/src/lib/runResult.ts',
   'apps/web/src/lib/setup.ts',

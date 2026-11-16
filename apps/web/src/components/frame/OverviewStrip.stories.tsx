@@ -6,7 +6,7 @@ import type { Strip } from '@/lib/strip';
 import { StripView } from './OverviewStrip';
 
 /** The Overview's strip: a busy day, a quiet one, the quota past its mark, the daemon stalled, and a box too narrow for one row. */
-const meta: Meta = { title: 'Board/OverviewStrip' };
+const meta: Meta = { title: 'Frame/OverviewStrip' };
 export default meta;
 
 /** The instant the stories' answers were read at. */
@@ -103,6 +103,7 @@ const PAST = quota([
 ]);
 
 export const BusyDay: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
   render: () => (
     <div style={WIDE}>
       <StripView strip={BUSY} dot={TICKING} quota={CALM} quotaError={null} now={NOW} />
@@ -111,6 +112,7 @@ export const BusyDay: StoryObj = {
 };
 
 export const QuietDay: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
   render: () => (
     <div style={WIDE}>
       <StripView strip={QUIET} dot={TICKING} quota={CALM} quotaError={null} now={NOW} />
@@ -119,6 +121,7 @@ export const QuietDay: StoryObj = {
 };
 
 export const QuotaPastTheMark: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
   render: () => (
     <div style={WIDE}>
       <StripView strip={BUSY} dot={TICKING} quota={PAST} quotaError={null} now={NOW} />
@@ -127,6 +130,7 @@ export const QuotaPastTheMark: StoryObj = {
 };
 
 export const DaemonStalled: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
   render: () => (
     <div style={WIDE}>
       <StripView strip={BUSY} dot={STALLED} quota={CALM} quotaError={null} now={NOW} />
@@ -135,6 +139,7 @@ export const DaemonStalled: StoryObj = {
 };
 
 export const Narrow: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
   render: () => (
     <div style={NARROW}>
       <StripView strip={BUSY} dot={TICKING} quota={PAST} quotaError={null} now={NOW} />

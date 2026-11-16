@@ -8,7 +8,7 @@ import { SignInView, type SignInShown } from './ServerSignIn';
  * words — a paste refused among them. No node test can judge how each reads, so each is
  * drawn here.
  */
-const meta: Meta = { title: 'Board/ServerSignIn' };
+const meta: Meta = { title: 'Factory/ServerSignIn' };
 export default meta;
 
 /** The width a row of the settings page gives it. */

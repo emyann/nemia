@@ -8,18 +8,21 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ours } from './ours.ts';
+import { storyless } from './stories.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
 const SRC = path.join(WEB, 'src');
 const LOOK = path.join(SRC, 'components', 'look');
+/** The look's folder, from the workspace root, as the board's rules name a file. */
+const LOOK_FROM_ROOT = 'apps/web/src/components/look';
 const SKILL = path.join(WEB, '..', '..', '.claude', 'skills', 'change-the-board', 'SKILL.md');
 
-/** Each part among `names`, the files of the look's folder, that has no stories beside it: a file named with a capital, by its name. */
-export const storyless = (names: readonly string[]): string[] =>
-  names
-    .filter((name) => /^[A-Z]\w*\.tsx$/.test(name))
-    .map((name) => name.slice(0, -'.tsx'.length))
-    .filter((part) => !names.includes(`${part}.stories.tsx`));
+/**
+ * Each part among `names`, the files of the look's folder, that has no stories beside it, by its name: the board's rule
+ * (`storyless`, `stories.ts`) on the look's folder, with no baseline.
+ */
+const lookStoryless = (names: readonly string[]): string[] =>
+  storyless(names.map((name) => `${LOOK_FROM_ROOT}/${name}`)).map((file) => path.posix.basename(file, '.tsx'));
 
 /**
  * Each import in `source`, the text of `file` of `src`, that reaches a file of the look's folder other than its door, by the module
@@ -56,13 +59,13 @@ test("the look's door: every part with its stories, no import past the door, and
   await t.test('REFUSED: a part of the look with no story', () => {
     const shipped = fs.readdirSync(LOOK);
     assert.ok(shipped.includes('CutFrame.tsx') && shipped.includes('index.ts'), 'the folder is read');
-    assert.deepEqual(storyless([...shipped, 'Extra.tsx']), ['Extra'], 'a part added with no stories is named');
+    assert.deepEqual(lookStoryless([...shipped, 'Extra.tsx']), ['Extra'], 'a part added with no stories is named');
     assert.deepEqual(
-      storyless(['Extra.tsx', 'Extra.stories.tsx', 'cut.ts', 'index.ts']),
+      lookStoryless(['Extra.tsx', 'Extra.stories.tsx', 'cut.ts', 'index.ts']),
       [],
       'stories beside it, and a file that is no part',
     );
-    assert.deepEqual(storyless(shipped), [], 'every shipped part has its stories');
+    assert.deepEqual(lookStoryless(shipped), [], 'every shipped part has its stories');
   });
   await t.test('REFUSED: an import past the door of the look', () => {
     assert.deepEqual(pastDoor('components/run/WaitingCard.tsx', "import { CutFrame } from '../look/CutFrame';"), ['../look/CutFrame']);

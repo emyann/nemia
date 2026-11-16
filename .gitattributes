@@ -18,6 +18,8 @@ CLAUDE.md merge=union
 # diff and a quick run's `change.ts size`, which leaves out each file marked so, measures the change a person wrote and not its output.
 /apps/web/theme/** linguist-generated
 /apps/web/src/routeTree.gen.ts linguist-generated
+# MSW's worker, written by `npx msw init .storybook/public` from apps/web and served to the board's Storybook alone: written again, never edited.
+/apps/web/.storybook/public/mockServiceWorker.js linguist-generated
 
 # What is not ours: another project's files, vendored unchanged, and what a tool writes. Marked once here, in git's own words, so that
 # GitHub folds them in a diff and every guard that leaves them unread asks git rather than keeping a list of its own (test-kit's `notOurs`,

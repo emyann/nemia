@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Jump } from './Jump';
 
 /** The pill over a talk the person has read back from: what it says of how many are new. */
-const meta: Meta = { title: 'Conversation/Jump' };
+const meta: Meta = { title: 'Run/Jump' };
 export default meta;
 
 /** Where the pill stands in its story: a panel's width, on the card's ground. */

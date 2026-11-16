@@ -4,7 +4,7 @@ import type { Pairing } from 'objects';
 import { PairingApprovals } from './PairingApprovals';
 
 /** The clients that wait to pair, as Setup lists them: one, several, none, and an approval refused. */
-const meta: Meta = { title: 'Board/PairingApprovals' };
+const meta: Meta = { title: 'Store/PairingApprovals' };
 export default meta;
 
 /** A pairing that waits, asked under `client`. */

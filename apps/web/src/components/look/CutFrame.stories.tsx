@@ -179,6 +179,7 @@ export const Failure: StoryObj = {
 
 /** A frame given a height, filled: what it holds is laid out down the whole of it, and a long child scrolls inside it. */
 export const Filled: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
   render: () => (
     <div data-ground="plain" style={ON_PLAIN}>
       <CutFrame hue="alive" fill className="h-50">

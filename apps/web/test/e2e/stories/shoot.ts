@@ -1,0 +1,391 @@
+/**
+ * Pictures the board's stories a change touches: `node test/e2e/stories/shoot.ts --base <ref> --out <dir> [--changed <path>…] [--list]`,
+ * from `apps/web`.
+ *
+ * The change's paths are the work's own since the merge base of HEAD and `--base`, as the factory's picture check reads them: its commits
+ * along the first parent, and of a merge only its resolution, so a path a merged branch changed is not the work's; `--changed` names
+ * them instead, each from the workspace root. A story is touched when a file its imports reach, through every import of the board's own
+ * (`src` and `.storybook`), is one of them (`storiesTouched`, `touched.ts`); a changed part that owes a story and that no story reaches
+ * is bare, and refused, exit 1, naming each and the story file to write beside it; a part the change deleted owes none.
+ *
+ * With `--list` it prints `{ "stories": [<id>…], "bare": [<path>…] }` and launches no browser: each id is Storybook's own
+ * (`toId(title, storyNameFromExport(export))`), read off the story file's title and named exports by the TypeScript compiler. Without
+ * it, it builds Storybook static into a scratch folder, serves it on loopback, and pictures each touched story's `iframe.html` in
+ * light, then dark (`story-<id>-<theme>.png`); then the same of the merge base, a `git archive` of its `apps/web` extracted into a
+ * scratch folder over this checkout's `node_modules`, so both sides are drawn on one machine; and for each story whose pixels differ
+ * writes `before-`, `after-` and `diff-<id>-<theme>.png`. Last, `stories.json`: `{ head, base, touched, changed, fresh, baseRendered,
+ * baseWhy }` — `fresh` the touched stories the base has none of, `baseRendered` false where the base would not build, with why. No
+ * picture goes into git: `--out` is the step's files or a scratch folder.
+ */
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import http from 'node:http';
+import path from 'node:path';
+import { parseArgs } from 'node:util';
+import type { Browser } from 'playwright';
+import { storyNameFromExport, toId } from 'storybook/internal/csf';
+import { importsIn } from 'test-kit/imports';
+import type { StoryReach } from '../../../contracts/touched-stories.contract.ts';
+import { storyModuleOf } from '../../stories.ts';
+import { owesAStory, storiesTouched } from './touched.ts';
+
+/** The board's folder, from the workspace root. */
+const BOARD = 'apps/web';
+
+/** What the board's own imports reach: its source and its Storybook's files. */
+const OWN = /^apps\/web\/(src|\.storybook)\//;
+
+/** A story file of the board, from the workspace root: anywhere under `src/components` but the vendored folders. */
+const isStoryFile = (file: string): boolean =>
+  /^apps\/web\/src\/components\/.+\.stories\.tsx$/.test(file) && !/^apps\/web\/src\/components\/(ui|ai-elements)\//.test(file);
+
+/** The workspace root of the git repository `cwd` is in. */
+const rootOf = (cwd: string): string =>
+  execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+/** Runs git in `root`, its output as text; throws naming the command where it fails. */
+const git = (root: string, args: readonly string[]): string => {
+  const ran = spawnSync('git', ['-c', 'core.quotePath=false', ...args], { cwd: root, encoding: 'utf8', maxBuffer: 64 << 20 });
+  if (ran.status !== 0) throw new Refusal(`git ${args.join(' ')} failed (${(ran.stderr ?? '').trim() || ran.error?.message})`);
+  return ran.stdout;
+};
+
+/** A refusal this tool ends on, exit 1, with what to do next. */
+class Refusal extends Error {}
+
+/**
+ * The paths the work's own commits touched since `base`, once each: its commits along the first parent, and of a merge only what
+ * differs from every parent (`--cc`), as the factory's picture check reads them.
+ * @param root The workspace root.
+ * @param base Where the work began: the merge base of HEAD and the base branch.
+ */
+export const changedSince = (root: string, base: string): string[] => [
+  ...new Set(
+    git(root, ['log', '--first-parent', '--cc', '--no-renames', '--format=', '--name-only', `${base}..HEAD`, '--'])
+      .split('\n')
+      .filter(Boolean),
+  ),
+];
+
+/** The file `spec`, imported by `from`, resolves to among the workspace's files, from its root; none for a package or a file not there. */
+const resolved = (root: string, from: string, spec: string): string | undefined => {
+  const named = spec.startsWith('@/')
+    ? path.posix.join(BOARD, 'src', spec.slice(2))
+    : spec.startsWith('.')
+      ? path.posix.join(path.posix.dirname(from), spec)
+      : undefined;
+  if (named === undefined) return undefined;
+  for (const tail of ['', '.ts', '.tsx', '/index.ts', '/index.tsx']) {
+    const file = named + tail;
+    if (fs.statSync(path.join(root, file), { throwIfNoEntry: false })?.isFile()) return file;
+  }
+  return undefined;
+};
+
+/**
+ * What `story` reaches: itself, and every file of the board's own its imports reach, followed through each such file's imports.
+ * @param root The workspace root.
+ * @param story The story file, from the workspace root.
+ */
+export const reachOf = (root: string, story: string): StoryReach => {
+  const reaches = [story];
+  for (let at = 0; at < reaches.length; at++) {
+    const file = reaches[at] ?? story;
+    for (const { spec } of importsIn(fs.readFileSync(path.join(root, file), 'utf8'))) {
+      const next = resolved(root, file, spec);
+      if (next !== undefined && OWN.test(next) && !reaches.includes(next)) reaches.push(next);
+    }
+  }
+  return { story, reaches };
+};
+
+/**
+ * Storybook's id of each story of `source`, the story file's text: `toId(title, storyNameFromExport(name))` of each named export.
+ * @param source The story file's text.
+ */
+export const idsOf = (source: string): string[] => {
+  const module = storyModuleOf(source);
+  const title = module.title;
+  return title === null ? [] : module.stories.map((story) => toId(title, storyNameFromExport(story.name)));
+};
+
+/** The story files of the workspace at `root`, in path order. */
+const storyFiles = (root: string): string[] =>
+  git(root, ['ls-files', '--cached', '--others', '--exclude-standard', '--', BOARD])
+    .split('\n')
+    .filter((file) => isStoryFile(file) && fs.existsSync(path.join(root, file)))
+    .sort();
+
+/**
+ * What `changed` touches of the stories of the workspace at `root`: the ids of each touched story file, in path order, and the bare
+ * parts.
+ * @param root The workspace root.
+ * @param changed The paths the change touched, from the workspace root.
+ */
+export const touchedOf = (root: string, changed: readonly string[]): { stories: string[]; bare: string[] } => {
+  const reach = storyFiles(root).map((story) => reachOf(root, story));
+  const owing = [...new Set(changed.filter((file) => owesAStory(file) && fs.existsSync(path.join(root, file))))];
+  const touched = storiesTouched(changed, reach, owing);
+  return { stories: touched.stories.flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8'))), bare: [...touched.bare] };
+};
+
+/** The themes a story is pictured in, in order. */
+const THEMES = ['light', 'dark'] as const;
+
+/** The longest a Storybook build may take. */
+const BUILD_MS = 10 * 60_000;
+
+/** Builds the Storybook of the board at `web` into `out`; resolves with why where it would not build, else with nothing. */
+async function buildStorybook(root: string, web: string, out: string): Promise<string | undefined> {
+  const bin = path.join(root, 'node_modules', 'storybook', 'dist', 'bin', 'dispatcher.js');
+  const child = spawn(process.execPath, [bin, 'build', '-o', out, '--quiet', '--disable-telemetry'], {
+    cwd: web,
+    stdio: ['ignore', 'ignore', 'pipe'],
+    timeout: BUILD_MS,
+  });
+  let said = '';
+  child.stderr.on('data', (chunk: Buffer) => (said += chunk));
+  const code = await new Promise<number | null>((resolve) => child.on('exit', resolve));
+  return code === 0 ? undefined : `Storybook did not build at ${web} (exit ${code}): ${said.trim().split('\n').slice(-5).join(' / ')}`;
+}
+
+const TYPES: Readonly<Record<string, string>> = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+};
+
+/** Serves the built Storybook at `dir` on loopback while `use` runs, handing it the address: MSW's worker needs a secure origin. */
+async function served<T>(dir: string, use: (at: string) => Promise<T>): Promise<T> {
+  const server = http.createServer((request, response) => {
+    const asked = path.join(dir, decodeURIComponent(new URL(`http://stories${request.url ?? '/'}`).pathname));
+    const file = asked.startsWith(dir) && fs.existsSync(asked) && fs.statSync(asked).isFile() ? asked : path.join(dir, 'index.html');
+    response.writeHead(200, { 'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream' }).end(fs.readFileSync(file));
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as { port: number };
+  try {
+    return await use(`http://127.0.0.1:${port}`);
+  } finally {
+    server.close();
+    server.closeAllConnections();
+  }
+}
+
+/** The story ids the Storybook built at `dir` holds. */
+const builtIds = (dir: string): Set<string> => {
+  const index = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8')) as { entries: Record<string, { type: string }> };
+  return new Set(Object.entries(index.entries).flatMap(([id, entry]) => (entry.type === 'story' ? [id] : [])));
+};
+
+/**
+ * Pictures each of `ids` the Storybook at `dir` holds, in each theme, into `out` as `<prefix><id>-<theme>.png`, by the e2e's
+ * `photograph`, which stills every animation for the shot; the ids pictured.
+ */
+async function shootAll(browser: Browser, dir: string, ids: readonly string[], out: string, prefix: string): Promise<string[]> {
+  const { photograph } = await import('../board.ts');
+  const held = builtIds(dir);
+  const shot = ids.filter((id) => held.has(id));
+  await served(dir, async (at) => {
+    for (const theme of THEMES) {
+      const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 }, reducedMotion: 'reduce' });
+      const page = await context.newPage();
+      for (const id of shot) {
+        await page.goto(`${at}/iframe.html?id=${encodeURIComponent(id)}&viewMode=story`);
+        await page.locator('[data-story-ground], [data-broken]').first().waitFor();
+        await page.waitForLoadState('networkidle');
+        await page.evaluate(() => document.fonts.ready.then(() => undefined));
+        await photograph(page, path.join(out, `${prefix}${id}-${theme}.png`), { fullPage: true, always: true });
+      }
+      await context.close();
+    }
+  });
+  return shot;
+}
+
+/** Whether the pictures `before` and `after` differ by a pixel, and where they do, a picture of it: each differing pixel red. */
+async function differ(browser: Browser, before: string, after: string): Promise<{ differs: boolean; png: Buffer }> {
+  const page = await browser.newPage();
+  try {
+    const [a, b] = [before, after].map((file) => `data:image/png;base64,${fs.readFileSync(file).toString('base64')}`);
+    const found = await page.evaluate(
+      async ([one, two]) => {
+        const load = (src: string) =>
+          new Promise<HTMLImageElement>((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => resolve(image);
+            image.onerror = reject;
+            image.src = src;
+          });
+        const [x, y] = await Promise.all([load(one ?? ''), load(two ?? '')]);
+        const width = Math.max(x.width, y.width);
+        const height = Math.max(x.height, y.height);
+        const read = (image: HTMLImageElement) => {
+          const canvas = new OffscreenCanvas(width, height);
+          const drawn = canvas.getContext('2d');
+          if (!drawn) throw new Error('no 2d context');
+          drawn.drawImage(image, 0, 0);
+          return drawn.getImageData(0, 0, width, height).data;
+        };
+        const [p, q] = [read(x), read(y)];
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const drawn = canvas.getContext('2d');
+        if (!drawn) throw new Error('no 2d context');
+        const out = drawn.createImageData(width, height);
+        let differs = false;
+        for (let i = 0; i < p.length; i += 4) {
+          const same = p[i] === q[i] && p[i + 1] === q[i + 1] && p[i + 2] === q[i + 2] && p[i + 3] === q[i + 3];
+          if (!same) differs = true;
+          const grey = Math.round(((q[i] ?? 0) + (q[i + 1] ?? 0) + (q[i + 2] ?? 0)) / 3);
+          out.data.set(same ? [grey, grey, grey, 60] : [255, 0, 0, 255], i);
+        }
+        drawn.putImageData(out, 0, 0);
+        return { differs, url: canvas.toDataURL('image/png') };
+      },
+      [a, b],
+    );
+    return { differs: found.differs, png: Buffer.from(found.url.slice(found.url.indexOf(',') + 1), 'base64') };
+  } finally {
+    await page.close();
+  }
+}
+
+/** A scratch folder of the kit's (`test-kit/scratch`), taken only when pictures are, so `--list` loads none of node:test's hooks. */
+const scratch = async (prefix: string): Promise<string> => (await import('test-kit/scratch')).scratch(prefix);
+
+/** Extracts the board at `commit` into a scratch folder over the checkout's `node_modules`; the board's folder there. */
+async function boardAt(root: string, commit: string): Promise<string> {
+  const dir = await scratch('nemia-stories-base-');
+  const archive = spawnSync('git', ['archive', '--format=tar', commit, BOARD], { cwd: root, maxBuffer: 1 << 30 });
+  if (archive.status !== 0) throw new Refusal(`git archive ${commit} ${BOARD} failed: ${archive.stderr.toString().trim()}`);
+  const untar = spawnSync('tar', ['-x', '-C', dir], { input: archive.stdout });
+  if (untar.status !== 0) throw new Refusal(`tar could not extract the base's board: ${untar.stderr.toString().trim()}`);
+  fs.symlinkSync(path.join(root, 'node_modules'), path.join(dir, 'node_modules'));
+  if (fs.existsSync(path.join(root, BOARD, 'node_modules')))
+    fs.symlinkSync(path.join(root, BOARD, 'node_modules'), path.join(dir, BOARD, 'node_modules'));
+  return path.join(dir, BOARD);
+}
+
+/** The words of `--help`, and of a refusal of the arguments. */
+const USAGE =
+  'usage, from apps/web: node test/e2e/stories/shoot.ts --base <ref> --out <dir> [--changed <path>…] [--list]; ' +
+  '--list prints the touched story ids and bare parts as JSON and pictures nothing';
+
+/** The arguments `argv` gives: the flags, and the paths after `--changed`, which takes every path after it; refuses an unknown flag. */
+function argsOf(argv: readonly string[]) {
+  try {
+    return parseArgs({
+      args: [...argv],
+      options: {
+        base: { type: 'string' },
+        out: { type: 'string' },
+        changed: { type: 'string', multiple: true },
+        list: { type: 'boolean', default: false },
+      },
+      allowPositionals: true,
+    });
+  } catch (err) {
+    throw new Refusal(`${(err as Error).message}: ${USAGE}`);
+  }
+}
+
+async function main(): Promise<number> {
+  const { values, positionals } = argsOf(process.argv.slice(2));
+  const root = rootOf(process.cwd());
+  if (positionals.length > 0 && values.changed === undefined) throw new Refusal(`a path is named after --changed: ${USAGE}`);
+  if (values.base === undefined && values.changed === undefined) throw new Refusal(`name --base, or the paths with --changed: ${USAGE}`);
+  const mergeBase = values.base === undefined ? undefined : git(root, ['merge-base', 'HEAD', values.base]).trim();
+  const named = values.changed === undefined ? undefined : [...values.changed, ...positionals];
+  const changed = named ?? changedSince(root, mergeBase ?? 'HEAD');
+  const { stories, bare } = touchedOf(root, changed);
+  if (values.list) process.stdout.write(`${JSON.stringify({ stories, bare })}\n`);
+  if (bare.length > 0)
+    throw new Refusal(
+      `${bare.length} changed part${bare.length === 1 ? '' : 's'} no story reaches: ` +
+        bare.map((file) => `${file} (write ${file.replace(/\.tsx$/, '.stories.tsx')}, a story a state)`).join(', '),
+    );
+  if (values.list) return 0;
+  if (values.out === undefined) throw new Refusal(`name --out, the folder the pictures go to: ${USAGE}`);
+  const out = path.resolve(values.out);
+  fs.mkdirSync(out, { recursive: true });
+  const head = git(root, ['rev-parse', 'HEAD']).trim();
+  const report = {
+    head,
+    base: mergeBase ?? null,
+    touched: stories,
+    changed: [] as string[],
+    fresh: [] as string[],
+    baseRendered: false,
+    baseWhy: null as string | null,
+  };
+  if (stories.length > 0) {
+    const { chromium } = await import('playwright');
+    const browser = await chromium.launch();
+    try {
+      const headBuilt = path.join(await scratch('nemia-stories-head-'), 'static');
+      const why = await buildStorybook(root, path.join(root, BOARD), headBuilt);
+      if (why !== undefined) throw new Refusal(why);
+      const held = builtIds(headBuilt);
+      const unbuilt = stories.filter((id) => !held.has(id));
+      if (unbuilt.length > 0)
+        throw new Refusal(
+          `Storybook built no story of the ids read off the story files, ${unbuilt.join(', ')}: idsOf has drifted from Storybook's ` +
+            "id rule; compare it with the build's index.json",
+        );
+      const shot = await shootAll(browser, headBuilt, stories, out, 'story-');
+      console.log(`stories: ${shot.length} touched stor${shot.length === 1 ? 'y' : 'ies'} pictured, light and dark, in ${out}`);
+      if (mergeBase === undefined) report.baseWhy = 'no --base was named, so the base was not drawn';
+      else {
+        const baseBuilt = path.join(await scratch('nemia-stories-built-base-'), 'static');
+        const baseWhy = await buildStorybook(root, await boardAt(root, mergeBase), baseBuilt);
+        if (baseWhy !== undefined) report.baseWhy = baseWhy;
+        else {
+          report.baseRendered = true;
+          const beforeDir = await scratch('nemia-stories-before-');
+          const before = await shootAll(browser, baseBuilt, shot, beforeDir, 'before-');
+          report.fresh = shot.filter((id) => !before.includes(id));
+          for (const id of before) {
+            let differs = false;
+            for (const theme of THEMES) {
+              const was = path.join(beforeDir, `before-${id}-${theme}.png`);
+              const now = path.join(out, `story-${id}-${theme}.png`);
+              const diff = await differ(browser, was, now);
+              if (!diff.differs) continue;
+              differs = true;
+              fs.copyFileSync(was, path.join(out, `before-${id}-${theme}.png`));
+              fs.copyFileSync(now, path.join(out, `after-${id}-${theme}.png`));
+              fs.writeFileSync(path.join(out, `diff-${id}-${theme}.png`), diff.png);
+            }
+            if (differs) report.changed.push(id);
+          }
+        }
+      }
+    } finally {
+      await browser.close();
+    }
+  }
+  fs.writeFileSync(path.join(out, 'stories.json'), `${JSON.stringify(report, null, 2)}\n`);
+  console.log(
+    `stories: ${report.changed.length} changed against the base, ${report.fresh.length} new; ` +
+      `${report.baseRendered ? 'the base drawn' : `the base not drawn: ${report.baseWhy}`}; ${path.join(out, 'stories.json')}`,
+  );
+  return 0;
+}
+
+if (import.meta.main) {
+  try {
+    process.exitCode = await main();
+  } catch (err) {
+    if (!(err instanceof Refusal)) throw err;
+    process.stderr.write(`stories: ${err.message}\n`);
+    process.exitCode = 1;
+  }
+}

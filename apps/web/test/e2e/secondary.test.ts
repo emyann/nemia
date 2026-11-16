@@ -21,7 +21,7 @@ after(async () => {
   await browser?.close();
 });
 
-const STORY = '?story=board-secondaryrole--drawn';
+const STORY = '?story=frame-secondaryrole--drawn';
 
 /** Each part of the story, by its box's `data-secondary`, the element in it that draws secondary, and the property it draws with. */
 const DRAWN: { part: string; element: string; property: 'background-color' | 'color' }[] = [

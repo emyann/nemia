@@ -11,3 +11,9 @@ export const mediaOf = (type: string): string => type.split(';')[0]?.trim().toLo
  * @param type The value of a content-type header.
  */
 export const saysJson = (type: string): boolean => mediaOf(type) === 'application/json';
+
+/**
+ * Whether `type` says a form of files: `multipart/form-data`, whatever its parameters (its `boundary`), case and white space.
+ * @param type The value of a content-type header.
+ */
+export const saysForm = (type: string): boolean => mediaOf(type) === 'multipart/form-data';

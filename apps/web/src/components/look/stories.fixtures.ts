@@ -37,6 +37,13 @@ export const AT_WORK: RailStep[] = [
   { name: 'land', ...TO_COME },
 ];
 
+/** A run nothing of which has started. */
+export const TO_COME_ALL: RailStep[] = [
+  { name: 'design', ...TO_COME },
+  { name: 'implement', ...TO_COME },
+  { name: 'land', ...TO_COME },
+];
+
 /** A run whose second step failed its check. */
 export const REFUSED: RailStep[] = [
   { name: 'design', ...VERIFIED },

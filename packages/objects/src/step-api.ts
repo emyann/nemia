@@ -1,8 +1,9 @@
 /**
  * A run's step's reads, the `Api`'s `steps` group (`StepsGroup`): its tries, one try, a try's closeout and what it was told — the run
- * object's sub-resources — and the board's reads of it: the end of its session output (`StepLog`), a file it wrote, by name (its files
- * directory's, `artifacts/:file`, and a folder step's own folder's, `files/:file`), its task's path through the runtime's lifecycle
- * (`StepPath`), and its conversation read once from a cursor (`StepTranscript`) or followed as server-sent events (`StepStreamEvent`).
+ * object's sub-resources — and the board's reads of it: the end of its session output (`StepLog`), a file it wrote, by its path (its
+ * files directory's, `artifacts/:file`, and a folder step's own folder's, `files/:file`, each a path under it encoded whole), its
+ * task's path through the runtime's lifecycle (`StepPath`), and its conversation read once from a cursor (`StepTranscript`) or followed
+ * as server-sent events (`StepStreamEvent`).
  * Each under `/api/runs/:runId/steps/:step/`, found among the runs the store lists, in any namespace. Served by the api's step handlers
  * (`apps/api/src/steps/steps.ts`).
  */
@@ -190,8 +191,14 @@ const stepParams = {
 /** A step's try, by its number as the path says it. */
 const tryParams = { ...stepParams, try: Schema.String.annotate({ description: "The try's number, from 1." }) };
 
-/** A file of a step's, by its name, never by a path. */
-const fileParams = { ...stepParams, file: Schema.String.annotate({ description: "The file's name, never a path." }) };
+/** A file of a step's, by its path under the step's folder, encoded whole as one segment. */
+const fileParams = {
+  ...stepParams,
+  file: Schema.String.annotate({
+    description:
+      "The file's path under the step's folder, encoded whole as one segment of the request's path, its `/` as `%2F` (`e2e%2Fbar.png`). One that climbs out (`..`), is absolute, or passes a link is refused.",
+  }),
+};
 
 /**
  * The query of a read of a step's tries, a try or its closeout, each closeout read narrowly (`closeoutNarrowed`): `fields`, the fields of
@@ -290,7 +297,7 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
     error: [BadRequest, Missing, Gone],
   }).annotate(
     OpenApi.Description,
-    "Reads a file a run's step left in its files directory, by its name, as the bytes on disk with the headers that serve an agent's file safely. Answers the file, or Gone where a prune removed it.",
+    "Reads a file a run's step left in its files directory, at its top or in a folder beneath it, by its path there (encoded whole as one segment, its `/` as `%2F`), as the bytes on disk with the headers that serve an agent's file safely. Answers the file, or Gone where a prune removed it.",
   ),
   HttpApiEndpoint.get('file', '/api/runs/:runId/steps/:step/files/:file', {
     params: fileParams,
@@ -298,7 +305,7 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
     error: [BadRequest, Missing],
   }).annotate(
     OpenApi.Description,
-    "Reads a file of a folder step's own folder, by its name, as the bytes on disk with the headers that serve an agent's file safely. Answers the file.",
+    "Reads a file of a folder step's own folder, at its top or in a folder beneath it, by its path there (encoded whole as one segment, its `/` as `%2F`), as the bytes on disk with the headers that serve an agent's file safely. Answers the file.",
   ),
   HttpApiEndpoint.get('path', '/api/runs/:runId/steps/:step/path', {
     params: stepParams,

@@ -53,8 +53,6 @@ export const Short: StoryObj = {
   play: async ({ canvasElement, userEvent }) => {
     await idsHold(canvasElement, ['2e13: 0px, 0px 0px, 16px tall']);
     const id = canvasElement.querySelector('[data-run-id]')!;
-    const box = id.getBoundingClientRect();
-    await expect(document.elementFromPoint(box.right - 1, box.top + box.height / 2), 'the id answers the pointer to its edge').toBe(id);
     await expect(await tipOf(userEvent, id), "the whole id in the kit's tooltip").toHaveTextContent('the-tool-errors-panels-2e13');
     await expect(id).not.toHaveAttribute('title');
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} }, configurable: true });

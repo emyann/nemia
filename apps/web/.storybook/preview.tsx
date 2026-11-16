@@ -3,10 +3,17 @@
  * ground, and a router of its own over a history kept in memory, so a link of a story leads somewhere and moves no address but its
  * own. Where that router stands is written on the story's wrapper (`data-at`), and how many times it moved (`data-moves`). A story's
  * parameters say `at`, the address it opens on, and `scrollMark: false`, for a story nothing marks the scrolls of.
+ *
+ * A page body's queries resolve against a query client made once for each story, retrying nothing, so a refused read is said at once;
+ * its requests are answered by MSW (`mswLoader`) from the handlers a story names in `parameters.msw`, over fixtures typed by `objects`
+ * (`.storybook/fixtures/`). Every story is held to axe in the accessibility addon as `error`, so a violation fails `npm run stories`; a
+ * story that fails it today says `a11y: { test: 'todo' }` itself, a count `test/stories.test.ts` holds to its baseline.
  */
 import { Component, createContext, useContext, useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import { createMemoryHistory, createRootRoute, createRouter, RouterProvider, useRouter, useRouterState } from '@tanstack/react-router';
 import type { Preview } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { mswLoader } from 'msw-storybook-addon/csf3';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import '../src/styles.css';
 import { ScanLines } from '../src/components/look';
@@ -68,18 +75,25 @@ function Stage() {
 const routerAt = (at: string) =>
   createRouter({ routeTree: createRootRoute({ component: Stage }), history: createMemoryHistory({ initialEntries: [at] }) });
 
-/** One story under a router of its own, made once for as long as the story is drawn. */
+/** A query client of the story's own, which retries nothing, so a read the handlers refuse is said at once. */
+const clientOfAStory = () => new QueryClient({ defaultOptions: { queries: { retry: false, refetchInterval: false } } });
+
+/** One story under a router and a query client of its own, each made once for as long as the story is drawn. */
 function Routed({ Story, at, marked }: Drawn & { at: string }) {
   const [router] = useState(() => routerAt(at));
+  const [client] = useState(clientOfAStory);
   return (
-    <Drawing.Provider value={{ Story, marked }}>
-      <RouterProvider router={router} />
-    </Drawing.Provider>
+    <QueryClientProvider client={client}>
+      <Drawing.Provider value={{ Story, marked }}>
+        <RouterProvider router={router} />
+      </Drawing.Provider>
+    </QueryClientProvider>
   );
 }
 
 const preview: Preview = {
-  parameters: { layout: 'fullscreen' },
+  parameters: { layout: 'fullscreen', a11y: { test: 'error' } },
+  loaders: [mswLoader()],
   decorators: [
     (Story, { parameters }) => (
       <Routed Story={Story} at={typeof parameters.at === 'string' ? parameters.at : '/'} marked={parameters.scrollMark !== false} />

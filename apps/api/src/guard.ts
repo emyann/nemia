@@ -81,7 +81,6 @@ export const writeRefused: WriteRefused = (request) => {
   if (request.contentType === undefined) return 'media';
   if (saysJson(request.contentType) || (request.bearer && saysForm(request.contentType))) return null;
   return 'media';
-  return null;
 };
 
 /** Where every route is listed, with what it takes. */

@@ -2,9 +2,10 @@
  * The runner of `nemia start`: a run of a workflow named by its name (the Run's `create`), from a brief in words or a file's text read
  * here — a file that opens with a plan card's frontmatter giving its body and its `workflow:` — or of an inbox card named by its name (the
  * Card's `start`). What the api cannot read from where it runs is read here and sent as data: the brief's file, each `--input` file
- * uploaded first, its own request, and named by its id (`inputsOf`, `uploaded`), and `--repo` as `pathSent` sends a path — else, under this machine's context and with no `--factory`, the
- * repository the start is typed in, or the folder where it is in none (`repoQueryOf`) — which only finds the factory of a brief's start
- * (its run works on the repository the factory's wiring names) and is refused on a card's, whose factory places its run. A plan folder
+ * uploaded first, its own request, and named by its id (`inputsOf`, `uploaded`), and `--repo` as `pathSent` sends a path — else, under
+ * this machine's context and with no `--factory`, the repository the start is typed in, or the folder where it is in none
+ * (`repoQueryOf`) — which only finds the factory of a brief's start (its run works on the repository the factory's wiring names) and is
+ * refused on a card's, whose factory places its run. A plan folder
  * and a workflow given as a path are refused, naming the start by name; so is a brief whose workflow is not named. It prints what the api
  * answers of the run, worded here (`startedLines`).
  */

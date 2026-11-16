@@ -1,10 +1,10 @@
 /**
  * The files a factory keeps for a start to hand its run's steps (`objects`' `FileObject`, uploaded by `POST
  * /api/namespaces/<namespace>/files`): each under the store's `files/<namespace>/`, its bytes as `<id>` and what it was sent as beside
- * them, `<id>.json`. A file is written first as `<id>.part`, as its bytes come (`fileBegun`, its `write`), then kept whole (`fileKept`) or let go of
- * (`fileDropped`); a start finds one by its id in its own namespace (`fileAt`). Every file is let go of `FILE_KEPT_FOR` after it was
- * last written (`filesPruned`, which each upload asks first): a run copies what it is handed into its own `inputs/`, so a file let go of takes
- * nothing from a run.
+ * them, `<id>.json`. A file is written first as `<id>.part`, as its bytes come (`fileBegun`, its `write`), then kept whole (`fileKept`)
+ * or let go of (`fileDropped`); a start finds one by its id in its own namespace (`fileAt`). Every file is let go of `FILE_KEPT_FOR`
+ * after it was last written (`filesPruned`, which each upload asks first): a run copies what it is handed into its own `inputs/`, so a
+ * file let go of takes nothing from a run.
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -26,8 +26,8 @@ const namespaceKept = (namespace: string): boolean => namespace === 'default' ||
 export const filesDir = (home: string, namespace: string): string => path.join(home, 'files', namespace);
 
 /**
- * Every file of every namespace last written longer ago than `FILE_KEPT_FOR` before `now`, let go of, its bytes, its record and a part never
- * finished alike: the names let go of, as `<namespace>/<file>`.
+ * Every file of every namespace last written longer ago than `FILE_KEPT_FOR` before `now`, let go of, its bytes, its record and a part
+ * never finished alike: the names let go of, as `<namespace>/<file>`.
  * @param home The store's root.
  * @param now The time it is now, in milliseconds.
  */

@@ -1,7 +1,8 @@
 /**
  * The files a start hands its run's steps as a client sends them over the api: each by its name and its bytes, its text or base64, or a
- * file the factory keeps for it, uploaded first (`files.store.ts`), never a path of the client's. Why one cannot be handed (`sentInputRefusal`), and the files written into a folder of their own for `START` to copy from as it
- * copies `--input` files (`sentInputsWritten`), that folder removed once it has (`sentInputsRemoved`).
+ * file the factory keeps for it, uploaded first (`files.store.ts`), never a path of the client's. Why one cannot be handed
+ * (`sentInputRefusal`), and the files written into a folder of their own for `START` to copy from as it copies `--input` files
+ * (`sentInputsWritten`), that folder removed once it has (`sentInputsRemoved`).
  */
 import fs from 'node:fs';
 import os from 'node:os';

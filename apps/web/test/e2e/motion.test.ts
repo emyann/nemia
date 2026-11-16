@@ -87,8 +87,8 @@ const shimmerOf = (page: Page): Promise<{ animation: string; image: string }> =>
     .evaluate((title) => ({ animation: getComputedStyle(title).animationName, image: getComputedStyle(title).backgroundImage }));
 
 test("a trace's running title shimmers, and holds still where the person asked for reduced motion", WAITED, async () => {
-  const moving = await openStory(browser, served.at, 'dark', 'run-trace--running');
-  const still = await openStory(browser, served.at, 'dark', 'run-trace--running', { still: true });
+  const moving = await openStory(browser, served.at, 'dark', 'look-trace--running');
+  const still = await openStory(browser, served.at, 'dark', 'look-trace--running', { still: true });
   try {
     const shimmer = await shimmerOf(moving);
     assert.equal(shimmer.animation, 'tw-shimmer', 'it shimmers');

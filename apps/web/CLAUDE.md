@@ -40,7 +40,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - `npm run build` regenerates `src/routeTree.gen.ts`: a new route file fails `typecheck` until a build has run once.
 - `npm run e2e -- --pages <the pages the change touches>` runs its assertions in the dark theme, `--photos` too when pictures are due;
   never the whole suite in a session but to measure it. It runs none of the look's browser tests: add `--look` (`npm run e2e -- --look
-  --pages <…>`, or `--look` alone) when the change touches a part of the look, a story, `test/e2e/parts/` or a runner file beside the
+  --pages <…>`, or `--look` alone) when the change touches a part of the look, a story, `test/e2e/stories/` or a runner file beside the
   pages (`visit.ts`, `checks.ts`, `contrast.ts`). A whole run whose pages cost more than `PAGES_BOUND_MS` summed fails, naming
   its slowest pages; its own time past `E2E_BOUND_MS` is said, never refused: it is the machine's, by the workers it gave (`overBound`,
   `pastTool`, `e2e/timing.ts`).
@@ -65,8 +65,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   deletes the builds of every Playwright it does not see): `npx playwright install chromium` for the e2e, and
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.
 - `npm test` runs `test/*.test.ts`, never `test/e2e/*.test.ts` (those launch Chromium): `npm run e2e -- --look`, and a whole `npm run
-  e2e`, run them first, two files at a time (`LOOK_TESTS`, `e2e/look.ts`), then every story (`npm run stories`); `--pages` and
-  `--shard` run none. A web test that needs
+  e2e`, build Storybook static once, then run them, two files at a time (`LOOK_TESTS`, `e2e/look.ts`), then every story (`npm run
+  stories`); `--pages` and `--shard` run none. A web test that needs
   no browser sits in `test/`.
 - The stories are the one place the parts are shown, and where a step builds and judges a visual change: write or extend the story
   first, then the part. They draw under one decorator (`.storybook/preview.tsx`: the look's ground, a router of the story's own in
@@ -98,17 +98,24 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `before-`, `after-` and `diff-` for each story whose pixels differ, and `stories.json`; a changed part no story reaches is refused,
   exit 1, named. `--list` prints the touched ids and bare parts as JSON and launches no browser; `--changed <path>…` names the paths
   instead of git. It builds Storybook twice: a few minutes, about 2.6 GB.
-- The checks still read the parts page, `test/e2e/parts/main.tsx` (`?part=<name>`, `?story=<id>`; the `Pages/` stories are not on it,
-  having no loader there), built into a scratch folder by `buildParts` and never by `npm run build`: `test/e2e/parts.test.ts` presses
-  it (`npm run e2e -- --look`), and `node test/e2e/parts-photos.ts` pictures it, light then dark.
+- What a person does to a part — a press, the keyboard, the focus, where a link leads, what a press opens — is its story's play
+  function (`play`, its helpers `.storybook/play.ts`), run by `npm run stories`. What needs the browser's own input or reads pixels
+  stays a browser test under `test/e2e/` (`cuts.test.ts`, `bars.test.ts`, `motion.test.ts`, `secondary.test.ts`), each story opened
+  alone in Storybook's static build at `iframe.html?id=<id>` (`openStory`, `e2e/stories/built.ts`), which `--look` builds once and names
+  in `LOOK_STORYBOOK`, and a test run alone builds itself: the pixels (`e2e/pixels.ts`), Enter on a link, which the browser turns into a
+  click and a play function's keys never do (`e2e/keys.ts`), CSS's `:hover`, reduced motion and the dark theme. `node
+  test/e2e/look-photos.ts` pictures every story and the look's close-ups, light then dark, for a person.
+- **A step looks at its visual work through `storybook dev`**, from `apps/web`: `npx storybook dev -p <a port of its own> --no-open
+  --ci` (never 6007, the person's, nor a port another run holds), kept by its pid in the step's own files, and each story read at
+  `http://localhost:<port>/iframe.html?id=<story id>`; an edit shows in under a second. It holds about 2.5 GB while it runs, which
+  counts against the step's memory limit: stop it, by that pid, before a Vitest run, a build, the e2e or the typecheck.
 - `npm run board:serve` (`e2e/serve.ts`) builds outside the workspace and serves one board a workspace, on a seeded store of its own
-  (`e2e/served.ts`, the worker's serving code too), and the look's stories beside it, whose address it prints on a third line, `stories
-  on <url>`, and on a fourth the person's token its store keeps, `token <token>`, which a browser pastes on the board's token page: every
-  api route asks for one, loopback too; `npm run board:stop` ends its holder, which else ends by itself.
+  (`e2e/served.ts`, the worker's serving code too), for what needs the api and the whole board; it prints its address, its api's, and
+  on a third line the person's token its store keeps, `token <token>`, which a browser pastes on the board's token page: every api route
+  asks for one, loopback too; `npm run board:stop` ends its holder, which else ends by itself.
 - Every api route asks for a token, so each browser context the e2e opens on a worker's seat is given the seed's (`SEAT_TOKEN`) as the
   board's cookie before a page loads (`seated`, `e2e/served.ts`; `visitAll` does it for every page), and a request made from Node presents
-  it as its bearer (`bearer`); a context meant to meet the token page is opened bare.
-  on <url>`; `npm run board:stop` ends its holder, which else ends by itself. A holder that ends before it serves leaves
+  it as its bearer (`bearer`); a context meant to meet the token page is opened bare. A holder that ends before it serves leaves
   `hold.log` in its folder, and the refusal quotes its last lines and its path; its api is given no `NEMIA_BIND` or `WF_EXPOSED` (`apiEnvOf`).
 
 ## Writing an e2e page

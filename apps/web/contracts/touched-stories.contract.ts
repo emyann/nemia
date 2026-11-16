@@ -10,7 +10,8 @@
  *
  * That each list keeps the order it was handed in is no law here: said as one (the output is the input filtered, value for value, or
  * each value after the one before it), the verifier runs out of work on it at four times its default and proves it for no length, so
- * `test/e2e-stories.test.ts` holds the order on a row of its table instead.
+ * `test/e2e-stories.test.ts` holds each order on a row of its own instead: the stories' in the order of their files, and the bare
+ * parts' in the order they were handed in, each seen failing on a `storiesTouched` that reversed it.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 

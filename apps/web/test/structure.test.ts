@@ -109,7 +109,7 @@ const importsIn = (text: string): string[] => specifiersIn(withoutComments(text)
 const leavesWeb = (file: string, mod: string): boolean =>
   mod.startsWith('.') && path.posix.normalize(path.posix.join(path.posix.dirname(file), mod)).startsWith('../');
 
-/** Whether a relative module named in `file` of `src` is under the board's `test/`: a fixture, a helper, the page of the look's stories. */
+/** Whether a relative module named in `file` of `src` is under the board's `test/`: a fixture, a helper, `test/e2e/stories/built.ts`. */
 const reachesTests = (file: string, mod: string): boolean =>
   mod.startsWith('.') && path.posix.normalize(path.posix.join(path.posix.dirname(file), mod)).startsWith('test/');
 
@@ -298,19 +298,19 @@ test('REFUSED: a generated file under lib/api, and a Schema of src named as a ki
   assert.deepEqual(planted('src/routeTree.gen.ts', 'export const x = 1;\n'), [], "the router's generated tree, out of lib/api");
 });
 
-test("REFUSED: a file of the source that imports a test file, the page of the look's stories among them", () => {
+test("REFUSED: a file of the source that imports a test file, the look's static Storybook among them", () => {
   const planted = (mod: string): string[] => importBreaks(new Map([...sourceTexts(), ['src/x.ts', `import { y } from '${mod}';\n`]]));
   assert.deepEqual(planted('../test/fixtures.ts'), [
     'src/x.ts imports ../test/fixtures.ts, a file of the tests: move what the board needs under src, the built board holds no test',
   ]);
-  assert.deepEqual(planted('../test/e2e/parts/main.tsx'), [
-    'src/x.ts imports ../test/e2e/parts/main.tsx, a file of the tests: move what the board needs under src, the built board holds no test',
+  assert.deepEqual(planted('../test/e2e/stories/built.ts'), [
+    'src/x.ts imports ../test/e2e/stories/built.ts, a file of the tests: move what the board needs under src, the built board holds no test',
   ]);
 });
 
 test('REFUSED: the board is built from its one page, never from an entry of its own beside it', () => {
   const entries = (config: string): string[] => [...config.matchAll(/\b(?:input|entry)\s*:/g)].map((m) => m[0]);
-  assert.deepEqual(entries("build: { rollupOptions: { input: { parts: 'test/e2e/parts/index.html' } } }"), ['input:']);
+  assert.deepEqual(entries("build: { rollupOptions: { input: { gallery: 'test/e2e/gallery/index.html' } } }"), ['input:']);
   const config = fs.readFileSync(path.join(WEB, 'vite.config.ts'), 'utf8');
   assert.match(config, /export default defineConfig\(/, 'the config is read');
   assert.deepEqual(entries(config), []);

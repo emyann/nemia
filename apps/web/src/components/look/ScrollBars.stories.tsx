@@ -1,14 +1,19 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-/** The look's scroll bars, which the board's styles draw on what is marked as scrolling: a box shorter than what it holds. */
+/**
+ * The look's scroll bars, which the board's styles draw on what is marked as scrolling: a box shorter than what it holds, in a page
+ * longer than the window, as the board's pages are, so the page's own bar is drawn too.
+ */
 const meta: Meta = { title: 'Look/ScrollBars' };
 export default meta;
 
-/** A box shorter than what it holds. */
+/** A box shorter than what it holds, at the head of a page twice the height of the checks' window (800). */
 function Scroller() {
   return (
-    <div data-scroller style={{ width: 260, height: 160, overflow: 'auto', background: 'var(--card)' }}>
-      <div style={{ height: 640, padding: 16 }}>A box shorter than what it holds.</div>
+    <div style={{ minHeight: 1600 }}>
+      <div data-scroller style={{ width: 260, height: 160, overflow: 'auto', background: 'var(--card)' }}>
+        <div style={{ height: 640, padding: 16 }}>A box shorter than what it holds.</div>
+      </div>
     </div>
   );
 }

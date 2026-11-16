@@ -778,7 +778,7 @@ const lookRunStep = (workflow: Workflow): Step | undefined =>
 
 /**
  * A look job that is not there or runs other than the look's tests alone, and a shard that runs them too. The look's tests run once per
- * push: in every shard they ran four times, each file with its own Chromium and stories page, and nowhere they would run not at all.
+ * push: in every shard they ran four times, each file with its own Chromium, and nowhere they would run not at all.
  */
 function lookDrift(workflow: Workflow): string[] {
   const command = `${E2E_COMMAND} -- ${LOOK_FLAG}`;

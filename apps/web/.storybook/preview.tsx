@@ -1,5 +1,5 @@
 /**
- * What every story of the look is drawn in, in Storybook and on the page the checks read alike: the board's styles, the look's
+ * What every story of the look is drawn in, in Storybook and in `npm run stories` alike: the board's styles, the look's
  * ground, and a router of its own over a history kept in memory, so a link of a story leads somewhere and moves no address but its
  * own. Where that router stands is written on the story's wrapper (`data-at`), and how many times it moved (`data-moves`). A story's
  * parameters say `at`, the address it opens on, and `scrollMark: false`, for a story nothing marks the scrolls of.
@@ -8,8 +8,8 @@
  * its requests are answered by MSW (`mswLoader`) from the handlers a story names in `parameters.msw`, over fixtures typed by `objects`
  * (`.storybook/fixtures/`). Every story is held to axe in the accessibility addon as `error`, so a violation fails `npm run stories`; a
  * story that fails it today has its a11y test set to warn only, in its own file, a count `test/stories.test.ts` holds to its
- * baseline. A story the holder caught throwing fails after it is drawn (`afterEach`), so a broken story is a failing test and not a
- * quiet `data-broken`.
+ * baseline. A story the holder caught throwing, or one that draws nothing, fails after it is drawn (`afterEach`, `undrawn`), so a
+ * broken story is a failing test and not a quiet `data-broken`.
  */
 import { Component, createContext, useContext, useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import { createMemoryHistory, createRootRoute, createRouter, RouterProvider, useRouter, useRouterState } from '@tanstack/react-router';
@@ -20,6 +20,7 @@ import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import '../src/styles.css';
 import { ScanLines } from '../src/components/look';
 import { useScrollMark } from '../src/lib/useScrollMark';
+import { undrawn } from './drawn';
 
 /** What a story's router draws: the story, and whether its scrolls are marked. */
 type Drawn = { Story: ComponentType; marked: boolean };
@@ -96,9 +97,11 @@ function Routed({ Story, at, marked }: Drawn & { at: string }) {
 const preview: Preview = {
   parameters: { layout: 'fullscreen', a11y: { test: 'error' } },
   loaders: [mswLoader()],
-  afterEach: ({ canvasElement }) => {
+  afterEach: ({ canvasElement, id }) => {
     const broken = canvasElement.querySelector('[data-broken]');
-    if (broken) throw new Error(`the story threw as it was drawn: ${broken.textContent ?? ''}`);
+    const drawn = canvasElement.querySelector('[data-story-ground] > *')?.getBoundingClientRect().height ?? 0;
+    const faults = undrawn([{ id, broken: broken ? (broken.textContent ?? '') : null, height: drawn }]);
+    if (faults.length) throw new Error(`the story did not draw as it should: ${faults.join('; ')}`);
   },
   decorators: [
     (Story, { parameters }) => (

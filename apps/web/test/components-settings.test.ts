@@ -1,7 +1,7 @@
 /**
  * Settings' Server release section (`src/components/settings/ServerRelease.tsx`) and the frame's note that sends a person there
  * (`NewerRelease`), rendered to markup as a server renders them, the reads they make already answered: what a person is shown and
- * offered, without a browser. Its states in a browser are its stories, pictured by `test/e2e/parts-photos.ts`.
+ * offered, without a browser. Its states in a browser are its stories.
  *
  * Node runs a test's TypeScript as it is, and not a component's JSX: `./tsx.ts` registers the hooks that load one. Registered before
  * the components are imported, so every import of one below is dynamic.

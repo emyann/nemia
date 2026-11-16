@@ -1,16 +1,25 @@
 /**
  * The look's browser tests — `test/e2e/*.test.ts`, the assertions made to refuse (checks.test.ts), the visiting and its exit
- * (visit.test.ts), a full-page picture (photograph.test.ts), the contrast's measure (contrast.test.ts) and the look's parts on their
- * stories page (bars, parts and secondary) — then every story in Chromium through Vitest (`npm run stories`: its render, its play
- * function, axe), which the runner runs before it builds anything when its plan says `look` (`planOf`, pages.ts): `npm run e2e --
- * --look`, and a whole `npm run e2e`. Never `--pages` alone, nor a shard: CI runs them once per push, in its `e2e-look` job.
+ * (visit.test.ts), a full-page picture (photograph.test.ts), the contrast's measure (contrast.test.ts) and the look's stories read in
+ * pixels and by the browser's own input, each opened alone in Storybook's static build (bars, cuts, motion and secondary), and the
+ * stories' Vitest leaving the route tree unwritten (route-tree) — then every
+ * story in Chromium through Vitest (`npm run stories`: its render, its play function, axe), which the runner runs before it builds
+ * anything when its plan says `look` (`planOf`, pages.ts): `npm run e2e -- --look`, and a whole `npm run e2e`. Never `--pages` alone,
+ * nor a shard: CI runs them once per push, in its `e2e-look` job.
  *
- * Each file launches Chromium, and three build the look's stories page into a scratch folder: about 1.8 GB a file. So they run at most
- * two files at once, the bound of every package's `test` script, and each test at `WAITED`'s timeout (held by `test/e2e-look.test.ts`).
- * The stories' Vitest runs after them, never beside them, so the two never hold their memory at once.
+ * Storybook is built static once, into a folder of the machine's temp directory, before the tests, which read it through
+ * `LOOK_STORYBOOK` (`stories/built.ts`) and build none of their own; the folder goes once they have run. Each file launches Chromium:
+ * so they run at most two files at once, the bound of every package's `test` script, and each test at `WAITED`'s timeout (held by
+ * `test/e2e-look.test.ts`). The build runs before them and the whole stories' Vitest after them, never beside them. One test file
+ * runs a Vitest of its own, on one story file (route-tree.test.ts), and so beside whichever other file runs with it: a Vitest and a
+ * Chromium of a test at once, the peak of the run's tree.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { WEB } from './world.ts';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { buildStorybook, LOOK_STORYBOOK } from './stories/built.ts';
+import { REPO, WEB } from './world.ts';
 
 /** The node arguments the look's tests run with, from the web app: node expands the glob itself. */
 export const LOOK_TESTS: readonly string[] = ['--test', '--test-concurrency=2', '--test-timeout=120000', 'test/e2e/*.test.ts'];
@@ -36,10 +45,17 @@ export const LOOK_RUNS: readonly LookRun[] = [
   },
 ];
 
-/** Runs `run`, its output said as it says it; resolves once it passes, rejects naming how to run it again when it does not. */
-function runOne(run: LookRun, children: ChildProcess[]): Promise<void> {
+/**
+ * Runs `run`, its output said as it says it, with `LOOK_STORYBOOK` naming `storybook`; resolves once it passes, rejects naming how to
+ * run it again when it does not.
+ */
+function runOne(run: LookRun, children: ChildProcess[], storybook: string): Promise<void> {
   console.log(`e2e: ${run.said}`);
-  const child = spawn(run.command, [...run.args], { cwd: WEB, stdio: 'inherit' });
+  const child = spawn(run.command, [...run.args], {
+    cwd: WEB,
+    stdio: 'inherit',
+    env: { ...process.env, [LOOK_STORYBOOK]: storybook },
+  });
   children.push(child);
   return new Promise((resolve, reject) => {
     child.on('error', reject);
@@ -51,10 +67,24 @@ function runOne(run: LookRun, children: ChildProcess[]): Promise<void> {
 }
 
 /**
- * Runs what `--look` runs (`LOOK_RUNS`), one after the other, and resolves once each passes; rejects at the first that fails, naming
- * how to run it again. Each child is pushed onto `children`, the runner's, so a signal stops it with the workers.
+ * Builds Storybook static into a folder of the temp directory, then runs what `--look` runs (`LOOK_RUNS`), one after the other, and
+ * resolves once each passes; rejects where the build fails, and at the first that fails, naming how to run it again. Each child is
+ * pushed onto `children`, the runner's, so a signal stops it with the workers. The folder is removed either way, and on the runner's
+ * exit.
  * @param children The runner's children, which a signal stops.
  */
 export async function lookTests(children: ChildProcess[]): Promise<void> {
-  for (const run of LOOK_RUNS) await runOne(run, children);
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-look-storybook-'));
+  const away = (): void => fs.rmSync(folder, { recursive: true, force: true });
+  process.once('exit', away);
+  try {
+    const storybook = path.join(folder, 'static');
+    console.log("e2e: Storybook's static build, which the look's tests read (storybook build)");
+    const why = await buildStorybook(REPO, WEB, storybook);
+    if (why) throw new Error(`${why}: build it by hand from apps/web, npx storybook build, and read what it says`);
+    for (const run of LOOK_RUNS) await runOne(run, children, storybook);
+  } finally {
+    away();
+    process.off('exit', away);
+  }
 }

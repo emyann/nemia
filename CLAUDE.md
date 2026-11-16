@@ -57,8 +57,8 @@ holds what every change needs.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
   `--pages` runs none of the look's browser tests (`apps/web/test/e2e/*.test.ts`): add `--look` (`npm run e2e -- --look --pages
-  <…>`, or `--look` alone) when the change touches a part of the look (`src/components/look`), a story, `test/e2e/parts/` or a runner
-  file beside the pages; they run two files at a time, then every story through Vitest in Chromium (`npm run stories`, from
+  <…>`, or `--look` alone) when the change touches a part of the look (`src/components/look`), a story, `test/e2e/stories/` or a runner
+  file beside the pages; Storybook is built static once for them, they run two files at a time, then every story through Vitest in Chromium (`npm run stories`, from
   `apps/web`, which a change to a story runs alone, or one file of it: `npx vitest run --project=storybook <file>.stories.tsx`). A
   session never runs it whole but to measure it: `ci`'s `e2e-look` job runs the look's tests and the stories once and its `e2e` shards
   every page, on the commit implement's round check pushed, which is the commit the landing

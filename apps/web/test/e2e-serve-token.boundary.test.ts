@@ -4,7 +4,7 @@
  *
  * A boundary test, and the real holder is its whole subject: the token is minted by the seed inside a detached process and read back
  * from the file it writes, which no stand-in models. No build is made: the board's `dist` is a page of one line, since the api is
- * what is asked, and the stories' folder is left empty.
+ * what is asked.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +16,6 @@ import { alive, servedIn, startHolder } from './e2e/serve.ts';
 test('a holder serves the token its store minted, and its api takes it', async () => {
   const dir = path.join(scratch('nemia-board-token-'), 'board');
   fs.mkdirSync(path.join(dir, 'dist'), { recursive: true });
-  fs.mkdirSync(path.join(dir, 'stories'));
   fs.writeFileSync(path.join(dir, 'dist', 'index.html'), '<!doctype html><title>board</title>\n');
   const served = await startHolder(dir, 'tree');
   try {

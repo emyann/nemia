@@ -1,11 +1,11 @@
 /**
- * Which cuts of a framed table's frame were painted over (`spilledOver`, `test/e2e/parts/pixels.ts`), as `bars.test.ts` reads them:
+ * Which cuts of a framed table's frame were painted over (`spilledOver`, `test/e2e/pixels.ts`), as `bars.test.ts` reads them:
  * a name is kept when its point is far enough from the ground, each name once, and in one order whichever point crossed first, so
  * that a borderline pixel at the first depth cannot refuse a case both cuts spilled in. `npm run e2e` reads the painted pixels.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spilledOver, type Rgb } from './e2e/parts/pixels.ts';
+import { spilledOver, type Rgb } from './e2e/pixels.ts';
 
 const GROUND: Rgb = [16, 16, 16];
 const PAINTED: Rgb = [220, 220, 220];

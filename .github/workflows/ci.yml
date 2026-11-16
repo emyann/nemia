@@ -284,9 +284,9 @@ jobs:
 
   e2e-look:
     # The look's browser tests (apps/web/test/e2e/*.test.ts), once per push, beside the shards, which run none of them: each file
-    # launches Chromium and three build the look's stories page, so in every shard they cost four times what they prove once. Two
-    # files at a time, the bound of every package's suite (LOOK_TESTS, apps/web/test/e2e/look.ts). The job took 2m43s on its first
-    # green run (Actions run 43510805757, 2026-11-13); bounded at 20, above that and above its Chromium install's 15 on a cache miss.
+    # launches Chromium and reads Storybook's static build, made once before them: in every shard they cost four times what they
+    # prove once. Two files at a time, the bound of every package's suite (LOOK_TESTS, apps/web/test/e2e/look.ts). The job took
+    # 2m43s on its first green run (Actions run 43510805757, 2026-11-13); bounded at 20, above that and above its Chromium install's 15 on a cache miss.
     name: e2e look
     runs-on: ubuntu-latest
     timeout-minutes: 20

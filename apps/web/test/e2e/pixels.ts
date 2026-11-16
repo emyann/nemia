@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import type { Browser, Page } from 'playwright';
-import { photograph } from '../board.ts';
+import { photograph } from './board.ts';
 
 /** A colour as a picture holds it. */
 export type Rgb = [number, number, number];

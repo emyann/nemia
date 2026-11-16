@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, screen, userEvent, within } from 'storybook/test';
+import { expect, screen, userEvent, waitFor, within } from 'storybook/test';
 import { levelQuery, nemiaMemoryQuery, type NemiaLevel } from '@/lib/api/nemia';
 import { policyQuery } from '@/lib/api/policy';
 import { NemiaSettings } from './NemiaSettings';
@@ -45,7 +45,7 @@ export const SemiAuto: Story = {
   play: async ({ canvasElement }) => {
     const section = within(canvasElement);
     await userEvent.click(section.getByRole('button', { name: /Her level$/ }));
-    await expect(await screen.findByRole('option', { name: 'Auto' })).toBeVisible();
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Auto' })).toBeVisible());
     await userEvent.keyboard('{Escape}');
     await expect(section.getByRole('button', { name: 'End the raise' })).toBeVisible();
     await expect(section.getByRole('button', { name: 'owner.md' })).toHaveAttribute('aria-expanded', 'false');

@@ -326,6 +326,13 @@ function Field({
         ref={group}
         data-slot="combo-box-container"
         data-populated={populated || undefined}
+        // Tab commits the option the list has under the focus. In multiple
+        // mode the list stays open on the option just chosen, and to commit
+        // it again takes it back out: close the list first, before React
+        // Aria's own handler, and Tab leaves the choice as it is.
+        onKeyDownCapture={(e) => {
+          if (multiple && e.key === "Tab" && state?.isOpen) state.close();
+        }}
         className={s.container()}
       >
         {leadingIcon && (

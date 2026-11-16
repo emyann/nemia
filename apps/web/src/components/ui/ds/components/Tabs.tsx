@@ -317,8 +317,10 @@ export function Tab({
               renderProps.isDisabled,
             ).tab({
               // Fixed tabs divide the row into equal sections; scrollable ones
-              // size to their labels.
-              className: isScrollable ? "shrink-0" : "flex-1",
+              // size to their labels. The ring is drawn inside: a tab fills
+              // the list's height, and a list that scrolls cuts what is
+              // drawn outside it.
+              className: cn("-outline-offset-3", isScrollable ? "shrink-0" : "flex-1"),
             }),
           }),
           caller,

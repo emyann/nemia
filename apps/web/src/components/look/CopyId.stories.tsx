@@ -4,7 +4,7 @@ import { atRest } from '../../../.storybook/play';
 import { CopyId } from './CopyId';
 import { ON_CARD } from './stories.fixtures';
 
-/** A run's id with the control that copies it: short, its last four characters in a box, whole, and whole under a title. */
+/** A run's id with the control that copies it: short, its last four characters, whole, and whole under a title. */
 const meta: Meta = { title: 'Look/CopyId' };
 export default meta;
 
@@ -28,8 +28,8 @@ async function idsHold(canvas: HTMLElement, boxes: readonly string[]): Promise<v
   );
 }
 
-/** The colour of the edge of the short id's box drawn in `canvas`, as the page computes it. */
-const edgeOf = (canvas: HTMLElement): string => getComputedStyle(canvas.querySelector('[data-run-id]')!).borderTopColor;
+/** The ink of the short id drawn in `canvas`, as the page computes it. */
+const inkOf = (canvas: HTMLElement): string => getComputedStyle(canvas.querySelector('[data-run-id]')!).color;
 
 /** The hue of a session at work, as the page computes it. */
 const aliveOf = (): string => {
@@ -41,27 +41,27 @@ const aliveOf = (): string => {
   return said;
 };
 
-/** The short id's box as it is at rest, whatever was just copied. */
-const KEPT_HAIRLINE = '[data-copied] [data-run-id] { border-color: var(--md-sys-color-outline-variant) !important; }';
+/** The short id's ink as it is at rest, whatever was just copied. */
+const KEPT_INK = '[data-copied] [data-run-id] { color: var(--md-sys-color-on-surface-variant) !important; }';
 
 /**
- * The short id: boxed, a hairline with six pixels of room; and its box takes the hue of a session at work for the moment after a
- * copy, on a clipboard that takes anything, and its hairline back at rest: a box kept as it was is seen.
+ * The short id: its last four characters in no box, quiet beside a title; and its ink takes the hue of a session at work for the
+ * moment after a copy, on a clipboard that takes anything, and its own back at rest: an ink kept as it was is seen.
  */
 export const Short: StoryObj = {
   play: async ({ canvasElement, userEvent }) => {
-    await idsHold(canvasElement, ['2e13: 1px, 6px 6px, 20px tall']);
+    await idsHold(canvasElement, ['2e13: 0px, 0px 0px, 16px tall']);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} }, configurable: true });
-    const [rest, alive] = [edgeOf(canvasElement), aliveOf()];
-    await expect(rest, `at rest the box is no hue of a session at work: ${rest}`).not.toBe(alive);
+    const [rest, alive] = [inkOf(canvasElement), aliveOf()];
+    await expect(rest, `at rest the id is no hue of a session at work: ${rest}`).not.toBe(alive);
     await userEvent.click(canvasElement.querySelector('button')!);
     await waitFor(() => expect(canvasElement.querySelector('[data-copied]')).not.toBeNull());
-    await waitFor(() => expect(edgeOf(canvasElement), 'just copied, its edge is the hue of a session at work').toBe(alive));
+    await waitFor(() => expect(inkOf(canvasElement), 'just copied, its ink is the hue of a session at work').toBe(alive));
     const kept = document.createElement('style');
-    kept.textContent = KEPT_HAIRLINE;
+    kept.textContent = KEPT_INK;
     document.head.append(kept);
     try {
-      await waitFor(() => expect(edgeOf(canvasElement), 'a box left with its hairline: seen').toBe(rest));
+      await waitFor(() => expect(inkOf(canvasElement), 'an id left in its own ink: seen').toBe(rest));
     } finally {
       kept.remove();
     }

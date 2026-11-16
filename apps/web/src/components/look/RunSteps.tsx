@@ -12,21 +12,32 @@ function nameInk(state: StepState): string {
   return hue === 'yours' || hue === 'failure' ? ink[hue] : 'text-on-surface-variant';
 }
 
-/** The states of a step not started: to come, waiting for a run slot, or held. */
+/** The states of a step not started. */
 const NOT_STARTED: ReadonlySet<StepState> = new Set(['waiting', 'waiting-for-slot', 'held']);
 
 /**
- * A step's bar, by its state: done filled whether a check says so or its own word does; at work filled in its hue, its glow
- * breathing on a layer of its own (`Breath`); one that waits on a person filled in yellow, one that failed filled in red; one not
- * started a dashed outline; every other as its state is drawn on every page (`stateClass`).
+ * A step's bar, by its state and whether it waits on something now (`waits`): done filled whether a check says so or its own word
+ * does; at work filled in its hue, its glow breathing on a layer of its own (`Breath`); one that waits on a person filled in yellow,
+ * one that failed filled in red; one not started a dashed outline where it waits on a run, a slot or a hold, and a quiet fill where it
+ * only waits its turn; every other as its state is drawn on every page (`stateClass`).
  */
-function barClass(state: StepState): string {
+function barClass(state: StepState, waits: boolean): string {
   const { hue } = stateDrawn[state];
   if (state === 'working') return cn('relative', filled.alive);
   if (hue === 'yours') return filled.yours;
   if (hue === 'failure') return filled.failure;
-  if (NOT_STARTED.has(state)) return dashed.grey;
+  if (NOT_STARTED.has(state)) return waits ? dashed.grey : 'bg-surface-container-highest';
   return stateClass[state === 'unverified' ? 'verified' : state];
+}
+
+/**
+ * Whether the step of `drawn` at `at` waits on something now, not only its turn: a run slot or a hold by its state, a thing it names
+ * (`on`), or, on a held run, the first step not started, which the hold stops.
+ */
+function waitsNow(drawn: ReadonlyArray<{ state: StepState; on: WaitOn | null }>, at: number, held: boolean): boolean {
+  const { state, on } = drawn[at]!;
+  if (state !== 'waiting') return NOT_STARTED.has(state);
+  return on !== null || (held && drawn.findIndex((step) => NOT_STARTED.has(step.state)) === at);
 }
 
 /**
@@ -72,13 +83,13 @@ export function RunSteps({
       className={cn('grid text-label-small uppercase', names ? 'gap-1.5' : 'w-fit gap-[3px]')}
       style={{ gridTemplateColumns: `repeat(${Math.max(1, drawn.length)}, ${names ? 'minmax(0, 1fr)' : '30px'})` }}
     >
-      {drawn.map((step) => {
+      {drawn.map((step, at) => {
         const bar = (
           <span
             key={step.name}
             data-step={step.name}
             data-state={step.state}
-            className={cn('block', names ? 'h-2' : 'h-[5px]', barClass(step.state))}
+            className={cn('block', names ? 'h-2' : 'h-[5px]', barClass(step.state, waitsNow(drawn, at, held)))}
           >
             {step.state === 'working' && <Breath />}
           </span>

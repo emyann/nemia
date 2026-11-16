@@ -271,7 +271,7 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
     },
   );
   await t.test(
-    'a step done is filled in the rail whether a check says so or its own word does, and a step to come is dashed',
+    'a step done is filled in the rail whether a check says so or its own word does, one to come is quiet, one that waits dashed',
     async () => {
       const steps = [
         { name: 'design', ...coded('unverified') },
@@ -284,7 +284,11 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
       assert.equal(classOf('design'), classOf('implement'), 'done on its own word is drawn as done on a check');
       assert.match(classOf('design') ?? '', /bg-sage /, 'filled');
       assert.notEqual(classOf('review'), classOf('design'), 'a step to come is not drawn as one done');
-      assert.match(classOf('review') ?? '', /border-dashed/, 'a step to come is a dashed outline');
+      assert.match(classOf('review') ?? '', /bg-surface-container-highest/, 'a step that only waits its turn is a quiet fill');
+      const waiting = await drawn(createElement(RunSteps, { steps: [{ name: 'land', ...coded('waiting on r-0') }], cancelled: false, held: false }));
+      assert.match(tagWith(waiting, 'data-step="land"'), /border-dashed/, 'a step that waits on a run is a dashed outline');
+      const held = await drawn(createElement(RunSteps, { steps, cancelled: false, held: true }));
+      assert.match(tagWith(held, 'data-step="review"'), /border-dashed/, "a held run's first step not started is dashed: the hold stops it");
       assert.match(tagWith(html, 'data-run-steps'), /grid-template-columns:repeat\(3, 30px\)/, 'with no names, short bars side by side');
       assert.match(html, /aria-label="design done, implement verified, review to come"/, 'read aloud, a check is told from a word');
     },

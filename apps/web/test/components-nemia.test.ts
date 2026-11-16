@@ -57,7 +57,7 @@ async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): 
 
 /** The level the Select pressed at `mark` shows in `html`, or undefined where there is none. */
 const pickedAt = (html: string, mark: string): string | undefined =>
-  html.slice(html.indexOf(mark)).match(/data-slot="select-value"[^>]*><span[^>]*>([^<]*)</)?.[1];
+  html.slice(html.indexOf(mark)).match(/data-slot="select-value"[^>]*>(?:<[^>]*>)*([^<]+)</)?.[1];
 
 test("REFUSED to offer: the default factory's own switch or raise, a raise over a raise, a raise of a factory at Semi-auto by default", async () => {
   const row = (factory: string, over: Record<string, unknown> = {}) => ({
@@ -193,7 +193,7 @@ test("Nemia's folder the keeper could not trust: under the switch, the refusal's
 test('Nemia stopped from outside: said so, with a way to a fresh session', async () => {
   const html = await nemiaWith({ ...nemiaUp, stopped: true });
   assert.match(html, /data-state="stopped"/);
-  assert.match(html, /data-nemia-restart[^>]*>Start a fresh session</);
+  assert.match(html, /data-nemia-restart[^>]*>(?:<[^>]*>)*Start a fresh session</);
 });
 
 test('Nemia not filed, or her folder untrusted, names no task; filed, it names its task and phase', async () => {

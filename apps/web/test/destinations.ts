@@ -63,7 +63,6 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/components/ui/label:Label': kit('TextField', 'its label'),
   '@/components/ui/select:Select': kit('Select'),
   '@/components/ui/select:SelectContent': kit('Select'),
-  '@/components/ui/select:SelectGroup': kit('Select'),
   '@/components/ui/select:SelectItem': kit('SelectItem'),
   '@/components/ui/select:SelectTrigger': kit('Select'),
   '@/components/ui/select:SelectValue': kit('Select'),

@@ -1,7 +1,6 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { Button, Switch } from '@/components/ui/ds';
 import { BackToAgents, AgentLink, SkillRefused, SkillSourceBadge } from './AgentParts';
 import { SkillForm } from './SkillForm';
 import { saveSkill, SkillRefusal, skillQuery, switchPreload, type SkillDetail, type SkillDraft, type SkillSaved } from '@/lib/api/skills';
@@ -141,7 +140,7 @@ function Moved({ file, onReadAgain }: { file: string; onReadAgain: () => void })
         {file} has changed since this form was drawn, so a save of it would write over that change and is refused. What you typed stays here
         until you read it again, which draws the form from the file as it now reads and drops it: copy out what you want to keep first.
       </p>
-      <Button variant="outline" onPress={onReadAgain}>
+      <Button variant="outlined" onPress={onReadAgain}>
         Read it again
       </Button>
     </div>
@@ -210,18 +209,16 @@ function Preload({
   changed: boolean;
   onSwitch: (on: boolean) => void;
 }) {
-  const id = useId();
   const { skill } = detail;
   const mine = skill.from === 'user';
   return (
     <fieldset data-preload className="space-y-2 rounded border border-outline-variant px-3 py-3">
       <legend className="px-1 text-label-medium text-muted-foreground uppercase">Every turn, or when needed</legend>
-      <div className="flex items-center gap-2 text-body-medium">
-        <Switch id={id} isSelected={skill.preload} onChange={onSwitch} isDisabled={!mine || changed || pending} />
-        <label htmlFor={id} className={mine && !changed && !pending ? 'cursor-pointer' : 'text-muted-foreground'}>
+      <Switch isSelected={skill.preload} onChange={onSwitch} isDisabled={!mine || changed || pending}>
+        <span>
           Load it every turn <code className="font-mono text-body-small text-muted-foreground">(preload: true)</code>
-        </label>
-      </div>
+        </span>
+      </Switch>
       {skill.cost && (
         <>
           <p data-skill-cost className="text-body-small text-foreground">

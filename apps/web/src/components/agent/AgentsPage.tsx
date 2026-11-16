@@ -1,9 +1,8 @@
 import { useQuery, useSuspenseQuery, type QueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { LinkButton } from '@/components/ui/button';
 import { AgentCard } from './AgentCard';
 import { SkillLink } from './AgentParts';
-import { routeLink } from '../nav/routeLink';
+import { Button } from '@/components/ui/ds';
 import { agentsQuery, type LibraryAgent } from '@/lib/api/agents';
 import { skillsQuery, type SkillPlace } from '@/lib/api/skills';
 import { storeQuery } from '@/lib/api/store';
@@ -16,7 +15,6 @@ import { PLACE_LABELS } from '@/lib/skills';
 export const loadAgents = (client: QueryClient) =>
   Promise.all([client.ensureQueryData(agentsQuery), client.ensureQueryData(storeQuery), client.prefetchQuery(skillsQuery)]);
 
-const RouterLinkButton = routeLink(LinkButton);
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
 /**
@@ -41,14 +39,12 @@ export function AgentsPage() {
           run already started.
         </p>
         <div className="flex flex-wrap gap-2">
-          <RouterLinkButton to="/agents/new" variant="outline">
-            <Plus data-icon="inline-start" />
+          <Button href="/agents/new" variant="outlined" icon={Plus}>
             New agent
-          </RouterLinkButton>
-          <RouterLinkButton to="/agents/skills/new" variant="outline">
-            <Plus data-icon="inline-start" />
+          </Button>
+          <Button href="/agents/skills/new" variant="outlined" icon={Plus}>
             New skill
-          </RouterLinkButton>
+          </Button>
         </div>
       </div>
 

@@ -286,6 +286,8 @@ export const apiEnvOf = (root: string, bin: string): NodeJS.ProcessEnv => ({
   NEMIA_BIND: '',
   /** Nor is the store marked exposed, by the same rule; a seat that wants one lays it over this (`serveExposed`). */
   WF_EXPOSED: '',
+  /** Nor does it declare a name it is served at, by the same rule. */
+  WF_SERVED_NAMES: '',
   /**
    * This machine's PATH without a folder that holds a `claude`, the store's or one installed here: the readiness read checks a harness
    * installed by finding its program on PATH, and a fresh seed has none.

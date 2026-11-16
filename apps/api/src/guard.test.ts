@@ -2,12 +2,15 @@
  * The guard on every write, read as the pure function it is (`writeRefused`): the near misses of each of its three headers, and a bearer
  * token that passes the host. Which refusal a request meets, and in what order, is the contract's
  * (`apps/api/contracts/write-guard.contract.ts`), proved; which spellings of a name or a media type the two patterns take (`loopback`,
- * `saysJson`), which the contract declares and does not read, is held here.
+ * `saysJson`), which the contract declares and does not read, is held here, and which hosts name a store's served names (`servedAt`),
+ * which the middleware hands the contract as `served`.
  * The middleware that applies it to every write is held by `test/guarded.test.ts`, over every endpoint of the `Api`.
  */
 import '../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { servedNamesOf } from 'agent-orchestrator';
+import { servedAt } from './address/address.ts';
 import { writeRefused } from './guard.ts';
 
 /**
@@ -15,7 +18,7 @@ import { writeRefused } from './guard.ts';
  * board's cookie alone where `cookie` is.
  */
 const refused = (host: string | undefined, site: string | undefined, type: string | undefined, bearer = false, cookie = false) =>
-  writeRefused({ method: 'POST', host, site, contentType: type, bearer, cookie });
+  writeRefused({ method: 'POST', host, site, contentType: type, bearer, cookie, served: false });
 
 test('writeRefused: which of its three headers refuses a write, and in what order', async (t) => {
   await t.test(
@@ -74,7 +77,15 @@ test('writeRefused: which of its three headers refuses a write, and in what orde
       assert.equal(refused('127.0.0.1', 'cross-site', 'text/plain'), 'site');
       for (const method of ['GET', 'HEAD'])
         assert.equal(
-          writeRefused({ method, host: 'evil.example', site: 'cross-site', contentType: undefined, bearer: false, cookie: false }),
+          writeRefused({
+            method,
+            host: 'evil.example',
+            site: 'cross-site',
+            contentType: undefined,
+            bearer: false,
+            cookie: false,
+            served: false,
+          }),
           null,
           method,
         );
@@ -99,4 +110,30 @@ test('writeRefused: which of its three headers refuses a write, and in what orde
       assert.equal(refused('100.64.0.1:8787', 'same-origin', 'text/plain', false, true), 'media');
     },
   );
+});
+
+test('servedAt: which hosts name a name an exposed store is served at', async (t) => {
+  const names = servedNamesOf(true, '100.64.0.7', ['nemia.taile26745.ts.net']);
+  await t.test('a served name on any port, in any case, with a trailing dot or white space around it', () => {
+    for (const host of [
+      'nemia.taile26745.ts.net:8787',
+      'nemia.taile26745.ts.net',
+      'NEMIA.taile26745.TS.net:8787',
+      'nemia.taile26745.ts.net.:8787',
+      ' 100.64.0.7:8787 ',
+    ])
+      assert.equal(servedAt(host, names), true, host);
+    assert.equal(servedAt('[fd7a:115c::1]:8787', ['[fd7a:115c::1]']), true);
+  });
+  await t.test('a name beside a served one is none: a subdomain, a suffix, a site that ends in it, another address, the empty host', () => {
+    for (const host of [
+      'evil.nemia.taile26745.ts.net',
+      'nemia.taile26745.ts.net.evil.example',
+      'xnemia.taile26745.ts.net',
+      '100.64.0.70:8787',
+      '',
+      ':8787',
+    ])
+      assert.equal(servedAt(host, names), false, host);
+  });
 });

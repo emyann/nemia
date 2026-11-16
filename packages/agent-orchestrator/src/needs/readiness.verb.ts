@@ -17,7 +17,17 @@ import { Effect, Exit } from 'effect';
 import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, memoryBytesOf } from 'agent-runtime/vocabulary';
 import type { Need, NeedState, Readiness, ReadinessCost, ReadinessFix, ReadinessPiece, ReadinessState } from 'objects';
 import { pathLedByTools, StoreRoot, toolsBinDir, toolsDir } from '../config/root.store.ts';
-import { cgroupParent, maxConcurrent, memoryLimit, memoryRequest, memoryReserved, type Env } from '../config/config.store.ts';
+import {
+  cgroupParent,
+  exposedStore,
+  maxConcurrent,
+  memoryLimit,
+  memoryRequest,
+  memoryReserved,
+  servedNames,
+  servedNamesOf,
+  type Env,
+} from '../config/config.store.ts';
 import { isRefusal } from '../refusal/refusal.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
 import type { Factory, FactoryListing } from '../factory/factory.ts';
@@ -118,7 +128,7 @@ const piece = (
   state: ReadinessState,
   message: string,
   fixes: readonly ReadinessFix[] = [],
-  more: Partial<Pick<ReadinessPiece, 'factory' | 'workflow' | 'addressKind' | 'harness'>> = {},
+  more: Partial<Pick<ReadinessPiece, 'factory' | 'workflow' | 'addressKind' | 'servedNames' | 'harness'>> = {},
 ): ReadinessPiece => ({ name, area, state, message, fixes, ...more, cost });
 
 /** The service and its linger keep the server up: a run waits on neither while the daemon runs. */
@@ -171,7 +181,11 @@ function servicePieces(facts: ReadinessFacts): ReadinessPiece[] {
   return [service, linger];
 }
 
-/** The bind: the kind of the address the api listens on (`kindOfBind`), and whether a public or wildcard one was acknowledged. */
+/**
+ * The bind: the kind of the address the api listens on (`kindOfBind`), and whether a public or wildcard one was acknowledged; on a store
+ * marked exposed, the names it is served at besides the loopback (`servedNamesOf`), and a `WF_SERVED_NAMES` set wrong as missing, in its
+ * reader's words.
+ */
 function bindPiece(facts: ReadinessFacts): ReadinessPiece {
   const bind = facts.env.NEMIA_BIND?.trim() || '127.0.0.1';
   const kind = kindOfBind(bind);
@@ -188,7 +202,27 @@ function bindPiece(facts: ReadinessFacts): ReadinessPiece {
       { addressKind: kind },
     );
   const reach = kind === 'loopback' ? 'this machine alone reaches it' : `it is reached on its ${kind} network`;
-  return piece(BIND, 'met', `the api listens on ${bind}: ${reach}`, [], { addressKind: kind });
+  if (!exposedStore(facts.env)) return piece(BIND, 'met', `the api listens on ${bind}: ${reach}`, [], { addressKind: kind });
+  let declared: readonly string[];
+  try {
+    declared = servedNames(facts.env);
+  } catch (error) {
+    if (!isRefusal(error)) throw error;
+    return piece(BIND, 'missing', error.message, [], { addressKind: kind });
+  }
+  const names = servedNamesOf(true, bind, declared);
+  const at =
+    names.length === 0 ? 'the loopback alone (declare the names you reach it by in WF_SERVED_NAMES)' : `the loopback, ${names.join(', ')}`;
+  return piece(
+    BIND,
+    'met',
+    `the api listens on ${bind}: ${reach}; a sign-in with no token, a pairing or a first-visit link, is taken at ${at}`,
+    [],
+    {
+      addressKind: kind,
+      servedNames: names,
+    },
+  );
 }
 
 /**

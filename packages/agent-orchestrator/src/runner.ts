@@ -48,6 +48,7 @@ export {
   maxRuns,
   SESSION_VARIABLES,
   SERVING_VARIABLES,
+  servedNamesOf,
   setting,
   type Settings,
   settingsOf,

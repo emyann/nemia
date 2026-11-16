@@ -20,6 +20,7 @@ const DAEMONS: Record<(typeof DROPPED)[number], string> = {
   WF_MEMORY_RESERVED: '1Gi',
   WF_CGROUP_PARENT: 'sessions.slice',
   NEMIA_BIND: '100.126.244.0',
+  WF_SERVED_NAMES: 'nemia.example.ts.net',
   WF_EXPOSED: '1',
   NEMIA_CONTEXT: 'the-persons-vps',
   XDG_CONFIG_HOME: '/elsewhere/.config',

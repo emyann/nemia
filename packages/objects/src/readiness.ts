@@ -48,9 +48,9 @@ export type ReadinessFix = typeof ReadinessFix.Type;
 /**
  * One piece of the read: its name (a need's name for a declared need), its area, its state, a sentence of what it is or why it is not in
  * place, its fixes, the factory and workflow of a workflow's need (the factory alone of a repository's), the kind of the bind's address
- * for the `bind` piece, for a harness's piece the harness it is of and which of its two needs (`harness`), so a reader groups a
- * harness's pieces without naming one, and what it costs while it is missing (`cost`, one of `READINESS_COSTS`; a server that declares
- * none is read as `run`).
+ * and, on a store marked exposed, the names it is served at (`servedNames`) for the `bind` piece, for a harness's piece the harness it
+ * is of and which of its two needs (`harness`), so a reader groups a harness's pieces without naming one, and what it costs while it is
+ * missing (`cost`, one of `READINESS_COSTS`; a server that declares none is read as `run`).
  */
 export const ReadinessPiece = Schema.Struct({
   name: Schema.String.annotate({ description: "The piece's name; a need's name for a declared need." }),
@@ -67,6 +67,12 @@ export const ReadinessPiece = Schema.Struct({
   workflow: Schema.optionalKey(Schema.String.annotate({ description: "The workflow of a workflow's need; absent otherwise." })),
   addressKind: Schema.optionalKey(
     Schema.Literals(ADDRESS_KINDS).annotate({ description: "The kind of the bind's address, for the bind piece." }),
+  ),
+  servedNames: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description:
+        'For the bind piece of a store marked exposed, the names besides the loopback a write with no token, a pairing among them, is taken at: the address it binds and the names declared in WF_SERVED_NAMES.',
+    }),
   ),
   harness: Schema.optionalKey(
     Schema.Struct({

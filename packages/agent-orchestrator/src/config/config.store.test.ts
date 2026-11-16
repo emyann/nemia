@@ -20,6 +20,8 @@ import {
   metricsHourDays,
   metricsMinuteDays,
   releaseCheck,
+  servedNames,
+  servedNamesOf,
   settingsOf,
   verifiesRest,
   wfRoot,
@@ -88,6 +90,12 @@ test('REFUSED at shipped defaults: each WF_ variable set to what it does not tak
       'WF_CGROUP_PARENT',
       ['/sys/fs/cgroup/x', 'run.scope', 'sessions', 'a/b.slice', '.slice', 'a b.slice'],
       'WF_CGROUP_PARENT=sessions.slice',
+    ],
+    'WF_SERVED_NAMES not a list of hosts — a scheme, a port, a wildcard, a path, an underscore, a bare IPv6 address': [
+      servedNames,
+      'WF_SERVED_NAMES',
+      ['http://nemia.example.ts.net', 'nemia.example.ts.net:8787', '*.ts.net', 'nemia.example/board', 'a_b.example', 'fd7a::1'],
+      'WF_SERVED_NAMES=nemia.example.ts.net',
     ],
     'NEMIA_RELEASE_CHECK neither on nor off': [releaseCheck, 'NEMIA_RELEASE_CHECK', ['0', 'no', 'OFF', ' off'], 'NEMIA_RELEASE_CHECK=off'],
   };
@@ -170,6 +178,31 @@ test('each WF_ variable reads its default unset, empty or blank, and the values 
       'the settings carry the release check',
       () => [settingsOf({ NEMIA_RELEASE_CHECK: 'off' }).releaseCheck, settingsOf({}).releaseCheck],
       [false, true],
+    ],
+    [
+      'WF_SERVED_NAMES: none unset or blank; each host of a list by commas or white space, in lower case, its trailing dot left out',
+      () => [
+        servedNames({}),
+        servedNames({ WF_SERVED_NAMES: ' ' }),
+        servedNames({ WF_SERVED_NAMES: 'Nemia.Taile26745.ts.net., 100.64.0.7  [fd7a:115c::1],nemia' }),
+      ],
+      [[], [], ['nemia.taile26745.ts.net', '100.64.0.7', '[fd7a:115c::1]', 'nemia']],
+    ],
+    [
+      'an exposed store is served at the address it binds and the names declared, every interface naming none; one not exposed at none',
+      () => [
+        servedNamesOf(true, '100.64.0.7', ['nemia.taile26745.ts.net']),
+        servedNamesOf(true, 'fd7a:115c::1', []),
+        servedNamesOf(true, '0.0.0.0', ['a.example']),
+        servedNamesOf(true, '::', []),
+        servedNamesOf(false, '100.64.0.7', ['nemia.taile26745.ts.net']),
+      ],
+      [['100.64.0.7', 'nemia.taile26745.ts.net'], ['[fd7a:115c::1]'], ['a.example'], [], []],
+    ],
+    [
+      'the settings carry the served names',
+      () => settingsOf({ WF_SERVED_NAMES: 'nemia.example.ts.net' }).servedNames,
+      ['nemia.example.ts.net'],
     ],
     ['the settings carry it as exposed', () => [settingsOf({ WF_EXPOSED: '1' }).exposed, settingsOf({}).exposed], [true, false]],
     [

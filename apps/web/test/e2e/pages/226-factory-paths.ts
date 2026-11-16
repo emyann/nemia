@@ -43,6 +43,7 @@ const PAGES: readonly string[] = [
   `${AT}/agents`,
   `${AT}/agents/${AGENT.name}?from=repo`,
   `${AT}/skills`,
+  `${AT}/proposals`,
   `${AT}/settings`,
 ];
 

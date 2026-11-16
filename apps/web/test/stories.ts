@@ -215,7 +215,10 @@ export const CONTROL_STRINGS: readonly (keyof typeof Classes)[] = [
 /** The input kinds the kit draws with a part of their own, each keyed apart from the other inputs. */
 const INPUT_KINDS = ['checkbox', 'radio'];
 
-/** ` type="<kind>"` where `element` sets its `type` to a literal of `INPUT_KINDS`, else nothing: a spread or another type is a plain input. */
+/**
+ * ` type="<kind>"` where `element` sets its `type` to a literal of `INPUT_KINDS`, else nothing: a spread or another type is a plain
+ * input.
+ */
 const typeOf = (element: ts.JsxOpeningElement | ts.JsxSelfClosingElement): string => {
   for (const one of element.attributes.properties) {
     if (!ts.isJsxAttribute(one) || !ts.isIdentifier(one.name) || one.name.text !== 'type') continue;

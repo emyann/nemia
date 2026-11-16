@@ -13,6 +13,9 @@ const styles = tv({
   base: [
     "flex flex-col items-center justify-center gap-3 rounded-shape-medium border-2 border-dashed border-outline-variant bg-surface-container-low p-6 text-center text-body-medium font-body-medium text-on-surface-variant transition-colors duration-short-4",
     "data-drop-target:border-primary data-drop-target:bg-primary/8",
+    // React Aria puts an unseen button in the zone, for a paste or a drop by
+    // the keyboard: when Tab stops on it, the zone shows the ring.
+    "outline-ring outline-3 outline-offset-2 outline-none data-focus-visible:outline-solid",
     "data-disabled:pointer-events-none data-disabled:opacity-38",
   ],
   variants: {

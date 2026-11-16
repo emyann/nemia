@@ -7,7 +7,9 @@ import Button from "./Button";
 export const styles = tv({
   slots: {
     // Material's basic dialog: at least 280dp wide, at most 560dp.
-    base: "bg-surface-container-high rounded-shape-extra-large p-6 min-w-[280px] max-w-[560px] w-full shadow-elevation-3 outline-hidden relative overflow-hidden",
+    // An outlined field's label is cut into its outline with the colour of
+    // what is behind it: here, the dialog's.
+    base: "[--md3-field-notch:var(--md-sys-color-surface-container-high)] bg-surface-container-high rounded-shape-extra-large p-6 min-w-[280px] max-w-[560px] w-full shadow-elevation-3 outline-hidden relative overflow-hidden",
     header: "mb-4",
     icon: "text-secondary",
     // No weight here: the headline this styles is `Headline`, and its weight
@@ -42,6 +44,13 @@ type ActionConfig = {
   isDisabled?: boolean;
   /** `"error"` for an action that destroys something: "Delete", "Discard". */
   color?: "primary" | "error";
+  /** `"submit"` with `form`, the `id` of a form among the dialog's
+   *  `children`: the action then submits that form, as Enter in a field
+   *  of it does. */
+  type?: "button" | "submit";
+  form?: string;
+  /** What a screen reader hears when the action starts loading. */
+  loadingLabel?: string;
 };
 
 type Actions = {
@@ -70,15 +79,41 @@ type ChildrenDialogContentProps = BaseDialogContentProps & {
   children: React.ReactNode;
 };
 
+/** Content of your own between the headline and the actions. */
+type ContentDialogContentProps = BaseDialogContentProps & {
+  icon?: IconProp;
+  supportingText?: string | React.ReactNode;
+  actions: JSX.Element | Actions;
+  children: React.ReactNode;
+};
+
 export type DialogContentProps =
   | StructuredDialogContentProps
-  | ChildrenDialogContentProps;
+  | ChildrenDialogContentProps
+  | ContentDialogContentProps;
 
 /**
  * What an MD3 dialog holds: an optional icon, the headline, supporting text
  * and the actions, or children of your own in their place. With `children`
- * nothing else is drawn, the `title` included: write the headline yourself
- * (`<Headline size="medium">`).
+ * alone nothing else is drawn, the `title` included: write the headline
+ * yourself (`<Headline size="medium">`).
+ *
+ * With `children` and `actions` together, the children are the dialog's
+ * content, between the headline and the actions: a form, a list, a tree.
+ * The kit still draws the headline and the two buttons, and `ModalDialog`
+ * still holds the dialog open while one of them is loading:
+ *
+ *   <ModalDialog
+ *     title="Rename"
+ *     actions={{
+ *       cancel: { label: "Cancel", onPress: close },
+ *       confirm: { label: "Rename", type: "submit", form: "rename", isLoading: saving },
+ *     }}
+ *   >
+ *     <form id="rename" onSubmit={save}>
+ *       <TextField label="Name" autoFocus />
+ *     </form>
+ *   </ModalDialog>
  *
  * `actions` is two buttons, `{ confirm, cancel }`, each a `label`, an
  * `onPress`, and `isLoading`, `isDisabled` and `color` where needed, or an
@@ -122,7 +157,10 @@ export function DialogContent(props: DialogContentProps) {
             color={cancel.color}
             onPress={cancel.isLoading ? undefined : cancel.onPress}
             isLoading={cancel.isLoading}
+            loadingLabel={cancel.loadingLabel}
             isDisabled={cancel.isDisabled || confirm.isLoading}
+            type={cancel.type}
+            form={cancel.form}
           >
             {cancel.label}
           </Button>
@@ -130,7 +168,10 @@ export function DialogContent(props: DialogContentProps) {
             color={confirm.color}
             onPress={confirm.isLoading ? undefined : confirm.onPress}
             isLoading={confirm.isLoading}
+            loadingLabel={confirm.loadingLabel}
             isDisabled={confirm.isDisabled || cancel.isLoading}
+            type={confirm.type}
+            form={confirm.form}
           >
             {confirm.label}
           </Button>
@@ -142,7 +183,7 @@ export function DialogContent(props: DialogContentProps) {
 
   return (
     <div data-slot="dialog-content" className={base({ className })}>
-      {"children" in props ? (
+      {props.children !== undefined && !props.actions ? (
         props.children
       ) : (
         <>
@@ -158,6 +199,11 @@ export function DialogContent(props: DialogContentProps) {
             <Body className={supportingTextStyles()}>
               {props.supportingText}
             </Body>
+          )}
+          {props.children !== undefined && (
+            <div data-slot="dialog-body" className="mt-4">
+              {props.children}
+            </div>
           )}
           {props.actions && (
             <div className={actionsStyles()}>{renderActions()}</div>

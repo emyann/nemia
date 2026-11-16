@@ -11,7 +11,7 @@ import {
   type ToggleButtonProps as AriaToggleButtonProps,
   composeRenderProps,
 } from "react-aria-components";
-import { focusRing, tv } from "../utils";
+import { announce, focusRing, tv } from "../utils";
 import { type IconComponent, SpinnerIcon } from "../icons";
 import {
   ButtonGroupContext,
@@ -256,6 +256,11 @@ type BaseButtonProps = {
    *  draw the spinner and still act. A form with one text field is still
    *  submitted by Enter in that field: guard `onSubmit` there. */
   isLoading?: boolean;
+  /** What a screen reader hears when the button starts loading while it
+   *  holds the focus: "Loading" by default. Say what is happening
+   *  ("Saving") and in the page's language. What comes of it is the page's
+   *  to say, in a snackbar or a `role="status"` line. */
+  loadingLabel?: string;
   /**
    * `round` (default) or `square`, Material's two shapes. A FAB keeps its
    * own corners.
@@ -442,6 +447,7 @@ const StandardButton = React.forwardRef<HTMLButtonElement, StandardButtonProps>(
       classNames,
       children,
       isLoading,
+      loadingLabel = "Loading",
       variant = "filled",
       size: sizeProp,
       shape = "round",
@@ -454,6 +460,17 @@ const StandardButton = React.forwardRef<HTMLButtonElement, StandardButtonProps>(
       download,
       ...buttonProps
     } = props;
+
+    // The spinner says nothing: say that the action runs, when it starts
+    // under the focus (the press that started it left the focus here).
+    const own = React.useRef<HTMLButtonElement | null>(null);
+    const wasLoading = React.useRef(false);
+    React.useEffect(() => {
+      if (isLoading && !wasLoading.current && own.current?.contains(document.activeElement)) {
+        announce(loadingLabel);
+      }
+      wasLoading.current = !!isLoading;
+    }, [isLoading, loadingLabel]);
 
     const isFab = variant === "fab";
     const isExtendedFab = isFab && children !== undefined;
@@ -544,7 +561,11 @@ const StandardButton = React.forwardRef<HTMLButtonElement, StandardButtonProps>(
             }
           : {})}
         className={baseStyles}
-        ref={ref}
+        ref={(node) => {
+          own.current = node;
+          if (typeof ref === "function") ref(node);
+          else if (ref) ref.current = node;
+        }}
       >
         {content}
       </AriaButton>

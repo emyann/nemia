@@ -24,7 +24,7 @@ import { Button, LinkButton } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { ceilingsQuery } from '@/lib/api/ceilings';
-import { inboxQuery, QUEUE_POLL_MS } from '@/lib/api/inbox';
+import { inboxQuery } from '@/lib/api/inbox';
 import { runObjectQuery } from '@/lib/api/run';
 import { judged, runViewOf, type RunRow, type RunView } from '@/lib/api/judged';
 import { namespaceOf } from '@/lib/api/namespace';
@@ -168,9 +168,8 @@ const minimapFill = ({ data: { run, finished } }: RunFlowNode) =>
  * The inbox's queued cards of `factory` (`queuedIn`) wait at the floor's left edge, as ghosts, in the order the tick starts them
  * (`QueueLane`), and the header says the run slots taken of the cap the daemon runs with (`CapLine`), said to be this machine's, not the
  * factory's; the daemon and the quota are the gauges' (`GaugesBar`). The cap is read again as the runs are, on each run's
- * event of the workflow feed, and so is the queue, the inbox's one query of the page (`inboxQuery`): a card the daemon starts when a run
- * slot frees is a run made. A card queued at the command line is no event of the feed, so the queue is polled besides, every
- * `QUEUE_POLL_MS`.
+ * event of the workflow feed; the queue every 5 s, since the feed carries no card's events: the daemon starts a card when a run slot frees,
+ * and nothing on the board asks it to.
  *
  * The floor fills the rest of the frame: nothing is drawn above it.
  */
@@ -502,7 +501,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
     setShowFinished(on);
     setFits((n) => n + 1);
   };
-  const queue = useQuery({ ...inboxQuery, refetchInterval: QUEUE_POLL_MS });
+  const queue = useQuery({ ...inboxQuery, refetchInterval: 5_000 });
   const queued = queue.data ? queueOf(queuedIn(queue.data, factory)) : [];
   const laned = queued.length > 0 && !machine;
   const wasLaned = useRef(laned);

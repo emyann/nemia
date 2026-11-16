@@ -3,7 +3,6 @@ import path from 'node:path';
 import type { Locator, Page, Request } from 'playwright';
 import { herChat, openChat, photograph, placeLitOf, placeOf, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
-import { QUEUE_POLL_MS } from '../../../src/lib/api/inbox.ts';
 import { WAITING_SELECTOR } from '../../../src/lib/api/proposals.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -23,6 +22,9 @@ const goto = async (page: Page, to: string): Promise<void> => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 };
+
+/** How often the floor's queue reads the inbox again (`refetchInterval` in `FactoryCanvas`): no poll is sent sooner after it mounts. */
+const QUEUE_POLL_MS = 5_000;
 
 /** Each request the page makes while `work` runs. */
 async function heardDuring(page: Page, work: () => Promise<void>): Promise<Request[]> {

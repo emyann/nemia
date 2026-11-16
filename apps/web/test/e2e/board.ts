@@ -592,6 +592,34 @@ const drewWith = (): readonly Date[] => {
 };
 
 /**
+ * What the kit's tooltip of each of `triggers` says, in their order, read as a person reads it: the pointer rests on each in turn, and
+ * the tooltip that describes it (`role="tooltip"`, named by its `aria-describedby`) is read once it opens; then the pointer leaves, and
+ * the last tooltip is waited out, so nothing after this reads or pictures one. Refuses a trigger no tooltip describes within `WAIT_MS`.
+ * @param triggers The marks, links or buttons the tooltips hang off.
+ * @param what What the triggers are, named in the refusal.
+ */
+export async function tipsOf(triggers: Locator, what: string): Promise<string[]> {
+  const page = triggers.page();
+  const said: string[] = [];
+  for (const trigger of await triggers.all()) {
+    await trigger.hover();
+    const until = performance.now() + WAIT_MS;
+    let tip: string | null = null;
+    while (tip === null && performance.now() < until) {
+      const id = await trigger.getAttribute('aria-describedby');
+      const found = id ? page.locator(`[role="tooltip"][id="${id}"]`) : null;
+      tip = found && (await found.count()) === 1 ? await found.textContent() : null;
+      if (tip === null) await page.waitForTimeout(50);
+    }
+    if (tip === null) throw new Refused(`${what} each say their words in the kit's tooltip — no tooltip describes one`);
+    said.push(tip);
+  }
+  await page.mouse.move(0, 0);
+  await page.locator('[role="tooltip"]').waitFor({ state: 'detached', timeout: WAIT_MS });
+  return said;
+}
+
+/**
  * Refuses a `<time>` that does not say its instant as the board writes one where the browser is: `words` of its `datetime` as its
  * text (`instantWords` by default), and on hover `about`, a colon, then the instant whole (`instantWhole`). `what` names the time in
  * the refusal. The text is taken for every clock the page may have drawn with (`DREW_WITHIN_MS`), so a day or a year that turns

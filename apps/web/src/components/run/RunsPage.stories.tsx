@@ -5,7 +5,7 @@ import { RunsFailed, RunsLoading, RunsPage } from './RunsPage';
 import { everyState, noRuns, nothingWaits, oneWaits, REFUSED_WORDS, refused, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
 import { ENDED, NOW_WORDS } from '@/lib/words';
 import type { RunOutcome } from '@/lib/api/runs';
-import { atRest, tipOf } from '../../../.storybook/play';
+import { atRest, tipInRow } from '../../../.storybook/play';
 
 /** What holds the page as its route does: the loading page while its reads are out, the failed page when one is refused. */
 class Routed extends Component<{ children: ReactNode }, { error: unknown }> {
@@ -79,22 +79,27 @@ const checkoutWaits = async (page: HTMLElement, ends: Array<keyof typeof TARGET_
 };
 
 /**
- * That the rows' marks say their words in the kit's tooltip, each opened by the keyboard's focus: a finished row's title whole, how long
- * ago it finished as the whole instant, and how it ended in a sentence; a row in flight's id whole behind its last four characters.
+ * That the rows' marks say their words in the kit's tooltip, each reached by the keyboard, the arrows walking its row: a finished
+ * row's title whole, how long ago it finished as the whole instant, and how it ended in a sentence; a row in flight's id whole behind
+ * its last four characters.
  * @param page The page.
  * @param user The user the play function is handed.
  */
-const tipsSay = async (page: HTMLElement, user: Parameters<typeof tipOf>[0]) => {
+const tipsSay = async (page: HTMLElement, user: Parameters<typeof tipInRow>[0]) => {
   const finished = page.querySelector<HTMLElement>('[data-section="finished"] tr[data-run]')!;
   const title = finished.querySelector('a[href^="/runs/"]')!;
-  await expect(await tipOf(user, title), "a finished run's title whole").toHaveTextContent(title.textContent ?? '');
-  await expect((await tipOf(user, finished.querySelector('time')!)).textContent, 'the whole instant').toMatch(
+  await expect(await tipInRow(user, finished, title), "a finished run's title whole").toHaveTextContent(title.textContent ?? '');
+  await expect((await tipInRow(user, finished, finished.querySelector('time')!)).textContent, 'the whole instant').toMatch(
     /\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M$/,
   );
   const outcome = finished.getAttribute('data-outcome') as RunOutcome;
-  await expect(await tipOf(user, finished.querySelector('[data-ended]')!), 'how it ended').toHaveTextContent(ENDED[outcome].title);
-  const lgll = page.querySelector(`[data-section="in-flight"] [data-copy-id="${TARGET_RUNS.lgll.metadata.name}"] [data-run-id]`)!;
-  await expect(await tipOf(user, lgll), 'the whole id').toHaveTextContent(TARGET_RUNS.lgll.metadata.name);
+  await expect(await tipInRow(user, finished, finished.querySelector('[data-ended]')!), 'how it ended').toHaveTextContent(
+    ENDED[outcome].title,
+  );
+  const flying = page.querySelector<HTMLElement>(`[data-section="in-flight"] [data-run="${TARGET_RUNS.lgll.metadata.name}"]`)!;
+  await expect(await tipInRow(user, flying, flying.querySelector('[data-run-id]')!), 'the whole id').toHaveTextContent(
+    TARGET_RUNS.lgll.metadata.name,
+  );
   await expect(page.querySelectorAll('[data-run-id][title], [data-ended][title], tr[data-run] time[title]')).toHaveLength(0);
   atRest();
 };

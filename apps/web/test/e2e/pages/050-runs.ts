@@ -35,6 +35,7 @@ import {
   finishedAnswered,
   openAnswered,
   runListPath,
+  tipsOf,
 } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
 import { agosRefused } from '../runs-times.ts';
@@ -227,7 +228,9 @@ async function cardSays(page: Page, run: WaitingRun): Promise<void> {
     `the card of ${run.id} says what is asked of you`,
   );
   await expectTexts(card.getByRole('heading', { level: 3 }).locator(`a${open}`), [titleOf(run)], "the run's title, a link to its page");
-  await expectTexts(card.locator(`[data-run-id][title="${run.id}"]`), [run.id.slice(-4)], "its id's end, the whole id on hover");
+  await expectTexts(card.locator(`[data-copy-id="${run.id}"] [data-run-id]`), [run.id.slice(-4)], "its id's end");
+  if ((await tipsOf(card.locator('[data-run-id]'), "the card's id")).join() !== run.id)
+    throw new Refused(`the card of ${run.id} says its whole id in the kit's tooltip`);
   await expectCount(card.locator('[data-run-steps] [data-step]'), run.steps.length, 'a rail of its own steps');
   await expectCount(card.locator('[data-step-name]'), 0, 'a short rail, with no names under its bars');
   await expectTexts(card.locator(`a[data-cut-button]${open}`), [OPENS], "one quiet button, which opens the run's page");
@@ -717,7 +720,9 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
   const flying = open.inFlight.filter(judged)[0];
   const row = section(page, 'in-flight').locator(`tr[data-run="${flying.id}"]`);
   await expectTexts(row.locator(`a[href="/runs/${flying.id}"]`), [titleOf(flying)], 'a row in flight says its title, a link to the run');
-  await expectTexts(row.locator(`[data-run-id][title="${flying.id}"]`), [flying.id.slice(-4)], "its id's end, the whole id on hover");
+  await expectTexts(row.locator(`[data-copy-id="${flying.id}"] [data-run-id]`), [flying.id.slice(-4)], "its id's end");
+  if ((await tipsOf(row.locator('[data-run-id]'), "the row's id")).join() !== flying.id)
+    throw new Refused(`the row of ${flying.id} says its whole id in the kit's tooltip`);
   await expectCount(row.locator('[data-run-steps] [data-step]'), flying.steps.length, 'its own steps as a rail');
   const flights = open.inFlight.filter(judged);
   const tones = await section(page, 'in-flight')
@@ -779,9 +784,7 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
       .evaluateAll((rows) => rows.map((row) => [...row.querySelectorAll('time')].map((time) => time.textContent).join('|')));
     return said.join() === whens.join() ? null : `expected ${whens.join(', ')}, found ${said.join(', ')}`;
   }, 'a finished row says how long ago it finished, as `agoWords` writes it');
-  const titles = await section(page, 'finished')
-    .locator('tr[data-run] time')
-    .evaluateAll((all) => all.map((time) => time.getAttribute('title') ?? ''));
+  const titles = await tipsOf(section(page, 'finished').locator('tr[data-run] time'), "the finished rows' times");
   if (!titles.length || titles.some((title) => !/\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M$/.test(title)))
     throw new Refused(`each of them carries the whole instant on hover — ${titles.join(', ')}`);
   const drawn = await section(page, 'finished')
@@ -838,9 +841,11 @@ async function workflowsSay(page: Page, finished: FinishedPage): Promise<void> {
     finished.runs.map((run) => workflowNameOf(run.workflowDir)),
     "each finished row names its workflow, by its folder's name",
   );
-  const said = await links.evaluateAll((all) =>
-    all.map((link) => ({ title: link.getAttribute('title') ?? '', href: link.getAttribute('href') ?? '' })),
-  );
+  const folders = await tipsOf(links, "the finished rows' workflows");
+  const said = (await links.evaluateAll((all) => all.map((link) => link.getAttribute('href') ?? ''))).map((href, i) => ({
+    title: folders[i] ?? '',
+    href,
+  }));
   const pages = await Promise.all(
     finished.runs.map(
       async (run) => (await answered<{ workflowPage: WorkflowPageAddress | null }>(page, `/api/runs/${run.id}/lines`)).workflowPage,
@@ -854,9 +859,7 @@ async function workflowsSay(page: Page, finished: FinishedPage): Promise<void> {
       : [`${run.id}: ${JSON.stringify(said[i])}, expected ${run.workflowDir} to ${JSON.stringify(want)}`];
   });
   if (wrong.length) throw new Refused(`each workflow is whole on hover and links to its page — ${wrong.join('; ')}`);
-  const titled = await section(page, 'finished')
-    .locator('tr[data-run] a[href^="/runs/"]')
-    .evaluateAll((all) => all.map((link) => link.getAttribute('title') ?? ''));
+  const titled = await tipsOf(section(page, 'finished').locator('tr[data-run] a[href^="/runs/"]'), "the finished rows' titles");
   if (titled.join('|') !== finished.runs.map(titleOf).join('|'))
     throw new Refused(`and each run's title, a link cut to its room, is whole on hover — ${titled.join(', ')}`);
   const [first] = finished.runs;

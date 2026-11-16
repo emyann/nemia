@@ -14,7 +14,10 @@ const MOST_WORDS = ByteSize.format(FILE_LIMIT);
 /** `bytes` in words, in the units the limit is said in. */
 const sizeWords = (bytes: number): string => ByteSize.format(ByteSize.bytes(bytes));
 
-/** Whether `file` is past what the files api keeps of one. */
+/**
+ * Whether `file` is past what the files api keeps of one.
+ * @param file The file listed.
+ */
 export const pastLimit = (file: File): boolean => file.size > MOST;
 
 /** Where the file at `index` stands while the start uploads: uploaded, uploading now, or waiting its turn. */
@@ -26,12 +29,8 @@ const markOf = (index: number, sent: number): 'sent' | 'uploading' | 'waiting' =
  * each listed by its name and size, removable until the start is pressed. The files api's limit is said before anything is sent, and a
  * file past it is marked in failure's ink, its size beside the cap: the form starts nothing while one is listed. A file added under a
  * name already listed takes its place (`inputsAdded`), since the run finds each by its name. While the start uploads them (`uploading`),
- * each says whether it is sent, uploading or waiting, `sent` being how many are.
- * @param files The files listed, in order.
- * @param onChange Told the list as it is after a file is added or removed.
- * @param sent How many of the files, in order, are uploaded.
- * @param uploading Whether the start is uploading them now.
- * @param isDisabled Whether the list may change: not while the start is pressed.
+ * each says whether it is sent, uploading or waiting, `sent` being how many are, in order. `onChange` is told the list as it is after a
+ * file is added or removed; `isDisabled` keeps it as it is while the start is pressed.
  */
 export function StartInputs({
   files,
@@ -71,7 +70,10 @@ export function StartInputs({
         </FileTrigger>
       </DropZone>
       {files.length > 0 && (
-        <ul aria-label="Files listed for the run" className="divide-y divide-outline-variant rounded-shape-small border border-outline-variant">
+        <ul
+          aria-label="Files listed for the run"
+          className="divide-y divide-outline-variant rounded-shape-small border border-outline-variant"
+        >
           {files.map((file, index) => {
             const past = pastLimit(file);
             const mark = uploading ? markOf(index, sent) : null;

@@ -418,14 +418,12 @@ export const files = {
     for (const file of listed) {
       const id =
         sent.get(file) ??
-        (await files
-          .upload(namespace, file, `${file.name} may be kept: starting again uploads it again.`)
-          .then(
-            (kept) => kept.id,
-            (error: unknown) => {
-              throw error instanceof WriteRefusal ? new WriteRefusal(`${file.name}: ${error.message}`, error.status) : error;
-            },
-          ));
+        (await files.upload(namespace, file, `${file.name} may be kept: starting again uploads it again.`).then(
+          (kept) => kept.id,
+          (error: unknown) => {
+            throw error instanceof WriteRefusal ? new WriteRefusal(`${file.name}: ${error.message}`, error.status) : error;
+          },
+        ));
       sent.set(file, id);
       inputs.push({ name: file.name, file: id });
       onSent?.(inputs.length);

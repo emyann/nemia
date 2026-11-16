@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { startRun, type Place, type Started, type WorkflowListing } from '../../lib/api/workflows.ts';
 import type { RunView } from '../../lib/api/judged.ts';
+import type { StartFiles } from '../../lib/api/objects.ts';
 import { startCard } from '../../lib/api/inbox.ts';
 import { standingOf, titleOf } from '../../lib/factory';
 import { afterFor } from '../../lib/inbox';
@@ -58,19 +59,16 @@ export function StartRun({
   const [brief, setBrief] = useState(card?.body ?? '');
   const [after, setAfter] = useState<string[]>([]);
   const [context, setContext] = useState<string[]>([]);
-  const [files, setFiles] = useState<File[]>([]);
-  const [uploaded] = useState(() => new Map<File, string>());
-  const [sentCount, setSentCount] = useState(0);
+  const handed = useHandedFiles();
   const inFolders = workflow.folderTeam;
   const start = useMutation({
     mutationFn: (asked: { brief: string; after: string[]; context: string[]; files: File[] }) => {
-      setSentCount(0);
       const start = {
         workflow: workflow.name,
         brief: asked.brief,
         ...(asked.after.length ? { after: asked.after } : {}),
         ...(asked.context.length ? { context: asked.context } : {}),
-        ...(asked.files.length ? { files: { listed: asked.files, sent: uploaded, onSent: setSentCount } } : {}),
+        ...(asked.files.length ? { files: handed.sending(asked.files) } : {}),
       };
       return card ? startCard(card, start, place?.factory) : startRun({ ...start, from: workflow.from }, place);
     },
@@ -80,8 +78,7 @@ export function StartRun({
         setBrief('');
         setAfter([]);
         setContext([]);
-        setFiles([]);
-        uploaded.clear();
+        handed.clear();
       }
       void runsMoved(queryClient);
       onStarted?.(started);
@@ -99,7 +96,7 @@ export function StartRun({
       className={card ? 'space-y-2' : 'space-y-2 border-t border-outline-variant pt-4'}
       onSubmit={(event) => {
         event.preventDefault();
-        start.mutate({ brief, after: afterFor(workflow, after), context, files });
+        start.mutate({ brief, after: afterFor(workflow, after), context, files: handed.files });
       }}
     >
       <label htmlFor={field} className="block text-body-medium font-medium">
@@ -113,39 +110,65 @@ export function StartRun({
         placeholder="What to do: the brief each step is told, under “What was asked for”."
         className="block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none"
       />
-      <StartInputs
-        files={files}
-        onChange={setFiles}
-        sent={sentCount}
-        uploading={start.isPending && files.length > 0}
-        isDisabled={start.isPending}
-      />
+      <StartInputs {...handed.drawn(start.isPending)} />
       {!inFolders && <AfterPicker selected={after} onChange={setAfter} repo={repo} />}
       <ContextPicker selected={context} onChange={setContext} />
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
-          disabled={!brief.trim() || start.isPending || files.some(pastLimit)}
+          disabled={!brief.trim() || start.isPending || handed.files.some(pastLimit)}
           className="rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
         >
-          {!start.isPending
-            ? 'Start'
-            : files.length > 0 && sentCount < files.length
-              ? `Uploading ${sentCount + 1} of ${files.length}…`
-              : 'Starting…'}
+          {startWords(start.isPending, handed.files.length, handed.sent)}
         </button>
         <Where workflow={workflow} repo={repo} factory={place?.factory} card={!!card} />
       </div>
       {start.isSuccess && <StartedLine id={start.data.id} after={start.variables.after} />}
-      {start.isError && !onRefused && (
-        <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-          <p className="text-body-medium font-medium text-on-failure-container">Not started. The api refused it:</p>
-          <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{start.error.message}</p>
-        </div>
-      )}
+      {start.isError && !onRefused && <StartRefused message={start.error.message} />}
     </form>
   );
 }
+
+/** The api's refusal of a start, in its words, where no caller shows it. */
+function StartRefused({ message }: { message: string }) {
+  return (
+    <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="text-body-medium font-medium text-on-failure-container">Not started. The api refused it:</p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
+    </div>
+  );
+}
+
+/**
+ * The files a start hands its run, as the form lists them, with how many of them a press has uploaded and the ids of those it has, kept
+ * while the form lives so a start refused for another reason sends none again (`sending`); `clear` empties both once a start is taken,
+ * and `drawn` is what `StartInputs` is drawn with while a start is pressed or not.
+ */
+function useHandedFiles() {
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploaded] = useState(() => new Map<File, string>());
+  const [sent, setSent] = useState(0);
+  const sending = (listed: File[]): StartFiles => {
+    setSent(0);
+    return { listed, sent: uploaded, onSent: setSent };
+  };
+  const clear = () => {
+    setFiles([]);
+    uploaded.clear();
+  };
+  const drawn = (pending: boolean) => ({
+    files,
+    onChange: setFiles,
+    sent,
+    uploading: pending && files.length > 0,
+    isDisabled: pending,
+  });
+  return { files, sent, sending, clear, drawn };
+}
+
+/** What the Start button says: Start, or while pressed, which file of how many it uploads, then Starting. */
+const startWords = (pending: boolean, files: number, sent: number): string =>
+  !pending ? 'Start' : files > 0 && sent < files ? `Uploading ${sent + 1} of ${files}…` : 'Starting…';
 
 /**
  * That run `id` was started, linked to its page, and when its steps are filed: on the daemon's next pass, once each of `after` has

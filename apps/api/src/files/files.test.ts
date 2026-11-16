@@ -2,7 +2,8 @@
  * A factory's files (`POST /api/namespaces/<namespace>/files`) and a start that names them by id: three pictures of 3 MB in all, each
  * uploaded as its own form as `nemia start --input` uploads it, then a card started with their ids, its run's `inputs/` holding each
  * byte for byte, past the 1 MiB that every object write keeps; and what is refused — a file past its cap, a form with no file, a form a
- * write with no bearer token sends (but the board's, by its cookie with the header a script sets), an id no file of the namespace is kept under — with nothing kept or started.
+ * write with no bearer token sends (but the board's, by its cookie with the header a script sets), an id no file of the namespace is
+ * kept under — with nothing kept or started.
  *
  * In a factory of the store (`acme`, the orchestrator's test team's `dev`), on a scratch repository: each run is written and nothing is
  * filed.

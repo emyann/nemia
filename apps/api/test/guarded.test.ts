@@ -1,12 +1,12 @@
 /**
  * Every write of `objects`' `Api` meets the write guard before its handler runs (`writeGuard`, src/guard.ts), read off the `Api` itself:
  * each endpoint but a GET, asked by a page on another site that holds the board's cookie and sends the header a script sets (a bearer
- * passes the site by design: no page can send one), answers 403 with `Forbidden`'s reason `site`; addressed to another host with no token, the gate's 401 `token-required` where
- * its route needs a token (`needOf`) and the guard's 403 `host` where it needs none (a pairing asked or claimed, a link claimed); and sent
- * `text/plain` with the person's token, a body any page can send without asking, 415. Each is asked with names no object has, so the
- * handler, had it run, would answer its own 404 or 400: the status says the gate or the guard answered. Which request meets which refusal,
- * and in what order, is `writeRefused`'s contract (`apps/api/contracts/write-guard.contract.ts`); this file holds that every write is
- * behind it.
+ * passes the site by design: no page can send one), answers 403 with `Forbidden`'s reason `site`; addressed to another host with no token,
+ * the gate's 401 `token-required` where its route needs a token (`needOf`) and the guard's 403 `host` where it needs none (a pairing asked
+ * or claimed, a link claimed); and sent `text/plain` with the person's token, a body any page can send without asking, 415. Each is asked
+ * with names no object has, so the handler, had it run, would answer its own 404 or 400: the status says the gate or the guard answered.
+ * Which request meets which refusal, and in what order, is `writeRefused`'s contract (`apps/api/contracts/write-guard.contract.ts`); this
+ * file holds that every write is behind it.
  */
 import { NO_TOKEN, PERSON_TOKEN } from './harness.ts';
 import { test } from 'node:test';

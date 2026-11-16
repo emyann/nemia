@@ -36,7 +36,7 @@ export function RunMeta({
       <CopyId id={run.id} short />
       <span data-run-where className="inline-flex items-center gap-1.25">
         <span data-factory={factory}>{factory}</span>
-        <span aria-hidden="true" className="text-outline">
+        <span aria-hidden="true" className="text-on-surface-variant">
           /
         </span>
         {workflowPage === undefined ? (

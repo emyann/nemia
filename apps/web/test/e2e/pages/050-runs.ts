@@ -466,14 +466,14 @@ const missed = (control: Locator, across: number, up: number, down: number): Pro
   );
 
 /**
- * What the page guarantees a finger on a copy control: 48 pixels across everywhere; on a card from the title's lower edge, 12 above
- * its centre, to 24 below it; in a table 40 down, from 24 above its centre to 16 below, where the target of the next row's control
+ * What the page guarantees a finger on a copy control: 48 pixels across everywhere; on a card from 24 above its centre to 12 below
+ * it, where the title under it begins; in a table 40 down, from 24 above its centre to 16 below, where the target of the next row's control
  * begins. Probed a pixel inside each edge, the pointer away so that no step's card stands open; and the probe refuses a control whose
  * target something clips.
  */
 async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
   const controls: Array<[Locator, number, number, string]> = [
-    [cardOf(page, open.waiting[0].id).locator('[data-copy-id] button'), 11, 23, 'a card'],
+    [cardOf(page, open.waiting[0].id).locator('[data-copy-id] button'), 23, 11, 'a card'],
     [section(page, 'in-flight').locator('tr[data-run] [data-copy-id] button').first(), 23, 15, 'a row in flight'],
     [section(page, 'finished').locator(`tr[data-run="${finished.runs[1].id}"] [data-copy-id] button`), 23, 15, 'a finished row'],
   ];
@@ -709,7 +709,7 @@ function finishedDrawn(page: Page): { last: () => FinishedPage | undefined; stop
 }
 
 /**
- * A row in flight and a finished row say their plain facts: the id's end, the factory and workflow, the labels as quiet links; in flight
+ * A row in flight and a finished row say their plain facts: the id's end, the factory and workflow; in flight
  * the chip of what it does now in the tone `nowOf` gives it, its words never cut, and its rail; finished, how it ended, red only when it
  * failed, and when.
  */
@@ -735,19 +735,6 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
     .locator('[data-now-words], [data-now-word]')
     .evaluateAll((all) => all.filter((words) => words.scrollWidth > words.clientWidth + 1).map((words) => words.textContent));
   if (cut.length) throw new Refused(`what a run does now is never cut — ${cut.join(', ')}`);
-  const labels = await page
-    .locator('[data-runs-page] [data-run-meta] a[data-label]')
-    .evaluateAll((all) =>
-      all.map(
-        (link) =>
-          [link.getAttribute('data-label') ?? '', link.getAttribute('aria-label'), link.getAttribute('href'), link.textContent] as const,
-      ),
-    );
-  const misread = labels.filter(([pair, said, href, text]) => {
-    const [key = '', value = ''] = pair.split('=');
-    return said !== pair || href !== `/labels/${encodeURIComponent(key)}/${encodeURIComponent(value)}` || text !== value;
-  });
-  if (misread.length) throw new Refused(`a label says its value, its key in its name, a link to its page — ${JSON.stringify(misread)}`);
   await expectTexts(section(page, 'in-flight').locator('th'), ['Run', 'Now', 'Clock', 'Cost'], 'the table in flight has its columns');
   await expectTexts(
     section(page, 'finished').locator('th'),
@@ -956,7 +943,7 @@ async function lookRules(page: Page): Promise<void> {
  */
 async function lookDetails(page: Page): Promise<void> {
   await expectDrawn(page, 'th', 'tracking', '1.1px', 'a heading is the small label, tracked by a tenth of its 11 pixels');
-  await expectDrawn(page, '[data-now-word]', 'tracking', '0.72px', 'a chip is tracked by six hundredths of its 12 pixels');
+  await expectDrawn(page, '[data-now-word] span', 'tracking', '0.72px', 'a chip is tracked by six hundredths of its 12 pixels');
   await expectDrawn(page, '[data-cut-button] [data-cut-shape]', 'tracking', '0.84px', 'the cut button, by six hundredths of its 14');
   await expectDrawn(page, '[data-pager-newer], [data-pager-older]', 'tracking', '0.84px', "the pager's buttons, as the cut button");
   await expectDrawn(

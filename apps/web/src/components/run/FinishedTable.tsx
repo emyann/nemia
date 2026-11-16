@@ -97,7 +97,7 @@ export function FinishedTable({ page, trail }: { page: FinishedPage; trail: read
               <Column id="finished" className={cn(HEAD, 'w-[150px]')}>
                 Finished
               </Column>
-              <Column id="clock" align="end" className={cn(HEAD, 'w-[96px]')}>
+              <Column id="clock" align="end" className={cn(HEAD, 'w-[144px]')}>
                 Clock
               </Column>
               <Column id="cost" align="end" className={cn(HEAD, 'w-[96px]')}>

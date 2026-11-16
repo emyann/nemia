@@ -73,10 +73,10 @@ export function FlightTable({
             <Column id="run" isRowHeader className={HEAD}>
               Run
             </Column>
-            <Column id="now" className={cn(HEAD, 'w-[384px]')}>
+            <Column id="now" className={cn(HEAD, 'w-[360px]')}>
               Now
             </Column>
-            <Column id="clock" align="end" className={cn(HEAD, 'w-[96px]')}>
+            <Column id="clock" align="end" className={cn(HEAD, 'w-[144px]')}>
               Clock
             </Column>
             <Column id="cost" align="end" className={cn(HEAD, 'w-[96px]')}>

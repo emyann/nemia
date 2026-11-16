@@ -38,7 +38,7 @@ export function LabelTags({ labels }: { labels: Readonly<LabelMap> }) {
 const ownOf = (map: Readonly<LabelMap>): Array<[string, string]> => entriesOf(map).filter(([key]) => !CLOSED_LABEL_KEYS.includes(key));
 
 /**
- * A run's own labels, quiet: each its value alone in the outline's ink, its whole `key=value` in the kit's tooltip and said aloud, a
+ * A run's own labels, quiet: each its value alone in the meta line's ink, its whole `key=value` in the kit's tooltip and said aloud, a
  * link to its label page; every key drawn alike, the store's `factory` and `workflow` left to the line that says them. None for none.
  */
 export function QuietLabels({ labels }: { labels: Readonly<LabelMap> }) {
@@ -53,7 +53,7 @@ export function QuietLabels({ labels }: { labels: Readonly<LabelMap> }) {
             params={{ key, value }}
             data-label={`${key}=${value}`}
             aria-label={`${key}=${value}`}
-            className="text-body-small font-medium whitespace-nowrap text-outline hover:text-on-surface"
+            className="text-body-small font-medium whitespace-nowrap text-on-surface-variant hover:text-on-surface"
           >
             {value}
           </TextLink>

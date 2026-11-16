@@ -37,6 +37,7 @@ export const ROOTS = [
   'apps/web/src/lib/proposals.ts',
   'apps/web/src/lib/runResult.ts',
   'apps/web/src/lib/setup.ts',
+  'apps/web/src/lib/startInputs.ts',
   'apps/web/src/lib/tryAddress.ts',
   'apps/web/src/lib/upgrade.ts',
   'apps/web/src/lib/viewers.ts',

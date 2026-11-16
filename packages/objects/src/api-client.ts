@@ -13,7 +13,7 @@
  *
  * Each caller maps a failure into its own error type, since each prints and exits by its own rules.
  */
-import { Cause, Data, Effect } from 'effect';
+import { ByteSize, Cause, Data, Effect } from 'effect';
 import { HttpClient, HttpClientError, HttpClientRequest, type HttpClientResponse } from 'effect/http';
 import { HttpApiClient } from 'effect/http-api';
 import { Api } from './api.ts';
@@ -26,6 +26,13 @@ import { jsonBodied } from './write-body.ts';
  * terminal is told within half a minute that an api which took the connection is not answering.
  */
 export const READ_BOUND_MS = 30_000;
+
+/**
+ * How long one file's upload may take, in ms: the bound of every call, and a second for each MiB of it beside, so a link of 1 MiB/s (8
+ * Mbit/s, a slow uplink) carries a file of the cap within its bound. The cli and the board each bound an upload by it.
+ * @param size The file's size in bytes.
+ */
+export const uploadBoundMs = (size: number): number => READ_BOUND_MS + Math.ceil(size / Number(ByteSize.mebibytes(1))) * 1000;
 
 /** Where the api is and how its caller is known: its token, a session's or a person's, its headers, and its bound. */
 export type ApiClientOptions = {

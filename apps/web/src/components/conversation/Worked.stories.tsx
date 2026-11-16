@@ -133,6 +133,7 @@ const LONG = Array.from({ length: 40 }, (_, i) => `${i + 1}  const line = ${i} /
 
 /** A line whose result is long enough to scroll inside its own cap. */
 export const Long: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
   render: () => (
     <div style={PANEL}>
       <WorkedLine

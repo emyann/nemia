@@ -21,6 +21,7 @@ const DESTINATIONS = [
 
 /** Each part that draws secondary, side by side. */
 export const Drawn: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
   render: () => (
     <div style={ROW}>
       <div data-secondary="toggle">

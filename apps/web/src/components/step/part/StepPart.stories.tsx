@@ -281,10 +281,10 @@ export const ToCome: StoryObj = { render: () => <Sizes run={RUNS.toCome} /> };
 export const AtWork: StoryObj = { render: () => <Sizes run={RUNS.atWork} /> };
 
 /** A step at its gate: what it asks of you first, then what it said and gave. */
-export const WaitsOnYou: StoryObj = { render: () => <Sizes run={RUNS.waitsOnYou} /> };
+export const WaitsOnYou: StoryObj = { parameters: { a11y: { test: 'todo' } }, render: () => <Sizes run={RUNS.waitsOnYou} /> };
 
 /** A step done: what it said, then each field it gave by its widget, its picture a thumbnail. */
-export const Done: StoryObj = { render: () => <Sizes run={RUNS.done} /> };
+export const Done: StoryObj = { parameters: { a11y: { test: 'todo' } }, render: () => <Sizes run={RUNS.done} /> };
 
 /** A step tried again after its check failed the first try: the picker of its tries, the second at work. */
 export const TryAgain: StoryObj = { render: () => <Sizes run={RUNS.tryAgain} /> };

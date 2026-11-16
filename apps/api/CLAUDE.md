@@ -89,7 +89,8 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **The board's built pages are host content, served after the mount** (`src/board/board.ts`, `GET /*`): `NEMIA_BOARD_DIR`, else the
   running code's `apps/web/dist`, `index.html` for a route of the board's, never a path under `/api`, `/openapi` or `/mcp`. The board's
   token is an HttpOnly cookie (`TOKEN_COOKIE`) the api sets and clears (`POST` and `DELETE /api/session`, `src/server/session.ts`);
-  `callerGate` reads it after the bearer, on the api's own paths alone, and the write guard lets it pass the host but not the site.
+  `callerGate` reads it after the bearer, on the api's own paths alone, and the write guard lets it pass the host but not the site,
+  and a form of files only with `SCRIPTED_HEADER`, which holds while the api answers no CORS (`test/no-cors.test.ts`).
 - **Who a request is from is resolved before any router** (`callerGate`, `src/caller/caller.ts`): a handler reads `caller` off `Served`,
   never the `Authorization` header, and hands it to the package's program, which judges it (`src/proposals/`). A token refused is a 401
   on every route, not the proposals' alone. A test that presents a live token mints it through the package's `TokenDoor`, its run

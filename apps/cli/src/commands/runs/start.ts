@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ByteSize } from 'effect';
-import { type Args, type CardStart, DEFAULT_NAMESPACE, FILE_LIMIT, READ_BOUND_MS, type RunStart, START_WORDS } from 'objects';
+import { type Args, type CardStart, DEFAULT_NAMESPACE, FILE_LIMIT, type RunStart, START_WORDS, uploadBoundMs } from 'objects';
 import { asked } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
 import { listArg, repoQueryOf, said, switchArg, textArg } from '../requests.ts';
@@ -108,13 +108,6 @@ export function inputsOf(files: readonly string[]): InputFile[] {
     );
   return inputs;
 }
-
-/**
- * How long one file's upload may take, in ms: the bound of every call, and a second for each MiB of it beside, so a link of 1 MiB/s (8
- * Mbit/s, a slow uplink) carries a file of the cap within its bound.
- * @param size The file's size in bytes.
- */
-export const uploadBoundMs = (size: number): number => READ_BOUND_MS + Math.ceil(size / Number(ByteSize.mebibytes(1))) * 1000;
 
 /**
  * Each of `inputs` uploaded to `namespace`'s files (`POST /api/namespaces/<namespace>/files`), one request a file, read from disk as it is

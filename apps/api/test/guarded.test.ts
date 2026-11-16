@@ -1,7 +1,7 @@
 /**
  * Every write of `objects`' `Api` meets the write guard before its handler runs (`writeGuard`, src/guard.ts), read off the `Api` itself:
- * each endpoint but a GET, asked by a page on another site that holds the board's cookie (a bearer passes the site by design: no page can
- * send one), answers 403 with `Forbidden`'s reason `site`; addressed to another host with no token, the gate's 401 `token-required` where
+ * each endpoint but a GET, asked by a page on another site that holds the board's cookie and sends the header a script sets (a bearer
+ * passes the site by design: no page can send one), answers 403 with `Forbidden`'s reason `site`; addressed to another host with no token, the gate's 401 `token-required` where
  * its route needs a token (`needOf`) and the guard's 403 `host` where it needs none (a pairing asked or claimed, a link claimed); and sent
  * `text/plain` with the person's token, a body any page can send without asking, 415. Each is asked with names no object has, so the
  * handler, had it run, would answer its own 404 or 400: the status says the gate or the guard answered. Which request meets which refusal,
@@ -11,7 +11,7 @@
 import { NO_TOKEN, PERSON_TOKEN } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Api, TOKEN_COOKIE } from 'objects';
+import { Api, SCRIPTED_HEADER, TOKEN_COOKIE } from 'objects';
 import { app } from '../src/app.ts';
 import { needOf } from '../src/caller/caller.ts';
 
@@ -37,7 +37,11 @@ test('every write of the Api is refused before its handler runs: 403 for another
   );
   const open: string[] = [];
   for (const { at, method, path } of WRITES) {
-    const site = await asked(method, path, { 'sec-fetch-site': 'cross-site', cookie: `${TOKEN_COOKIE}=${PERSON_TOKEN}` });
+    const site = await asked(method, path, {
+      'sec-fetch-site': 'cross-site',
+      cookie: `${TOKEN_COOKIE}=${PERSON_TOKEN}`,
+      [SCRIPTED_HEADER]: 'XMLHttpRequest',
+    });
     if (site.status !== 403 || site.body.reason !== 'site') open.push(`${at}: another site answered ${site.status}`);
     const host = await asked(method, path, { ...NO_TOKEN, host: 'evil.example' });
     const [status, reason] = needOf(method, filled(path)) === 'none' ? [403, 'host'] : [401, 'token-required'];

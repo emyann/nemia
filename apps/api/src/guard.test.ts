@@ -14,11 +14,17 @@ import { servedAt } from './address/address.ts';
 import { writeRefused } from './guard.ts';
 
 /**
- * `writeRefused` of a POST, as the board sends a write but for what each case names, presenting a bearer token where `bearer` is and the
- * board's cookie alone where `cookie` is.
+ * `writeRefused` of a POST, as the board sends a write but for what each case names, presenting a bearer token where `bearer` is, the
+ * board's cookie alone where `cookie` is, and the header a script sets where `scripted` is.
  */
-const refused = (host: string | undefined, site: string | undefined, type: string | undefined, bearer = false, cookie = false) =>
-  writeRefused({ method: 'POST', host, site, contentType: type, bearer, cookie, served: false });
+const refused = (
+  host: string | undefined,
+  site: string | undefined,
+  type: string | undefined,
+  bearer = false,
+  cookie = false,
+  scripted = false,
+) => writeRefused({ method: 'POST', host, site, contentType: type, bearer, cookie, served: false, scripted });
 
 test('writeRefused: which of its three headers refuses a write, and in what order', async (t) => {
   await t.test(
@@ -85,6 +91,7 @@ test('writeRefused: which of its three headers refuses a write, and in what orde
             bearer: false,
             cookie: false,
             served: false,
+            scripted: false,
           }),
           null,
           method,
@@ -108,6 +115,18 @@ test('writeRefused: which of its three headers refuses a write, and in what orde
       assert.equal(refused('100.64.0.1:8787', 'same-site', 'application/json', false, true), 'site');
       assert.equal(refused('100.64.0.1:8787', 'cross-site', 'application/json', false, true), 'site');
       assert.equal(refused('100.64.0.1:8787', 'same-origin', 'text/plain', false, true), 'media');
+    },
+  );
+
+  await t.test(
+    "a form of files by the board's cookie passes with the header a script sets, from the board's own page or no browser; REFUSED 403 from another site with it, 415 without it, and 415 with it but no token",
+    () => {
+      const form = 'multipart/form-data; boundary=x';
+      assert.equal(refused('100.64.0.1:8787', 'same-origin', form, false, true, true), null);
+      assert.equal(refused('127.0.0.1:8787', undefined, form, false, true, true), null, 'no browser');
+      assert.equal(refused('100.64.0.1:8787', 'same-site', form, false, true, true), 'site');
+      assert.equal(refused('100.64.0.1:8787', 'same-origin', form, false, true), 'media');
+      assert.equal(refused('127.0.0.1:8787', 'same-origin', form, false, false, true), 'media');
     },
   );
 });

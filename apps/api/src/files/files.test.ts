@@ -2,7 +2,7 @@
  * A factory's files (`POST /api/namespaces/<namespace>/files`) and a start that names them by id: three pictures of 3 MB in all, each
  * uploaded as its own form as `nemia start --input` uploads it, then a card started with their ids, its run's `inputs/` holding each
  * byte for byte, past the 1 MiB that every object write keeps; and what is refused — a file past its cap, a form with no file, a form a
- * write with no bearer token sends, an id no file of the namespace is kept under — with nothing kept or started.
+ * write with no bearer token sends (but the board's, by its cookie with the header a script sets), an id no file of the namespace is kept under — with nothing kept or started.
  *
  * In a factory of the store (`acme`, the orchestrator's test team's `dev`), on a scratch repository: each run is written and nothing is
  * filed.
@@ -16,7 +16,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { FILE_LIMIT, type FileObject, TOKEN_COOKIE } from 'objects';
+import { FILE_LIMIT, type FileObject, SCRIPTED_HEADER, TOKEN_COOKIE } from 'objects';
 import { appOver, eachTest } from '../../test/placed.ts';
 import { runsAtOnce } from 'agent-orchestrator';
 import { TEAM } from '../../test/team.ts';
@@ -162,12 +162,35 @@ test('REFUSED: a form whose part is no file, and one of two parts, are a 422, an
   assert.deepEqual(kept(), before);
 });
 
-test('REFUSED: a form sent with no bearer token, by the board’s cookie or none, is a 415 before its body is read', async () => {
+/** The board's cookie, holding the person's token, as the browser sends it on the board's every request. */
+const COOKIE = { cookie: `${TOKEN_COOKIE}=harness-person-token-0123456789abcdefghijklmnopq` };
+
+test('REFUSED: a form sent with no bearer token, by the board’s cookie without the header a script sets, is a 415 before its body is read', async () => {
+  const before = kept();
+  const res = await upload(formOf('a.png', Buffer.from('a')), 'acme', COOKIE);
+  assert.equal(res.status, 415, await res.clone().text());
+  assert.deepEqual(kept(), before);
+});
+
+test('a form sent by the board’s cookie with the header a script sets, from the board’s own page, is kept as a bearer’s is', async () => {
+  const res = await upload(formOf('a.png', Buffer.from('a')), 'acme', {
+    ...COOKIE,
+    [SCRIPTED_HEADER]: 'XMLHttpRequest',
+    'sec-fetch-site': 'same-origin',
+  });
+  assert.equal(res.status, 201, await res.clone().text());
+  const file = (await res.json()) as FileObject;
+  assert.equal(fs.readFileSync(path.join(root, 'files', 'acme', file.id), 'utf8'), 'a');
+});
+
+test('REFUSED: a form sent by the board’s cookie with the header a script sets, from a page on another port of this host, is a 403', async () => {
   const before = kept();
   const res = await upload(formOf('a.png', Buffer.from('a')), 'acme', {
-    cookie: `${TOKEN_COOKIE}=harness-person-token-0123456789abcdefghijklmnopq`,
+    ...COOKIE,
+    [SCRIPTED_HEADER]: 'XMLHttpRequest',
+    'sec-fetch-site': 'same-site',
   });
-  assert.equal(res.status, 415, await res.clone().text());
+  assert.equal(res.status, 403, await res.clone().text());
   assert.deepEqual(kept(), before);
 });
 

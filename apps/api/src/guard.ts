@@ -25,13 +25,23 @@
  * `Host` is the store's public name, which only a token makes safe. The token itself is judged before the guard (`callerGate`,
  * src/caller/caller.ts), so one refused there never reaches it. It still says a JSON body, or a form of files (`multipart/form-data`): the
  * one write that sends one, a file uploaded for a start (`POST /api/namespaces/<namespace>/files`), is a client's with a token, and a
- * form a page on another site posts carries no `Authorization` without the browser asking first. The board's cookie sends no form.
+ * form a page on another site posts carries no `Authorization` without the browser asking first.
  *
  * A write that presents a token by the board's cookie alone (`TOKEN_COOKIE`, the HttpOnly cookie `POST /api/session` sets,
  * server/session.ts) passes the host, but not the site: a site whose name was pointed at this machine is another origin, which the
  * browser never hands the cookie, and a board reached at a private network's address names that address; but a page on another port of
  * the same host is sent the cookie too (`SameSite=Strict` is by site, and a cookie is scoped by host, not port), so only the board's
  * own page, `same-origin`, or no browser, writes by it.
+ *
+ * A form of files by the board's cookie (a file the board uploads for a start) passes where it carries the header a script sets
+ * (`SCRIPTED_HEADER`, `X-Requested-With`, not empty; the contract's `scripted`), and is refused 415 without it. No HTML form sends that
+ * header, and a script of another origin — another site, or another port of this host — cannot set it without the browser asking the
+ * api first (a CORS preflight). **This rests on the api answering no CORS**: no `OPTIONS` route and no `Access-Control-Allow-*` header
+ * on any answer (`test/no-cors.test.ts`). A change that lets another origin send this header (an `Access-Control-Allow-Headers` naming
+ * it, or a wildcard) lets that origin's page make the store keep a file by the person's cookie. The site is still read first, where the
+ * browser says it. Not `Sec-Fetch-Site: same-origin` alone: a browser sends no `Sec-Fetch-*` to an address that is not potentially
+ * trustworthy (a store exposed over plain http at a network's address), nor does an old one, and that store's board would upload
+ * nothing. Not the file's bytes in JSON: a third more bytes, held whole in the api's memory.
  *
  * A write that presents no token at all reaches the guard on an open route alone (a pairing asked or claimed, a first-visit link claimed:
  * `needOf`, src/caller/caller.ts), which judges its own secret: every other route under `/api/` needs a token on every store, loopback
@@ -45,7 +55,7 @@
 import { Effect } from 'effect';
 import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
-import { Forbidden, TOKEN_COOKIE, UnsupportedMediaType } from 'objects';
+import { Forbidden, SCRIPTED_HEADER, TOKEN_COOKIE, UnsupportedMediaType } from 'objects';
 import type { WriteRefusal, WriteRefused, WriteRequest } from '../contracts/write-guard.contract.ts';
 import { servedNamesOf } from 'agent-orchestrator';
 import { loopback, nameOf, servedAt } from './address/address.ts';
@@ -79,16 +89,18 @@ export const cookieTokenOf = (c: Context): string | undefined => {
 
 /**
  * Why a write is refused before its body is read, or null: its host first, neither where it presents a bearer token or the board's
- * cookie; then its site, not where it presents a bearer token; then its body's type, JSON, or a form of files with a bearer token; a read
- * never.
- * @param request The request's method, host, site, content type and whether it presents a bearer token or the board's cookie.
+ * cookie; then its site, not where it presents a bearer token; then its body's type, JSON, or a form of files with a bearer token or by
+ * the board's cookie with the header a script sets; a read never.
+ * @param request The request's method, host, site, content type and whether it presents a bearer token or the board's cookie, and sends
+ * the header a script sets.
  */
 export const writeRefused: WriteRefused = (request) => {
   if (request.method === 'GET' || request.method === 'HEAD') return null;
   if (!request.bearer && !request.cookie && request.host !== undefined && !loopback(request.host) && !request.served) return 'host';
   if (!request.bearer && request.site !== undefined && request.site !== 'same-origin') return 'site';
   if (request.contentType === undefined) return 'media';
-  if (saysJson(request.contentType) || (request.bearer && saysForm(request.contentType))) return null;
+  if (saysJson(request.contentType)) return null;
+  if (saysForm(request.contentType) && (request.bearer || (request.cookie && request.scripted))) return null;
   return 'media';
 };
 
@@ -116,6 +128,10 @@ const answerOf = (refusal: WriteRefusal, route: string, request: WriteRequest, e
       error: `${route} refuses a request made by a page on another site (Sec-Fetch-Site: ${request.site}): a write is what an agent acts on in this repository, or a person's work gone. Make it from the board, or with \`nemia\`.`,
     });
   const media = request.contentType === undefined ? '' : mediaOf(request.contentType);
+  if (request.cookie && request.contentType !== undefined && saysForm(request.contentType))
+    return new UnsupportedMediaType({
+      error: `${route} takes a form of files by the board's cookie only with the header a script sets (\`${SCRIPTED_HEADER}: XMLHttpRequest\`), which no form on another site can send: upload from the board's Start form, or with \`nemia start --input <file>\`.`,
+    });
   return new UnsupportedMediaType({
     error: `${route} takes its body as \`content-type: application/json\`, and this request sent ${media ? `\`${media}\`` : 'no content-type'} — a body any page can send without asking. Send JSON with that header, \`{}\` where it takes none: ${DOCUMENT} says what it takes.`,
   });
@@ -159,6 +175,7 @@ export const writeGuard: MiddlewareHandler<ApiEnv> = async (c, next) => {
     bearer,
     cookie,
     served: host !== undefined && servedAt(host, serving.names),
+    scripted: (c.req.header(SCRIPTED_HEADER) ?? '').trim() !== '',
   };
   const refusal = writeRefused(request);
   if (refusal === null) return next();

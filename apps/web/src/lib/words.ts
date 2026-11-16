@@ -224,6 +224,19 @@ export const RUN_WAITS: Record<'hold' | 'after' | 'unfinished', WaitWords> = {
   },
 };
 
+/**
+ * The words a runs-page row says beside its chip of what its step waits on, where it waits on no person: the run it waits on (`waits
+ * on` before its id), the checkout, a run slot, a hold until a run lands (`until` and `lands` around its id), and a step past its cap.
+ */
+export const NOW_WORDS = {
+  waitsOn: 'waits on',
+  checkout: 'waits on the checkout',
+  slot: 'a run slot',
+  until: '· until',
+  lands: 'lands',
+  over: (cap: string): string => `over its ${cap}`,
+} as const;
+
 /** The words of a wait the board has no kind for. */
 export const ANY_WAIT: WaitWords = { tag: () => GATE, sentence: () => 'It waits on you.', open: opens };
 

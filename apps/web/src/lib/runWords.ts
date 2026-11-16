@@ -5,12 +5,14 @@
  * and composes them. Pure.
  */
 import { format, formatDistanceStrict, isSameDay, isSameYear } from 'date-fns';
-import type { RunView } from './api/judged.ts';
+import { agentOf, type RunView } from './api/judged.ts';
+import type { NowStands } from '../../contracts/now-chip.contract.ts';
+import { chipTone, nowStandsOf, type ChipTone } from './nowChip.ts';
 import type { WaitOn } from 'objects';
-import { stepState, type StepState } from './status.ts';
+import { stepState, waitsOnPerson, type StepState } from './status.ts';
 import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
 import { durationWords } from './duration.ts';
-import { ANY_WAIT, OPENS, PERSON, RUN_WAITS, stateWordsOf, type Wait as Waited, type WaitWords } from './words.ts';
+import { ANY_WAIT, NOW_WORDS, OPENS, PERSON, RUN_WAITS, stateWordsOf, type Wait as Waited, type WaitWords } from './words.ts';
 
 /** Every kind of wait on a person the page has a sentence for. */
 export const WAIT_KINDS = ['approve', 'answer', 'check', 'unfinished', 'unsigned', 'denied', 'rounds', 'budget', 'hold', 'after'] as const;
@@ -124,9 +126,6 @@ export function waitTag(row: WaitingRow): string {
   return wait ? wordsOf(wait.kind).tag(wait) : ANY_WAIT.tag({ step: null, done: 0 });
 }
 
-/** The states of a step not started: on a held run, what it does now is the hold, though its step is drawn as any step to come. */
-const NOT_STARTED: readonly StepState[] = ['waiting', 'waiting-for-slot'];
-
 /** The states of a step a run is past. */
 const PAST: readonly StepState[] = ['verified', 'unverified'];
 
@@ -153,24 +152,81 @@ export function openWord(row: OpenedRow): string {
   return wait ? wordsOf(wait.kind).open(wait, readAt(row, wait.step)) : OPENS;
 }
 
-/** What a row in flight says it does now: the word of the step it is on, and a note of which step, its place, and how long. */
-type Now = { word: string; note: string };
+/** A part of what NOW says: a word, or a run it names, which the row links by its id. */
+export type NowPart = string | { run: string };
 
 /**
- * What a run in flight does now: its first step not done, by the rail's word for its state, and its name and its place among the run's
- * steps as the note (`implement (2 of 4)`); on a run a person holds whose step is not started, the hold's word, which is why it has not
- * (`held`, the step itself drawn as any step to come). None for a run whose every step is done. It says no duration: the row's Clock
- * column says how long the run has been at work, and a second time in the note beside it read as one word and said the same thing twice.
- * @param row The run's row: its steps with their codes, its calling off and its hold.
+ * What a row says it does now: the step it is on, its chip's colour (`chipTone`), the step's agent, its round of its rounds and its
+ * budget against what it spent (each null where the step has none), and the few words of its wait, in parts.
  */
-export function nowOf(row: WaitingRow): Now | null {
+export type Now = {
+  step: string;
+  tone: ChipTone;
+  agent: string | null;
+  round: { at: number; of: number } | null;
+  budget: { spent: number; cap: number; capSaid: string; over: boolean } | null;
+  words: NowPart[];
+};
+
+/** A row as NOW reads it: its wait, and of each step its codes, its frozen spec, its current try, its budget and what it spent. */
+type NowRow = WaitingRow & {
+  steps: ReadonlyArray<CodedStep & Partial<Pick<RunView['steps'][number], 'spec' | 'current' | 'budget' | 'spent'>>>;
+};
+
+/**
+ * The words of a step that waits on no person, by where it stands: being checked, the run it waits on (the first the store has), the
+ * checkout, a run slot, a hold and the run it waits until (the first not landed), a failure's or a rest's rail word, and none at work
+ * or still to come.
+ */
+function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn | null): NowPart[] {
   const held = row.holding != null;
-  const states = railStates(row.steps, Boolean(row.cancelledAt), held);
-  const at = states.findIndex((step) => !PAST.includes(step.state));
-  const step = states[at];
-  if (!step) return null;
-  const word = held && NOT_STARTED.includes(step.state) ? PERSON.held.rail : stateWordsOf(step.state, step.on, held).rail;
-  return { word, note: `${step.name} (${at + 1} of ${states.length})` };
+  if (stands === 'atWork') return state === 'checking' ? [PERSON.checking.rail] : [];
+  if (stands === 'held') {
+    const until = row.holding?.runs.find((run) => !run.landed)?.run;
+    return until ? [PERSON.held.rail, NOW_WORDS.until, { run: until }, NOW_WORDS.lands] : [PERSON.held.rail];
+  }
+  if (stands === 'waitsOnARun') {
+    if (on === 'base') return [NOW_WORDS.checkout];
+    const run = row.waiting?.runs.find((waited) => !waited.missing)?.run;
+    return run ? [NOW_WORDS.waitsOn, { run }] : [RUN_WAITS.after.tag({ step: null, done: 0 })];
+  }
+  if (stands === 'waitsForASlot') return [NOW_WORDS.slot];
+  if (stands === 'failed' || stands === 'atRest') return [stateWordsOf(state, on, held).rail];
+  return [];
+}
+
+/**
+ * What a run does now: the step its wait on a person names, else its first step not done, with the colour of its chip (`chipTone` of
+ * where it stands, `nowStandsOf`, and whether the row waits on a person), its agent as the run froze it, its round of its rounds, its
+ * budget and what it spent, and the few words of its wait: on a person, the wait's tag (`waitTag`); on no person, `waitWords`. None for
+ * a run whose every step is done. It says no duration: the row's Clock column says how long the run has been at work.
+ * @param row The run's row: its steps with their codes, spec, try, budget and spend, its calling off, its hold and its waits.
+ */
+export function nowOf(row: NowRow): Now | null {
+  const held = row.holding != null;
+  const cancelled = Boolean(row.cancelledAt);
+  const states = railStates(row.steps, cancelled, held);
+  const wait = waitOf(row);
+  const named = wait?.step ? states.findIndex((step) => step.name === wait.step) : -1;
+  const at = named >= 0 ? named : states.findIndex((step) => !PAST.includes(step.state));
+  const drawn = states[at];
+  const step = row.steps[at];
+  if (!drawn || !step) return null;
+  const yours = wait !== null || waitsOnPerson(drawn.state, cancelled);
+  const stands = nowStandsOf(drawn.state, drawn.on, held);
+  const rounds = step.spec?.rounds ?? null;
+  return {
+    step: drawn.name,
+    tone: chipTone({ stands, yours }),
+    agent: step.spec ? agentOf({ spec: step.spec }) : null,
+    round: rounds !== null && step.current ? { at: step.current.round, of: rounds } : null,
+    budget: step.budget
+      ? { spent: step.spent?.usd ?? 0, cap: step.budget.usd, capSaid: step.budget.said, over: step.budget.over }
+      : null,
+    words: yours
+      ? [wait ? waitTag(row) : stateWordsOf(drawn.state, drawn.on, held).rail]
+      : waitWords(row, stands, drawn.state, drawn.on),
+  };
 }
 
 /**

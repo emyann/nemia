@@ -73,7 +73,7 @@ const FOR_A_SLOT = { phase: 'waiting', reason: 'Waiting', on: 'limit', via: null
 const SKIPPED = { phase: 'succeeded', reason: 'Skipped', on: null, via: null, verdict: null, note: null, roundDue: false } as const;
 
 /** A run as its graph draws it: its steps, its workflow's graph, its gates, never called off, held where `held` says. */
-export type GraphRunFixture = {
+type GraphRunFixture = {
   steps: RailStep[];
   graph: RunView['graph'];
   gates: string[];

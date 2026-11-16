@@ -124,7 +124,8 @@ export const OneWaitsOnYou: Story = {
 
 /**
  * A row in each state in flight — at work, at work past its step's cap, being checked, waiting on a run, waiting on the checkout that
- * run holds, waiting for a run slot, held — the run being checked counting both in its fan; and a card of each kind of wait on you: one that asks questions, one whose check failed.
+ * run holds, waiting for a run slot, held — the run being checked counting both in its fan; and a card of each kind of wait on you:
+ * one that asks questions, one whose check failed.
  */
 export const EveryState: Story = {
   args: { at: {} },

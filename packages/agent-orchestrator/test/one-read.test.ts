@@ -168,7 +168,7 @@ const checksOn = (steps: Record<string, readonly { try: number; check: { at: str
     .sort()
     .flatMap((name) => (steps[name] ?? []).flatMap((t) => (t.check ? [`${name}:${t.try}:${t.check.at}`] : [])));
 
-/** The run whose ending holds the checkout a step of the object waits on (`baseHeldBy`), said only where a step waits on it (`on: base`). */
+/** The run whose ending holds the checkout a step of the object waits on (`baseHeldBy`), said only where one waits on it (`on: base`). */
 const onTheCheckout = (steps: readonly { on: string | null; baseHeldBy?: { run: string } }[]): { checkout?: string | null } => {
   const waits = steps.find((s) => s.on === 'base');
   return waits ? { checkout: waits.baseHeldBy?.run ?? null } : {};

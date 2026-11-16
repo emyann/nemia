@@ -178,9 +178,21 @@ type NowRow = Omit<WaitingRow, 'steps'> & {
 };
 
 /**
- * The words of a step that waits on no person, by where it stands: being checked, the run it waits on (the first the store has), the
- * checkout and the run whose ending has it (`baseHeldBy`), a run slot, a hold and the run it waits until (the first not landed), a failure's or a rest's rail word, and none at work
- * or still to come.
+ * The words of a step that waits on a run or on the checkout: the run whose ending has the checkout (`baseHeldBy`), else the checkout
+ * alone; the run it waits on, the first the store has, else a run that will not finish without a person.
+ */
+function runWaitWords(row: NowRow, on: WaitOn | null, step: CodedStep): NowPart[] {
+  if (on === 'base') {
+    const holder = step.baseHeldBy?.run;
+    return holder ? [NOW_WORDS.waitsOn, { run: holder }, NOW_WORDS.theCheckout] : [NOW_WORDS.checkout];
+  }
+  const run = row.waiting?.runs.find((waited) => !waited.missing)?.run;
+  return run ? [NOW_WORDS.waitsOn, { run }] : [RUN_WAITS.after.tag({ step: null, done: 0 })];
+}
+
+/**
+ * The words of a step that waits on no person, by where it stands: being checked, a run or the checkout (`runWaitWords`), a run slot, a
+ * hold and the run it waits until (the first not landed), a failure's or a rest's rail word, and none at work or still to come.
  */
 function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn | null, step: CodedStep): NowPart[] {
   const held = row.holding != null;
@@ -189,14 +201,7 @@ function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn 
     const until = row.holding?.runs.find((run) => !run.landed)?.run;
     return until ? [PERSON.held.rail, NOW_WORDS.until, { run: until }, NOW_WORDS.lands] : [PERSON.held.rail];
   }
-  if (stands === 'waitsOnARun') {
-    if (on === 'base') {
-      const holder = step.baseHeldBy?.run;
-      return holder ? [NOW_WORDS.waitsOn, { run: holder }, NOW_WORDS.theCheckout] : [NOW_WORDS.checkout];
-    }
-    const run = row.waiting?.runs.find((waited) => !waited.missing)?.run;
-    return run ? [NOW_WORDS.waitsOn, { run }] : [RUN_WAITS.after.tag({ step: null, done: 0 })];
-  }
+  if (stands === 'waitsOnARun') return runWaitWords(row, on, step);
   if (stands === 'waitsForASlot') return [NOW_WORDS.slot];
   if (stands === 'failed' || stands === 'atRest') return [stateWordsOf(state, on, held).rail];
   return [];

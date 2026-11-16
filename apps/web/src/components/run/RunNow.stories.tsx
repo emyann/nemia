@@ -6,6 +6,7 @@ import type { ListedRun } from '@/lib/api/runs';
 import { NOW_WORDS, PERSON } from '@/lib/words';
 import { RunNow } from './RunNow';
 import { TARGET_RUNS } from '../../../.storybook/fixtures/runs';
+import { atRest, tipOf } from '../../../.storybook/play';
 
 /** The instant the stories' answer was read at. */
 const AS_OF = new Date('2026-11-15T18:00:00.000Z');
@@ -51,6 +52,23 @@ export const AtWork: Story = {
   },
 };
 
+/**
+ * Each mark says its words in the kit's tooltip, opened by the keyboard's focus: the round, how many runs wait on it, and last the
+ * budget's ring, whose tooltip is left open to be pictured.
+ */
+export const MarksSayTheirWords: Story = {
+  args: { waitedBy: 1 },
+  play: async ({ canvasElement, userEvent }) => {
+    const mark = (selector: string) => canvasElement.querySelector(selector)!;
+    await expect(await tipOf(userEvent, mark('[data-pips]'))).toHaveTextContent('round 2 of 3');
+    await expect(await tipOf(userEvent, mark('[data-waited-by]'))).toHaveTextContent('a run waits on it');
+    const ring = await tipOf(userEvent, mark('[data-ring]'));
+    await expect(ring).toHaveTextContent('its step: $2.40 of its $12 cap');
+    await expect(ring).toBeVisible();
+    await expect(canvasElement.querySelector('[title]'), "no mark says its words in the browser's own tooltip").toBeNull();
+  },
+};
+
 /** At work past its step's cap: the ring red, and the words that say so. */
 export const OverItsCap: Story = {
   args: { run: listed(TARGET_RUNS.wov8) },
@@ -70,13 +88,15 @@ export const BeingChecked: Story = {
   },
 };
 
-/** Waiting on a run: the outlined chip, and the run it waits on by its id's end, a link to its page. */
+/** Waiting on a run: the outlined chip, and the run it waits on by its id's end, a link to its page, its whole id in its tooltip. */
 export const WaitsOnARun: Story = {
   args: { run: listed(TARGET_RUNS.onLgll) },
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, userEvent }) => {
     await expect(chipOf(canvasElement)).toEqual({ tone: 'waits', word: 'land' });
     const link = within(canvasElement).getByRole('link', { name: 'lgll' });
     await expect(link).toHaveAttribute('href', `/runs/${TARGET_RUNS.lgll.metadata.name}`);
+    await expect(await tipOf(userEvent, link), "its whole id in the kit's tooltip").toHaveTextContent(TARGET_RUNS.lgll.metadata.name);
+    atRest();
   },
 };
 

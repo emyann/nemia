@@ -2,6 +2,8 @@ import type { WorkflowPageAddress } from '@/lib/api/address';
 import { CLOSED_LABEL_KEYS } from '@/lib/api/labels';
 import { workflowNameOf } from '@/lib/api/workflows';
 import { namespaceOf } from '@/lib/factories';
+import { Focusable, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { focusRing } from '@/components/ui/ds/utils';
 import { QuietLabels } from '../field/Labels';
 import { workflowTarget } from '../workflow/WorkflowLink';
 import { CopyId, TextLink } from '../look';
@@ -18,9 +20,9 @@ function TagMark() {
 
 /**
  * What a run is, in one quiet line under its title, in three groups: its id's last four characters with a copy control; where it runs,
- * its factory and its workflow as a path (`nemia / quick`), the workflow's folder whole on hover and, where `workflowPage` is given,
- * linked as `WorkflowLink` links it (`workflowTarget`); then, past a thin divider and a tag mark, its own labels, quiet
- * (`QuietLabels`). A run with no labels of its own draws neither the divider nor the mark.
+ * its factory and its workflow as a path (`nemia / quick`), the workflow's folder whole in the kit's tooltip on hover and on focus and,
+ * where `workflowPage` is given, linked as `WorkflowLink` links it (`workflowTarget`); then, past a thin divider and a tag mark, its
+ * own labels, quiet (`QuietLabels`). A run with no labels of its own draws neither the divider nor the mark.
  */
 export function RunMeta({
   run,
@@ -40,15 +42,27 @@ export function RunMeta({
         <span aria-hidden="true" className="text-on-surface-variant">
           /
         </span>
-        {workflowPage === undefined ? (
-          <span data-workflow={workflow} title={run.workflowDir}>
-            {workflow}
-          </span>
-        ) : (
-          <TextLink {...workflowTarget(workflowPage)} title={run.workflowDir} data-workflow={workflow} className="text-on-surface-variant">
-            {workflow}
-          </TextLink>
-        )}
+        <TooltipTrigger delay={300}>
+          {workflowPage === undefined ? (
+            <Focusable>
+              <span
+                data-workflow={workflow}
+                role="img"
+                aria-label={workflow}
+                // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the folder's tooltip by focusing it
+                tabIndex={0}
+                className={focusRing()}
+              >
+                {workflow}
+              </span>
+            </Focusable>
+          ) : (
+            <TextLink {...workflowTarget(workflowPage)} data-workflow={workflow} className="text-on-surface-variant">
+              {workflow}
+            </TextLink>
+          )}
+          <Tooltip>{run.workflowDir}</Tooltip>
+        </TooltipTrigger>
       </span>
       {labelled && (
         <span className="inline-flex min-w-0 items-center gap-3.5">

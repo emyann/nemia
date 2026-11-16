@@ -1,4 +1,4 @@
-import { Cell, Column, Row, Table, TableBody, TableHeader } from '@/components/ui/ds';
+import { Cell, Column, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import type { ListedRun } from '@/lib/api/runs';
 import { judged, type UnjudgedRun } from '@/lib/api/judged';
 import { namespaceOf } from '@/lib/factories';
@@ -15,7 +15,7 @@ import { CopyId, CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, Tex
 /** A column's heading, in the look's small caps. */
 const HEAD = 'text-label-small uppercase';
 
-/** A run's title in a row: one line, cut to the column's room, the whole of it on hover. */
+/** A run's title in a row: one line, cut to the column's room, the whole of it in the kit's tooltip. */
 const TITLE = 'block truncate text-body-large font-medium';
 
 /**
@@ -28,9 +28,12 @@ function UnjudgedRow({ run }: { run: UnjudgedRun }) {
     <Row id={run.id} data-run={run.id} data-unreadable="" className={FRAMED_ROW}>
       <Cell className="py-3">
         <span className="flex min-w-0 flex-col gap-1">
-          <TextLink to="/runs/$runId" params={{ runId: run.id }} title={run.id} className={TITLE}>
-            {run.id}
-          </TextLink>
+          <TooltipTrigger delay={300}>
+            <TextLink to="/runs/$runId" params={{ runId: run.id }} className={TITLE}>
+              {run.id}
+            </TextLink>
+            <Tooltip>{run.id}</Tooltip>
+          </TooltipTrigger>
           <span className="flex items-center gap-3.5 text-body-small font-medium text-on-surface-variant">
             <CopyId id={run.id} short />
             <span data-factory={namespaceOf(run.factory)}>{namespaceOf(run.factory)}</span>
@@ -89,9 +92,12 @@ export function FlightTable({
                 <Row key={run.id} id={run.id} data-run={run.id} className={FRAMED_ROW}>
                   <Cell className="py-3">
                     <span className="flex min-w-0 flex-col gap-1">
-                      <TextLink to="/runs/$runId" params={{ runId: run.id }} title={titleOf(run)} className={TITLE}>
-                        {titleOf(run)}
-                      </TextLink>
+                      <TooltipTrigger delay={300}>
+                        <TextLink to="/runs/$runId" params={{ runId: run.id }} className={TITLE}>
+                          {titleOf(run)}
+                        </TextLink>
+                        <Tooltip>{titleOf(run)}</Tooltip>
+                      </TooltipTrigger>
                       <RunMeta run={run} />
                     </span>
                   </Cell>

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect } from 'storybook/test';
+import { atRest, tipOf } from '../../../.storybook/play';
 import { RunSteps } from './RunSteps';
 import { AT_WORK, DONE, GATE, ON_CARD, REFUSED, TO_COME_ALL } from './stories.fixtures';
 
@@ -16,8 +18,19 @@ function Rail({ steps, names = true, wrap }: { steps: typeof GATE; names?: boole
   );
 }
 
-/** A run at its gate: the last bar filled in the hue of what waits on a person. */
-export const AtItsGate: StoryObj = { render: () => <Rail steps={GATE} /> };
+/**
+ * A run at its gate: the last bar filled in the hue of what waits on a person; each name, cut to its room, whole in the kit's tooltip
+ * the keyboard's focus opens.
+ */
+export const AtItsGate: StoryObj = {
+  play: async ({ canvasElement, userEvent }) => {
+    const name = canvasElement.querySelector('[data-step-name="implement"]')!;
+    await expect(await tipOf(userEvent, name)).toHaveTextContent('implement');
+    await expect(canvasElement.querySelector('[title]'), "no name says itself in the browser's own tooltip").toBeNull();
+    atRest();
+  },
+  render: () => <Rail steps={GATE} />,
+};
 
 /** A run whose steps are done: each filled, whether a check says so or the step's own word does. */
 export const Done: StoryObj = { render: () => <Rail steps={DONE} /> };

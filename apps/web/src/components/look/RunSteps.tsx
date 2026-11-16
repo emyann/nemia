@@ -4,7 +4,8 @@ import { Fragment, type ReactNode } from 'react';
 import { dashed, filled, ink, paint } from '@/lib/meaning';
 import { railSaid, railStates } from '@/lib/runWords';
 import { stateClass, stateDrawn, type StepState } from '@/lib/status';
-import { cn } from '@/components/ui/ds/utils';
+import { Focusable, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { cn, focusRing } from '@/components/ui/ds/utils';
 
 /** The ink of a step's name under its bar: its hue where it waits on a person or failed, muted for every other. */
 function nameInk(state: StepState): string {
@@ -78,7 +79,7 @@ export function RunSteps({
   const drawn = railStates(steps, cancelled, held);
   return (
     <div
-      role={wrap ? 'group' : 'img'}
+      role={wrap || names ? 'group' : 'img'}
       aria-label={railSaid(steps, cancelled, held)}
       data-run-steps
       className={cn('grid text-label-small uppercase', names ? 'gap-1.5' : 'w-fit gap-[3px]')}
@@ -99,9 +100,21 @@ export function RunSteps({
       })}
       {names &&
         drawn.map((step) => (
-          <span key={step.name} data-step-name={step.name} className={cn('truncate', nameInk(step.state))} title={step.name}>
-            {step.name}
-          </span>
+          <TooltipTrigger key={step.name} delay={300}>
+            <Focusable>
+              <span
+                data-step-name={step.name}
+                role="img"
+                aria-label={step.name}
+                // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the name's tooltip by focusing it
+                tabIndex={0}
+                className={cn('truncate', nameInk(step.state), focusRing())}
+              >
+                {step.name}
+              </span>
+            </Focusable>
+            <Tooltip>{step.name}</Tooltip>
+          </TooltipTrigger>
         ))}
     </div>
   );

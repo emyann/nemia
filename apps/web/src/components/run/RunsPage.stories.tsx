@@ -3,7 +3,9 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, waitFor, within } from 'storybook/test';
 import { RunsFailed, RunsLoading, RunsPage } from './RunsPage';
 import { everyState, noRuns, nothingWaits, oneWaits, REFUSED_WORDS, refused, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
-import { NOW_WORDS } from '@/lib/words';
+import { ENDED, NOW_WORDS } from '@/lib/words';
+import type { RunOutcome } from '@/lib/api/runs';
+import { atRest, tipOf } from '../../../.storybook/play';
 
 /** What holds the page as its route does: the loading page while its reads are out, the failed page when one is refused. */
 class Routed extends Component<{ children: ReactNode }, { error: unknown }> {
@@ -76,18 +78,40 @@ const checkoutWaits = async (page: HTMLElement, ends: Array<keyof typeof TARGET_
   }
 };
 
+/**
+ * That the rows' marks say their words in the kit's tooltip, each opened by the keyboard's focus: a finished row's title whole, how long
+ * ago it finished as the whole instant, and how it ended in a sentence; a row in flight's id whole behind its last four characters.
+ * @param page The page.
+ * @param user The user the play function is handed.
+ */
+const tipsSay = async (page: HTMLElement, user: Parameters<typeof tipOf>[0]) => {
+  const finished = page.querySelector<HTMLElement>('[data-section="finished"] tr[data-run]')!;
+  const title = finished.querySelector('a[href^="/runs/"]')!;
+  await expect(await tipOf(user, title), "a finished run's title whole").toHaveTextContent(title.textContent ?? '');
+  await expect((await tipOf(user, finished.querySelector('time')!)).textContent, 'the whole instant').toMatch(
+    /\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M$/,
+  );
+  const outcome = finished.getAttribute('data-outcome') as RunOutcome;
+  await expect(await tipOf(user, finished.querySelector('[data-ended]')!), 'how it ended').toHaveTextContent(ENDED[outcome].title);
+  const lgll = page.querySelector(`[data-section="in-flight"] [data-copy-id="${TARGET_RUNS.lgll.metadata.name}"] [data-run-id]`)!;
+  await expect(await tipOf(user, lgll), 'the whole id').toHaveTextContent(TARGET_RUNS.lgll.metadata.name);
+  await expect(page.querySelectorAll('[data-run-id][title], [data-ended][title], tr[data-run] time[title]')).toHaveLength(0);
+  atRest();
+};
+
 /** The headings of the table named `label`. */
 const headsOf = (page: HTMLElement, label: string) =>
   [...page.querySelectorAll(`[aria-label="${label}"] [role="columnheader"]`)].map((head) => head.textContent?.trim().toUpperCase());
 
 /**
  * Nothing waits on you: the waiting part one line, its chip quiet; three runs in flight, lgll being checked and two waiting on the
- * checkout it holds, each naming lgll, which counts them in its fan; and a page of the finished runs, each table by its columns.
+ * checkout it holds, each naming lgll, which counts them in its fan; and a page of the finished runs, each table by its columns; and
+ * the rows' marks each say their words in the kit's tooltip.
  */
 export const NothingWaits: Story = {
   args: { at: {} },
   parameters: { msw: nothingWaits },
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, userEvent }) => {
     const page = await loaded(canvasElement);
     await expect(chipsOf(page)).toEqual({ waiting: '0 quiet', 'in-flight': '3 alive', finished: '123 rest' });
     const waiting = within(page.querySelector<HTMLElement>('[data-section="waiting"]')!);
@@ -100,6 +124,7 @@ export const NothingWaits: Story = {
     await expect(within(lgll).getByRole('link', { name: 'area=api' })).toHaveTextContent('api');
     await expect(within(lgll).getByText('quick')).toBeVisible();
     await checkoutWaits(page, ['649a', '5zt1']);
+    await tipsSay(page, userEvent);
   },
 };
 

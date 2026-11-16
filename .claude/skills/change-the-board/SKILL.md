@@ -62,7 +62,9 @@ applies: ["apps/web/**"]
    it, by that pid, before a Vitest run, a build, the e2e or the typecheck. `npm run board:serve` stays for what needs the api and
    the whole board.
    A new part is the ds kit's (`ds-build`), or a part of the look where the kit has none and the part is Nemia's alone: never a new
-   import of shadcn's `components/ui/*` or of React Aria outside the kit and the look (`apps/web/test/stories.test.ts`).
+   import of shadcn's `components/ui/*` or of React Aria outside the kit and the look, nor a new raw `<button>`, `<input>`,
+   `<select>` or `<textarea>` or an import of `lib/classes.ts`'s control strings (`apps/web/test/stories.test.ts`). The map in
+   `apps/web/test/destinations.ts` says where each of these moves.
 
 ## The board's traps
 

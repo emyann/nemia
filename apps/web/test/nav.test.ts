@@ -18,12 +18,15 @@ test("RAIL_GROUPS and PANE_PLACES: the store rail's groups and the factory pane'
       ],
     );
   });
-  await t.test('the pane holds the floor, the runs, the inbox, the workflows, the agents, the skills and the settings', () => {
-    assert.deepEqual(
-      PANE_PLACES.map((place) => place.label),
-      ['Floor', 'Runs', 'Inbox', 'Workflows', 'Agents', 'Skills', 'Settings'],
-    );
-  });
+  await t.test(
+    'the pane holds the floor, the runs, the inbox, the workflows, the agents, the skills, the proposals and the settings',
+    () => {
+      assert.deepEqual(
+        PANE_PLACES.map((place) => place.label),
+        ['Floor', 'Runs', 'Inbox', 'Workflows', 'Agents', 'Skills', 'Proposals', 'Settings'],
+      );
+    },
+  );
 });
 
 test('seatOf: each page of the seat table at its level, under its destination or place', async (t) => {
@@ -57,7 +60,8 @@ test('seatOf: each page of the seat table at its level, under its destination or
     const rows: [string, string][] = [
       ['/factories/kit', 'floor'],
       ['/factories/kit/settings', 'settings'],
-      ['/factories/kit/proposals/p', 'settings'],
+      ['/factories/kit/proposals', 'proposals'],
+      ['/factories/kit/proposals/p', 'proposals'],
       ['/factories/kit/runs', 'runs'],
       ['/factories/kit/runs/r-1', 'runs'],
       ['/factories/kit/runs/r-1/steps/s', 'runs'],
@@ -104,7 +108,8 @@ test("pageNameOf: a page's head names its factory's place, else the store's page
   const rows: [string, string | undefined][] = [
     ['/factories/kit/runs/r-1', 'Runs'],
     ['/factories/kit', 'Floor'],
-    ['/factories/kit/proposals/p', 'Settings'],
+    ['/factories/kit/proposals', 'Proposals'],
+    ['/factories/kit/proposals/p', 'Proposals'],
     ['/', 'Factories'],
     ['/runs', 'Runs'],
     ['/labels/k/v', 'Runs'],
@@ -148,10 +153,13 @@ test('pickTo: where picking another factory takes a page', async (t) => {
     assert.equal(pickTo('/factories/a/workflows/repo/dev/review', { repo: 'r' }, 'b'), '/factories/b/workflows/repo/dev/review');
     assert.equal(pickTo('/factories/a/agents/x', { from: 'repo' }, 'b'), '/factories/b/agents/x?from=repo');
   });
-  await t.test('the floor, the settings and a proposal go to the picked factory’s floor or settings', () => {
+  await t.test('the floor and the settings go to the picked factory’s floor or settings', () => {
     assert.equal(pickTo('/factories/a', {}, 'b'), '/factories/b');
     assert.equal(pickTo('/factories/a/settings', {}, 'b'), '/factories/b/settings');
-    assert.equal(pickTo('/factories/a/proposals/p', {}, 'b'), '/factories/b/settings');
+  });
+  await t.test('the proposals and a proposal’s page go to the picked factory’s proposals, the proposal being the factory left’s', () => {
+    assert.equal(pickTo('/factories/a/proposals', {}, 'b'), '/factories/b/proposals');
+    assert.equal(pickTo('/factories/a/proposals/p', {}, 'b'), '/factories/b/proposals');
   });
   await t.test("a store page goes to the picked factory's floor, the store's Capabilities to its Skills", () => {
     assert.equal(pickTo('/stats', {}, 'b'), '/factories/b');

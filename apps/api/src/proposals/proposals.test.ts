@@ -193,6 +193,11 @@ test('a proposal filed by a live session names its agent, run and step; the pers
       list.items.map((p) => p.metadata.name),
       [proposal.metadata.name],
     );
+    const waiting = (await (await app().request(`${ns}/proposals?fieldSelector=status.phase%3Dwaiting`)).json()) as { items: Proposal[] };
+    assert.deepEqual(
+      waiting.items.map((p) => p.metadata.name),
+      [proposal.metadata.name],
+    );
     assert.equal((await app().request(`${ns}/proposals/${proposal.metadata.name}`)).status, 200);
     assert.equal((await app().request(`${ns}/proposals/nothing-here`)).status, 404);
   });
@@ -217,6 +222,21 @@ test('a proposal filed by a live session names its agent, run and step; the pers
     const declined = await ask(`${ns}/proposals/${mine.metadata.name}/decline`, 'POST', {});
     assert.equal(declined.status, 200);
     assert.equal(((await declined.json()) as Proposal).status.phase, 'declined');
+  });
+  await t.test('listed by phase: ?fieldSelector=status.phase keeps the proposals in it, or in every other by !=', async () => {
+    const phases = async (selector: string) => {
+      const res = await app().request(`${ns}/proposals?fieldSelector=${encodeURIComponent(selector)}`);
+      assert.equal(res.status, 200, selector);
+      return ((await res.json()) as { items: Proposal[] }).items.map((p) => p.status.phase);
+    };
+    assert.deepEqual(await phases('status.phase=waiting'), []);
+    assert.deepEqual(await phases('status.phase==applied'), ['applied']);
+    assert.deepEqual(await phases('status.phase!=applied'), ['declined']);
+    assert.deepEqual((await phases('')).sort(), ['applied', 'declined']);
+  });
+  await t.test('REFUSED: a fieldSelector that names no phase, or another field, is 422', async () => {
+    for (const selector of ['status.phase=pending', 'status.state=waiting'])
+      assert.equal((await app().request(`${ns}/proposals?fieldSelector=${encodeURIComponent(selector)}`)).status, 422, selector);
   });
 });
 

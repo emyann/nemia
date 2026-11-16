@@ -1,8 +1,8 @@
 /**
  * A factory's proposals and delegations, as the board reads and judges them (`apps/api/src/proposals/`): the factory's proposals
- * (`proposalsQuery`), one proposal (`proposalQuery`), its approval and its decline, the person's; and the factory's delegations
- * (`delegationsQuery`), each written whole and removed by the person alone. The board sends no session token, so every write is the
- * person's.
+ * (`proposalsQuery`), those that wait (`waitingProposalsQuery`), one proposal (`proposalQuery`), its approval and its decline, the
+ * person's; and the factory's delegations (`delegationsQuery`), each written whole and removed by the person alone. The board sends no
+ * session token, so every write is the person's.
  */
 import { queryOptions } from '@tanstack/react-query';
 import type { Delegation, DelegationWrite, Proposal } from 'objects';
@@ -11,10 +11,19 @@ import { retryUnlessGone } from './gone.ts';
 import { agents, delegations, proposals } from './objects.ts';
 
 /**
- * The key of the factory `factory`'s proposals, which a judgement invalidates exactly.
+ * The key of the factory `factory`'s proposals, which a judgement invalidates with every key under it (`waitingProposalsKey`).
  * @param factory The factory's name.
  */
 export const proposalsKey = (factory: string) => ['proposals', factory] as const;
+
+/** The selector of the proposals that wait on an approval, as a ProposalList's `?fieldSelector=` spells it. */
+export const WAITING_SELECTOR = 'status.phase=waiting';
+
+/**
+ * The key of the factory `factory`'s proposals that wait, under its proposals' (`proposalsKey`), so a judgement reads it again.
+ * @param factory The factory's name.
+ */
+const waitingProposalsKey = (factory: string) => [...proposalsKey(factory), 'waiting'] as const;
 
 /**
  * The key of the proposal `name` of `factory`, which a judgement sets from its answer.
@@ -31,6 +40,18 @@ export const proposalsQuery = (factory: string) =>
   queryOptions({
     queryKey: proposalsKey(factory),
     queryFn: async (): Promise<readonly Proposal[]> => (await proposals.list(factory)).items,
+    refetchInterval: () => pace(15_000),
+  });
+
+/**
+ * The proposals of the factory `factory` that wait on an approval (`WAITING_SELECTOR`), asked of the api by phase so a reader that counts
+ * them never reads the whole list, each proposal's objects and status whole: the factory pane's line. Polled as the whole list is.
+ * @param factory The factory's name.
+ */
+export const waitingProposalsQuery = (factory: string) =>
+  queryOptions({
+    queryKey: waitingProposalsKey(factory),
+    queryFn: async (): Promise<readonly Proposal[]> => (await proposals.list(factory, WAITING_SELECTOR)).items,
     refetchInterval: () => pace(15_000),
   });
 

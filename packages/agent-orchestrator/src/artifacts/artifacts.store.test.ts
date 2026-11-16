@@ -1,16 +1,17 @@
 /**
  * The files of a step, one table per function, and the artifact path rules as one table: where a named file is from
- * (`artifactPlace`), one file a step left read by name and never by path (`fileIn`, `artifactFile`), and each reason a named file is not
- * one the run has, off the disk alone (`filesLacked`). Then those that are there for the step after (`filesHanded`), the tasks whose
- * files a pass reads (`filesDue`), a near name (`nearName`), what a step is told of its files (`artifactsContract`) and what `nemia
- * decide` says of them (`artifactLines`). A closeout naming files in a run is told in `test/closeouts.test.ts`.
+ * (`artifactPlace`), one file a step left read by its path under its folder and never through a link (`fileUnder`, `artifactFile`),
+ * and each reason a named file is not one the run has, off the disk alone (`filesLacked`). Then those that are there for the step
+ * after (`filesHanded`), the tasks whose files a pass reads (`filesDue`), a near name (`nearName`), what a step is told of its files
+ * (`artifactsContract`) and what `nemia decide` says of them (`artifactLines`). A closeout naming files in a run is told in
+ * `test/closeouts.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { artifactFile, fileIn, filesHanded, filesLacked } from './artifacts.store.ts';
+import { artifactFile, fileUnder, filesHanded, filesLacked } from './artifacts.store.ts';
 import { REFUSING, artifactLines, artifactPlace, artifactsContract, filesDue, nearName } from './artifacts.ts';
 
 const ROOT = scratch('wf-artifacts-root-');
@@ -34,7 +35,7 @@ const naming = (...artifacts: string[]): Closeout => ({ outcome: 'done', summary
 
 const FILES = '/wf/runs/r-1/artifacts/implement';
 
-test('the artifact path rules: artifactPlace, fileIn and filesLacked', async (t) => {
+test('the artifact path rules: artifactPlace, fileUnder and filesLacked', async (t) => {
   await t.test(
     'artifactPlace: from the workspace by a relative path, refused when it climbs out of it; in the files directory by an absolute one inside it; outside anywhere else',
     () => {
@@ -86,26 +87,44 @@ test('the artifact path rules: artifactPlace, fileIn and filesLacked', async (t)
       assert.equal(artifactPlace(`${FILES}-old/.claude/x`, FILES), 'outside');
     },
   );
-  await t.test("fileIn and artifactFile: a step's file is read by its name, from its files directory or from any folder", () => {
+  await t.test("fileUnder and artifactFile: a step's file is read by its path, at its folder's top or in a folder under it", () => {
     const dir = path.join(ROOT, 'runs', 'r-1', 'artifacts', 'build');
-    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(path.join(dir, 'e2e', 'dark'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'shot.png'), 'png');
+    fs.writeFileSync(path.join(dir, 'e2e', 'dark', 'bar.png'), 'nested');
     assert.equal(artifactFile(ROOT, { id: 'r-1' }, 'build', 'shot.png')?.toString(), 'png');
-    assert.equal(fileIn(dir, 'shot.png')?.toString(), 'png');
-    assert.equal(fileIn(dir, 'gone.png'), null);
+    assert.equal(artifactFile(ROOT, { id: 'r-1' }, 'build', 'e2e/dark/bar.png')?.toString(), 'nested');
+    assert.equal(fileUnder(dir, 'shot.png')?.toString(), 'png');
+    assert.equal(fileUnder(dir, 'e2e/dark/bar.png')?.toString(), 'nested');
+    assert.equal(fileUnder(dir, 'gone.png'), null);
   });
-  await t.test('REFUSED: fileIn of a name that is a path reads none, though the file it reaches is there; nor a folder, nor a link', () => {
-    const dir = scratch('wf-artifacts-');
-    const beside = scratch('wf-artifacts-beside-');
-    fs.writeFileSync(path.join(beside, 'secret.txt'), 'secret');
-    fs.mkdirSync(path.join(dir, 'inner'));
-    fs.writeFileSync(path.join(dir, 'inner', 'notes.md'), 'notes');
-    fs.symlinkSync(path.join(beside, 'secret.txt'), path.join(dir, 'link.txt'));
-    assert.equal(fileIn(dir, `../${path.basename(beside)}/secret.txt`), null);
-    assert.equal(fileIn(dir, 'inner/notes.md'), null);
-    assert.equal(fileIn(dir, 'inner'), null);
-    assert.equal(fileIn(dir, 'link.txt'), null);
-  });
+  await t.test(
+    'REFUSED: fileUnder of a path that climbs out, is absolute, or passes a link reads none, though the file it reaches is there; nor a folder',
+    () => {
+      const dir = scratch('wf-artifacts-');
+      const beside = scratch('wf-artifacts-beside-');
+      fs.writeFileSync(path.join(beside, 'secret.txt'), 'secret');
+      fs.mkdirSync(path.join(dir, 'inner'));
+      fs.writeFileSync(path.join(dir, 'inner', 'notes.md'), 'notes');
+      fs.symlinkSync(path.join(beside, 'secret.txt'), path.join(dir, 'link.txt'));
+      fs.symlinkSync(beside, path.join(dir, 'out'));
+      fs.symlinkSync(beside, path.join(dir, 'inner', 'out'));
+      const refused = {
+        'a path that climbs out': `../${path.basename(beside)}/secret.txt`,
+        'a path that climbs out from a folder': 'inner/../../secret.txt',
+        'an absolute path': path.join(beside, 'secret.txt'),
+        'a path with an empty part': 'inner//notes.md',
+        'a path with a `.` part': './inner/notes.md',
+        'a path spelled with a backslash': 'inner\\notes.md',
+        'a link to a file': 'link.txt',
+        'a link to a folder out': 'out/secret.txt',
+        'a link to a folder out, beneath a folder': 'inner/out/secret.txt',
+        'a folder': 'inner',
+      };
+      for (const [what, rel] of Object.entries(refused)) assert.equal(fileUnder(dir, rel), null, what);
+      assert.equal(fileUnder(dir, 'inner/notes.md')?.toString(), 'notes', 'and the file in a folder of its own is read');
+    },
+  );
   await t.test(
     'REFUSED: filesLacked reads each reason a named file is not one the run has off the disk, and every one of them refuses',
     () => {

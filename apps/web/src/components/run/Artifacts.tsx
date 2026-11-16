@@ -59,7 +59,8 @@ function Opens({ artifact, step, className, children }: { artifact: Served; step
 }
 
 /**
- * The files a closeout named, or a step's folder holds: each picture the api serves as a thumbnail in a grid, every other file it serves
+ * The files a closeout named, or a step's folder holds: each picture the api serves as a thumbnail in a grid, captioned by its path (its
+ * `name`, which names the link, so the picture itself says nothing twice: an empty `alt`), every other file it serves
  * as a chip with its name (and its size, with `size`, or where it is no text), each opening its viewer's sheet where `step` names the
  * step it is of (`?view=`), else in a new tab. One the CLI's `prune --artifacts` removed is its path, muted, and when it went, as the
  * run's `pruned` row gives the same moment (`when`); any other path the api does not serve is the path, as the closeout gave it. `none`
@@ -88,7 +89,7 @@ export function Artifacts({
               <Opens artifact={picture} step={step} className={cn('block', focusRing())}>
                 <img
                   src={picture.url}
-                  alt={picture.name}
+                  alt=""
                   className="aspect-[4/3] w-full border border-outline-variant bg-surface-container object-cover object-top"
                 />
                 <span className="mt-1 block truncate font-mono text-on-surface-variant">{picture.name}</span>

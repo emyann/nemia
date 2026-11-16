@@ -37,6 +37,7 @@ import { Pins } from '../revisions/revisions.store.ts';
 import { countRecord, readText, within } from '../meter/tally.store.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { runMarkMove, runMarkOf, type RunMark } from '../run-marks/run-marks.ts';
+import { isFilePath } from '../artifacts/artifacts.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
@@ -1196,6 +1197,26 @@ export const cardsDir = (home: string, run: Pick<Run, 'id'>): string => path.joi
  * @param p The path.
  */
 export const lstatOf = (p: string) => fs.lstatSync(p, { throwIfNoEntry: false });
+
+/**
+ * The regular file at `rel` under `dir`, looked at without following a link (`lstat`), each folder on the way a folder of its own and
+ * no link: a link, to a file or a folder, may lead out of `dir`, and what it leads to is not under it. Undefined for a path
+ * `isFilePath` refuses, a file not there, a folder, or a link anywhere on the way.
+ * @param dir The folder.
+ * @param rel The file's path under it.
+ */
+export function statUnder(dir: string, rel: string): fs.Stats | undefined {
+  if (!isFilePath(rel)) return undefined;
+  const parts = rel.split('/');
+  let at = dir;
+  for (const [i, part] of parts.entries()) {
+    at = path.join(at, part);
+    const stat = fs.lstatSync(at, { throwIfNoEntry: false });
+    if (i === parts.length - 1) return stat?.isFile() ? stat : undefined;
+    if (!stat?.isDirectory()) return undefined;
+  }
+  return undefined;
+}
 
 /**
  * Whether a path is a directory, a link to one followed: false where nothing is there.

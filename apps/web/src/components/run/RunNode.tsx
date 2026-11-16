@@ -14,7 +14,7 @@ import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { spentTitle } from '@/lib/cost';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
 import { clockCounts, repoName, runClock, titleOf, toDecideOf, waitsOnRuns, waitsOnYou } from '@/lib/factory';
-import { flowSteps, railOf, tilesOf } from '@/lib/flow';
+import { flowSteps, tilesOf } from '@/lib/flow';
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
 import { namespaceOf } from '@/lib/factories';
@@ -22,7 +22,10 @@ import { ENDED } from '@/lib/words';
 import { RouteLink } from '../agent/AgentParts';
 import { CardGate, type Taken } from '../inbox/CardGate';
 import { CardLift } from './LiftHold';
-import { StepRail, StepTiles, type TilesRead } from '../step/StepRail';
+import { StepTiles, type TilesRead } from '../step/StepRail';
+import { previewBar } from '../step/StepPreview';
+import { StepGraph } from '../look';
+import { NowChip } from './RunNow';
 
 /**
  * `finished` is a run not in flight: on the floor only when finished runs are asked for, and dimmed.
@@ -46,7 +49,8 @@ type RunNodeData = {
 export type RunFlowNode = Node<RunNodeData, 'run'>;
 
 /**
- * One run on the Factory floor: what was asked, where, what each step is doing — a small flowchart of them (`StepRail`) — and for how long.
+ * One run on the Factory floor: what was asked, where, what each step is doing — the step it is on and its workflow's graph
+ * (`NowChip`, `StepGraph`) — and for how long.
  *
  * The chevron opens it: the card grows to the right with every step a tile
  * (`StepTiles`), and a tile shows its step in the frame's bar. A click on the card shows the run there, and the card is ringed while it
@@ -145,7 +149,6 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
   const clock = runClock(run, now, finished);
   const names = useMemo(() => run.steps.map((step) => step.name), [run.steps]);
   const edgeSteps = useMemo(() => flowSteps(run), [run]);
-  const rail = useMemo(() => railOf(names, run.graph, edgeSteps, cancelled), [names, run.graph, edgeSteps, cancelled]);
   const tiles = useMemo(
     () => (open ? tilesOf(names, run.graph, edgeSteps, cancelled) : null),
     [open, names, run.graph, edgeSteps, cancelled],
@@ -183,7 +186,7 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
           )}
         </div>
 
-        <StepRail run={run} flow={rail} />
+        <NowLine run={run} now={now} />
 
         {needs.length > 0 && (
           <ul aria-label="Needs" className="space-y-0.5 px-3 text-body-small">
@@ -247,6 +250,16 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
       <Handle type="target" position={Position.Left} isConnectable={false} className="opacity-0" />
       <Handle type="source" position={Position.Right} isConnectable={false} className="opacity-0" />
     </Card>
+  );
+}
+
+/** The step a run is on, as the runs row says it, over its workflow's graph, each node a button that opens its step's card at `now`. */
+function NowLine({ run, now }: { run: RunView; now: number }) {
+  return (
+    <div data-run-now className="flex min-w-0 flex-col gap-2 px-3">
+      <NowChip run={run} />
+      <StepGraph run={run} className="nodrag" wrap={previewBar(run, new Date(now))} />
+    </div>
   );
 }
 

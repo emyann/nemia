@@ -2,16 +2,32 @@
 import type { CSSProperties } from 'react';
 import type { RunView } from '@/lib/api/judged';
 
-/** A step of a rail, by its name and its codes, and its check's verdict. */
-type RailStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
+/** A step of a rail, by its name and its codes, its check's verdict, its note and whether its next round is due. */
+type RailStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict' | 'note' | 'roundDue'>;
 
 /** The codes of each state the stories draw. */
-const VERIFIED = { phase: 'succeeded', reason: 'CheckPassed', on: null, via: null, verdict: { result: 'passed', exit: 0 } } as const;
-const UNVERIFIED = { phase: 'succeeded', reason: 'Succeeded', on: null, via: null, verdict: null } as const;
-const APPROVAL = { phase: 'waiting', reason: 'AwaitingApproval', on: null, via: null, verdict: null } as const;
-const WORKING = { phase: 'running', reason: 'Running', on: null, via: null, verdict: null } as const;
-const TO_COME = { phase: 'pending', reason: 'Pending', on: null, via: null, verdict: null } as const;
-const REFUSED_CHECK = { phase: 'failed', reason: 'CheckFailed', on: null, via: null, verdict: { result: 'failed', exit: 1 } } as const;
+const VERIFIED = {
+  phase: 'succeeded',
+  reason: 'CheckPassed',
+  on: null,
+  via: null,
+  verdict: { result: 'passed', exit: 0 },
+  note: null,
+  roundDue: false,
+} as const;
+const UNVERIFIED = { phase: 'succeeded', reason: 'Succeeded', on: null, via: null, verdict: null, note: null, roundDue: false } as const;
+const APPROVAL = { phase: 'waiting', reason: 'AwaitingApproval', on: null, via: null, verdict: null, note: null, roundDue: false } as const;
+const WORKING = { phase: 'running', reason: 'Running', on: null, via: null, verdict: null, note: null, roundDue: false } as const;
+const TO_COME = { phase: 'pending', reason: 'Pending', on: null, via: null, verdict: null, note: null, roundDue: false } as const;
+const REFUSED_CHECK = {
+  phase: 'failed',
+  reason: 'CheckFailed',
+  on: null,
+  via: null,
+  verdict: { result: 'failed', exit: 1 },
+  note: null,
+  roundDue: false,
+} as const;
 
 /** A run at its gate: every step verified, the last waiting on a person's word. */
 export const GATE: RailStep[] = [
@@ -50,6 +66,109 @@ export const REFUSED: RailStep[] = [
   { name: 'implement', ...REFUSED_CHECK },
   { name: 'review', ...TO_COME },
 ];
+
+/** The codes of a step checked, waiting on a run slot, and passed by its route; a workflow node that filed its card. */
+const CHECKING = { phase: 'running', reason: 'Checking', on: null, via: null, verdict: null, note: null, roundDue: false } as const;
+const FOR_A_SLOT = { phase: 'waiting', reason: 'Waiting', on: 'limit', via: null, verdict: null, note: null, roundDue: false } as const;
+const SKIPPED = { phase: 'succeeded', reason: 'Skipped', on: null, via: null, verdict: null, note: null, roundDue: false } as const;
+
+/** A run as its graph draws it: its steps, its workflow's graph, its gates, never called off, held where `held` says. */
+export type GraphRunFixture = {
+  steps: RailStep[];
+  graph: RunView['graph'];
+  gates: string[];
+  cancelledAt: string | null;
+  holding: RunView['holding'];
+};
+
+/** The build workflow's graph, among the steps a run has: a chain, and review looping back to implement for three rounds. */
+const chainOf = (steps: readonly RailStep[]): RunView['graph'] => {
+  const names = steps.map((one) => one.name);
+  const edges: Array<RunView['graph']['edges'][number]> = names.slice(1).map((to, i) => ({ from: names[i], to, kind: 'after' }));
+  if (names.includes('review') && names.includes('implement')) edges.push({ from: 'review', to: 'implement', kind: 'loop', rounds: 3 });
+  return { roots: names.slice(0, 1), edges };
+};
+
+/** A hold on a run until another lands. */
+const HOLD: NonNullable<RunView['holding']> = {
+  at: '2026-11-15T17:30:00.000Z',
+  runs: [{ run: 'cli-the-api-only-consumer-1sw7', missing: false, cancelledAt: null, gone: [], landed: false }],
+  word: 'held until cli-the-api-only-consumer-1sw7 lands',
+  advice: '',
+  waitingOnYou: false,
+};
+
+/**
+ * A run of `steps` as its graph draws it: build's graph among them, design and land gated.
+ * @param steps The run's steps.
+ * @param held Whether a person holds it.
+ */
+export const graphRun = (steps: RailStep[], held = false): GraphRunFixture => ({
+  steps,
+  graph: chainOf(steps),
+  gates: ['design', 'land'].filter((gate) => steps.some((one) => one.name === gate)),
+  cancelledAt: null,
+  holding: held ? HOLD : null,
+});
+
+/** A run whose check is at work on implement. */
+export const CHECKED: RailStep[] = [
+  { name: 'design', ...VERIFIED },
+  { name: 'implement', ...CHECKING },
+  { name: 'review', ...TO_COME },
+  { name: 'land', ...TO_COME },
+];
+
+/** A run whose next step waits on a run slot. */
+export const SLOT: RailStep[] = [
+  { name: 'design', ...VERIFIED },
+  { name: 'implement', ...FOR_A_SLOT },
+  { name: 'review', ...TO_COME },
+  { name: 'land', ...TO_COME },
+];
+
+/** A run gone round its loop: implement at work on its second round. */
+export const LOOPED: RailStep[] = [
+  { name: 'design', ...VERIFIED },
+  { name: 'implement', ...WORKING, note: 'round 2 of 3' },
+  { name: 'review', ...VERIFIED },
+  { name: 'land', ...TO_COME },
+];
+
+/** A routed run, as intake's: its condition took build, so the route to quick was passed by. */
+export const ROUTED: GraphRunFixture = {
+  steps: [
+    { name: 'intake', ...VERIFIED },
+    { name: 'next', ...VERIFIED },
+    { name: 'to-build', ...UNVERIFIED, phase: 'succeeded', reason: 'Sent' },
+    { name: 'to-quick', ...SKIPPED },
+  ],
+  graph: {
+    roots: ['intake'],
+    edges: [
+      { from: 'intake', to: 'next', kind: 'after' },
+      { from: 'next', to: 'to-build', kind: 'route', route: 'build' },
+      { from: 'next', to: 'to-quick', kind: 'route', route: 'quick' },
+    ],
+    nodes: [
+      { name: 'intake', kind: 'step' },
+      { name: 'next', kind: 'condition' },
+      { name: 'to-build', kind: 'workflow', workflow: 'build' },
+      { name: 'to-quick', kind: 'workflow', workflow: 'quick' },
+    ],
+  },
+  gates: ['next'],
+  cancelledAt: null,
+  holding: null,
+};
+
+/** A run of nine steps in a chain, at work on its sixth: more than a row's width holds. */
+export const LONG: GraphRunFixture = graphRun(
+  ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map((name, i) => ({ name, ...(i < 5 ? VERIFIED : i === 5 ? WORKING : TO_COME) })),
+);
+
+/** A run listed without its graph, by an api older than the board. */
+export const UNGRAPHED_RUN: GraphRunFixture = { ...graphRun(AT_WORK), graph: undefined as unknown as RunView['graph'] };
 
 /** A card's ground around a part, as a part stands on a card. */
 export const ON_CARD: CSSProperties = { display: 'inline-block', padding: 16, background: 'var(--card)' };

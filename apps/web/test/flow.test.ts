@@ -90,7 +90,7 @@ const buildAt = (states: Record<string, StepState>, notes: Record<string, string
   graphOf(build, buildGraph, stepsOf(states, notes), ['design', 'land'], false);
 
 test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, folded around the live column", async (t) => {
-  await t.test('a chain of four is a row of points across 188 pixels, on one line, 24 high, in the layering\'s order', () => {
+  await t.test("a chain of four is a row of points across 188 pixels, on one line, 24 high, in the layering's order", () => {
     const g = buildAt({ design: 'verified', implement: 'working', review: 'waiting', land: 'waiting' });
     assert.deepEqual(readGraph(g), [['design'], ['implement'], ['review'], ['land']]);
     assert.deepEqual(
@@ -107,7 +107,10 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
       'step:review->step:land': 'to-come',
       'loop:step:review->step:implement': 'to-come',
     });
-    assert.ok(g.points.find((p) => p.names[0] === 'implement')!.r > g.points.find((p) => p.names[0] === 'design')!.r, 'at work a size larger');
+    assert.ok(
+      g.points.find((p) => p.names[0] === 'implement')!.r > g.points.find((p) => p.names[0] === 'design')!.r,
+      'at work a size larger',
+    );
   });
   await t.test('a loop runs under the row at right angles, its head under the step it runs again, taken only past its first round', () => {
     const first = buildAt({ design: 'verified', implement: 'working', review: 'waiting', land: 'waiting' });
@@ -163,7 +166,13 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
         { name: 'to-quick', kind: 'workflow', workflow: 'quick' },
       ],
     };
-    const g = graphOf(names, graph, stepsOf({ intake: 'verified', next: 'verified', 'to-build': 'sent', 'to-quick': 'skipped' }), [], false);
+    const g = graphOf(
+      names,
+      graph,
+      stepsOf({ intake: 'verified', next: 'verified', 'to-build': 'sent', 'to-quick': 'skipped' }),
+      [],
+      false,
+    );
     assert.deepEqual(readGraph(g), [['intake'], ['next'], ['to-build', 'to-quick']]);
     const [top, under] = g.points.filter((p) => p.label.startsWith('to-'));
     assert.notEqual(top.y, under.y);
@@ -193,13 +202,27 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
   await t.test('a column of five shows two and a point counting the rest, the live step never among them', () => {
     const lanes = ['l1', 'l2', 'l3', 'l4', 'l5'];
     const graph = graphOfEdges(...lanes.map((l) => after('plan', l)), ...lanes.map((l) => after(l, 'merge')));
-    const states = { plan: 'verified', l1: 'verified', l2: 'verified', l3: 'verified', l4: 'working', l5: 'waiting', merge: 'waiting' } as const;
+    const states = {
+      plan: 'verified',
+      l1: 'verified',
+      l2: 'verified',
+      l3: 'verified',
+      l4: 'working',
+      l5: 'waiting',
+      merge: 'waiting',
+    } as const;
     const g = graphOf(['plan', ...lanes, 'merge'], graph, stepsOf(states), [], false);
     assert.deepEqual(readGraph(g), [['plan'], ['l1', 'l4', '+3'], ['merge']]);
     assert.equal(g.height, 24 + 13, 'a lane past two takes 13 pixels more');
   });
   await t.test('a run listed without its graph, by an api older than the board: its steps in its order, no lines, and what to do', () => {
-    const g = graphOf(['implement', 'review'], undefined as unknown as RunGraph, stepsOf({ implement: 'working', review: 'waiting' }), [], false);
+    const g = graphOf(
+      ['implement', 'review'],
+      undefined as unknown as RunGraph,
+      stepsOf({ implement: 'working', review: 'waiting' }),
+      [],
+      false,
+    );
     assert.deepEqual(readGraph(g), [['implement'], ['review']]);
     assert.equal(g.lines.length, 0);
     assert.equal(g.error, UNGRAPHED);

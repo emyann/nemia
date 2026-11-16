@@ -8,7 +8,7 @@ import { CHIP_TAG, type ChipTone } from '@/lib/nowChip';
 import { nowOf, type Now, type NowPart } from '@/lib/runWords';
 import { NOW_WORDS } from '@/lib/words';
 import { previewBar } from '../step/StepPreview';
-import { CutTag, RunSteps, TextLink } from '../look';
+import { CutTag, StepGraph, TextLink } from '../look';
 
 /** The ink of NOW's words by the chip's colour: yellow where the row waits on you, red where it failed, quiet for every other. */
 const WORDS_INK: Record<ChipTone, string> = {
@@ -131,12 +131,46 @@ function Part({ part }: { part: NowPart }) {
   );
 }
 
+/** The chip naming the step a run is on, its colour the state, and the step's agent beside it. */
+function Chip({ now }: { now: Now }) {
+  const tag = CHIP_TAG[now.tone];
+  return (
+    <>
+      <CutTag>
+        <Tag data-now-word data-tone={now.tone} variant={tag.variant} color={tag.color} className="uppercase">
+          {now.step}
+        </Tag>
+      </CutTag>
+      {now.agent && (
+        <span data-now-agent className="text-body-medium font-medium text-on-surface">
+          {now.agent}
+        </span>
+      )}
+    </>
+  );
+}
+
+/**
+ * The step a run is on as the runs row says it, on a line of its own: its chip and its agent (`nowOf`, `CHIP_TAG`); nothing where the
+ * run is on no step.
+ * @param run The run, as its list gives it.
+ */
+export function NowChip({ run }: { run: Parameters<typeof nowOf>[0] }) {
+  const now = nowOf(run);
+  if (!now) return null;
+  return (
+    <span data-now={now.tone} className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+      <Chip now={now} />
+    </span>
+  );
+}
+
 /**
  * What a run does now, in marks: one chip naming the step it is on, its colour the state (`nowOf`, `chipTone`); the step's agent; its
  * round as pips; the few words of its wait, a run it names a link; and at the line's end how many of the page's runs wait on it
  * (`waitedBy`, none drawn for none) and its budget's ring, or `end` where the caller gives it. Under the line, with `rail`, the run's
- * steps (`RunSteps`), each bar a button that opens its step's card, said at `asOf`. Nothing on the line is cut: what does not fit
- * wraps.
+ * steps as its workflow's graph (`StepGraph`), each node a button that opens its step's card, said at `asOf`. Nothing on the line is
+ * cut: what does not fit wraps.
  */
 export function RunNow({
   run,
@@ -153,20 +187,10 @@ export function RunNow({
 }) {
   const now = nowOf(run);
   if (!now) return null;
-  const tag = CHIP_TAG[now.tone];
   return (
     <span data-now={now.tone} className="flex min-w-0 flex-col gap-2">
       <span className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
-        <CutTag>
-          <Tag data-now-word data-tone={now.tone} variant={tag.variant} color={tag.color} className="uppercase">
-            {now.step}
-          </Tag>
-        </CutTag>
-        {now.agent && (
-          <span data-now-agent className="text-body-medium font-medium text-on-surface">
-            {now.agent}
-          </span>
-        )}
+        <Chip now={now} />
         {now.round && <Pips round={now.round} tone={now.tone} />}
         {now.words.length > 0 && (
           <span data-now-words className={cn('text-body-medium', WORDS_INK[now.tone])}>
@@ -186,7 +210,7 @@ export function RunNow({
           </span>
         )}
       </span>
-      {rail && <RunSteps steps={run.steps} cancelled={run.cancelledAt !== null} held={run.holding != null} wrap={previewBar(run, asOf)} />}
+      {rail && <StepGraph run={run} wrap={previewBar(run, asOf)} />}
     </span>
   );
 }

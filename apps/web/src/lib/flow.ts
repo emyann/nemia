@@ -68,7 +68,11 @@ export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under
  * A run's steps as its flow reads them, off the list's record of it: each one's name, its state, its note and whether its round is due.
  * @param run The run: its steps, when it was called off, and its hold where it has one.
  */
-export const flowSteps = (run: Pick<RunView, 'steps' | 'cancelledAt'> & { holding?: RunView['holding'] }): EdgeStep[] =>
+export const flowSteps = (run: {
+  steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'note' | 'roundDue'>>;
+  cancelledAt: string | null;
+  holding?: RunView['holding'];
+}): EdgeStep[] =>
   run.steps.map((step) => ({
     name: step.name,
     state: stepState(step, run.cancelledAt !== null, run.holding != null),
@@ -221,15 +225,13 @@ export function graphOf(
   const middle = lanes === 1 ? GRAPH.line : GRAPH.top + ((lanes - 1) * GRAPH.lane) / 2;
   const gap = slots.length > 1 ? (width - 2 * GRAPH.pad) / (slots.length - 1) : 0;
   const points = slots.flatMap((slot, s) =>
-    slot.map(
-      (box, lane): GraphPoint => ({
-        ...box,
-        x: r1(GRAPH.pad + s * gap),
-        y: r1(middle + (lane - (slot.length - 1) / 2) * GRAPH.lane),
-        r: radiusOf(box.state),
-        route: box.kind === 'step' && conditions.has(box.names[0]),
-      }),
-    ),
+    slot.map((box, lane): GraphPoint => ({
+      ...box,
+      x: r1(GRAPH.pad + s * gap),
+      y: r1(middle + (lane - (slot.length - 1) / 2) * GRAPH.lane),
+      r: radiusOf(box.state),
+      route: box.kind === 'step' && conditions.has(box.names[0]),
+    })),
   );
   const at = new Map(points.map((point) => [point.id, point]));
   const lowest = Math.max(GRAPH.line, ...points.map((point) => point.y));

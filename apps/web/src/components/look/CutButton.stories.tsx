@@ -56,7 +56,7 @@ export const DisabledPress: StoryObj = {
     const button = canvasElement.querySelector<HTMLButtonElement>('[data-cut-button]');
     const stops = (await tabStops(userEvent)).filter((stop) => stop.marks.includes('cutButton'));
     await expect(stops, 'Tab passes the disabled press').toEqual([]);
-    fireEvent.click(button!);
+    await fireEvent.click(button!);
     await expect(pressesIn(canvasElement), 'a click presses nothing').toBe('0');
     await expect(button?.disabled).toBe(true);
     await expect(button?.querySelectorAll('[data-cut-ring]').length, 'it draws no ring').toBe(0);

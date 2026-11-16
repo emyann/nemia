@@ -1,7 +1,8 @@
 /**
  * The look's browser tests — `test/e2e/*.test.ts`, the assertions made to refuse (checks.test.ts), the visiting and its exit
  * (visit.test.ts), a full-page picture (photograph.test.ts), the contrast's measure (contrast.test.ts) and the look's stories read in
- * pixels and by the browser's own input, each opened alone in Storybook's static build (bars, cuts, motion and secondary) — then every
+ * pixels and by the browser's own input, each opened alone in Storybook's static build (bars, cuts, motion and secondary), and the
+ * stories' Vitest leaving the route tree unwritten (route-tree) — then every
  * story in Chromium through Vitest (`npm run stories`: its render, its play function, axe), which the runner runs before it builds
  * anything when its plan says `look` (`planOf`, pages.ts): `npm run e2e -- --look`, and a whole `npm run e2e`. Never `--pages` alone,
  * nor a shard: CI runs them once per push, in its `e2e-look` job.

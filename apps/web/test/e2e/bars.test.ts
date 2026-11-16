@@ -346,8 +346,9 @@ test(
     const page = await open('classic', MARKED);
     const unmarked = await open('classic', UNMARKED);
     try {
+      await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
       await page.locator(SCROLLER).scrollIntoViewIfNeeded();
-      await marked(page, 'html', 'rest', 'the page, brought to the box, comes to rest');
+      await marked(page, 'html', 'rest', 'the page, brought back to the box at its head, comes to rest');
       await wheelOver(page, SCROLLER);
       await marked(page, SCROLLER, 'shown', 'a box that scrolls is marked shown');
       await marked(page, SCROLLER, 'rest', 'and at rest once it scrolls no more');

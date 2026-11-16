@@ -1,9 +1,10 @@
 /**
  * The files of a step, one table per function, and the artifact path rules as one table: where a named file is from
- * (`artifactPlace`), one file a step left read by its path under its folder and never through a link (`fileUnder`, `artifactFile`), and each reason a named file is not
- * one the run has, off the disk alone (`filesLacked`). Then those that are there for the step after (`filesHanded`), the tasks whose
- * files a pass reads (`filesDue`), a near name (`nearName`), what a step is told of its files (`artifactsContract`) and what `nemia
- * decide` says of them (`artifactLines`). A closeout naming files in a run is told in `test/closeouts.test.ts`.
+ * (`artifactPlace`), one file a step left read by its path under its folder and never through a link (`fileUnder`, `artifactFile`),
+ * and each reason a named file is not one the run has, off the disk alone (`filesLacked`). Then those that are there for the step
+ * after (`filesHanded`), the tasks whose files a pass reads (`filesDue`), a near name (`nearName`), what a step is told of its files
+ * (`artifactsContract`) and what `nemia decide` says of them (`artifactLines`). A closeout naming files in a run is told in
+ * `test/closeouts.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -97,30 +98,33 @@ test('the artifact path rules: artifactPlace, fileUnder and filesLacked', async 
     assert.equal(fileUnder(dir, 'e2e/dark/bar.png')?.toString(), 'nested');
     assert.equal(fileUnder(dir, 'gone.png'), null);
   });
-  await t.test('REFUSED: fileUnder of a path that climbs out, is absolute, or passes a link reads none, though the file it reaches is there; nor a folder', () => {
-    const dir = scratch('wf-artifacts-');
-    const beside = scratch('wf-artifacts-beside-');
-    fs.writeFileSync(path.join(beside, 'secret.txt'), 'secret');
-    fs.mkdirSync(path.join(dir, 'inner'));
-    fs.writeFileSync(path.join(dir, 'inner', 'notes.md'), 'notes');
-    fs.symlinkSync(path.join(beside, 'secret.txt'), path.join(dir, 'link.txt'));
-    fs.symlinkSync(beside, path.join(dir, 'out'));
-    fs.symlinkSync(beside, path.join(dir, 'inner', 'out'));
-    const refused = {
-      'a path that climbs out': `../${path.basename(beside)}/secret.txt`,
-      'a path that climbs out from a folder': 'inner/../../secret.txt',
-      'an absolute path': path.join(beside, 'secret.txt'),
-      'a path with an empty part': 'inner//notes.md',
-      'a path with a `.` part': './inner/notes.md',
-      'a path spelled with a backslash': 'inner\\notes.md',
-      'a link to a file': 'link.txt',
-      'a link to a folder out': 'out/secret.txt',
-      'a link to a folder out, beneath a folder': 'inner/out/secret.txt',
-      'a folder': 'inner',
-    };
-    for (const [what, rel] of Object.entries(refused)) assert.equal(fileUnder(dir, rel), null, what);
-    assert.equal(fileUnder(dir, 'inner/notes.md')?.toString(), 'notes', 'and the file in a folder of its own is read');
-  });
+  await t.test(
+    'REFUSED: fileUnder of a path that climbs out, is absolute, or passes a link reads none, though the file it reaches is there; nor a folder',
+    () => {
+      const dir = scratch('wf-artifacts-');
+      const beside = scratch('wf-artifacts-beside-');
+      fs.writeFileSync(path.join(beside, 'secret.txt'), 'secret');
+      fs.mkdirSync(path.join(dir, 'inner'));
+      fs.writeFileSync(path.join(dir, 'inner', 'notes.md'), 'notes');
+      fs.symlinkSync(path.join(beside, 'secret.txt'), path.join(dir, 'link.txt'));
+      fs.symlinkSync(beside, path.join(dir, 'out'));
+      fs.symlinkSync(beside, path.join(dir, 'inner', 'out'));
+      const refused = {
+        'a path that climbs out': `../${path.basename(beside)}/secret.txt`,
+        'a path that climbs out from a folder': 'inner/../../secret.txt',
+        'an absolute path': path.join(beside, 'secret.txt'),
+        'a path with an empty part': 'inner//notes.md',
+        'a path with a `.` part': './inner/notes.md',
+        'a path spelled with a backslash': 'inner\\notes.md',
+        'a link to a file': 'link.txt',
+        'a link to a folder out': 'out/secret.txt',
+        'a link to a folder out, beneath a folder': 'inner/out/secret.txt',
+        'a folder': 'inner',
+      };
+      for (const [what, rel] of Object.entries(refused)) assert.equal(fileUnder(dir, rel), null, what);
+      assert.equal(fileUnder(dir, 'inner/notes.md')?.toString(), 'notes', 'and the file in a folder of its own is read');
+    },
+  );
   await t.test(
     'REFUSED: filesLacked reads each reason a named file is not one the run has off the disk, and every one of them refuses',
     () => {

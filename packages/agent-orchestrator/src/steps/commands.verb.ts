@@ -55,7 +55,10 @@ export const StepTranscriptInput = Schema.Struct({
 });
 export type StepTranscriptInput = typeof StepTranscriptInput.Type;
 
-/** The file at the path `name` under the files directory of the step `step` of the run `id` (`artifactFile`), or null where there is none. */
+/**
+ * The file at the path `name` under the files directory of the step `step` of the run `id` (`artifactFile`), or null where there is
+ * none.
+ */
 export const STEP_ARTIFACT: Command<{ file: Buffer | null }, StepFileInput> = {
   name: 'step artifact',
   served: [{ endpoint: 'steps.artifact' }],

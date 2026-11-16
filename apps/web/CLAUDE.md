@@ -7,7 +7,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 (`test/*.test.ts`) load `src/` as Node does; its e2e (`test/e2e/`) drives the built app in Chromium.
 
 Two component families draw from one palette. shadcn's (`src/components/ui/*.tsx`) are what many pages still use; it is retired, and
-no file gains an import of it (`test/stories.test.ts`). The design system kit (`src/components/ui/ds`, Material Design 3 on React Aria)
+no file gains an import of it, nor a control drawn by hand (`test/stories.test.ts`), and `test/destinations.ts` says where each
+of its parts moves. The design system kit (`src/components/ui/ds`, Material Design 3 on React Aria)
 is the board's one system, which it moves to a component at a time. The look is `DESIGN.md`,
 and `theme/` is what the kit's generator makes of it; `src/styles.css` imports the theme and reads shadcn's names from its roles.
 
@@ -87,8 +88,12 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - `test/stories.test.ts` holds the stories (`test/stories.ts`, the rules): a title opens with `Look/`, `Frame/`, `Store/`,
   `Factory/`, `Run/` or `Pages/`, by where the part sits, with no exception; and, each against `test/stories.baseline.ts`, whose
   lists only shrink, a component or page body of `src/components` with no story beside it (never `ui/` or `ai-elements/`), a story
-  given no args, a file importing shadcn's `components/ui/*` or React Aria outside the kit and the look, and the `todo` stories. A
-  file you mend is cut from its list in the same change; the test refuses a list that keeps it.
+  given no args, each name a file takes from shadcn's `components/ui/*` or React Aria outside the kit and the look
+  (`<file>#<module>:<name>`), each control a file draws by hand (a raw `<button>`, `<input>`, `<select>` or `<textarea>`, or an
+  import of `lib/classes.ts`'s control strings, `handDrawn`), and the `todo` stories. A file you mend is cut from its list in the same
+  change; the test refuses a list that keeps it. `test/destinations.ts` maps each name and control to where it moves (a part of the
+  kit, of the look, the frame's own state, plain markup, an ask of the kit, or exempt: `RouterProvider` alone), and the test refuses a
+  key taken that it does not map and a key it maps that nothing takes (`mapGaps`, proved by `contracts/destinations.contract.ts`).
 - One component system: the ds kit. shadcn's `components/ui/*` is retired, a page at a time, and React Aria is imported only inside
   the kit or a part of the look. A generic part the kit lacks is asked for upstream (french-tech-homies/design-system); one that is
   Nemia's alone is a part of the look, with its stories.
@@ -165,8 +170,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - An approval is `useApprove` (`lib/useApprove.ts`) wherever a person approves; an ending's warning is `endingWarning` (`lib/gate.ts`),
   the card's and the gate's confirm alike. A run's wait on runs, or its hold, is drawn by `components/run/RunWait.tsx`, a proposal's
   phase tag and Widens mark by `components/gate/ProposalTags.tsx`, and a graph's edges from `StepGraphFacts` (`stepEdges`).
-- A class string two features share (a button, a field, a popover, the floor's frame) is `lib/classes.ts`'s, never a feature
-  component's export.
+- A class string two features share is `lib/classes.ts`'s, never a feature component's export. Its control strings (the buttons,
+  `TEXTAREA`, `POPOVER`) are retiring for the kit's parts and no file gains an import of one; the floor's frame (`FLOOR_BOX`) stays.
 - A followed stream's event is decoded by `streamDataOf` (`lib/api/stream.ts`); one that does not decode is an `UnreadAnswer`, which
   `follow` says as its could-not-be-read line while the stream goes on.
 - No export of `src` is dead: `test/dead-exports.test.ts` refuses a name no other file of `src`, `test`, `.storybook` or `contracts`

@@ -5,7 +5,7 @@
  *
  * The facts are read by the caller from the tree, never here: each key a file of `apps/web/src` takes, `<module>:<name>` for an
  * import of a second system (`@/components/ui/button:Button`, `react-aria-components:Dialog`) and `<button>` or `@/lib/classes:BUTTON`
- * for a control drawn by hand, as many times as files take it; and each key the map gives a destination, once each. A key taken that
+ * for a control drawn by hand, once each however many files take it; and each key the map gives a destination, once each. A key taken that
  * the map gives no destination is unmapped, and refused; a key the map gives a destination that nothing takes is unused, and refused,
  * so the map is cut in the change that moves the last file off it.
  */
@@ -23,7 +23,7 @@ export type Gaps = {
 const once = (list: readonly string[]): boolean => list.every((one, at) => !list.slice(0, at).includes(one));
 
 const mapGapsSpec = spec<(taken: readonly string[], mapped: readonly string[]) => Gaps>({
-  requires: ({ input: [, mapped] }) => once(mapped),
+  requires: ({ input: [taken, mapped] }) => once(taken) && once(mapped),
   ensures: {
     unmappedExactlyWhereNoDestination: {
       description: 'A key the board takes is refused as unmapped exactly when the map gives it no destination',
@@ -32,14 +32,13 @@ const mapGapsSpec = spec<(taken: readonly string[], mapped: readonly string[]) =
         output.unmapped.every((key) => taken.includes(key)),
     },
     unmappedOnce: {
-      description: 'Each unmapped key is named once, however many files take it',
+      description: 'Each unmapped key is named once',
       condition: ({ output }) => once(output.unmapped),
     },
     unusedExactlyWhereNothingTakes: {
       description: 'A destination is refused as unused exactly when no file of the board takes its key',
       condition: ({ input: [taken, mapped], output }) =>
-        mapped.every((key) => output.unused.includes(key) === !taken.includes(key)) &&
-        output.unused.every((key) => mapped.includes(key)),
+        mapped.every((key) => output.unused.includes(key) === !taken.includes(key)) && output.unused.every((key) => mapped.includes(key)),
     },
     unusedOnce: {
       description: 'Each unused destination is named once',

@@ -8,7 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { files, REPO } from 'test-kit/repo';
-import { a11yTodos, argless, offCategory, secondSystem, storyless, storyModuleOf } from './stories.ts';
+import { DESTINATIONS, EXEMPT } from './destinations.ts';
+import { a11yTodos, argless, handDrawn, mapGaps, offCategory, secondSystem, storyless, storyModuleOf } from './stories.ts';
 import { BASELINE } from './stories.baseline.ts';
 
 /** The board's files that are there, from the workspace root. */
@@ -70,12 +71,51 @@ test("REFUSED: a title outside the board's categories, or none", () => {
   assert.equal(offCategory(storyModuleOf(STORY(`export default { title: 'Run/X' };`))), false);
 });
 
-test("REFUSED: a part of shadcn's ui/ or React Aria imported outside the kit and the look", () => {
-  const source = `import { Button } from '@/components/ui/button';\nimport { Dialog } from 'react-aria-components';\nimport { Card } from '../ui/ds';\n`;
-  assert.deepEqual(secondSystem('apps/web/src/components/run/X.tsx', source), ['@/components/ui/button', 'react-aria-components']);
-  assert.deepEqual(secondSystem('apps/web/src/components/run/X.tsx', `import { Tag } from '../ui/badge';`), ['../ui/badge']);
-  assert.deepEqual(secondSystem('apps/web/src/components/look/X.tsx', source), [], 'the look draws on React Aria');
-  assert.deepEqual(secondSystem('apps/web/src/components/ui/ds/X.tsx', source), [], 'so does the kit');
+test("REFUSED: a part of shadcn's ui/ or React Aria imported outside the kit and the look, by each name it takes", () => {
+  const file = 'apps/web/src/components/step/X.tsx';
+  const source = [
+    `import { Button as AriaButton, Dialog } from 'react-aria-components';`,
+    `import type { TraceStatus } from '../ui/trace';`,
+    `import Sheet from '@/components/ui/sheet';`,
+    `import * as Tabs from '@/components/ui/tabs.tsx';`,
+    `import { Card } from '../ui/ds';`,
+    `import { Badge } from '../ui/badge';`,
+    `import { Badge as Tag } from '@/components/ui/badge';`,
+    `const later = () => import('@/components/ui/alert');`,
+  ].join('\n');
+  assert.deepEqual(
+    secondSystem(file, source).map(({ module, name }) => `${module}:${name}`),
+    [
+      'react-aria-components:Button',
+      'react-aria-components:Dialog',
+      '@/components/ui/trace:TraceStatus',
+      '@/components/ui/sheet:default',
+      '@/components/ui/tabs:*',
+      '@/components/ui/badge:Badge',
+      '@/components/ui/alert:*',
+    ],
+  );
+  assert.equal(secondSystem('apps/web/src/components/look/X.tsx', source).length, 0, 'the look draws on React Aria');
+  assert.equal(secondSystem('apps/web/src/components/ui/ds/X.tsx', source).length, 0, 'so does the kit');
+});
+
+test('REFUSED: a control drawn by hand, by its element or a class string of lib/classes.ts, once each', () => {
+  const file = 'apps/web/src/components/gate/X.tsx';
+  const source = [
+    `import { BUTTON, FLOOR_BOX } from '../../lib/classes';`,
+    `import { Button } from '@/components/ui/ds';`,
+    `export const X = () => (<div className={FLOOR_BOX}><button className={BUTTON} /><input type="checkbox"/>`,
+    `<select><option /></select><select></select><Button>ok</Button></div>);`,
+  ].join('\n');
+  assert.deepEqual(handDrawn(file, source).toSorted(), ['<button>', '<input>', '<select>', '@/lib/classes:BUTTON']);
+  assert.equal(handDrawn('apps/web/src/components/look/X.tsx', source).length, 0, 'the look draws its own');
+  assert.equal(handDrawn('apps/web/src/components/ui/ds/X.tsx', source).length, 0, 'so does the kit');
+});
+
+test('REFUSED: a key the board takes that the map gives no destination, and a destination nothing takes', () => {
+  const { unmapped, unused } = mapGaps(['<button>', '<select>'], ['<button>', '<input>']);
+  assert.deepEqual([...unmapped], ['<select>']);
+  assert.deepEqual([...unused], ['<input>']);
 });
 
 test('REFUSED: a story whose axe is todo, by its meta or itself', () => {
@@ -109,11 +149,24 @@ test("the board's stories: every story titled in a category, and each other rule
     BASELINE.argless,
     'argless',
   );
+  const sources = all.filter((file) => /\.tsx?$/.test(file)).map((file) => ({ file, source: textOf(file) }));
+  const imported = sources.flatMap(({ file, source }) =>
+    secondSystem(file, source).map(({ module, name }) => ({ file, key: `${module}:${name}` })),
+  );
+  const drawn = sources.flatMap(({ file, source }) => handDrawn(file, source).map((key) => ({ file, key })));
   heldTo(
-    all.filter((file) => /\.tsx?$/.test(file)).filter((file) => secondSystem(file, textOf(file)).length > 0),
+    imported.filter(({ key }) => !EXEMPT.includes(key)).map(({ file, key }) => `${file}#${key}`),
     BASELINE.secondSystem,
     'secondSystem',
   );
+  heldTo(
+    drawn.map(({ file, key }) => `${file}#${key}`),
+    BASELINE.handDrawn,
+    'handDrawn',
+  );
+  const { unmapped, unused } = mapGaps([...new Set([...imported, ...drawn].map(({ key }) => key))], Object.keys(DESTINATIONS));
+  assert.deepEqual([...unmapped], [], 'give each of these its destination in test/destinations.ts');
+  assert.deepEqual([...unused], [], 'nothing takes these any more: cut each from test/destinations.ts');
   heldTo(
     modules.flatMap(({ file, module }) => a11yTodos(file, module)),
     BASELINE.a11yTodo,

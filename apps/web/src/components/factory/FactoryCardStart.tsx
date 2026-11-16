@@ -3,8 +3,9 @@
  * first: the workflow among those the factory offers, by name; the repository the factory wires for it, shown, never picked; the
  * workflow read there with its hires; and `StartRun` sending the start, as a start of the card in a factory from the command line does.
  */
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Select, SelectItem } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '../../lib/api/factories.ts';
 import { factoryWorkflowsQuery, type Place, type Started } from '../../lib/api/workflows.ts';
 import { storeQuery } from '../../lib/api/store.ts';
@@ -12,7 +13,7 @@ import { type InboxEntry } from '../../lib/api/inbox.ts';
 import { startRepo } from '../../lib/factories';
 import { cardPlace, factoriesOffered, startPlace, type CardPlace } from '../../lib/inbox';
 import { StartRun } from '../run/StartRun';
-import { FIELD, WorkflowsUnread } from '../workflow/WorkflowOptions';
+import { WorkflowsUnread } from '../workflow/WorkflowOptions';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
@@ -52,7 +53,6 @@ export function UnassignedStart({ entry, onStarted, onRefused }: { entry: InboxE
   const [picked, setPicked] = useState('');
   const offered = factoriesOffered(factories.data ?? []);
   const place = factories.data && store ? startPlace(entry, picked, factories.data, store.fileFactory) : null;
-  const field = useId();
 
   return (
     <div data-start-card data-start-unassigned className="space-y-3 border-t border-outline-variant pt-4">
@@ -65,22 +65,19 @@ export function UnassignedStart({ entry, onStarted, onRefused }: { entry: InboxE
           A card starts in a factory, and the store has none yet: file one with {code(store.fileFactory)}.
         </p>
       ) : (
-        <div className="space-y-1.5">
-          <label htmlFor={field} className="block text-body-medium font-medium">
-            Factory
-          </label>
-          <select id={field} value={picked} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} @md/page:max-w-xs`}>
-            <option value="" disabled>
-              Pick the factory it runs in
-            </option>
-            {offered.map((f) => (
-              <option key={f.name} value={f.name}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-          <p className="text-body-small text-muted-foreground">The card names no factory, and a run starts in one.</p>
-        </div>
+        <Select
+          label="Factory"
+          placeholder="Pick the factory it runs in"
+          value={picked || null}
+          onChange={(key) => setPicked(key === null ? '' : String(key))}
+          supportingText="The card names no factory, and a run starts in one."
+          data-pick-factory
+          className="@md/page:max-w-xs"
+        >
+          {offered.map((f) => (
+            <SelectItem key={f.name} id={f.name} label={f.name} />
+          ))}
+        </Select>
       )}
       {place && <Placed key={picked} entry={entry} place={place} onStarted={onStarted} onRefused={onRefused} />}
     </div>
@@ -94,7 +91,6 @@ export function UnassignedStart({ entry, onStarted, onRefused }: { entry: InboxE
  */
 function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; place: CardPlace } & Told) {
   const [picked, setPicked] = useState<string | null>(null);
-  const field = useId();
   if ('why' in place) {
     return (
       <p data-unplaced className="text-body-small text-yours">
@@ -108,33 +104,29 @@ function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; pla
   const on = workflow === null ? null : startRepo(factory, workflow);
   return (
     <>
-      <div className="space-y-1.5">
-        <label htmlFor={field} className="block text-body-medium font-medium">
-          Workflow
-        </label>
-        {offered.length === 0 ? (
+      {offered.length === 0 ? (
+        <div className="space-y-1.5">
+          <p className="text-body-medium font-medium">Workflow</p>
           <p data-no-workflow className="text-body-small text-yours">
             The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
           </p>
-        ) : (
-          <select
-            id={field}
-            value={workflow ?? ''}
-            onChange={(event) => setPicked(event.target.value)}
-            className={`${FIELD} @md/page:max-w-xs`}
-          >
-            <option value="" disabled>
-              Pick what runs it
-            </option>
-            {offered.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        )}
-        <p className="text-body-small text-muted-foreground">The workflows the factory {code(factory.name)} offers.</p>
-      </div>
+          <p className="text-body-small text-muted-foreground">The workflows the factory {code(factory.name)} offers.</p>
+        </div>
+      ) : (
+        <Select
+          label="Workflow"
+          placeholder="Pick what runs it"
+          value={workflow}
+          onChange={(key) => setPicked(key === null ? null : String(key))}
+          supportingText={<>The workflows the factory {code(factory.name)} offers.</>}
+          data-pick-workflow
+          className="@md/page:max-w-xs"
+        >
+          {offered.map((name) => (
+            <SelectItem key={name} id={name} label={name} />
+          ))}
+        </Select>
+      )}
       {on !== null && workflow !== null && <Wired factory={factory} workflow={workflow} on={on} />}
       {on !== null && workflow !== null && 'repo' in on && (
         <OnRepo

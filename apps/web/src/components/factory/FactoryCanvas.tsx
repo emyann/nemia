@@ -1,5 +1,5 @@
 import type * as RunObject from 'objects';
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
   applyNodeChanges,
@@ -20,9 +20,7 @@ import {
 } from '@xyflow/react';
 import { useNavigate } from '@tanstack/react-router';
 import { routeLink } from '@/components/nav/routeLink';
-import { Button, LinkButton } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
+import { Button, Card, CardContent, Switch, Title } from '@/components/ui/ds';
 import { ceilingsQuery } from '@/lib/api/ceilings';
 import { inboxQuery } from '@/lib/api/inbox';
 import { runObjectQuery } from '@/lib/api/run';
@@ -553,13 +551,13 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
                   Click a run to inspect it · double-click to open its page · drag a card, and it moves alone · kept in this browser
                 </Panel>
                 <Panel position="top-right" className="flex flex-wrap justify-end gap-2">
-                  <Button variant="outline" size="sm" onPress={resetLayout}>
+                  <Button variant="outlined" size="xsmall" onPress={resetLayout}>
                     Reset layout
                   </Button>
-                  <Button variant="outline" size="sm" onPress={collapseAll} isDisabled={!open.length}>
+                  <Button variant="outlined" size="xsmall" onPress={collapseAll} isDisabled={!open.length}>
                     Collapse all
                   </Button>
-                  <Button variant="outline" size="sm" onPress={() => setFits((n) => n + 1)}>
+                  <Button variant="outlined" size="xsmall" onPress={() => setFits((n) => n + 1)}>
                     Fit view
                   </Button>
                 </Panel>
@@ -640,8 +638,8 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
   );
 }
 
-/** A button that is a link to a route: React Aria's link in the button's look, given the router's `to` and its preloading. */
-const RouterLinkButton = routeLink(LinkButton);
+/** The kit's button that is a link to a route, given the router's `to` and its preloading. */
+const RouterLinkButton = routeLink(Button);
 
 /**
  * The floor's options, at the header's right: the Show finished switch, named by a label beside it, which shows the newest page of the
@@ -649,7 +647,6 @@ const RouterLinkButton = routeLink(LinkButton);
  * keep settings in, a link to the factory's settings.
  */
 function FloorOptions(props: { factory: FactoryPlace; showFinished: boolean; onShowFinished: (on: boolean) => void }) {
-  const finishedSwitch = useId();
   return (
     <div className="flex items-center gap-4 text-body-medium">
       <div
@@ -657,17 +654,16 @@ function FloorOptions(props: { factory: FactoryPlace; showFinished: boolean; onS
         title={`Shows the newest ${FINISHED_SIZE} finished runs of this factory. Every finished run is on Runs.`}
         data-show-finished
       >
-        <Switch id={finishedSwitch} isSelected={props.showFinished} onChange={props.onShowFinished} />
-        <label htmlFor={finishedSwitch} className="cursor-pointer">
+        <Switch isSelected={props.showFinished} onChange={props.onShowFinished}>
           Show finished
-        </label>
+        </Switch>
       </div>
       {!props.factory.default && (
         <RouterLinkButton
           to="/factories/$factory/settings"
           params={{ factory: props.factory.name }}
-          variant="outline"
-          size="sm"
+          variant="outlined"
+          size="xsmall"
           data-factory-settings-link
         >
           Settings
@@ -685,29 +681,36 @@ function Empty({ factory, counts, queued }: { factory: string; counts: OpenRuns[
   const anyRuns = counts.waiting + counts.inFlight + counts.finished > 0;
   return (
     <div className="flex flex-1 items-center justify-center p-6">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Nothing in flight</CardTitle>
-          <CardDescription>
-            {anyRuns
-              ? 'Every run has finished. Show finished runs above, or read them on Runs.'
-              : 'No runs yet. Start one from a workflow, on Workflows.'}
-            {queued > 0 && (
-              <>
-                {' '}
-                {queued === 1
-                  ? 'The card queued beside it starts on its own'
-                  : `The ${queued} cards queued beside it start on their own`}{' '}
-                while a daemon ticks the store: the api, <code>npm start</code> in apps/api.
-              </>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RouterLinkButton to="/factories/$factory/runs" params={{ factory }} variant="outline" size="sm">
-            Go to Runs
-          </RouterLinkButton>
-        </CardContent>
+      <Card variant="outlined" className="w-full max-w-sm" classNames={{ content: 'gap-4' }}>
+        <CardContent
+          headline={
+            <Title size="medium" component="h2">
+              Nothing in flight
+            </Title>
+          }
+          supportingText={
+            <>
+              {anyRuns
+                ? 'Every run has finished. Show finished runs above, or read them on Runs.'
+                : 'No runs yet. Start one from a workflow, on Workflows.'}
+              {queued > 0 && (
+                <>
+                  {' '}
+                  {queued === 1
+                    ? 'The card queued beside it starts on its own'
+                    : `The ${queued} cards queued beside it start on their own`}{' '}
+                  while a daemon ticks the store: the api, <code>npm start</code> in apps/api.
+                </>
+              )}
+            </>
+          }
+          actions={
+            <RouterLinkButton to="/factories/$factory/runs" params={{ factory }} variant="outlined" size="xsmall">
+              Go to Runs
+            </RouterLinkButton>
+          }
+          classNames={{ header: 'mb-0', actions: 'mt-0 justify-start' }}
+        />
       </Card>
     </div>
   );

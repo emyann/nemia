@@ -14,8 +14,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { TextField } from '@/components/ui/ds';
 import { CutPress, TEXT_LINK } from '@/components/look';
 import { Instant } from '../time/Instant';
 import {
@@ -58,29 +57,24 @@ const NOT_PASTING: Pasting = { pasted: '', onPasted: () => {}, onComplete: () =>
  * and the press that hands it on: pressed only once something is pasted.
  */
 function PasteBack({ name, pending, pasting }: { name: string; pending: boolean; pasting: Pasting }) {
-  const id = `sign-in-callback-${name}`;
   return (
-    <Field data-sign-in-paste>
-      <FieldLabel htmlFor={id}>the address your browser landed on</FieldLabel>
-      <div className="flex flex-wrap items-center gap-3">
-        <Input
-          id={id}
-          name="callback"
-          className="min-w-64 flex-1 font-mono"
-          value={pasting.pasted}
-          onChange={(e) => pasting.onPasted(e.target.value)}
-          placeholder="http://localhost:8791/callback?code=…&state=…"
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <CutPress isDisabled={pending || pasting.pasted.trim() === ''} onPress={pasting.onComplete}>
-          Complete
-        </CutPress>
-      </div>
-      <FieldDescription>
-        Where Nemia runs on another machine, the page your browser lands on after you approve fails to load. Paste its whole address here.
-      </FieldDescription>
-    </Field>
+    <div data-sign-in-paste className="flex flex-wrap items-start gap-3">
+      <TextField
+        label="the address your browser landed on"
+        name="callback"
+        value={pasting.pasted}
+        onChange={pasting.onPasted}
+        placeholder="http://localhost:8791/callback?code=…&state=…"
+        autoComplete="off"
+        spellCheck="false"
+        supportingText="Where Nemia runs on another machine, the page your browser lands on after you approve fails to load. Paste its whole address here."
+        inputClassName="font-mono"
+        className="min-w-64 flex-1"
+      />
+      <CutPress isDisabled={pending || pasting.pasted.trim() === ''} onPress={pasting.onComplete} className="mt-2">
+        Complete
+      </CutPress>
+    </div>
   );
 }
 

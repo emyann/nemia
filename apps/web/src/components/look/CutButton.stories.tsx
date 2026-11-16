@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, fireEvent } from 'storybook/test';
-import { tabStops, tabTo } from '../../../.storybook/play';
+import { atRest, tabStops, tabTo } from '../../../.storybook/play';
 import { CutButton, CutPress } from './CutButton';
 import { ON_CARD } from './stories.fixtures';
 
@@ -46,6 +46,7 @@ export const Press: StoryObj = {
     await expect(pressesIn(canvasElement), 'Enter presses it once').toBe('1');
     await userEvent.keyboard(' ');
     await expect(pressesIn(canvasElement), 'Space presses it once').toBe('2');
+    atRest();
   },
 };
 

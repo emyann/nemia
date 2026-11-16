@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor } from 'storybook/test';
+import { atRest } from '../../../.storybook/play';
 import { CopyId } from './CopyId';
 import { ON_CARD } from './stories.fixtures';
 
@@ -64,6 +65,8 @@ export const Short: StoryObj = {
     } finally {
       kept.remove();
     }
+    await waitFor(() => expect(canvasElement.querySelector('[data-copied]'), 'the copied moment ends').toBeNull(), { timeout: 3000 });
+    atRest();
   },
   render: () => (
     <div data-id-ground style={ON_CARD}>

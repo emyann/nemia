@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor } from 'storybook/test';
+import { atRest } from '../../../.storybook/play';
 import type { WaitingRun } from '@/lib/api/runs';
 import { WaitingCard } from './WaitingCard';
 
@@ -182,6 +183,7 @@ export const Wide: StoryObj = {
     const run = article.getAttribute('data-run');
     await waitFor(() => expect(canvasElement.querySelector('[data-story-ground]')?.getAttribute('data-at')).toBe(`/runs/${run}`));
     await expect(canvasElement.querySelectorAll('[data-copied]').length, 'and nothing was copied').toBe(0);
+    atRest();
   },
   render: () => (
     <div data-card-box style={WIDE}>

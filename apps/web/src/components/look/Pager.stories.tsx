@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useSearch } from '@tanstack/react-router';
 import { expect } from 'storybook/test';
-import { tabStops } from '../../../.storybook/play';
+import { atRest, tabStops } from '../../../.storybook/play';
 import { finishedSearch, trailOf } from '@/lib/finished';
 import { Pager } from './Pager';
 
@@ -29,6 +29,7 @@ export const OnTheFirstPage: StoryObj = {
     const newer = canvasElement.querySelector('[data-pager-newer]');
     await expect(newer?.getAttribute('aria-disabled')).toBe('true');
     await expect(newer?.getAttribute('href')).toBeNull();
+    atRest();
   },
 };
 
@@ -40,5 +41,6 @@ export const OnTheLastPage: StoryObj = {
     const ends = await stopsOf(userEvent);
     await expect(ends, `on the last page Newer takes the focus: ${ends.join(' ')}`).toContain('pagerNewer');
     await expect(ends, `on the last page Older takes no focus: ${ends.join(' ')}`).not.toContain('pagerOlder');
+    atRest();
   },
 };

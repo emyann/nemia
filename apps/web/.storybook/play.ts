@@ -1,11 +1,16 @@
 /**
- * What the stories' play functions drive a part with, in Storybook and in `npm run stories` alike: what has the focus, and the stops of
- * the Tab key. Each takes the `userEvent` the play function is handed, so its presses show in Storybook's interactions panel. Its keys
- * are events a script sends, which the browser turns into no click: Enter on a link, whose second navigation only the browser's own
+ * What the stories' play functions drive a part with, in Storybook and in `npm run stories` alike: what has the focus, the stops of the
+ * Tab key, and the focus put down at the end, since Storybook runs a story's play function as it draws it and its pictures would show
+ * what the play left. Each takes the `userEvent` the play function is handed, so its presses show in Storybook's interactions panel.
+ * Its keys are events a script sends, which the browser turns into no click: Enter on a link, whose second navigation only the browser's own
  * click makes, is read by the look's browser tests (`test/e2e/keys.ts`).
  */
+
 /** What of the user a play function is handed these drive: its Tab key. */
 type User = { tab: (options?: { shift?: boolean }) => Promise<void> };
+
+/** Takes the focus off what has it, so the story a play function leaves behind is pictured at rest, as it was drawn. */
+export const atRest = (): void => (document.activeElement as HTMLElement | null)?.blur();
 
 /** What has the focus, as its marks say it: its `data-` attributes' names, and its text. */
 export const focused = (): { marks: string[]; text: string } => {

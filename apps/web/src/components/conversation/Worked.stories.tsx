@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor } from 'storybook/test';
+import { atRest } from '../../../.storybook/play';
 import type { ConversationLine } from '@/lib/conversation';
 import { Worked, WorkedLine } from './Worked';
 
@@ -71,7 +72,7 @@ feed-file.ts:141  export const drainsThis = (root: string) => …
 
 /**
  * A line that carries what it asked and what came back, closed, laying out nothing it holds: pressing it opens to both, each block
- * scrolling inside its own cap.
+ * scrolling inside its own cap; pressed again, it closes.
  */
 export const Openable: StoryObj = {
   play: async ({ canvasElement, userEvent }) => {
@@ -86,6 +87,9 @@ export const Openable: StoryObj = {
       getComputedStyle(came()!).overflowY,
       'each block scrolls inside its own cap, so a long result does not push the talk open',
     ).toBe('auto');
+    await userEvent.click(canvasElement.querySelector('[data-slot="trace-collapsible-trigger"]')!);
+    await waitFor(() => expect(asked(), 'pressed again, it closes').toBeNull());
+    atRest();
   },
   render: () => (
     <div style={PANEL}>

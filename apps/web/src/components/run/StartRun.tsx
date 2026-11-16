@@ -84,10 +84,7 @@ export function StartRun({
       void runsMoved(queryClient);
       onStarted?.(started);
     },
-    onError: (error) => {
-      handed.unkept(error);
-      onRefused?.(error.message);
-    },
+    onError: (error) => handed.refused(error, onRefused),
     onSettled: () => {
       if (card) void queryClient.invalidateQueries({ queryKey: ['inbox'] });
     },
@@ -145,8 +142,9 @@ function StartRefused({ message }: { message: string }) {
 
 /**
  * The files a start hands its run, as the form lists them, with how many of them a press has uploaded and the ids of those it has, kept
- * while the form lives so a start refused for another reason sends none again (`sending`); `unkept` forgets the id of each file a refusal
- * says the api keeps no more, `clear` empties both once a start is taken, and `drawn` is what `StartInputs` is drawn with while a start is pressed or not.
+ * while the form lives so a start refused for another reason sends none again (`sending`); `refused` forgets the id of each file a
+ * refusal says the api keeps no more and tells the caller its words, `clear` empties both once a start is taken, and `drawn` is what
+ * `StartInputs` is drawn with while a start is pressed or not.
  */
 function useHandedFiles() {
   const [files, setFiles] = useState<File[]>([]);
@@ -156,7 +154,10 @@ function useHandedFiles() {
     setSent(0);
     return { listed, sent: uploaded, onSent: setSent };
   };
-  const unkept = (refusal: unknown) => void startFiles.unkept(uploaded, refusal);
+  const refused = (refusal: Error, told?: (message: string) => void) => {
+    startFiles.unkept(uploaded, refusal);
+    told?.(refusal.message);
+  };
   const clear = () => {
     setFiles([]);
     uploaded.clear();
@@ -168,7 +169,7 @@ function useHandedFiles() {
     uploading: pending && files.length > 0,
     isDisabled: pending,
   });
-  return { files, sent, sending, unkept, clear, drawn };
+  return { files, sent, sending, refused, clear, drawn };
 }
 
 /** What the Start button says: Start, or while pressed, which file of how many it uploads, then Starting. */

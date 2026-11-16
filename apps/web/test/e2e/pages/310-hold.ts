@@ -40,7 +40,7 @@ export default {
       fs.writeFileSync(hold, JSON.stringify({ at: new Date().toISOString(), until: [until] }, null, 2), { flag: 'wx' });
       fed(id, 'held');
 
-      const said = card.locator('[data-holding="on-runs"]');
+      const said = card.locator('[data-now-words]');
       await expectVisible(said.filter({ hasText: new RegExp(`^${literal(word)}$`) }), `the card says ${word}`);
       const title = await said.getAttribute('title');
       if (title !== `${word}\n${advice}`)
@@ -96,7 +96,7 @@ export default {
     await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     await expectVisible(card.locator('[data-answer="Approve"]'), `and on the Factory, ${id}'s card offers its gate again`);
-    await expectCount(card.locator('[data-holding]'), 0, 'and says no hold');
+    await expectCount(card.locator('[data-now-words]'), 0, 'and says no hold');
     await expectCount(edge, 0, 'and no hold edge comes into it');
     await heldWithWords(page);
     await heldNotStarted(page);
@@ -126,7 +126,7 @@ async function heldWithWords(page: Page): Promise<void> {
     await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     const card = cardOf(page, id);
-    const said = card.locator('[data-holding="on-runs"]');
+    const said = card.locator('[data-now-words]');
     await expectVisible(said.filter({ hasText: whole }), `the card says ${word}`);
     const title = await said.getAttribute('title');
     if (!title?.startsWith(`${word}\n`))
@@ -140,7 +140,10 @@ async function heldWithWords(page: Page): Promise<void> {
       page.locator(`[data-runs-page] [data-run="${id}"] [data-run-steps][aria-label*=" held"]`),
       `on Runs, which says less, ${id} is drawn with its steps held on its rail`,
     );
-    await expectCount(page.locator('[data-runs-page] [data-holding]'), 0, 'and the hold in its own words is on its page');
+    await expectVisible(
+      page.locator(`[data-runs-page] [data-run="${id}"] [data-now-words]`).filter({ hasText: whole }),
+      'and its row says the hold in its few words, as the card does: a row says what a card at md does',
+    );
     await settled(page);
     await photograph(page, path.join(OUT, `hold-said-runs-${theme}.png`), { fullPage: true });
 

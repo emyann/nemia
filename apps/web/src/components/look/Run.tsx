@@ -195,7 +195,7 @@ function WordsSaid({ run, look, among, cut }: { run: PartRun; look: Look; among:
         words={words}
         tone={look.now.tone}
         among={among.filter((other) => other.id !== run.id)}
-        title={cut ? run.waiting?.advice || run.holding?.advice || whole : undefined}
+        title={cut ? [whole, run.waiting?.advice || run.holding?.advice].filter(Boolean).join('\n') : undefined}
         className={cn(cut && 'text-body-small')}
       />
     </span>

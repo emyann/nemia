@@ -421,7 +421,7 @@ test("a ghost's card says it waits on the first run it waits on, by its mark, an
   const html = await cardMarkup(ghost, false);
   assert.match(html, /data-ghost-run="true"/, 'the card is a ghost');
   const words = /<span[^>]*data-now-words="true"[^>]*>([\s\S]*?)<\/span><\/span>(?=<\/span>)/.exec(html)?.[0] ?? '';
-  assert.match(words, /title="it starts once both land"/, "the api's advice on hover");
+  assert.match(words, /title="[^"]*\nit starts once both land"/, "its words whole, then the api's advice, on hover");
   assert.deepEqual(
     [...words.matchAll(/data-run-mark="([^"]+)"/g)].map((m) => m[1]),
     ['a-1x2y'],

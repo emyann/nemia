@@ -29,7 +29,9 @@ function Named({ name, named, mark, x, y }: { name: string; named?: StepNamed; m
       className="absolute flex w-22 flex-col items-center text-center leading-tight"
       style={{ left: x - 44, top: y + 2 }}
     >
-      <span className={cn('truncate text-label-small uppercase', (mark && NAME_INK[mark]) ?? 'text-on-surface')}>{name}</span>
+      <span title={name} className={cn('truncate text-label-small uppercase', (mark && NAME_INK[mark]) ?? 'text-on-surface')}>
+        {name}
+      </span>
       <span className="truncate text-body-small text-on-surface">{named?.agent ?? '—'}</span>
       <span className="truncate font-mono text-body-small text-on-surface-variant">{named?.said || '–'}</span>
     </span>

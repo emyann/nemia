@@ -75,12 +75,9 @@ export default {
         card.locator('[data-ghost-run]'),
         `${CHAINED.id}, waiting on ${parent}, is on ${CHAINED.factory}'s floor as a ghost`,
       );
+      await expectVisible(card.locator('[data-now-words]', { hasText: CHAINED.word }), `its line says ${CHAINED.word}, in wf ls's words`);
       await expectVisible(
-        card.locator('[data-waiting="on-runs"]', { hasText: CHAINED.word }),
-        `its line says ${CHAINED.word}, in wf ls's words`,
-      );
-      await expectVisible(
-        card.locator(`a[data-waits-on="${parent}"][href="/runs/${parent}"]`),
+        card.locator(`a[data-run-mark="${parent}"][href="/runs/${parent}"]`),
         `${parent}, which it waits on, is a link to that run's page`,
       );
       await expectCount(cardOf(page, parent), 0, `${parent}, of the default factory, has no card on ${CHAINED.factory}'s floor`);

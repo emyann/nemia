@@ -243,7 +243,7 @@ export default {
     await expectCount(page.locator('.react-flow__edge-path[data-state="done"]'), 0, 'and no edge between cards is drawn solid');
     await expectLeftOf(cardOf(page, running.id), cardOf(page, bottom.id), `${running.id} is left of ${bottom.id}, which waits on it`);
     await expectVisible(
-      cardOf(page, bottom.id).locator('[data-waiting="on-runs"]', { hasText: DIAMOND.words.bottom }),
+      cardOf(page, bottom.id).locator('[data-now-words]', { hasText: DIAMOND.words.bottom }),
       `the bottom's card says ${DIAMOND.words.bottom}, in wf ls's words: the side that landed is waited on no more`,
     );
     await expectCount(
@@ -260,11 +260,9 @@ export default {
       cardOf(page, bottom.id),
       'and the graph stays inside the card',
     );
-    await expectCount(cardOf(page, running.id).locator('[data-waiting]'), 0, `${running.id} waits on no run`);
+    await expectCount(cardOf(page, running.id).locator('[data-now-words]'), 0, `${running.id} waits on no run`);
     await expectVisible(
-      cardOf(page, bottom.id).locator(
-        `[data-ghost-run] [data-waiting="on-runs"] a[data-waits-on="${running.id}"][href="/runs/${running.id}"]`,
-      ),
+      cardOf(page, bottom.id).locator(`[data-ghost-run] [data-now-words] a[data-run-mark="${running.id}"][href="/runs/${running.id}"]`),
       `the bottom's card is a ghost until it starts, and names ${running.id}, which it waits on, as a link to that run`,
     );
     for (const run of [running, orphan])
@@ -418,7 +416,7 @@ export default {
       `a run started in the factory ${FOLDER.factory} is on its floor, not the default factory's, finished runs shown (${FOLDER.id})`,
     );
     await expectVisible(
-      cardOf(page, orphan.id).locator('[data-waiting="on-you"]', { hasText: DIAMOND.words.orphan }),
+      cardOf(page, orphan.id).locator('[data-now-words]', { hasText: DIAMOND.words.orphan }),
       `${orphan.id}'s card says ${DIAMOND.words.orphan}, as a wait on a person`,
     );
     await expectVisible(cardOf(page, orphan.id).getByText('waiting on you', { exact: true }), `${orphan.id} waits on you`);

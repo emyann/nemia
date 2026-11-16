@@ -73,7 +73,7 @@ export default {
       await idle(page);
       await expectVisible(
         cardOf(page, id)
-          .locator('[data-holding="on-runs"]')
+          .locator('[data-now-words]')
           .filter({ hasText: new RegExp(`^${literal(word)}$`) }),
         `GATED's card on the Factory says ${word}`,
       );

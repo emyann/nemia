@@ -68,7 +68,7 @@ export default {
       await idle(page);
       const card = cardOf(page, id);
       await expectVisible(
-        card.locator('[data-holding="on-runs"]').filter({ hasText: new RegExp(`^${literal(word)}$`) }),
+        card.locator('[data-now-words]').filter({ hasText: new RegExp(`^${literal(word)}$`) }),
         `GATED's card says ${word}, in grey`,
       );
       await expectCount(card.locator('[data-answer="Approve"]'), 0, 'and offers no Approve');

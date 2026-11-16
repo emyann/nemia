@@ -257,7 +257,7 @@ function TaskParts({ parts }: { parts: Frozen<TaskPart[]> }) {
         return (
           <section key={i} data-from-run={part.run} data-how={part.how} className="flex flex-col gap-1 rounded border p-2">
             <h5 title={part.run} className="min-w-0 text-label-medium text-muted-foreground">
-              <RouteLink to="/runs/$runId" params={{ runId: part.run }} className="block truncate hover:underline">
+              <RouteLink to="/runs/$runId" params={{ runId: part.run }} underline="hover" className="block truncate">
                 {HANDED[part.how]} · {part.asked || part.run} ↗
               </RouteLink>
             </h5>

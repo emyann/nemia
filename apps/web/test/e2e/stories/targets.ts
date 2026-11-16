@@ -89,8 +89,9 @@ const GAP = 24;
 const CAPTION = 28;
 
 /**
- * Writes the match of `target` and `story` as one PNG, `out`, by the e2e's `photograph`: both scaled to the lower of their two heights, so neither is enlarged, the target on the
- * left captioned `target` and the story on the right captioned `after · <head>`, on the board's ground in `theme`.
+ * Writes the match of `target` and `story` as one PNG, `out`, by the e2e's `photograph`: both scaled to the lower of their two
+ * heights, so neither is enlarged, the target on the left captioned `target` and the story on the right captioned `after · <head>`,
+ * on the board's ground in `theme`.
  * @param browser The Chromium the pictures are taken in.
  * @param pair The target's file, the story's picture, the theme, the short head the story was drawn at, the board's theme stylesheet,
  * and the match's file.

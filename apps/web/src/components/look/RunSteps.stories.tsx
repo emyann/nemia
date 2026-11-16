@@ -28,16 +28,23 @@ export const AtWork: StoryObj = { render: () => <Rail steps={AT_WORK} /> };
 /** A run whose step failed its check: its bar filled in red, the step after it dashed. */
 export const Refused: StoryObj = { render: () => <Rail steps={REFUSED} /> };
 
+/** A rail on a card as a row draws it, with no names: short bars side by side. */
+const short = (args: Parameters<typeof RunSteps>[0]) => (
+  <div data-rail style={{ ...ON_CARD, display: 'block', width: 420 }}>
+    <RunSteps {...args} />
+  </div>
+);
+
 /** A run nothing of which has started: each bar a quiet fill, short, as a row draws it. */
-export const ToCome: StoryObj = { render: () => <Rail steps={TO_COME_ALL} names={false} /> };
+export const ToCome: StoryObj<typeof RunSteps> = {
+  args: { steps: TO_COME_ALL, cancelled: false, held: false, names: false },
+  render: short,
+};
 
 /** A held run nothing of which has started: its first bar a dashed outline, the hold stopping it, the rest quiet. */
-export const Held: StoryObj = {
-  render: () => (
-    <div data-rail style={{ ...ON_CARD, display: 'block', width: 420 }}>
-      <RunSteps steps={TO_COME_ALL} cancelled={false} held names={false} />
-    </div>
-  ),
+export const Held: StoryObj<typeof RunSteps> = {
+  args: { steps: TO_COME_ALL, cancelled: false, held: true, names: false },
+  render: short,
 };
 
 /** A rail with no names under its bars, as a table's row draws it. */

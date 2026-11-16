@@ -35,7 +35,7 @@ function barClass(state: StepState, waits: boolean): string {
  * (`on`), or, on a held run, the first step not started, which the hold stops.
  */
 function waitsNow(drawn: ReadonlyArray<{ state: StepState; on: WaitOn | null }>, at: number, held: boolean): boolean {
-  const { state, on } = drawn[at]!;
+  const { state, on } = drawn[at];
   if (state !== 'waiting') return NOT_STARTED.has(state);
   return on !== null || (held && drawn.findIndex((step) => NOT_STARTED.has(step.state)) === at);
 }
@@ -57,9 +57,9 @@ function Breath() {
 
 /**
  * A run's own steps as a rail: one bar a step, in the run's order, each drawn by its state (`barClass`, `Breath`), short bars side by
- * side, or, with `names`, bars that share the rail's width with each step's name under its own. Read aloud as one picture, each step and its word (`railSaid`). `cancelled` and `held` are
- * the run's, as `stepState` takes them. With `wrap`, each bar is put inside what it gives (a button that opens the step), and the rail
- * is a group named by `railSaid`, each bar its own step.
+ * side, or, with `names`, bars that share the rail's width with each step's name under its own. Read aloud as one picture, each step
+ * and its word (`railSaid`). `cancelled` and `held` are the run's, as `stepState` takes them. With `wrap`, each bar is put inside
+ * what it gives (a button that opens the step), and the rail is a group named by `railSaid`, each bar its own step.
  */
 export function RunSteps({
   steps,

@@ -55,14 +55,16 @@ export function nowStandsOf(state: StepState, on: WaitOn | null, held: boolean):
 }
 
 /** How each colour of the chip is drawn: the kit's tag in the variant and colour of its role. */
-export const CHIP_TAG: Record<ChipTone, { variant: 'tonal' | 'filled' | 'outlined'; color: 'neutral' | 'primary' | 'secondary' | 'error' }> =
-  {
-    alive: { variant: 'tonal', color: 'secondary' },
-    yours: { variant: 'filled', color: 'primary' },
-    failure: { variant: 'tonal', color: 'error' },
-    waits: { variant: 'outlined', color: 'neutral' },
-    rest: { variant: 'filled', color: 'neutral' },
-  };
+export const CHIP_TAG: Record<
+  ChipTone,
+  { variant: 'tonal' | 'filled' | 'outlined'; color: 'neutral' | 'primary' | 'secondary' | 'error' }
+> = {
+  alive: { variant: 'tonal', color: 'secondary' },
+  yours: { variant: 'filled', color: 'primary' },
+  failure: { variant: 'tonal', color: 'error' },
+  waits: { variant: 'outlined', color: 'neutral' },
+  rest: { variant: 'filled', color: 'neutral' },
+};
 
 /**
  * How many of `rows` wait on the run `id`, or are held until it lands: a run that names it among the runs it waits on and the store has,

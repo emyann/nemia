@@ -44,7 +44,13 @@ test('nowStandsOf: where a step stands, by its state, what it waits on and the h
       assert.equal(nowStandsOf(state, null, false), stands, state);
   });
   await t.test('a step to come by what it waits on: another run or the checkout, the pause, a hold', () => {
-    const on: Record<WaitOn, NowStands> = { run: 'waitsOnARun', base: 'waitsOnARun', limit: 'waitsForASlot', pause: 'atRest', hold: 'held' };
+    const on: Record<WaitOn, NowStands> = {
+      run: 'waitsOnARun',
+      base: 'waitsOnARun',
+      limit: 'waitsForASlot',
+      pause: 'atRest',
+      hold: 'held',
+    };
     for (const [thing, stands] of Object.entries(on) as Array<[WaitOn, NowStands]>)
       assert.equal(nowStandsOf('waiting', thing, false), stands, thing);
   });

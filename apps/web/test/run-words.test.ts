@@ -379,7 +379,15 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
   });
   await t.test('what a wait says in NOW: the run it waits on, the checkout, a run slot, a hold until a run lands', () => {
     const onRun = summary([['land', 'waiting on r-0']], {
-      waiting: { runs: [{ run: 'r-gone', missing: true, cancelledAt: null, gone: [] }, { run: 'r-0', missing: false, cancelledAt: null, gone: [] }], word: '', advice: '', waitingOnYou: false },
+      waiting: {
+        runs: [
+          { run: 'r-gone', missing: true, cancelledAt: null, gone: [] },
+          { run: 'r-0', missing: false, cancelledAt: null, gone: [] },
+        ],
+        word: '',
+        advice: '',
+        waitingOnYou: false,
+      },
     });
     assert.deepEqual(nowOf(onRun)?.words, [NOW_WORDS.waitsOn, { run: 'r-0' }], 'the first run it waits on the store has');
     assert.equal(nowOf(onRun)?.tone, 'waits');

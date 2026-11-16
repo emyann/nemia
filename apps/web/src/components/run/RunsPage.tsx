@@ -9,8 +9,9 @@ import { runLinesQuery } from '@/lib/api/run';
 import { ReadRefusal } from '@/lib/api/read';
 import { trailOf } from '@/lib/finished';
 import { ink } from '@/lib/meaning';
-import { Plate, ScanLines } from '../look';
-import { Button } from '../ui/ds';
+import { CutTag, ScanLines } from '../look';
+import { Button, Tag } from '../ui/ds';
+import { judged } from '@/lib/api/judged';
 import { useBar } from '@/lib/useBar';
 
 /** What the runs page reads of its address: the factory its path names, none for every factory's, its trail and its label selector. */
@@ -73,29 +74,56 @@ export function RunsFailed({ error }: { error: unknown }) {
   );
 }
 
-/** A section of the page: its plate, alone on its line, then what it holds, and under it what opens more of it (`foot`). */
-function Section({ name, plate, foot, children }: { name: string; plate: ReactNode; foot?: ReactNode; children: ReactNode }) {
+/** A section of the page: its count chip, alone on its line, then what it holds, and under it what opens more of it (`foot`). */
+function Section({ name, head, foot, children }: { name: string; head: ReactNode; foot?: ReactNode; children: ReactNode }) {
   return (
-    <section data-section={name} className="flex flex-col gap-4">
-      <div className="flex items-center">{plate}</div>
+    <section data-section={name} className="flex flex-col gap-3.5">
+      <div className="flex items-center">{head}</div>
       {children}
       {foot && <div className="flex">{foot}</div>}
     </section>
   );
 }
 
-/** The button under the runs that wait on you that opens, and closes, the bar of the runs that wait on you in every factory. */
+/** How a section's count chip is drawn by its meaning: the kit's tag in the section's role, outlined and quiet where it holds none. */
+const COUNT_TAG = {
+  yours: { variant: 'filled', color: 'primary' },
+  alive: { variant: 'tonal', color: 'secondary' },
+  rest: { variant: 'filled', color: 'neutral' },
+  quiet: { variant: 'outlined', color: 'neutral' },
+} as const;
+
+/** A section's head: its count, in the mono face, and its title in small caps, on a cut tag in the section's colour; quiet at zero. */
+function CountChip({ count, title, tone }: { count: number; title: string; tone: 'yours' | 'alive' | 'rest' }) {
+  const drawn = count === 0 ? 'quiet' : tone;
+  const tag = COUNT_TAG[drawn];
+  return (
+    <h2 className="m-0 flex">
+      <CutTag>
+        <Tag data-count-chip={count} data-count-tone={drawn} variant={tag.variant} color={tag.color} className="h-8 px-3">
+          <span className="inline-flex items-baseline gap-2.5">
+            <span className="font-mono text-body-large">{count}</span>
+            <span className="text-label-large uppercase">{title}</span>
+          </span>
+        </Tag>
+      </CutTag>
+    </h2>
+  );
+}
+
+/** The text button that opens, and closes, the bar of the runs that wait on you in every factory. */
 function AcrossFactories() {
   const { open, toggle } = useBar();
   return (
     <Button
       data-waiting-opener
-      variant="outlined"
-      size="small"
+      variant="text"
+      size="xsmall"
       aria-expanded={open?.kind === 'waiting'}
       onPress={() => toggle({ kind: 'waiting' })}
+      className="-mx-3 text-on-surface"
     >
-      Waiting in every factory
+      Waiting in every factory ›
     </Button>
   );
 }
@@ -111,8 +139,10 @@ function Nothing({ children }: { children: string }) {
 
 /**
  * The runs, in three parts, by two reads the api filters by the address' factory: what waits on a person, a card a run and never a
- * row; the runs in flight, a quiet table; and one page of the finished runs, the one the address' trail leads to, newest finished
- * first. Each plate says the api's own count, and under what waits a button opens the bar of what waits on you in every factory. Every
+ * row; the runs in flight, a quiet table, each row saying how many of the page's open runs wait on it; and one page of the finished
+ * runs, the one the address' trail leads to, newest finished first. Each part's head is a count chip in its colour saying the api's
+ * own count; where nothing waits on you that part is one line, its chip quiet, and a text button opens the bar of what waits on you in
+ * every factory. Every
  * time on the page is a fact to the minute, said against the instant its answer was read at: nothing here counts by itself.
  */
 export function RunsPage({ at, onLabel }: { at: RunsAt; onLabel: (selector: string | undefined) => void }) {
@@ -121,28 +151,33 @@ export function RunsPage({ at, onLabel }: { at: RunsAt; onLabel: (selector: stri
   const { data: finished } = useSuspenseQuery(finishedRunsQuery(at.factory, trail, at.l));
   const asOf = new Date(open.asOf);
   const { counts } = open;
+  const among = [...open.waiting, ...open.inFlight].filter((run) => judged(run));
   return (
     <Frame state="loaded">
       <SelectorField key={at.l ?? ''} selector={at.l} onSelect={onLabel} />
-      <Section
-        name="waiting"
-        plate={<Plate count={counts.waiting} title="Waiting on you" quiet={counts.waiting === 0} />}
-        foot={<AcrossFactories />}
-      >
-        {open.waiting.length === 0 ? (
+      {open.waiting.length === 0 ? (
+        <section data-section="waiting" className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <CountChip count={counts.waiting} title="Waiting on you" tone="yours" />
           <Nothing>Nothing waits on you.</Nothing>
-        ) : (
+          <AcrossFactories />
+        </section>
+      ) : (
+        <Section name="waiting" head={<CountChip count={counts.waiting} title="Waiting on you" tone="yours" />} foot={<AcrossFactories />}>
           <div data-cards className="grid grid-cols-1 gap-4 @5xl/page:grid-cols-2">
             {open.waiting.map((run) => (
               <WaitingCard key={run.id} run={run} asOf={asOf} />
             ))}
           </div>
+        </Section>
+      )}
+      <Section name="in-flight" head={<CountChip count={counts.inFlight} title="In flight" tone="alive" />}>
+        {open.inFlight.length === 0 ? (
+          <Nothing>Nothing is in flight.</Nothing>
+        ) : (
+          <FlightTable runs={open.inFlight} among={among} asOf={asOf} />
         )}
       </Section>
-      <Section name="in-flight" plate={<Plate count={counts.inFlight} title="In flight" hue="alive" quiet={counts.inFlight === 0} />}>
-        {open.inFlight.length === 0 ? <Nothing>Nothing is in flight.</Nothing> : <FlightTable runs={open.inFlight} asOf={asOf} />}
-      </Section>
-      <Section name="finished" plate={<Plate count={counts.finished} title="Finished" hue="grey" quiet={counts.finished === 0} />}>
+      <Section name="finished" head={<CountChip count={counts.finished} title="Finished" tone="rest" />}>
         {finished.total === 0 && finished.runs.length === 0 ? (
           <Nothing>No run has finished yet.</Nothing>
         ) : (

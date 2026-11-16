@@ -27,10 +27,7 @@ function Pips({ round, tone }: { round: NonNullable<Now['round']>; tone: ChipTon
       {Array.from({ length: round.of }, (_, i) => (
         <i
           key={i}
-          className={cn(
-            'block size-1.5',
-            i < round.at ? (tone === 'yours' ? 'bg-yours' : 'bg-alive') : 'bg-surface-container-highest',
-          )}
+          className={cn('block size-1.5', i < round.at ? (tone === 'yours' ? 'bg-yours' : 'bg-alive') : 'bg-surface-container-highest')}
         />
       ))}
     </span>
@@ -66,7 +63,13 @@ function Ring({ budget }: { budget: NonNullable<Now['budget']> }) {
 function Fan({ count }: { count: number }) {
   const said = NOW_WORDS.waitedBy(count);
   return (
-    <span data-waited-by={count} title={said} aria-label={said} role="img" className="inline-flex shrink-0 items-center gap-1 font-mono text-body-small text-on-surface-variant">
+    <span
+      data-waited-by={count}
+      title={said}
+      aria-label={said}
+      role="img"
+      className="inline-flex shrink-0 items-center gap-1 font-mono text-body-small text-on-surface-variant"
+    >
       <svg width="12" height="10" viewBox="0 0 12 10" aria-hidden="true">
         <path d="M0.5,5 L4.5,5 L11.5,1 M4.5,5 L11.5,5 M4.5,5 L11.5,9" fill="none" stroke="currentColor" strokeWidth="1.4" />
       </svg>
@@ -79,7 +82,13 @@ function Fan({ count }: { count: number }) {
 function Part({ part }: { part: NowPart }) {
   if (typeof part === 'string') return <>{part}</>;
   return (
-    <TextLink to="/runs/$runId" params={{ runId: part.run }} title={part.run} data-now-run={part.run} className="font-mono text-body-medium">
+    <TextLink
+      to="/runs/$runId"
+      params={{ runId: part.run }}
+      title={part.run}
+      data-now-run={part.run}
+      className="font-mono text-body-medium"
+    >
       {part.run.slice(-4)}
     </TextLink>
   );
@@ -140,9 +149,7 @@ export function RunNow({
           </span>
         )}
       </span>
-      {rail && (
-        <RunSteps steps={run.steps} cancelled={run.cancelledAt !== null} held={run.holding != null} wrap={previewBar(run, asOf)} />
-      )}
+      {rail && <RunSteps steps={run.steps} cancelled={run.cancelledAt !== null} held={run.holding != null} wrap={previewBar(run, asOf)} />}
     </span>
   );
 }

@@ -169,7 +169,7 @@ export type Now = {
 };
 
 /** A row as NOW reads it: its wait, and of each step its codes, its frozen spec, its current try, its budget and what it spent. */
-type NowRow = WaitingRow & {
+type NowRow = Omit<WaitingRow, 'steps'> & {
   steps: ReadonlyArray<CodedStep & Partial<Pick<RunView['steps'][number], 'spec' | 'current' | 'budget' | 'spent'>>>;
 };
 
@@ -220,12 +220,8 @@ export function nowOf(row: NowRow): Now | null {
     tone: chipTone({ stands, yours }),
     agent: step.spec ? agentOf({ spec: step.spec }) : null,
     round: rounds !== null && step.current ? { at: step.current.round, of: rounds } : null,
-    budget: step.budget
-      ? { spent: step.spent?.usd ?? 0, cap: step.budget.usd, capSaid: step.budget.said, over: step.budget.over }
-      : null,
-    words: yours
-      ? [wait ? waitTag(row) : stateWordsOf(drawn.state, drawn.on, held).rail]
-      : waitWords(row, stands, drawn.state, drawn.on),
+    budget: step.budget ? { spent: step.spent?.usd ?? 0, cap: step.budget.usd, capSaid: step.budget.said, over: step.budget.over } : null,
+    words: yours ? [wait ? waitTag(row) : stateWordsOf(drawn.state, drawn.on, held).rail] : waitWords(row, stands, drawn.state, drawn.on),
   };
 }
 

@@ -18,10 +18,11 @@ export const Tags: StoryObj = {
 };
 
 /** A run's own labels, quiet: each value alone, a link to its label page, its key in the tooltip; the store's keys left out. */
-export const Quiet: StoryObj = {
-  render: () => (
+export const Quiet: StoryObj<typeof QuietLabels> = {
+  args: { labels: MAP },
+  render: (args) => (
     <div style={BOX}>
-      <QuietLabels labels={MAP} />
+      <QuietLabels {...args} />
     </div>
   ),
   play: async ({ canvasElement }) => {

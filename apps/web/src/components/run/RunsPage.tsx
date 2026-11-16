@@ -93,8 +93,8 @@ const COUNT_TAG = {
   quiet: { variant: 'outlined', color: 'neutral' },
 } as const;
 
-/** A section's head: its count, in the mono face, and its title in small caps, on a cut tag in the section's colour; quiet at zero. */
-function CountChip({ count, title, tone }: { count: number; title: string; tone: 'yours' | 'alive' | 'rest' }) {
+/** A section's head: its count, in the mono face, and its word in small caps, on a cut tag in the section's colour; quiet at zero. */
+function CountChip({ count, word, tone }: { count: number; word: string; tone: 'yours' | 'alive' | 'rest' }) {
   const drawn = count === 0 ? 'quiet' : tone;
   const tag = COUNT_TAG[drawn];
   return (
@@ -103,7 +103,7 @@ function CountChip({ count, title, tone }: { count: number; title: string; tone:
         <Tag data-count-chip={count} data-count-tone={drawn} variant={tag.variant} color={tag.color} className="h-8 px-3">
           <span className="inline-flex items-baseline gap-2.5">
             <span className="font-mono text-body-large">{count}</span>
-            <span className="text-label-large uppercase">{title}</span>
+            <span className="text-label-large uppercase">{word}</span>
           </span>
         </Tag>
       </CutTag>
@@ -157,12 +157,12 @@ export function RunsPage({ at, onLabel }: { at: RunsAt; onLabel: (selector: stri
       <SelectorField key={at.l ?? ''} selector={at.l} onSelect={onLabel} />
       {open.waiting.length === 0 ? (
         <section data-section="waiting" className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <CountChip count={counts.waiting} title="Waiting on you" tone="yours" />
+          <CountChip count={counts.waiting} word="Waiting on you" tone="yours" />
           <Nothing>Nothing waits on you.</Nothing>
           <AcrossFactories />
         </section>
       ) : (
-        <Section name="waiting" head={<CountChip count={counts.waiting} title="Waiting on you" tone="yours" />} foot={<AcrossFactories />}>
+        <Section name="waiting" head={<CountChip count={counts.waiting} word="Waiting on you" tone="yours" />} foot={<AcrossFactories />}>
           <div data-cards className="grid grid-cols-1 gap-4 @5xl/page:grid-cols-2">
             {open.waiting.map((run) => (
               <WaitingCard key={run.id} run={run} asOf={asOf} />
@@ -170,14 +170,14 @@ export function RunsPage({ at, onLabel }: { at: RunsAt; onLabel: (selector: stri
           </div>
         </Section>
       )}
-      <Section name="in-flight" head={<CountChip count={counts.inFlight} title="In flight" tone="alive" />}>
+      <Section name="in-flight" head={<CountChip count={counts.inFlight} word="In flight" tone="alive" />}>
         {open.inFlight.length === 0 ? (
           <Nothing>Nothing is in flight.</Nothing>
         ) : (
           <FlightTable runs={open.inFlight} among={among} asOf={asOf} />
         )}
       </Section>
-      <Section name="finished" head={<CountChip count={counts.finished} title="Finished" tone="rest" />}>
+      <Section name="finished" head={<CountChip count={counts.finished} word="Finished" tone="rest" />}>
         {finished.total === 0 && finished.runs.length === 0 ? (
           <Nothing>No run has finished yet.</Nothing>
         ) : (

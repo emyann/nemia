@@ -6,6 +6,8 @@
  * browser's own click makes, is read by the look's browser tests (`test/e2e/keys.ts`).
  */
 
+import { waitFor } from 'storybook/test';
+
 /** What of the user a play function is handed these drive: its Tab key. */
 type User = { tab: (options?: { shift?: boolean }) => Promise<void> };
 
@@ -47,3 +49,42 @@ export async function tabStops(user: User): Promise<Array<{ marks: string[]; tex
   if (stops.length === 0) return stops;
   throw new Error(`Tab did not come back to its first stop in 40 presses: ${JSON.stringify(stops)}`);
 }
+
+/**
+ * Opens the kit's tooltip of `trigger` by the keyboard, as a person who tabs to it does: one Tab press puts the page in the keyboard's
+ * mode, then the focus is put on `trigger`. Answers the tooltip that describes it (`role="tooltip"`, named by its `aria-describedby`).
+ * @param user The user the play function is handed.
+ * @param trigger The mark, link or button the tooltip hangs off.
+ */
+export async function tipOf(user: User, trigger: Element): Promise<HTMLElement> {
+  await user.tab();
+  (trigger as HTMLElement).focus();
+  return describing(trigger);
+}
+
+/**
+ * Opens the kit's tooltip of `trigger`, inside a row of the kit's table, as a person who reaches it by the keyboard does: the focus put
+ * on its row, then the right arrow pressed, from mark to mark of the row, until it reaches `trigger`. A table's row takes back a focus
+ * a script puts on a mark inside it, so no other way reaches one. Answers the tooltip that describes it.
+ * @param user The user the play function is handed.
+ * @param row The row of the table that holds `trigger`.
+ * @param trigger The mark or link the tooltip hangs off.
+ */
+export async function tipInRow(user: User & Keys, row: HTMLElement, trigger: Element): Promise<HTMLElement> {
+  await user.tab();
+  row.focus();
+  for (let i = 0; i < 20 && document.activeElement !== trigger; i += 1) await user.keyboard('{ArrowRight}');
+  if (document.activeElement !== trigger) throw new Error(`the right arrow never reached ${trigger.outerHTML.slice(0, 80)}`);
+  return describing(trigger);
+}
+
+/** What of the user a play function is handed `tipInRow` drives besides: its keys. */
+type Keys = { keyboard: (keys: string) => Promise<void> };
+
+/** The tooltip that describes `trigger` (`role="tooltip"`, named by its `aria-describedby`), once it opens. */
+const describing = (trigger: Element): Promise<HTMLElement> =>
+  waitFor(() => {
+    const tip = document.getElementById(trigger.getAttribute('aria-describedby') ?? '');
+    if (tip?.getAttribute('role') !== 'tooltip') throw new Error(`no tooltip describes ${trigger.outerHTML.slice(0, 80)}`);
+    return tip;
+  });

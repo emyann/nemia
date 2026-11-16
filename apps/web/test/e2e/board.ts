@@ -592,6 +592,39 @@ const drewWith = (): readonly Date[] => {
 };
 
 /**
+ * What the kit's tooltip of each of `triggers` says, in their order, read as a person reads it: the pointer moves first, since React
+ * Aria opens a tooltip on hover only once a pointer has moved over the page since the last key, then rests on each in turn, two pixels
+ * in from its left edge, where no target beside it reaches (the copy control's reaches over the short id's right, `finger` in
+ * `pages/050-runs.ts`), and the tooltip that describes it (`role="tooltip"`, named by its `aria-describedby`) is read once it opens;
+ * then the pointer leaves, and the last tooltip is waited out, so nothing after this reads or pictures one. Refuses a trigger no
+ * tooltip describes within `WAIT_MS`.
+ * @param triggers The marks, links or buttons the tooltips hang off.
+ * @param what What the triggers are, named in the refusal.
+ */
+export async function tipsOf(triggers: Locator, what: string): Promise<string[]> {
+  const page = triggers.page();
+  const said: string[] = [];
+  await page.mouse.move(1, 1);
+  for (const trigger of await triggers.all()) {
+    const box = await trigger.boundingBox();
+    await trigger.hover({ position: { x: 2, y: (box?.height ?? 4) / 2 } });
+    const tip = await trigger
+      .and(page.locator('[aria-describedby]'))
+      .waitFor({ timeout: WAIT_MS })
+      .then(
+        async () =>
+          page.locator(`[role="tooltip"][id="${await trigger.getAttribute('aria-describedby')}"]`).textContent({ timeout: WAIT_MS }),
+        () => null,
+      );
+    if (tip === null) throw new Refused(`${what} each say their words in the kit's tooltip — no tooltip describes one`);
+    said.push(tip);
+  }
+  await page.mouse.move(0, 0);
+  await page.locator('[role="tooltip"]').waitFor({ state: 'detached', timeout: WAIT_MS });
+  return said;
+}
+
+/**
  * Refuses a `<time>` that does not say its instant as the board writes one where the browser is: `words` of its `datetime` as its
  * text (`instantWords` by default), and on hover `about`, a colon, then the instant whole (`instantWhole`). `what` names the time in
  * the refusal. The text is taken for every clock the page may have drawn with (`DREW_WITHIN_MS`), so a day or a year that turns

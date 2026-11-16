@@ -1,7 +1,7 @@
 import type { Locator, Page } from 'playwright';
 import { FINISHED_SIZE } from '../../../src/lib/api/runs.ts';
 import { agoWords } from '../../../src/lib/runWords.ts';
-import { finishedAnswered, photographBothWidths } from '../board.ts';
+import { finishedAnswered, photographBothWidths, tipsOf } from '../board.ts';
 import { expectCount, expectNone, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, FOLDER, seedFinished } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -53,7 +53,7 @@ async function thirdPage(page: Page, trail: string[]): Promise<void> {
     await expectTexts(page.locator('[data-pager-at]'), ['Page 3 / 3'], `${how}, the pager stands on page 3 of the factory's three`);
     await expectTexts(page.locator('[data-pager-rows]'), [`Runs 19–19 of ${WRITTEN + 1}`], 'and says its one row');
     await expectCount(rowsOf(page), 1, 'page 3 holds one row');
-    await expectVisible(rowsOf(page).locator(`[data-run-id][title="${idOf(WRITTEN)}"]`), 'the oldest finished of the factory');
+    await expectVisible(rowsOf(page).locator(`[data-copy-id="${idOf(WRITTEN)}"] [data-run-id]`), 'the oldest finished of the factory');
     await expectVisible(
       page.locator(`section[data-section="finished"] [data-count-chip="${WRITTEN + 1}"]`),
       "the count chip's count is the factory's",
@@ -77,8 +77,8 @@ async function newerAndOlder(page: Page, trail: string[]): Promise<void> {
   await expectCount(rowsOf(page), FINISHED_SIZE, 'Newer leads to page 2, nine rows');
   await expectTexts(page.locator('[data-pager-at]'), ['Page 2 / 3'], 'where the pager stands');
   const ids = await rowsOf(page)
-    .locator('[data-run-id]')
-    .evaluateAll((all) => all.map((id) => id.getAttribute('title')));
+    .locator('[data-copy-id]')
+    .evaluateAll((all) => all.map((id) => id.getAttribute('data-copy-id')));
   const second = Array.from({ length: FINISHED_SIZE }, (_, i) => idOf(FINISHED_SIZE + i));
   if (ids.join() !== second.join())
     throw new Refused(`page 2 holds the tenth to the eighteenth, newest finished first — ${ids.join(', ')}`);
@@ -87,7 +87,10 @@ async function newerAndOlder(page: Page, trail: string[]): Promise<void> {
   await page.locator('[data-pager-newer]').focus();
   await page.keyboard.press('Enter');
   await page.waitForURL((url) => !url.searchParams.has('older') && url.pathname === `/factories/${FACTORY}/runs`, { timeout: WAIT_MS });
-  await expectVisible(rowsOf(page).locator(`[data-run-id][title="${FOLDER.id}"]`), 'Newer again, by the keyboard, leads to the first page');
+  await expectVisible(
+    rowsOf(page).locator(`[data-copy-id="${FOLDER.id}"] [data-run-id]`),
+    'Newer again, by the keyboard, leads to the first page',
+  );
   await expectVisible(page.locator('[data-pager-newer][data-disabled]'), 'where Newer leads nowhere');
   await page.locator('[data-pager-older]').click();
   await page.waitForURL(toSecond, { timeout: WAIT_MS });
@@ -116,7 +119,7 @@ async function noToken(page: Page): Promise<void> {
   await visit(page, `/factories/${FACTORY}/runs?older=bogus`);
   await expectVisible(page.locator('section[data-section="waiting"]'), 'a trail that is no token still draws the waiting runs');
   await expectVisible(page.locator('section[data-section="in-flight"]'), 'and the runs in flight');
-  await expectVisible(rowsOf(page).locator(`[data-run-id][title="${FOLDER.id}"]`), 'and the first page of the finished');
+  await expectVisible(rowsOf(page).locator(`[data-copy-id="${FOLDER.id}"] [data-run-id]`), 'and the first page of the finished');
 }
 
 /** A run that finished more than a year back, whenever the e2e runs: four hundred days ago. */
@@ -178,14 +181,14 @@ async function datesFit(page: Page): Promise<void> {
   const back = seedFinished(store!, LONG_AGO);
   try {
     await visit(page, `/factories/${FACTORY}/runs`);
-    const old = rowsOf(page).filter({ has: page.locator(`[data-run-id][title="${LONG_AGO.id}"]`) });
+    const old = rowsOf(page).filter({ has: page.locator(`[data-copy-id="${LONG_AGO.id}"] [data-run-id]`) });
     await expectTexts(
       old.locator('td[data-finished]'),
       [agoWords(new Date(Date.now() - LONG_AGO.finishedAgo * 60_000), new Date())],
       'a run finished more than a year back still says how long ago, never a date',
     );
-    const title = await old.locator('td[data-finished] time').getAttribute('title');
-    if (!title?.match(/\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M$/)) throw new Refused(`with the exact instant on hover — it says "${title}"`);
+    const [title] = await tipsOf(old.locator('td[data-finished] time'), 'the finished time');
+    if (!title?.match(/\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M$/)) throw new Refused(`with the exact instant in its tooltip — it says "${title}"`);
     await expectRoom(page, 'each column of the runs page has its own room');
     await settled(page);
     await photographBothWidths(page, OUT, 'runs-pages', 'another-year');

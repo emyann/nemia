@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
-import { Tag } from '@/components/ui/ds';
-import { cn } from '@/components/ui/ds/utils';
+import type { ComponentProps, ReactNode } from 'react';
+import { Focusable, Tag, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { cn, focusRing } from '@/components/ui/ds/utils';
 import type { ListedRun } from '@/lib/api/runs';
 import { ink } from '@/lib/meaning';
 import { dollars } from '@/lib/money';
@@ -19,18 +19,40 @@ const WORDS_INK: Record<ChipTone, string> = {
   rest: 'text-on-surface-variant',
 };
 
+/**
+ * A mark that is no control, `children`, as a trigger of the kit's plain tooltip saying `said`: it takes the focus, so the keyboard
+ * opens the tooltip as the pointer does, and is said aloud as `said` too.
+ */
+function Marked({ said, children }: { said: string; children: ComponentProps<typeof Focusable>['children'] }) {
+  return (
+    <TooltipTrigger delay={300}>
+      <Focusable>{children}</Focusable>
+      <Tooltip>{said}</Tooltip>
+    </TooltipTrigger>
+  );
+}
+
 /** The step's round of its rounds, as pips: one a round, lit up to the round it is on, in the chip's colour where it waits on you. */
 function Pips({ round, tone }: { round: NonNullable<Now['round']>; tone: ChipTone }) {
   const said = NOW_WORDS.round(round.at, round.of);
   return (
-    <span data-pips={`${round.at}/${round.of}`} role="img" aria-label={said} title={said} className="inline-flex shrink-0 gap-[3px]">
-      {Array.from({ length: round.of }, (_, i) => (
-        <i
-          key={i}
-          className={cn('block size-1.5', i < round.at ? (tone === 'yours' ? 'bg-yours' : 'bg-alive') : 'bg-surface-container-highest')}
-        />
-      ))}
-    </span>
+    <Marked said={said}>
+      <span
+        data-pips={`${round.at}/${round.of}`}
+        role="img"
+        aria-label={said}
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the mark's tooltip by focusing it
+        tabIndex={0}
+        className={cn('inline-flex shrink-0 gap-[3px]', focusRing())}
+      >
+        {Array.from({ length: round.of }, (_, i) => (
+          <i
+            key={i}
+            className={cn('block size-1.5', i < round.at ? (tone === 'yours' ? 'bg-yours' : 'bg-alive') : 'bg-surface-container-highest')}
+          />
+        ))}
+      </span>
+    </Marked>
   );
 }
 
@@ -40,20 +62,32 @@ function Ring({ budget }: { budget: NonNullable<Now['budget']> }) {
   const share = Math.max(0, Math.min(1, budget.spent / budget.cap));
   const said = NOW_WORDS.ring(dollars(budget.spent), budget.capSaid);
   return (
-    <span data-budget-ring={budget.over ? 'over' : 'under'} title={said} className="inline-flex shrink-0 items-center gap-1.5">
-      <svg width="14" height="14" viewBox="0 0 14 14" role="img" aria-label={said}>
-        <circle cx="7" cy="7" r="5" fill="none" strokeWidth="2.4" className="stroke-surface-container-highest" />
-        <circle
-          cx="7"
-          cy="7"
-          r="5"
-          fill="none"
-          strokeWidth="2.4"
-          strokeDasharray={`${(share * round).toFixed(2)} ${round.toFixed(2)}`}
-          transform="rotate(-90 7 7)"
-          className={budget.over ? 'stroke-failure' : 'stroke-money'}
-        />
-      </svg>
+    <span data-budget-ring={budget.over ? 'over' : 'under'} className="inline-flex shrink-0 items-center gap-1.5">
+      <Marked said={said}>
+        <svg
+          data-ring
+          width="14"
+          height="14"
+          viewBox="0 0 14 14"
+          role="img"
+          aria-label={said}
+          // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the ring's tooltip by focusing it
+          tabIndex={0}
+          className={cn('rounded-full', focusRing())}
+        >
+          <circle cx="7" cy="7" r="5" fill="none" strokeWidth="2.4" className="stroke-surface-container-highest" />
+          <circle
+            cx="7"
+            cy="7"
+            r="5"
+            fill="none"
+            strokeWidth="2.4"
+            strokeDasharray={`${(share * round).toFixed(2)} ${round.toFixed(2)}`}
+            transform="rotate(-90 7 7)"
+            className={budget.over ? 'stroke-failure' : 'stroke-money'}
+          />
+        </svg>
+      </Marked>
       {budget.over && <span className={cn('text-body-small', ink.failure)}>{NOW_WORDS.over(budget.capSaid)}</span>}
     </span>
   );
@@ -63,34 +97,37 @@ function Ring({ budget }: { budget: NonNullable<Now['budget']> }) {
 function Fan({ count }: { count: number }) {
   const said = NOW_WORDS.waitedBy(count);
   return (
-    <span
-      data-waited-by={count}
-      title={said}
-      aria-label={said}
-      role="img"
-      className="inline-flex shrink-0 items-center gap-1 font-mono text-body-small text-on-surface-variant"
-    >
-      <svg width="12" height="10" viewBox="0 0 12 10" aria-hidden="true">
-        <path d="M0.5,5 L4.5,5 L11.5,1 M4.5,5 L11.5,5 M4.5,5 L11.5,9" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      </svg>
-      {count}
-    </span>
+    <Marked said={said}>
+      <span
+        data-waited-by={count}
+        aria-label={said}
+        role="img"
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the fan's tooltip by focusing it
+        tabIndex={0}
+        className={cn('inline-flex shrink-0 items-center gap-1 font-mono text-body-small text-on-surface-variant', focusRing())}
+      >
+        <svg width="12" height="10" viewBox="0 0 12 10" aria-hidden="true">
+          <path d="M0.5,5 L4.5,5 L11.5,1 M4.5,5 L11.5,5 M4.5,5 L11.5,9" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        </svg>
+        {count}
+      </span>
+    </Marked>
   );
 }
 
-/** A part of NOW's words: a word, or the run it names, a link to its page by its id's last four characters, the whole id on hover. */
+/**
+ * A part of NOW's words: a word, or the run it names, a link to its page by its id's last four characters, the whole id in the kit's
+ * tooltip on hover and on focus.
+ */
 function Part({ part }: { part: NowPart }) {
   if (typeof part === 'string') return <>{part}</>;
   return (
-    <TextLink
-      to="/runs/$runId"
-      params={{ runId: part.run }}
-      title={part.run}
-      data-now-run={part.run}
-      className="font-mono text-body-medium"
-    >
-      {part.run.slice(-4)}
-    </TextLink>
+    <TooltipTrigger delay={300}>
+      <TextLink to="/runs/$runId" params={{ runId: part.run }} data-now-run={part.run} className="font-mono text-body-medium">
+        {part.run.slice(-4)}
+      </TextLink>
+      <Tooltip>{part.run}</Tooltip>
+    </TooltipTrigger>
   );
 }
 

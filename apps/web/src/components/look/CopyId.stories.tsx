@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor } from 'storybook/test';
-import { atRest } from '../../../.storybook/play';
+import { atRest, tipOf } from '../../../.storybook/play';
 import { CopyId } from './CopyId';
 import { ON_CARD } from './stories.fixtures';
 
@@ -45,12 +45,16 @@ const aliveOf = (): string => {
 const KEPT_INK = '[data-copied] [data-run-id] { color: var(--md-sys-color-on-surface-variant) !important; }';
 
 /**
- * The short id: its last four characters in no box, quiet beside a title; and its ink takes the hue of a session at work for the
- * moment after a copy, on a clipboard that takes anything, and its own back at rest: an ink kept as it was is seen.
+ * The short id: its last four characters in no box, quiet beside a title, the whole id in the kit's tooltip the keyboard's focus
+ * opens; and its ink takes the hue of a session at work for the moment after a copy, on a clipboard that takes anything, and its own
+ * back at rest: an ink kept as it was is seen.
  */
 export const Short: StoryObj = {
   play: async ({ canvasElement, userEvent }) => {
     await idsHold(canvasElement, ['2e13: 0px, 0px 0px, 16px tall']);
+    const id = canvasElement.querySelector('[data-run-id]')!;
+    await expect(await tipOf(userEvent, id), "the whole id in the kit's tooltip").toHaveTextContent('the-tool-errors-panels-2e13');
+    await expect(id).not.toHaveAttribute('title');
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} }, configurable: true });
     const [rest, alive] = [inkOf(canvasElement), aliveOf()];
     await expect(rest, `at rest the id is no hue of a session at work: ${rest}`).not.toBe(alive);

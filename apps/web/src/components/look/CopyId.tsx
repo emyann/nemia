@@ -1,6 +1,6 @@
 import { Check, Copy, type LucideIcon } from 'lucide-react';
-import { IconButton } from '@/components/ui/ds';
-import { cn } from '@/components/ui/ds/utils';
+import { Focusable, IconButton, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { cn, focusRing } from '@/components/ui/ds/utils';
 import { ink } from '@/lib/meaning';
 import { useCopy, type CopySaid } from '@/lib/useCopy';
 
@@ -24,27 +24,44 @@ const [COPY, COPIED] = [glyphOf(Copy), glyphOf(Check)];
  */
 const PULLED = '-my-2 -ml-0.75';
 
+/** How the id is drawn: the mono face, on one line, quiet. */
+const ID = 'font-mono text-body-small whitespace-nowrap text-on-surface-variant';
+
 /**
  * A run's id, in the mono face, with the control that copies it: the kit's smallest icon button, its glyph twelve pixels across and
  * seven from the id, which answers over 48 by 48 pixels where nothing around it clips or stands over it. Pressed, it says so for a
  * moment (`data-copied`), or that it could not. `short` shows the id's last four characters, quiet beside a run's title, which take
- * the hue of a session at work for that moment, and the whole id in its title; what is copied is always the whole id. `room` is how
- * many characters wide the id is drawn at least, so that ids of different lengths given the same room hold their controls, and what
- * follows, at one edge.
+ * the hue of a session at work for that moment, and the whole id in the kit's tooltip, on hover and on focus; what is copied is always
+ * the whole id. `room` is how many characters wide the id is drawn at least, so that ids of different lengths given the same room hold
+ * their controls, and what follows, at one edge.
  */
 export function CopyId({ id, short = false, room }: { id: string; short?: boolean; room?: number }) {
   const { said, copy } = useCopy(id);
   const copied = said === 'copied';
   return (
     <span data-copy-id={id} data-copied={copied || undefined} className="inline-flex items-center">
-      <span
-        data-run-id
-        title={short ? id : undefined}
-        style={room ? { minWidth: `${room}ch` } : undefined}
-        className={cn('font-mono text-body-small whitespace-nowrap text-on-surface-variant', short && copied && ink.alive)}
-      >
-        {short ? id.slice(-4) : id}
-      </span>
+      {short ? (
+        <TooltipTrigger delay={300}>
+          <Focusable>
+            <span
+              data-run-id
+              role="img"
+              aria-label={id.slice(-4)}
+              // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the whole id's tooltip by focusing it
+              tabIndex={0}
+              style={room ? { minWidth: `${room}ch` } : undefined}
+              className={cn(ID, copied && ink.alive, focusRing())}
+            >
+              {id.slice(-4)}
+            </span>
+          </Focusable>
+          <Tooltip>{id}</Tooltip>
+        </TooltipTrigger>
+      ) : (
+        <span data-run-id style={room ? { minWidth: `${room}ch` } : undefined} className={ID}>
+          {id}
+        </span>
+      )}
       <IconButton
         size="xsmall"
         variant="standard"

@@ -212,8 +212,28 @@ export const CONTROL_STRINGS: readonly (keyof typeof Classes)[] = [
   'POPOVER',
 ];
 
+/** The input kinds the kit draws with a part of their own, each keyed apart from the other inputs. */
+const INPUT_KINDS = ['checkbox', 'radio'];
+
+/** ` type="<kind>"` where `element` sets its `type` to a literal of `INPUT_KINDS`, else nothing: a spread or another type is a plain input. */
+const typeOf = (element: ts.JsxOpeningElement | ts.JsxSelfClosingElement): string => {
+  for (const one of element.attributes.properties) {
+    if (!ts.isJsxAttribute(one) || !ts.isIdentifier(one.name) || one.name.text !== 'type') continue;
+    const at = one.initializer;
+    const value =
+      at && ts.isStringLiteral(at)
+        ? at.text
+        : at && ts.isJsxExpression(at) && at.expression && ts.isStringLiteralLike(at.expression)
+          ? at.expression.text
+          : null;
+    return value !== null && INPUT_KINDS.includes(value) ? ` type="${value}"` : '';
+  }
+  return '';
+};
+
 /**
- * Each control `file`'s source draws by hand, once each: a JSX element of `CONTROL_ELEMENTS` (`<button>`), and a class string of
+ * Each control `file`'s source draws by hand, once each: a JSX element of `CONTROL_ELEMENTS` (`<button>`), an input whose literal
+ * `type` is a checkbox or a radio keyed by it (`<input type="radio">`), since the kit draws each with its own part, and a class string of
  * `CONTROL_STRINGS` it imports (`@/lib/classes:BUTTON`). None for a file of the kit, shadcn's own `ui/`, `ai-elements/` or the look.
  * It reads JSX tags and static imports alone: a control made by `createElement`, or a tag held in a variable, escapes it, and none
  * exists.
@@ -231,7 +251,7 @@ export const handDrawn = (file: string, source: string): string[] => {
       ts.isIdentifier(node.tagName) &&
       controls.includes(node.tagName.text)
     )
-      found.add(`<${node.tagName.text}>`);
+      found.add(`<${node.tagName.text}${node.tagName.text === 'input' ? typeOf(node) : ''}>`);
     ts.forEachChild(node, visit);
   };
   visit(tree);

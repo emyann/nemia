@@ -82,6 +82,8 @@ test("REFUSED: a part of shadcn's ui/ or React Aria imported outside the kit and
     `import { Badge } from '../ui/badge';`,
     `import { Badge as Tag } from '@/components/ui/badge';`,
     `const later = () => import('@/components/ui/alert');`,
+    `export { Label as FieldLabel } from '../ui/label';`,
+    `export * from '@/components/ui/switch';`,
   ].join('\n');
   assert.deepEqual(
     secondSystem(file, source).map(({ module, name }) => `${module}:${name}`),
@@ -93,6 +95,8 @@ test("REFUSED: a part of shadcn's ui/ or React Aria imported outside the kit and
       '@/components/ui/tabs:*',
       '@/components/ui/badge:Badge',
       '@/components/ui/alert:*',
+      '@/components/ui/label:Label',
+      '@/components/ui/switch:*',
     ],
   );
   assert.equal(secondSystem('apps/web/src/components/look/X.tsx', source).length, 0, 'the look draws on React Aria');
@@ -105,9 +109,17 @@ test('REFUSED: a control drawn by hand, by its element or a class string of lib/
     `import { BUTTON, FLOOR_BOX } from '../../lib/classes';`,
     `import { Button } from '@/components/ui/ds';`,
     `export const X = () => (<div className={FLOOR_BOX}><button className={BUTTON} /><input type="checkbox"/>`,
+    `<input value="x" /><input type="radio" /><input type={'radio'} /><input {...props} />`,
     `<select><option /></select><select></select><Button>ok</Button></div>);`,
   ].join('\n');
-  assert.deepEqual([...handDrawn(file, source)].sort(), ['<button>', '<input>', '<select>', '@/lib/classes:BUTTON']);
+  assert.deepEqual([...handDrawn(file, source)].sort(), [
+    '<button>',
+    '<input type="checkbox">',
+    '<input type="radio">',
+    '<input>',
+    '<select>',
+    '@/lib/classes:BUTTON',
+  ]);
   assert.equal(handDrawn('apps/web/src/components/look/X.tsx', source).length, 0, 'the look draws its own');
   assert.equal(handDrawn('apps/web/src/components/ui/ds/X.tsx', source).length, 0, 'so does the kit');
 });

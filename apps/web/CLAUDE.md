@@ -90,7 +90,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   lists only shrink, a component or page body of `src/components` with no story beside it (never `ui/` or `ai-elements/`), a story
   given no args, each name a file takes from shadcn's `components/ui/*` or React Aria outside the kit and the look
   (`<file>#<module>:<name>`), each control a file draws by hand (a raw `<button>`, `<input>`, `<select>` or `<textarea>`, or an
-  import of `lib/classes.ts`'s control strings, `handDrawn`), and the `todo` stories. A file you mend is cut from its list in the same
+  import of `lib/classes.ts`'s control strings, `handDrawn`; an input whose literal `type` is `checkbox` or `radio` is keyed by it, the kit
+  drawing each with its own part), and the `todo` stories. A file you mend is cut from its list in the same
   change; the test refuses a list that keeps it. `test/destinations.ts` maps each name and control to where it moves (a part of the
   kit, of the look, the frame's own state, plain markup, an ask of the kit, or exempt: `RouterProvider` alone), and the test refuses a
   key taken that it does not map and a key it maps that nothing takes (`mapGaps`, proved by `contracts/destinations.contract.ts`).

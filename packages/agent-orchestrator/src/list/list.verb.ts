@@ -81,6 +81,11 @@ export type ListReadingHow = {
   parent?: (id: string) => ParentRun;
   landed?: (branch: string) => Landed;
   /**
+   * The store's runs as the caller listed them, among which the claims on the repository's checkout are read (`checkoutHold`): a caller
+   * that reads many runs off one listing hands it, so the store is not listed again for each; left out, it is listed where a claim is read.
+   */
+  store?: () => readonly Run[];
+  /**
    * The store's real releases folder (`realReleasesDir`), which a step at work is said to run on under (`ranOnOf`); left out, none
    * is said.
    */
@@ -123,7 +128,7 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
   const { steps, views, phaseOf, answers, spendOf } = base;
   const memo = statusMemo(headsOver(git), yield* PlaceService);
   const standing = how.checkout ? Effect.succeed(how.checkout) : standingSnapshot();
-  const checkout = yield* checkoutHold(home, e, run, steps, { standing }, how.config ?? (yield* StoreConfig), memo);
+  const checkout = yield* checkoutHold(home, e, run, steps, { standing, ...(how.store ? { store: how.store } : {}) }, how.config ?? (yield* StoreConfig), memo);
   const repo = isRepositoryRun(run) ? run.repo : undefined;
   const tipOf = repo === undefined ? {} : { tipOf: (branch: string) => git.heads(repo).get(branch) };
   const held = { ...base, checkout, ...tipOf };

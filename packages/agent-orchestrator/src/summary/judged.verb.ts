@@ -483,6 +483,8 @@ export type JudgeHow = {
   parent?: (id: string) => ParentRun;
   /** The settings the checkout's claim reads the cap on runs in flight from (`ListReadingHow`'s `config`); left out, the program's. */
   config?: Settings;
+  /** The store's runs as the caller listed them, among which the checkout's claims are read (`ListReadingHow`'s `store`); left out, listed. */
+  store?: () => readonly Run[];
 };
 
 /**
@@ -514,7 +516,7 @@ export const judge = Effect.fn('judge')(function* (
   names: readonly string[],
   folder: readonly StepSpec[] | null,
   views: Views,
-  { reader, git, standings = () => [], parent, config }: JudgeHow,
+  { reader, git, standings = () => [], parent, config, store }: JudgeHow,
 ) {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
@@ -527,6 +529,7 @@ export const judge = Effect.fn('judge')(function* (
     landed: landedThrough(run, steps, git),
     ...(config ? { config } : {}),
     ...(parent ? { parent } : {}),
+    ...(store ? { store } : {}),
   });
   const { status, ready, check, retry, round } = read.assessed;
   const waiting = runWaitingOf(run, read.waiting);

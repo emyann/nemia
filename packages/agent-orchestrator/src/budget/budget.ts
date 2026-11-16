@@ -17,7 +17,7 @@ import type {
   Unchanged,
 } from '../../contracts/budget.contract.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { fieldsOf, itemsOf, sameSchema } from '../shape/shape.ts';
+import { fieldsOf, itemsOf, knownSchemas, sameSchema } from '../shape/shape.ts';
 import type { StepSpec } from '../step/step.ts';
 import { downstreamOf } from '../workspace/workspace.ts';
 import { tryOf, type Run } from '../record/record.ts';
@@ -46,13 +46,16 @@ export const BUDGETS_SCHEMA = {
   },
 };
 
+/** `BUDGETS_SCHEMA`, written out once (`knownSchemas`). */
+const BUDGETS_SCHEMAS = knownSchemas([BUDGETS_SCHEMA]);
+
 /**
  * The fields a step's `output:` declares whose schema is `BUDGETS_SCHEMA`, in the schema's order: none for a step without `output:`.
  * @param step The step whose `output:` is read, or undefined where there is none, which declares no field.
  */
 export const budgetFields = (step: StepSpec | undefined): string[] =>
   Object.entries(step?.output?.schema.properties ?? {})
-    .filter(([, schema]) => sameSchema(schema, [BUDGETS_SCHEMA]))
+    .filter(([, schema]) => sameSchema(schema, BUDGETS_SCHEMAS))
     .map(([name]) => name);
 
 /** The keys a budget has, sorted. */

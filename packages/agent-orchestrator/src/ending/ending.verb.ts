@@ -57,8 +57,9 @@ const inFlightPhase = (phase: TaskPhase): boolean => phase === 'pending' || phas
  * @param from The pass that asks (`PassRead`), and the slot it gave this run (`advanceRun`'s): the runs whose claims are read are the
  *   pass's own listing, the very runs it advances, so a step it filed is read on the run it filed it on; the runs the cap holds are read
  *   once for the pass, and only where another run's claim waits on a slot, since this run's own claim reads the slot the pass gave it; and
- *   each run another waits on is read once for the pass. Else where the branches stand, as the caller reads it (`PassStanding`): the store
- *   is listed, and that read, only past the run's own asks, and the cap read only where a claim waits on a slot.
+ *   each run another waits on is read once for the pass. Else where the branches stand, as the caller reads it (`PassStanding`), and the
+ *   store's runs as the caller listed them (`store`), read only past the run's own asks — left out, the store is listed there — and the
+ *   cap read only where a claim waits on a slot.
  * @param config Where the cap on runs in flight is read before any pass has written one (`runSlots`): the program's `StoreConfig`.
  * @param memo The reading of the places (`StatusMemo`), shared with the pass's `landEnding`, so a checkout is read once a run.
  * @param phaseOf The phase of this run's tasks as the caller read them on this pass (`advancePass`'s): an ending in flight there is in the
@@ -70,7 +71,9 @@ export const checkoutHold = (
   e: Engine,
   run: Run,
   steps: readonly StepSpec[],
-  from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal, StoreRoot> },
+  from:
+    | { read: PassRead; slot: RunSlot | undefined }
+    | { standing: Effect.Effect<PassStanding, Refusal, StoreRoot>; store?: () => readonly Run[] },
   config: Settings,
   memo: StatusMemo,
   phaseOf?: (taskId: string) => TaskPhase,
@@ -87,7 +90,9 @@ export const checkoutHold = (
 const claimsRead = Effect.fn('checkoutHold')(function* (
   e: Engine,
   run: Run,
-  from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal, StoreRoot> },
+  from:
+    | { read: PassRead; slot: RunSlot | undefined }
+    | { standing: Effect.Effect<PassStanding, Refusal, StoreRoot>; store?: () => readonly Run[] },
   config: Settings,
   memo: StatusMemo,
 ) {
@@ -95,7 +100,7 @@ const claimsRead = Effect.fn('checkoutHold')(function* (
   const read =
     'read' in from
       ? from.read
-      : passRead(home, e, yield* (yield* RunDoor).runs.list(), config, yield* from.standing, yield* passRevisions());
+      : passRead(home, e, from.store?.() ?? (yield* (yield* RunDoor).runs.list()), config, yield* from.standing, yield* passRevisions());
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
   const mine = yield* mainClaim(e, run, 'read' in from ? Effect.succeed(from.slot) : slotOf(run.id), read.parents, memo);
   if (!mine || mine.holds) return undefined;

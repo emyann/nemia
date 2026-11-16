@@ -199,11 +199,26 @@ const committed = <T, O>(e: Engine, memo: InformerMemo<T, O>, held: ReadonlyMap<
   });
 
 /**
+ * The JSON of each run object compared (`recordText`), kept by identity: a run is never changed in place, and the tick's memo hands the
+ * very run it kept to every pass while its stamp holds (`keptOf`), so a run at rest is written out once, not twice a pass.
+ */
+const recordTexts = new WeakMap<Run, string>();
+
+/** `run` as JSON, written once per run object (`recordTexts`). */
+const recordText = (run: Run): string => {
+  const known = recordTexts.get(run);
+  if (known !== undefined) return known;
+  const text = JSON.stringify(run);
+  recordTexts.set(run, text);
+  return text;
+};
+
+/**
  * Whether `entry` was judged on `run` as it is now: the run's `stamp`, the run itself, and, for a run that has filed nothing, where the
  * needs' readings stand (`needs`, `needsVersionOf`).
  */
 const judgedOn = <T, O>(entry: Entry<T, O>, run: Run, stamp: string | undefined, needs: number | undefined): boolean =>
-  entry.stamp === stamp && (entry.run === run || JSON.stringify(entry.run) === JSON.stringify(run)) && entry.needs === needs;
+  entry.stamp === stamp && (entry.run === run || recordText(entry.run) === recordText(run)) && entry.needs === needs;
 
 /**
  * What the informer checks before it serves a run from memory, by each watch of `RUN_INPUTS` but `request`: the run's stamp

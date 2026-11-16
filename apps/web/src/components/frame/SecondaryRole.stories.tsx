@@ -13,7 +13,7 @@ export default meta;
 const ROW: CSSProperties = { display: 'flex', alignItems: 'flex-start', gap: 32, padding: 24 };
 const METER: CSSProperties = { width: 200 };
 
-/** The destinations of the rail, none a link: the stories page is never left. */
+/** The destinations of the rail, none a link: the story is never left. */
 const DESTINATIONS = [
   { id: 'runs', label: 'Runs', icon: CheckIcon },
   { id: 'find', label: 'Find', icon: SearchIcon },

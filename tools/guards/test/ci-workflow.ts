@@ -28,7 +28,7 @@ export const E2E = 'e2e';
 
 /**
  * The job that runs the look's browser tests (`apps/web/test/e2e/*.test.ts`) once per push, beside the shards, which run none: the look's
- * tests each build the stories page and launch Chromium, and run in every shard they cost four times what they prove once.
+ * tests each launch Chromium and read Storybook's static build, and run in every shard they cost four times what they prove once.
  */
 export const LOOK = 'e2e-look';
 

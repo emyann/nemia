@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { expect, within } from 'storybook/test';
 import type { StepCloseout, StepTry } from '@/lib/api/tries';
 import type { RunDetail, StepView } from '@/lib/runView';
 import type { PartSize } from '@/lib/stepPart';
@@ -274,17 +275,57 @@ function Sizes({ run }: { run: RunDetail }) {
   );
 }
 
-/** A step to come: when it starts, nothing said and nothing given yet. */
-export const ToCome: StoryObj = { render: () => <Sizes run={RUNS.toCome} /> };
+/**
+ * The step's card at M drawn in `canvas`, in its state: its card's kind, its frame in the step's hue, its five facts whole, a meter
+ * only where a spend and its budget are measured, its label the card's small caps as its facts' labels, and its one action.
+ */
+async function cardAtM(canvas: HTMLElement, kind: string, hue: string, action: string): Promise<HTMLElement> {
+  const card = canvas.querySelector<HTMLElement>('[data-step-part="M"]')!;
+  const frame = card.closest('[data-cut-frame]');
+  await expect(frame?.getAttribute('data-cut-frame'), "its frame's hue").toBe(hue);
+  await expect(card.querySelector('[data-step-card]')?.getAttribute('data-step-kind')).toBe(kind);
+  await expect(card.querySelectorAll('[data-step-facts] dd').length, 'the five facts, whole').toBe(5);
+  const meter = card.querySelector<HTMLElement>('[data-step-spend="meter"]');
+  await expect(meter !== null, 'a meter where a spend and its budget are measured').toBe(kind === 'gate' || kind === 'done');
+  if (meter) {
+    const [spent, fact] = [within(meter).getByText('Spent', { exact: true }), card.querySelector('[data-step-facts] dt span')!].map(
+      (label) => ({ case: getComputedStyle(label).textTransform, size: getComputedStyle(label).fontSize }),
+    );
+    await expect(spent, "the meter's label is the card's small caps, as its facts' labels").toEqual({ ...fact, case: 'uppercase' });
+  }
+  const named = (name: string) => name.toLowerCase().includes(action.toLowerCase());
+  await expect(within(card).queryAllByRole('link', { name: named }).length, `one action, ${action}`).toBe(1);
+  return card;
+}
 
-/** A step at work: its session running, nothing given yet. */
-export const AtWork: StoryObj = { render: () => <Sizes run={RUNS.atWork} /> };
+/** A step to come: when it starts, nothing said and nothing given yet. */
+export const ToCome: StoryObj = {
+  render: () => <Sizes run={RUNS.toCome} />,
+  play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'come', 'none', 'Open the step')),
+};
+
+/** A step at work: its session running, nothing given yet, its spend not measured yet. */
+export const AtWork: StoryObj = {
+  render: () => <Sizes run={RUNS.atWork} />,
+  play: async ({ canvasElement }) => {
+    const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
+    await expect(card.textContent).toMatch(/not measured yet/);
+  },
+};
 
 /** A step at its gate: what it asks of you first, then what it said and gave. */
-export const WaitsOnYou: StoryObj = { parameters: { a11y: { test: 'todo' } }, render: () => <Sizes run={RUNS.waitsOnYou} /> };
+export const WaitsOnYou: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
+  render: () => <Sizes run={RUNS.waitsOnYou} />,
+  play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'gate', 'yours', 'Read and approve')),
+};
 
 /** A step done: what it said, then each field it gave by its widget, its picture a thumbnail. */
-export const Done: StoryObj = { parameters: { a11y: { test: 'todo' } }, render: () => <Sizes run={RUNS.done} /> };
+export const Done: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
+  render: () => <Sizes run={RUNS.done} />,
+  play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'done', 'none', 'Open the step')),
+};
 
 /** A step tried again after its check failed the first try: the picker of its tries, the second at work. */
 export const TryAgain: StoryObj = { render: () => <Sizes run={RUNS.tryAgain} /> };

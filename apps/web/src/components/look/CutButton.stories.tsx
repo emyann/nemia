@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
+import { expect, fireEvent } from 'storybook/test';
+import { tabStops, tabTo } from '../../../.storybook/play';
 import { CutButton, CutPress } from './CutButton';
 import { ON_CARD } from './stories.fixtures';
 
@@ -30,8 +32,33 @@ function Counted({ isDisabled = false }: { isDisabled?: boolean }) {
   );
 }
 
-/** The button as a press: a click, Enter and Space each press it once, and its ring is the link's. */
-export const Press: StoryObj = { render: () => <Counted /> };
+/** How many times the press drawn in `canvas` was pressed. */
+const pressesIn = (canvas: HTMLElement) => canvas.querySelector('[data-presses]')?.getAttribute('data-presses');
 
-/** A press that is disabled: it takes no press and no focus, and is drawn in the disabled ground and ink. */
-export const DisabledPress: StoryObj = { render: () => <Counted isDisabled /> };
+/** The button as a press: a button, no link, which Enter and Space each press once by the keyboard; its ring is the link's. */
+export const Press: StoryObj = {
+  render: () => <Counted />,
+  play: async ({ canvasElement, userEvent }) => {
+    await tabTo(userEvent, 'cutButton');
+    await expect(canvasElement.querySelector('[data-cut-button]')?.tagName, 'the press is a button, no link').toBe('BUTTON');
+    await expect(pressesIn(canvasElement)).toBe('0');
+    await userEvent.keyboard('{Enter}');
+    await expect(pressesIn(canvasElement), 'Enter presses it once').toBe('1');
+    await userEvent.keyboard(' ');
+    await expect(pressesIn(canvasElement), 'Space presses it once').toBe('2');
+  },
+};
+
+/** A press that is disabled: it takes no press and no focus, draws no ring, and is drawn in the disabled ground and ink. */
+export const DisabledPress: StoryObj = {
+  render: () => <Counted isDisabled />,
+  play: async ({ canvasElement, userEvent }) => {
+    const button = canvasElement.querySelector<HTMLButtonElement>('[data-cut-button]');
+    const stops = (await tabStops(userEvent)).filter((stop) => stop.marks.includes('cutButton'));
+    await expect(stops, 'Tab passes the disabled press').toEqual([]);
+    fireEvent.click(button!);
+    await expect(pressesIn(canvasElement), 'a click presses nothing').toBe('0');
+    await expect(button?.disabled).toBe(true);
+    await expect(button?.querySelectorAll('[data-cut-ring]').length, 'it draws no ring').toBe(0);
+  },
+};

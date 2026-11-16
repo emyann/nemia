@@ -1,27 +1,28 @@
 /**
- * The kit's parts draw Material's secondary on the board: in the stories' page (`parts/main.tsx`), built as the board is, a selected
- * tonal toggle's ground, a selected tonal icon toggle's ground, a collapsed rail's active label and a secondary meter's indicator each
- * take the colour of `--md-sys-color-secondary`, in light and dark, and not shadcn's quiet surface. `npm run e2e -- --look` runs this,
- * and a whole `npm run e2e` first; it needs Chromium.
+ * The kit's parts draw Material's secondary on the board: in its story, opened alone in Storybook's static build
+ * (`stories/built.ts`), a selected tonal toggle's ground, a selected tonal icon toggle's ground, a collapsed rail's active label and a
+ * secondary meter's indicator each take the colour of `--md-sys-color-secondary`, in light and dark, and not shadcn's quiet surface.
+ * `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it needs Chromium.
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, type Browser, type Page } from 'playwright';
 import { scratch } from 'test-kit/scratch';
 import { WAITED } from '../waits.ts';
-import { buildParts, openParts } from './parts/gallery.ts';
+import { openStory, serveBuilt, storybookFor } from './stories/built.ts';
 
-const built = scratch('nemia-secondary-');
 let browser: Browser;
+let served: { at: string; close: () => void };
 before(async () => {
-  await buildParts(built);
+  served = await serveBuilt(await storybookFor(scratch('nemia-secondary-storybook-')));
   browser = await chromium.launch();
 }, WAITED);
 after(async () => {
   await browser?.close();
+  served?.close();
 });
 
-const STORY = '?story=frame-secondaryrole--drawn';
+const STORY = 'frame-secondaryrole--drawn';
 
 /** Each part of the story, by its box's `data-secondary`, the element in it that draws secondary, and the property it draws with. */
 const DRAWN: { part: string; element: string; property: 'background-color' | 'color' }[] = [
@@ -58,7 +59,7 @@ function drawnOf(page: Page): Promise<string[]> {
 
 for (const theme of ['light', 'dark'] as const)
   test(`the kit's parts draw Material's secondary in ${theme}, never shadcn's quiet surface`, WAITED, async () => {
-    const page = await openParts(browser, built, theme, STORY, { still: true });
+    const page = await openStory(browser, served.at, theme, STORY, { still: true });
     try {
       const secondary = await colourOf(page, '--md-sys-color-secondary');
       const quiet = await colourOf(page, '--md-sys-color-surface-container-highest');

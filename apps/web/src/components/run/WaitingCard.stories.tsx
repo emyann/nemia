@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, waitFor } from 'storybook/test';
 import type { WaitingRun } from '@/lib/api/runs';
 import { WaitingCard } from './WaitingCard';
 
@@ -130,8 +131,23 @@ const NARROW: CSSProperties = { width: 360 };
 /** A box as wide as a card where the page is wide: the foot holds the tiles and the button on one line. */
 const WIDE: CSSProperties = { width: 760 };
 
+/** Where the button of the card drawn in `canvas` stands against its tiles, and how far its right edge is from the foot's. */
+const footOf = (canvas: HTMLElement): { under: boolean; beside: boolean; fromRight: number } => {
+  const foot = canvas.querySelector('[data-foot]')!;
+  const [tiles, button] = ['[data-tiles]', '[data-cut-button]'].map((part) => foot.querySelector(part)!.getBoundingClientRect());
+  return {
+    under: button.top >= tiles.bottom,
+    beside: button.top < tiles.bottom && button.bottom > tiles.top,
+    fromRight: Math.round(foot.getBoundingClientRect().right - button.right),
+  };
+};
+
 /** The card where it cannot hold its tiles and its button side by side: the button under the tiles, at the card's right. */
 export const Narrow: StoryObj = {
+  play: async ({ canvasElement }) => {
+    await document.fonts.ready;
+    await expect(footOf(canvasElement), 'narrow, the button wraps under the tiles').toEqual({ under: true, beside: false, fromRight: 0 });
+  },
   render: () => (
     <div data-card-box style={NARROW}>
       <WaitingCard run={RUN} asOf={AS_OF} />
@@ -139,8 +155,34 @@ export const Narrow: StoryObj = {
   ),
 };
 
-/** The card where it holds both: the button beside the tiles, at the card's right, and the title on one line over the copy control. */
+/**
+ * The card where it holds both: the button beside the tiles, at the card's right, and the title on one line over the copy control,
+ * whose lowest pixels over the control answer the title's link: a press there opens the run, and copies nothing.
+ */
 export const Wide: StoryObj = {
+  play: async ({ canvasElement, userEvent }) => {
+    await document.fonts.ready;
+    await expect(footOf(canvasElement), 'wide, it stands beside them').toEqual({ under: false, beside: true, fromRight: 0 });
+    const article = canvasElement.querySelector('article[data-run]')!;
+    const link = article.querySelector('h3 a')!;
+    const button = article.querySelector('[data-copy-id] button')!.getBoundingClientRect();
+    const [x, cy] = [button.left + button.width / 2, button.top + button.height / 2];
+    const rows = [...link.getClientRects()];
+    const row = rows.at(-1)!;
+    const at = document.elementFromPoint(x, row.bottom - 1);
+    const hit = { rows: rows.length, over: x > row.left && x < row.right, above: Math.round(cy - row.bottom) };
+    await expect(
+      hit.rows === 1 && hit.over && hit.above < 24,
+      `the title runs over the copy control, within its reach: ${JSON.stringify(hit)}`,
+    ).toBe(true);
+    await expect(at?.closest('a'), `the point a pixel inside the title, over the copy control, answers ${at?.tagName ?? 'nothing'}`).toBe(
+      link,
+    );
+    await userEvent.click(at!);
+    const run = article.getAttribute('data-run');
+    await waitFor(() => expect(canvasElement.querySelector('[data-story-ground]')?.getAttribute('data-at')).toBe(`/runs/${run}`));
+    await expect(canvasElement.querySelectorAll('[data-copied]').length, 'and nothing was copied').toBe(0);
+  },
   render: () => (
     <div data-card-box style={WIDE}>
       <WaitingCard run={RUN} asOf={AS_OF} />

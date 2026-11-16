@@ -43,17 +43,24 @@ applies: ["apps/web/**"]
    a page's name; `Sticker` for a tile that carries a number and `StatTile` for one over its breakdown; `BreakdownRows` for a breakdown's rows and
    `BreakdownPreview` for one hung off a focusable trigger of your own; `RunSteps` for a run's rail;
    `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`. Each is shown in its stories beside it
-   (`<Part>.stories.tsx`): `npm run storybook`, from `apps/web`, serves them to a person on port 6007, and `npm run board:serve`
-   prints a third line, `stories on <address>`, where a step given a browser opens them. A new part of the look gets its stories in
-   the same change, and its name here.
+   (`<Part>.stories.tsx`): `npm run storybook`, from `apps/web`, serves them to a person on port 6007, and a step looks at them
+   through `storybook dev` on a port of its own (item 10). A new part of the look gets its stories in the same change, and its name
+   here.
 10. **Build and judge a visual change in Storybook, not by serving the whole board.** Write or extend the story of the part first
    (one a state, with `args`, titled `Look/`, `Frame/`, `Store/`, `Factory/`, `Run/` or `Pages/` by where it sits), then change the
    part. A page body's story answers its reads through MSW over fixtures typed by `objects` (`apps/web/.storybook/fixtures/`, the runs
-   page's stories the pattern). `npm run stories`, from `apps/web`, runs every story in Chromium (its render, its play function,
-   axe as `error`); one file with `npx vitest run --project=storybook <file>.stories.tsx`. `node test/e2e/stories/shoot.ts --base
-   main-worktree/HEAD --out <your files>` pictures each story the change touches, light and dark, and the before, after and diff of
-   each whose pixels moved; it refuses a changed part no story reaches. A dev server (`npm run storybook`) is the quickest second
-   look, under a second against a whole build's 20 s or more, but holds about 2.5 GB while it runs: stop it before Vitest or a build.
+   page's stories the pattern). What a person does to the part (a press, the keyboard, the focus, where a link leads, what a press
+   opens) is the story's play function, asserting what it must; what reads pixels, or needs the browser's own Enter on a link, its
+   `:hover`, reduced motion or the dark theme, is a test under `apps/web/test/e2e/` that opens the story alone in Storybook's static
+   build (`openStory`, `test/e2e/stories/built.ts`). `npm run stories`, from `apps/web`, runs every story in Chromium (its render,
+   its play function, axe as `error`); one file with `npx vitest run --project=storybook <file>.stories.tsx`. `node
+   test/e2e/stories/shoot.ts --base main-worktree/HEAD --out <your files>` pictures each story the change touches, light and dark, and
+   the before, after and diff of each whose pixels moved; it refuses a changed part no story reaches. **Look through `storybook
+   dev`** while you work: from `apps/web`, `npx storybook dev -p <a port of its own> --no-open --ci &`, its pid kept in your step's
+   files, never port 6007 (the person's); read a story at `http://localhost:<port>/iframe.html?id=<story id>`, which shows an edit in
+   under a second against a static build's 20 s. It holds about 2.5 GB while it runs, counted against your step's memory limit: stop
+   it, by that pid, before a Vitest run, a build, the e2e or the typecheck. `npm run board:serve` stays for what needs the api and
+   the whole board.
    A new part is the ds kit's (`ds-build`), or a part of the look where the kit has none and the part is Nemia's alone: never a new
    import of shadcn's `components/ui/*` or of React Aria outside the kit and the look (`apps/web/test/stories.test.ts`).
 
@@ -128,7 +135,7 @@ is written, the commands, and what its own code promises — and this section ho
 - A line that `truncate`s in a node holds about thirty characters: say the short form there, the whole sentence in its `title`, and prove
   it is read whole with `expectUncut`.
 - A box the browser lays between two pixels is drawn from the next whole one, and `boundingBox` carries float noise: a test that reads a
-  pixel beside an edge rounds past it (`edgesOf` in `apps/web/test/e2e/parts.test.ts`).
+  pixel beside an edge rounds past it (`edgesOf` in `apps/web/test/e2e/pixels.ts`).
 - A table cell's `scrollWidth` does not grow with a `nowrap` text that runs out of it: measure the text's right edge against the cell's
   own room (`expectRoom` in `apps/web/test/e2e/pages/052-runs-pages.ts`).
 - The kit's `xsmall` icon button answers 8 pixels beyond its box, and of two targets that overlap the later in the document wins: in a
@@ -180,7 +187,7 @@ is written, the commands, and what its own code promises — and this section ho
   (`340-agent-try.ts`).
 - A package program the e2e runs from a string (`PASS` in `apps/web/test/e2e/world.ts`) is read by no typecheck: after changing what a
   package's program requires, run `npm run e2e -- --pages runs`, which seeds through it.
-- `npm run e2e -- --pages` runs none of `test/e2e/*.test.ts`: a change to a part of the look, its stories, `test/e2e/parts/`, or the
+- `npm run e2e -- --pages` runs none of `test/e2e/*.test.ts`: a change to a part of the look, its stories, `test/e2e/stories/`, or the
   runner's `visit.ts`, `checks.ts` or `contrast.ts` runs `npm run e2e -- --look` (with `--pages` when pages are due too).
 - A story of a part lays out with inline styles, never a class of its own, and a node test imports a part by its own file: the look's door
   loads the kit's folder, which Node refuses. A component of the board that needs a state proven in a browser has its stories beside it

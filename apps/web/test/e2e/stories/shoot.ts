@@ -17,9 +17,8 @@
  * baseWhy }` — `fresh` the touched stories the base has none of, `baseRendered` false where the base would not build, with why. No
  * picture goes into git: `--out` is the step's files or a scratch folder.
  */
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import http from 'node:http';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import type { Browser } from 'playwright';
@@ -27,6 +26,7 @@ import { storyNameFromExport, toId } from 'storybook/internal/csf';
 import { importsIn } from 'test-kit/imports';
 import type { StoryReach } from '../../../contracts/touched-stories.contract.ts';
 import { storyModuleOf } from '../../stories.ts';
+import { buildStorybook, builtIds, serveBuilt } from './built.ts';
 import { owesAStory, storiesTouched } from './touched.ts';
 
 /** The board's folder, from the workspace root. */
@@ -132,57 +132,15 @@ export const touchedOf = (root: string, changed: readonly string[]): { stories: 
 /** The themes a story is pictured in, in order. */
 const THEMES = ['light', 'dark'] as const;
 
-/** The longest a Storybook build may take. */
-const BUILD_MS = 10 * 60_000;
-
-/** Builds the Storybook of the board at `web` into `out`; resolves with why where it would not build, else with nothing. */
-async function buildStorybook(root: string, web: string, out: string): Promise<string | undefined> {
-  const bin = path.join(root, 'node_modules', 'storybook', 'dist', 'bin', 'dispatcher.js');
-  const child = spawn(process.execPath, [bin, 'build', '-o', out, '--quiet', '--disable-telemetry'], {
-    cwd: web,
-    stdio: ['ignore', 'ignore', 'pipe'],
-    timeout: BUILD_MS,
-  });
-  let said = '';
-  child.stderr.on('data', (chunk: Buffer) => (said += chunk));
-  const code = await new Promise<number | null>((resolve) => child.on('exit', resolve));
-  return code === 0 ? undefined : `Storybook did not build at ${web} (exit ${code}): ${said.trim().split('\n').slice(-5).join(' / ')}`;
-}
-
-const TYPES: Readonly<Record<string, string>> = {
-  '.html': 'text/html',
-  '.js': 'text/javascript',
-  '.mjs': 'text/javascript',
-  '.css': 'text/css',
-  '.json': 'application/json',
-  '.woff2': 'font/woff2',
-  '.woff': 'font/woff',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-};
-
 /** Serves the built Storybook at `dir` on loopback while `use` runs, handing it the address: MSW's worker needs a secure origin. */
 async function served<T>(dir: string, use: (at: string) => Promise<T>): Promise<T> {
-  const server = http.createServer((request, response) => {
-    const asked = path.join(dir, decodeURIComponent(new URL(`http://stories${request.url ?? '/'}`).pathname));
-    const file = asked.startsWith(dir) && fs.existsSync(asked) && fs.statSync(asked).isFile() ? asked : path.join(dir, 'index.html');
-    response.writeHead(200, { 'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream' }).end(fs.readFileSync(file));
-  });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address() as { port: number };
+  const server = await serveBuilt(dir);
   try {
-    return await use(`http://127.0.0.1:${port}`);
+    return await use(server.at);
   } finally {
     server.close();
-    server.closeAllConnections();
   }
 }
-
-/** The story ids the Storybook built at `dir` holds. */
-const builtIds = (dir: string): Set<string> => {
-  const index = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8')) as { entries: Record<string, { type: string }> };
-  return new Set(Object.entries(index.entries).flatMap(([id, entry]) => (entry.type === 'story' ? [id] : [])));
-};
 
 /**
  * Pictures each of `ids` the Storybook at `dir` holds, in each theme, into `out` as `<prefix><id>-<theme>.png`, by the e2e's
@@ -190,7 +148,7 @@ const builtIds = (dir: string): Set<string> => {
  */
 async function shootAll(browser: Browser, dir: string, ids: readonly string[], out: string, prefix: string): Promise<string[]> {
   const { photograph } = await import('../board.ts');
-  const held = builtIds(dir);
+  const held = new Set(builtIds(dir));
   const shot = ids.filter((id) => held.has(id));
   await served(dir, async (at) => {
     for (const theme of THEMES) {
@@ -333,7 +291,7 @@ async function main(): Promise<number> {
       const headBuilt = path.join(await scratch('nemia-stories-head-'), 'static');
       const why = await buildStorybook(root, path.join(root, BOARD), headBuilt);
       if (why !== undefined) throw new Refusal(why);
-      const held = builtIds(headBuilt);
+      const held = new Set(builtIds(headBuilt));
       const unbuilt = stories.filter((id) => !held.has(id));
       if (unbuilt.length > 0)
         throw new Refusal(

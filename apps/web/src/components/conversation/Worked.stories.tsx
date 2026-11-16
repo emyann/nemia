@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, waitFor } from 'storybook/test';
 import type { ConversationLine } from '@/lib/conversation';
 import { Worked, WorkedLine } from './Worked';
 
@@ -68,8 +69,24 @@ feed.ts:88        const held = () => draining || drainsThis(root);
 feed-file.ts:141  export const drainsThis = (root: string) => …
 1 more, in feed.boundary.test.ts`;
 
-/** A line that carries what it asked and what came back, closed: pressing it opens to both. */
+/**
+ * A line that carries what it asked and what came back, closed, laying out nothing it holds: pressing it opens to both, each block
+ * scrolling inside its own cap.
+ */
 export const Openable: StoryObj = {
+  play: async ({ canvasElement, userEvent }) => {
+    const asked = () => canvasElement.querySelector('[data-chat-asked]');
+    const came = () => canvasElement.querySelector('[data-chat-came]');
+    await expect(asked(), 'closed, a line lays out nothing it holds').toBeNull();
+    await userEvent.click(canvasElement.querySelector('[data-slot="trace-collapsible-trigger"]')!);
+    await waitFor(() => expect(asked()).not.toBeNull());
+    await expect(asked()?.textContent, 'what it asked').toMatch(/rg -n drainsThis/);
+    await expect(came()?.textContent, 'and what came back').toMatch(/feed\.ts:88/);
+    await expect(
+      getComputedStyle(came()!).overflowY,
+      'each block scrolls inside its own cap, so a long result does not push the talk open',
+    ).toBe('auto');
+  },
   render: () => (
     <div style={PANEL}>
       <WorkedLine

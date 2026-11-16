@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useSearch } from '@tanstack/react-router';
+import { expect } from 'storybook/test';
+import { tabStops } from '../../../.storybook/play';
 import { finishedSearch, trailOf } from '@/lib/finished';
 import { Pager } from './Pager';
 
@@ -14,8 +16,29 @@ function Standing() {
   return <Pager trail={trail} next={last ? null : `f.page${trail.length + 2}`} count={last ? 7 : 9} total={25} size={9} />;
 }
 
-/** On the first page: Newer leads nowhere, and is no link. */
-export const OnTheFirstPage: StoryObj = { render: () => <Standing /> };
+/** The marks of every stop the Tab key makes in the story. */
+const stopsOf = async (user: Parameters<typeof tabStops>[0]) => (await tabStops(user)).flatMap((stop) => stop.marks);
 
-/** On the last page: Older leads nowhere, and is no link. */
-export const OnTheLastPage: StoryObj = { parameters: { at: '/?older=f.page2~f.page3' }, render: () => <Standing /> };
+/** On the first page: Newer leads nowhere, takes no focus, and is no link. */
+export const OnTheFirstPage: StoryObj = {
+  render: () => <Standing />,
+  play: async ({ canvasElement, userEvent }) => {
+    const stops = await stopsOf(userEvent);
+    await expect(stops, `Tab reaches Older: ${stops.join(' ')}`).toContain('pagerOlder');
+    await expect(stops, 'on the first page Newer takes no focus').not.toContain('pagerNewer');
+    const newer = canvasElement.querySelector('[data-pager-newer]');
+    await expect(newer?.getAttribute('aria-disabled')).toBe('true');
+    await expect(newer?.getAttribute('href')).toBeNull();
+  },
+};
+
+/** On the last page: Older leads nowhere, takes no focus, and is no link. */
+export const OnTheLastPage: StoryObj = {
+  parameters: { at: '/?older=f.page2~f.page3' },
+  render: () => <Standing />,
+  play: async ({ userEvent }) => {
+    const ends = await stopsOf(userEvent);
+    await expect(ends, `on the last page Newer takes the focus: ${ends.join(' ')}`).toContain('pagerNewer');
+    await expect(ends, `on the last page Older takes no focus: ${ends.join(' ')}`).not.toContain('pagerOlder');
+  },
+};

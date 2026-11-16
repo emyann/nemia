@@ -1,6 +1,7 @@
 /**
  * The look's scroll bars and a table in a cut frame, read in browsers that draw scroll bars, which the e2e's own hides: the page of
- * the look's stories (`parts/main.tsx`) opened in a browser whose bars take room (`classic`) and in one whose bars float (`overlay`).
+ * the look's stories, each opened alone in Storybook's static build (`stories/built.ts`), in a browser whose bars take room (`classic`)
+ * and in one whose bars float (`overlay`).
  * The last row of a framed table draws no line and nothing of the table is painted in a cut corner; a table whose rows fit shows no
  * upright bar and a narrow one still scrolls sideways, its thumb off the cut; a bar is an 8-pixel lane the ground shows through, its
  * thumb in the look's inks while it scrolls, under the pointer and while held, in both kinds of browser and both schemes; and what
@@ -14,20 +15,22 @@ import type { Browser, Page } from 'playwright';
 import { scratch } from 'test-kit/scratch';
 import { WAITED } from '../waits.ts';
 import { expectNone } from './checks.ts';
-import { buildParts, openParts, story } from './parts/gallery.ts';
-import { apart, coloursOf, edgesOf, spilledOver, type Rgb } from './parts/pixels.ts';
+import { apart, coloursOf, edgesOf, spilledOver, type Rgb } from './pixels.ts';
+import { openStory, serveBuilt, storybookFor, type Look } from './stories/built.ts';
 import { launch, type Bars } from './visit.ts';
 
 const built = scratch('nemia-bars-');
 const browsers = {} as Record<Bars, Browser>;
+let served: { at: string; close: () => void };
 before(async () => {
-  await buildParts(built);
+  served = await serveBuilt(await storybookFor(scratch('nemia-bars-storybook-')));
   browsers.classic = await launch('classic');
   browsers.overlay = await launch('overlay');
 }, WAITED);
 after(async () => {
   await browsers.classic?.close();
   await browsers.overlay?.close();
+  served?.close();
 });
 
 const THEMES = ['light', 'dark'] as const;
@@ -37,10 +40,21 @@ const KINDS = ['classic', 'overlay'] as const;
 const framed = (name: string): string => `[data-framed="${name}"]`;
 const boxOf = (name: string): string => `${framed(name)} [data-table-box]`;
 
-/** The box the scroll bars' story draws shorter than what it holds, and the same box in the story nothing marks the scrolls of. */
-const SCROLLER = `${story('look-scrollbars--marked')} [data-scroller]`;
+/** The story of each framed table, by the table's name. */
+const TABLES = {
+  one: 'look-cutframe--table-of-one-row',
+  several: 'look-cutframe--table-of-several-rows',
+  narrow: 'look-cutframe--table-narrower-than-its-columns',
+} as const;
+
+/** The box the scroll bars' stories draw shorter than what it holds: marked as the board marks it, and with nothing marking it. */
+const SCROLLER = '[data-scroller]';
+const MARKED = 'look-scrollbars--marked';
 const UNMARKED = 'look-scrollbars--unmarked';
-const UNMARKED_SCROLLER = `${story(UNMARKED)} [data-scroller]`;
+
+/** The story `id` opened alone in the browser of `kind`, in `theme`. */
+const open = (kind: Bars, id: string, theme: 'light' | 'dark' = 'dark', look: Look = {}): Promise<Page> =>
+  openStory(browsers[kind], served.at, theme, id, look);
 
 /** The colours of the named `points` in a picture of the window taken now, as `name`. */
 const read = <K extends string>(kind: Bars, page: Page, name: string, points: Record<K, readonly [number, number]>) =>
@@ -57,14 +71,16 @@ test(
   'REFUSED: the last row of a framed table draws no line under it, with one row and with several; a line put back is seen',
   WAITED,
   async () => {
-    const page = await openParts(browsers.classic, built, 'dark');
+    const page = await open('classic', TABLES.one);
+    const several = await open('classic', TABLES.several);
     try {
       assert.deepEqual(await linesOf(page, 'one'), ['0px'], 'one row: no line under it');
-      assert.deepEqual(await linesOf(page, 'several'), ['1px', '1px', '0px'], 'several: a line under each row but the last');
+      assert.deepEqual(await linesOf(several, 'several'), ['1px', '1px', '0px'], 'several: a line under each row but the last');
       await page.addStyleTag({ content: LINED });
       assert.deepEqual(await linesOf(page, 'one'), ['1px'], 'the line put back is read');
     } finally {
       await page.context().close();
+      await several.context().close();
     }
   },
 );
@@ -109,14 +125,14 @@ for (const theme of THEMES) {
     `REFUSED: nothing of a framed table is painted in its frame's cut corners, ${theme}; a line put back and a ground are each seen`,
     WAITED,
     async () => {
-      const page = await openParts(browsers.classic, built, theme);
+      const page = await open('classic', TABLES.one, theme);
+      const several = await open('classic', TABLES.several, theme);
       try {
-        for (const name of ['one', 'several'])
-          assert.deepEqual(
-            await cutSpills('classic', page, name, `cut-${name}-${theme}`),
-            [],
-            `${name}: the ground shows through both cuts`,
-          );
+        for (const [name, on] of [
+          ['one', page],
+          ['several', several],
+        ] as const)
+          assert.deepEqual(await cutSpills('classic', on, name, `cut-${name}-${theme}`), [], `${name}: the ground shows through both cuts`);
         const lined = await page.addStyleTag({ content: LINED });
         assert.deepEqual(
           await cutSpills('classic', page, 'one', `cut-lined-${theme}`),
@@ -132,34 +148,34 @@ for (const theme of THEMES) {
         );
       } finally {
         await page.context().close();
+        await several.context().close();
       }
     },
   );
 }
 
-/** What is wrong with the room the framed tables' boxes take, none when no bar is drawn that nothing scrolls. */
-const roomFaults = (page: Page): Promise<string[]> =>
-  page.evaluate(() => {
+/** What is wrong with the room the framed table `name` takes in its box, none when no bar is drawn that nothing scrolls. */
+const roomFaultsOf = (page: Page, name: 'one' | 'several' | 'narrow'): Promise<string[]> =>
+  page.evaluate((name) => {
     const faults: string[] = [];
-    const box = (name: string) => document.querySelector<HTMLElement>(`[data-framed="${name}"] [data-table-box]`)!;
-    for (const name of ['one', 'several', 'narrow']) {
-      const at = box(name);
-      if (at.scrollHeight > at.clientHeight) faults.push(`${name}: ${at.scrollHeight} tall inside a box of ${at.clientHeight}`);
-      if (at.offsetWidth !== at.clientWidth) faults.push(`${name}: an upright bar takes ${at.offsetWidth - at.clientWidth}`);
-    }
-    for (const name of ['one', 'several']) {
-      const at = box(name);
+    const at = document.querySelector<HTMLElement>(`[data-framed="${name}"] [data-table-box]`)!;
+    if (at.scrollHeight > at.clientHeight) faults.push(`${name}: ${at.scrollHeight} tall inside a box of ${at.clientHeight}`);
+    if (at.offsetWidth !== at.clientWidth) faults.push(`${name}: an upright bar takes ${at.offsetWidth - at.clientWidth}`);
+    if (name !== 'narrow') {
       if (at.offsetHeight !== at.clientHeight) faults.push(`${name}: a sideways bar takes ${at.offsetHeight - at.clientHeight}`);
+      return faults;
     }
-    const narrow = box('narrow');
-    if (narrow.scrollWidth <= narrow.clientWidth) faults.push('narrow: nothing to scroll sideways');
-    if (narrow.offsetHeight - narrow.clientHeight !== 8)
-      faults.push(`narrow: its sideways lane is ${narrow.offsetHeight - narrow.clientHeight}`);
-    narrow.scrollLeft = 60;
-    if (narrow.scrollLeft !== 60) faults.push(`narrow: scrolled sideways to ${narrow.scrollLeft}, not 60`);
-    narrow.scrollLeft = 0;
+    if (at.scrollWidth <= at.clientWidth) faults.push('narrow: nothing to scroll sideways');
+    if (at.offsetHeight - at.clientHeight !== 8) faults.push(`narrow: its sideways lane is ${at.offsetHeight - at.clientHeight}`);
+    at.scrollLeft = 60;
+    if (at.scrollLeft !== 60) faults.push(`narrow: scrolled sideways to ${at.scrollLeft}, not 60`);
+    at.scrollLeft = 0;
     return faults;
-  });
+  }, name);
+
+/** What is wrong with the room each framed table takes, each in its own story's page of `pages`. */
+const roomFaults = async (pages: Record<keyof typeof TABLES, Page>): Promise<string[]> =>
+  (await Promise.all((['one', 'several', 'narrow'] as const).map((name) => roomFaultsOf(pages[name], name)))).flat();
 
 /** The framed tables laid out as a table is by default: what it holds runs past its box. */
 const UNCLIPPED = '[data-framed] table { overflow: visible !important; }';
@@ -168,17 +184,21 @@ test(
   'REFUSED: a framed table whose rows fit shows no scroll bar, and a narrow one scrolls sideways alone; a table left unclipped is seen',
   WAITED,
   async () => {
-    const page = await openParts(browsers.classic, built, 'dark');
+    const pages = {
+      one: await open('classic', TABLES.one),
+      several: await open('classic', TABLES.several),
+      narrow: await open('classic', TABLES.narrow),
+    };
     try {
-      assert.deepEqual(await roomFaults(page), [], 'no box is taller inside than it is, and no bar takes room where nothing scrolls');
-      await page.addStyleTag({ content: UNCLIPPED });
-      const faults = await roomFaults(page);
+      assert.deepEqual(await roomFaults(pages), [], 'no box is taller inside than it is, and no bar takes room where nothing scrolls');
+      for (const page of Object.values(pages)) await page.addStyleTag({ content: UNCLIPPED });
+      const faults = await roomFaults(pages);
       assert.ok(
         faults.some((fault) => fault.startsWith('one:') && fault.includes('tall inside')),
         `unclipped, the content is taller: ${faults.join('; ')}`,
       );
     } finally {
-      await page.context().close();
+      for (const page of Object.values(pages)) await page.context().close();
     }
   },
 );
@@ -286,7 +306,7 @@ const UNSTYLED = `::-webkit-scrollbar { width: auto !important; height: auto !im
 for (const kind of KINDS) {
   for (const theme of THEMES) {
     test(`REFUSED: a scroll bar is the look's in a browser whose bars are ${kind}, ${theme}; the rule undone is seen`, WAITED, async () => {
-      const page = await openParts(browsers[kind], built, theme, '', { still: true });
+      const page = await open(kind, MARKED, theme, { still: true });
       try {
         assert.deepEqual(await barFaults(kind, page, `bar-${kind}-${theme}`), [], 'an 8-pixel lane, the ground at rest, the three inks');
         await page.addStyleTag({ content: UNSTYLED });
@@ -323,8 +343,8 @@ test(
   'REFUSED: what scrolls is marked shown while it scrolls and at rest after, a box and the page; with nothing listening no mark is written',
   WAITED,
   async () => {
-    const page = await openParts(browsers.classic, built, 'dark');
-    const unmarked = await openParts(browsers.classic, built, 'dark', `?story=${UNMARKED}`);
+    const page = await open('classic', MARKED);
+    const unmarked = await open('classic', UNMARKED);
     try {
       await page.locator(SCROLLER).scrollIntoViewIfNeeded();
       await marked(page, 'html', 'rest', 'the page, brought to the box, comes to rest');
@@ -336,10 +356,10 @@ test(
       await wheelOver(page, 'html');
       await marked(page, 'html', 'shown', 'the page that scrolls is marked shown, on its root');
       await marked(page, 'html', 'rest', 'and at rest once it scrolls no more');
-      await unmarked.locator(UNMARKED_SCROLLER).scrollIntoViewIfNeeded();
-      await wheelOver(unmarked, UNMARKED_SCROLLER);
+      await unmarked.locator(SCROLLER).scrollIntoViewIfNeeded();
+      await wheelOver(unmarked, SCROLLER);
       assert.equal(
-        await unmarked.locator(UNMARKED_SCROLLER).getAttribute('data-scroll-bar'),
+        await unmarked.locator(SCROLLER).getAttribute('data-scroll-bar'),
         null,
         'nothing listening, a box that scrolled has no mark',
       );
@@ -380,7 +400,7 @@ test(
   "REFUSED: the sideways thumb of a framed table starts past its frame's bottom-left cut; a track from the box's left is seen",
   WAITED,
   async () => {
-    const page = await openParts(browsers.classic, built, 'dark', '', { still: true });
+    const page = await open('classic', TABLES.narrow, 'dark', { still: true });
     try {
       assert.deepEqual(await thumbInCut(page, 'thumb-clear'), [], 'the ground shows through the cut, the thumb beside it');
       await page.addStyleTag({ content: UNSET_TRACK });

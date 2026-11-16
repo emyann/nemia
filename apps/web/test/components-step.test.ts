@@ -924,6 +924,7 @@ const unset: WorkflowStepSpec = {
   memory: null,
   budget: null,
   check: null,
+  checkMemory: null,
   retries: null,
   checkFailurePolicy: null,
   gate: null,

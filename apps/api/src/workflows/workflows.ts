@@ -440,6 +440,7 @@ export const specOf = (step: StepSpec): WorkflowStepSpec => ({
   remote: step.remote ?? null,
   ...boundsOf(step),
   check: step.check ?? null,
+  checkMemory: step.checkMemory ?? null,
   retries: step.retries ?? null,
   checkFailurePolicy: step.checkFailurePolicy ? checkFailurePolicyLine(step.checkFailurePolicy) : null,
   gate: step.gate ?? null,

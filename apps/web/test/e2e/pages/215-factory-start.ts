@@ -9,6 +9,10 @@ import { OUT, store, takeBackRuns } from '../world.ts';
 
 /** The brief the page starts its run with. */
 const BRIEF = 'Start a run from the floor of its factory';
+/** The file the page hands its run, and its bytes: a PNG's signature and a little more, as small as a screenshot gets. */
+const SHOT = 'shot.png';
+const SHOT_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+
 /** The step of `dev` whose file names no agent, which leaves the workflow unfilled in a factory until it hires into it. */
 const UNFILLED = 'review';
 /** The agent the page writes into the checkout's `workflows/agents/` for the factory to hire into `review`. */
@@ -98,7 +102,9 @@ export default {
    * A run is started from a factory's floor: the pane's Start a run opens its bar in the side sheet on the factory's one repository,
    * fixed, listing the workflows it offers there with its hires. A workflow whose step the factory hires no one into says so in the
    * package's words and cannot be picked. Once the factory hires into it, it is picked; Escape in its brief leaves the field and keeps the
-   * brief, and a second Escape closes the bar. Picked again, the start sends `?factory=` and `?repo=`: the record names both. The hires,
+   * brief, and a second Escape closes the bar. Picked again, with a file chosen, the file is listed, uploaded to the factory's files by
+   * the board's cookie, and named by its id among the start's inputs, the run holding its bytes; the start sends `?factory=` and
+   * `?repo=`: the record names both. The hires,
    * the agent hired and the run are taken back. On a second repository the factory then works on two: the bar offers no repository to pick,
    * the workflow is picked by name, and, unwired, it says why with the attach; wired by the factory's file, it says the wired one.
    */
@@ -113,6 +119,9 @@ export default {
     const factoryText = fs.readFileSync(factoryFile, 'utf8');
     const reviewerFile = path.join(checkout, 'workflows', 'agents', `${REVIEWER}.md`);
     const runsBefore = fs.readdirSync(runsDir).sort();
+    const filesDir = path.join(store!, 'files', factory);
+    const kept = (): string[] => (fs.existsSync(filesDir) ? fs.readdirSync(filesDir) : []);
+    const filesBefore = new Set(kept());
     const theme = await themeOf(page);
     const other = await page.context().newPage();
     try {
@@ -147,17 +156,34 @@ export default {
       bar = await openStart(other);
       form = await pickWorkflow(bar, workflow);
       await form.getByRole('textbox').fill(BRIEF);
-      const [started] = await Promise.all([
+      await form.locator('input[type="file"]').setInputFiles({ name: SHOT, mimeType: 'image/png', buffer: SHOT_BYTES });
+      await expectVisible(form.locator(`[data-start-input="${SHOT}"]`), `${SHOT} is listed by its name and size before the start`);
+      const [uploaded, started] = await Promise.all([
+        other.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/namespaces/${factory}/files`, {
+          timeout: WAIT_MS,
+        }),
         other.waitForResponse((r) => r.request().method() === 'POST' && isRunStart(new URL(r.url()).pathname), { timeout: WAIT_MS }),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
+      if (uploaded.status() !== 201)
+        throw new Refused(
+          `${SHOT} is uploaded to ${factory}'s files by the board's cookie — it answered ${uploaded.status()}: ${await uploaded.text()}`,
+        );
+      const { id: fileId } = (await uploaded.json()) as { id: string };
+      const sent = started.request().postDataJSON() as { inputs?: { name?: string; file?: string }[] };
+      if (JSON.stringify(sent.inputs) !== JSON.stringify([{ name: SHOT, file: fileId }]))
+        throw new Refused(`the start names ${SHOT} among its inputs by its id ${fileId} — it sent ${JSON.stringify(sent.inputs)}`);
       const sentTo = new URL(started.url());
       if (sentTo.pathname !== `/api/namespaces/${factory}/runs` || sentTo.searchParams.get('repo') !== checkout)
         throw new Refused(`the start is sent in the factory's namespace, its repository in its query — it was sent to ${started.url()}`);
       if (started.status() !== 201)
         throw new Refused(`the api starts the run in ${factory} — it answered ${started.status()}: ${await started.text()}`);
-      const { id } = (await started.json()) as { id: string };
+      const { id, run } = (await started.json()) as { id: string; run?: { inputs?: { names: string[]; dir: string } } };
       await expectVisible(bar.locator(`[data-started="${id}"]`), `the bar says ${id} started, and links to it`);
+      if (!run?.inputs?.names.includes(SHOT))
+        throw new Refused(`the run holds ${SHOT} among its inputs — it answered ${JSON.stringify(run?.inputs)}`);
+      if (!fs.readFileSync(path.join(run.inputs.dir, SHOT)).equals(SHOT_BYTES))
+        throw new Refused(`the run's ${SHOT} holds the bytes the board uploaded`);
       const record = JSON.parse(fs.readFileSync(path.join(runsDir, `${id}.json`), 'utf8')) as { factory?: string; repo?: string };
       if (record.factory !== factory || record.repo !== checkout)
         throw new Refused(
@@ -175,6 +201,7 @@ export default {
     } finally {
       await other.close();
       takeBackRuns(runsDir, runsBefore);
+      for (const name of kept()) if (!filesBefore.has(name)) fs.rmSync(path.join(filesDir, name), { force: true });
       fs.rmSync(reviewerFile, { force: true });
       fs.writeFileSync(factoryFile, factoryText);
     }

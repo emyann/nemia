@@ -351,3 +351,11 @@ export function filesDue(
     })
     .map(({ name }) => name);
 }
+
+/**
+ * Whether `rel` is a path under a folder the file routes serve: its parts split at `/`, each a name — none empty, none `.`, none with
+ * `..`, a backslash or a NUL in it — so an absolute path, one that climbs out, and one spelled with the other separator are none.
+ * @param rel The path asked for, from the folder.
+ */
+export const isFilePath = (rel: string): boolean =>
+  rel.split('/').every((part) => Boolean(part) && part !== '.' && !/[\\\0]/.test(part) && !part.includes('..'));

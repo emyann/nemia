@@ -80,7 +80,6 @@ export const BASELINE = {
     'apps/web/src/components/nemia/chat/ChatPanel.tsx',
     'apps/web/src/components/nemia/chat/ChatProposal.tsx',
     'apps/web/src/components/nemia/chat/ChatTalk.tsx',
-    'apps/web/src/components/run/Artifacts.tsx',
     'apps/web/src/components/run/AsksOfYou.tsx',
     'apps/web/src/components/run/FinishedTable.tsx',
     'apps/web/src/components/run/FlightTable.tsx',

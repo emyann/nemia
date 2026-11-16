@@ -6,8 +6,9 @@ no command of its own — a command or a store folder it shows is text the api a
 The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's components on React Aria (`aria-nova`). Its node tests
 (`test/*.test.ts`) load `src/` as Node does; its e2e (`test/e2e/`) drives the built app in Chromium.
 
-Two component families draw from one palette. shadcn's (`src/components/ui/*.tsx`) are what the pages use today. The design system kit
-(`src/components/ui/ds`, Material Design 3 on React Aria) is what the board moves to, a component at a time. The look is `DESIGN.md`,
+Two component families draw from one palette. shadcn's (`src/components/ui/*.tsx`) are what many pages still use; it is retired, and
+no file gains an import of it (`test/stories.test.ts`). The design system kit (`src/components/ui/ds`, Material Design 3 on React Aria)
+is the board's one system, which it moves to a component at a time. The look is `DESIGN.md`,
 and `theme/` is what the kit's generator makes of it; `src/styles.css` imports the theme and reads shadcn's names from its roles.
 
 The traps of the board's tools — what Chromium, Playwright, React Flow, React Aria, the React Compiler, the e2e runner and the kit's
@@ -64,13 +65,42 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   deletes the builds of every Playwright it does not see): `npx playwright install chromium` for the e2e, and
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.
 - `npm test` runs `test/*.test.ts`, never `test/e2e/*.test.ts` (those launch Chromium): `npm run e2e -- --look`, and a whole `npm run
-  e2e`, run them first, two files at a time (`LOOK_TESTS`, `e2e/look.ts`); `--pages` and `--shard` run none. A web test that needs
+  e2e`, run them first, two files at a time (`LOOK_TESTS`, `e2e/look.ts`), then every story (`npm run stories`); `--pages` and
+  `--shard` run none. A web test that needs
   no browser sits in `test/`.
-- The stories are the one place the parts are shown, in two hosts under one decorator (`.storybook/preview.tsx`: the look's ground,
-  a router of the story's own in memory, `data-at` where it stands). `npm run storybook`, from `apps/web` or the root, is a person's, on port
-  6007, in no check; dark follows the system alone, so its toolbar switches nothing. The checks read the stories' page,
-  `test/e2e/parts/main.tsx` (`?part=<name>`, `?story=<id>`), built into a scratch folder by `buildParts` and never by `npm run
-  build`: `test/e2e/parts.test.ts` presses it (`npm run e2e -- --look`), and `node test/e2e/parts-photos.ts` pictures it, light then dark.
+- The stories are the one place the parts are shown, and where a step builds and judges a visual change: write or extend the story
+  first, then the part. They draw under one decorator (`.storybook/preview.tsx`: the look's ground, a router of the story's own in
+  memory, `data-at` where it stands, a query client of its own that retries nothing, MSW's loader, axe as `error`, and a story the
+  holder caught throwing failed after it draws). Storybook's addons are the docs, the accessibility panel, the Vitest addon and MSW;
+  the ds kit's own published Storybook is composed beside ours (`refs`), loaded from its site in a person's browser, and no check runs
+  its stories. `npm run storybook`, from `apps/web` or the root, is a person's, on port 6007; dark follows the system alone, so its
+  toolbar switches nothing.
+- `npm run stories`, from `apps/web`, runs every story through Vitest in Playwright's Chromium (`vitest.config.ts`, the project
+  `storybook`): each a smoke test that it renders, its play function, and axe. `npm run e2e -- --look` runs it after the look's
+  tests (`LOOK_RUNS`, `e2e/look.ts`), so CI's `e2e-look` job does; `npm test` never does. One file:
+  `npx vitest run --project=storybook <file>.stories.tsx`. A story axe fails today says `a11y: { test: 'todo' }` itself, and the
+  count only shrinks.
+- A page body's stories (`Pages/`, the runs page's `components/run/RunsPage.stories.tsx` the pattern) answer its reads through MSW
+  (`parameters.msw`), with handlers over fixtures typed by `objects`' own types (`.storybook/fixtures/`), so a key the api renames
+  fails the typecheck there; no file of `src` gains a seam for a story. MSW's worker, `.storybook/public/mockServiceWorker.js`, is
+  written by `npx msw init .storybook/public --no-save` and served to Storybook alone.
+- `test/stories.test.ts` holds the stories (`test/stories.ts`, the rules): a title opens with `Look/`, `Frame/`, `Store/`,
+  `Factory/`, `Run/` or `Pages/`, by where the part sits, with no exception; and, each against `test/stories.baseline.ts`, whose
+  lists only shrink, a component or page body of `src/components` with no story beside it (never `ui/` or `ai-elements/`), a story
+  given no args, a file importing shadcn's `components/ui/*` or React Aria outside the kit and the look, and the `todo` stories. A
+  file you mend is cut from its list in the same change; the test refuses a list that keeps it.
+- One component system: the ds kit. shadcn's `components/ui/*` is retired, a page at a time, and React Aria is imported only inside
+  the kit or a part of the look. A generic part the kit lacks is asked for upstream (french-tech-homies/design-system); one that is
+  Nemia's alone is a part of the look, with its stories.
+- `node test/e2e/stories/shoot.ts --base main-worktree/HEAD --out <dir>`, from `apps/web`, pictures each story a change touches
+  (found by its imports, `storiesTouched`, `e2e/stories/touched.ts`, proved by `contracts/touched-stories.contract.ts`), light and
+  dark, at the head (`story-<id>-<theme>.png`), and again at the merge base drawn from a `git archive` on this machine, writing
+  `before-`, `after-` and `diff-` for each story whose pixels differ, and `stories.json`; a changed part no story reaches is refused,
+  exit 1, named. `--list` prints the touched ids and bare parts as JSON and launches no browser; `--changed <path>…` names the paths
+  instead of git. It builds Storybook twice: a few minutes, about 2.6 GB.
+- The checks still read the parts page, `test/e2e/parts/main.tsx` (`?part=<name>`, `?story=<id>`; the `Pages/` stories are not on it,
+  having no loader there), built into a scratch folder by `buildParts` and never by `npm run build`: `test/e2e/parts.test.ts` presses
+  it (`npm run e2e -- --look`), and `node test/e2e/parts-photos.ts` pictures it, light then dark.
 - `npm run board:serve` (`e2e/serve.ts`) builds outside the workspace and serves one board a workspace, on a seeded store of its own
   (`e2e/served.ts`, the worker's serving code too), and the look's stories beside it, whose address it prints on a third line, `stories
   on <url>`, and on a fourth the person's token its store keeps, `token <token>`, which a browser pastes on the board's token page: every

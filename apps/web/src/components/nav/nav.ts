@@ -9,7 +9,7 @@ const under = (to: string) => (path: string) => path === to || path.startsWith(`
 type RailId = 'factories' | 'waiting' | 'agents' | 'skills' | 'library' | 'stats' | 'settings';
 
 /** A place of a factory's pane, by its key: the factory's floor, then its lists, then its settings. */
-export type PanePlace = 'floor' | 'runs' | 'inbox' | 'workflows' | 'agents' | 'skills' | 'settings';
+export type PanePlace = 'floor' | 'runs' | 'inbox' | 'workflows' | 'agents' | 'skills' | 'proposals' | 'settings';
 
 /**
  * Where a page sits in the frame: at the store's level, under a destination of the rail or her face (`nemia`, her chat's own page); or at
@@ -62,8 +62,8 @@ const PLACE_OF_SEGMENT: Readonly<Record<string, PanePlace>> = {
   workflows: 'workflows',
   agents: 'agents',
   skills: 'skills',
+  proposals: 'proposals',
   settings: 'settings',
-  proposals: 'settings',
 };
 
 /**
@@ -162,7 +162,10 @@ export function litOf(seat: Seat | undefined): RailId | undefined {
 /** A place of the pane: its key and its name. */
 type PanePlaceItem = { readonly id: PanePlace; readonly label: string };
 
-/** The factory pane's places, in their order: the floor, its runs, its inbox, its workflows, its agents, its skills and its settings. */
+/**
+ * The factory pane's places, in their order: the floor, its runs, its inbox, its workflows, its agents, its skills, its proposals and its
+ * settings.
+ */
 export const PANE_PLACES: readonly PanePlaceItem[] = [
   { id: 'floor', label: 'Floor' },
   { id: 'runs', label: 'Runs' },
@@ -170,6 +173,7 @@ export const PANE_PLACES: readonly PanePlaceItem[] = [
   { id: 'workflows', label: 'Workflows' },
   { id: 'agents', label: 'Agents' },
   { id: 'skills', label: 'Skills' },
+  { id: 'proposals', label: 'Proposals' },
   { id: 'settings', label: 'Settings' },
 ];
 
@@ -191,13 +195,15 @@ export const placeHref = (place: PanePlace, factory: string): string =>
  */
 export const frameRunsQuery = (path: string) => openRunsQuery(seatFactory(seatOf(path)));
 
-/** The pane's places whose page reads one object by the next segment, a run or a card, which a pick sends to the place's list. */
-const OBJECT_PLACES: ReadonlySet<string> = new Set(['runs', 'inbox']);
+/**
+ * The pane's places whose page reads one object by the next segment, a run, a card or a proposal, which a pick sends to the place's list.
+ */
+const OBJECT_PLACES: ReadonlySet<string> = new Set(['runs', 'inbox', 'proposals']);
 
 /**
  * Where picking `factory` takes the page at `path` with `search`, as an address: on a factory's page, the same place in the picked
  * factory, every key of its search kept but `repo`, the repository of the factory left — a workflow's page, a step's, an agent's or a
- * skill's the same name read there, a run's or a card's page the place's list, and a proposal the picked factory's settings; on the
+ * skill's the same name read there, a run's, a card's or a proposal's page the place's list; on the
  * store's Capabilities, the picked factory's Skills; on any other page of the store's level, the picked factory's floor.
  *
  * @param path the address of the page

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
-import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
+import { expectCount, expectVisible, idle, settled } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -42,13 +42,16 @@ const statusOf = (applied: typeof RENDERED) => ({
   conditions: [applied, NO_UPGRADE],
 });
 
-/** Go to the floor of the factory `name`, read again. */
-async function floorOf(page: Page, name: string): Promise<void> {
-  await page.goto(new URL(`/factories/${name}`, page.url()).href, { waitUntil: 'load' });
+/** Go to the page `at` of the factory `name`, its floor for none, read again. */
+async function factoryAt(page: Page, name: string, at = ''): Promise<void> {
+  await page.goto(new URL(`/factories/${name}${at}`, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
-/** Photograph the floor `page` shows, as `what`, once it has settled. */
+/** Go to the settings of the factory `name`, read again. */
+const settingsOf = (page: Page, name: string): Promise<void> => factoryAt(page, name, '/settings');
+
+/** Photograph the page `page` shows, as `what`, once it has settled. */
 async function pictured(page: Page, what: string): Promise<void> {
   await settled(page);
   await photograph(page, path.join(OUT, `factory-template-${what}-${await themeOf(page)}.png`));
@@ -56,10 +59,10 @@ async function pictured(page: Page, what: string): Promise<void> {
 
 export default {
   /**
-   * A factory made from a template shows it above its floor, read-only: where it is, the version wanted and the one its tree was applied
-   * at, each parameter, and each condition the daemon wrote, in its words, the one amiss in the destructive colour; the floor keeps the
-   * rest of the frame. Before the daemon renders it, the card says so and shows no condition; rendered, Applied is True; drifted, False. A
-   * factory made from none shows no template. Each state photographed.
+   * A factory made from a template shows it as the first section of its Settings, read-only: where it is, the version wanted and the one
+   * its tree was applied at, each parameter, and each condition the daemon wrote, in its words, the one amiss in the destructive colour;
+   * its floor draws no template. Before the daemon renders it, the card says so and shows no condition; rendered, Applied is True; drifted,
+   * False. A factory made from none shows no template on its Settings. Each state photographed, and the floor that holds the floor alone.
    */
   name: 'factory-template',
   route: '/',
@@ -71,8 +74,11 @@ export default {
       fs.writeFileSync(path.join(folder, 'status.json'), `${JSON.stringify(statusOf(applied), null, 2)}\n`);
     try {
       fs.writeFileSync(file, `${JSON.stringify({ repos: [path.join(store!, 'checkout')], template: TEMPLATE }, null, 2)}\n`);
-      await floorOf(page, SHAPED);
-      await expectVisible(card.getByText('Template', { exact: true }), 'the templated factory shows its template above the floor');
+      await factoryAt(page, SHAPED);
+      await expectCount(page.locator('[data-template], [data-factory-template]'), 0, 'the floor draws no template');
+      await pictured(page, 'floor');
+      await settingsOf(page, SHAPED);
+      await expectVisible(card.getByText('Template', { exact: true }), 'the templated factory shows its template on its Settings');
       await expectVisible(card.locator('[data-template-version]', { hasText: TEMPLATE.version }), 'with the version wanted');
       await expectVisible(
         card.locator('[data-template-applied=""]', { hasText: 'not rendered yet: the daemon renders its tree on its next pass' }),
@@ -81,17 +87,15 @@ export default {
       await expectCount(card.locator('[data-condition]'), 0, 'and shows no condition, since the daemon has written none');
       await expectVisible(card.locator('[data-param="reviewers"]', { hasText: '2' }), 'each parameter given');
       await expectCount(card.locator('button, input, textarea'), 0, 'read-only: nothing to press or type in');
-      const below = await page.locator('[data-factory-settings-link]').boundingBox();
-      const shown = await card.boundingBox();
-      if (!below || !shown || shown.y + shown.height > below.y)
-        throw new Refused(
-          `the template sits above the floor's header — it ends at ${shown ? shown.y + shown.height : '?'}, the header at ${below?.y}`,
-        );
+      await expectVisible(
+        page.locator('[data-factory-settings] > section').first().and(page.locator('[data-factory-template]')),
+        'the template is the first section of the Settings',
+      );
       await pictured(page, 'unrendered');
 
       fs.mkdirSync(folder, { recursive: true });
       writeStatus(RENDERED);
-      await floorOf(page, SHAPED);
+      await settingsOf(page, SHAPED);
       await expectVisible(card.locator(`[data-template-applied="${TEMPLATE.version}"]`), 'rendered, the version its tree was applied at');
       await expectVisible(
         card.locator('[data-condition="Applied"][data-condition-status="True"]:not([data-amiss]) [data-variant="secondary"]'),
@@ -106,7 +110,7 @@ export default {
       await pictured(page, 'applied');
 
       writeStatus(DRIFTED);
-      await floorOf(page, SHAPED);
+      await settingsOf(page, SHAPED);
       await expectVisible(
         card.locator('[data-condition="Applied"][data-condition-status="False"][data-amiss] [data-variant="destructive"]'),
         'Applied False, the template drifted, is amiss, in the destructive colour',
@@ -114,8 +118,9 @@ export default {
       await expectVisible(card.getByText(DRIFTED.message), 'with what the daemon says to do');
       await pictured(page, 'drift');
 
-      await floorOf(page, FACTORIES.hiring.name);
-      await expectCount(page.locator('[data-template]'), 0, 'a factory made from no template shows none');
+      await settingsOf(page, FACTORIES.hiring.name);
+      await expectVisible(page.locator(`[data-factory-settings="${FACTORIES.hiring.name}"]`), "the untemplated factory's Settings");
+      await expectCount(page.locator('[data-template], [data-factory-template]'), 0, 'a factory made from no template shows none');
     } finally {
       fs.rmSync(file, { force: true });
       fs.rmSync(folder, { recursive: true, force: true });

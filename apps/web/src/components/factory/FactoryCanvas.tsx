@@ -1,5 +1,5 @@
 import type * as RunObject from 'objects';
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
   applyNodeChanges,
@@ -171,12 +171,11 @@ const minimapFill = ({ data: { run, finished } }: RunFlowNode) =>
  * event of the workflow feed; the queue every 5 s, since the feed carries no card's events: the daemon starts a card when a run slot frees,
  * and nothing on the board asks it to.
  *
- * What the page puts `above` the floor, its template among them, takes its height from the floor's, which fills the rest of the frame.
+ * The floor fills the rest of the frame: nothing is drawn above it.
  */
-export function FactoryCanvas({ open, factory, above }: { open: OpenRuns; factory: FactoryPlace; above?: ReactNode }) {
+export function FactoryCanvas({ open, factory }: { open: OpenRuns; factory: FactoryPlace }) {
   return (
     <div className="flex h-[calc(100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot))] min-h-96 flex-col">
-      {above}
       <ReactFlowProvider>
         <Floor light={open} factory={factory} />
       </ReactFlowProvider>

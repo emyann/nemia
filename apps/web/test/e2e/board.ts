@@ -47,7 +47,7 @@ export const RAIL_GROUPS = [
 export const RAIL_PLACES: readonly string[] = RAIL_GROUPS.flatMap(([, places]) => places);
 
 /** The factory pane's places, in their order. */
-export const PANE_PLACES = ['Floor', 'Runs', 'Inbox', 'Workflows', 'Agents', 'Skills', 'Settings'] as const;
+export const PANE_PLACES = ['Floor', 'Runs', 'Inbox', 'Workflows', 'Agents', 'Skills', 'Proposals', 'Settings'] as const;
 
 /** The store's rail at the left of a window not narrow: her face, the menu button on a factory's page, and the groups. */
 export const railColumnOf = (page: Page): Locator => page.locator('[data-frame-rail]');

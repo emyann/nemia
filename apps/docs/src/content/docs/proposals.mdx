@@ -15,7 +15,8 @@ agent's custom instructions. A proposal that carries one is refused, naming the 
 
 **It is reached through** `nemia propose` and `nemia proposals`, and the api's routes under `/api/namespaces/<factory>/proposals`. Each
 proposal is a file in your store, `~/.agent-workflows/factories/<factory>/proposals/<name>.json` (`WF_ROOT`), named after who proposed
-it. The board does not show proposals yet: until it does, you read and approve them from the command line or the api.
+it. On the board, a factory's proposals are a page of its own, Proposals, at `/factories/<factory>/proposals`, each opening its own
+page, where you approve or decline it.
 
 ## What a proposal can change
 

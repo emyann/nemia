@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link as AriaLink } from 'react-aria-components';
 import { ListItem } from '@/components/ui/ds';
+import { factoriesQuery } from '@/lib/api/factories';
 import { inboxQuery } from '@/lib/api/inbox';
+import { proposalsQuery } from '@/lib/api/proposals';
 import { notStarted } from '@/lib/inbox';
 import { cn } from '@/lib/utils';
 import { FactoryPicker } from '../factory/FactoryPicker';
@@ -10,15 +12,20 @@ import { frameRunsQuery, PANE_PLACES, type PanePlace, placeHref } from '../nav/n
 
 /**
  * What a place of the pane says under its name: Runs how many wait on the person, off the frame's one count of the runs (`frameRunsQuery`),
- * and the Inbox how many cards are not started; none for any other place, or before they are read.
+ * the Inbox how many cards are not started, and Proposals how many proposals wait on the person, read for a factory a person made alone,
+ * the default factory having none; none for any other place, or before they are read.
  */
 function usePlaceLines(path: string, factory: string): Partial<Record<PanePlace, string>> {
   const runs = useQuery(frameRunsQuery(path)).data;
   const inbox = useQuery(inboxQuery).data;
+  const place = useQuery(factoriesQuery).data?.find((f) => f.name === factory);
+  const proposals = useQuery({ ...proposalsQuery(factory), enabled: place !== undefined && !place.default }).data;
   const cards = inbox ? notStarted(inbox, factory).length : undefined;
+  const waiting = place?.default ? 0 : proposals?.filter((p) => p.status.phase === 'waiting').length;
   return {
     ...(runs && { runs: runs.counts.waiting > 0 ? `${runs.counts.waiting} waiting on you` : 'nothing waits on you' }),
     ...(cards !== undefined && { inbox: cards > 0 ? `${cards} not started` : 'every card started' }),
+    ...(waiting !== undefined && { proposals: waiting > 0 ? `${waiting} wait on you` : 'none waiting' }),
   };
 }
 

@@ -667,8 +667,8 @@ export default {
     await expectCount(page.locator('.react-flow__edge animateMotion'), 0, 'nor any edge between cards');
     await expectCount(
       page.locator('[data-arrow] animateMotion'),
-      await page.locator('[data-arrow][data-state="running"]').count(),
-      'on the whole floor, a dot travels each running arrow and no other',
+      await page.locator(`section[aria-label="The run's steps"] [data-arrow][data-state="running"]`).count(),
+      "on the whole floor, a dot travels each running arrow between an open card's tiles and no other: a graph at rest says it by its pulse",
     );
     await expectCount(
       page.locator('.react-flow__panel[aria-label="Legend"] animateMotion'),

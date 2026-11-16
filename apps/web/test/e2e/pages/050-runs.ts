@@ -226,11 +226,11 @@ async function cardSays(page: Page, run: WaitingRun): Promise<void> {
   await expectTexts(card.locator(`[data-copy-id="${run.id}"] [data-run-id]`), [run.id.slice(-4)], "its id's end");
   if ((await tipsOf(card.locator('[data-run-id]'), "the card's id")).join() !== run.id)
     throw new Refused(`the card of ${run.id} says its whole id in the kit's tooltip`);
-  await expectCount(card.locator('[data-run-steps] [data-step]'), run.steps.length, 'a rail of its own steps');
-  await expectCount(card.locator('[data-step-name]'), 0, 'a short rail, with no names under its bars');
+  await expectCount(card.locator('[data-run-steps] [data-step]'), run.steps.length, 'its own steps as its graph');
+  await expectCount(card.locator('[data-step-name]'), 0, 'a graph that names no step under its nodes');
   await expectTexts(card.locator(`a[data-cut-button]${open}`), [OPENS], "one quiet button, which opens the run's page");
   await expectCount(card.locator('[data-cut-button]'), 1, 'and only one');
-  await expectCount(card.locator('button[data-step-bar]'), run.steps.length, "each bar of its rail a button that opens its step's card");
+  await expectCount(card.locator('button[data-step-bar]'), run.steps.length, "each node of its graph a button that opens its step's card");
   await expectCount(
     card.locator('button:not([data-step-bar])'),
     1 + (run.cost && run.tokens ? 1 : 0),
@@ -940,7 +940,7 @@ async function lookRules(page: Page): Promise<void> {
     .evaluateAll((all) =>
       all
         .filter((bar) => ['verified', 'unverified'].includes((bar as HTMLElement).dataset.state ?? ''))
-        .map((bar) => `${(bar as HTMLElement).dataset.state} ${getComputedStyle(bar).backgroundColor}`),
+        .map((bar) => `${(bar as HTMLElement).dataset.state} ${getComputedStyle(bar.querySelector('svg > :last-child')!).fill}`),
     );
   const fills = new Set(done.map((bar) => bar.split(' ').slice(1).join(' ')));
   if (!done.some((bar) => bar.startsWith('unverified')) || fills.size !== 1 || fills.has('rgba(0, 0, 0, 0)'))

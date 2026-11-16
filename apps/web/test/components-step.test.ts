@@ -65,8 +65,8 @@ const factsOf = (run: RunDetail): StepGraphFacts => ({
     message,
   })),
 });
-const { StepRail, StepTiles } = await import('../src/components/step/StepRail.tsx');
-const { flowSteps, railOf, tilesOf } = await import('../src/lib/flow.ts');
+const { StepTiles } = await import('../src/components/step/StepRail.tsx');
+const { flowSteps, tilesOf } = await import('../src/lib/flow.ts');
 const { StateEdge } = await import('../src/components/step/StateEdge.tsx');
 const { CanvasLegend } = await import('../src/components/step/CanvasLegend.tsx');
 const { edgeStroke, LOOP_SOURCE, LOOP_TARGET, TRAVEL_SECONDS } = await import('../src/lib/canvas.ts');
@@ -543,21 +543,6 @@ function summaryRun(): RunView {
   } as unknown as RunView;
 }
 
-const railMarkup = (run: RunView, reduce = false): string =>
-  withMotion(reduce, () =>
-    renderToStaticMarkup(
-      createElement(StepRail, {
-        run,
-        flow: railOf(
-          run.steps.map((s) => s.name),
-          run.graph,
-          flowSteps(run),
-          false,
-        ),
-      }),
-    ),
-  );
-
 const tilesMarkup = (run: RunView, selected: string | null = null, reduce = false): string =>
   withMotion(reduce, () =>
     renderToStaticMarkup(
@@ -575,47 +560,6 @@ const tilesMarkup = (run: RunView, selected: string | null = null, reduce = fals
       }),
     ),
   );
-
-test("a card at rest draws its run's steps as a rail: a pill each in its state, the ones at work or waiting on you ringed, and an arrow between each, the one into work moving", () => {
-  const html = railMarkup(summaryRun());
-  const pills = [...html.matchAll(/<li data-step="([^"]+)" data-state="([^"]+)"( data-live="true")?/g)].map((m) => [
-    m[1],
-    m[2],
-    Boolean(m[3]),
-  ]);
-  assert.deepEqual(
-    pills,
-    [
-      ['implement', 'verified', false],
-      ['tokens', 'unverified', false],
-      ['review', 'working', true],
-      ['theme', 'awaiting-approval', true],
-      ['respond', 'waiting', false],
-    ],
-    html,
-  );
-  const arrows = Object.fromEntries(
-    [...html.matchAll(/<g data-arrow="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1].replaceAll('&gt;', '>'), m[2]]),
-  );
-  assert.deepEqual(arrows, {
-    'step:implement->step:review': 'running',
-    'step:review->step:respond': 'to-come',
-    'step:implement->step:respond': 'to-come',
-    'step:tokens->step:theme': 'to-come',
-  });
-  assert.equal(travelling(html).length, 1, `one dot, on the arrow into the step at work: ${html}`);
-  assert.equal(
-    travelling(railMarkup(summaryRun(), true)).length,
-    0,
-    'none where the person asked for reduced motion, where the colour says it alone',
-  );
-  assert.match(html, /<ul aria-label="Steps">/);
-  assert.match(
-    html,
-    /title="review: at work — /,
-    "a pill's name is cut to its width; hovering says it whole, with a person's word for its state and what that means",
-  );
-});
 
 test("an opened card's tiles each name the step, its chip and what it waits on a person for, and press to inspect it", () => {
   const html = tilesMarkup(summaryRun(), 'review');
@@ -2466,25 +2410,6 @@ test('on a run a person holds, a step at its gate is drawn held — no human gat
   assert.match(
     nodeMarkup({ ...runOf('running (working)', { waitingOnYou: [] }), holding: HOLDING, holdUntil: ['p-1'] }),
     /data-state="working"/,
-  );
-});
-
-test("a held run's rail draws its gate held, its steps not filed as any step to come (grey blocks read as almost done) whose hover says the hold, and its work at work", () => {
-  const held = {
-    ...summaryRun(),
-    waitingOnYou: [],
-    waitingOnYouWords: [],
-    toDecide: null,
-    holdUntil: ['p-1'],
-    holding: HOLDING,
-  } as unknown as RunView;
-  const html = railMarkup(held);
-  const pills = Object.fromEntries([...html.matchAll(/<li data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]));
-  assert.deepEqual(pills, { implement: 'verified', tokens: 'unverified', review: 'working', theme: 'held', respond: 'waiting' }, html);
-  assert.match(
-    html,
-    /<li data-step="respond" data-state="waiting" title="respond: to come — [^"]*holds the run/,
-    'its hover says the hold',
   );
 });
 

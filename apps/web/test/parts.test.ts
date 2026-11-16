@@ -16,7 +16,7 @@ const { CutField } = await import('../src/components/look/CutField.tsx');
 const { CutTag } = await import('../src/components/look/CutTag.tsx');
 const { Pager } = await import('../src/components/look/Pager.tsx');
 const { PageName, Plate } = await import('../src/components/look/Plate.tsx');
-const { RunSteps } = await import('../src/components/look/RunSteps.tsx');
+const { StepGraph } = await import('../src/components/look/StepGraph.tsx');
 const { ScanLines } = await import('../src/components/look/ScanLines.tsx');
 const { Sticker } = await import('../src/components/look/Sticker.tsx');
 const { TextLink } = await import('../src/components/look/TextLink.tsx');
@@ -37,11 +37,23 @@ function tagWith(html: string, mark: string): string {
 }
 
 const STEPS = [
-  { name: 'design', ...coded('verified ✓') },
-  { name: 'implement', ...coded('running (working)') },
-  { name: 'review', ...coded('failed ✗ check (exit 1)') },
-  { name: 'land', ...coded('awaiting approval') },
+  { name: 'design', ...coded('verified ✓'), note: null, roundDue: false },
+  { name: 'implement', ...coded('running (working)'), note: null, roundDue: false },
+  { name: 'review', ...coded('failed ✗ check (exit 1)'), note: null, roundDue: false },
+  { name: 'land', ...coded('awaiting approval'), note: null, roundDue: false },
 ];
+
+/** A run of `steps` on a chain in their order, design and land gated, held where `held` says. */
+const graphRun = (steps: ReadonlyArray<(typeof STEPS)[number]>, held = false) => ({
+  steps,
+  graph: {
+    roots: [steps[0].name],
+    edges: steps.slice(1).map((step, i) => ({ from: steps[i].name, to: step.name, kind: 'after' as const })),
+  },
+  gates: ['design', 'land'],
+  cancelledAt: null,
+  holding: held ? { at: '2026-11-15T17:30:00.000Z', runs: [], word: 'held by you', advice: '', waitingOnYou: false } : null,
+});
 
 /** The canvas's barcode of each plate: an inked bar and a gap in turn, in pixels. */
 const BARS = {
@@ -208,99 +220,91 @@ test('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each wears
   );
 });
 
-test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page', async (t) => {
+test("StepGraph, Pager and TextLink: a run's steps as its graph, and the ways off a page", async (t) => {
   await t.test(
-    'the steps rail: one bar a step by its state, its names in the hue of what waits or failed, read aloud as a group named, each name a stop of the keyboard',
+    "the step graph: one node a step by its mark, at work and waiting on you a size larger, read aloud as a group named, each node told in the kit's tooltip",
     async () => {
-      const html = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: false, names: true }));
-      assert.match(tagWith(html, 'data-run-steps'), /role="group"/, 'with names, a group, so each name can take the focus');
-      assert.match(tagWith(html, 'data-step-name="review"'), /role="img"[^>]*aria-label="review"[^>]*tabindex="0"/);
+      const html = await drawn(createElement(StepGraph, { run: graphRun(STEPS) }));
+      assert.match(tagWith(html, 'data-run-steps'), /role="group"/);
       assert.match(html, /aria-label="design verified, implement at work, review failed its check, land waits on you"/);
       assert.deepEqual(
-        [...html.matchAll(/data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+        [...html.matchAll(/data-step="([^"]+)" data-state="([^"]+)" data-mark="([^"]+)"/g)].map((m) => [m[1], m[2], m[3]]),
         [
-          ['design', 'verified'],
-          ['implement', 'working'],
-          ['review', 'failed-check'],
-          ['land', 'awaiting-approval'],
+          ['design', 'verified', 'done'],
+          ['implement', 'working', 'alive'],
+          ['review', 'failed-check', 'failure'],
+          ['land', 'awaiting-approval', 'yours'],
         ],
       );
-      assert.match(tagWith(html, 'data-step-name="land"'), /text-yours/);
-      assert.match(tagWith(html, 'data-step-name="review"'), /text-failure/);
-      assert.match(tagWith(html, 'data-step-name="design"'), /text-on-surface-variant/);
-      const [gate, atWork] = [tagWith(html, 'data-step="land"'), tagWith(html, 'data-step="implement"')];
-      assert.match(gate, /bg-yours /, 'the step that waits on a person is filled in its hue');
-      assert.doesNotMatch(gate, /box-shadow/, 'and casts no glow: only the step at work is lit');
-      assert.doesNotMatch(atWork, /box-shadow/, "the step at work's bar carries no glow of its own");
-      assert.match(
-        tagWith(html, 'data-step-breath'),
-        /box-shadow:0 0 12px color-mix\(in srgb, var\(--meaning-alive\) 70%, transparent\)/,
-        'the step at work glows, on a layer of its own',
-      );
-      assert.match(html, /data-step="implement"[^>]*><span aria-hidden="true" data-step-breath/, "the layer is the step at work's");
-      assert.equal(html.match(/data-step-breath/g)?.length, 1, 'and no other step has one');
-      for (const dark of ['design', 'review'])
-        assert.doesNotMatch(tagWith(html, `data-step="${dark}"`), /box-shadow/, `${dark} neither waits nor works: no glow`);
-      assert.match(tagWith(html, 'data-step="implement"'), /bg-alive /, 'the step at work is the lit bar, in its hue itself');
-      assert.doesNotMatch(tagWith(html, 'data-step="implement"'), /bg-alive-container/);
-      assert.match(tagWith(html, 'data-step="review"'), /bg-failure /, 'the step that failed is filled in red');
-      assert.doesNotMatch(tagWith(html, 'data-step="review"'), /bg-failure-container/);
-      const bare = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: true }));
-      assert.doesNotMatch(bare, /data-step-name/, 'no names unless asked');
-      assert.match(tagWith(bare, 'data-run-steps'), /role="img"/, 'and without them, one picture');
-      assert.match(tagWith(bare, 'data-step="land"'), /data-state="held"/, "a held run's gate is drawn held");
-    },
-  );
-  await t.test(
-    'the steps rail with a wrap: a group named as the rail is said, each bar inside what the wrap gives, its step and state handed',
-    async () => {
-      const wrap = (bar: unknown, step: { name: string; state: string }) =>
-        createElement('button', { 'data-wrapped': `${step.name} ${step.state}` }, bar as ReactElement);
-      const html = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: false, wrap }));
-      const rail = tagWith(html, 'data-run-steps');
-      assert.match(rail, /role="group"/);
-      assert.doesNotMatch(rail, /role="img"/);
-      assert.match(rail, /aria-label="design verified, implement at work, review failed its check, land waits on you"/);
+      assert.match(html, /role="img" aria-label="review · failed its check"[^>]*tabindex="0"/, 'each node a stop of the keyboard, told');
+      const sizeOf = (step: string) => Number(/d="M0,-([\d.]+) /.exec(html.slice(html.indexOf(`data-step="${step}"`)))![1]);
+      assert.ok(sizeOf('implement') > sizeOf('design') && sizeOf('land') > sizeOf('design'), 'at work and yours a size larger');
+      assert.equal(html.match(/data-step-pulse/g)?.length, 1, 'the step at work alone pulses');
+      assert.match(html, /data-step="implement"[\s\S]*?data-step-pulse/, "the pulse is the step at work's");
       assert.deepEqual(
-        [...html.matchAll(/data-wrapped="([^"]+)"><span data-step="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+        [...html.matchAll(/data-gate="([^"]+)"[^>]*stroke="([^"]+)"/g)].map((m) => [m[1], m[2]]),
         [
-          ['design verified', 'design'],
-          ['implement working', 'implement'],
-          ['review failed-check', 'review'],
-          ['land awaiting-approval', 'land'],
+          ['design', 'var(--md-sys-color-outline)'],
+          ['land', 'var(--meaning-yours)'],
         ],
+        "a gate's tick before each gated step, yellow where that step waits on you",
       );
     },
   );
   await t.test(
-    'a step done is filled in the rail whether a check says so or its own word does, one to come is quiet, one that waits dashed',
+    'the step graph with a wrap: each node inside what the wrap gives, its step and state handed, and no tooltip of its own',
+    async () => {
+      const wrap = (node: unknown, step: { name: string; state: string }) =>
+        createElement('button', { 'data-wrapped': `${step.name} ${step.state}` }, node as ReactElement);
+      const html = await drawn(createElement(StepGraph, { run: graphRun(STEPS), wrap }));
+      assert.match(
+        tagWith(html, 'data-run-steps'),
+        /aria-label="design verified, implement at work, review failed its check, land waits on you"/,
+      );
+      assert.deepEqual(
+        [...html.matchAll(/data-step="([^"]+)"[^>]*><button data-wrapped="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+        [
+          ['design', 'design verified'],
+          ['implement', 'implement working'],
+          ['review', 'review failed-check'],
+          ['land', 'land awaiting-approval'],
+        ],
+      );
+      assert.doesNotMatch(html, /tabindex="0"/, 'the wrap is the stop, not a told mark');
+    },
+  );
+  await t.test(
+    'done is filled whether a check says so or its own word does; one to come is hollow; one that waits on something now by its corners; a held run as not started',
     async () => {
       const steps = [
-        { name: 'design', ...coded('unverified') },
-        { name: 'implement', ...coded('verified ✓') },
-        { name: 'review', ...coded('waiting') },
+        { name: 'design', ...coded('unverified'), note: null, roundDue: false },
+        { name: 'implement', ...coded('verified ✓'), note: null, roundDue: false },
+        { name: 'review', ...coded('waiting'), note: null, roundDue: false },
       ];
-      const html = await drawn(createElement(RunSteps, { steps, cancelled: false, held: false }));
-      const classOf = (step: string) => tagWith(html, `data-step="${step}"`).match(/class="([^"]*)"/)?.[1];
+      const html = await drawn(createElement(StepGraph, { run: graphRun(steps) }));
+      const markOf = (markup: string, step: string) => /data-mark="([^"]+)"/.exec(tagWith(markup, `data-step="${step}"`))?.[1];
       assert.match(tagWith(html, 'data-step="design"'), /data-state="unverified"/, 'the state is still said as it is');
-      assert.equal(classOf('design'), classOf('implement'), 'done on its own word is drawn as done on a check');
-      assert.match(classOf('design') ?? '', /bg-sage /, 'filled');
-      assert.notEqual(classOf('review'), classOf('design'), 'a step to come is not drawn as one done');
-      assert.match(classOf('review') ?? '', /bg-surface-container-highest/, 'a step that only waits its turn is a quiet fill');
+      assert.equal(markOf(html, 'design'), 'done');
+      assert.equal(markOf(html, 'implement'), 'done');
+      assert.equal(markOf(html, 'review'), 'todo', 'a step that only waits its turn is hollow');
       const waiting = await drawn(
-        createElement(RunSteps, { steps: [{ name: 'land', ...coded('waiting on r-0') }], cancelled: false, held: false }),
+        createElement(StepGraph, { run: graphRun([{ name: 'land', ...coded('waiting on r-0'), note: null, roundDue: false }]) }),
       );
-      assert.match(tagWith(waiting, 'data-step="land"'), /border-dashed/, 'a step that waits on a run is a dashed outline');
-      const held = await drawn(createElement(RunSteps, { steps, cancelled: false, held: true }));
-      assert.match(
-        tagWith(held, 'data-step="review"'),
-        /border-dashed/,
-        "a held run's first step not started is dashed: the hold stops it",
-      );
-      assert.match(tagWith(html, 'data-run-steps'), /grid-template-columns:repeat\(3, 30px\)/, 'with no names, short bars side by side');
+      assert.equal(markOf(waiting, 'land'), 'waits', 'a step that waits on a run is drawn by its corners');
+      assert.match(waiting, /stroke-dasharray:3.2 3.871/);
+      const held = await drawn(createElement(StepGraph, { run: graphRun(steps, true) }));
+      assert.equal(markOf(held, 'review'), 'waits', "a held run's first step not started waits on the hold");
+      const gate = await drawn(createElement(StepGraph, { run: graphRun(STEPS, true) }));
+      assert.match(tagWith(gate, 'data-step="land"'), /data-state="held"/, "a held run's gate is drawn held");
+      assert.equal(markOf(gate, 'land'), 'waits', 'and as not started');
       assert.match(html, /aria-label="design done, implement verified, review to come"/, 'read aloud, a check is told from a word');
     },
   );
+  await t.test('a run listed without its graph says what to do', async () => {
+    const html = await drawn(createElement(StepGraph, { run: { ...graphRun(STEPS), graph: undefined as never } }));
+    assert.match(html, /data-graph-error/);
+    assert.match(html, /restart the api/);
+  });
   await t.test('the pager: Newer and Older keep the address and change its trail alone, and say the rows and where it stands', async () => {
     const at = { trail: ['f.a'], next: 'f.b', count: 9, total: 25, size: 9 };
     const html = await drawn(createElement(Pager, at), '/?factory=nemia&older=f.a');

@@ -53,7 +53,7 @@ export type Route = {
 export type Drawing = { states: StateBox[]; routes: Route[]; width: number; height: number };
 
 /** How wide one character of an event is drawn, in pixels: mono at the small body role, 12 px and untracked. */
-export const CHAR_WIDTH = 6.5;
+const CHAR_WIDTH = 6.5;
 /** How tall one line of an edge list is, in pixels (`leading-4`). */
 export const LINE_HEIGHT = 16;
 /** How tall a state's head is: what kind of state it is, and its name. */

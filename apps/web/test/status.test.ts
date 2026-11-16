@@ -325,7 +325,7 @@ const STATE_DRAWERS = [
   'step/MachineEdge.tsx',
   'factory/FactoryCanvas.tsx',
   'inbox/QueueLane.tsx',
-  'look/RunSteps.tsx',
+  'look/StepGraph.tsx',
 ];
 
 test("the meanings of a state's colour: one thing each, read from the look's roles, never a hand-picked hue", async (t) => {

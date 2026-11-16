@@ -10,14 +10,14 @@ import { previewBar } from '../step/StepPreview';
 import { RunCostCell } from './RunCostCell';
 import { RunMeta } from './RunMeta';
 import { RunNow } from './RunNow';
-import { CopyId, CutButton, CutFrame, CutTag, RunSteps, TextLink } from '../look';
+import { CopyId, CutButton, CutFrame, CutTag, StepGraph, TextLink } from '../look';
 
 /**
  * A run that waits on a person, as a card: its meta line (`RunMeta`: its id's end with a copy control, its factory and workflow, its
  * own labels); its title as a link, raised over the copy control's target, so a press on the title opens the run; what it does now in
  * marks (`RunNow`: the yellow chip of the step it waits on you at, its agent, the words of what is asked), and at that line's end how
- * long it has waited on a person this time, where the answer dates that wait; then a foot of its own steps as a short rail, each bar a
- * button that opens its step's card, its cost, and one button at the card's right that opens the run's page (`OPENS`). It decides
+ * long it has waited on a person this time, where the answer dates that wait; then a foot of its own steps as its workflow's graph, each
+ * node a button that opens its step's card, its cost, and one button at the card's right that opens the run's page (`OPENS`). It decides
  * nothing and shows no command: the run's page does. A run the list could not judge is a card of its own (`UnjudgedCard`).
  */
 export function WaitingCard({ run, asOf }: { run: WaitingRun | UnjudgedRun; asOf: Date }) {
@@ -105,7 +105,7 @@ function JudgedCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
           }
         />
         <div data-foot className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-3">
-          <RunSteps steps={run.steps} cancelled={run.cancelledAt !== null} held={run.holding != null} wrap={previewBar(run, asOf)} />
+          <StepGraph run={run} wrap={previewBar(run, asOf)} />
           <span data-cost className={`font-mono text-body-small whitespace-nowrap ${ink.money}`}>
             <RunCostCell run={run} />
           </span>

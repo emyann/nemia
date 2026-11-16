@@ -13,7 +13,7 @@ export { CutTag } from './CutTag';
 export { Pager } from './Pager';
 export { PageName, Plate, type PlateHue } from './Plate';
 export { Reading, ReadingLines } from './Reading';
-export { RunSteps } from './RunSteps';
+export { StepGraph } from './StepGraph';
 export { ScanLines } from './ScanLines';
 export { StatTile } from './StatTile';
 export { Sticker } from './Sticker';

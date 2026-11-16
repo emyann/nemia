@@ -6,13 +6,10 @@ import { attemptLine, edgeLine, edgeStroke, isLive } from '../../lib/canvas';
 import { costText, pastBudget } from '../../lib/cost';
 import type { Flow, Pill } from '../../lib/flow';
 import { gateNodeLine, gateOfSummary } from '../../lib/gate';
-import { waitsAtGate, stateClass, stepState } from '../../lib/status';
-import { chipTitle, stateWordsOf } from '../../lib/words';
+import { waitsAtGate, stepState } from '../../lib/status';
 import { useNow } from '../../lib/useNow';
 import { StatusChip } from './StatusChip';
 import { Travelling } from './StateEdge';
-
-type SummaryStep = RunView['steps'][number];
 
 /**
  * The arrows of a flow, in one SVG under its boxes: each as the canvases draw an edge — dashed and still to come, solid done, in the
@@ -55,63 +52,6 @@ function Arrows({ flow, rounds = false }: { flow: Flow; rounds?: boolean }) {
 
 /** Where a box is drawn in its flow: React Flow's floor is scaled, so everything in a flow is placed in its own pixels. */
 const at = (pill: Pill) => ({ left: pill.x, top: pill.y, width: pill.width, height: pill.height });
-
-/**
- * A run's steps on its card at rest: a pill per step in its chip's colour, on the run's layering, with the arrows between them (`railOf`).
- * A pill says its step's name, cut to its width and whole on hover with the step's status and note; the step the run is at wears a ring.
- * Past four columns, the columns before and after the ones around the run are one pill that counts them; past three lanes, one that counts
- * the rest.
- */
-export function StepRail({ run, flow }: { run: RunView; flow: Flow }) {
-  const cancelled = run.cancelledAt !== null;
-  const held = run.holding != null;
-  const byName = new Map(run.steps.map((step) => [step.name, step]));
-  return (
-    <div className="px-3">
-      <div className="relative" style={{ width: flow.width, height: flow.height }}>
-        <Arrows flow={flow} />
-        <ul aria-label="Steps">
-          {flow.pills.map((pill) => (
-            <li
-              key={pill.id}
-              data-step={pill.kind === 'step' ? pill.names[0] : undefined}
-              data-fold={pill.kind === 'fold' ? pill.names.join(' ') : undefined}
-              data-more={pill.kind === 'more' ? pill.names.join(' ') : undefined}
-              data-state={pill.state ?? (pill.done ? 'done' : 'mixed')}
-              data-live={pill.live || undefined}
-              title={
-                pill.kind === 'step'
-                  ? stepTitle(byName.get(pill.names[0]), pill.names[0], cancelled, held)
-                  : pill.names.map((name) => stepTitle(byName.get(name), name, cancelled, held)).join('\n')
-              }
-              style={at(pill)}
-              className={[
-                'absolute flex items-center justify-center rounded-full px-1 font-mono text-body-small leading-none',
-                pill.state ? stateClass[pill.state] : 'border border-dashed border-outline bg-background text-muted-foreground',
-                pill.live ? 'ring-2 ring-alive/60 ring-offset-1 ring-offset-background' : '',
-              ].join(' ')}
-            >
-              <span className="truncate">{pill.label}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-      {flow.error && (
-        <p title={flow.error} className="mt-1 line-clamp-2 text-body-small text-failure">
-          {flow.error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** A step's name, a person's word for its state and what that means (`chipTitle`), and its note: what hovering over it says. */
-function stepTitle(step: SummaryStep | undefined, name: string, cancelled: boolean, held: boolean): string {
-  if (!step) return name;
-  const state = stepState(step, cancelled, held);
-  const words = stateWordsOf(state, step.on, held);
-  return `${name}: ${words.rail} — ${chipTitle(state, words.meaning, step.message, step.note)}`;
-}
 
 /**
  * What the tiles read of an open run, once read: each step's attempts, filing and cost, as its object's status holds them

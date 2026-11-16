@@ -5,8 +5,8 @@ import { waitSentence } from '@/lib/runWords';
 import { ENDED } from '@/lib/words';
 import { CopyId } from './CopyId';
 import { CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE } from './CutFrame';
-import { RunSteps } from './RunSteps';
-import { AT_WORK, CARD, GATE, ON_OTHER, ON_PLAIN, REFUSED } from './stories.fixtures';
+import { StepGraph } from './StepGraph';
+import { AT_WORK, CARD, GATE, graphRun, ON_OTHER, ON_PLAIN, REFUSED } from './stories.fixtures';
 import { TextLink } from './TextLink';
 
 /** The look's cut-corner frame: in each hue and at each cut, on two grounds, with a link in its cut corner, and around a table. */
@@ -31,7 +31,7 @@ export const Yours: StoryObj = {
             The Tool errors panels show Bash apart
           </TextLink>
           <span>{waitSentence(WAITING)}</span>
-          <RunSteps steps={GATE} cancelled={false} held={false} names />
+          <StepGraph run={graphRun(GATE)} />
           <span>{durationWords(27 * 60_000 + 40_000, 'minute')} since it was created</span>
         </div>
       </CutFrame>
@@ -46,7 +46,7 @@ export const Alive: StoryObj = {
       <CutFrame hue="alive">
         <div style={CARD}>
           <span>A run at work</span>
-          <RunSteps steps={AT_WORK} cancelled={false} held={false} names />
+          <StepGraph run={graphRun(AT_WORK)} />
         </div>
       </CutFrame>
     </div>
@@ -62,7 +62,7 @@ export const Quiet: StoryObj = {
           <span>
             {ENDED.undecided.word}: {ENDED.undecided.title}
           </span>
-          <RunSteps steps={REFUSED} cancelled={false} held={false} />
+          <StepGraph run={graphRun(REFUSED)} />
         </div>
       </CutFrame>
     </div>

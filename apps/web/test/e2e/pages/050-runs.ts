@@ -226,11 +226,11 @@ async function cardSays(page: Page, run: WaitingRun): Promise<void> {
   await expectTexts(card.locator(`[data-copy-id="${run.id}"] [data-run-id]`), [run.id.slice(-4)], "its id's end");
   if ((await tipsOf(card.locator('[data-run-id]'), "the card's id")).join() !== run.id)
     throw new Refused(`the card of ${run.id} says its whole id in the kit's tooltip`);
-  await expectCount(card.locator('[data-run-steps] [data-step]'), run.steps.length, 'a rail of its own steps');
-  await expectCount(card.locator('[data-step-name]'), 0, 'a short rail, with no names under its bars');
+  await expectCount(card.locator('[data-run-steps] [data-step]'), run.steps.length, 'its own steps as its graph');
+  await expectCount(card.locator('[data-step-name]'), 0, 'a graph that names no step under its nodes');
   await expectTexts(card.locator(`a[data-cut-button]${open}`), [OPENS], "one quiet button, which opens the run's page");
   await expectCount(card.locator('[data-cut-button]'), 1, 'and only one');
-  await expectCount(card.locator('button[data-step-bar]'), run.steps.length, "each bar of its rail a button that opens its step's card");
+  await expectCount(card.locator('button[data-step-bar]'), run.steps.length, "each node of its graph a button that opens its step's card");
   await expectCount(
     card.locator('button:not([data-step-bar])'),
     1 + (run.cost && run.tokens ? 1 : 0),
@@ -940,7 +940,7 @@ async function lookRules(page: Page): Promise<void> {
     .evaluateAll((all) =>
       all
         .filter((bar) => ['verified', 'unverified'].includes((bar as HTMLElement).dataset.state ?? ''))
-        .map((bar) => `${(bar as HTMLElement).dataset.state} ${getComputedStyle(bar).backgroundColor}`),
+        .map((bar) => `${(bar as HTMLElement).dataset.state} ${getComputedStyle(bar.querySelector('svg > :last-child')!).fill}`),
     );
   const fills = new Set(done.map((bar) => bar.split(' ').slice(1).join(' ')));
   if (!done.some((bar) => bar.startsWith('unverified')) || fills.size !== 1 || fills.has('rgba(0, 0, 0, 0)'))
@@ -949,7 +949,7 @@ async function lookRules(page: Page): Promise<void> {
 
 /**
  * The details of the look, as the browser draws them: each label role's tracking where it is written, the chips that say a state or a
- * count cut, the pager's buttons in the face of a heading, and only the step at work alive with a glow.
+ * count cut, the pager's buttons in the face of a heading, and only the step at work alive with a pulse.
  */
 async function lookDetails(page: Page): Promise<void> {
   await expectDrawn(page, 'th', 'tracking', '1.1px', 'a heading is the small label, tracked by a tenth of its 11 pixels');
@@ -970,12 +970,13 @@ async function lookDetails(page: Page): Promise<void> {
     throw new Refused(
       `the pager's buttons are in the face of a heading, not the mono of its counts — ${buttons.map((b) => b.face).join(' | ')}; a heading ${head.face}; a count ${count.face}`,
     );
-  const glows = (await drawnOf(page, '[data-step][data-state="working"] [data-step-breath]')).map((drawn) => drawn.glow);
-  if (!glows.length || glows.includes('none'))
-    throw new Refused(`the step at work glows, on a layer of its own — ${glows.join(' | ') || 'no step at work'}`);
+  if ((await page.locator('[data-step][data-state="working"] [data-step-pulse]').count()) === 0)
+    throw new Refused('the step at work pulses, on a layer of its own — no step at work has its pulse');
   await lookRules(page);
+  const stray = await page.locator('[data-step]:not([data-mark="alive"]) [data-step-pulse]').count();
+  if (stray > 0) throw new Refused(`no node but the step at work, or its check, pulses — ${stray} others do`);
   const rest = (await drawnOf(page, '[data-step]')).map((drawn) => drawn.glow);
-  if (rest.some((glow) => glow !== 'none')) throw new Refused(`no bar but the breath of the step at work glows — ${rest.join(' | ')}`);
+  if (rest.some((glow) => glow !== 'none')) throw new Refused(`no node's holder casts a glow of its own — ${rest.join(' | ')}`);
 }
 
 /** The parts of the page this change draws, each as a picture of its own, three times the size: `runs-<what>-<theme>.png`. */

@@ -153,7 +153,6 @@ function Chip({ now }: { now: Now }) {
 /**
  * The step a run is on as the runs row says it, on a line of its own: its chip and its agent (`nowOf`, `CHIP_TAG`); nothing where the
  * run is on no step.
- * @param run The run, as its list gives it.
  */
 export function NowChip({ run }: { run: Parameters<typeof nowOf>[0] }) {
   const now = nowOf(run);

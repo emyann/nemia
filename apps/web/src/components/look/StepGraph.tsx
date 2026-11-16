@@ -125,11 +125,8 @@ function Told({ said, children }: { said: string; children: ReactNode }) {
  * run has gone and dashed ahead, a loop under the row at right angles, violet once gone round, a gate a tick before its step, yellow
  * where that step waits on you. Past what its width holds the columns away from where the run is fold into a count. Read aloud as one
  * group, each step and its word (`railSaid`). With `wrap`, each node is put inside what it gives (a button that opens the step);
- * without, each says its name and word in the kit's tooltip. A run listed without its graph says what to do (`UNGRAPHED`).
- * @param run The run: its steps, graph, gates, when it was called off, and its hold.
- * @param wrap What each step's node is put inside, handed the step's name, state and wait.
- * @param width How wide the graph is drawn: 188 pixels by default.
- * @param className Classes for the graph's box, `nodrag` on the floor.
+ * without, each says its name and word in the kit's tooltip. A run listed without its graph says what to do (`UNGRAPHED`). `width` is
+ * 188 pixels by default; `className` is the box's, `nodrag` on the floor.
  */
 export function StepGraph({
   run,

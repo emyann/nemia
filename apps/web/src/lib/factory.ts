@@ -401,7 +401,7 @@ export const byAge = <T extends Pick<RunView, 'id' | 'createdAt'>>(runs: readonl
 export const CELL_WIDTH = 384;
 /**
  * A cell holds a card at rest and the gap under it, as its width holds a card and the gap beside it. A card's steps do not make it
- * taller: they are its rail (`StepRail`), a pill a step, never more than `RAIL_LANES` lanes whatever the run, and an open card takes as
+ * taller: they are its graph (`StepGraph`), a node a step, never more than `RAIL_LANES` lanes whatever the run, and an open card takes as
  * many cells down as its tiles need (`openSpan`). What makes a card at rest tall is what it asks of a person — a line per ask and per step
  * blocked (`needsOf`, two lines each), a gate's line and its buttons. Of the cards the e2e seeds, the tallest is the gate's in
  * `factory-gate-long-names`, 262; then a card with its cost and an ask, 228; most stand about 190. At 320 the tallest keeps about 60 under

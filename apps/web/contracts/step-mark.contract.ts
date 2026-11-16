@@ -2,7 +2,7 @@
  * How the board draws a step on a run's graph (apps/web, src/lib/stepMark.ts): its mark (`stepMark`), from its state and whether it
  * waits on something now — a run, a run slot, a hold — rather than only its turn (`waitsNow`, the rail's rule before it).
  *
- * The meanings are the rail's (`RunSteps`' `barClass`) moved onto a node: a session or its check at work is alive; a state that waits on
+ * The meanings are the rail's, as its bars drew them, moved onto a node: a session or its check at work is alive; a state that waits on
  * a person is yours; a failure is failure; a step done, by its check or its own word, or a workflow node that filed its card, is done; a
  * step not started is drawn by its four corners where it waits on something now and hollow where it only waits its turn — a held step
  * among them, drawn as not started (the person's rule of 1 Nov); a node its route passed by is off; and the rest (paused, called off,

@@ -808,6 +808,13 @@ export type FeedStreamEventName = (typeof FEED_STREAM_EVENTS)[number];
  */
 export const TOKEN_COOKIE = 'nemia-token';
 
+/**
+ * The name of the header a script sets, which no HTML form sends: a page of another origin cannot set it without the browser asking the
+ * api first (a CORS preflight), and the api answers no such question. The board sends it, `XMLHttpRequest`, on a form of files it writes
+ * by its cookie (a file uploaded for a start), and the api's write guard lets that form pass by it alone.
+ */
+export const SCRIPTED_HEADER = 'x-requested-with';
+
 /** What `POST /api/session` and `DELETE /api/session` did to the board's cookie: set it, or cleared it. */
 export const SESSION_COOKIE_STATES = ['set', 'cleared'] as const;
 

@@ -1,9 +1,9 @@
 /**
- * A person's targets set beside the stories they are for: `shoot.ts --targets <dir>` reads the folder's `target-<story id>[-light|-dark].png`
- * (`targetsOf`; a name with no theme is for both, every other file ignored), pairs each with the story's picture at the head
- * (`matchesOf`, which names the targets whose story no story file holds, with the nearest ids), and composes each pair into one picture
- * (`composeMatch`): the target on the left, the story on the right, scaled to one height, each captioned, on the board's ground, in the
- * Chromium `shoot.ts` already runs.
+ * A person's targets set beside the stories they are for: `shoot.ts --targets <dir>` reads the folder's
+ * `target-<story id>[-light|-dark].png` (`targetsOf`; a name with no theme is for both, every other file ignored), pairs each with
+ * the story's picture at the head (`matchesOf`, which names the targets whose story no story file holds, with the nearest ids), and
+ * composes each pair into one picture (`composeMatch`): the target on the left, the story on the right, scaled to one height, each
+ * captioned, on the board's ground, in the Chromium `shoot.ts` already runs.
  */
 import fs from 'node:fs';
 import type { Browser } from 'playwright';

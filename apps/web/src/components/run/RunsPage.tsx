@@ -165,7 +165,7 @@ export function RunsPage({ at, onLabel }: { at: RunsAt; onLabel: (selector: stri
         <Section name="waiting" head={<CountChip count={counts.waiting} word="Waiting on you" tone="yours" />} foot={<AcrossFactories />}>
           <div data-cards className="grid grid-cols-1 gap-4 @5xl/page:grid-cols-2">
             {open.waiting.map((run) => (
-              <WaitingCard key={run.id} run={run} asOf={asOf} />
+              <WaitingCard key={run.id} run={run} among={among} asOf={asOf} />
             ))}
           </div>
         </Section>

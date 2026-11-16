@@ -338,7 +338,7 @@ export default {
         'the screenshots implement names are listed where the field names them',
       );
       await expectDrawn(
-        gave.locator('[data-artifacts] img[alt="runs-light.png"]'),
+        gave.locator('[data-artifacts] [data-artifact="image"]', { hasText: 'runs-light.png' }).locator('img'),
         'and drawn once, as a thumbnail among the files it named',
       );
       await expectVisible(

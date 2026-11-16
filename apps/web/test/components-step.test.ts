@@ -1283,7 +1283,8 @@ test("a plan's approach is prose, its files a table, its steps a list; the files
   const thumb = /<li data-artifact="image"[\s\S]*?<\/li>/.exec(html)![0];
   assert.match(thumb, /<a [^>]*data-opens-view="runs-light\.png"/, "the file is opened by its path from its step's folder");
   assert.match(thumb, /href="\/\?view=review%2Fruns-light\.png"/, "the address names the step and the file, never the server's path");
-  assert.match(thumb, /<img src="\/api\/runs\/r-1\/steps\/review\/artifacts\/runs-light\.png" alt="runs-light\.png"/);
+  assert.match(thumb, /<img src="\/api\/runs\/r-1\/steps\/review\/artifacts\/runs-light\.png" alt=""/);
+  assert.match(thumb, />runs-light\.png<\/span>/, 'captioned by its path, which names the link: the picture says nothing twice');
 });
 
 test('a questions field is drawn as its questions, read-only, the recommended marked', () => {
@@ -1339,7 +1340,7 @@ test('a try whose statement could not be read says so in its Said, why, and show
   );
 });
 
-test("a closeout's picture is a thumbnail, its name its alt; every other file it serves a chip, with its size where it is no text; a bare path the path; each opening in a new tab where no step is named", () => {
+test("a closeout's picture is a thumbnail captioned by its name, which names its link, its own alt empty; every other file it serves a chip, with its size where it is no text; a bare path the path; each opening in a new tab where no step is named", () => {
   const url = (name: string) => `/api/runs/r-1/steps/shoot/artifacts/${name}`;
   const dir = '/wf/runs/r-1/artifacts/shoot';
   const html = renderToStaticMarkup(
@@ -1355,7 +1356,8 @@ test("a closeout's picture is a thumbnail, its name its alt; every other file it
   const [image, text, other, bare] = html.split('<li ').slice(1);
   assert.match(image, /data-artifact="image"/);
   assert.ok(image.includes(`<a href="${url('shot.png')}" target="_blank" rel="noreferrer"`), image);
-  assert.match(image, /<a [^>]*><img src="\/api\/runs\/r-1\/steps\/shoot\/artifacts\/shot\.png" alt="shot\.png"/);
+  assert.match(image, /<a [^>]*><img src="\/api\/runs\/r-1\/steps\/shoot\/artifacts\/shot\.png" alt=""/);
+  assert.match(image, />shot\.png<\/span><\/a>/, 'the caption inside the link names it');
   assert.ok(text.includes(`<a href="${url('notes.txt')}" target="_blank" rel="noreferrer"`), text);
   assert.doesNotMatch(text, / · /, 'a text file: no size');
   assert.match(other, />trace\.zip<\/span><span[^>]*>· 2\.3 MB<\/span>/);

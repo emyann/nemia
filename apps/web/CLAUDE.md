@@ -101,7 +101,9 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - `node test/e2e/stories/shoot.ts --base main-worktree/HEAD --out <dir>`, from `apps/web`, pictures each story a change touches
   (found by its imports, `storiesTouched`, `e2e/stories/touched.ts`, proved by `contracts/touched-stories.contract.ts`), light and
   dark, at the head (`story-<id>-<theme>.png`), and again at the merge base drawn from a `git archive` on this machine, writing
-  `before-`, `after-` and `diff-` for each story whose pixels differ, and `stories.json`; a changed part no story reaches is refused,
+  `before-`, `after-` and `diff-` for each story whose pixels differ, and `stories.json`. Before it builds, it removes from `--out`
+  what an earlier pass wrote there (each `before-`, `after-`, `diff-`, `story-` and `match-*.png`, and `stories.json`, no other file
+  and no folder), so a step shooting again removes no picture by hand; a changed part no story reaches is refused,
   exit 1, named. `--list` prints the touched ids and bare parts as JSON and launches no browser; `--changed <path>…` names the paths
   instead of git. It builds Storybook twice: a few minutes, about 2.6 GB. `--targets <dir>` sets each `target-<story id>[-light|-dark].png`
   there beside its story at the head, one height, captioned, as `match-<id>-<theme>.png` (`e2e/stories/targets.ts`), listed in

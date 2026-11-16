@@ -1,56 +1,70 @@
 /**
- * The files a start hands its run, as the start's form lists them before it is pressed (`inputsAdded`, src/lib/startInputs.ts): files
- * dropped on the form's drop zone, or picked with its file trigger, are added to the list it holds. A run finds each input by its name
- * (the api copies each into the run's own `inputs/` under it), so the list holds a name once: a file added under a name already listed
- * takes its place, where it stood, the last of the files added under one name winning; every other file listed stays, in its order, and
- * the files added under new names follow, in the order they were added. Nothing is listed that was not listed or added.
+ * The files a start hands its run, as the start's form lists them before it is pressed (`inputAdded`, src/lib/startInputs.ts): each file
+ * dropped on the form's drop zone, or picked with its file trigger, is added to the list it holds, one after another in the order they
+ * came. A run finds each input by its name (the api copies each into the run's own `inputs/` under it), so the list holds a name once: a
+ * file added under a name already listed takes its place, where it stood, and so the last of the files added under one name wins; every
+ * other file listed stays, in its order, and a file under a new name follows them. Nothing is listed that was not listed or added.
+ *
+ * A file is told apart by its name and its size, as the list shows it: the verifier compares no records by identity.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
 /** A file as the list reads it: its own name, which the run finds it by, and its size in bytes. A browser's `File` is one. */
 export type ListedInput = { readonly name: string; readonly size: number };
 
-/** Whether `files` names `name`. */
-const names = (files: readonly ListedInput[], name: string): boolean => files.some((f) => f.name === name);
+/** Whether `a` and `b` are one file as the list reads it: the same name and size. */
+const same = (a: ListedInput, b: ListedInput): boolean => a.name === b.name && a.size === b.size;
 
-/** The last of `files` named `name`, or undefined where none is. */
-const lastNamed = (files: readonly ListedInput[], name: string): ListedInput | undefined =>
-  [...files].reverse().find((f) => f.name === name);
+/** Whether `files` holds `file`. */
+const holds = (files: readonly ListedInput[], file: ListedInput): boolean => files.some((f) => same(f, file));
 
-const inputsAddedSpec = spec<(listed: readonly ListedInput[], added: readonly ListedInput[]) => readonly ListedInput[]>({
-  /** The list the form holds names each file once, as this function leaves it. */
-  requires: ({ input: [listed] }) => listed.every((f, i) => listed.findIndex((g) => g.name === f.name) === i),
+/** The largest size a file is counted to, a safe integer's. */
+const MOST_BYTES = 9_007_199_254_740_991;
+
+/** Whether `file` has a size as a browser's file has: a count of bytes, none below 0, none past a safe integer. */
+const sized = (file: ListedInput): boolean => file.size >= 0 && file.size <= MOST_BYTES;
+
+const inputAddedSpec = spec<(listed: readonly ListedInput[], added: ListedInput) => readonly ListedInput[]>({
+  /** The list the form holds names each file once, as this function leaves it; every file has a size, as a browser's has. */
+  requires: ({ input: [listed, added] }) =>
+    sized(added) && listed.every((f, i) => sized(f) && !listed.slice(0, i).some((g) => g.name === f.name)),
   ensures: {
     aNameIsListedOnce: {
       description: 'The list names each file once: a run finds its inputs by name',
-      condition: ({ output }) => output.every((f, i) => output.findIndex((g) => g.name === f.name) === i),
+      condition: ({ output }) => output.every((f, i) => !output.slice(0, i).some((g) => g.name === f.name)),
     },
-    theLastAddedUnderANameWins: {
-      description: 'Of the files added under one name, the last added is the one listed',
-      condition: ({ input: [, added], output }) => added.every((f) => output.includes(lastNamed(added, f.name) as ListedInput)),
+    aNewNameIsListedLast: {
+      description: 'A file added under a name nothing listed names is listed after them all',
+      condition: ({ input: [listed, added], output }) => {
+        const last = output.at(listed.length);
+        return listed.some((f) => f.name === added.name) || (last !== undefined && same(last, added));
+      },
     },
     aFileListedStaysUnlessReplaced: {
-      description: 'A file listed under a name nothing added names stays listed',
-      condition: ({ input: [listed, added], output }) => listed.every((f) => names(added, f.name) || output.includes(f)),
+      description: 'A file listed under another name than the added one stays listed',
+      condition: ({ input: [listed, added], output }) => listed.every((f) => f.name === added.name || holds(output, f)),
     },
     nothingIsListedThatWasNotGiven: {
-      description: 'Every file listed was listed before or added now',
-      condition: ({ input: [listed, added], output }) => output.every((f) => listed.includes(f) || added.includes(f)),
+      description: 'Every file listed was listed before or is the one added',
+      condition: ({ input: [listed, added], output }) => output.every((f) => holds(listed, f) || same(f, added)),
     },
     aReplacedFileKeepsItsPlace: {
       description: 'A file added under a name already listed stands where the one it replaces stood',
       condition: ({ input: [listed, added], output }) =>
-        listed.every((f, i) => !names(added, f.name) || output[i] === lastNamed(added, f.name)),
+        listed.every((f, i) => {
+          const standing = output.at(i);
+          return f.name !== added.name || (standing !== undefined && same(standing, added));
+        }),
     },
     theListedComeFirst: {
-      description: 'The files listed before keep their order, ahead of the files added under new names',
-      condition: ({ input: [listed], output }) => output.length >= listed.length && listed.every((f, i) => output[i]?.name === f.name),
+      description: 'The files listed before keep their order, ahead of a file added under a new name',
+      condition: ({ input: [listed], output }) => output.length >= listed.length && listed.every((f, i) => output.at(i)?.name === f.name),
     },
   },
 });
 
 /**
- * `inputsAdded`'s type, which src/lib/startInputs.ts takes: written generic over the list's own items (`<T extends ListedInput>`, a
- * browser's `File`) and held to this by `satisfies`, so the form keeps its files' type.
+ * `inputAdded`'s type at `ListedInput`, which src/lib/startInputs.ts's `inputAddedOf` takes: the form's own `inputAdded` is generic over
+ * the list's items (a browser's `File`), so it keeps its files' type, and the verifier reads no generic function.
  */
-export type InputsAdded = Implementation<typeof inputsAddedSpec>;
+export type InputAdded = Implementation<typeof inputAddedSpec>;

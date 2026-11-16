@@ -4,8 +4,12 @@
  * and its sub-resources (`runs`), the inbox's cards (`cards`), and a factory and its parts: the Factory with its rules, instruction,
  * command lines and cost lines (`factories`), its MCP servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its
  * schedules, hires and volumes; and the definitions a namespace serves, its workflows, agents and skills (`workflows`, `agents`, `skills`);
- * and the proposals that change them and the delegations that may approve them (`proposals`, `delegations`). Each is a promise, as TanStack
- * Query's functions take one.
+ * and the proposals that change them and the delegations that may approve them (`proposals`, `delegations`); and the files a start hands
+ * its run (`files`). Each is a promise, as TanStack Query's functions take one.
+ *
+ * A file is the one write sent as a form (`multipart/form-data`), not JSON: the board writes by its cookie, and the api's write guard lets
+ * its form through only with the header a script sets (`SCRIPTED_HEADER`), which no form on another site can send; each is bounded by its
+ * size (`uploadBoundMs`), not the bound of every call.
  *
  * A list the board shows whole is read page by page (`everyPage`): the api answers a page of `LIST_PAGE.byDefault` to a list asked with no
  * `limit`, and `continue` on every page but the last, so each list read here asks pages of `LIST_PAGE.most` and reads on until a page
@@ -93,6 +97,10 @@ import {
   BODY_PAGE,
   TryCloseout,
   type StepTry,
+  FileObject,
+  type RunInput,
+  SCRIPTED_HEADER,
+  uploadBoundMs,
 } from 'objects';
 import { askToken, decoded, ReadRefusal, tokenAskOf, WriteRefusal } from './read.ts';
 
@@ -107,9 +115,12 @@ const NO_PAGE = 'http://board.invalid';
  * site's page cannot send unasked — the Card's verbs that send no body sent `{}`; and every call given up at the bound `objects` gives
  * one (`READ_BOUND_MS`), its `fetch` aborted.
  */
-const client = Effect.runSync(
-  apiClient({ baseUrl: typeof location === 'undefined' ? NO_PAGE : '' }).pipe(Effect.provide(FetchHttpClient.layer)),
-);
+const clientOf = (boundMs?: number) =>
+  Effect.runSync(
+    apiClient({ baseUrl: typeof location === 'undefined' ? NO_PAGE : '', boundMs }).pipe(Effect.provide(FetchHttpClient.layer)),
+  );
+
+const client = clientOf();
 
 type Client = typeof client;
 
@@ -123,8 +134,13 @@ type How<A> = {
   may?: string;
   /** Keys the request is sent with beyond the ones the Api declares: the place a card is started in (`?factory=&repo=`). */
   query?: Record<string, string>;
-  /** Headers the request is sent with beyond the ones the Api declares: the token pasted on the token page, as its bearer. */
+  /**
+   * Headers the request is sent with beyond the ones the Api declares: the token pasted on the token page, as its bearer; the header a
+   * script sets on a file's form.
+   */
   headers?: Record<string, string>;
+  /** The call's bound, in milliseconds, where it is not the bound of every call: a file's upload, by its size. */
+  boundMs?: number;
 };
 
 /** `input`'s path and query: a request of the board's goes to its own api, wherever it is served. */
@@ -171,7 +187,7 @@ export async function call<A>(use: (client: Client) => Effect.Effect<A, unknown>
     return res;
   };
   const exit = await Effect.runPromiseExit(
-    use(client).pipe(Effect.provideService(FetchHttpClient.Fetch, fetchSeen)),
+    use(how.boundMs === undefined ? client : clientOf(how.boundMs)).pipe(Effect.provideService(FetchHttpClient.Fetch, fetchSeen)),
     signal ? { signal } : undefined,
   );
   if (Exit.isSuccess(exit)) return exit.value;
@@ -368,6 +384,54 @@ export const steps = {
   },
   /** What a step was told. */
   told: (runId: string, step: string): Promise<StepTold> => call((c) => c.steps.told({ params: { runId, step } }), read(StepTold)),
+};
+
+/**
+ * The files a start hands its run, as its form lists them (`listed`), with the ids of those an earlier press uploaded (`sent`) and what is
+ * told how many are uploaded as each goes (`onSent`).
+ */
+export type StartFiles = { listed: readonly File[]; sent: Map<File, string>; onSent?: (count: number) => void };
+
+/** The files a start hands its run, each uploaded to its namespace before the start names it by its id. */
+export const files = {
+  /**
+   * `file` uploaded to `namespace`'s files (`POST /api/namespaces/:namespace/files`) as a form of one part, `file`, under its own name,
+   * with the header a script sets, which the write guard asks of a form by the board's cookie; bounded by its size. Its id and size.
+   */
+  upload: (namespace: string, file: File, may: string): Promise<FileObject> => {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return call((c) => c.files.upload({ params: { namespace }, payload: form }), {
+      ...write(FileObject, may),
+      headers: { [SCRIPTED_HEADER]: 'XMLHttpRequest' },
+      boundMs: uploadBoundMs(file.size),
+    });
+  },
+  /**
+   * Each file `listed` uploaded to `namespace`'s files, one after another, in order, and named among a start's inputs by its id, as `nemia
+   * start --input` names each: a file already in `sent`, uploaded by an earlier press of the same form, is named by the id it was answered
+   * and not sent again, and each one uploaded now is set there. `onSent` is told how many are uploaded, after each. Rejects with the
+   * `WriteRefusal` of the first one refused, its words naming the file, and uploads none after it.
+   */
+  uploaded: async (namespace: string, { listed, sent, onSent }: StartFiles): Promise<RunInput[]> => {
+    const inputs: RunInput[] = [];
+    for (const file of listed) {
+      const id =
+        sent.get(file) ??
+        (await files
+          .upload(namespace, file, `${file.name} may be kept: starting again uploads it again.`)
+          .then(
+            (kept) => kept.id,
+            (error: unknown) => {
+              throw error instanceof WriteRefusal ? new WriteRefusal(`${file.name}: ${error.message}`, error.status) : error;
+            },
+          ));
+      sent.set(file, id);
+      inputs.push({ name: file.name, file: id });
+      onSent?.(inputs.length);
+    }
+    return inputs;
+  },
 };
 
 /** What a card's start answers: its new run, and the card's name. */

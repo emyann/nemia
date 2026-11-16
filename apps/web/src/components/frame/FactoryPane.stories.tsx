@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import { DEFAULT_NAMESPACE, type Proposal } from 'objects';
 import { factoriesQuery } from '@/lib/api/factories';
 import { inboxQuery } from '@/lib/api/inbox';
@@ -54,9 +54,9 @@ export const ProposalsWaiting: Story = {
     drawn(args, { waiting: [proposal('nemia-k3p9q', 'waiting'), proposal('nemia-w1d3n', 'waiting', true)], cards: 1, runs: 1 }),
   play: async ({ canvasElement }) => {
     const pane = within(canvasElement);
-    await expect(await pane.findByText('2 wait on you')).toBeVisible();
-    await expect(pane.getByText('1 not started')).toBeVisible();
-    await expect(pane.getByText('1 waiting on you')).toBeVisible();
+    await waitFor(() => expect(pane.getByText('2 wait on you')).toBeVisible());
+    await waitFor(() => expect(pane.getByText('1 not started')).toBeVisible());
+    await waitFor(() => expect(pane.getByText('1 waiting on you')).toBeVisible());
   },
 };
 
@@ -66,9 +66,9 @@ export const NoneWaiting: Story = {
   render: (args) => drawn(args, { waiting: [], cards: 0, runs: 0 }),
   play: async ({ canvasElement }) => {
     const pane = within(canvasElement);
-    await expect(await pane.findByText('none waiting')).toBeVisible();
-    await expect(pane.getByText('every card started')).toBeVisible();
-    await expect(pane.getByText('nothing waits on you')).toBeVisible();
+    await waitFor(() => expect(pane.getByText('none waiting')).toBeVisible());
+    await waitFor(() => expect(pane.getByText('every card started')).toBeVisible());
+    await waitFor(() => expect(pane.getByText('nothing waits on you')).toBeVisible());
   },
 };
 
@@ -77,6 +77,6 @@ export const DefaultFactory: Story = {
   args: { path: `/factories/${DEFAULT_NAMESPACE}`, factory: DEFAULT_NAMESPACE, lit: 'runs' },
   render: (args) => drawn(args, { waiting: [], cards: 0, runs: 0 }),
   play: async ({ canvasElement }) => {
-    await expect(await within(canvasElement).findByText('none waiting')).toBeVisible();
+    await waitFor(() => expect(within(canvasElement).getByText('none waiting')).toBeVisible());
   },
 };

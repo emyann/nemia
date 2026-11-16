@@ -18,7 +18,6 @@ import {
   type ProposedObject,
   type SkillSpec,
   type WorkflowSpec,
-  type WorkflowStep,
 } from 'objects';
 import { tried } from '../runtime-client.ts';
 import { Invalid, type Refusal } from '../refusal/refusal.ts';
@@ -31,7 +30,7 @@ import { AgentName, SkillName } from '../agents/agents.model.ts';
 import type { AgentDraft } from '../agents/agents.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { workflowDirAt, workflowSpecReadme } from '../folder/folder.store.ts';
-import type { StepDraft } from '../workflow/index.ts';
+import { stepDraftOf } from '../propose/index.ts';
 import { definitionRevision } from '../revisions/revisions.store.ts';
 import type { RevisionKind } from '../revisions/revisions.ts';
 import { FactoryDoor, filedFactory } from '../factory/door/factories.store.ts';
@@ -43,19 +42,6 @@ import { treeDir, type ProposalNeeds, type ProposalPlace } from '../propose/curr
 import { AGENTS_FOLDER } from '../step/step.ts';
 import type { Entry } from '../factory/applied/applied.store.ts';
 import { verbOf } from '../propose/propose.verb.ts';
-
-/**
- * A step as the object says it, as the Workflow door takes it: its keys, `output` as the file it names, and its body.
- * @param step The step as the Workflow object says it.
- */
-export const stepDraftOf = (step: WorkflowStep): StepDraft => {
-  const draft: Record<string, unknown> = { after: [] };
-  for (const [key, value] of Object.entries(step.keys)) {
-    if (value === null || value === undefined) continue;
-    draft[key] = key === 'output' ? { file: value } : value;
-  }
-  return { ...draft, name: step.name, body: step.body } as StepDraft;
-};
 
 /** An Agent's spec as the Agent door's draft. */
 const agentDraftOf = (name: string, spec: AgentSpec): AgentDraft => ({

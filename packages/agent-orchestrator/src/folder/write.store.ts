@@ -122,7 +122,7 @@ export function writeWorkflowAt(
   if (twice) refuse(twiceRefusal(twice.name));
   const { agents, skills } = found;
   refuse(codexModeRefusal(steps, agents));
-  const texts = steps.map((step) => [step.name, hiredLineOut(step.name, renderStep(ownLine(step, agents)), fills)] as const);
+  const texts = stepFilesOf(steps, agents, fills);
   const there = (file: string): string | undefined => {
     try {
       return fs.readFileSync(path.resolve(at, file), 'utf8');
@@ -217,11 +217,6 @@ function codexModeRefusal(steps: readonly StepDraft[], agents: Agents): string |
   return undefined;
 }
 
-/**
- * Draft `step` as its own file holds it: one that names its agent `agent:` by name and sends a `disallowedTools` list — the board sends
- * the resolved one, its agent's denies with the step's own — without the rules that agent's file denies, which the step's line adds to
- * (`deniesWith`), so a save never pins its agent's line into the step again. Any other draft as it is.
- */
 /** The harness a draft runs on: its own `harness`, else its agent's by its file, else none said. */
 function harnessOfDraft(step: StepDraft, agents: Agents): string | undefined {
   if (step.harness != null) return String(step.harness);
@@ -229,11 +224,33 @@ function harnessOfDraft(step: StepDraft, agents: Agents): string | undefined {
   return agent === undefined || agent instanceof WorkflowError ? undefined : agent.keys.harness;
 }
 
+/**
+ * Draft `step` as its own file holds it: one that names its agent `agent:` by name and sends a `disallowedTools` list — the board sends
+ * the resolved one, its agent's denies with the step's own — without the rules that agent's file denies, which the step's line adds to
+ * (`deniesWith`), so a save never pins its agent's line into the step again. Any other draft as it is.
+ */
 function ownLine(step: StepDraft, agents: Agents): StepDraft {
   const agent = typeof step.agent === 'string' ? agents.get(step.agent) : undefined;
   if (!step.disallowedTools || agent === undefined || agent instanceof WorkflowError) return step;
   const denies = agentDeniesOf(agent);
   return { ...step, disallowedTools: step.disallowedTools.filter((rule) => !denies.includes(rule)) };
+}
+
+/**
+ * Each step of a draft as the file a write of it writes, by the step's name: rendered (`renderStep`) with its own denies alone
+ * (`ownLine`), and without the `agent:` line of the agent its factory hires into it (`hiredLineOut`). One rendering for the write
+ * (`writeWorkflowAt`) and for the folder a proposal's apply would leave (`workflowStepsWritten`, `current.verb.ts`). Refused,
+ * `WorkflowError`, as `renderStep` refuses a step. Writes nothing.
+ * @param steps The steps the folder is to hold, as drafted.
+ * @param agents The agents a step may name, found where a run of the folder would look.
+ * @param fills What a factory gives the workflow's steps, or undefined where none gives any.
+ */
+export function stepFilesOf(
+  steps: readonly StepDraft[],
+  agents: Agents,
+  fills: Fills | undefined,
+): (readonly [name: string, text: string])[] {
+  return steps.map((step) => [step.name, hiredLineOut(step.name, renderStep(ownLine(step, agents)), fills)] as const);
 }
 
 /** What `removeWorkflow` did: the folder removed, and the files it held, by their path in it, sorted. */

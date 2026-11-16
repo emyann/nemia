@@ -30,6 +30,21 @@ const RUN = 'pr-run';
 const TASK = 't-pr-design';
 const STEP = '---\nplace: folder\nbudget: 5\n---\nPlan the change.\n';
 
+/**
+ * The workflow `fenced` and the agents it runs, by file (an agent's under the tree's `workflows/agents/`): `design` names `writer`,
+ * whose own denies its step adds one to, and `review` is filled by the factory's hire of `reader`, its own deny beside the agent's. Served,
+ * each step carries its agent's denies with its own and `review` its hired agent, which neither step's file writes.
+ */
+const FENCED: Readonly<Record<string, string>> = {
+  'workflows/agents/writer.md':
+    '---\nrole: Writer\ndescription: Writes the change.\nclaude:\n  fence:\n    permissionMode: auto\n    disallowedTools: Bash(git push:*), Bash(gh:*)\n---\nWrite it.\n',
+  'workflows/agents/reader.md':
+    '---\nrole: Reader\ndescription: Reads the change.\nclaude:\n  fence:\n    disallowedTools: Bash(git push:*), Bash(git commit:*)\n---\nRead it.\n',
+  'README.md': '# fenced\n\nWrite, then read.\n',
+  'design.md': '---\nplace: folder\nagent: writer\nbudget: 5\nclaude:\n  fence:\n    disallowedTools: Bash(rm:*)\n---\nDesign it.\n',
+  'review.md': '---\nafter: design\nplace: folder\nbudget: 3\nclaude:\n  fence:\n    disallowedTools: Bash(curl:*)\n---\nReview it.\n',
+};
+
 /** The factory `pmill`, made from a template: its tree one workflow `dev` with a step `plan`, attached. */
 const TREE = (() => {
   const repo = path.join(root, 'pr-repo');
@@ -42,9 +57,14 @@ const TREE = (() => {
   );
   const tree = path.join(factories, FACTORY, 'tree');
   fs.mkdirSync(path.join(tree, 'workflows', 'dev'), { recursive: true });
-  fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hires: {} }));
+  fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev', 'fenced'], hires: { 'fenced/review': 'reader' } }));
   fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'README.md'), '# dev\n\nPlan.\n');
   fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'plan.md'), STEP);
+  const fenced = path.join(tree, 'workflows', 'fenced');
+  const agents = path.join(tree, 'workflows', 'agents');
+  fs.mkdirSync(fenced, { recursive: true });
+  fs.mkdirSync(agents, { recursive: true });
+  for (const [file, text] of Object.entries(FENCED)) fs.writeFileSync(path.join(file.includes('/') ? tree : fenced, file), text);
   return tree;
 })();
 
@@ -115,6 +135,24 @@ async function devChanged(body: string): Promise<ProposedObject> {
   };
 }
 
+/** A step of a Workflow as the namespace serves it: its name, the keys it sets, and its note. */
+type ServedStep = { name: string; keys: Record<string, unknown>; body: string };
+
+/**
+ * The `fenced` workflow as the namespace serves it (`nemia get workflow fenced -o json`), each step changed by `change`, at the version
+ * it was read.
+ */
+async function fencedChanged(change: (step: ServedStep) => ServedStep): Promise<ProposedObject> {
+  const res = await app().request(`${ns}/workflows/fenced`);
+  assert.equal(res.status, 200, 'the workflow reads');
+  const now = (await res.json()) as { metadata: { resourceVersion?: string }; spec: { steps: ServedStep[] } };
+  return {
+    kind: 'Workflow',
+    metadata: { name: 'fenced', resourceVersion: now.metadata.resourceVersion },
+    spec: { ...now.spec, steps: now.spec.steps.map(change) },
+  };
+}
+
 const planText = () => fs.readFileSync(path.join(TREE, 'workflows', 'dev', 'plan.md'), 'utf8');
 
 test('REFUSED: a forged bearer, and an Authorization that is no bearer, are 401 on any route, before it answers', async () => {
@@ -179,6 +217,36 @@ test('a proposal filed by a live session names its agent, run and step; the pers
     const declined = await ask(`${ns}/proposals/${mine.metadata.name}/decline`, 'POST', {});
     assert.equal(declined.status, 200);
     assert.equal(((await declined.json()) as Proposal).status.phase, 'declined');
+  });
+});
+
+test("a Workflow proposed as the namespace serves it reports the access of its fence keys alone, its agents' denies and hire never read as a change", async (t) => {
+  const accessOf = async (change: (step: ServedStep) => ServedStep) => {
+    const res = await ask(`${ns}/proposals`, 'POST', { objects: [await fencedChanged(change)] });
+    assert.equal(res.status, 201);
+    const proposal = (await res.json()) as Proposal;
+    return { access: proposal.status.changes.map((c) => c.access), widens: proposal.status.widens };
+  };
+  await t.test('as served, unchanged: same', async () => {
+    const served = (await (await app().request(`${ns}/workflows/fenced`)).json()) as { spec: { steps: ServedStep[] } };
+    const keys = Object.fromEntries(served.spec.steps.map((s) => [s.name, s.keys]));
+    assert.deepEqual(
+      keys.design?.disallowedTools,
+      ['Bash(rm:*)', 'Bash(git push:*)', 'Bash(gh:*)'],
+      "the served design step carries its agent's denies after its own, which its file does not write",
+    );
+    assert.equal(keys.review?.agent, 'reader', 'the served review step carries the agent hired into it, which its file does not write');
+    assert.deepEqual(await accessOf((s) => s), { access: ['same'], widens: false });
+  });
+  await t.test("a step's body changed: same", async () => {
+    assert.deepEqual(await accessOf((s) => (s.name === 'review' ? { ...s, body: 'Review it twice.\n' } : s)), {
+      access: ['same'],
+      widens: false,
+    });
+  });
+  await t.test("a step's allow added: widens", async () => {
+    const added = (s: ServedStep) => (s.name === 'design' ? { ...s, keys: { ...s.keys, allowedTools: ['Bash(npm test)'] } } : s);
+    assert.deepEqual(await accessOf(added), { access: ['widens'], widens: true });
   });
 });
 

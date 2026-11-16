@@ -22,10 +22,13 @@ import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { workflowDirAt } from '../folder/folder.store.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
-import { workflowSpecOf } from './workflow-spec.ts';
+import { stepDraftOf, workflowSpecOf } from './workflow-spec.ts';
 import { agentSpecOf } from './agent-spec.ts';
 import { skillSpecOf } from './skill-spec.ts';
 import { textIn } from '../folder/folder.ts';
+import { stepFilesOf } from '../folder/write.store.ts';
+import { WorkflowError } from '../step/step.ts';
+import type { WorkflowStep } from 'objects';
 import { FactoryDoor, filedAtOnce, treeChecked } from '../factory/door/factories.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory/factory.model.ts';
 import { factoryObject } from '../factory/object/factory.verb.ts';
@@ -91,6 +94,36 @@ function workflowSpecAt(dir: string): unknown {
     });
   return workflowSpecOf(texts);
 }
+
+/**
+ * The steps of the Workflow `name` of the factory's tree as its folder would read them once `steps` are written over it, in the shape
+ * `currentOf` reads a folder in (`workflowSpecOf`): each step as the file its write would write (`stepFilesOf`), against the agents the
+ * write finds in the places it is judged in (`factoryWriteOf`), its agent's denies and the agent its factory hires into it left to them.
+ * So a Workflow sent as the api serves it, its steps resolved, reads as the folder it would leave. Undefined where a step does not render,
+ * which the apply refuses in its own words.
+ * @param place Where the factory's tree is.
+ * @param factory The factory's name.
+ * @param name The Workflow's name.
+ * @param steps The steps proposed, as the Workflow object says them.
+ */
+export const workflowStepsWritten = (place: ProposalPlace, factory: string, name: string, steps: readonly WorkflowStep[]) =>
+  Effect.gen(function* () {
+    const dir = yield* tried(() => workflowDirAt(path.join(treeDir(place.home, factory, 'workflows'), name)));
+    const { places, fills } = yield* tried(() => factoryWriteOf(place.home, factory, name));
+    const agents = yield* (yield* AgentDoor).agents.found({ dir, places });
+    const files = renderedOrNone(() => stepFilesOf(steps.map(stepDraftOf), agents, fills));
+    return files === undefined ? undefined : workflowSpecOf(files.map(([step, text]) => ({ name: `${step}.md`, text }))).steps;
+  });
+
+/** What `render` answers, or undefined where it refuses a step (`WorkflowError`); anything else it throws, thrown. */
+const renderedOrNone = <A>(render: () => A): A | undefined => {
+  try {
+    return render();
+  } catch (err) {
+    if (err instanceof WorkflowError) return undefined;
+    throw err;
+  }
+};
 
 /**
  * The Workflow `name` of the factory's tree, now: its version read in the places its write is judged in (`factoryWriteOf`), the factory's

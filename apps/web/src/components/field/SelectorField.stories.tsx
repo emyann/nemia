@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { SelectorField } from './SelectorField';
 
 /** The label filter of Inbox and Runs: empty, holding a selector, and refusing one in the api's words. */
-const meta: Meta = { title: 'Board/SelectorField' };
+const meta: Meta = { title: 'Run/SelectorField' };
 export default meta;
 
 const BOX = { maxWidth: 560, padding: 24 };

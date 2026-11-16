@@ -4,10 +4,16 @@
     "typeAware": true
   },
   // The code that is not ours, as .gitattributes marks it: the design system kit the shadcn CLI writes into the board from the `@ds`
-  // registry and its skills beside it (another project's, vendored unchanged), and the route tree TanStack Router's plugin writes.
+  // registry and its skills beside it (another project's, vendored unchanged), the route tree TanStack Router's plugin writes, and the
+  // worker `npx msw init` writes for the board's Storybook.
   // Nothing here shapes them, so no rule reads them. tools/guards/test/comments.test.ts holds this list to .gitattributes: a file of
   // code marked there that no glob here skips is refused, and so is a glob that skips a file of ours.
-  "ignorePatterns": ["apps/web/src/components/ui/ds/**", "apps/web/.claude/**", "apps/web/src/routeTree.gen.ts"],
+  "ignorePatterns": [
+    "apps/web/src/components/ui/ds/**",
+    "apps/web/.claude/**",
+    "apps/web/src/routeTree.gen.ts",
+    "apps/web/.storybook/public/**"
+  ],
   "jsPlugins": [
     { "name": "comments", "specifier": "./lint/comments.ts" },
     { "name": "sonarjs", "specifier": "eslint-plugin-sonarjs" }

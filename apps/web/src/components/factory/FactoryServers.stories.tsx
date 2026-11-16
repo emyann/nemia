@@ -9,7 +9,7 @@ import { SignInView } from './ServerSignIn';
  * state is what no node test can judge — `needs-auth` is the one that waits on a person, and a state that could not be read is a note
  * in rest and not a caution — so each is drawn here.
  */
-const meta: Meta = { title: 'Board/FactoryServers' };
+const meta: Meta = { title: 'Factory/FactoryServers' };
 export default meta;
 
 /** A row of a factory's list, in the state `state`, with whatever else that state comes with. */

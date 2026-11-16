@@ -15,6 +15,7 @@ import {
 } from 'react-aria-components';
 import { ChevronRightIcon } from 'lucide-react';
 
+import { focusRing } from '@/components/ui/ds/utils';
 import { cn } from '@/lib/utils';
 
 /**
@@ -122,7 +123,8 @@ function TraceCollapsibleTrigger({
       {...props}
       data-slot="trace-collapsible-trigger"
       className={cn(
-        'group/trace-collapsible-trigger flex w-full max-w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-sm pr-2 text-left outline-none hover:bg-on-surface/8 focus-visible:ring-3 focus-visible:ring-ring/50',
+        focusRing(),
+        'group/trace-collapsible-trigger flex w-full max-w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-sm pr-2 text-left hover:bg-on-surface/8',
         className,
       )}
     >

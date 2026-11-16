@@ -5,7 +5,8 @@ import { tv, type VariantProps } from "../utils";
  * modal date input, the full-screen date and range pickers and the time
  * picker render their shell from: `DatePicker`, `DateRangePicker` and
  * `TimePicker`. Fork it and every picker's dialog changes together; see the
- * README, "Retheming — the three layers", for what a style module may do.
+ * kit's docs, "Retheming — the three layers", for what a style module may do:
+ * https://github.com/french-tech-homies/design-system/blob/main/docs/theming.md
  *
  * Spec: https://m3.material.io/components/date-pickers/specs and
  * https://m3.material.io/components/time-pickers/specs (token db 38.2.9):

@@ -259,6 +259,17 @@ export function Tooltip({
 
 export type TooltipTriggerProps = AriaTooltipTriggerProps;
 
+/**
+ * React Aria's `TooltipTrigger` at Material's timing: wraps a trigger (a
+ * button, or a `Focusable` child) and its `Tooltip`, and shows the tooltip
+ * 300 ms after the pointer rests on the trigger, or at once when the
+ * keyboard focuses it, and puts it away 1.5 seconds after the pointer
+ * leaves, as Material's guidelines ask. `delay` and `closeDelay` still
+ * take other values; everything else is React Aria's (`isOpen`,
+ * `onOpenChange`, `trigger="focus"`, `isDisabled`).
+ *
+ * Spec: https://m3.material.io/components/tooltips/{overview,specs,guidelines,accessibility}
+ */
 export function TooltipTrigger(props: TooltipTriggerProps) {
   const {
     children,

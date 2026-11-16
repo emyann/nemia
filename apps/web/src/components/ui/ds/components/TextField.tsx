@@ -24,6 +24,8 @@ export type TextFieldProps = Omit<AriaTextFieldProps, "className"> &
     /** Helper text under the field; replaced by `errorMessage` when invalid. */
     supportingText?: ReactNode;
     errorMessage?: string | ((validation: ValidationResult) => string);
+    /** The error icon's accessible name. Default `"Error"`. */
+    errorLabel?: string;
     leadingIcon?: IconProp;
     trailingIcon?: IconProp;
     /** Only shown while the label is floated, like MD3. */
@@ -49,6 +51,9 @@ export type TextFieldProps = Omit<AriaTextFieldProps, "className"> &
  * — measurements, colour per state and the CSS-only floating label live with
  * the shared container styles in `./field-styles.ts` (also used by
  * `NumberField`, `PhoneField`, `Select` and `ComboBox`).
+ *
+ * Strings: `errorLabel` names the error icon, "Error" by default; React Aria
+ * translates the rest. `NumberField`, `PhoneField` and `ComboBox` take it too.
  *
  * Deliberate deviations:
  * - `multiline` is the growing "multi-line" field, from a 96dp floor, where
@@ -79,6 +84,7 @@ export function TextField(props: TextFieldProps) {
     label,
     supportingText,
     errorMessage,
+    errorLabel = "Error",
     leadingIcon,
     trailingIcon,
     placeholder,
@@ -184,7 +190,7 @@ export function TextField(props: TextFieldProps) {
           <span
             data-slot="trailing-icon"
             role="img"
-            aria-label="Error"
+            aria-label={errorLabel}
             className={s.trailingIcon()}
           >
             <ErrorIcon size={24} />

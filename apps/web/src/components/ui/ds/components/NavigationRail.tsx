@@ -146,7 +146,8 @@ export type NavigationRailProps = Omit<
  * A destination's `badge` is the kit's `Badge`, read after its name. It sits
  * on the icon; on an expanded rail, where the label follows the icon, a large
  * badge goes to the trailing edge of the pill instead, as Material's badge
- * guidelines ask, and the small dot stays on the icon.
+ * guidelines ask, and the small dot stays on the icon. Its `badgeColor`
+ * draws it in another role than Material's `error` (`Badge`'s `color`).
  *
  * Deviations, the two `BottomNavigation` documents: no filled active icon
  * unless the item carries an `activeIcon` (the kit ships no icon library to
@@ -256,7 +257,7 @@ function Destination({
         <span className={s.iconBox()}>
           <Icon size={24} className={s.icon()} />
           {item.badge !== undefined && !isTrailingBadge ? (
-            <Badge value={item.badge} anchored />
+            <Badge value={item.badge} color={item.badgeColor} anchored />
           ) : null}
         </span>
         {isExpanded ? (
@@ -265,7 +266,11 @@ function Destination({
           </Label>
         ) : null}
         {isTrailingBadge ? (
-          <Badge value={item.badge} className="ms-auto" />
+          <Badge
+            value={item.badge}
+            color={item.badgeColor}
+            className="ms-auto"
+          />
         ) : null}
       </>
     );

@@ -40,6 +40,16 @@ const itemStyles = tv({
   base: [focusRing(), "group/grid-list-item"],
 });
 
+/**
+ * One row of a `GridList`: React Aria's `GridListItem`, which gives the row
+ * its focus, its selection, its action and its drag. It draws the kit's
+ * focus ring and nothing else; put the row's look inside it (a `ListItem`,
+ * or a `Card`, whose state layer follows the row's hover, focus, press and
+ * drag). When its children are a string, that string is the row's
+ * `textValue` for type-ahead; otherwise give `textValue` yourself.
+ *
+ * Spec: https://m3.material.io/components/lists/{overview,specs,guidelines,accessibility}
+ */
 export function GridListItem(props: GridListItemProps) {
   const { children, className, ...gridListItemProps } = props;
 

@@ -247,6 +247,23 @@ export type CardContentProps = {
   };
 };
 
+/**
+ * The inside of a `Card` as Material's anatomy draws it: optional media,
+ * the headline (`headline-medium`, `on-surface`), the supporting text
+ * (`body-medium`, `on-surface-variant`) and the actions, end-aligned under
+ * them. Each part is drawn only when given. Media is an element of your own,
+ * or a src that `renderImage` turns into one (a plain `<img>` by default; a
+ * `mediaAlt` of `""` marks it decorative) cropped to `mediaAspectRatio`.
+ * With media, the card's padding moves off the card and onto the text, so
+ * the media runs to the card's edges. It renders a fragment, so it goes
+ * directly inside `Card`. Its parts and their `data-slot`s are listed on
+ * `Card`.
+ *
+ * Material's subhead and dividers are not parts here: compose them as
+ * children of the card instead (the gaps, on `Card`).
+ *
+ * Spec: https://m3.material.io/components/cards/{overview,specs,guidelines,accessibility}
+ */
 export function CardContent({
   headline,
   supportingText,

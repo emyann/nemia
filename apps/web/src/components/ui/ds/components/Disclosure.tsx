@@ -87,6 +87,18 @@ export type DisclosureGroupProps = AriaDisclosureGroupProps & {
   children: ReactNode;
 };
 
+/**
+ * The accordion: React Aria's `DisclosureGroup` around `Disclosure`s. It
+ * takes the group's expanded keys (`expandedKeys`, `defaultExpandedKeys`,
+ * `onExpandedChange`), `allowsMultipleExpanded` (off by default, so opening
+ * one section closes the one that was open) and `isDisabled`, and a
+ * `variant` that every `Disclosure` inside reads unless it says its own:
+ * `plain` rows separated by `outline-variant` hairlines, or `outlined`
+ * boxes 8dp apart.
+ *
+ * Material 3 does not describe this component; `Disclosure` says what it is
+ * built from instead.
+ */
 export function DisclosureGroup({
   variant = "plain",
   className,
@@ -271,6 +283,17 @@ export type DisclosurePanelProps = AriaDisclosurePanelProps & {
   contentClassName?: string;
 };
 
+/**
+ * The content of a `Disclosure`, shown while it is expanded: React Aria's
+ * `DisclosurePanel`, labelled by the section's trigger. It pads its content
+ * 16dp at the sides and sets it in `body-medium`, `on-surface-variant`;
+ * `isUnstyled` drops that for content that brings its own, and
+ * `contentClassName` styles the box inside either way. Its height animates
+ * open and closed only where the reader allows motion.
+ *
+ * Material 3 does not describe this component; `Disclosure` says what it is
+ * built from instead.
+ */
 export function DisclosurePanel({
   isUnstyled = false,
   className,

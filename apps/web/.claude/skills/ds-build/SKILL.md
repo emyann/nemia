@@ -50,8 +50,9 @@ The kit holds what Material 3's specification describes, and a named group
 of components of its own: each of those says "Material 3 does not describe
 this component." in its doc comment and cites, beside it, the Material page
 of each thing it borrows. A React Aria component that Material 3 does not
-describe joins that group when a project needs it, asked of the kit and
-built there from Material's foundations and the nearest Material component.
+describe joins that group when one of the screens the kit measures itself
+on needs it, or when a project asks the kit for it: it is built there, from
+Material's foundations and the nearest Material component.
 Until then, and for anything neither Material nor React Aria describes, a
 component the kit does not have is the project's: it is written beside the
 kit, not inside it, on `react-aria-components`, following the rules below.
@@ -218,28 +219,31 @@ npx shadcn add @ds/button    # one component and what it needs
 `@ds/ds` writes nothing into the project's CSS, and no `add` writes a colour
 there or touches `DESIGN.md` or `theme/`.
 
-**Updating is not the same command.** Over an existing install, a plain `add`
-asks about the first kit file that differs, defaulting to No, even under
-`-y`; with no one to answer it writes nothing, or waits for ever. First ask
-the kit which of its files the project changed, since the update replaces
-them:
+**Updating is three commands**, from a clean working tree, with each adapter
+or preset the project added by name written after `@ds/ds` on all three
+(`@ds/ds` alone leaves it at the old release):
 
 ```bash
-node <kit>/changed.mjs
+npx shadcn add @ds/ds --dry-run          # what the release would change, file by file; writes nothing
+npx shadcn add @ds/ds --diff <path>      # the change itself, in one file the dry run marked ~ overwrite
+npx shadcn add @ds/ds --overwrite -y     # take it
 ```
 
-It lists them and writes nothing (exit 0: none; 1: the files listed, changed
-or missing; 2: it cannot tell, as for a kit installed before 0.3.0). Its
-last line is the update command for what the project holds: an adapter or a
-preset the project added by name is named in it, since `@ds/ds` alone leaves
-it at the old release. Then update from a clean working tree with that
-command, which for a project with no adapter and no preset is
+then read `git diff`. A plain `add` over an existing install is not an
+update: it asks about each kit file that differs, defaulting to No, even
+under `-y`, and with no one to answer it writes nothing, or waits for ever.
+`--diff` with no path shows the first five files, not the changed ones:
+name the file.
 
-```bash
-npx shadcn add @ds/ds --overwrite -y
-```
+**A project that edits kit files** runs `node <kit>/changed.mjs` before the
+dry run. The dry run marks a file the project edited `~ overwrite` exactly as
+a file the kit changed, and the overwrite removes the edit; the check
+compares with the release the project installed and names its edits alone,
+to put back from `git diff` (exit 0: none; 1: the files listed, changed or
+missing; 2: it cannot tell, as for a kit installed before 0.3.0). Its last
+line is the update command for what the project holds.
 
-then read `git diff`, put back the project's edits, and regenerate the
-project's theme where it has one. The steps are in the `ds-theme` skill, "Taking a kit
-update": steps 1 to 3 for every project, steps 4 and 5 (regenerate, lint)
-only when the project generated a theme of its own.
+The steps are in the `ds-theme` skill, "Taking a kit update": steps 1 to 4
+for every project,
+steps 5 and 6 (regenerate, lint) only when the project generated a theme of
+its own.

@@ -113,6 +113,18 @@ export type RadioGroupProps = Omit<
   className?: string;
 };
 
+/**
+ * The one choice among `Radio`s: React Aria's `RadioGroup`, which makes the
+ * set one tab stop whose arrow keys move the selection. It draws the group's
+ * `label` (`title-small`) and, after the options, the `supportingText`
+ * (`body-small`, `on-surface-variant`), which the `errorMessage` replaces
+ * while the group is invalid. `orientation` is `vertical` by default, the
+ * options 12dp apart; `horizontal` wraps them in a row, for the rare compact
+ * case Material's guidelines allow and caution against. Disabling the group
+ * disables every option and fades the label to 38 %.
+ *
+ * Spec: https://m3.material.io/components/radio-button/{overview,specs,guidelines,accessibility}
+ */
 export function RadioGroup({
   label,
   supportingText,

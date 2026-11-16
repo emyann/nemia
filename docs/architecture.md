@@ -390,7 +390,10 @@ route the api answers (`/api`, `/openapi`) needs one, on every store, loopback i
 listens on this machine's loopback unless `NEMIA_BIND` names another address, which it takes on a store marked exposed alone (`bindOf`,
 `apps/api/src/port.ts`); TLS stays outside it. It serves the board's built pages beside `/api` on one origin (`apps/api/src/board/`),
 which need no token: the board's page asks for one where a read is refused for it, and the api keeps the pasted token as this browser's
-HttpOnly cookie (`POST /api/session`, `TOKEN_COOKIE`), read after a bearer and let past the write guard's host but not its site.
+HttpOnly cookie (`POST /api/session`, `TOKEN_COOKIE`), read after a bearer and let past the write guard's host but not its site. A
+form of files by that cookie (a file the board uploads for a start) passes the guard only with the header a script sets
+(`SCRIPTED_HEADER`, `X-Requested-With`), which no form sends and a page of another origin cannot set without a CORS preflight: the api
+answers none, and `apps/api/test/no-cors.test.ts` holds that it never does, since the rule rests on it.
 
 **What a harness can do is the runtime's**: each harness declares it once (`HarnessDeclaration`, agent-runtime's
 `src/harness/declaration.ts`), and every check above that used to name a harness reads the declaration — the orchestrator through

@@ -95,7 +95,9 @@ export function inputsOf(files: readonly string[]): InputFile[] {
   const inputs = files.map((file): InputFile => {
     const at = fs.statSync(file, { throwIfNoEntry: false });
     if (!at?.isFile())
-      throw new Refused(`nemia start cannot read --input ${path.resolve(file)}: it is ${at ? 'no file' : 'not there'}. Name a file that is there.`);
+      throw new Refused(
+        `nemia start cannot read --input ${path.resolve(file)}: it is ${at ? 'no file' : 'not there'}. Name a file that is there.`,
+      );
     return { file, name: path.basename(file), size: at.size };
   });
   const past = inputs.filter((input) => input.size > Number(FILE_LIMIT));

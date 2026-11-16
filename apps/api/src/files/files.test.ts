@@ -103,7 +103,11 @@ test('three pictures of 3 MB in all, each uploaded, start a card whose run holds
   assert.equal(res.status, 201, await res.clone().text());
   const { id } = (await res.json()) as { id: string };
   const run = runsAtOnce(root).runs.read(id);
-  assert.deepEqual(run.inputs, pictures.map((p) => p.name), 'the run names each file by the name it was uploaded with');
+  assert.deepEqual(
+    run.inputs,
+    pictures.map((p) => p.name),
+    'the run names each file by the name it was uploaded with',
+  );
   for (const { name, bytes } of pictures)
     assert.ok(fs.readFileSync(path.join(root, 'runs', id, 'inputs', name)).equals(bytes), `${name} is in the run's inputs byte for byte`);
 });

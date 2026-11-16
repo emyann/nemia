@@ -114,7 +114,10 @@ test('nemia start of an inbox card with three pictures of 3 MB in all uploads ea
   const said = await store.nemia(['start', 'pictured-card', ...pictures.flatMap((p) => ['--input', p.file])]);
   assert.equal(said.code, 0, said.err);
   const id = idIn(said);
-  assert.deepEqual(recordOf(store.root, id).inputs, pictures.map((p) => p.name));
+  assert.deepEqual(
+    recordOf(store.root, id).inputs,
+    pictures.map((p) => p.name),
+  );
   for (const { name, bytes } of pictures)
     assert.ok(fs.readFileSync(path.join(store.root, 'runs', id, 'inputs', name)).equals(bytes), `${name} byte for byte`);
 });

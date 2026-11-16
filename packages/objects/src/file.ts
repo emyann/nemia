@@ -29,7 +29,7 @@ export const FileObject = Schema.Struct({
   name: Schema.String.annotate({
     description: "The file's own name, as the form's part named it, no folder in it: what a run's steps find it by.",
   }),
-  mediaType: Schema.String.annotate({ description: 'Its media type, as the form\'s part said it (application/octet-stream where none).' }),
+  mediaType: Schema.String.annotate({ description: "Its media type, as the form's part said it (application/octet-stream where none)." }),
   size: Schema.Int.annotate({ description: 'Its size in bytes, as the api kept it.' }),
   createdAt: Schema.String.annotate({
     description: 'When it was uploaded, as an ISO 8601 time: a day later it is let go of, whether a run took it or not.',

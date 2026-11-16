@@ -102,7 +102,10 @@ test('REFUSED by the write guard until mapped: every bodiless write carries `{}`
 
 test("a file's upload, the one write sent as a form, carries the form's parts as multipart/form-data, never `{}` in its place", async () => {
   assert.ok(endpointKeysOf(Api, 'files.upload').form);
-  answer = { status: 201, body: { id: 'file_0', name: 'shot.png', mediaType: 'image/png', size: 3, createdAt: '2026-11-16T00:00:00.000Z' } };
+  answer = {
+    status: 201,
+    body: { id: 'file_0', name: 'shot.png', mediaType: 'image/png', size: 3, createdAt: '2026-11-16T00:00:00.000Z' },
+  };
   sent.length = 0;
   const form = new FormData();
   form.append('file', new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }), 'shot.png');

@@ -82,8 +82,7 @@ test('a file last written a day ago is let go of by the next upload, a younger o
   const dayAgo = new Date(NOW - FILE_KEPT_FOR);
   for (const name of [old.id, `${old.id}.json`]) fs.utimesSync(path.join(filesDir(home, 'acme'), name), dayAgo, dayAgo);
   const hourShort = new Date(NOW - FILE_KEPT_FOR + 60 * 60 * 1000);
-  for (const name of [young.id, `${young.id}.json`])
-    fs.utimesSync(path.join(filesDir(home, 'default'), name), hourShort, hourShort);
+  for (const name of [young.id, `${young.id}.json`]) fs.utimesSync(path.join(filesDir(home, 'default'), name), hourShort, hourShort);
   assert.deepEqual(filesPruned(home, NOW).sort(), [`acme/${old.id}`, `acme/${old.id}.json`].sort());
   assert.equal(fileAt(home, 'acme', old.id), undefined);
   assert.ok(fileAt(home, 'default', young.id));

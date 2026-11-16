@@ -80,7 +80,9 @@ const uploaded = (namespace: string, parts: Stream.Stream<Multipart.Part, Multip
     const begun = yield* answeredWriteIn(namespace, async (s) => ({ home: s.home, at: fileBegun(s.home, namespace, now) }));
     if (begun.at === undefined)
       return yield* Effect.fail(
-        new Invalid({ error: `${ROUTE} keeps files for a factory, and \`${namespace}\` names none: upload it to a namespace nemia factory ls lists, or to default.` }),
+        new Invalid({
+          error: `${ROUTE} keeps files for a factory, and \`${namespace}\` names none: upload it to a namespace nemia factory ls lists, or to default.`,
+        }),
       );
     const { id } = begun.at;
     const exit = yield* Effect.exit(written(parts, begun.at));

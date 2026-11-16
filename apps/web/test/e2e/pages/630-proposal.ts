@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Locator, Page } from 'playwright';
+import type { Locator, Page, Request } from 'playwright';
 import { herChat, openChat, photograph, placeLitOf, placeOf, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { QUEUE_POLL_MS } from '../../../src/lib/api/inbox.ts';
 import { WAITING_SELECTOR } from '../../../src/lib/api/proposals.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -23,10 +24,10 @@ const goto = async (page: Page, to: string): Promise<void> => {
   await idle(page);
 };
 
-/** The address of each request the page makes while `work` runs, its path and its query. */
-async function heardDuring(page: Page, work: () => Promise<void>): Promise<URL[]> {
-  const heard: URL[] = [];
-  const hear = (request: { url: () => string }) => heard.push(new URL(request.url()));
+/** Each request the page makes while `work` runs. */
+async function heardDuring(page: Page, work: () => Promise<void>): Promise<Request[]> {
+  const heard: Request[] = [];
+  const hear = (request: Request) => heard.push(request);
   page.on('request', hear);
   try {
     await work();
@@ -36,28 +37,71 @@ async function heardDuring(page: Page, work: () => Promise<void>): Promise<URL[]
   return heard;
 }
 
+/** The path of a request's address. */
+const pathOf = (request: Request): string => new URL(request.url()).pathname;
+
 /**
- * The floor of FACTORY, loaded whole, asks the inbox's cards once, and the pane's Proposals line asks the proposals that wait
- * (`WAITING_SELECTOR`) and never the whole list: the floor's readers of the cards share one read, and only the proposals page reads every
- * proposal whole.
+ * The reads of `asked` the page made as it mounted, by the browser's own clock: each sent before `QUEUE_POLL_MS` had passed since the
+ * first was answered. The floor's queue mounts after the route's loader has its answer, so its first poll is sent no sooner than that: a
+ * poll is never counted, however long the page took to load and settle, and a second read as it mounts always is.
+ * @param asked The requests of one read, as the page sent them.
  */
-async function floorReads(page: Page): Promise<void> {
+function mountReads(asked: readonly Request[]): Request[] {
+  const timed = asked.filter((r) => r.timing().startTime > 0).sort((a, b) => a.timing().startTime - b.timing().startTime);
+  const first = timed[0];
+  if (first === undefined) return [];
+  const answered = first.timing().startTime + first.timing().responseEnd;
+  return timed.filter((r) => r.timing().startTime < answered + QUEUE_POLL_MS);
+}
+
+/** The proposal `name` of FACTORY written again as one already applied, under `applied`: a proposal that waits no more beside it. */
+function appliedBeside(name: string, applied: string): void {
+  const dir = path.join(store!, 'factories', FACTORY, 'proposals');
+  const proposal = JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8')) as {
+    metadata: { name: string };
+    status: Record<string, unknown>;
+  };
+  proposal.metadata.name = applied;
+  proposal.status = { ...proposal.status, phase: 'applied', approvedBy: { by: 'person', at: '2026-11-15T10:00:00.000Z' } };
+  fs.writeFileSync(path.join(dir, `${applied}.json`), `${JSON.stringify(proposal, null, 2)}\n`);
+}
+
+/**
+ * The floor of FACTORY, loaded whole beside an applied proposal written next to the one that waits (`appliedBeside`), asks the inbox's
+ * cards once as it mounts (`mountReads`), and the pane's Proposals line asks the proposals that wait (`WAITING_SELECTOR`), never the whole
+ * list, and counts the one: the floor's readers of the cards share one read, and only the proposals page reads every proposal whole.
+ * The applied proposal is taken back.
+ * @param page The page.
+ * @param name The proposal that waits.
+ */
+async function floorReads(page: Page, name: string): Promise<void> {
   const proposals = `/api/namespaces/${FACTORY}/proposals`;
-  const heard = await heardDuring(page, async () => {
-    await goto(page, `/factories/${FACTORY}`);
-    await expectVisible(placeOf(page, 'Proposals').getByText('1 wait on you'), "the floor's pane counts the proposal that waits");
-  });
-  const cards = heard.filter((url) => url.pathname === '/api/cards');
-  if (cards.length !== 1)
-    throw new Refused(`the floor asks the inbox's cards once — it asked ${cards.length} times: ${cards.map((u) => u.search).join(', ')}`);
-  const asked = heard.filter((url) => url.pathname === proposals);
-  if (!asked.some((url) => url.searchParams.get('fieldSelector') === WAITING_SELECTOR))
-    throw new Refused(`the pane asks ${proposals} for the proposals that wait (${WAITING_SELECTOR}) — it asked none`);
-  const whole = asked.filter((url) => url.searchParams.get('fieldSelector') !== WAITING_SELECTOR);
-  if (whole.length > 0)
-    throw new Refused(
-      `the floor never asks the whole list of proposals — it asked ${whole.map((u) => `${u.pathname}${u.search}`).join(', ')}`,
-    );
+  const applied = `${name}-applied`;
+  appliedBeside(name, applied);
+  try {
+    const heard = await heardDuring(page, async () => {
+      await goto(page, `/factories/${FACTORY}`);
+      await expectVisible(
+        placeOf(page, 'Proposals').getByText('1 wait on you'),
+        "the floor's pane counts the proposal that waits, and not the one applied beside it",
+      );
+    });
+    const cards = mountReads(heard.filter((r) => pathOf(r) === '/api/cards'));
+    if (cards.length !== 1)
+      throw new Refused(
+        `the floor asks the inbox's cards once as it mounts — it asked ${cards.length} times: ${cards.map((r) => r.url()).join(', ')}`,
+      );
+    const asked = heard.filter((r) => pathOf(r) === proposals).map((r) => new URL(r.url()));
+    if (!asked.some((url) => url.searchParams.get('fieldSelector') === WAITING_SELECTOR))
+      throw new Refused(`the pane asks ${proposals} for the proposals that wait (${WAITING_SELECTOR}) — it asked none`);
+    const whole = asked.filter((url) => url.searchParams.get('fieldSelector') !== WAITING_SELECTOR);
+    if (whole.length > 0)
+      throw new Refused(
+        `the floor never asks the whole list of proposals — it asked ${whole.map((u) => `${u.pathname}${u.search}`).join(', ')}`,
+      );
+  } finally {
+    fs.rmSync(path.join(store!, 'factories', FACTORY, 'proposals', `${applied}.json`), { force: true });
+  }
 }
 
 /** A POST to the api from the page, as the board makes one: no session token, so the person's. Its status and answer. */
@@ -144,7 +188,7 @@ async function proposalsLit(page: Page, where: string): Promise<void> {
  * draws no proposal and no template, and asks the cards once and no whole list of proposals (`floorReads`).
  */
 async function listedWaiting(page: Page, name: string): Promise<void> {
-  await floorReads(page);
+  await floorReads(page, name);
   await expectCount(page.locator('[data-factory-proposals], [data-factory-proposal]'), 0, 'the floor lists no proposal');
   await expectCount(page.locator('[data-template]'), 0, 'nor any template');
   await goto(page, `/factories/${FACTORY}/proposals`);

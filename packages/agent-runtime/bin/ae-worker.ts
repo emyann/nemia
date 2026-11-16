@@ -76,7 +76,9 @@
  * write), it names it in the run's `.launched`, as the spawn named this one, and exits, writing nothing on the run file: from then on
  * there is one worker, in its scope. Where the scope's program exits before any worker published a pid (`systemd-run` refusing, a user
  * manager gone since the probe passed), it runs the session itself, bare, as a worker with no scope does, and writes why (`unscoped`)
- * with no folder: a session with no limit never needed a scope to run.
+ * with no folder: a session with no limit never needed a scope to run. That refusal is read off the run file as it was handed, word
+ * for word: a run file that says no pid says it of the next run as well, spawned again under the name once the scope's worker ran
+ * this one to its end unseen, and a file that changed or went is no run of this worker's to start.
  *
  * argv: <runFile> [--scope-by <scope argv> --]  — JSON: { cmd, args, cwd, logFile, env?, streams?, stopFile?, start?, input?,
  * inputAt?, stopGraceMs?, beatMs?, terminationMessagePath?, memoryLimit?, scoped? }
@@ -95,7 +97,9 @@ const runFile = ((given: string | undefined): string => {
   process.stderr.write('ae-worker: give the run file to work from, as `node bin/ae-worker.ts <runFile>`\n');
   process.exit(2);
 })(process.argv[2]);
-const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
+/** The run file as the spawn wrote it and this worker read it: one that still reads so has had no worker publish on it. */
+const handed = fs.readFileSync(runFile, 'utf8');
+const plan = JSON.parse(handed) as {
   cmd: string;
   args: string[];
   cwd: string;
@@ -120,19 +124,40 @@ const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
 const scopeBy = process.argv[3] === '--scope-by' ? process.argv.slice(4) : undefined;
 /** How often a worker handed `--scope-by` reads the run file for the pid of the worker it started. */
 const SCOPED_POLL_MS = 20;
-/** The pid the run file says its worker published: 0 before any did, or where it cannot be read yet. */
-const publishedPid = (): number => {
+/** The run file as it reads now: `undefined` once it is gone. */
+const runFileNow = (): string | undefined => {
   try {
-    const pid: unknown = (JSON.parse(fs.readFileSync(runFile, 'utf8')) as { pid?: unknown }).pid;
+    return fs.readFileSync(runFile, 'utf8');
+  } catch {
+    return undefined;
+  }
+};
+/** The pid `text`, a run file, says its worker published: 0 before any did, or where it cannot be read. */
+const publishedPid = (text: string): number => {
+  try {
+    const pid: unknown = (JSON.parse(text) as { pid?: unknown }).pid;
     return typeof pid === 'number' && Number.isInteger(pid) ? pid : 0;
   } catch {
     return 0;
   }
 };
 /**
- * Starts the session's worker behind `scope`, and answers whether it runs: `true` once it published its pid, which is then named in the
- * run's `.launched` in this process's place (its pid, start and boot, as `harness/detached/launched.ts` reads them); `false` where the
- * process started exited before any pid was published, the scope refused.
+ * Names the worker `pid` in the run's `.launched` in this process's place: its pid, start and boot, as `harness/detached/launched.ts`
+ * reads them.
+ */
+const nameLaunched = (pid: number) => {
+  const start = processStart(pid);
+  const boot = monoNow()?.boot;
+  fs.writeFileSync(
+    runFile.replace(/\.json$/, '.launched'),
+    JSON.stringify({ pid, ...(start ? { start } : {}), ...(boot ? { boot } : {}) }),
+  );
+};
+/**
+ * Starts the session's worker behind `scope`, and answers whether this worker is to run nothing: `true` once the run file no longer
+ * reads as it was handed (`handed`), and a pid published there is then named in the run's `.launched` (`nameLaunched`); `false` where
+ * the process started exited and the run file still reads as handed, the scope refused. A file that changed with no pid on it is the
+ * run spawned again under the name, and one gone, the run taken away: neither is this worker's to run.
  */
 const startedIn = async (scope: readonly string[]): Promise<boolean> => {
   const [program, ...args] = scope;
@@ -147,14 +172,10 @@ const startedIn = async (scope: readonly string[]): Promise<boolean> => {
   inner.unref();
   for (;;) {
     const was = exited;
-    const pid = publishedPid();
-    if (pid > 0) {
-      const start = processStart(pid);
-      const boot = monoNow()?.boot;
-      fs.writeFileSync(
-        runFile.replace(/\.json$/, '.launched'),
-        JSON.stringify({ pid, ...(start ? { start } : {}), ...(boot ? { boot } : {}) }),
-      );
+    const now = runFileNow();
+    if (now !== handed) {
+      const pid = now === undefined ? 0 : publishedPid(now);
+      if (pid > 0) nameLaunched(pid);
       return true;
     }
     if (was) return false;

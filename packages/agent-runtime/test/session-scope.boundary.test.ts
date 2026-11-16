@@ -7,7 +7,9 @@
  *
  * Skipped, with the probe's words, on a host that cannot make a scope (`scopeRefusal`). The rows of a host whose probe passed and whose
  * later `systemd-run` fails stand a program in for it (`scopeProgram`), so they run anywhere: the session runs bare, as it would with no
- * scope, and its run file says why.
+ * scope, and its run file says why. A stand-in that runs the worker as `systemd-run --scope` does, held at will, proves that the worker
+ * started bare, which saw nothing of its scope's worker run its job to its end, runs nothing once the job is spawned again under its
+ * name: it would otherwise run the first job again, on the second's streams and run file.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -257,3 +259,91 @@ test('an unlimited session whose scope cannot be made runs bare, as with no scop
     assert.equal(run(root)?.cgroup, undefined, 'and records no scope');
   });
 });
+
+/**
+ * A scope's program stood in (`scopeProgram`) that makes a scope as `systemd-run --scope` does, running the worker in its own place
+ * (`exec`), but holds it while `hold` is there, having written `<hold>.asked` to say it was asked: what answers the probe a scope's
+ * `memory.max` of 256Mi runs anywhere.
+ */
+const heldScope = (hold: string) => {
+  const program = path.join(scratch('ae-scope-program-'), 'scope.sh');
+  fs.writeFileSync(
+    program,
+    [
+      '#!/bin/sh',
+      'while [ "$1" != "--" ]; do shift; done; shift',
+      'if [ "$1" = sh ] && [ "$2" = -c ]; then echo 268435456; exit 0; fi',
+      `: > '${hold}.asked'`,
+      `while [ -e '${hold}' ]; do sleep 0.02; done`,
+      'exec "$@"',
+      '',
+    ].join('\n'),
+    { mode: 0o755 },
+  );
+  return program;
+};
+
+/** The state `/proc` says the process `pid` is in (`T` stopped, `Z` exited and unreaped), or `undefined` once it is gone. */
+const stateOf = (pid: number) => {
+  try {
+    return fs.readFileSync(`/proc/${pid}/stat`, 'utf8').replace(/^.*\) /s, '')[0];
+  } catch {
+    return undefined;
+  }
+};
+
+test(
+  'a worker that started its run behind a scope and saw nothing of it, the run spawned again under its name meanwhile, runs nothing',
+  WAITED,
+  async (t) => {
+    const root = scratch('ae-scope-');
+    const cwd = scratch('ae-scope-cwd-');
+    const hold = path.join(scratch('ae-scope-hold-'), 'hold');
+    const ops = detachedOps(commandHarness, root, { ...QUICK, scopeProgram: heldScope(hold) });
+    const name = 'ae/again/1';
+    const output = (stream: 'stdout' | 'stderr') => Effect.runPromise(ops.output!(name, stream));
+    const working = () => runFileOf(root, 'again')?.pid;
+    fs.writeFileSync(hold, '');
+    await Effect.runPromise(ops.spawn({ name, brief: 'x', cwd, config: { command: ['sh', '-c', 'printf "aé"; echo old >&2'] } }));
+    const handing = runFileOf(root, 'again', 'launched')?.pid ?? 0;
+    assert.ok(handing > 0, 'the spawn names the worker it started bare, which starts the run behind the scope');
+    bounded(t, handing);
+    await until(t, () => fs.existsSync(`${hold}.asked`), 'the worker started bare asked the scope for the run', { everyMs: 20 });
+    process.kill(handing, 'SIGSTOP');
+    t.after(() => {
+      try {
+        process.kill(handing, 'SIGCONT');
+      } catch {}
+    });
+    await until(t, () => stateOf(handing) === 'T', 'the worker handing the run to its scope is stopped', { everyMs: 20 });
+    fs.rmSync(hold);
+    await until(
+      t,
+      () => (runFileOf(root, 'again') as { state?: string } | undefined)?.state === 'done',
+      'the first run done in its scope',
+      {
+        everyMs: 20,
+      },
+    );
+    assert.deepEqual([await output('stdout'), await output('stderr')], ['aé', 'old\n']);
+
+    fs.writeFileSync(hold, '');
+    await Effect.runPromise(ops.spawn({ name, brief: 'x', cwd, config: { command: ['true'] } }));
+    assert.equal(working(), 0, 'the run spawned again has no worker of its own yet: its scope holds it');
+    process.kill(handing, 'SIGCONT');
+    await until(t, () => [undefined, 'Z'].includes(stateOf(handing)), 'the worker that handed the first run on has exited', {
+      everyMs: 20,
+    });
+    assert.deepEqual(
+      [await output('stdout'), await output('stderr'), working()],
+      [undefined, undefined, 0],
+      'it ran nothing: the first run is not run again on the streams and the run file of the second',
+    );
+
+    fs.rmSync(hold);
+    await until(t, async () => (await Effect.runPromise(ops.observe)).get(name)?.state === 'completed', 'the second run completed', {
+      everyMs: 50,
+    });
+    assert.deepEqual([await output('stdout'), await output('stderr')], ['', '']);
+  },
+);

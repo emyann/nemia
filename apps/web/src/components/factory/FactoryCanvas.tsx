@@ -150,7 +150,7 @@ const minimapFill = ({ data: { run, finished } }: RunFlowNode) =>
 
 /**
  * The runs of `factory` that are not finished, given as its light answer `open` (`openRunsQuery`), a card each, on a floor a person can
- * arrange, each with its steps as a small flowchart on it (`StepRail`). A run started `--after` runs is drawn with an edge from each of
+ * arrange, each with its steps as its workflow's graph on it (`StepGraph`). A run started `--after` runs is drawn with an edge from each of
  * their cards into its own (`afterEdges`), and a finished run of the factory a run in flight waits on is read by id and on the floor for
  * it (`parentsWanted`, `floorRuns`); cards joined so are laid out layered, parents left of children. A finished run nobody decided waits
  * on a person and is on the floor too, read by its outcome (`undecidedRunsQuery`). Show finished adds the newest page of the factory's

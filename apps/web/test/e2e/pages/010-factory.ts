@@ -80,7 +80,7 @@ async function tookOnTheCard(page: Page): Promise<void> {
     `and its time at work, its sessions and checks side by side counted once (${COSTLY.took}): it waits on you`,
   );
   await expectUncut(costly.locator('time, [data-cost], [data-tokens]'), 'the clock, the cost and the tokens are read whole');
-  await expectUncut(costly.locator('ul[aria-label="Steps"] [data-step] span'), "each step's name on the rail is read whole");
+  await expectUncut(costly.locator('[data-now-word]'), 'the step it is on is read whole on its chip, over the graph that names none');
   await photographCard(page, costly, path.join(OUT, `factory-card-took-${await themeOf(page)}.png`));
 }
 
@@ -252,13 +252,13 @@ export default {
       'and does not wait on you: the side it waits on may still land',
     );
     await expectVisible(
-      cardOf(page, bottom.id).locator('ul[aria-label="Steps"] [data-step][data-state="waiting"]'),
-      "the bottom card's rail draws its step waiting",
+      cardOf(page, bottom.id).locator('[data-run-steps] [data-step][data-state="waiting"]'),
+      "the bottom card's graph draws its step waiting",
     );
     await expectInside(
-      cardOf(page, bottom.id).locator('ul[aria-label="Steps"] [data-step]'),
+      cardOf(page, bottom.id).locator('[data-run-steps] [data-step]'),
       cardOf(page, bottom.id),
-      'and the rail stays inside the card',
+      'and the graph stays inside the card',
     );
     await expectCount(cardOf(page, running.id).locator('[data-waiting]'), 0, `${running.id} waits on no run`);
     await expectVisible(
@@ -357,8 +357,10 @@ export default {
     await expectVisible(ending.getByRole('button', { name: 'Send back…', exact: true }), 'and Send back…');
     await expectVisible(ending.getByText('to decide', { exact: true }), 'and is marked to decide');
     await expectVisible(
-      ending.locator(`[data-step="${ENDING.ending}"][data-state="awaiting-approval"][title^="${ENDING.ending}: waits on you — "]`),
-      `and its rail shows ${ENDING.ending} as awaiting approval`,
+      ending.locator(
+        `[data-step="${ENDING.ending}"][data-state="awaiting-approval"][data-mark="yours"] [data-step-bar][aria-label="${ENDING.ending}, waits on you"]`,
+      ),
+      `and its graph shows ${ENDING.ending} as awaiting approval, a node that waits on you, said so by its button`,
     );
     await expectCount(
       ending.locator(`[data-need="approve"][data-step="${ENDING.ending}"]`),
@@ -429,9 +431,9 @@ export default {
     await expectLeftOf(cardOf(page, cancelled.id), cardOf(page, orphan.id), `${cancelled.id} is left of ${orphan.id}, which waits on it`);
     await expectVisible(
       page.locator(
-        `.react-flow__node[data-id="${LOOPING.id}"] [data-step="${LOOPING.exhausted}"][data-state="exhausted"][title*=": waits on you — "][title$="${LOOPING.notes.review}"]`,
+        `.react-flow__node[data-id="${LOOPING.id}"] [data-step="${LOOPING.exhausted}"][data-state="exhausted"][data-mark="yours"] [data-step-bar][aria-label="${LOOPING.exhausted}, waits on you"]`,
       ),
-      `the loop's rail shows ${LOOPING.exhausted} out of rounds as a pill that waits on a person, its note after what that means on hover (${LOOPING.id})`,
+      `the loop's graph shows ${LOOPING.exhausted} out of rounds as a node that waits on a person, said so by its button (${LOOPING.id})`,
     );
     await expectVisible(card, `the fake run's card, once finished runs are shown (${FAKE.id})`);
     await expectVisible(
@@ -452,7 +454,7 @@ export default {
     await expectVisible(gated.getByRole('button', { name: 'Approve', exact: true }), 'and answers it on the card');
     await expectVisible(
       gated.locator(`[data-step="${GATED.gated}"][data-state="awaiting-approval"][data-live]`),
-      'and its rail shows the step as awaiting approval, a pill that waits on a person, ringed as the step the run is at',
+      'and its graph shows the step as awaiting approval, a node that waits on a person, the step the run is at',
     );
     await expectVisible(gated.getByText('waiting on you', { exact: true }), 'and waits on you');
     await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);
@@ -462,19 +464,21 @@ export default {
     );
     await expectVisible(card.locator(`a[href="/runs/${FAKE.id}"]`), "the card's title links to the run's page");
     await expectVisible(
-      pill(FAKE.refused).and(page.locator('[data-state="failed-check"][title*=": failed its check — "]')),
-      `the card's rail shows ${FAKE.refused}'s refused check as a red pill, failed its check on hover`,
+      pill(FAKE.refused)
+        .and(page.locator('[data-state="failed-check"][data-mark="failure"]'))
+        .locator(`[data-step-bar][aria-label="${FAKE.refused}, failed its check"]`),
+      `the card's graph shows ${FAKE.refused}'s refused check as a red node, its button saying failed its check`,
     );
-    await expectCount(pills, FAKE.steps.length, `a pill per step on the card at rest (${FAKE.steps.join(', ')})`);
+    await expectCount(pills, FAKE.steps.length, `a node per step on the card at rest (${FAKE.steps.join(', ')})`);
     await expectCount(
-      card.locator('ul[aria-label="Steps"]').locator('..').locator('[data-arrow]'),
+      card.locator('[data-run-steps]').locator('..').locator('[data-arrow]'),
       FAKE.edges,
-      "an arrow between the pills for each `after` between the run's steps",
+      "a line between the nodes for each `after` between the run's steps",
     );
     await expectCount(tiles, 0, 'and no tile: the card is closed');
     const railArrow = (edge: string) =>
       beside
-        .locator('ul[aria-label="Steps"]')
+        .locator('[data-run-steps]')
         .locator('..')
         .locator(`[data-arrow="step:${edge.replace('->', '->step:')}"]`);
     const railMoving = railArrow(NEIGHBOUR.running);
@@ -483,8 +487,12 @@ export default {
       1,
       `the arrow ${NEIGHBOUR.running} on ${NEIGHBOUR.id}'s rail runs: draft's session is at work`,
     );
-    await expectCount(railMoving.locator('animateMotion'), 1, `a dot travels ${NEIGHBOUR.running} on the card at rest`);
-    await expectCount(railArrow(NEIGHBOUR.still).locator('animateMotion'), 0, `and none travels ${NEIGHBOUR.still}, which waits`);
+    await expectCount(
+      beside.locator('[data-run-steps] [data-step][data-state="working"] [data-step-pulse]'),
+      1,
+      `the step at work pulses on the card at rest, the one mark of the graph that moves`,
+    );
+    await expectCount(beside.locator('[data-run-steps] animateMotion'), 0, `and no dot travels the graph's lines`);
 
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
@@ -556,7 +564,7 @@ export default {
 
     await page.getByRole('button', { name: 'Collapse all' }).click();
     await expectCount(tiles, 0, 'Collapse all folds the tiles away');
-    await expectCount(pills, FAKE.steps.length, 'and leaves the rail');
+    await expectCount(pills, FAKE.steps.length, 'and leaves the graph');
     await card.getByRole('button', { name: 'Show steps' }).click();
     await expectCount(tiles, FAKE.steps.length, "the card's chevron opens it again");
 
@@ -659,8 +667,8 @@ export default {
     await expectCount(page.locator('.react-flow__edge animateMotion'), 0, 'nor any edge between cards');
     await expectCount(
       page.locator('[data-arrow] animateMotion'),
-      await page.locator('[data-arrow][data-state="running"]').count(),
-      'on the whole floor, a dot travels each running arrow and no other',
+      await page.locator(`section[aria-label="The run's steps"] [data-arrow][data-state="running"]`).count(),
+      "on the whole floor, a dot travels each running arrow between an open card's tiles and no other: a graph at rest says it by its pulse",
     );
     await expectCount(
       page.locator('.react-flow__panel[aria-label="Legend"] animateMotion'),
@@ -677,11 +685,11 @@ export default {
     const looping = cardOf(page, LOOPING.id);
     const back = `[data-arrow="loop:step:${LOOPING.exhausted}->step:${LOOPING.target}"]`;
     await expectCount(
-      looping.locator('ul[aria-label="Steps"]').locator('..').locator(back),
+      looping.locator('[data-run-steps]').locator('..').locator(back),
       1,
       `${LOOPING.id}'s rail draws the arrow back from ${LOOPING.exhausted} into ${LOOPING.target}`,
     );
-    await expectCount(looping.locator('[data-round]'), 0, "and says no round on the card at rest: the pill's hover does");
+    await expectCount(looping.locator('[data-round]'), 0, "and says no round on the card at rest: the node's card does");
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
     await looping.getByRole('button', { name: 'Show steps' }).click();

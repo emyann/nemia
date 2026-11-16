@@ -7,10 +7,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 const meta: Meta = { title: 'Look/ScrollBars' };
 export default meta;
 
-/** A box shorter than what it holds, at the head of a page twice the window's height. */
+/** A box shorter than what it holds, at the head of a page twice the height of the checks' window (800). */
 function Scroller() {
   return (
-    <div style={{ minHeight: '200svh' }}>
+    <div style={{ minHeight: 1600 }}>
       <div data-scroller style={{ width: 260, height: 160, overflow: 'auto', background: 'var(--card)' }}>
         <div style={{ height: 640, padding: 16 }}>A box shorter than what it holds.</div>
       </div>

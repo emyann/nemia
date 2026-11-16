@@ -8,7 +8,7 @@ import { saysReading, Unread } from '../../../.storybook/unread';
 const LISTING: WorkflowListing = {
   name: 'build',
   from: 'repo',
-  dir: '/code/app/workflows/build',
+  dir: '/code/app/flow',
   description: 'Build a card.',
   readme: null,
   steps: [],

@@ -29,9 +29,8 @@ export function Reading({ label, at = 'late', className, children }: ReadingProp
 }
 
 /**
- * Lines of text still being read, one kit `Skeleton` a line, each as wide as its entry of `widths` (a width class, `w-2/3`).
- * @param widths The width class of each line, in order.
- * @param className The layout of the lines, a column by default.
+ * Lines of text still being read, one kit `Skeleton` a line, each as wide as its entry of `widths` (a width class, `w-2/3`), laid out by
+ * `className`, a column by default: its type role sets the lines' height.
  */
 export function ReadingLines({ widths, className }: { widths: readonly string[]; className?: string }) {
   return (

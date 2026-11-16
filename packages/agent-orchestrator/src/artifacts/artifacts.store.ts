@@ -3,8 +3,8 @@
  * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`; `filesLacked`, off the disk alone, as the
  * step signs off; `filesHanded`, those that are there for the step after), and what that directory holds (`artifactFiles`), the
  * step's closeout written there for the steps after it (`handCloseout`, `holdsCloseout`), and the pictures an ending's check took of the
- * merged tree, removed once it has landed (`dropLandedPictures`); and one file of that directory or of a step's folder, read by its name
- * and never by a path (`artifactFile`, `fileIn`).
+ * merged tree, removed once it has landed (`dropLandedPictures`); and one file of that directory or of a step's folder, read by its path
+ * under it and never through a link (`artifactFile`, `fileUnder`).
  *
  * Beneath the controllers, beside `record.store.ts` and `worktree.store.ts`: it imports neither the engine nor a controller, and
  * `runner.ts` re-exports `artifactFiles` and `missingArtifacts`. The closeout itself is read off the engine's record, so `closeoutOf` is
@@ -17,7 +17,7 @@ import type { StepSpec } from '../step/step.ts';
 import { inside } from '../workspace/workspace.ts';
 import { artifactPlace, HANDED_CLOSEOUT, sizeOf, type ArtifactFile, type HandedFiles, type MissingArtifact } from './artifacts.ts';
 import { isRepositoryRun, type LackedFile, type Run } from '../record/record.ts';
-import { artifactsDir, lstatOf } from '../record/record.store.ts';
+import { artifactsDir, lstatOf, statUnder } from '../record/record.store.ts';
 import { presentOn } from '../branches/changes.store.ts';
 import type { Place } from '../place/place.store.ts';
 
@@ -416,38 +416,34 @@ function landedPicturesNote(
 }
 
 /**
- * Whether `name` names a file directly in a folder: a name with a separator of either kind, `..` or a NUL is a path, and names none.
- * @param name The name asked for.
- */
-export const isFileName = (name: string): boolean => Boolean(name) && !/[/\\\0]/.test(name) && !name.includes('..');
-
-/**
- * The bytes of the regular file `name` directly in `dir`, or null where there is none: a name that is a path (`isFileName`), a file not
- * there, a folder, or a link, which is opened without being followed, so what is read is what was looked at.
+ * The bytes of the regular file at `rel` under `dir` (`statUnder`), or null where there is none: opened without following a link, and
+ * read only where what was opened is the file looked at, so a folder on the way swapped for a link after the look reads nothing.
  * @param dir The folder.
- * @param name The file's name in it.
+ * @param rel The file's path under it.
  */
-export function fileIn(dir: string, name: string): Buffer | null {
-  if (!isFileName(name)) return null;
+export function fileUnder(dir: string, rel: string): Buffer | null {
+  const looked = statUnder(dir, rel);
+  if (!looked) return null;
   let fd: number;
   try {
-    fd = fs.openSync(path.join(dir, name), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    fd = fs.openSync(path.join(dir, rel), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
   } catch {
     return null;
   }
   try {
-    return fs.fstatSync(fd).isFile() ? fs.readFileSync(fd) : null;
+    const opened = fs.fstatSync(fd);
+    return opened.isFile() && opened.ino === looked.ino && opened.dev === looked.dev ? fs.readFileSync(fd) : null;
   } finally {
     fs.closeSync(fd);
   }
 }
 
 /**
- * The file `name` of the files directory of `step` in `run` (`artifactsDir`), read as `fileIn` reads it.
+ * The file at `rel` under the files directory of `step` in `run` (`artifactsDir`), read as `fileUnder` reads it.
  * @param home The store's root.
  * @param run The run, by its id.
  * @param step The step's name.
- * @param name The file's name in its files directory.
+ * @param rel The file's path under its files directory.
  */
-export const artifactFile = (home: string, run: Pick<Run, 'id'>, step: string, name: string): Buffer | null =>
-  fileIn(artifactsDir(home, run, step), name);
+export const artifactFile = (home: string, run: Pick<Run, 'id'>, step: string, rel: string): Buffer | null =>
+  fileUnder(artifactsDir(home, run, step), rel);

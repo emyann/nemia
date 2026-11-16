@@ -706,7 +706,7 @@ const PINNED: Record<string, string[]> = {
     'statsRun',
     'taskPhasesRead',
     'tickRun',
-    'refusedName',
+    'refusedPath',
     'runObject',
     'runIn',
     'runList',

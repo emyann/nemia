@@ -1,12 +1,10 @@
 import { useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Badge } from '@/components/ui/badge';
+import { Button, Checkbox, Tag } from '@/components/ui/ds';
 import { concludedQuery } from '../../lib/api/runs.ts';
 import type { RunView } from '../../lib/api/judged.ts';
 import { standingOf, titleOf } from '../../lib/factory';
 import { usePickerRuns } from '../../lib/pickerRuns.ts';
-import { BUTTON_SECONDARY, BUTTON_SMALL } from '../../lib/classes';
-import { cn } from '../../lib/utils';
 import { Markdown } from '../markdown/Markdown';
 import { Reading, ReadingLines } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
@@ -59,23 +57,23 @@ export function ContextPicker({
         <ul aria-label="Runs to read" className="max-h-44 divide-y divide-outline-variant overflow-y-auto rounded border border-outline">
           {listed.map((run) => (
             <li key={run.id} data-run={run.id}>
-              <label className="flex cursor-pointer items-baseline gap-2 px-2 py-1 text-body-medium hover:bg-accent">
-                <input
-                  type="checkbox"
-                  value={run.id}
-                  disabled={disabled}
-                  checked={selected.includes(run.id)}
-                  onChange={(event) => onChange(event.target.checked ? [...selected, run.id] : selected.filter((id) => id !== run.id))}
-                  className="translate-y-0.5 self-start"
-                />
-                <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={run.title}>
-                  {run.title}
+              <Checkbox
+                value={run.id}
+                isDisabled={disabled}
+                isSelected={selected.includes(run.id)}
+                onChange={(checked) => onChange(checked ? [...selected, run.id] : selected.filter((id) => id !== run.id))}
+                className="flex w-full cursor-pointer px-2 hover:bg-accent"
+              >
+                <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                  <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={run.title}>
+                    {run.title}
+                  </span>
+                  <span className="hidden shrink-0 font-mono text-body-small text-muted-foreground @md/page:inline">{run.id}</span>
+                  <span data-standing className="shrink-0 text-body-small text-muted-foreground" title={run.advice}>
+                    {run.standing}
+                  </span>
                 </span>
-                <span className="hidden shrink-0 font-mono text-body-small text-muted-foreground @md/page:inline">{run.id}</span>
-                <span data-standing className="shrink-0 text-body-small text-muted-foreground" title={run.advice}>
-                  {run.standing}
-                </span>
-              </label>
+              </Checkbox>
             </li>
           ))}
         </ul>
@@ -101,9 +99,9 @@ export function ConcludedPreview({ run }: { run: string }) {
           What <span className="font-mono">{run}</span> hands
         </span>
         {concluded.data && !concluded.data.landed && (
-          <Badge variant="outline" data-not-landed className="border-dashed border-outline text-on-surface-variant">
+          <Tag variant="outlined" data-not-landed className="border-dashed">
             not landed, not judged
-          </Badge>
+          </Tag>
         )}
       </h4>
       {concluded.error ? (
@@ -130,8 +128,8 @@ const listedOf = (run: RunView): Listed => ({ id: run.id, title: titleOf(run), s
 /** Show older, under a picker's list: asks for the next, older page of the finished runs (`usePickerRuns`'s `older`). */
 export function ShowOlder({ onPress }: { onPress: () => void }) {
   return (
-    <button type="button" data-picker-older onClick={onPress} className={cn(BUTTON_SMALL, BUTTON_SECONDARY)}>
+    <Button variant="tonal" size="xsmall" data-picker-older onPress={onPress}>
       Show older
-    </button>
+    </Button>
   );
 }

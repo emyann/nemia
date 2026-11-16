@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { readGone } from '../../lib/api/gone.ts';
 import { finishedPagesQuery, openRunsQuery } from '../../lib/api/runs.ts';
@@ -14,6 +14,7 @@ import { CopyButton } from '../command/CopyButton';
 import { StatusChip } from '../step/StatusChip';
 import { runsMoved } from '@/lib/runWrites';
 import { Reading, ReadingLines } from '@/components/look';
+import { Button, TextField } from '@/components/ui/ds';
 
 const code = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
 
@@ -46,7 +47,6 @@ function TryForm({ agent }: { agent: AgentListing }) {
     agent.name,
   );
   const shown = started ?? latest?.id ?? null;
-  const field = useId();
   const start = useMutation({
     mutationFn: (asked: string) => tryAgent(agent.name, asked),
     onSuccess: (tried) => {
@@ -73,25 +73,18 @@ function TryForm({ agent }: { agent: AgentListing }) {
           if (!held) start.mutate(brief);
         }}
       >
-        <label htmlFor={field} className="block text-body-small font-medium text-foreground">
-          Brief
-        </label>
-        <textarea
-          id={field}
+        <TextField
+          label="Brief"
+          multiline
           value={brief}
-          onChange={(event) => setBrief(event.target.value)}
-          rows={3}
+          onChange={setBrief}
           placeholder="A short brief to try it on: what it is told, in a folder of its own."
-          className="block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none"
+          className="w-full"
         />
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={held !== null || start.isPending}
-            className="rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
-          >
+          <Button type="submit" isDisabled={held !== null || start.isPending}>
             {start.isPending ? 'Starting…' : 'Try it'}
-          </button>
+          </Button>
           {held && (
             <span data-try-held className="text-body-small text-muted-foreground">
               {held}
@@ -112,12 +105,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
 export function TryRun({ id }: { id: string }) {
   const { view: run, error } = useRunRead(id);
   const link = (
-    <RouteLink
-      to="/runs/$runId"
-      params={{ runId: id }}
-      data-try-run={id}
-      className="font-mono text-body-small underline underline-offset-2"
-    >
+    <RouteLink to="/runs/$runId" params={{ runId: id }} data-try-run={id} className="font-mono text-body-small underline">
       {id}
     </RouteLink>
   );

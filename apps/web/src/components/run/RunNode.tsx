@@ -188,24 +188,7 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
 
         <NowLine run={run} now={now} />
 
-        {needs.length > 0 && (
-          <ul aria-label="Needs" className="space-y-0.5 px-3 text-body-small">
-            {needs.map((need) => (
-              <li key={need.step} title={needLine(need)} className="line-clamp-2 break-words">
-                <RouteLink
-                  to="/runs/$runId"
-                  params={{ runId: run.id }}
-                  hash={stepAnchor(need.step)}
-                  data-need={need.kind}
-                  data-step={need.step}
-                  className="nodrag text-yours hover:underline"
-                >
-                  {needLine(need)}
-                </RouteLink>
-              </li>
-            ))}
-          </ul>
-        )}
+        <CardNeeds runId={run.id} needs={needs} />
 
         {said ? (
           <p data-taken className="px-3 text-body-small break-words text-muted-foreground">
@@ -228,7 +211,8 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
               params={{ runId: run.id }}
               hash="decide"
               data-to-decide="result"
-              className="nodrag text-yours hover:underline"
+              underline="hover"
+              className="nodrag text-yours"
             >
               {decideLine(decide.branches)}
             </RouteLink>
@@ -267,6 +251,34 @@ function NowLine({ run, now }: { run: RunView; now: number }) {
  * A run card's title line: its title, a link to the run's page, not preloaded; and the chevron that opens or
  * closes its steps (`onToggle`). Neither button drags the card nor shows the run in the bar.
  */
+/**
+ * The card's needs, each a link to its step on the run's page, underlined on hover.
+ * @param runId The run they are needs of.
+ * @param needs What the run waits on, but the gate the card offers.
+ */
+function CardNeeds({ runId, needs }: { runId: string; needs: ReturnType<typeof needsOf> }) {
+  if (needs.length === 0) return null;
+  return (
+    <ul aria-label="Needs" className="space-y-0.5 px-3 text-body-small">
+      {needs.map((need) => (
+        <li key={need.step} title={needLine(need)} className="line-clamp-2 break-words">
+          <RouteLink
+            to="/runs/$runId"
+            params={{ runId }}
+            hash={stepAnchor(need.step)}
+            data-need={need.kind}
+            data-step={need.step}
+            underline="hover"
+            className="nodrag text-yours"
+          >
+            {needLine(need)}
+          </RouteLink>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function CardTitle({ run, title, open, onToggle }: { run: RunView; title: string; open: boolean; onToggle: (runId: string) => void }) {
   return (
     <div className="flex items-center gap-1">

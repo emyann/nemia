@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
-import { FILE_LIMIT } from 'objects';
+import { http, HttpResponse } from 'msw';
+import { expect, waitFor, within } from 'storybook/test';
+import { FILE_LIMIT, type FileObject, type RunStart } from 'objects';
 import type { WorkflowListing } from '@/lib/api/workflows';
 import { StartRun } from './StartRun';
 import { noRuns } from '../../../.storybook/fixtures/runs';
@@ -79,5 +80,57 @@ export const PastLimit: Story = {
     ]);
     await expect(canvasElement.querySelector('[data-start-input="screen-recording.mov"]')).toHaveAttribute('data-past-limit', 'true');
     await expect(within(canvasElement).getByRole('button', { name: 'Start' })).toBeDisabled();
+  },
+};
+
+/** What the api was sent while a story ran: how many files were uploaded, and the file ids each start named. */
+const SENT = { uploads: 0, starts: [] as string[][] };
+
+/** The id the api answers the `n`th upload with, as a file id is: `file_` and 32 hex characters. */
+const idOf = (n: number): string => `file_${String(n).padStart(32, '0')}`;
+
+/**
+ * The api of a start whose file the api no longer keeps: each upload kept under an id of its own, the first start refused 422 naming the
+ * id it was sent, as the api refuses a file kept no more, and any later start refused 409, naming none.
+ */
+const keepsNoMore = [
+  ...noRuns,
+  http.post('/api/namespaces/default/files', () => {
+    SENT.uploads += 1;
+    const kept: FileObject = {
+      id: idOf(SENT.uploads),
+      name: 'tides.png',
+      mediaType: 'image/png',
+      size: 1,
+      createdAt: '2026-11-16T10:00:00.000Z',
+    };
+    return HttpResponse.json(kept, { status: 201 });
+  }),
+  http.post('/api/namespaces/default/runs', async ({ request }) => {
+    const ids = ((await request.json()) as RunStart).inputs?.flatMap((input) => (input.file === undefined ? [] : [input.file])) ?? [];
+    SENT.starts.push(ids);
+    return SENT.starts.length === 1
+      ? HttpResponse.json({ error: `the input tides.png names the file ${ids[0]}, and default keeps no file by that id` }, { status: 422 })
+      : HttpResponse.json({ error: 'refused again, naming no file' }, { status: 409 });
+  }),
+];
+
+/**
+ * A start refused 422 for a file the api keeps no more: the form forgets that file's id, so pressing Start again uploads it again and
+ * names it by its fresh id.
+ */
+export const UploadsAgain: Story = {
+  parameters: { msw: keepsNoMore },
+  play: async ({ canvasElement, userEvent }) => {
+    SENT.uploads = 0;
+    SENT.starts = [];
+    await briefAndPick(canvasElement, userEvent, [fileOf('tides.png', 412_331)]);
+    const start = within(canvasElement).getByRole('button', { name: 'Start' });
+    await userEvent.click(start);
+    await waitFor(() => expect(canvasElement.querySelector('[data-refused]')).not.toBeNull());
+    await userEvent.click(start);
+    await waitFor(() => expect(SENT.starts).toHaveLength(2));
+    await expect(SENT.uploads).toBe(2);
+    await expect(SENT.starts).toEqual([[idOf(1)], [idOf(2)]]);
   },
 };

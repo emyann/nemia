@@ -6,15 +6,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Logger, Metric, References } from 'effect';
-import { delaysOf, EVENT_LOOP_DELAY, eventLoopWatched } from './event-loop.verb.ts';
+import { delaysOf, EVENT_LOOP_DELAY, eventLoopWatched } from './event-loop.store.ts';
 
 /** What a capturing logger was handed: each log's level and its annotations. */
 type Logged = { level: string; annotations: Record<string, unknown> };
 
-/** Holds the event loop for `ms`, as a synchronous read does. */
+/** Holds the event loop for `ms`, as a synchronous read does: the thread waits on a cell nobody writes. */
 const held = (ms: number): void => {
-  const until = performance.now() + ms;
-  while (performance.now() < until);
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 };
 
 test('a stand-in step that holds the loop is in the delay histogram and in the one warning the stall is logged with, named', async () => {

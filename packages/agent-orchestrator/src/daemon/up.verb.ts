@@ -44,7 +44,7 @@ import { upgradeCarries, type Running } from '../release/index.ts';
 import { adoptBundled, atPin, harnessesHeld, pinnedHarnesses, releaseTrees, type Adopted } from '../release/carry.store.ts';
 import { startFix, FIX_DEADLINE_SECONDS } from '../needs/fix.verb.ts';
 import { fixesDir, readFixRecord } from '../needs/fix.store.ts';
-import { eventLoopWatched, EVENT_LOOP_DELAY } from './event-loop.verb.ts';
+import { eventLoopWatched, EVENT_LOOP_DELAY } from '../telemetry/event-loop.store.ts';
 
 /**
  * How the daemon asks a harness for its quota: the engine's `quota` unless the process hands it another. The api hands it the ask its

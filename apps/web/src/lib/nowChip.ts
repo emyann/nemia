@@ -1,7 +1,7 @@
 /**
  * The one chip a runs-page row draws for what its run does now: where its step stands (`nowStandsOf`), the chip's colour by that and by
  * whether the row waits on a person (`chipTone`, proved by `contracts/now-chip.contract.ts`), the kit's tag each colour is drawn as
- * (`CHIP_TAG`), and how many runs of the page wait on a run (`waitedOnBy`). Pure.
+ * (`CHIP_TAG`), and how many runs of the page wait on a run or its checkout (`waitedOnBy`). Pure.
  */
 import type { WaitOn } from 'objects';
 import type { ChipTone, ChipToneOf, NowCase, NowStands } from '../../contracts/now-chip.contract.ts';
@@ -66,16 +66,23 @@ export const CHIP_TAG: Record<
   rest: { variant: 'filled', color: 'neutral' },
 };
 
+/** A row as the fan counts it: its waits, its hold, and of each step the run whose ending holds the checkout it waits on. */
+type FanRow = Pick<RunView, 'id' | 'waiting' | 'holding'> & {
+  steps: ReadonlyArray<Partial<Pick<RunView['steps'][number], 'baseHeldBy'>>>;
+};
+
 /**
- * How many of `rows` wait on the run `id`, or are held until it lands: a run that names it among the runs it waits on and the store has,
- * or among the runs its hold waits for that have not landed; never `id` itself.
- * @param rows The runs of the page, each with what it waits on and its hold.
+ * How many of `rows` wait on the run `id`, on its checkout, or are held until it lands: a run that names it among the runs it waits on
+ * and the store has, a run a step of which waits on the checkout its ending has (`baseHeldBy`), or one that names it among the runs its
+ * hold waits for that have not landed; each run once, never `id` itself.
+ * @param rows The runs of the page, each with what it waits on, its hold and its steps.
  * @param id The run waited on.
  */
-export const waitedOnBy = (rows: ReadonlyArray<Pick<RunView, 'id' | 'waiting' | 'holding'>>, id: string): number =>
+export const waitedOnBy = (rows: ReadonlyArray<FanRow>, id: string): number =>
   rows.filter(
     (row) =>
       row.id !== id &&
       ((row.waiting?.runs.some((run) => run.run === id && !run.missing) ?? false) ||
+        row.steps.some((step) => step.baseHeldBy?.run === id) ||
         (row.holding?.runs.some((run) => run.run === id && !run.landed) ?? false)),
   ).length;

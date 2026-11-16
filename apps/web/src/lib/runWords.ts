@@ -52,7 +52,8 @@ export const waitKindOf: Record<StepState, WaitKind | null> = {
 };
 
 /** A step of a row as the words read it: its name, its codes, and its check's verdict. */
-type CodedStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
+type CodedStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'> &
+  Partial<Pick<RunView['steps'][number], 'baseHeldBy'>>;
 
 /** What the words read of a row of the light answer: of each step its name and its codes, and of the run who it waits on. */
 type WaitingRow = Pick<RunView, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & { steps: ReadonlyArray<CodedStep> };
@@ -178,10 +179,10 @@ type NowRow = Omit<WaitingRow, 'steps'> & {
 
 /**
  * The words of a step that waits on no person, by where it stands: being checked, the run it waits on (the first the store has), the
- * checkout, a run slot, a hold and the run it waits until (the first not landed), a failure's or a rest's rail word, and none at work
+ * checkout and the run whose ending has it (`baseHeldBy`), a run slot, a hold and the run it waits until (the first not landed), a failure's or a rest's rail word, and none at work
  * or still to come.
  */
-function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn | null): NowPart[] {
+function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn | null, step: CodedStep): NowPart[] {
   const held = row.holding != null;
   if (stands === 'atWork') return state === 'checking' ? [PERSON.checking.rail] : [];
   if (stands === 'held') {
@@ -189,7 +190,10 @@ function waitWords(row: NowRow, stands: NowStands, state: StepState, on: WaitOn 
     return until ? [PERSON.held.rail, NOW_WORDS.until, { run: until }, NOW_WORDS.lands] : [PERSON.held.rail];
   }
   if (stands === 'waitsOnARun') {
-    if (on === 'base') return [NOW_WORDS.checkout];
+    if (on === 'base') {
+      const holder = step.baseHeldBy?.run;
+      return holder ? [NOW_WORDS.waitsOn, { run: holder }, NOW_WORDS.theCheckout] : [NOW_WORDS.checkout];
+    }
     const run = row.waiting?.runs.find((waited) => !waited.missing)?.run;
     return run ? [NOW_WORDS.waitsOn, { run }] : [RUN_WAITS.after.tag({ step: null, done: 0 })];
   }
@@ -225,7 +229,9 @@ export function nowOf(row: NowRow): Now | null {
     agent: step.spec && (yours || STARTED.includes(stands)) ? agentOf({ spec: step.spec }) : null,
     round: rounds !== null && step.current ? { at: step.current.round, of: rounds } : null,
     budget: step.budget ? { spent: step.spent?.usd ?? 0, cap: step.budget.usd, capSaid: step.budget.said, over: step.budget.over } : null,
-    words: yours ? [wait ? waitTag(row) : stateWordsOf(drawn.state, drawn.on, held).rail] : waitWords(row, stands, drawn.state, drawn.on),
+    words: yours
+      ? [wait ? waitTag(row) : stateWordsOf(drawn.state, drawn.on, held).rail]
+      : waitWords(row, stands, drawn.state, drawn.on, step),
   };
 }
 

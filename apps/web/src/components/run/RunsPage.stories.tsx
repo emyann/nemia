@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, waitFor, within } from 'storybook/test';
 import { RunsFailed, RunsLoading, RunsPage } from './RunsPage';
 import { everyState, noRuns, nothingWaits, oneWaits, REFUSED_WORDS, refused, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
+import { NOW_WORDS } from '@/lib/words';
 
 /** What holds the page as its route does: the loading page while its reads are out, the failed page when one is refused. */
 class Routed extends Component<{ children: ReactNode }, { error: unknown }> {
@@ -60,13 +61,28 @@ const tonesOf = (page: HTMLElement, name: string) =>
     ]),
   );
 
+/**
+ * That lgll's row counts the two runs that wait on it in its fan, and that each of `ends` says it waits on lgll's checkout, lgll a link.
+ * @param page The page.
+ * @param ends The rows that wait on the checkout lgll holds, by their id's last four characters.
+ */
+const checkoutWaits = async (page: HTMLElement, ends: Array<keyof typeof TARGET_RUNS>) => {
+  const row = (end: keyof typeof TARGET_RUNS) =>
+    page.querySelector<HTMLElement>(`[data-section="in-flight"] [data-run="${TARGET_RUNS[end].metadata.name}"]`)!;
+  await expect(within(row('lgll')).getByRole('img', { name: NOW_WORDS.waitedBy(2) })).toHaveTextContent('2');
+  for (const end of ends) {
+    await expect(within(row(end)).getByRole('link', { name: 'lgll' })).toHaveAttribute('href', `/runs/${TARGET_RUNS.lgll.metadata.name}`);
+    await expect(row(end).querySelector('[data-now-words]')).toHaveTextContent(`${NOW_WORDS.waitsOn} lgll ${NOW_WORDS.theCheckout}`);
+  }
+};
+
 /** The headings of the table named `label`. */
 const headsOf = (page: HTMLElement, label: string) =>
   [...page.querySelectorAll(`[aria-label="${label}"] [role="columnheader"]`)].map((head) => head.textContent?.trim().toUpperCase());
 
 /**
  * Nothing waits on you: the waiting part one line, its chip quiet; three runs in flight, lgll being checked and two waiting on the
- * checkout it holds; and a page of the finished runs, each table by its columns.
+ * checkout it holds, each naming lgll, which counts them in its fan; and a page of the finished runs, each table by its columns.
  */
 export const NothingWaits: Story = {
   args: { at: {} },
@@ -83,6 +99,7 @@ export const NothingWaits: Story = {
     const lgll = page.querySelector<HTMLElement>(`[data-run="${TARGET_RUNS.lgll.metadata.name}"]`)!;
     await expect(within(lgll).getByRole('link', { name: 'area=api' })).toHaveTextContent('api');
     await expect(within(lgll).getByText('quick')).toBeVisible();
+    await checkoutWaits(page, ['649a', '5zt1']);
   },
 };
 
@@ -101,12 +118,13 @@ export const OneWaitsOnYou: Story = {
     await expect(card.querySelectorAll('[data-cut-button]').length).toBe(1);
     await expect(open).toHaveTextContent('Open the run');
     await expect(open?.closest('a') ?? open).toHaveAttribute('href', `/runs/${TARGET_RUNS.vqvd.metadata.name}`);
+    await checkoutWaits(page, ['649a', '5zt1']);
   },
 };
 
 /**
- * A row in each state in flight — at work, at work past its step's cap, being checked, waiting on a run, waiting for a run slot, held
- * — and a card of each kind of wait on you: one that asks questions, one whose check failed.
+ * A row in each state in flight — at work, at work past its step's cap, being checked, waiting on a run, waiting on the checkout that
+ * run holds, waiting for a run slot, held — the run being checked counting both in its fan; and a card of each kind of wait on you: one that asks questions, one whose check failed.
  */
 export const EveryState: Story = {
   args: { at: {} },
@@ -118,6 +136,7 @@ export const EveryState: Story = {
       wov8: 'alive',
       lgll: 'alive',
       '649a': 'waits',
+      '5zt1': 'waits',
       k2rq: 'waits',
       c7un: 'waits',
     });
@@ -127,8 +146,8 @@ export const EveryState: Story = {
     await expect(row('wov8').getByText('over its $6')).toBeVisible();
     await expect(row('1sw7').getByRole('img', { name: 'round 2 of 3' })).toBeVisible();
     await expect(row('1sw7').getByRole('img', { name: 'a run waits on it' })).toHaveTextContent('1');
-    await expect(row('lgll').getByRole('img', { name: 'a run waits on it' })).toHaveTextContent('1');
     await expect(row('649a').getByRole('link', { name: 'lgll' })).toBeVisible();
+    await checkoutWaits(page, ['5zt1']);
     for (const card of page.querySelectorAll('[data-section="waiting"] article[data-run]'))
       await expect(card.querySelectorAll('[data-cut-button]').length).toBe(1);
   },

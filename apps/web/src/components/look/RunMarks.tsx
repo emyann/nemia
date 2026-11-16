@@ -102,10 +102,7 @@ export function Pips({ round, tone, words = false }: { round: NonNullable<Now['r
           {Array.from({ length: round.of }, (_, i) => (
             <i
               key={i}
-              className={cn(
-                'block size-1.5',
-                i < round.at ? (tone === 'yours' ? 'bg-yours' : 'bg-alive') : 'bg-surface-container-highest',
-              )}
+              className={cn('block size-1.5', i < round.at ? (tone === 'yours' ? 'bg-yours' : 'bg-alive') : 'bg-surface-container-highest')}
             />
           ))}
         </span>
@@ -174,11 +171,7 @@ export function Fan({ count, className }: { count: number; className?: string })
         role="img"
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the keyboard opens the fan's tooltip by focusing it
         tabIndex={0}
-        className={cn(
-          'inline-flex shrink-0 items-center gap-1 font-mono text-body-small text-on-surface-variant',
-          focusRing(),
-          className,
-        )}
+        className={cn('inline-flex shrink-0 items-center gap-1 font-mono text-body-small text-on-surface-variant', focusRing(), className)}
       >
         <svg width="12" height="10" viewBox="0 0 12 10" aria-hidden="true">
           <path d="M0.5,5 L4.5,5 L11.5,1 M4.5,5 L11.5,5 M4.5,5 L11.5,9" fill="none" stroke="currentColor" strokeWidth="1.4" />

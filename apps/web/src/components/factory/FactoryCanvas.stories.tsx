@@ -14,7 +14,11 @@ import { onTheFloor, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
  * The floor of `factory` with no run on it, the inbox's cards `cards` read under the one key every reader of a page shares
  * (`inboxQuery`), so its queue draws what the pane counts.
  */
-const drawn = (args: Parameters<typeof FactoryCanvas>[0], cards: readonly InboxEntry[], read: readonly (keyof typeof TARGET_RUNS)[] = []) => (
+const drawn = (
+  args: Parameters<typeof FactoryCanvas>[0],
+  cards: readonly InboxEntry[],
+  read: readonly (keyof typeof TARGET_RUNS)[] = [],
+) => (
   <QueryClientProvider
     client={seeded([
       [factoriesQuery.queryKey, [factoryView(FACTORY)]],
@@ -85,17 +89,27 @@ export const RunsOnTheFloor: Story = {
       return found;
     });
     await expect(canvasElement.querySelectorAll('[data-run-steps]').length, 'the five in flight and lgll, which 649a waits on').toBe(6);
-    await expect(panel.querySelector('[data-tile="implement"][data-state="working"]'), 'the step at work, a press in the panel').not.toBeNull();
-    await expect(canvasElement.querySelector('[data-step="land"][data-mark="failure"] [data-step-bar]'), "a closed card's step").not.toBeNull();
+    await expect(
+      panel.querySelector('[data-tile="implement"][data-state="working"]'),
+      'the step at work, a press in the panel',
+    ).not.toBeNull();
+    await expect(
+      canvasElement.querySelector('[data-step="land"][data-mark="failure"] [data-step-bar]'),
+      "a closed card's step",
+    ).not.toBeNull();
     const box = panel.getBoundingClientRect();
     const others = [...canvasElement.querySelectorAll('article[data-run]')].filter((card) => card !== panel);
     await expect(others.length, 'the five other cards').toBe(5);
     for (const card of others)
       await expect(meet(card.getBoundingClientRect(), box), `${card.getAttribute('data-run')} stands clear of the panel`).toBe(false);
-    await waitFor(() => {
+    const underPanels = await waitFor(() => {
       const panels = [...canvasElement.querySelectorAll('.react-flow__panel')].map((one) => one.getBoundingClientRect());
-      for (const card of canvasElement.querySelectorAll('article[data-run]'))
-        expect(panels.some((one) => meet(card.getBoundingClientRect(), one)), `${card.getAttribute('data-run')} under a panel`).toBe(false);
+      const under = [...canvasElement.querySelectorAll('article[data-run]')]
+        .filter((card) => panels.some((one) => meet(card.getBoundingClientRect(), one)))
+        .map((card) => card.getAttribute('data-run'));
+      if (under.length > 0) throw new Error(`under a panel of the floor: ${under.join(', ')}`);
+      return under;
     });
+    await expect(underPanels, 'no card under a panel of the floor, once it is fitted').toEqual([]);
   },
 };

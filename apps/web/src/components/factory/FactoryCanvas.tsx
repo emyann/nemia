@@ -329,10 +329,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
   const spanEntries = useContent(
     [...opened].reverse().map((id): [string, Span] => {
       const run = shownJudged.find((one) => one.id === id)!;
-      return [
-        id,
-        openSpan(run.steps.length),
-      ];
+      return [id, openSpan(run.steps.length)];
     }),
   );
   const spans = useMemo(() => new Map(spanEntries), [spanEntries]);

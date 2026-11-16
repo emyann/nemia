@@ -203,28 +203,7 @@ export function StepGraph({
         className="relative shrink-0"
         style={{ width: layout.width, height: layout.height + (named ? NAMED_HEIGHT : 0) }}
       >
-        <svg
-          width={layout.width}
-          height={layout.height}
-          aria-hidden="true"
-          className="pointer-events-none absolute top-0 left-0 overflow-visible"
-        >
-          {layout.lines.map((line) => (
-            <Line key={line.id} line={line} />
-          ))}
-          {layout.gates.map((gate) => (
-            <line
-              key={gate.step}
-              data-gate={gate.step}
-              x1={gate.x}
-              x2={gate.x}
-              y1={gate.y - 5.5}
-              y2={gate.y + 5.5}
-              strokeWidth={1.8}
-              stroke={at.get(gate.step)?.mark === 'yours' ? paint.yours : GONE}
-            />
-          ))}
-        </svg>
+        <Lines layout={layout} at={at} />
         {layout.points.map((point) => (
           <Node key={point.id} point={point} at={at} tall={(lanes.get(point.x) ?? 1) > 1 ? 13 : 24} held={held} wrap={wrap} />
         ))}
@@ -248,6 +227,34 @@ export function StepGraph({
         </p>
       )}
     </div>
+  );
+}
+
+/** The graph's lines under its nodes, and each gate's tick before its step, yellow where that step waits on you. */
+function Lines({ layout, at }: { layout: ReturnType<typeof graphOf>; at: ReadonlyMap<string, { mark: StepMark }> }) {
+  return (
+    <svg
+      width={layout.width}
+      height={layout.height}
+      aria-hidden="true"
+      className="pointer-events-none absolute top-0 left-0 overflow-visible"
+    >
+      {layout.lines.map((line) => (
+        <Line key={line.id} line={line} />
+      ))}
+      {layout.gates.map((gate) => (
+        <line
+          key={gate.step}
+          data-gate={gate.step}
+          x1={gate.x}
+          x2={gate.x}
+          y1={gate.y - 5.5}
+          y2={gate.y + 5.5}
+          strokeWidth={1.8}
+          stroke={at.get(gate.step)?.mark === 'yours' ? paint.yours : GONE}
+        />
+      ))}
+    </svg>
   );
 }
 

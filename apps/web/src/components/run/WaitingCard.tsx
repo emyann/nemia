@@ -7,20 +7,12 @@ import { previewBar } from '../step/StepPreview';
 import { CopyId, CutButton, CutFrame, CutTag, Run, TextLink } from '../look';
 
 /**
- * A run that waits on a person, as a card: the run part at lg (`Run`) — its meta line, its title, its step now and how long it has
- * waited on a person this time, its steps as its workflow's graph, each node a button that opens its step's card, its cost and Open
- * run, the card glowing yellow; how many of `among`, the page's runs, wait on it, and each run its words name by its mark. It decides nothing and shows no command: the run's page does. A run the list could not judge is a card
- * of its own (`UnjudgedCard`).
+ * A run that waits on a person, as a card: the run part at lg (`Run`) — its meta line, its title, its step now and how long it has waited
+ * on a person this time, its steps as its workflow's graph, each node a button that opens its step's card, its cost and Open run, the card
+ * glowing yellow; how many of `among`, the page's runs, wait on it, and each run its words name by its mark. It decides nothing and shows
+ * no command: the run's page does. A run the list could not judge is a card of its own (`UnjudgedCard`).
  */
-export function WaitingCard({
-  run,
-  among = [],
-  asOf,
-}: {
-  run: WaitingRun | UnjudgedRun;
-  among?: readonly ListedRun[];
-  asOf: Date;
-}) {
+export function WaitingCard({ run, among = [], asOf }: { run: WaitingRun | UnjudgedRun; among?: readonly ListedRun[]; asOf: Date }) {
   return judged(run) ? <JudgedCard run={run} among={among} asOf={asOf} /> : <UnjudgedCard run={run} />;
 }
 

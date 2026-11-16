@@ -208,7 +208,9 @@ function DecideLine({ run, said, branches }: { run: RunView; said: string; branc
   );
 }
 
-/** The chevron after a card's title, which opens or closes its steps (`onToggle`): it neither drags the card nor shows the run in the bar. */
+/**
+ * The chevron after a card's title, which opens or closes its steps (`onToggle`): it neither drags the card nor shows the run in the bar.
+ */
 function Chevron({ run, open, onToggle }: { run: RunView; open: boolean; onToggle: (runId: string) => void }) {
   return (
     <button
@@ -263,8 +265,8 @@ function TouchedLine({ run }: { run: RunView }) {
 }
 
 /**
- * A card's chips, at its foot: a try of an agent, tagged with its agent, since its folder is on no page; how many runs it reads as context, each on hover (`reads`); to decide (`decide`); waiting on
- * you; held, with the hold lifted here (`CardLift`); `cancelled`; and pruned.
+ * A card's chips, at its foot: a try of an agent, tagged with its agent, since its folder is on no page; how many runs it reads as context,
+ * each on hover (`reads`); to decide (`decide`); waiting on you; held, with the hold lifted here (`CardLift`); `cancelled`; and pruned.
  */
 function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolean; cancelled: boolean; reads: string[] }) {
   return (

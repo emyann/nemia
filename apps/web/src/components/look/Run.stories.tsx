@@ -200,7 +200,9 @@ export const Panels: Story = {
     const [atWork] = [...canvasElement.querySelectorAll('[data-size="xl"]')] as HTMLElement[];
     const names = [...atWork.querySelectorAll('[data-named]')].map((one) => one.getAttribute('data-named'));
     await expect(names, 'each step named under the graph').toEqual(['design', 'implement', 'review', 'land']);
-    const waiters = [...atWork.querySelectorAll('[data-runs="Waited on by"] [data-run-mark]')].map((one) => one.getAttribute('data-run-mark'));
+    const waiters = [...atWork.querySelectorAll('[data-runs="Waited on by"] [data-run-mark]')].map((one) =>
+      one.getAttribute('data-run-mark'),
+    );
     await expect(waiters).toEqual([TARGET_RUNS.c7un.metadata.name]);
     await expect(within(atWork).getByText('npx tsrs --noEmit -p apps/cli')).toBeVisible();
   },

@@ -114,7 +114,8 @@ export type GraphPoint = Box & { x: number; y: number; r: number; route: boolean
 
 /**
  * A line of the graph between two points: `path` drawn straight between them, or under the row at right angles for a `loop`, with its
- * arrowhead `head`; `state` as an edge's (`EdgeState`); `untaken` a route its condition did not take; `taken` a loop the run has gone round.
+ * arrowhead `head`; `state` as an edge's (`EdgeState`); `untaken` a route its condition did not take; `taken` a loop the run has gone
+ * round.
  */
 export type GraphLine = {
   id: string;

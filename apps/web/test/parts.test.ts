@@ -459,10 +459,8 @@ test('Run: each size draws what its ladder says and no more, in its tone, and on
   const asOf = new Date('2026-11-15T18:00:00.000Z');
   const among = Object.values(TARGET_RUNS).map((one) => ({ ...runViewOf(one), clock: null }));
   const run = among.find((one) => one.id.endsWith('1sw7'))!;
-  /** What a drawing says, by the marks of its slots. */
   const said = (html: string): string[] =>
     [...new Set([...html.matchAll(/data-run-says="([^"]+)"/g)].flatMap((m) => m[1].split(' ')))].sort();
-  /** What 1sw7 has nothing of: no words at work. */
   const none = new Set(['words']);
   const sizes = [
     ['xs', 'card'],
@@ -483,10 +481,10 @@ test('Run: each size draws what its ladder says and no more, in its tone, and on
     const drawings = await Promise.all(
       ladder.map(async (size) => said(await drawn(createElement(Run, { run, size, layout: 'card', asOf, among, read: READS['1sw7'] })))),
     );
-    for (const thing of new Set(drawings.flat())) {
-      const first = ladder.indexOf(smallestSize(thing as Parameters<typeof smallestSize>[0], 'card'));
+    for (const thing of [...says('xl', 'card')].filter((one) => !none.has(one))) {
+      const first = ladder.indexOf(smallestSize(thing, 'card'));
       assert.deepEqual(
-        ladder.filter((_, at) => drawings[at]!.includes(thing)),
+        ladder.filter((_, at) => drawings[at].includes(thing)),
         ladder.slice(first),
         thing,
       );

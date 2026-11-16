@@ -14,7 +14,6 @@ const graphOfEdges = (...edges: GraphEdge[]): RunGraph => ({ roots: [], edges })
 const stepsOf = (states: Record<string, StepState>, notes: Record<string, string> = {}, due: string[] = []): EdgeStep[] =>
   Object.entries(states).map(([name, state]) => ({ name, state, note: notes[name] ?? null, roundDue: due.includes(name) }));
 
-
 /** Each column's points, left first, top to bottom: what the graph reads as. */
 const readGraph = (g: StepGraphLayout): string[][] => {
   const xs = [...new Set(g.points.map((p) => p.x))].sort((a, b) => a - b);
@@ -171,7 +170,10 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
     assert.deepEqual(readGraph(g), [['implement'], ['review']]);
     assert.equal(g.lines.length, 0);
     assert.equal(g.error, UNGRAPHED);
-    assert.equal(graphOf(['implement'], { roots: [] } as unknown as RunGraph, stepsOf({ implement: 'working' }), [], false).error, UNGRAPHED);
+    assert.equal(
+      graphOf(['implement'], { roots: [] } as unknown as RunGraph, stepsOf({ implement: 'working' }), [], false).error,
+      UNGRAPHED,
+    );
   });
   await t.test("a cycle in the steps' after is the run's order, no lines, and says why", () => {
     const g = graphOf(['a', 'b'], graphOfEdges(after('a', 'b'), after('b', 'a')), stepsOf({ a: 'waiting', b: 'waiting' }), [], false);

@@ -48,7 +48,9 @@ export type RunProps = {
 /** The step a panel's press shows, and what a press on a node does with its step: the floor shows it in its bar. */
 type StepPick = { selected: string | null; onStep: (step: string) => void };
 
-/** The band around a card, in the cut's shape, a few pixels off its edge: the focus colour while it is shown, yellow while it is to decide. */
+/**
+ * The band around a card, in the cut's shape, a few pixels off its edge: the focus colour while it is shown, yellow while it is to decide.
+ */
 const RING: Record<'focus' | 'yours', string> = { focus: 'bg-ring', yours: 'bg-yours/60' };
 
 /** Each tone's frame: its edge in the tone's hue where it is at work, waits on you or failed; the line's ink for the rest. */
@@ -85,17 +87,17 @@ const saying = (...things: RunSays[]) => ({ 'data-run-says': things.join(' ') })
  *
  * - **xs**, a mark: the step now's diamond and the id's end, a link (`RunMark`), where a run is named inside something else.
  * - **sm**, a line: and the step now as a small chip, the title on one line and the clock.
- * - **md**, a row of the runs table (`layout="row"`, the kit's `Row` with its Run, Now, Clock and Cost cells) or a card of the floor:
- *   and factory / workflow, the agent, the round as pips, the words of its wait (a run named a mark), the step graph (each node inside
- *   `wrap`), the step's budget ring, its cost and how many of `among` wait on it; a row its labels too.
+ * - **md**, a row of the runs table (`layout="row"`, the kit's `Row` with its Run, Now, Clock and Cost cells) or a card of the floor: and
+ *   factory / workflow, the agent, the round as pips, the words of its wait (a run named a mark), the step graph (each node inside `wrap`),
+ *   the step's budget ring, its cost and how many of `among` wait on it; a row its labels too.
  * - **lg**, a card: and its labels and Open run; a card that waits on you glows.
  * - **xl**, a panel: and each step named under the graph, the facts, the runs it waits on and that wait on it, and the step's last line
  *   from `read`, the run read alone.
  *
  * `asOf` is the instant its clock is said at. `pick` makes each node of the panel's graph a button that shows its step (`data-tile`,
- * pressed while it is the step shown); `ringed` draws a band in the cut's shape around a card, the focus colour or yellow. `titleEnd` stands after the title (the floor's chevron), `children` under what the part
- * says (the floor's lines), and `still` is the class of every control the part draws (`nodrag` on the floor). A finished run is drawn at
- * rest, by its last step and how it ended.
+ * pressed while it is the step shown); `ringed` draws a band in the cut's shape around a card, the focus colour or yellow. `titleEnd`
+ * stands after the title (the floor's chevron), `children` under what the part says (the floor's lines), and `still` is the class of every
+ * control the part draws (`nodrag` on the floor). A finished run is drawn at rest, by its last step and how it ended.
  */
 export function Run(props: RunProps) {
   const { run, size, among = [] } = props;
@@ -114,7 +116,10 @@ export function Run(props: RunProps) {
   return <RunBig {...props} look={look} among={among} />;
 }
 
-/** The run's title, a link to its page, raised over the copy control's target; whole in the kit's tooltip where it is cut to a line; a card's heading where `heading`. */
+/**
+ * The run's title, a link to its page, raised over the copy control's target; whole in the kit's tooltip where it is cut to a line; a
+ * card's heading where `heading`.
+ */
 function Title({ run, look, still, end, heading }: { run: PartRun; look: Look; still?: string; end?: ReactNode; heading?: boolean }) {
   const Holder = heading ? 'h3' : 'span';
   return (
@@ -188,7 +193,7 @@ function WordsSaid({ run, look, among, cut }: { run: PartRun; look: Look; among:
         words={words}
         tone={look.now.tone}
         among={among.filter((other) => other.id !== run.id)}
-        title={cut ? (run.waiting?.advice || run.holding?.advice || whole) : undefined}
+        title={cut ? run.waiting?.advice || run.holding?.advice || whole : undefined}
         className={cn(cut && 'text-body-small')}
       />
     </span>
@@ -234,10 +239,10 @@ function RunRow({ run, asOf, among = [], wrap, still, look }: RunProps & { look:
             <WordsSaid run={run} look={look} among={among} />
             <span className={look.s.end()}>
               {waiters > 0 && (
-            <span {...saying('waitedBy')} className="inline-flex">
-              <Fan count={waiters} />
-            </span>
-          )}
+                <span {...saying('waitedBy')} className="inline-flex">
+                  <Fan count={waiters} />
+                </span>
+              )}
               {look.now.budget && (
                 <span {...saying('budget')} className="inline-flex">
                   <Ring budget={look.now.budget} />
@@ -290,10 +295,10 @@ function Framed({
         />
       )}
       <CutFrame hue={HUE[tone]} size={CUT[size]} ground={look.s.ground()} glow={tone === 'yours' && size !== 'md'} className={className}>
-      <article aria-label={look.title} data-run={run.id} data-now={tone} data-tone={tone} data-size={size} className={look.s.base()}>
-        {children}
-      </article>
-    </CutFrame>
+        <article aria-label={look.title} data-run={run.id} data-now={tone} data-tone={tone} data-size={size} className={look.s.base()}>
+          {children}
+        </article>
+      </CutFrame>
     </span>
   );
 }
@@ -312,7 +317,18 @@ function Eyebrow({ run }: { run: PartRun }) {
 }
 
 /** The run as a card at md, the floor's: its eyebrow, its title on two lines, its step now and its graph over its cost. */
-function RunCard({ run, asOf, among, wrap, titleEnd, ringed, still, children, className, look }: RunProps & { look: Look; among: readonly PartRun[] }) {
+function RunCard({
+  run,
+  asOf,
+  among,
+  wrap,
+  titleEnd,
+  ringed,
+  still,
+  children,
+  className,
+  look,
+}: RunProps & { look: Look; among: readonly PartRun[] }) {
   const { s, now } = look;
   const waiters = waitersOf(among, run.id).length;
   return (

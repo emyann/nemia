@@ -541,7 +541,9 @@ function summaryRun(): RunView {
   } as unknown as RunView;
 }
 
-/** The run's panel, the floor's card opened (`Run` at xl), each node of its graph a button that shows its step, `selected` the one shown. */
+/**
+ * The run's panel, the floor's card opened (`Run` at xl), each node of its graph a button that shows its step, `selected` the one shown.
+ */
 const panelMarkup = async (run: RunView, selected: string | null = null): Promise<string> => {
   const { Run } = await import('../src/components/look/Run.tsx');
   return routedWith(

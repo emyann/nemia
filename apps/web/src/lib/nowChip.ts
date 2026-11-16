@@ -79,10 +79,12 @@ type FanRow = Pick<RunView, 'id' | 'waiting' | 'holding'> & {
  * @param id The run waited on.
  */
 export const waitersOf = (rows: ReadonlyArray<FanRow>, id: string): string[] =>
-  rows.filter(
-    (row) =>
-      row.id !== id &&
-      ((row.waiting?.runs.some((run) => run.run === id && !run.missing) ?? false) ||
-        row.steps.some((step) => step.baseHeldBy?.run === id) ||
-        (row.holding?.runs.some((run) => run.run === id && !run.landed) ?? false)),
-  ).map((row) => row.id);
+  rows
+    .filter(
+      (row) =>
+        row.id !== id &&
+        ((row.waiting?.runs.some((run) => run.run === id && !run.missing) ?? false) ||
+          row.steps.some((step) => step.baseHeldBy?.run === id) ||
+          (row.holding?.runs.some((run) => run.run === id && !run.landed) ?? false)),
+    )
+    .map((row) => row.id);

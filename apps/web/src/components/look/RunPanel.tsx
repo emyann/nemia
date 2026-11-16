@@ -197,7 +197,11 @@ export const pickWrap =
       aria-label={`Inspect step ${step.name}`}
       aria-pressed={pick.selected === step.name}
       onPress={() => pick.onStep(step.name)}
-      className={cn('grid size-full cursor-pointer place-items-center rounded-sm aria-pressed:bg-surface-container-highest', focusRing(), still)}
+      className={cn(
+        'grid size-full cursor-pointer place-items-center rounded-sm aria-pressed:bg-surface-container-highest',
+        focusRing(),
+        still,
+      )}
     >
       {node}
     </AriaButton>

@@ -57,8 +57,7 @@ const ofMd = (thing: RunSays): boolean =>
   thing === 'waitedBy';
 
 /** Added by the panel alone. */
-const ofThePanel = (thing: RunSays): boolean =>
-  thing === 'named' || thing === 'facts' || thing === 'runs' || thing === 'lastLine';
+const ofThePanel = (thing: RunSays): boolean => thing === 'named' || thing === 'facts' || thing === 'runs' || thing === 'lastLine';
 
 const smallestSizeSpec = spec<(thing: RunSays, layout: RunLayout) => RunSize>({
   ensures: {
@@ -75,7 +74,8 @@ const smallestSizeSpec = spec<(thing: RunSays, layout: RunLayout) => RunSize>({
       condition: ({ input: [thing], output }) => (output === 'sm') === ofTheLine(thing),
     },
     mdAddsWhatTheRunIsDoing: {
-      description: 'Where it runs, the agent, the round, the words, the graph, the budget, the cost and who waits on it are said from md up, in either layout',
+      description:
+        'Where it runs, the agent, the round, the words, the graph, the budget, the cost and who waits on it are said from md up, in either layout',
       condition: ({ input: [thing], output }) => !ofMd(thing) || output === 'md',
     },
     aRowSaysTheLabelsAtMd: {

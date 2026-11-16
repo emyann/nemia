@@ -66,7 +66,7 @@ type Shape = {
 const chainOf = (names: readonly string[]): Run['status']['graph'] => ({
   roots: names.slice(0, 1),
   edges: [
-    ...names.slice(1).map((to, i) => ({ from: names[i]!, to, kind: 'after' as const })),
+    ...names.slice(1).map((to, i) => ({ from: names[i], to, kind: 'after' as const })),
     ...(names.includes('review') && names.includes('implement') ? [{ from: 'review', to: 'implement', kind: 'loop' as const, rounds: 3 }] : []),
   ],
 });

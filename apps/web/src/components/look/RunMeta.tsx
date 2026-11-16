@@ -56,7 +56,15 @@ function TagMark() {
 }
 
 /** Where a run runs, its factory and its workflow as a path, the workflow's folder whole in the kit's tooltip, linked where asked. */
-function Where({ factory, workflowDir, workflowPage }: { factory: string; workflowDir: string; workflowPage?: WorkflowPageAddress | null }) {
+function Where({
+  factory,
+  workflowDir,
+  workflowPage,
+}: {
+  factory: string;
+  workflowDir: string;
+  workflowPage?: WorkflowPageAddress | null;
+}) {
   const workflow = workflowNameOf(workflowDir);
   return (
     <span data-run-where className="inline-flex items-center gap-1.25">

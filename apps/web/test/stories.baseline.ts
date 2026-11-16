@@ -22,7 +22,6 @@ export const BASELINE = {
     'apps/web/src/components/factory/FactoriesCanvas.tsx',
     'apps/web/src/components/factory/FactoryBar.tsx',
     'apps/web/src/components/factory/FactoryBlock.tsx',
-    'apps/web/src/components/factory/FactoryCanvas.tsx',
     'apps/web/src/components/factory/FactoryCardStart.tsx',
     'apps/web/src/components/factory/FactoryCostLines.tsx',
     'apps/web/src/components/factory/FactoryDelegations.tsx',

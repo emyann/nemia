@@ -1,8 +1,9 @@
 /**
- * A factory's proposals and the reads its pane draws from, for their stories (`Gate/ProposalCard`, `Frame/FactoryPane`): proposals typed
- * by `objects`' own `Proposal` (`proposal`), so a key the api adds or renames fails the typecheck here first; a factory as the board views
- * it (`factoryView`); a card not started (`unstartedCard`); and the frame's light answer of the runs (`openRuns`). Each story seeds its
- * own query client with them (`seeded`), its queries never asked of the network, so the part draws the state the story names.
+ * A factory's proposals and the reads its pane and its floor draw from, for their stories (`Factory/ProposalCard`, `Frame/FactoryPane`,
+ * `Factory/FactoryCanvas`): proposals typed by `objects`' own `Proposal` (`proposal`), so a key the api adds or renames fails the
+ * typecheck here first; a factory as the board views it (`factoryView`); a card not started (`unstartedCard`) or queued (`queuedCard`);
+ * and the frame's light answer of the runs (`openRuns`). Each story seeds its own query client with them (`seeded`), its queries never
+ * asked of the network, so the part draws the state the story names.
  */
 import { QueryClient } from '@tanstack/react-query';
 import type { Proposal, ProposalPhase } from 'objects';
@@ -95,6 +96,18 @@ export const unstartedCard = (name: string, factory: string): InboxEntry => ({
   body: `${name}\n`,
   filedAt: AT,
   factoryRepo: null,
+});
+
+/**
+ * A card of `factory` queued at `place` in the order the tick starts cards in.
+ * @param name The card's name.
+ * @param factory The factory it is filed in.
+ * @param place Its place in the queue, from 1.
+ */
+export const queuedCard = (name: string, factory: string, place: number): InboxEntry => ({
+  ...unstartedCard(name, factory),
+  state: 'queued',
+  queued: { at: AT, place },
 });
 
 /** The frame's light answer of the runs: `waiting` runs wait on the person, none listed, since the pane reads the counts alone. */

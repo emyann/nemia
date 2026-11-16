@@ -51,7 +51,6 @@ function Ghost({ card, now, factories }: { card: InboxEntry; now: number; factor
       params={{ name: card.name }}
       data-ghost={card.name}
       data-place={place}
-      aria-label={`Queued ${ordinal(place)}: ${title}`}
       className="block rounded-lg border border-dashed border-outline bg-background/60 px-3 py-2 text-muted-foreground transition-colors hover:border-on-surface-variant hover:bg-background hover:text-foreground"
     >
       <span className="flex items-center justify-between gap-2 text-body-small">

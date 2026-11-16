@@ -5,7 +5,8 @@ import { tv, type VariantProps } from "../utils";
  * render their calendar from: the docked popover, the header with its menu
  * buttons, the weekday row, the day cell in every state, the year grid, the
  * month and year lists, and a range's month headings. Fork it and both
- * pickers change together; see the README, "Retheming — the three layers".
+ * pickers change together; see the kit's docs, "Retheming — the three
+ * layers": https://github.com/french-tech-homies/design-system/blob/main/docs/theming.md
  *
  * Every interactive part is `group/dpi` (never nested), and its states come
  * from React Aria's attributes: `data-hovered`, `data-focus-visible`,

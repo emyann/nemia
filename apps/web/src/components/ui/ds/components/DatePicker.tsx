@@ -303,6 +303,19 @@ export function DatePicker<T extends DateValue>(props: DatePickerProps<T>) {
   );
 }
 
+/**
+ * Material's date range picker: a start and an end date, on React Aria's
+ * `DateRangePicker`, the value a `{ start, end }` of
+ * `@internationalized/date` values. The field is two segmented dates under
+ * one label; its calendar button opens the picker full screen, the months
+ * in a vertical scroll, as Material's range picker is. It takes what
+ * `DatePicker` takes but `layout`, which it refuses: there is no docked or
+ * modal range picker. `defaultMode="input"` opens it on two outlined date
+ * fields instead. The draft, the constraints and the deviations are
+ * `DatePicker`'s, said there.
+ *
+ * Spec: https://m3.material.io/components/date-pickers/{overview,specs,guidelines,accessibility}
+ */
 export function DateRangePicker<T extends DateValue>(
   props: DateRangePickerProps<T>,
 ) {

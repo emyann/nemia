@@ -5,8 +5,9 @@ import { tv, type VariantProps } from "../utils";
  * from: `TextField`, `NumberField`, `PhoneField`, `Select`, `ComboBox`,
  * `DatePicker` and `DateRangePicker`.
  * Fork this one file and every field in the app changes anatomy together; see
- * the README, "Retheming — the three layers", for what a style module is allowed to
- * do and what a kit update guarantees about it.
+ * the kit's docs, "Retheming — the three layers", for what a style module is
+ * allowed to do and what a kit update guarantees about it:
+ * https://github.com/french-tech-homies/design-system/blob/main/docs/theming.md
  *
  * Spec: https://m3.material.io/components/text-fields/{overview,specs,guidelines,accessibility}
  * — 56dp container (the outlined variant's 1dp outline is inside it, so its

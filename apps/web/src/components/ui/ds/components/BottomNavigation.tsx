@@ -7,7 +7,12 @@ import {
   Link as AriaLink,
 } from "react-aria-components";
 
-import { Badge, badgeAccessibleText, type BadgeValue } from "./Badge";
+import {
+  Badge,
+  badgeAccessibleText,
+  type BadgeColor,
+  type BadgeValue,
+} from "./Badge";
 import { type IconComponent } from "../icons";
 import StateLayer from "../primitives/StateLayer";
 import { Label } from "../primitives/Typography";
@@ -83,6 +88,13 @@ export type NavigationItem = {
   /** What the badge says to a screen reader, when the count alone is not
       enough ("3 unread"). */
   badgeLabel?: string;
+  /**
+   * The badge's colour role, `Badge`'s `color`: Material's `error` when left
+   * out. The others are not Material's, for a project whose colours mean
+   * something else. The drawer's badge text keeps its own colour; only its
+   * dot takes this.
+   */
+  badgeColor?: BadgeColor;
 };
 
 /**
@@ -134,7 +146,9 @@ export type BottomNavigationProps = Omit<
  *   member from.
  *
  * A destination's `badge` is the kit's `Badge`, anchored on its icon, and is
- * read after its name (Material's badges page, accessibility).
+ * read after its name (Material's badges page, accessibility). Its
+ * `badgeColor` draws it in another role than Material's `error` (`Badge`'s
+ * `color`, not Material's).
  */
 export function BottomNavigation({
   items,
@@ -214,7 +228,7 @@ function Destination({
         <span className={iconBox()}>
           <Icon size={24} className={icon({ isActive })} />
           {item.badge !== undefined ? (
-            <Badge value={item.badge} anchored />
+            <Badge value={item.badge} color={item.badgeColor} anchored />
           ) : null}
         </span>
       </span>

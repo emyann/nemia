@@ -146,7 +146,9 @@ export type NavigationDrawerProps = {
  * on the active one, never the red `Badge` the bar and the rail draw. It is
  * read after the name ("Inbox, 24"). A badge of `true`, which has no text,
  * shows its `badgeLabel` as that text; without one it falls back to the small
- * `Badge` dot, so that an unread mark is never drawn as nothing.
+ * `Badge` dot, so that an unread mark is never drawn as nothing. A
+ * destination's `badgeColor` colours that dot only: the text is the drawer's
+ * own label, not a filled badge.
  *
  * Deviations: no bottom-anchored drawer
  * (`…bottom.container.shape` describes a compact-window variant the kit's
@@ -326,7 +328,7 @@ function Destination({
           {badgeText}
         </Label>
       ) : hasBadge(item.badge) ? (
-        <Badge value={true} />
+        <Badge value={true} color={item.badgeColor} />
       ) : null}
     </>
   );

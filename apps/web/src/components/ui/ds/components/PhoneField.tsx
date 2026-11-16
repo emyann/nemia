@@ -66,6 +66,8 @@ export type PhoneFieldProps = Omit<
     /** Helper text under the field; replaced by `errorMessage` when invalid. */
     supportingText?: ReactNode;
     errorMessage?: string | ((validation: ValidationResult) => string);
+    /** The error icon's accessible name. Default `"Error"`. */
+    errorLabel?: string;
     /** E.164 number, or `""` / `undefined` for empty (controlled). */
     value?: string;
     defaultValue?: string;
@@ -122,6 +124,7 @@ export function PhoneField(props: PhoneFieldProps) {
     label,
     supportingText,
     errorMessage,
+    errorLabel = "Error",
     value: controlledValue,
     defaultValue,
     onChange,
@@ -195,7 +198,7 @@ export function PhoneField(props: PhoneFieldProps) {
                 <span
                   data-slot="trailing-icon"
                   role="img"
-                  aria-label="Error"
+                  aria-label={errorLabel}
                   className={s.trailingIcon()}
                 >
                   <ErrorIcon size={24} />

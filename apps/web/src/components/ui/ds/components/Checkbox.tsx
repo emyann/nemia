@@ -114,6 +114,17 @@ export type CheckboxGroupProps = Omit<
   className?: string;
 };
 
+/**
+ * A set of `Checkbox`es with one name and one value: React Aria's
+ * `CheckboxGroup`, the `value` an array of the selected checkboxes'
+ * `value`s. It draws the group's `label` (`title-small`) above the boxes and,
+ * under them, the `supportingText` (`body-small`, `on-surface-variant`), which
+ * the `errorMessage` replaces while the group is invalid; both are read with
+ * the group. Disabling the group disables every box and fades the label to
+ * 38 %. The boxes stack 12dp apart.
+ *
+ * Spec: https://m3.material.io/components/checkbox/{overview,specs,guidelines,accessibility}
+ */
 export function CheckboxGroup({
   label,
   supportingText,

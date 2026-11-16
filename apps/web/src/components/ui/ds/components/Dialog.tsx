@@ -24,6 +24,22 @@ type BaseDialogProps = {
 
 type DialogProps = BaseDialogProps & DialogContentProps;
 
+/**
+ * MD3 dialog, without its overlay: React Aria's `Dialog` around the kit's
+ * `DialogContent`. It takes `DialogContent`'s props — a `title`, then an
+ * `icon`, `supportingText` and `actions`, or `children` of your own in their
+ * place, never both — and `role`. The `title` is always the dialog's
+ * accessible name. It is drawn as the headline only without `children`:
+ * with them the dialog shows what you pass and nothing else, so write the
+ * headline yourself (`<Headline size="medium">`).
+ *
+ * It draws no scrim and opens nothing: render it inside a `Modal` or a
+ * React Aria `DialogTrigger` and `Popover`, or use `ModalDialog`, which is
+ * this inside the kit's modal with the open state, light-dismiss and the
+ * full-screen variant handled.
+ *
+ * Spec: https://m3.material.io/components/dialogs/{overview,specs,guidelines,accessibility}
+ */
 export function Dialog(props: DialogProps) {
   const { className, role = "dialog", ...contentProps } = props;
 

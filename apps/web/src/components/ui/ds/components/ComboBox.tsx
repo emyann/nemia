@@ -91,6 +91,8 @@ export type ComboBoxProps<
     /** Helper text under the field; replaced by `errorMessage` when invalid. */
     supportingText?: ReactNode;
     errorMessage?: string | ((validation: ValidationResult) => string);
+    /** The error icon's accessible name. Default `"Error"`. */
+    errorLabel?: string;
     leadingIcon?: IconProp;
     /** Only shown while the label is floated, like MD3. */
     placeholder?: string;
@@ -161,6 +163,7 @@ export function ComboBox<T extends object, M extends SelectionMode = "single">(
     label,
     supportingText,
     errorMessage,
+    errorLabel = "Error",
     leadingIcon,
     placeholder,
     items,
@@ -196,6 +199,7 @@ export function ComboBox<T extends object, M extends SelectionMode = "single">(
           label={label}
           supportingText={supportingText}
           errorMessage={errorMessage}
+          errorLabel={errorLabel}
           leadingIcon={leadingIcon}
           placeholder={placeholder}
           isRequired={!!comboBoxProps.isRequired}
@@ -256,6 +260,7 @@ type FieldProps = {
   label?: string;
   supportingText?: ReactNode;
   errorMessage?: string | ((validation: ValidationResult) => string);
+  errorLabel: string;
   leadingIcon?: IconProp;
   placeholder?: string;
   isRequired: boolean;
@@ -275,6 +280,7 @@ function Field({
   label,
   supportingText,
   errorMessage,
+  errorLabel,
   leadingIcon,
   placeholder,
   isRequired,
@@ -366,7 +372,7 @@ function Field({
           <span
             data-slot="trailing-icon"
             role="img"
-            aria-label="Error"
+            aria-label={errorLabel}
             className={s.trailingIcon()}
           >
             <ErrorIcon size={24} />

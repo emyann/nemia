@@ -183,19 +183,30 @@ test('a run spawned again under its name starts with empty streams, and a cut in
   const cwd = scratch('ae-command-cwd-');
   const ops = detachedOps(commandHarness, root);
   const name = 'ae/again/1';
-  const done = () =>
-    until(t, async () => (await Effect.runPromise(ops.observe)).get(name)?.state === 'completed', 'the run completed', { everyMs: 50 });
+  const said = path.join(cwd, 'said');
+  const done = (message?: string) =>
+    until(
+      t,
+      async () => {
+        const seen = (await Effect.runPromise(ops.observe)).get(name);
+        return seen?.state === 'completed' && seen.terminationMessage === message;
+      },
+      message === undefined ? 'the run completed' : `the run that says ${message} completed`,
+      { everyMs: 50 },
+    );
   await Effect.runPromise(ops.spawn({ name, brief: 'x', cwd, config: { command: ['sh', '-c', 'printf "aé"; echo old >&2'] } }));
   await done();
   assert.equal(await Effect.runPromise(ops.output!(name, 'stdout', 1)), '', 'the one byte left of `é` is no character');
   assert.equal(await Effect.runPromise(ops.output!(name, 'stdout', 2)), 'é');
   assert.equal(await Effect.runPromise(ops.output!(name, 'stderr')), 'old\n');
-  await Effect.runPromise(ops.spawn({ name, brief: 'x', cwd, config: { command: ['true'] } }));
+  await Effect.runPromise(
+    ops.spawn({ name, brief: 'x', cwd, config: { command: ['sh', '-c', `printf again > ${said}`], terminationMessagePath: said } }),
+  );
   assert.ok(
     [undefined, ''].includes(await Effect.runPromise(ops.output!(name, 'stderr'))),
     'the run before is gone before its worker has started',
   );
-  await done();
+  await done('again');
   assert.deepEqual([await Effect.runPromise(ops.output!(name, 'stdout')), await Effect.runPromise(ops.output!(name, 'stderr'))], ['', '']);
   assert.equal(await Effect.runPromise(ops.output!('ae/never/1', 'stdout')), undefined, 'a run that never was has no stream');
 });

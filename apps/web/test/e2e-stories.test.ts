@@ -67,7 +67,7 @@ function planted(): { root: string; base: string } {
     'apps/web/src/components/look/index.ts': "export { Lone } from './Lone';\n",
     [DRAWN]: 'export const undrawn = () => false;\n',
     [STYLES]:
-      "@import 'tailwindcss';\n@import '../theme/theme.css';\n/* @import './components/run/none.css'; */\n" +
+      "@import 'tailwindcss';\n@import '../theme/theme.css';\n/* @import './components/ui/ds/tokens/theme.css'; */\n" +
       "@import './components/look/grain.css';\n",
     [THEME]: ':root { --md-sys-color-secondary: #5fa8b8; }\n',
     [GRAIN]: '.grain { opacity: 0.1; }\n',

@@ -209,7 +209,18 @@ test('on an empty store the report counts no run and holds every measure, the ma
   for (const key of ['runList', 'runListHundred'] as const)
     assert.ok(Number.isInteger(written.measures[key]?.bytes), `${key}: the answer's bytes are measured`);
   assert.equal(written.asked.factory, null, 'no factory of its own');
-  for (const key of ['factoryGet', 'factoryCommands', 'scheduleList', 'hireList', 'volumeList', 'mcpServerList', 'libraryAddList'] as const)
+  for (const key of [
+    'factoryGet',
+    'factoryCommands',
+    'scheduleList',
+    'hireList',
+    'volumeList',
+    'mcpServerList',
+    'libraryAddList',
+    'proposalList',
+    'proposalWaiting',
+    'cardList',
+  ] as const)
     assert.equal(written.measures[key], null, `${key}: no factory of its own to ask`);
   assert.equal(written.measures.finishedRun, null, 'no finished run to read');
   assert.equal(written.measures.openRun, null, 'no open run to read');

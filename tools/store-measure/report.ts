@@ -52,7 +52,9 @@
  *   and of the copy's first factory but the default by name, `GET /api/factories/:name`, `…/commands` and
  *   `GET /api/namespaces/:name/schedules`, `hires`, `volumes` and `mcpservers`, over apps as `runList` is; null where the copy has no
  *   factory of its own. `libraryAddList`: `GET /api/namespaces/:name/libraryadds` of that factory, the same way: its adds, recorded or
- *   derived from what its workflows resolve. `libraryAgents`, `librarySkills`: `GET /api/agents` and `/api/skills` at the store's level,
+ *   derived from what its workflows resolve. `proposalList`, `proposalWaiting`: `GET /api/namespaces/:name/proposals?limit=500` of that
+ *   factory, every proposal whole (the proposals page's read), and the same asked `?fieldSelector=status.phase=waiting` (the factory
+ *   pane's line). `cardList`: `GET /api/namespaces/:name/cards?limit=500`, the factory's cards, as `inbox` reads every card. `libraryAgents`, `librarySkills`: `GET /api/agents` and `/api/skills` at the store's level,
  *   over apps as `runList` is, each item with the factories that use it, the library's reverse lookup over every factory.
  *   `ceilings`: `GET /api/ceilings`, the same way, and `ceilingsAfterPass` the same asked after a pass has filled the app's informer, as
  *   `runListAfterPass` is.
@@ -553,6 +555,9 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     volumeList: await ofFactory((f) => `/api/namespaces/${f}/volumes`),
     mcpServerList: await ofFactory((f) => `/api/namespaces/${f}/mcpservers`),
     libraryAddList: await ofFactory((f) => `/api/namespaces/${f}/libraryadds`),
+    proposalList: await ofFactory((f) => `/api/namespaces/${f}/proposals?limit=500`),
+    proposalWaiting: await ofFactory((f) => `/api/namespaces/${f}/proposals?limit=500&fieldSelector=status.phase%3Dwaiting`),
+    cardList: await ofFactory((f) => `/api/namespaces/${f}/cards?limit=500`),
     libraryAgents: await overApps(fresh, (app) => get(app, '/api/agents?limit=500'), repeat),
     librarySkills: await overApps(fresh, (app) => get(app, '/api/skills?limit=500'), repeat),
     ceilings: await overApps(fresh, (app) => get(app, '/api/ceilings'), repeat),

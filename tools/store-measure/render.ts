@@ -8,7 +8,8 @@ import type { Refusal } from './fence.ts';
  * The six reads, the run list asked again at the old default page of 100, the run's object counted twice, the old list of summaries
  * beside the RunList (its yardstick), the list, an open run and the inbox read again after a pass, and her chat's three (its history, the
  * old beat's whole re-projection and the fold of one moment of her session), and the factory's reads the board polls (the list, one
- * factory, its commands, its schedules, hires, volumes and MCP servers) and the ceilings: `measures`' keys.
+ * factory, its commands, its schedules, hires, volumes and MCP servers, its proposals whole and those that wait, and its cards) and the
+ * ceilings: `measures`' keys.
  */
 export const MEASURES = [
   'tickPass',
@@ -35,6 +36,9 @@ export const MEASURES = [
   'volumeList',
   'mcpServerList',
   'libraryAddList',
+  'proposalList',
+  'proposalWaiting',
+  'cardList',
   'libraryAgents',
   'librarySkills',
   'ceilings',

@@ -10,5 +10,10 @@
   "options": {
     "typeAware": false
   },
-  "ignorePatterns": ["apps/web/src/components/ui/ds/**", "apps/web/.claude/**", "apps/web/src/routeTree.gen.ts"]
+  "ignorePatterns": [
+    "apps/web/src/components/ui/ds/**",
+    "apps/web/.claude/**",
+    "apps/web/src/routeTree.gen.ts",
+    "apps/web/.storybook/public/**"
+  ]
 }

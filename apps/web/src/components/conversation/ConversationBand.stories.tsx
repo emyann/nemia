@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ConversationBand } from './ConversationBand';
 
 /** The band both conversations draw over their talk: a quiet note at rest, and a failure's container whole. */
-const meta: Meta = { title: 'Conversation/ConversationBand' };
+const meta: Meta = { title: 'Run/ConversationBand' };
 export default meta;
 
 /** Where a band stands in its story: a panel's width, on the card's ground. */

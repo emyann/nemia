@@ -4,7 +4,7 @@ import type { Readiness } from 'objects';
 import { ReadinessList } from './ReadinessList';
 
 /** The readiness read as the Setup page draws it: pieces missing, in place and unknown, with fixes typed and started. */
-const meta: Meta = { title: 'Board/ReadinessList' };
+const meta: Meta = { title: 'Store/ReadinessList' };
 export default meta;
 
 /** A server half set up: the harness's token missing, its service in place, the bind unknown, and a workflow's sign-in missing. */

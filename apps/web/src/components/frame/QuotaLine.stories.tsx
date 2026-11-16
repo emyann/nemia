@@ -7,7 +7,7 @@ import { QuotaLine } from './QuotaLine';
  * The quota over a factory's floor: an ask's answer, the windows a token's sessions heard with a turn, and a token none of whose sessions
  * has reported one yet. Times are counted back from when the story is drawn, since the line says how long ago against the clock.
  */
-const meta: Meta = { title: 'Board/QuotaLine' };
+const meta: Meta = { title: 'Frame/QuotaLine' };
 export default meta;
 
 /** The room of a board at 1440 pixels with the rail open. */

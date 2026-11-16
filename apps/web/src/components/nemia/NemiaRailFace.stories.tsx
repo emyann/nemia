@@ -3,7 +3,7 @@ import { UP, type Presence } from '@/lib/presence';
 import { NemiaRailFace } from './NemiaRailFace';
 
 /** Nemia's face as the rail draws it: closed, with cues in its tooltip, open and ringed, and on her own page. */
-const meta: Meta = { title: 'Board/NemiaRailFace' };
+const meta: Meta = { title: 'Frame/NemiaRailFace' };
 export default meta;
 
 /** Where a face stands in its story: the rail's ground, as wide as the narrow rail. */

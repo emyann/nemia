@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Composer } from './Composer';
 
 /** The family's composer: open, off with nowhere to send to, offering the stop, and inviting the person's own words. */
-const meta: Meta = { title: 'Conversation/Composer' };
+const meta: Meta = { title: 'Run/Composer' };
 export default meta;
 
 /** Where the composer stands in its story: a panel's width, on the card's ground. */

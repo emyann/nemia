@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { LOOK_TESTS } from './e2e/look.ts';
+import { LOOK_RUNS, LOOK_TESTS } from './e2e/look.ts';
 import { WAITED } from './waits.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
@@ -73,4 +73,18 @@ test("the e2e script is the runner alone, so npm appends --pages to it, and the 
 
 test('REFUSED: the old script, which ran every look test past any --pages', () => {
   assert.equal(scriptBreaks('node --test --test-timeout=120000 test/e2e/*.test.ts && node test/e2e/run.ts').length, 1);
+});
+
+test("--look runs the stories' Vitest after the look's node tests, the stories script being the storybook project's run", () => {
+  assert.deepEqual(
+    LOOK_RUNS.map((run) => run.what),
+    ['tests', 'stories'],
+    "the look's node tests, then every story in Chromium",
+  );
+  const stories = LOOK_RUNS.find((run) => run.what === 'stories');
+  assert.deepEqual(stories && [stories.command, ...stories.args], ['npm', 'run', 'stories']);
+  assert.match(
+    (JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { scripts: Record<string, string> }).scripts.stories ?? '',
+    /^vitest run --project=storybook$/,
+  );
 });

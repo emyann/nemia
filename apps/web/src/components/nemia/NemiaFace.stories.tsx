@@ -4,7 +4,7 @@ import { cuesOf, UP, type Presence } from '@/lib/presence';
 import { NemiaFace } from './NemiaFace';
 
 /** Nemia's face, in each of her six expressions, at the size she is docked at and at a header's, and beside her cues. */
-const meta: Meta = { title: 'Board/NemiaFace' };
+const meta: Meta = { title: 'Frame/NemiaFace' };
 export default meta;
 
 /** Where a face stands in its story. */

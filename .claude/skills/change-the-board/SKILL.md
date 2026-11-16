@@ -46,6 +46,16 @@ applies: ["apps/web/**"]
    (`<Part>.stories.tsx`): `npm run storybook`, from `apps/web`, serves them to a person on port 6007, and `npm run board:serve`
    prints a third line, `stories on <address>`, where a step given a browser opens them. A new part of the look gets its stories in
    the same change, and its name here.
+10. **Build and judge a visual change in Storybook, not by serving the whole board.** Write or extend the story of the part first
+   (one a state, with `args`, titled `Look/`, `Frame/`, `Store/`, `Factory/`, `Run/` or `Pages/` by where it sits), then change the
+   part. A page body's story answers its reads through MSW over fixtures typed by `objects` (`apps/web/.storybook/fixtures/`, the runs
+   page's stories the pattern). `npm run stories`, from `apps/web`, runs every story in Chromium (its render, its play function,
+   axe as `error`); one file with `npx vitest run --project=storybook <file>.stories.tsx`. `node test/e2e/stories/shoot.ts --base
+   main-worktree/HEAD --out <your files>` pictures each story the change touches, light and dark, and the before, after and diff of
+   each whose pixels moved; it refuses a changed part no story reaches. A dev server (`npm run storybook`) is the quickest second
+   look, under a second against a whole build's 20 s or more, but holds about 2.5 GB while it runs: stop it before Vitest or a build.
+   A new part is the ds kit's (`ds-build`), or a part of the look where the kit has none and the part is Nemia's alone: never a new
+   import of shadcn's `components/ui/*` or of React Aria outside the kit and the look (`apps/web/test/stories.test.ts`).
 
 ## The board's traps
 

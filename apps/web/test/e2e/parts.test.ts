@@ -684,8 +684,8 @@ test(
   },
 );
 
-const CARD_NARROW = 'board-waitingcard--narrow';
-const CARD_WIDE = 'board-waitingcard--wide';
+const CARD_NARROW = 'run-waitingcard--narrow';
+const CARD_WIDE = 'run-waitingcard--wide';
 
 /** Where the button of the card the page draws stands against its tiles, and how far its right edge is from the foot's. */
 const footOf = (page: Page): Promise<{ under: boolean; beside: boolean; fromRight: number }> =>
@@ -838,10 +838,10 @@ test(
 
 /** Each of the step part's stories, by the state its step stands in: its card's kind, its frame's hue, and its one action. */
 const STEP_CARDS = [
-  ['board-steppart--to-come', 'come', 'none', 'Open the step'],
-  ['board-steppart--at-work', 'work', 'alive', 'Open the step'],
-  ['board-steppart--waits-on-you', 'gate', 'yours', 'Read and approve'],
-  ['board-steppart--done', 'done', 'none', 'Open the step'],
+  ['run-steppart--to-come', 'come', 'none', 'Open the step'],
+  ['run-steppart--at-work', 'work', 'alive', 'Open the step'],
+  ['run-steppart--waits-on-you', 'gate', 'yours', 'Read and approve'],
+  ['run-steppart--done', 'done', 'none', 'Open the step'],
 ] as const;
 
 test(
@@ -882,7 +882,7 @@ test(
   },
 );
 
-const WORKED_OPENABLE = 'conversation-worked--openable';
+const WORKED_OPENABLE = 'run-worked--openable';
 
 test("a conversation's line opens on a press and shows what it asked and what came back", WAITED, async () => {
   const page = await openParts(browser, built, 'dark', alone(WORKED_OPENABLE));
@@ -907,13 +907,13 @@ test("a conversation's line opens on a press and shows what it asked and what ca
 /** The running line's title in Trace's story of it: the animation it runs and the image its text is painted with. */
 async function shimmerOf(page: Page): Promise<{ animation: string; image: string }> {
   return page
-    .locator('[data-story="board-trace--running"] [data-status="running"] [data-slot="trace-title"]')
+    .locator('[data-story="run-trace--running"] [data-status="running"] [data-slot="trace-title"]')
     .evaluate((title) => ({ animation: getComputedStyle(title).animationName, image: getComputedStyle(title).backgroundImage }));
 }
 
 test("a trace's running title shimmers, and holds still where the person asked for reduced motion", WAITED, async () => {
-  const moving = await openParts(browser, built, 'dark', alone('board-trace--running'));
-  const still = await openParts(browser, built, 'dark', alone('board-trace--running'), { still: true });
+  const moving = await openParts(browser, built, 'dark', alone('run-trace--running'));
+  const still = await openParts(browser, built, 'dark', alone('run-trace--running'), { still: true });
   try {
     const shimmer = await shimmerOf(moving);
     assert.equal(shimmer.animation, 'tw-shimmer', 'it shimmers');

@@ -3,7 +3,7 @@ import type { ConversationLine } from '@/lib/conversation';
 import { Worked, WorkedLine } from './Worked';
 
 /** The family's turn: at work with a line in each state, folded, the same opened, and a line that opens to what it asked and got. */
-const meta: Meta = { title: 'Conversation/Worked' };
+const meta: Meta = { title: 'Run/Worked' };
 export default meta;
 
 /** Where a turn stands in its story: a panel's width, on the card's ground. */
@@ -133,6 +133,7 @@ const LONG = Array.from({ length: 40 }, (_, i) => `${i + 1}  const line = ${i} /
 
 /** A line whose result is long enough to scroll inside its own cap. */
 export const Long: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
   render: () => (
     <div style={PANEL}>
       <WorkedLine

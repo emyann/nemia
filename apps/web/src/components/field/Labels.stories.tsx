@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { LabelTags, Labels } from './Labels';
 
 /** A run's labels: as a row's tags, and edited on its page, the store's `factory` and `workflow` shown and never removed. */
-const meta: Meta = { title: 'Board/Labels' };
+const meta: Meta = { title: 'Run/Labels' };
 export default meta;
 
 const BOX = { maxWidth: 640, padding: 24 };

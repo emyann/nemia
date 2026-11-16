@@ -8,7 +8,7 @@ import { ServerReleaseView, type ServerReleaseShown, UpgradeOutcome, UpgradeRun 
  * Settings' Server release section in each of its states: no newer release, a newer one with its notes, upgrading, restarting,
  * upgraded with the pieces new runs wait on, failed, and Back refused by the store's floor.
  */
-const meta: Meta = { title: 'Board/ServerRelease' };
+const meta: Meta = { title: 'Store/ServerRelease' };
 export default meta;
 
 /** A box as wide as Settings' column. */

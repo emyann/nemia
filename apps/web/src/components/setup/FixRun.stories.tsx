@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { FixRun } from './FixRun';
 
 /** A fix the server runs, as Setup follows it: running with a device code and a link, done, and failed. */
-const meta: Meta = { title: 'Board/FixRun' };
+const meta: Meta = { title: 'Store/FixRun' };
 export default meta;
 
 /** What a device-code sign-in prints. */

@@ -2,7 +2,6 @@ import { Blobatar } from '@blobatar/react';
 import { useGaze } from '@blobatar/react/gaze';
 import type { Expression } from 'blobatar';
 import type { ReactNode } from 'react';
-import { Link as AriaLink } from 'react-aria-components';
 import { sourceOf, type AgentSkill, type GivenSkill, type SkillSource } from '../../lib/api/library.ts';
 import { type AgentFill, type AgentListing, type AgentUser } from '../../lib/api/agents.ts';
 import { type PagePlace } from '../../lib/api/workflows.ts';
@@ -12,12 +11,23 @@ import { routeLink } from '../nav/routeLink';
 import { usePagePlace } from '../nav/useSeat';
 import { definitionLink, workflowLink } from '../../lib/factoryAddress';
 import { container, hairline } from '../../lib/meaning';
-import { focusRing } from '../ui/ds/utils';
+import { composeTailwindRenderProps, Link, type LinkProps } from '../ui/ds';
 
-/** A link to a route, as React Aria draws one (`routeLink`): what the Agents pages link a node and an agent with. */
-export const RouteLink = routeLink(AriaLink);
+/**
+ * A link to a route, as the kit draws one (`routeLink`), in the colour of the text around it: what the Agents pages link a node and an
+ * agent with.
+ */
+export const RouteLink = routeLink(InheritedLink);
 
-const LINK = cn('rounded-sm underline decoration-outline underline-offset-2 hover:decoration-foreground', focusRing());
+const LINK = 'underline decoration-outline hover:decoration-foreground';
+
+/**
+ * The kit's link in the colour of the text around it, and with no underline unless the caller's classes give one: the board's route
+ * links are pills, rows and words alike, and each says its own underline, as the bare link they were drawn with did.
+ */
+function InheritedLink({ className, ...props }: LinkProps) {
+  return <Link color="inherit" {...props} className={composeTailwindRenderProps(className, 'no-underline')} />;
+}
 
 /** The word for each origin an agent is read from. */
 const AGENT_FROM: Readonly<Record<AgentListing['from'], string>> = {
@@ -395,7 +405,7 @@ export function GivenSkills({
 /** The way back to the Agents page. */
 export function BackToAgents() {
   return (
-    <RouteLink to="/agents" className={cn('rounded-sm text-body-medium text-muted-foreground hover:text-foreground', focusRing())}>
+    <RouteLink to="/agents" underline="hover" className="text-body-medium text-muted-foreground hover:text-foreground">
       ← Agents
     </RouteLink>
   );

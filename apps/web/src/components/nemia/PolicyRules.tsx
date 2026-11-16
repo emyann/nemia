@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, Tag } from '@/components/ui/ds';
 import { policyQuery, confirmRule, dropRule, type PolicyList } from '../../lib/api/policy.ts';
 import { clockWord } from '../../lib/quota';
 import { useNow } from '../../lib/useNow';
@@ -110,7 +109,7 @@ function Rule({ rule, children }: { rule: { id: string; words: string; answer: s
 /** A Drop for the rule `id` in force. */
 function Drop({ id, pending, onAsk }: { id: string; pending: boolean; onAsk: (rule: RuleAsk) => void }) {
   return (
-    <Button variant="outline" size="sm" data-auto-drop isDisabled={pending} onPress={() => onAsk({ verb: 'drop', id })}>
+    <Button variant="outlined" size="xsmall" data-auto-drop isDisabled={pending} onPress={() => onAsk({ verb: 'drop', id })}>
       Drop
     </Button>
   );
@@ -127,11 +126,11 @@ function Confirm({
   onAsk: (rule: RuleAsk) => void;
 }) {
   return rule.confirmed ? (
-    <Badge variant="secondary" data-auto-confirmed>
+    <Tag color="neutral" data-auto-confirmed>
       In force
-    </Badge>
+    </Tag>
   ) : (
-    <Button size="sm" data-auto-confirm isDisabled={pending} onPress={() => onAsk({ verb: 'confirm', id: rule.id, words: rule.words })}>
+    <Button size="xsmall" data-auto-confirm isDisabled={pending} onPress={() => onAsk({ verb: 'confirm', id: rule.id, words: rule.words })}>
       Confirm
     </Button>
   );
@@ -146,9 +145,9 @@ function InForce({ list, pending, onAsk }: { list: PolicyList; pending: boolean;
           {list.rules.map((rule) => (
             <Rule key={rule.id} rule={rule}>
               {rule.from === DEFAULT_ID && (
-                <Badge variant="outline" data-auto-default>
+                <Tag variant="outlined" data-auto-default>
                   Default
-                </Badge>
+                </Tag>
               )}
               <Drop id={rule.id} pending={pending} onAsk={onAsk} />
             </Rule>
@@ -162,8 +161,8 @@ function InForce({ list, pending, onAsk }: { list: PolicyList; pending: boolean;
       {!list.rules.some((rule) => rule.id === DEFAULT_ID) && (
         <div>
           <Button
-            variant="outline"
-            size="sm"
+            variant="outlined"
+            size="xsmall"
             data-auto-default-back
             isDisabled={pending}
             onPress={() => onAsk({ verb: 'confirm', id: DEFAULT_ID, words: list.builtin.words })}

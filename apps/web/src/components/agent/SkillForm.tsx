@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import type { SkillDetail, SkillDraft } from '../../lib/api/skills.ts';
 import { draftOfForm, EMPTY_SKILL_FORM, skillEdited, skillFormOf, type SkillForm as Form } from '../../lib/skills';
 import { Field } from './AgentForm';
@@ -115,7 +115,7 @@ export function SkillForm({
             {saving ? 'Saving…' : detail ? 'Save' : 'Create skill'}
           </Button>
           {detail && changed && (
-            <Button variant="ghost" onPress={() => setForm(was)} isDisabled={saving}>
+            <Button variant="text" onPress={() => setForm(was)} isDisabled={saving}>
               Discard changes
             </Button>
           )}

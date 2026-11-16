@@ -7,7 +7,7 @@
 import { Effect } from 'effect';
 import { PROPOSAL_PHASES, type Proposal } from 'objects';
 import { Conflict, Forbidden, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
-import { phaseTakes, proposalPhaseSelector } from '../proposal/phase-selector.ts';
+import { phaseTakes, proposalPhaseSelector } from '../proposal/index.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { proposalApproval } from './approval.ts';

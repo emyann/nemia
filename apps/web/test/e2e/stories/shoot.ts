@@ -5,8 +5,10 @@
  * The change's paths are the work's own since the merge base of HEAD and `--base`, as the factory's picture check reads them: its commits
  * along the first parent, and of a merge only its resolution, so a path a merged branch changed is not the work's; `--changed` names
  * them instead, each from the workspace root. A story is touched when a file its imports reach, through every import of the board's own
- * (`src` and `.storybook`), is one of them (`storiesTouched`, `touched.ts`); a changed part that owes a story and that no story reaches
- * is bare, and refused, exit 1, naming each and the story file to write beside it; a part the change deleted owes none.
+ * (`src` and `.storybook`), is one of them, or a file every story is drawn in: Storybook's preview, the board's files it imports and
+ * the stylesheets those `@import` under `src` and `theme` (`storiesTouched`, `touched.ts`); a changed part that owes a story and
+ * that no story reaches is bare, and refused, exit 1, naming each and the story file to write beside it; a part the change deleted
+ * owes none.
  *
  * With `--list` it prints `{ "stories": [<id>…], "bare": [<path>…] }` and launches no browser: each id is Storybook's own
  * (`toId(title, storyNameFromExport(export))`), read off the story file's title and named exports by the TypeScript compiler. Without
@@ -32,8 +34,21 @@ import { owesAStory, storiesTouched } from './touched.ts';
 /** The board's folder, from the workspace root. */
 const BOARD = 'apps/web';
 
-/** What the board's own imports reach: its source and its Storybook's files. */
-const OWN = /^apps\/web\/(src|\.storybook)\//;
+/** What the board's own imports reach: its source, its Storybook's files and its theme. */
+const OWN = /^apps\/web\/(src|\.storybook|theme)\//;
+
+/** What Storybook draws every story in, from the workspace root. */
+const PREVIEW = `${BOARD}/.storybook/preview.tsx`;
+
+/** Each local stylesheet a stylesheet's text `@import`s, outside its comments, by its specifier. */
+const cssImportsIn = (text: string): string[] =>
+  [...text.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/@import\s+(?:url\(\s*)?['"]([^'"]+)['"]/g)].flatMap((m) =>
+    m[1]?.startsWith('.') ? [m[1]] : [],
+  );
+
+/** The modules `file`'s text names: a stylesheet's `@import`s, a module's imports. */
+const specsOf = (file: string, text: string): string[] =>
+  file.endsWith('.css') ? cssImportsIn(text) : importsIn(text).map(({ spec }) => spec);
 
 /** A story file of the board, from the workspace root: anywhere under `src/components` but the vendored folders. */
 const isStoryFile = (file: string): boolean =>
@@ -82,21 +97,42 @@ const resolved = (root: string, from: string, spec: string): string | undefined 
   return undefined;
 };
 
+/** Each file of the board's own `file`'s text names, by its path from the workspace root. */
+const ownOf = (root: string, file: string): string[] =>
+  specsOf(file, fs.readFileSync(path.join(root, file), 'utf8')).flatMap((spec) => {
+    const next = resolved(root, file, spec);
+    return next !== undefined && OWN.test(next) ? [next] : [];
+  });
+
 /**
- * What `story` reaches: itself, and every file of the board's own its imports reach, followed through each such file's imports.
+ * What every story is drawn in: Storybook's preview, each file of the board's own it imports, and the stylesheets those `@import`,
+ * followed; none where the board has no preview. A module the preview imports is not followed, so a part behind a door it imports
+ * reaches only the stories that import it.
+ * @param root The workspace root.
+ */
+const drawnIn = (root: string): string[] => {
+  if (!fs.existsSync(path.join(root, PREVIEW))) return [];
+  const drawn = [PREVIEW, ...ownOf(root, PREVIEW)];
+  for (let at = 1; at < drawn.length; at++) {
+    const file = drawn[at] ?? PREVIEW;
+    if (file.endsWith('.css')) for (const next of ownOf(root, file)) if (!drawn.includes(next)) drawn.push(next);
+  }
+  return [...new Set(drawn)];
+};
+
+/**
+ * What `story` reaches: itself, every file of the board's own its imports reach, followed through each such file's imports, and
+ * `drawn`, what every story is drawn in.
  * @param root The workspace root.
  * @param story The story file, from the workspace root.
+ * @param drawn What every story is drawn in (`drawnIn`).
  */
-export const reachOf = (root: string, story: string): StoryReach => {
+export const reachOf = (root: string, story: string, drawn: readonly string[]): StoryReach => {
   const reaches = [story];
   for (let at = 0; at < reaches.length; at++) {
-    const file = reaches[at] ?? story;
-    for (const { spec } of importsIn(fs.readFileSync(path.join(root, file), 'utf8'))) {
-      const next = resolved(root, file, spec);
-      if (next !== undefined && OWN.test(next) && !reaches.includes(next)) reaches.push(next);
-    }
+    for (const next of ownOf(root, reaches[at] ?? story)) if (!reaches.includes(next)) reaches.push(next);
   }
-  return { story, reaches };
+  return { story, reaches: [...reaches, ...drawn.filter((file) => !reaches.includes(file))] };
 };
 
 /**
@@ -123,7 +159,8 @@ const storyFiles = (root: string): string[] =>
  * @param changed The paths the change touched, from the workspace root.
  */
 export const touchedOf = (root: string, changed: readonly string[]): { stories: string[]; bare: string[] } => {
-  const reach = storyFiles(root).map((story) => reachOf(root, story));
+  const drawn = drawnIn(root);
+  const reach = storyFiles(root).map((story) => reachOf(root, story, drawn));
   const owing = [...new Set(changed.filter((file) => owesAStory(file) && fs.existsSync(path.join(root, file))))];
   const touched = storiesTouched(changed, reach, owing);
   return { stories: touched.stories.flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8'))), bare: [...touched.bare] };

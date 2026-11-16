@@ -383,7 +383,7 @@ async function main(): Promise<number> {
           fs.writeFileSync(path.join(out, match.match), png);
         }
         console.log(
-          `stories: ${matches.length} target${matches.length === 1 ? '' : 's'} set beside ${matched.length === 1 ? 'its story' : 'their stories'}, match-<id>-<theme>.png`,
+          `stories: ${matches.length} match${matches.length === 1 ? '' : 'es'} of a target and its story written, match-<id>-<theme>.png, in ${out}`,
         );
       }
       if (shot.length === 0) report.baseWhy = 'the change touches no story, so the base was not drawn';

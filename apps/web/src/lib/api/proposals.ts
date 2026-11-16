@@ -23,7 +23,7 @@ export const WAITING_SELECTOR = 'status.phase=waiting';
  * The key of the factory `factory`'s proposals that wait, under its proposals' (`proposalsKey`), so a judgement reads it again.
  * @param factory The factory's name.
  */
-export const waitingProposalsKey = (factory: string) => [...proposalsKey(factory), 'waiting'] as const;
+const waitingProposalsKey = (factory: string) => [...proposalsKey(factory), 'waiting'] as const;
 
 /**
  * The key of the proposal `name` of `factory`, which a judgement sets from its answer.

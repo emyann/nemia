@@ -124,7 +124,7 @@ const inPlaySelected = async (selector: string | undefined): Promise<InboxEntry[
   (await cardsListed(selector)).items.filter((card) => card.status.inPlay).map(entryOf);
 
 /** How long a read of the inbox in play stands fresh (`inboxQuery`): what a page's loader read is not asked again as the page mounts. */
-export const INBOX_FRESH_MS = 10_000;
+const INBOX_FRESH_MS = 10_000;
 
 /**
  * The inbox's cards still in play: each not yet started, and each whose run is pending, running or waiting — a card whose run ended is

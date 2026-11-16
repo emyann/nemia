@@ -91,14 +91,7 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
   };
   return (
     <PreviewTrigger delay={warm ? 0 : undefined} onOpenChange={opened}>
-      <Button
-        ref={bar}
-        aria-label={said}
-        data-step-bar={step.name}
-        data-step-preview="card"
-        className={BAR_BUTTON}
-        onKeyDown={intoTheCard}
-      >
+      <Button ref={bar} aria-label={said} data-step-bar={step.name} data-step-preview="card" className={BAR_BUTTON} onKeyDown={intoTheCard}>
         {children}
       </Button>
       <ByTheRail>

@@ -16,6 +16,7 @@ export {
   EditIcon,
   ScheduleIcon,
   KeyboardIcon,
+  DragIndicatorIcon,
   GlobeIcon,
   ImageIcon,
   MinusIcon,
@@ -78,6 +79,33 @@ export { default as ListItem, type ListItemProps } from "./components/ListItem";
 export { Tag, type TagProps } from "./components/Tag";
 export { Link, type LinkProps } from "./components/Link";
 export {
+  ContextMenu,
+  type ContextMenuProps,
+} from "./components/ContextMenu";
+export {
+  Tree,
+  TreeItem,
+  type TreeProps,
+  type TreeItemProps,
+} from "./components/Tree";
+export { DropZone, type DropZoneProps } from "./components/DropZone";
+export {
+  FileTrigger,
+  type FileTriggerProps,
+} from "./components/FileTrigger";
+export {
+  Popover,
+  PopoverTrigger,
+  type PopoverProps,
+  type PopoverTriggerProps,
+} from "./components/Popover";
+export {
+  Breadcrumbs,
+  Breadcrumb,
+  type BreadcrumbsProps,
+  type BreadcrumbProps,
+} from "./components/Breadcrumbs";
+export {
   Badge,
   badgeAccessibleText,
   BADGE_MAX,
@@ -87,6 +115,7 @@ export {
 } from "./components/Badge";
 export {
   Table,
+  ResizableTableContainer,
   TableHeader,
   TableBody,
   TableFooter,
@@ -99,7 +128,11 @@ export {
   type CellProps,
 } from "./components/Table";
 export { Avatar, type AvatarProps } from "./components/Avatar";
-export { GridList, GridListItem } from "./components/GridList";
+export {
+  GridList,
+  GridListItem,
+  GridListDragHandle,
+} from "./components/GridList";
 export {
   Menu,
   type MenuItemType,

@@ -268,11 +268,12 @@ test('REFUSED: a weight or a tracking written beside a label or title role: the 
 
 test("the board's cn knows the theme's roles as the kit's does: a role stays beside an ink and gives way to another role", async () => {
   const { cn: ours } = await import('../src/lib/utils.ts');
-  const { cn: kits } = await import('../src/components/ui/ds/utils.ts');
+  const { cn: kits, tv } = await import('../src/components/ui/ds/utils.ts');
   const merged: [string[], string][] = [
     [['text-body-small', 'text-on-surface-variant'], 'text-body-small text-on-surface-variant'],
     [['text-on-surface', 'block text-title-small'], 'text-on-surface block text-title-small'],
     [['text-body-medium', 'text-body-small'], 'text-body-small'],
+    [['text-on-surface', 'text-primary'], 'text-primary'],
     [['text-body-small', 'leading-none'], 'text-body-small leading-none'],
     [['font-brand', 'font-plain'], 'font-plain'],
     [['rounded-lg', 'rounded-shape-full'], 'rounded-shape-full'],
@@ -281,6 +282,8 @@ test("the board's cn knows the theme's roles as the kit's does: a role stays bes
   for (const [classes, kept] of merged) {
     assert.equal(ours(...classes), kept, classes.join(' '));
     assert.equal(kits(...classes), kept, `the kit's: ${classes.join(' ')}`);
+    const [base, ...given] = classes;
+    assert.equal(tv({ base })({ className: given.join(' ') }), kept, `the kit's tv: ${classes.join(' ')}`);
   }
 });
 

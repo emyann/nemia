@@ -4,7 +4,7 @@ import { Body, Headline } from "../primitives/Typography";
 
 const emptyState = tv({
   slots: {
-    base: "m-auto p-8 bg-surface-container-highest border border-outline rounded-lg flex flex-col items-center w-full max-w-lg",
+    base: "m-auto p-8 bg-surface-container-highest border border-outline rounded-shape-medium flex flex-col items-center w-full max-w-lg",
     content: "flex flex-col items-center text-center",
     mediaContainer: "mb-8 flex items-center justify-center",
     textContainer: "mb-8",
@@ -45,8 +45,16 @@ interface EmptyStateProps extends VariantProps<typeof emptyState> {
  * What a list, a table or a page shows when it has nothing to show: optional
  * media, a title, a description and up to two actions, centred.
  *
+ * It draws a box of its own: `surface-container-highest` with an `outline`
+ * border and the medium corner, centred in what holds it (`m-auto`) and at
+ * most `max-w-lg` wide, padded by `size` (`sm`, `md` the default, `lg`). To draw
+ * it bare inside a card or a table, pass
+ * `className="border-0 bg-transparent"`.
+ *
  * Material 3 does not describe this component. The title and the description
- * take MD3's type scale; the actions are whatever the caller passes.
+ * take MD3's type scale; the box takes a card's corner
+ * (https://m3.material.io/components/cards/specs: the medium shape); the
+ * actions are whatever the caller passes.
  */
 export default function EmptyState(props: EmptyStateProps) {
   const {

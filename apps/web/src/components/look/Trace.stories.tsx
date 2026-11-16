@@ -23,10 +23,10 @@ import {
   TraceLine,
   TraceTitle,
   type TraceStatus,
-} from '../ui/trace';
+} from './Trace';
 
-/** The board's Trace, drawn in the look: a line in each state, a step opened, a sub-agent's steps nested, a turn folded and unfolded. */
-const meta: Meta = { title: 'Run/Trace' };
+/** The look's trace: a line in each state, a step opened, a sub-agent's steps nested, a turn folded and unfolded. */
+const meta: Meta = { title: 'Look/Trace' };
 export default meta;
 
 /** Where a trace stands in its story: a panel's width, on the card's ground. */
@@ -44,11 +44,12 @@ function Line({ icon, status, fact, children }: { icon: ReactNode; status?: Trac
 }
 
 /** A line in each state: done, running, error, pending, and waiting on you. */
-export const Lines: StoryObj = {
-  render: () => (
+export const Lines: StoryObj<{ fact: string }> = {
+  args: { fact: '212 lines' },
+  render: ({ fact }) => (
     <div style={PANEL}>
       <Trace>
-        <Line icon={<FileTextIcon />} fact="212 lines">
+        <Line icon={<FileTextIcon />} fact={fact}>
           Read <code>src/lib/feed.ts</code>
         </Line>
         <Line icon={<TerminalIcon />} status="running" fact="14s">
@@ -69,11 +70,12 @@ export const Lines: StoryObj = {
 };
 
 /** The line at work alone, its title shimmering in alive: still where the person asked for reduced motion. */
-export const Running: StoryObj = {
-  render: () => (
+export const Running: StoryObj<{ fact: string }> = {
+  args: { fact: '14s' },
+  render: ({ fact }) => (
     <div style={PANEL}>
       <Trace>
-        <Line icon={<TerminalIcon />} status="running" fact="14s">
+        <Line icon={<TerminalIcon />} status="running" fact={fact}>
           Running <code>npm run lint</code>
         </Line>
       </Trace>
@@ -88,8 +90,9 @@ feed-file.ts:141  export const drainsThis = (root: string) => …
 1 more, in feed.boundary.test.ts`;
 
 /** A step opened: what it asked and what came back. */
-export const Opened: StoryObj = {
-  render: () => (
+export const Opened: StoryObj<{ body: string }> = {
+  args: { body: SEARCHED },
+  render: ({ body }) => (
     <div style={PANEL}>
       <Trace>
         <TraceCollapsible defaultExpanded>
@@ -98,7 +101,7 @@ export const Opened: StoryObj = {
               Searched for <code>drainsThis</code>
             </Line>
           </TraceCollapsibleTrigger>
-          <TraceCollapsibleContent kind="body">{SEARCHED}</TraceCollapsibleContent>
+          <TraceCollapsibleContent kind="body">{body}</TraceCollapsibleContent>
         </TraceCollapsible>
       </Trace>
     </div>
@@ -106,13 +109,14 @@ export const Opened: StoryObj = {
 };
 
 /** An agent she asked, its steps nested under it. */
-export const SubAgent: StoryObj = {
-  render: () => (
+export const SubAgent: StoryObj<{ fact: string }> = {
+  args: { fact: '2m 10s' },
+  render: ({ fact }) => (
     <div style={PANEL}>
       <Trace>
         <TraceCollapsible defaultExpanded>
           <TraceCollapsibleTrigger>
-            <Line icon={<UsersIcon />} fact="2m 10s">
+            <Line icon={<UsersIcon />} fact={fact}>
               Reviewer reviewed the change
             </Line>
           </TraceCollapsibleTrigger>
@@ -161,19 +165,20 @@ function Turn({ open }: { open: boolean }) {
 }
 
 /** A turn folded into one line once she has answered. */
-export const Folded: StoryObj = { render: () => <Turn open={false} /> };
+export const Folded: StoryObj<typeof Turn> = { args: { open: false }, render: Turn };
 
 /** The same turn, unfolded. */
-export const Unfolded: StoryObj = { render: () => <Turn open /> };
+export const Unfolded: StoryObj<typeof Turn> = { args: { open: true }, render: Turn };
 
 /** A turn at work, as her panel shows it while she answers: the turn running, its steps done and the one at work under it. */
-export const Working: StoryObj = {
-  render: () => (
+export const Working: StoryObj<{ fact: string }> = {
+  args: { fact: '41s' },
+  render: ({ fact }) => (
     <div style={PANEL}>
       <Trace>
         <TraceCollapsible defaultExpanded>
           <TraceCollapsibleTrigger>
-            <Line icon={<WorkflowIcon />} status="running" fact="41s">
+            <Line icon={<WorkflowIcon />} status="running" fact={fact}>
               Working on it
             </Line>
           </TraceCollapsibleTrigger>

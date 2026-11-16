@@ -3,8 +3,7 @@
  * else said in her chat is the family's (`conversation/Said`), from which this takes the line that says who said it and when (`Who`).
  */
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Button, TextField } from '@/components/ui/ds';
 import { CutTag } from '@/components/look';
 import { Who } from '@/components/conversation/Said';
 import { container, ink } from '@/lib/meaning';
@@ -41,7 +40,7 @@ export function ChatKeptMessage({
           {kept.text}
         </div>
       ) : (
-        <Textarea aria-label="Change the message" value={draft} onChange={(event) => setDraft(event.target.value)} />
+        <TextField multiline aria-label="Change the message" value={draft} onChange={setDraft} className="w-full" />
       )}
       <span data-chat-kept-why={kept.refused === undefined ? 'lost' : 'refused'} className={`text-body-small ${ink.failure}`}>
         {kept.refused ?? 'The board lost the daemon. Nothing reached her.'}
@@ -49,21 +48,21 @@ export function ChatKeptMessage({
       <div className="flex flex-wrap justify-end gap-2">
         {draft === null ? (
           <>
-            <Button variant="secondary" size="sm" onPress={onAgain}>
+            <Button variant="tonal" size="xsmall" onPress={onAgain}>
               Send again
             </Button>
-            <Button variant="outline" size="sm" onPress={() => setDraft(kept.text)}>
+            <Button variant="outlined" size="xsmall" onPress={() => setDraft(kept.text)}>
               Edit
             </Button>
-            <Button variant="link" size="sm" onPress={onDiscard}>
+            <Button variant="text" size="xsmall" onPress={onDiscard}>
               Discard
             </Button>
           </>
         ) : (
           <>
             <Button
-              variant="secondary"
-              size="sm"
+              variant="tonal"
+              size="xsmall"
               onPress={() => {
                 onEdit(draft);
                 setDraft(null);
@@ -71,7 +70,7 @@ export function ChatKeptMessage({
             >
               Keep the change
             </Button>
-            <Button variant="link" size="sm" onPress={() => setDraft(null)}>
+            <Button variant="text" size="xsmall" onPress={() => setDraft(null)}>
               Leave it
             </Button>
           </>

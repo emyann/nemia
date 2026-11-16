@@ -229,7 +229,7 @@ test("her session stopped is a status, the daemon lost an alert in the failure's
   assert.match(stopped, /data-band="stopped"[^>]*role="status"|role="status"[^>]*data-band="stopped"/);
   assert.match(stopped, /Her session stopped/);
   assert.match(stopped, /What you write waits for her\./);
-  assert.match(stopped, /data-chat-start[^>]*href="\/settings"|href="\/settings"/, 'Start her session leads to her settings');
+  assert.match(stopped, /href="\/settings"[^>]*>(?:(?!<\/a>).)*Start her session/, 'Start her session leads to her settings');
   const lost = renderToStaticMarkup(
     createElement(ChatLostBand, { since: '2026-10-15T21:57:00.000Z', now: new Date('2026-10-15T22:00:00.000Z') }),
   );
@@ -237,7 +237,8 @@ test("her session stopped is a status, the daemon lost an alert in the failure's
   assert.match(lost, /No answer from the daemon/);
   assert.match(lost, /bg-failure-container text-on-failure-container/);
   assert.match(lost, /nothing you wrote is lost/);
-  for (const html of [stopped, lost]) assert.doesNotMatch(html, /\sopacity-\d/, 'a dimmed text falls under 4.5:1');
+  const unlayered = (html: string) => html.replaceAll(/<[a-z]+ data-slot="state-layer"[^>]*>/g, '');
+  for (const html of [stopped, lost]) assert.doesNotMatch(unlayered(html), /\sopacity-\d/, 'a dimmed text falls under 4.5:1');
 });
 
 test("her face in the rail is called by the presence that gives it its expression, in the owner's order", () => {
@@ -344,8 +345,8 @@ test('her several questions are drawn as the flow: a tab each and Submit, number
   const questions = [askQuestion(), { ...askQuestion(), question: 'And the values?', header: 'Values' }];
   const html = renderToStaticMarkup(createElement(ChatAskMany, { ask: askEvent('question', questions), onAnswer: () => undefined }));
   assert.match(html, /data-chat-ask="many"/);
-  assert.match(html, /data-chat-qtab="on"[^>]*>Summary/);
-  assert.match(html, /data-chat-qtab="off"[^>]*>Values/);
+  assert.match(html, /data-chat-qtab="on"(?:(?!<\/button>).)*>Summary</);
+  assert.match(html, /data-chat-qtab="off"(?:(?!<\/button>).)*>Values</);
   assert.match(html, /Submit/);
   assert.match(html, /1\./, 'the choices are numbered');
   assert.match(html, /data-chat-option="own"/);

@@ -9,14 +9,7 @@
  */
 import { FlagIcon, ScrollTextIcon, SendIcon } from 'lucide-react';
 import { CodeBlock } from '@/components/ai-elements/code-block';
-import {
-  TraceCollapsible,
-  TraceCollapsibleContent,
-  TraceCollapsibleTrigger,
-  TraceIcon,
-  TraceLine,
-  TraceTitle,
-} from '@/components/ui/trace';
+import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '@/components/look';
 import { Who } from '@/components/conversation/Said';
 import { mark } from '@/lib/conversation';
 import { container } from '@/lib/meaning';

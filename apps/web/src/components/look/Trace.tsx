@@ -1,13 +1,20 @@
 /**
- * shadcn's Trace, drawn in the look: what an agent did, a line a step, each with an icon, one sentence and a quiet fact in mono. A
+ * The look's trace: what an agent did, a line a step, each with an icon, one sentence and a quiet fact in mono. A
  * line says its state in the board's meanings, and a step opens to show what it asked and what came back, or the steps nested under
  * it.
  */
 import * as React from 'react';
-import { Button as ButtonPrimitive, DisclosureStateContext, type ButtonProps } from 'react-aria-components';
+import {
+  Button as ButtonPrimitive,
+  Disclosure,
+  DisclosurePanel,
+  DisclosureStateContext,
+  type ButtonProps,
+  type DisclosurePanelProps,
+  type DisclosureProps,
+} from 'react-aria-components';
 import { ChevronRightIcon } from 'lucide-react';
 
-import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 
 /**
@@ -87,17 +94,17 @@ function TraceDescription({ className, ...props }: React.ComponentProps<'span'>)
 function TraceCollapsible({
   className,
   ...props
-}: Omit<React.ComponentProps<typeof Collapsible>, 'isExpanded' | 'className'> &
+}: Omit<DisclosureProps, 'isExpanded' | 'className'> &
   (
     | { isExpanded?: undefined }
     | {
         isExpanded: boolean;
-        onExpandedChange: NonNullable<React.ComponentProps<typeof Collapsible>['onExpandedChange']>;
+        onExpandedChange: NonNullable<DisclosureProps['onExpandedChange']>;
       }
   ) & {
     className?: string;
   }) {
-  return <Collapsible data-slot="trace-collapsible" className={cn('flex w-full min-w-0 flex-col', className)} {...props} />;
+  return <Disclosure data-slot="trace-collapsible" className={cn('flex w-full min-w-0 flex-col', className)} {...props} />;
 }
 
 /** What opens a step: the line it holds, a state layer under the pointer, and a chevron on its right that turns down while open. */
@@ -139,20 +146,20 @@ function TraceCollapsibleContent({
   children,
   kind = 'nest',
   ...props
-}: Omit<React.ComponentProps<typeof CollapsibleContent>, 'className' | 'children'> & {
+}: Omit<DisclosurePanelProps, 'className' | 'children'> & {
   className?: string;
   children?: React.ReactNode;
   kind?: keyof typeof CONTENT;
 }) {
   const open = React.useContext(DisclosureStateContext)?.isExpanded ?? false;
   return (
-    <CollapsibleContent data-slot="trace-collapsible-content" className="min-w-0" {...props}>
+    <DisclosurePanel data-slot="trace-collapsible-content" className="min-w-0" {...props}>
       {open && (
         <div data-slot="trace-collapsible-content-inner" data-kind={kind} className={cn('min-w-0', CONTENT[kind], className)}>
           {children}
         </div>
       )}
-    </CollapsibleContent>
+    </DisclosurePanel>
   );
 }
 

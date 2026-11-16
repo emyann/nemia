@@ -10,7 +10,7 @@
  */
 import { useRef, useState } from 'react';
 import { ArrowUpIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { CutField, cutRing, cutShape } from '@/components/look';
 import { mark } from '@/lib/conversation';
 
@@ -19,6 +19,11 @@ const COMPOSER_CUT = 10;
 
 /** The room between the button and its focus ring, and the ring's width, in pixels: the look's cut button's own. */
 const [GAP, RING] = [2, 3];
+
+/** What the stop's button shows: a square of the button's ink, the kit's icon slot drawing it at its own size. */
+const StopGlyph = ({ className }: { size?: number; className?: string }) => (
+  <span aria-hidden="true" className={`size-3 bg-current ${className ?? ''}`} />
+);
 
 /** A key the hints name. */
 const Key = ({ children }: { children: string }) => (
@@ -85,15 +90,14 @@ export function Composer({ marks, start = '', label, placeholder, off, sendLabel
               type={stops ? 'button' : 'submit'}
               {...mark(marks, 'button', stops ? 'stop' : 'send')}
               aria-label={stop?.label ?? sendLabel}
-              size="icon"
-              variant="secondary"
+              icon={stops ? StopGlyph : ArrowUpIcon}
+              size="xsmall"
+              variant="tonal"
               isDisabled={stops ? false : !ready}
               onPress={stop?.press}
-              className="relative rounded-none"
+              className="w-8 rounded-none px-0"
               style={{ clipPath: cutShape(COMPOSER_CUT) }}
-            >
-              {stops ? <span aria-hidden="true" className="size-3 bg-current" /> : <ArrowUpIcon />}
-            </Button>
+            />
           </span>
         </div>
       </CutField>

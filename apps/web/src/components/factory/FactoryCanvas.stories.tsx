@@ -3,9 +3,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
 import { inboxQuery, type InboxEntry } from '@/lib/api/inbox';
-import { undecidedRunsQuery } from '@/lib/api/runs';
+import { openOf, undecidedRunsQuery } from '@/lib/api/runs';
 import { FactoryCanvas } from './FactoryCanvas';
 import { FACTORY, factoryView, openRuns, queuedCard, seeded } from '../../../.storybook/fixtures/proposals';
+import { onTheFloor } from '../../../.storybook/fixtures/runs';
 
 /**
  * The floor of `factory` with no run on it, the inbox's cards `cards` read under the one key every reader of a page shares
@@ -52,5 +53,18 @@ export const CardsQueued: Story = {
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-ghost="decode-the-reads"]')).not.toBeNull();
     await expect(canvasElement.querySelector('[data-ghost="measure-the-list"]')).not.toBeNull();
+  },
+};
+
+/**
+ * Runs on the floor: one at work, one waiting on a run, one for a run slot, one held and one waiting on you. Each card says the step it is
+ * on over its workflow's graph, each node a button that opens its step's card.
+ */
+export const RunsOnTheFloor: Story = {
+  args: { open: openOf(onTheFloor) },
+  render: (args) => drawn(args, []),
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelectorAll('[data-run-steps]').length).toBe(5);
+    await expect(canvasElement.querySelector('[data-step="implement"][data-mark="alive"] [data-step-bar]')).not.toBeNull();
   },
 };

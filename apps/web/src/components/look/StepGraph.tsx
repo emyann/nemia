@@ -52,11 +52,20 @@ function markPaint(mark: StepMark): {
   return { fill: `color-mix(in srgb, ${paint.grey} 45%, transparent)` };
 }
 
-/** A node's mark: a cut diamond, or a dot for a route; for a step at work, its pulse ring on a layer of its own (`pulse.css`). */
-function Mark({ point, mark }: { point: GraphPoint; mark: StepMark }) {
+/**
+ * A node's mark, in a box 24 wide and `tall` high about its centre: a cut diamond, or a dot for a route; for a step at work, its pulse
+ * ring on a layer of its own (`pulse.css`).
+ */
+function Mark({ point, mark, tall }: { point: GraphPoint; mark: StepMark; tall: number }) {
   const s = point.r;
   return (
-    <svg width="24" height="24" viewBox="-12 -12 24 24" aria-hidden="true" className="pointer-events-none overflow-visible">
+    <svg
+      width="24"
+      height={tall}
+      viewBox={`-12 ${-tall / 2} 24 ${tall}`}
+      aria-hidden="true"
+      className="pointer-events-none overflow-visible"
+    >
       {mark === 'alive' && <path data-step-pulse d={diamond(6.8)} fill="none" stroke={paint.alive} strokeWidth={1} />}
       {point.route ? (
         <circle r={s - 0.4} strokeWidth={1.4} style={markPaint(mark)} />
@@ -220,7 +229,7 @@ function Node({
       </div>
     );
   }
-  const node = <Mark point={point} mark={one.mark} />;
+  const node = <Mark point={point} mark={one.mark} tall={tall} />;
   return (
     <div
       data-step={one.step.name}

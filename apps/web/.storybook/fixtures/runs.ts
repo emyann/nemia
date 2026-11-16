@@ -187,6 +187,26 @@ const before = (minutes: number): string => new Date(Date.parse(AS_OF) - minutes
 /** The steps of each workflow of the targets, in its order. */
 const STEPS_OF = { quick: ['implement', 'review', 'land'], build: ['design', 'implement', 'review', 'land'] } as const;
 
+/** Each workflow's graph, as the api answers it: a chain in its order, review looping back to implement for three rounds. */
+const GRAPH_OF = Object.fromEntries(
+  (Object.keys(STEPS_OF) as Array<keyof typeof STEPS_OF>).map((workflow) => {
+    const names = STEPS_OF[workflow];
+    return [
+      workflow,
+      {
+        roots: [names[0]],
+        edges: [
+          ...names.slice(1).map((to, i) => ({ from: names[i], to, kind: 'after' as const })),
+          { from: 'review', to: 'implement', kind: 'loop' as const, rounds: 3 },
+        ],
+      },
+    ];
+  }),
+) as Record<keyof typeof STEPS_OF, Run['status']['graph']>;
+
+/** Each workflow's gates: build's design and land; quick's none. */
+const GATES_OF: Record<keyof typeof STEPS_OF, string[]> = { build: ['design', 'land'], quick: [] };
+
 /** A run of the targets: its id, title, workflow, labels, its steps (each step not named in `now` done), and its status over them. */
 type Staged = {
   name: string;
@@ -210,6 +230,8 @@ const staged = ({ name, brief, workflow, labels, now, minutes, usd, status }: St
     createdAt: before(240),
     steps: STEPS_OF[workflow].map((step) => now[step] ?? stepOf(step, 'succeeded', 'CheckPassed', 'verified', 'verified')),
     status: {
+      graph: GRAPH_OF[workflow],
+      gates: GATES_OF[workflow],
       ...status,
       startedAt: minutes === null ? null : before(200),
       atWork: minutes === null ? null : { ms: minutes * 60_000, since: null, endedAt: before(1) },
@@ -229,9 +251,10 @@ const staged = ({ name, brief, workflow, labels, now, minutes, usd, status }: St
 
 const stepOf = step;
 
-/** `step`'s current try: its first, in round `round`. */
+/** `step`'s current try: its first, in round `round`, its note saying a round past the first as the api writes it. */
 const tried = (status: RunStepStatus, round: number): RunStepStatus => ({
   ...status,
+  note: round > 1 ? `round ${round} of 3` : status.note,
   current: { try: 1, round, phase: status.phase, reason: status.reason, outcome: null, verdict: status.verdict },
 });
 
@@ -486,6 +509,9 @@ export const TARGET_RUNS = {
   c7un: HELD,
   f41l: FAILED_RUN,
 } as const;
+
+/** The floor's runs: 1sw7 at work, a run waiting on lgll, one for a run slot, one held, and vqvd waiting on you, its land failed. */
+export const onTheFloor: RunList = listOf([VQVD, AT_WORK, ON_A_RUN, FOR_A_SLOT, HELD], { waiting: 1, inFlight: 4, finished: 0 });
 
 /** Nothing waits on you: three runs in flight, lgll being checked and two waiting on the checkout it holds; five finished of 123. */
 export const nothingWaits = answering([LGLL, ...ON_THE_CHECKOUT], { waiting: 0, inFlight: 3, finished: FINISHED_COUNT });

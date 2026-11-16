@@ -23,6 +23,12 @@ const QUIET = 'text-on-surface';
  */
 const HAIRLINE = cutRing(CUT - (2 - Math.SQRT2), 0, 1);
 
+/**
+ * The hairline's paint, the outline's colour as an image: a ground colour under the words would be taken by the accessibility check,
+ * which reads no clip, as the words' ground, where the card's shows.
+ */
+const HAIRLINE_PAINT = 'linear-gradient(var(--md-sys-color-outline), var(--md-sys-color-outline))';
+
 /** The ground and the ink of a press that is disabled, as Material draws a disabled filled button: 12 % and 38 % of the surface's ink. */
 const DISABLED = 'bg-on-surface/12 text-on-surface/38';
 
@@ -57,8 +63,8 @@ function Body({ disabled = false, quiet = false, children }: { disabled?: boolea
           <span
             aria-hidden="true"
             data-cut-hairline
-            className="pointer-events-none absolute inset-0 bg-outline"
-            style={{ clipPath: HAIRLINE }}
+            className="pointer-events-none absolute inset-0"
+            style={{ clipPath: HAIRLINE, backgroundImage: HAIRLINE_PAINT }}
           />
         )}
         {!disabled && (

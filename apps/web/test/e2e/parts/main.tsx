@@ -3,7 +3,8 @@
  * component's in its noun's folder — but the vendored `ui/` and `ai-elements/`, drawn as Storybook draws it
  * (`composeStories`, under the annotations of `.storybook/preview.tsx`), each in a section of its own named by Storybook's id for it.
  * The bare address draws an index and every story; `?part=<name>` every story of one part; `?story=<id>` one story. A story that
- * throws is said in its place by the preview (`data-broken`). It holds no part's props: a state is shown by writing its story. Built
+ * throws is said in its place by the preview (`data-broken`). A page body's stories (titled `Pages/`) are not drawn here: they answer
+ * their reads through MSW's loader, which this page runs no loader for; Vitest runs them (`npm run stories`). It holds no part's props: a state is shown by writing its story. Built
  * by `buildParts` (`gallery.ts`) into a scratch folder, never by the board's own build, and no file of `src` imports it. Its layout is
  * inline styles: a class written here alone would enter the board's stylesheet.
  */
@@ -25,11 +26,15 @@ const MODULES = import.meta.glob<Stories>(
   { eager: true },
 );
 
+/** The title of a page body's stories, which answer their reads through a loader this page does not run. */
+const PAGES = 'Pages/';
+
 /** Every story, a part after another by its file's path, each part's by their names. */
 const STORIES: Shown[] = Object.entries(MODULES)
   .sort(([a], [b]) => a.localeCompare(b))
   .flatMap(([file, stories]) => {
     const part = file.replace(/^.*\/([^/]+)\.stories\.tsx$/, '$1');
+    if (stories.default.title?.startsWith(PAGES)) return [];
     const composed = composeStories(stories, preview) as Record<string, Composed>;
     return Object.values(composed).map((Story) => ({ id: Story.id, part, name: Story.storyName, Story }));
   });

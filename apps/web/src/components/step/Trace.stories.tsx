@@ -26,7 +26,7 @@ import {
 } from '../ui/trace';
 
 /** The board's Trace, drawn in the look: a line in each state, a step opened, a sub-agent's steps nested, a turn folded and unfolded. */
-const meta: Meta = { title: 'Board/Trace' };
+const meta: Meta = { title: 'Run/Trace' };
 export default meta;
 
 /** Where a trace stands in its story: a panel's width, on the card's ground. */

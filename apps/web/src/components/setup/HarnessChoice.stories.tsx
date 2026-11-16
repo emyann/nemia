@@ -6,7 +6,7 @@ import { FixRun } from './FixRun';
 import { HarnessChoice, HarnessSkipped } from './HarnessChoice';
 
 /** The first visit's question on Setup: none activated, one installing, one installed and signed out, and the question skipped. */
-const meta: Meta = { title: 'Board/HarnessChoice' };
+const meta: Meta = { title: 'Store/HarnessChoice' };
 export default meta;
 
 /** A harness's two pieces as the read answers them, its install in `installed` and its sign-in missing, with `signIn`'s fixes. */

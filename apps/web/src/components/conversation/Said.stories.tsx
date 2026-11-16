@@ -6,7 +6,7 @@ import { Note, Said, Writing } from './Said';
  * What is said in a conversation: the agent's words with their links, the person's own, another agent's, the message being written,
  * and a quiet line that frames them.
  */
-const meta: Meta = { title: 'Conversation/Said' };
+const meta: Meta = { title: 'Run/Said' };
 export default meta;
 
 /** Where a bubble stands in its story: a panel's width, on the card's ground, laid out as the talk lays its items out. */

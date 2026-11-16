@@ -6,7 +6,7 @@ import type { Strip } from '@/lib/strip';
 import { StripView } from './OverviewStrip';
 
 /** The Overview's strip: a busy day, a quiet one, the quota past its mark, the daemon stalled, and a box too narrow for one row. */
-const meta: Meta = { title: 'Board/OverviewStrip' };
+const meta: Meta = { title: 'Frame/OverviewStrip' };
 export default meta;
 
 /** The instant the stories' answers were read at. */

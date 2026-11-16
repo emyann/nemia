@@ -7,7 +7,7 @@ import { Button, CheckIcon, IconButton, Meter, NavigationRail, PlusIcon, SearchI
  * selected tonal icon toggle, the active label of a collapsed rail, and a secondary meter. Each stands in a box named by
  * `data-secondary`, which the e2e reads.
  */
-const meta: Meta = { title: 'Board/SecondaryRole' };
+const meta: Meta = { title: 'Frame/SecondaryRole' };
 export default meta;
 
 const ROW: CSSProperties = { display: 'flex', alignItems: 'flex-start', gap: 32, padding: 24 };

@@ -6,7 +6,7 @@ import { Talk, TalkEmpty } from './Talk';
  * The family's talk: an item of every kind at once, the line over what is new, the compact density, a message being written, and the
  * empty shell.
  */
-const meta: Meta = { title: 'Conversation/Talk' };
+const meta: Meta = { title: 'Run/Talk' };
 export default meta;
 
 /** Where a talk stands in its story: a panel's width and a panel's height, on the card's ground. */

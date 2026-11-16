@@ -4,7 +4,7 @@ import type { WaitingRun } from '@/lib/api/runs';
 import { WaitingCard } from './WaitingCard';
 
 /** A run that waits on a person, as a card of the runs page: in a box too narrow to hold its tiles and its button, and in one that does. */
-const meta: Meta = { title: 'Board/WaitingCard' };
+const meta: Meta = { title: 'Run/WaitingCard' };
 export default meta;
 
 /** The instant the stories' answer was read at. */

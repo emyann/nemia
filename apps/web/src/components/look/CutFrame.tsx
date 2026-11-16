@@ -31,7 +31,7 @@ export function CutFrame({
   size = 28,
   fill = false,
   ground = 'bg-card',
-  glow = hue === 'yours',
+  glow,
   className,
   children,
 }: {
@@ -45,7 +45,12 @@ export function CutFrame({
 }) {
   return (
     <div data-cut-frame={hue} className={cn('relative p-px text-card-foreground', className)}>
-      <span aria-hidden="true" data-cut-shape className="pointer-events-none absolute inset-0" style={{ filter: glow ? GLOW : undefined }}>
+      <span
+        aria-hidden="true"
+        data-cut-shape
+        className="pointer-events-none absolute inset-0"
+        style={{ filter: (glow ?? hue === 'yours') ? GLOW : undefined }}
+      >
         <span data-cut-edge className="absolute inset-0" style={{ backgroundColor: EDGE[hue], clipPath: cutShape(size) }} />
         <span
           data-cut-ground

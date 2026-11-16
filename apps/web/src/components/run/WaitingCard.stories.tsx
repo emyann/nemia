@@ -142,11 +142,14 @@ const footOf = (canvas: HTMLElement): { beside: boolean; fromRight: number } => 
   };
 };
 
-/** The card where the page is narrow: its rail, its cost and its one button on one line, the button at the card's right. */
+/**
+ * The card where the page is narrow: its graph, 188 pixels wide as on every surface, and its cost on one line, and its one button
+ * under them, at the card's right.
+ */
 export const Narrow: StoryObj = {
   play: async ({ canvasElement }) => {
     await document.fonts.ready;
-    await expect(footOf(canvasElement), 'the button beside the rail, at the right').toEqual({ beside: true, fromRight: 0 });
+    await expect(footOf(canvasElement), 'the button under the graph, at the right').toEqual({ beside: false, fromRight: 0 });
     await expect(canvasElement.querySelectorAll('[data-cut-button]').length, 'one button').toBe(1);
   },
   render: () => (

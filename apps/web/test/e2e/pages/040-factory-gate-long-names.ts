@@ -102,8 +102,8 @@ export default {
   /**
    * The gate's card with the names the seed never has: a gated step, a send-back step and a base branch that do not fit a line, four
    * steps, one asking. The run is dated before every run in the store, so the grid, oldest first, puts it at the top of its column with
-   * the default floor's cards beneath it, whatever runs join or leave that floor. Its gate line holds one row, the rest on hover; its rail
-   * has a pill a step, each cut to its pill and whole on hover; opened, it has a tile a step, each named whole; and the card stays clear of
+   * the default floor's cards beneath it, whatever runs join or leave that floor. Its gate line holds one row, the rest on hover; its graph
+   * has a node a step, each a button named whole; opened, it has a tile a step, each named whole; and the card stays clear of
    * the card beneath it after a Reset layout. The run is written for this page and taken back before it ends, the floor laid out again as
    * seeded.
    */
@@ -147,17 +147,16 @@ export default {
         throw new Refused(
           `the gate line holds one row whatever the names, read in the card's own pixels as the floor is drawn zoomed out — it is ${rows} rows`,
         );
-      const pills = card.locator('ul[aria-label="Steps"] [data-step]');
-      await expectCount(pills, LONG_NAMES.steps.length, 'a pill per step on the rail');
+      const pills = card.locator('[data-run-steps] [data-step]');
+      await expectCount(pills, LONG_NAMES.steps.length, 'a node per step on the graph');
       for (const name of LONG_NAMES.steps) {
-        const title = await card.locator(`ul[aria-label="Steps"] [data-step="${name}"]`).getAttribute('title');
-        if (!title?.startsWith(`${name}: `)) throw new Refused(`${name}'s pill is whole on hover — its title is ${JSON.stringify(title)}`);
+        const label = await card.locator(`[data-run-steps] [data-step="${name}"] [data-step-bar]`).getAttribute('aria-label');
+        if (!label?.startsWith(`${name}, `))
+          throw new Refused(`${name}'s node is named whole by its button — it says ${JSON.stringify(label)}`);
       }
-      const cut = await pills.locator('span').evaluateAll((spans) => spans.filter((span) => span.scrollWidth > span.clientWidth).length);
-      if (cut === 0) throw new Refused('a name longer than its pill is cut to it, not drawn over the next pill — no pill is cut');
-      await expectInside(pills, card, 'and every pill stays inside the card');
+      await expectInside(pills, card, 'and every node stays inside the card');
       const [notesAt, backAt] = await Promise.all(
-        [notes, back].map((name) => placeOf(card.locator(`ul[aria-label="Steps"] [data-step="${name}"]`))),
+        [notes, back].map((name) => placeOf(card.locator(`[data-run-steps] [data-step="${name}"]`))),
       );
       if (Math.abs(notesAt.x - backAt.x) > 1 || Math.abs(notesAt.y - backAt.y) < 1) {
         throw new Refused(

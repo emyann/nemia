@@ -40,8 +40,10 @@ export default {
       `and what approving ${gated} does`,
     );
     await expectVisible(
-      card.locator(`ul[aria-label="Steps"] [data-step="${gated}"][data-state="awaiting-approval"][title^="${gated}: waits on you — "]`),
-      `and ${gated}'s pill on its rail, awaiting approval`,
+      card.locator(
+        `[data-run-steps] [data-step="${gated}"][data-state="awaiting-approval"][data-mark="yours"] [data-step-bar][aria-label="${gated}, waits on you"]`,
+      ),
+      `and ${gated}'s node on its graph, awaiting approval, said so by its button`,
     );
     await settled(page);
     await photograph(page, path.join(OUT, `factory-mid-gate-${await themeOf(page)}.png`), { fullPage: true });

@@ -25,7 +25,6 @@ const read = (flow: Flow): string[][] => {
       .map((p) => p.label),
   );
 };
-const arrows = (flow: Flow): Record<string, string> => Object.fromEntries(flow.arrows.map((a) => [a.id, a.state]));
 
 test('tilesOf: a run opened, every step a tile', async (t) => {
   await t.test('a loop past its first round says the round it is on, under the middle of its curve, below the tiles', () => {
@@ -67,8 +66,6 @@ test('tilesOf: a run opened, every step a tile', async (t) => {
   });
 });
 
-/** What a pill keeps of its width from its name: its padding (`px-1`, four pixels a side) and its border, a pixel a side. */
-const PILL_EDGES = 10;
 
 /** Each column's points, left first, top to bottom: what the graph reads as. */
 const readGraph = (g: StepGraphLayout): string[][] => {

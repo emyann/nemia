@@ -273,8 +273,8 @@ make them hold across a first try and a restart:
   value, in two posts of their own. So a step's first try in a new factory shows in its panel with its cost, and after a restart
   Prometheus sees the series come back at zero and reads a reset. The daemon's own series are born the same way (`seriesBorn`), all at
   once, as soon as it holds the store and before anything counts into them: the passes' histograms (`pass_duration`,
-  `pass_phase_duration` by phase, `pass_journal_reads`), the feed's live readers' `feed_follow_beats_total` and
-  `feed_follow_reads_total`, and the api's `api_step_follows_total`, which the api hands its daemon to be born with its own.
+  `pass_phase_duration` by phase, `pass_journal_reads`), its event loop's delay (`nodejs_eventloop_delay`, charted on **System**'s
+  passes row beside the pass's time), the feed's live readers' `feed_follow_beats_total` and `feed_follow_reads_total`, and the api's `api_step_follows_total`, which the api hands its daemon to be born with its own.
 - **Each settle is counted once, by a mark on the run's record** (`settlesCounted`), written by the pass before the metrics are
   recorded. A session that ended while no daemon ran is counted by the first daemon that reads it, and a daemon started again counts
   none twice. A session held open and answered by a person is one try when it settles, with its cost once, however many answers it took.

@@ -4104,8 +4104,16 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   route's pattern. A process that does not tick (an api started with `--no-tick`, or beside a `wf up`) has none of the pass's. Once
   `up` holds the store, before its first pass and before `onTaken`, it births at zero and exports so the series a collector reads by
   their increase (`seriesBorn` in `src/telemetry/telemetry.store.ts`): the pass's histograms (`PASS_SERIES`), the feed's
-  `feed.follow.beats`, `feed.follow.reads` and `feed.follow.lines` (`DAEMON_SERIES` in `src/daemon/up.verb.ts`), and the series its caller hands it
-  (`UpOptions.series`: the api's `api.step.follows`). `api.poll.reads` is not born: its routes are known only once served.
+  `feed.follow.beats`, `feed.follow.reads` and `feed.follow.lines`, its event loop's delay, `nodejs.eventloop.delay` (`DAEMON_SERIES` in
+  `src/daemon/up.verb.ts`), and the series its caller hands it (`UpOptions.series`: the api's `api.step.follows`). `api.poll.reads` is not
+  born: its routes are known only once served.
+- **The daemon watches its event loop** (`eventLoopWatched`, `src/telemetry/event-loop.store.ts`), since the api serves in the process
+  that ticks and a pass that holds the loop delays every request: Node's measure of the loop's delay (`monitorEventLoopDelay`) is read
+  every 10 s into `nodejs.eventloop.delay`, a histogram in ms (`EVENT_LOOP_DELAY`), and a stall of a second or more is logged once as a
+  warning annotated with how long the loop was held (`heldMs`) and the span of the daemon's most recently started and still open as it
+  came back (`span`, its parents in `spans`), kept by a wrapping of the process's tracer (`openSpans`). A pass gives the loop up between
+  two runs it judges in full (`advanceResting`), and so does a judgement of many runs (`judgementsOf`). What the passes cost the loop on a
+  copy of the store is `tools/store-measure/loop.ts`'s.
 - **And metrics of its steps** (`STEP_METRICS`, `recordStepMetrics` in `src/meter/meter.verb.ts`), recorded by the tick once a pass, off
   what each run's full pass already read — no read of the store or the engine of their own. A run's pass takes each of its tasks it
   reads settled that the run's mark does not hold (`settlesCounted`, `settlesDue`), a task shared by tries once, and reads each of its

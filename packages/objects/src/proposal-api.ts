@@ -14,6 +14,21 @@ const cardParams = {
   name: Schema.String.annotate({ description: "The object's name in the namespace." }),
 };
 
+/**
+ * The query of a list of proposals: a list's (`listQuery`), and `fieldSelector`, the proposals in one phase, in Kubernetes' spelling:
+ * `status.phase=<phase>` (or `==`), or every other phase by `!=`; an empty one, or none, every proposal. Any other is refused `Invalid`,
+ * naming the forms it takes.
+ */
+const proposalListQuery = {
+  ...listQuery,
+  fieldSelector: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        "A fieldSelector in Kubernetes' spelling that keeps the proposals in one phase (status.phase=waiting, or ==), or in every other (status.phase!=applied); empty or absent, every proposal.",
+    }),
+  ),
+};
+
 /** A namespace, for a list in it. */
 const namespaceParams = { namespace: cardParams.namespace };
 
@@ -34,12 +49,12 @@ const proposalErrors = [Missing, Conflict, Invalid, Forbidden, Unauthorized, Fai
 export class ProposalsGroup extends HttpApiGroup.make('proposals').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/proposals', {
     params: namespaceParams,
-    query: listQuery,
+    query: proposalListQuery,
     success: ProposalListObject,
     error: proposalErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a factory's proposals in its namespace, a page at a time, read by anyone. Answers a ProposalList.",
+    "Lists a factory's proposals in its namespace, a page at a time, read by anyone; ?fieldSelector=status.phase=<phase> keeps those in one phase. Answers a ProposalList.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/proposals/:name', {
     params: cardParams,

@@ -134,7 +134,7 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'events.list': LIST,
   'events.getAll': ONE,
   'events.get': ONE,
-  'proposals.list': LIST,
+  'proposals.list': LIST_BY_FIELD,
   'proposals.get': ONE,
   'delegations.list': LIST,
   'delegations.get': ONE,

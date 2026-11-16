@@ -5,8 +5,9 @@
  * person's alone (`declineProgram`). Each takes its caller explicitly and the store's place; a refusal by who calls is `Forbidden`.
  */
 import { Effect } from 'effect';
-import type { Proposal } from 'objects';
-import { Conflict, Forbidden, Missing, type Refusal } from '../refusal/refusal.ts';
+import { PROPOSAL_PHASES, type Proposal } from 'objects';
+import { Conflict, Forbidden, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
+import { phaseTakes, proposalPhaseSelector } from '../proposal/phase-selector.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { proposalApproval } from './approval.ts';
@@ -27,9 +28,20 @@ const proposalAt = (factory: string, name: string): Effect.Effect<Proposal, Refu
     return p;
   });
 
-/** The proposals of `factory`, by name. */
-export const proposalsList = Effect.fn('proposalsList')(function* (factory: string) {
-  return yield* (yield* ProposalDoor).proposals.list(factory);
+/**
+ * The proposals of `factory`, by name, that `fieldSelector` keeps: every one where it is empty or none, else those in the phase it asks
+ * (`proposalPhaseSelector`, `phaseTakes`); `Invalid` naming the forms it takes where it spells none, before a proposal is read.
+ */
+export const proposalsList = Effect.fn('proposalsList')(function* (factory: string, fieldSelector?: string) {
+  const selector = fieldSelector === undefined || fieldSelector === '' ? undefined : proposalPhaseSelector(fieldSelector);
+  if (selector === null)
+    return yield* Effect.fail(
+      new Invalid({
+        message: `fieldSelector ${fieldSelector} is none a proposal list takes: give status.phase=<phase> (or ==, !=), a phase being one of ${PROPOSAL_PHASES.join(', ')}, or an empty one for every proposal`,
+      }),
+    );
+  const proposals = yield* (yield* ProposalDoor).proposals.list(factory);
+  return selector === undefined ? proposals : proposals.filter((p) => phaseTakes(selector, p.status.phase));
 });
 
 /** The proposal `name` of `factory`; `Missing` where none is. */

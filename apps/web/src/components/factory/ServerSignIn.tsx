@@ -56,7 +56,7 @@ const NOT_PASTING: Pasting = { pasted: '', onPasted: () => {}, onComplete: () =>
  * The field a waiting sign-in takes the address the browser landed on in, for a browser that runs on another machine than the daemon,
  * and the press that hands it on: pressed only once something is pasted.
  */
-function PasteBack({ name, pending, pasting }: { name: string; pending: boolean; pasting: Pasting }) {
+function PasteBack({ pending, pasting }: { pending: boolean; pasting: Pasting }) {
   return (
     <div data-sign-in-paste className="flex flex-wrap items-start gap-3">
       <TextField
@@ -119,7 +119,7 @@ export function SignInView({
             </a>
             , pick the repositories {name} may reach, and approve. Waiting until <Instant at={shown.until} />.
           </p>
-          <PasteBack name={name} pending={pending} pasting={pasting} />
+          <PasteBack pending={pending} pasting={pasting} />
         </>
       ) : (
         <div className="flex flex-wrap items-center gap-3">

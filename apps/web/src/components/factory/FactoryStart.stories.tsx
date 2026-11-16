@@ -21,7 +21,7 @@ const drawn = (factory: string | null, factories: readonly Factory[]) => (
 
 /**
  * The bar on a run's start, one story a state: in no factory yet, the factories to pick; on a factory's one repository, its workflows
- * as the kit's radios; and on two, the workflow picked in the kit's select first, whose axe is todo as the card's start says.
+ * as the kit's radios; and on two, the workflow picked in the kit's select first, whose axe check waits as the card's start says.
  */
 const meta: Meta<{ factory: string | null; factories: readonly Factory[] }> = {
   title: 'Factory/FactoryStart',

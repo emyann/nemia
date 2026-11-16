@@ -29,8 +29,8 @@ const drawn = (entry: InboxEntry) => (
 
 /**
  * A card's start on the Inbox page, one story a state: a card that names its factory, its workflow picked in the kit's select; and one
- * that names none, the factory to pick first. Their axe is todo: the kit's select trigger is named by its value and its label, which
- * axe reads as visible text left out of its name (`label-content-name-mismatch`), an ask of the kit.
+ * that names none, the factory to pick first. Axe's check of them waits: the kit's select trigger is named by its value and its
+ * label, which axe reads as visible text left out of its name (`label-content-name-mismatch`), an ask of the kit.
  */
 const meta: Meta<{ entry: InboxEntry }> = {
   title: 'Factory/FactoryCardStart',

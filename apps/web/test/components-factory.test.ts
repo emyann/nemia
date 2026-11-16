@@ -167,7 +167,11 @@ test("REFUSED: the floor's start in a factory of several repositories offers no 
   const factory = filed('quay', { repos: ['/code/a', '/code/b'], workflows: ['dev'], workflowRepos: { dev: 'b' } });
   const html = await pagedWith(createElement(StartBar, { factory: 'quay' }), [[['factories'], [factory]], STORE_ANSWER]);
   assert.doesNotMatch(html, /<option value="\/code\/a"/, 'refused: a repository a person picks, which the api would not run on');
-  assert.match(html, /data-pick-workflow[\s\S]*data-placeholder="true">Pick what runs<\/span>[\s\S]*>Workflow<\/span>/, "the kit's select, nothing picked");
+  assert.match(
+    html,
+    /data-pick-workflow[\s\S]*data-placeholder="true">Pick what runs<\/span>[\s\S]*>Workflow<\/span>/,
+    "the kit's select, nothing picked",
+  );
   assert.match(html, /<option value="dev">dev<\/option><\/select>/, 'the workflows the factory offers, by name');
 });
 
@@ -411,7 +415,11 @@ test('REFUSED: the start of a card that names no factory draws no start form bef
     ]);
   const html = await start(LISTED);
   assert.match(html, /data-start-unassigned="true"/);
-  assert.match(html, /data-pick-factory[\s\S]*data-placeholder="true">Pick the factory it runs in<\/span>/, "the kit's select, nothing picked");
+  assert.match(
+    html,
+    /data-pick-factory[\s\S]*data-placeholder="true">Pick the factory it runs in<\/span>/,
+    "the kit's select, nothing picked",
+  );
   assert.match(html, /<option value="solo">solo<\/option><option value="pair">pair<\/option><\/select>/);
   assert.doesNotMatch(html, /<form|>Workflow<|aria-label="Start idea"/);
   const none = await start([LISTED[0]]);

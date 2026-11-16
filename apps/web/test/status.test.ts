@@ -304,7 +304,7 @@ const ROLE_OF = { yours: 'primary', alive: 'secondary', money: 'tertiary', failu
 const readsRole = (css: string, meaning: keyof typeof ROLE_OF): boolean =>
   new RegExp(`--meaning-${meaning}:\\s*var\\(\\s*--md-sys-color-${ROLE_OF[meaning]}\\s*\\)\\s*;`).test(css);
 
-const WRITTEN = { primary: '#f5e61a', secondary: '#eaf6f8', tertiary: '#e0a15e', error: '#ff7676' } as const;
+const WRITTEN = { primary: '#f5e61a', secondary: '#c4a8ff', tertiary: '#e0a15e', error: '#ff7676' } as const;
 
 /** The roles of `WRITTEN` a look's front matter does not write at their value, by name. */
 const unwritten = (look: string): string[] => {
@@ -356,7 +356,7 @@ test("the meanings of a state's colour: one thing each, read from the look's rol
     },
   );
   await t.test(
-    "the meanings are the look's: each reads its role of the theme once, and the look writes yellow, a pale ice, amber and red",
+    "the meanings are the look's: each reads its role of the theme once, and the look writes yellow, a violet, amber and red",
     () => {
       const css = fs.readFileSync(path.join(web, 'src', 'styles.css'), 'utf8');
       for (const meaning of Object.keys(ROLE_OF) as Array<keyof typeof ROLE_OF>) {
@@ -370,7 +370,7 @@ test("the meanings of a state's colour: one thing each, read from the look's rol
       const look = fs.readFileSync(path.join(web, 'DESIGN.md'), 'utf8');
       assert.equal(unwritten(look).length, 0, `the look writes ${unwritten(look).join(', ')} at another value`);
       const old = look
-        .replace('  secondary: "#eaf6f8"\n', '  secondary: "#39ff5a"\n')
+        .replace('  secondary: "#c4a8ff"\n', '  secondary: "#39ff5a"\n')
         .replace('  error: "#ff7676"\n', '  error: "#e8695b"\n');
       assert.deepEqual(unwritten(old), ['secondary', 'error'], 'the neon green and the terracotta put back are named');
       const below = look.replace('  error: "#ff7676"\n', '').replace('\n---\n\n', '\n---\n\n  error: "#ff7676"\n');

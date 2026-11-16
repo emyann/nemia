@@ -1,15 +1,19 @@
 /**
- * The guard on every write the api serves: a request refused before its body is read, whatever route it is for, by its method and three
- * headers alone (`writeRefused`, proved by `apps/api/contracts/write-guard.contract.ts`), and one Hono middleware that applies it to every
- * request under `/api/` but a GET or a HEAD (`writeGuard`, which app.ts registers before any route). No route keeps words of its own for
- * it: a refusal names the request's method and path, and where the document says what each route takes.
+ * The guard on every write the api serves: a request refused before its body is read, whatever route it is for, by its method, three
+ * headers and the names the store is served at (`writeRefused`, proved by `apps/api/contracts/write-guard.contract.ts`), and one Hono
+ * middleware that applies it to every request under `/api/` but a GET or a HEAD (`writeGuard`, which app.ts registers before any route).
+ * No route keeps words of its own for it: a refusal names the request's method and path, and where the document says what each route takes.
  *
  * Why each: a write is what an agent acts on in the repository — once a tick files it, at once, or once a person starts the card or the
  * workflow — or a person's idea or step gone, or its place, so a page on another site must not be able to make any of them; and a `fetch`
  * with a body, from any page, reaches the api without the browser asking it first, unless the body is JSON.
  *
  * - Addressed to a name that is not this machine (`Host`): a site whose name was pointed at 127.0.0.1, which the browser treats as that
- *   site's own origin. Absent — a client that sends none — is this machine. Refused 403, `Forbidden`'s reason `host`.
+ *   site's own origin. Absent — a client that sends none — is this machine, and so is the loopback on any port. On a store marked
+ *   exposed, so is a name it is served at (the contract's `served`, `servedAt` over `servedNamesOf`): the address it binds (`NEMIA_BIND`,
+ *   read off `ApiConfig`) and the names the person declares it reached by (`WF_SERVED_NAMES`, read off `StoreConfig`), so a browser on
+ *   another device asks a pairing, or claims a link, at the name it opened the board at. Refused 403, `Forbidden`'s reason `host`, in
+ *   words that name `WF_SERVED_NAMES` on an exposed store and the loopback on any other.
  * - Made by a page on another site (`Sec-Fetch-Site`, which the browser sets and no page can): anything but `same-origin`, which the board
  *   is, through vite's proxy too. `same-site` is refused: another port on localhost is the same site. Absent is a client outside a
  *   browser, such as curl. Refused 403, `Forbidden`'s reason `site`.
@@ -19,7 +23,9 @@
  * A write that presents a bearer token (`Authorization: Bearer <token>`) passes the host and the site: a page on another site cannot send
  * that header without the browser asking the api first, which it never answers, and cannot know a token; behind a proxy or a tunnel the
  * `Host` is the store's public name, which only a token makes safe. The token itself is judged before the guard (`callerGate`,
- * src/caller/caller.ts), so one refused there never reaches it. It still says a JSON body.
+ * src/caller/caller.ts), so one refused there never reaches it. It still says a JSON body, or a form of files (`multipart/form-data`): the
+ * one write that sends one, a file uploaded for a start (`POST /api/namespaces/<namespace>/files`), is a client's with a token, and a
+ * form a page on another site posts carries no `Authorization` without the browser asking first. The board's cookie sends no form.
  *
  * A write that presents a token by the board's cookie alone (`TOKEN_COOKIE`, the HttpOnly cookie `POST /api/session` sets,
  * server/session.ts) passes the host, but not the site: a site whose name was pointed at this machine is another origin, which the
@@ -46,7 +52,7 @@ import { loopback, nameOf, servedAt } from './address/address.ts';
 import { ApiConfig, type ApiEnv } from './layer.ts';
 import { bindOf } from './port.ts';
 import { StoreConfig } from './store.ts';
-import { mediaOf, saysJson } from './media/media.ts';
+import { mediaOf, saysForm, saysJson } from './media/media.ts';
 
 export type { WriteRefusal, WriteRequest } from '../contracts/write-guard.contract.ts';
 export { loopback } from './address/address.ts';
@@ -73,15 +79,17 @@ export const cookieTokenOf = (c: Context): string | undefined => {
 
 /**
  * Why a write is refused before its body is read, or null: its host first, neither where it presents a bearer token or the board's
- * cookie; then its site, not where it presents a bearer token; then its body's type; a read never.
+ * cookie; then its site, not where it presents a bearer token; then its body's type, JSON, or a form of files with a bearer token; a read
+ * never.
  * @param request The request's method, host, site, content type and whether it presents a bearer token or the board's cookie.
  */
 export const writeRefused: WriteRefused = (request) => {
   if (request.method === 'GET' || request.method === 'HEAD') return null;
   if (!request.bearer && !request.cookie && request.host !== undefined && !loopback(request.host) && !request.served) return 'host';
   if (!request.bearer && request.site !== undefined && request.site !== 'same-origin') return 'site';
-  if (request.contentType === undefined || !saysJson(request.contentType)) return 'media';
-  return null;
+  if (request.contentType === undefined) return 'media';
+  if (saysJson(request.contentType) || (request.bearer && saysForm(request.contentType))) return null;
+  return 'media';
 };
 
 /** Where every route is listed, with what it takes. */

@@ -37,6 +37,7 @@ import {
 import { namespaceParams, cardParams, templateParams, documentParams, subscriptionParams, eventNameParams } from './api-params.ts';
 import { DelegationsGroup, ProposalsGroup } from './proposal-api.ts';
 import { RunsGroup } from './run-api.ts';
+import { FilesGroup } from './file-api.ts';
 import { StepsGroup } from './step-api.ts';
 import { NemiaGroup } from './nemia-api.ts';
 import { Subscription, SubscriptionList } from './subscription.ts';
@@ -256,6 +257,7 @@ export const RESOURCE_PLURALS = {
 /** Everything the api serves as objects. */
 export const Api = HttpApi.make('nemia')
   .add(RunsGroup)
+  .add(FilesGroup)
   .add(StepsGroup)
   .add(CardsGroup)
   .add(FactoriesGroup)

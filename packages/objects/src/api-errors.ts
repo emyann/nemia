@@ -130,6 +130,9 @@ export class Unjudged extends Schema.Class<Unjudged>('Unjudged')({ error: ErrorS
  */
 export class ReadFailed extends Schema.Class<ReadFailed>('ReadFailed')({ error: ErrorSentence }, { httpApiStatus: 502 }) {}
 
+/** A body past the most its endpoint takes — a file past its cap — naming the cap and what to send instead: a 413. */
+export class TooLarge extends Schema.Class<TooLarge>('TooLarge')({ error: ErrorSentence }, { httpApiStatus: 413 }) {}
+
 /**
  * A thing that was there and was removed on purpose, its record kept — a step's file `nemia prune --artifacts` removed: a 410, with when
  * it was removed (`pruned`), so a client tells it from one that never was (a 404).

@@ -366,6 +366,11 @@
     {
       "term": "relativePath",
       "meaning": "a served file's path from its step's folder that holds it — its artifacts folder, or a folder run's own folder — which a client keys, matches and addresses the file by (`StepArtifact`, `packages/objects/src/run-step.ts`). The absolute `path` beside it, the server's own place for the file, is kept as it is under nemia/v1 and retired only at a new version of the objects."
+    },
+    {
+      "term": "File",
+      "meaning": "a file a factory keeps for a start to hand its run's steps, as the model APIs' Files API keeps one: uploaded once, its own request, as a form of one part (`POST /api/namespaces/<namespace>/files`), 64 MiB at most (`FILE_LIMIT`) and kept a day (`FILE_KEPT_FOR`), and answered as its file object, whose id (`file_…`) a start in the same namespace names as an input's `file` (`FileObject`, `packages/objects/src/file.ts`).",
+      "type": "FileObject"
     }
   ]
 }

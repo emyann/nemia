@@ -14,7 +14,9 @@
  * A write that presents a bearer token (`Authorization: Bearer <token>`) passes the host and the site: a page on another site cannot
  * send that header without the browser asking the api first, which the api never answers, and cannot know a token; behind a proxy or a
  * tunnel the `Host` is the store's public name, which only a token makes safe. The token itself is judged before the guard (`callerGate`,
- * src/caller/caller.ts), a token refused there never reaching it, so presenting one here means a live one. It still says a JSON body.
+ * src/caller/caller.ts), a token refused there never reaching it, so presenting one here means a live one. It still says a JSON body, or
+ * a form of files (`multipart/form-data`, a file uploaded for a start): a form a page on another site posts carries no `Authorization`
+ * without the browser asking first, so a token's form is the client's own. With the board's cookie, or no token, a form is refused.
  *
  * A write that presents a token by the board's cookie alone (`cookie`, `objects`' `TOKEN_COOKIE`: the HttpOnly cookie the api sets
  * (`POST /api/session`) once a person pastes a token of theirs into the board, which no script of the page reads, and the one credential
@@ -29,7 +31,7 @@
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import { loopback } from '../src/address/address.ts';
-import { saysJson } from '../src/media/media.ts';
+import { saysForm, saysJson } from '../src/media/media.ts';
 
 /**
  * A request as the guard reads it: its method, its `Host`, `Sec-Fetch-Site` and `Content-Type` headers, each absent where not sent,
@@ -59,6 +61,7 @@ export type WriteRefusal = 'host' | 'site' | 'media';
  */
 export const loopbackName = assume(loopback, { pure: true });
 export const jsonType = assume(saysJson, { pure: true });
+export const formType = assume(saysForm, { pure: true });
 
 /** The methods that write nothing, which the guard never stands in front of. */
 const reads = (method: string): boolean => method === 'GET' || method === 'HEAD';
@@ -73,6 +76,12 @@ const ours = (site: string | undefined): boolean => site === undefined || site =
 
 /** Whether `contentType` says a JSON body, its parameters (`; charset=utf-8`) and its case left out. */
 const json = (contentType: string | undefined): boolean => contentType !== undefined && saysJson(contentType);
+
+/** Whether `contentType` says a form of files (`multipart/form-data`), its boundary and its case left out. */
+const form = (contentType: string | undefined): boolean => contentType !== undefined && saysForm(contentType);
+
+/** Whether a write sends a form of files with a bearer token, which no page on another site can send without asking first. */
+const tokenForm = (r: WriteRequest): boolean => r.bearer && form(r.contentType);
 
 /** Whether a write presents a token by the board's cookie. */
 const byCookie = (r: WriteRequest): boolean => r.cookie;
@@ -111,8 +120,14 @@ const writeRefusedSpec = spec<(request: WriteRequest) => WriteRefusal | null>({
       condition: ({ input: [r], output }) => !r.bearer || (output !== 'host' && output !== 'site'),
     },
     aBodyNotJsonIsRefused: {
-      description: 'A write from where it may come that does not say a JSON body is refused for its media, a token or none',
-      condition: ({ input: [r], output }) => reads(r.method) || !fromWhereItMay(r) || json(r.contentType) || output === 'media',
+      description:
+        'A write from where it may come that does not say a JSON body is refused for its media, a token or none, but a form of files with a bearer token',
+      condition: ({ input: [r], output }) =>
+        reads(r.method) || !fromWhereItMay(r) || json(r.contentType) || tokenForm(r) || output === 'media',
+    },
+    aFormWithATokenPasses: {
+      description: 'A write that presents a bearer token and sends a form of files (multipart/form-data) is never refused',
+      condition: ({ input: [r], output }) => !tokenForm(r) || output === null,
     },
     aJsonWriteFromWhereItMayPasses: {
       description: 'A write from this machine and no other site, or with a token, saying a JSON body, is never refused',

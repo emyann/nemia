@@ -102,6 +102,9 @@ export function menuRow(
       data-slot="menu-item"
       key={item.id}
       id={item.id}
+      // The row's content is elements, and React Aria takes an item's text
+      // from a string alone: without this a typed letter goes to no item.
+      textValue={item.label}
       onAction={item.onAction}
       href={item.href}
       isDisabled={item.isDisabled}

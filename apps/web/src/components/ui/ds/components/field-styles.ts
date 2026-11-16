@@ -76,10 +76,11 @@ import { tv, type VariantProps } from "../utils";
  *   `DateRangePicker`.
  *
  * The outlined variant's label sits on the outline over a notch painted in
- * `--md3-field-notch` (defaults to `surface`); set that variable on any
- * ancestor whose background differs, e.g.
- * `[--md3-field-notch:var(--md-sys-color-surface-container-high)]` inside a
- * dialog.
+ * `--md3-field-notch` (defaults to `surface`). The kit's own containers set
+ * it to their colour: a dialog, a side sheet, a bottom sheet, a popover and
+ * each `Card`. Set it on any other ancestor whose background is not
+ * `surface`, e.g.
+ * `[--md3-field-notch:var(--md-sys-color-surface-container)]` on a pane.
  */
 /**
  * Focus outranks hover on an invalid field. The hover rule stacks two

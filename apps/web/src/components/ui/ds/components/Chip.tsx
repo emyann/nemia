@@ -13,7 +13,13 @@ import {
   type ToggleButtonProps,
   composeRenderProps,
 } from "react-aria-components";
-import { type FocusEventHandler, type ReactNode, type JSX, useId } from "react";
+import {
+  type FocusEventHandler,
+  type ReactNode,
+  type JSX,
+  type Ref,
+  useId,
+} from "react";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -569,6 +575,14 @@ export type ChipGroupProps = Omit<
   isInvalid?: boolean;
   /** Fires when focus leaves any chip in the set (form "touched" tracking). */
   onBlur?: FocusEventHandler<HTMLDivElement>;
+  /** One row that scrolls sideways where the chips do not fit, in place of
+   *  wrapping onto more rows: a filter row on a phone. Material's
+   *  guidelines: "Chip sets can be scrolled horizontally", and past two
+   *  rows of wrapping they ask for it. */
+  isScrollable?: boolean;
+  /** The group's element: to scroll it into view, or to find a chip in it
+   *  and give it the focus. */
+  ref?: Ref<HTMLDivElement>;
   children?: ReactNode;
   className?: string;
 };
@@ -588,6 +602,8 @@ export function ChipGroup({
   isInvalid = false,
   isDisabled = false,
   onBlur,
+  isScrollable = false,
+  ref,
   children,
   className,
   ...props
@@ -603,7 +619,8 @@ export function ChipGroup({
       data-invalid={isInvalid || undefined}
       data-disabled={isDisabled || undefined}
       onBlur={onBlur}
-      className={cn("flex flex-col gap-2", className)}
+      ref={ref}
+      className={cn("flex min-w-0 flex-col gap-2", className)}
     >
       {label && (
         <span
@@ -621,7 +638,14 @@ export function ChipGroup({
         aria-describedby={message ? messageId : undefined}
         {...props}
         isDisabled={isDisabled}
-        className="flex flex-wrap gap-2 data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-start"
+        className={cn(
+          "flex gap-2 data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-start",
+          // Room around the row for a chip's focus ring, which the
+          // scrolling would cut.
+          isScrollable
+            ? "-m-1.5 flex-nowrap overflow-x-auto p-1.5 [&>*]:shrink-0"
+            : "flex-wrap",
+        )}
       >
         {children}
       </ToggleButtonGroup>

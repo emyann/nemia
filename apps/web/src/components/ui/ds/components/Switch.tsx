@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import {
   composeRenderProps,
   Switch as AriaSwitch,
@@ -68,6 +68,17 @@ export type SwitchProps = Omit<AriaSwitchProps, "className" | "children"> & {
   children?: ReactNode;
   /** Show a check / cross on the handle; `"selected"` shows the check only. */
   icons?: boolean | "selected";
+  /** A line under the label, in `on-surface-variant`: what the setting
+   *  does. It is the switch's description for a screen reader. */
+  supportingText?: ReactNode;
+  /**
+   * `"start"` is a settings row: the label and its supporting line first,
+   * the switch at the far end, the row as wide as what holds it and pressed
+   * anywhere.
+   *
+   * @default "end"
+   */
+  labelPosition?: "start" | "end";
   className?: string;
 };
 
@@ -77,6 +88,16 @@ export type SwitchProps = Omit<AriaSwitchProps, "className" | "children"> & {
  * target. `icons` shows a check on the handle when on and a cross when off;
  * `icons="selected"` is the spec's "icon on selected switch" configuration.
  *
+ *   <Switch labelPosition="start" supportingText="A sound for each message">
+ *     Notification sounds
+ *   </Switch>
+ *
+ * The label is its children. `supportingText` is a second line under it and
+ * the switch's description; `labelPosition="start"` makes the whole a
+ * settings row, the label first and the switch at the end: Material's
+ * guidelines give switches for "standalone or more verbose options in a
+ * list, like settings", and describe no row; this one is the kit's.
+ *
  * Spec: https://m3.material.io/components/switch/{overview,specs,guidelines,accessibility}
  * Deviation: the spec lists Enter as a toggle key; React Aria's switch (a
  * native checkbox input) toggles with Space only.
@@ -84,14 +105,35 @@ export type SwitchProps = Omit<AriaSwitchProps, "className" | "children"> & {
 export function Switch({
   children,
   icons = false,
+  supportingText,
+  labelPosition = "end",
   className,
   ...props
 }: SwitchProps) {
+  const descriptionId = useId();
+  // The switch is a label around all it holds: named by its first line
+  // alone, so the supporting line is its description and not its name too.
+  const titleId = useId();
+  const describedBy =
+    [props["aria-describedby"], supportingText ? descriptionId : undefined]
+      .filter(Boolean)
+      .join(" ") || undefined;
+  const atStart = labelPosition === "start";
   return (
     <AriaSwitch
       data-slot="switch"
+      data-label-position={labelPosition}
       {...props}
-      className={composeTailwindRenderProps(className, styles().base())}
+      aria-describedby={describedBy}
+      aria-labelledby={
+        props["aria-labelledby"] ?? (supportingText ? titleId : undefined)
+      }
+      className={composeTailwindRenderProps(
+        className,
+        styles().base({
+          className: atStart ? "flex w-full justify-between gap-4" : "",
+        }),
+      )}
     >
       {composeRenderProps(children, (children, { isSelected }) => {
         const s = styles({ isSelected, hasIcons: icons === true });
@@ -110,7 +152,27 @@ export function Switch({
                 </span>
               </span>
             </span>
-            {children}
+            {supportingText ? (
+              <span
+                data-slot="switch-text"
+                className={`flex min-w-0 flex-col ${atStart ? "-order-1" : ""}`}
+              >
+                <span id={titleId}>{children}</span>
+                <span
+                  id={descriptionId}
+                  data-slot="supporting-text"
+                  className="text-on-surface-variant group-data-disabled/sw:text-on-surface/38"
+                >
+                  {supportingText}
+                </span>
+              </span>
+            ) : atStart ? (
+              <span data-slot="switch-text" className="-order-1 min-w-0">
+                {children}
+              </span>
+            ) : (
+              children
+            )}
           </>
         );
       })}

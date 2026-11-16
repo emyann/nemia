@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { tv } from "../utils";
 import {
   Label,
@@ -15,6 +16,10 @@ interface SliderProps<T extends number | number[]> extends AriaSliderProps<T> {
   label?: string;
   thumbLabels?: string[];
   showOutput?: boolean;
+  /** The value as words, where a number and `formatOptions` do not say it:
+   *  a time ("1:05"), a size ("Large"). It is what the output draws and
+   *  what a screen reader hears for the handle. */
+  formatValue?: (value: number) => string;
   className?: string;
 }
 
@@ -80,7 +85,9 @@ const GAP = 8;
  * It is as wide as what holds it: give it, or its container, a width
  * (`className="max-w-xs"`). `label` names it and `showOutput` writes the
  * value beside the label; with no `label`, pass `aria-label`. A range names
- * each handle with `thumbLabels`.
+ * each handle with `thumbLabels`. The value is written by React Aria's
+ * `formatOptions` (a percentage, a unit) or, where a number does not say
+ * it, by `formatValue` (`(s) => "1:05"`).
  *
  * This is Material's extra-small slider: a 16dp track, the active part on
  * `primary` and the rest on `secondary-container`, a 4dp by 44dp handle
@@ -95,18 +102,30 @@ function Slider<T extends number | number[]>({
   label,
   thumbLabels,
   showOutput = true,
+  formatValue,
   className,
   ...props
 }: SliderProps<T>) {
   const { root, label: labelStyles, output: outputStyles } = styles();
 
+  const own = useRef<HTMLDivElement>(null);
+
   return (
-    <AriaSlider data-slot="slider" {...props} className={root({ className })}>
+    <AriaSlider
+      data-slot="slider"
+      {...props}
+      ref={own}
+      className={root({ className })}
+    >
       {label && <Label className={labelStyles()}>{label}</Label>}
       {showOutput && (
         <SliderOutput className={outputStyles()}>
           {({ state }) =>
-            state.values.map((_, i) => state.getThumbValueLabel(i)).join(" – ")
+            state.values
+              .map((value, i) =>
+                formatValue ? formatValue(value) : state.getThumbValueLabel(i),
+              )
+              .join(" – ")
           }
         </SliderOutput>
       )}
@@ -143,6 +162,13 @@ function Slider<T extends number | number[]>({
                   </div>
                 );
               })}
+              {formatValue && (
+                <SpokenValues
+                  root={own}
+                  values={state.values}
+                  formatValue={formatValue}
+                />
+              )}
               {state.values.map((_, i) => (
                 <SliderThumb
                   data-slot="slider-thumb"
@@ -158,6 +184,29 @@ function Slider<T extends number | number[]>({
       </SliderTrack>
     </AriaSlider>
   );
+}
+
+/** React Aria writes each handle's `aria-valuetext` from the number and
+    gives no way to say it otherwise: written again here, after it, each
+    time a value moves. Draws nothing. */
+function SpokenValues({
+  root,
+  values,
+  formatValue,
+}: {
+  root: React.RefObject<HTMLDivElement | null>;
+  values: number[];
+  formatValue: (value: number) => string;
+}) {
+  useEffect(() => {
+    root.current?.querySelectorAll("input").forEach((input, i) => {
+      const value = values[i];
+      if (value !== undefined) {
+        input.setAttribute("aria-valuetext", formatValue(value));
+      }
+    });
+  });
+  return null;
 }
 
 export { Slider };

@@ -129,6 +129,7 @@ export {
   type CellProps,
 } from "./components/Table";
 export { Avatar, type AvatarProps } from "./components/Avatar";
+export { Pressable, type PressableProps } from "./components/Pressable";
 export {
   Skeleton,
   SkeletonGroup,

@@ -2,12 +2,14 @@
  * A workflow folder's files read as the spec a Workflow object carries (`WorkflowSpec` of objects): each step, a `.md` file that is not
  * its README, by its name, its frontmatter's keys in the form the spec carries them (`servedKeys`) and its body, in the order of their
  * names; its README; and the folder's other text files (`files`), sorted by name. One reading for the folder on disk (`workflowSpecAt`,
- * `current.verb.ts`) and for a folder composed from an upgrade's merge (`nemia factory resolve`). Pure.
+ * `current.verb.ts`) and for a folder composed from an upgrade's merge (`nemia factory resolve`); and the other way, a step of the spec as
+ * the draft a write takes (`stepDraftOf`). Pure.
  */
 import { isReadme, splitFrontmatter } from '../step/step.ts';
 import { isMarkdown } from '../folder/folder.ts';
 import { frontmatterValues, MAP_KEYS, readFrontmatter } from '../frontmatter/frontmatter.ts';
-import { STEP_KEY_FORM } from 'objects';
+import { STEP_KEY_FORM, type WorkflowStep } from 'objects';
+import type { StepDraft } from '../workflow/index.ts';
 import { tokensOf } from '../keys/index.ts';
 import { isHarnessBlock } from '../former/former.ts';
 import { isMap } from '../template/index.ts';
@@ -102,3 +104,16 @@ export function workflowSpecOf(files: readonly FolderText[]): WorkflowSpecRead {
   const others = byName.filter((f) => !isMarkdown(f.name)).map((f) => ({ path: f.name, text: f.text }));
   return { ...(readme !== undefined && { readme: readme.text }), steps, files: others };
 }
+
+/**
+ * A step as the object says it, as the Workflow door takes it: its keys, `output` as the file it names, and its body.
+ * @param step The step as the Workflow object says it.
+ */
+export const stepDraftOf = (step: WorkflowStep): StepDraft => {
+  const draft: Record<string, unknown> = { after: [] };
+  for (const [key, value] of Object.entries(step.keys)) {
+    if (value === null || value === undefined) continue;
+    draft[key] = key === 'output' ? { file: value } : value;
+  }
+  return { ...draft, name: step.name, body: step.body } as StepDraft;
+};

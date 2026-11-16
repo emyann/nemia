@@ -24,6 +24,7 @@ import {
   type ProposalChange,
   type Need,
   type ProposedObject,
+  type WorkflowStep,
   DEFAULT_NAMESPACE,
 } from 'objects';
 import { Conflict, Forbidden, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
@@ -31,7 +32,7 @@ import { brokenBy } from '../door/door.store.ts';
 import { mayPropose } from '../approval/index.ts';
 import { accessChange, accessOf } from './access.ts';
 import { readmeComposed } from '../folder/folder.ts';
-import { currentOf, type ProposalNeeds, type ProposalPlace } from './current.verb.ts';
+import { currentOf, workflowStepsWritten, type ProposalNeeds, type ProposalPlace } from './current.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { proposerOf, type ProposalCaller } from '../caller/index.ts';
 import { skillFilesRefusal } from '../skills/skills.ts';
@@ -197,7 +198,8 @@ const changeOf = (place: ProposalPlace, factory: string, object: ProposedObject)
         }),
       );
     const before = accessOf(object.kind, object.metadata.name, now.spec);
-    const after = accessOf(object.kind, object.metadata.name, verb === 'delete' ? undefined : mergedSpec(object, now.spec));
+    const merged = verb === 'delete' ? undefined : mergedSpec(object, now.spec);
+    const after = accessOf(object.kind, object.metadata.name, yield* folderShaped(place, factory, object, merged));
     const change: ProposalChange = {
       resource: RESOURCE_PLURALS[object.kind],
       name: object.metadata.name,
@@ -206,6 +208,20 @@ const changeOf = (place: ProposalPlace, factory: string, object: ProposedObject)
     };
     return change;
   });
+
+/**
+ * The spec `merged` an object will hold once written, in the shape `currentOf` reads what is there now, so `accessOf` reads both sides
+ * alike: a Workflow's steps as its folder would read them once written (`workflowStepsWritten`), each step's keys its file's own, never
+ * those its agent gives it or the agent its factory hires into it, which the api serves on each step; its steps as given where one does
+ * not render, or where it gives none. Any other kind's spec as it is.
+ */
+const folderShaped = (place: ProposalPlace, factory: string, object: ProposedObject, merged: unknown) => {
+  const spec = recordOf(merged);
+  if (object.kind !== 'Workflow' || spec === undefined || !Array.isArray(spec.steps)) return Effect.succeed(merged);
+  return Effect.map(workflowStepsWritten(place, factory, object.metadata.name, spec.steps as readonly WorkflowStep[]), (steps) =>
+    steps === undefined ? merged : { ...spec, steps },
+  );
+};
 
 /** `value` as a record, or none where it is not an object. */
 const recordOf = (value: unknown): Readonly<Record<string, unknown>> | undefined =>

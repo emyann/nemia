@@ -608,9 +608,14 @@ const PROPOSAL_JUDGED = 'The proposal may be judged: read it again on its page b
 
 /** A factory's proposals, each a change to its definitions waiting on, or judged by, an approval. */
 export const proposals = {
-  /** Every proposal of the factory `namespace`, every page. */
-  list: (namespace: string): Promise<ProposalList> =>
-    everyPage((asked) => call((c) => c.proposals.list({ params: { namespace }, query: asked }), read(ProposalList))),
+  /** Every proposal of the factory `namespace` that `fieldSelector` keeps (`status.phase=<phase>`), or every one for none, every page. */
+  list: (namespace: string, fieldSelector?: string): Promise<ProposalList> =>
+    everyPage((asked) =>
+      call(
+        (c) => c.proposals.list({ params: { namespace }, query: fieldSelector === undefined ? asked : { ...asked, fieldSelector } }),
+        read(ProposalList),
+      ),
+    ),
   get: (namespace: string, name: string): Promise<Proposal> =>
     call((c) => c.proposals.get({ params: { namespace, name } }), read(Proposal)),
   /** The proposal `name` approved, the person's: answers it as it then reads, applied where it applies at approval. */

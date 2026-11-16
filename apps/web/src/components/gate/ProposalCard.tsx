@@ -39,7 +39,7 @@ export function ProposalCard({ factory, name }: { factory: string; name: string 
     mutationFn: (asked: Judgement) => (asked === 'approve' ? approveProposal(factory, name) : declineProposal(factory, name)),
     onSuccess: (now) => {
       queryClient.setQueryData(proposalKey(factory, name), now);
-      void queryClient.invalidateQueries({ queryKey: proposalsKey(factory), exact: true });
+      void queryClient.invalidateQueries({ queryKey: proposalsKey(factory) });
     },
   });
   if (!proposal) {

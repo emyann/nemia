@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { herChat, openChat, photograph, placeLitOf, placeOf, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { WAITING_SELECTOR } from '../../../src/lib/api/proposals.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -21,6 +22,43 @@ const goto = async (page: Page, to: string): Promise<void> => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 };
+
+/** The address of each request the page makes while `work` runs, its path and its query. */
+async function heardDuring(page: Page, work: () => Promise<void>): Promise<URL[]> {
+  const heard: URL[] = [];
+  const hear = (request: { url: () => string }) => heard.push(new URL(request.url()));
+  page.on('request', hear);
+  try {
+    await work();
+  } finally {
+    page.off('request', hear);
+  }
+  return heard;
+}
+
+/**
+ * The floor of FACTORY, loaded whole, asks the inbox's cards once, and the pane's Proposals line asks the proposals that wait
+ * (`WAITING_SELECTOR`) and never the whole list: the floor's readers of the cards share one read, and only the proposals page reads every
+ * proposal whole.
+ */
+async function floorReads(page: Page): Promise<void> {
+  const proposals = `/api/namespaces/${FACTORY}/proposals`;
+  const heard = await heardDuring(page, async () => {
+    await goto(page, `/factories/${FACTORY}`);
+    await expectVisible(placeOf(page, 'Proposals').getByText('1 wait on you'), "the floor's pane counts the proposal that waits");
+  });
+  const cards = heard.filter((url) => url.pathname === '/api/cards');
+  if (cards.length !== 1)
+    throw new Refused(`the floor asks the inbox's cards once — it asked ${cards.length} times: ${cards.map((u) => u.search).join(', ')}`);
+  const asked = heard.filter((url) => url.pathname === proposals);
+  if (!asked.some((url) => url.searchParams.get('fieldSelector') === WAITING_SELECTOR))
+    throw new Refused(`the pane asks ${proposals} for the proposals that wait (${WAITING_SELECTOR}) — it asked none`);
+  const whole = asked.filter((url) => url.searchParams.get('fieldSelector') !== WAITING_SELECTOR);
+  if (whole.length > 0)
+    throw new Refused(
+      `the floor never asks the whole list of proposals — it asked ${whole.map((u) => `${u.pathname}${u.search}`).join(', ')}`,
+    );
+}
 
 /** A POST to the api from the page, as the board makes one: no session token, so the person's. Its status and answer. */
 const post = (page: Page, at: string, body: unknown): Promise<{ status: number; answer: unknown }> =>
@@ -103,10 +141,10 @@ async function proposalsLit(page: Page, where: string): Promise<void> {
 
 /**
  * Waiting, the proposal is listed on the factory's proposals page, and the pane's Proposals counts it as one that waits on you; the floor
- * draws no proposal and no template.
+ * draws no proposal and no template, and asks the cards once and no whole list of proposals (`floorReads`).
  */
 async function listedWaiting(page: Page, name: string): Promise<void> {
-  await goto(page, `/factories/${FACTORY}`);
+  await floorReads(page);
   await expectCount(page.locator('[data-factory-proposals], [data-factory-proposal]'), 0, 'the floor lists no proposal');
   await expectCount(page.locator('[data-template]'), 0, 'nor any template');
   await goto(page, `/factories/${FACTORY}/proposals`);
@@ -228,10 +266,11 @@ export default {
   /**
    * A factory's proposal on the board. In a factory the page writes, a proposal of Nemia's that widens access, which her message links: her
    * chat draws it under her words with its mark, and Approve applies it there, after which it offers nothing. The factory's proposals page
-   * lists it, waiting, then applied, the pane's Proposals lit and counting what waits, and the floor lists none; its link opens its page
-   * with the same part, whose way back is the proposals page. On the factory's settings, the form writes a delegation, listed, then
-   * removed. On Nemia's settings, her proposed rule over the factory's proposals is confirmed, read in force, then dropped. The page takes
-   * back the factory, its folder of proposals and hires, and her chat, and her rules.
+   * lists it, waiting, then applied, the pane's Proposals lit and counting what waits off the proposals that wait alone, and the floor
+   * lists none, asking the cards once; its link opens its page with the same part, whose way back is the proposals page. On the
+   * factory's settings, the form writes a delegation, listed, then removed. On Nemia's settings, her proposed rule over the factory's
+   * proposals is confirmed, read in force, then dropped. The page takes back the factory, its folder of proposals and hires, and her
+   * chat, and her rules.
    */
   name: 'proposal',
   route: '/runs',

@@ -123,15 +123,20 @@ const cardsSelected = async (selector: string | undefined): Promise<InboxEntry[]
 const inPlaySelected = async (selector: string | undefined): Promise<InboxEntry[]> =>
   (await cardsListed(selector)).items.filter((card) => card.status.inPlay).map(entryOf);
 
+/** How long a read of the inbox in play stands fresh (`inboxQuery`): what a page's loader read is not asked again as the page mounts. */
+export const INBOX_FRESH_MS = 10_000;
+
 /**
  * The inbox's cards still in play: each not yet started, and each whose run is pending, running or waiting — a card whose run ended is
- * left out (`inboxAllQuery` lists it). Not polled: it changes when a person files, drops or starts a card, here or at the command line.
- * Read again on each visit, and on a run's event on the workflow feed, which a queued card started is, and a run ending too; the feed says
- * nothing of cards.
+ * left out (`inboxAllQuery` lists it). It changes when a person files, drops or starts a card, here or at the command line. Read again
+ * on each visit once `INBOX_FRESH_MS` has passed since the last read, and on a run's event on the workflow feed, which a queued card
+ * started is, and a run ending too; the feed says nothing of cards. One key for every reader of a page (the factory pane's line, the
+ * floor's queue), so the page asks the list once: the route's loader reads it, and the readers that mount after it find it fresh.
  */
 export const inboxQuery = queryOptions({
   queryKey: ['inbox'],
   queryFn: () => inPlaySelected(undefined),
+  staleTime: INBOX_FRESH_MS,
 });
 
 /**

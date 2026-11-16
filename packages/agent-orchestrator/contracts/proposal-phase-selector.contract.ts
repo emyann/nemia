@@ -45,7 +45,7 @@ const proposalPhaseSelectorSpec = spec<(text: string) => ProposalPhaseSelector |
   },
 });
 
-/** `proposalPhaseSelector`'s type, which `src/proposal/phase-selector.ts` takes: the selector `text` spells, or null where it spells none. */
+/** `proposalPhaseSelector`'s type, which `src/proposal/phase-selector.ts` takes: the selector `text` spells, or null for none. */
 export type ProposalPhaseSelectorOf = Implementation<typeof proposalPhaseSelectorSpec>;
 
 const phaseTakesSpec = spec<(selector: ProposalPhaseSelector, phase: ProposalPhase) => boolean>({

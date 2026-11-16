@@ -43,7 +43,7 @@ export const NothingPicked: Story = {
 };
 
 /**
- * lgll picked: its box ticked, and what it would hand drawn under the list, badged not landed. It warns on axe only (`todo`): the
+ * lgll picked: its box ticked, and what it would hand drawn under the list, badged not landed. It warns on axe, its test to come: the
  * preview draws the section's `##` as an `h6` under its own `h4` (`heading-order`), on the page as here; that is the preview's outline
  * to mend.
  */

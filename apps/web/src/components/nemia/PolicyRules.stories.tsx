@@ -9,7 +9,7 @@ import { seeded } from '../../../.storybook/fixtures/proposals';
 /**
  * Her rules for Auto, seeded: what is in force, the default marked, and what she proposed.
  *
- * Each warns on axe only (`todo`): the part draws the custom instruction's `h2` inside its own `h3`, then its `h4`s
+ * Each warns on axe, its test to come: the part draws the custom instruction's `h2` inside its own `h3`, then its `h4`s
  * (`heading-order`), on the Settings page as here; that is the page's outline to mend.
  */
 const meta: Meta<typeof PolicyRules> = {

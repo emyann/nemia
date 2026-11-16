@@ -30,7 +30,7 @@ export const NoneGiven: Story = { args: { skills: '', given: [] } };
 /**
  * The sheet open: your library's skills, one given and one to add, and Nemia's own to copy; Add hands the line back with it.
  *
- * It warns on axe only (`todo`): Copy's name names its skill inside its words (`Copy grill-me to my library and add`), which its
+ * It warns on axe, its test to come: Copy's name names its skill inside its words (`Copy grill-me to my library and add`), which its
  * visible words (`Copy to my library and add`) are then not a part of (`label-content-name-mismatch`), on the page as here; its
  * words are the page's to mend.
  */

@@ -10,7 +10,7 @@ import { seeded } from '../../../.storybook/fixtures/proposals';
 /**
  * Nemia's section of the Settings page, its reads seeded: her level, each factory's, her session, her rules and her memory.
  *
- * Each warns on axe only (`todo`): her rules (`PolicyRules`) draw the custom instruction's `h2` inside their own `h3`, then their
+ * Each warns on axe, its test to come: her rules (`PolicyRules`) draw the custom instruction's `h2` inside their own `h3`, then their
  * `h4`s (`heading-order`), on the Settings page as here; that is the page's outline to mend.
  */
 const meta: Meta<typeof NemiaSettings> = {

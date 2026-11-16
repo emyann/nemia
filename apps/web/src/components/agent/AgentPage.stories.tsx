@@ -11,7 +11,7 @@ import { seeded } from '../../../.storybook/fixtures/proposals';
 /**
  * An agent's page, its reads seeded: the agent at its origin and the skills it can be given.
  *
- * Theirs warns on axe only (`todo`): a read-only agent's instructions are drawn as markdown whose `##` is an `h4` under the page's
+ * Theirs warns on axe, its test to come: a read-only agent's instructions are drawn as markdown whose `##` is an `h4` under the page's
  * `h1` (`heading-order`), on the page as here; that is the page's outline to mend.
  */
 const meta: Meta<typeof AgentPage> = {

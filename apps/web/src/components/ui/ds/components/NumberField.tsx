@@ -43,6 +43,8 @@ export type NumberFieldProps = Omit<AriaNumberFieldProps, "className"> &
     /** Helper text under the field; replaced by `errorMessage` when invalid. */
     supportingText?: ReactNode;
     errorMessage?: string | ((validation: ValidationResult) => string);
+    /** The error icon's accessible name. Default `"Error"`. */
+    errorLabel?: string;
     leadingIcon?: IconProp;
     trailingIcon?: IconProp;
     /** Only shown while the label is floated, like MD3. */
@@ -93,6 +95,7 @@ export function NumberField(props: NumberFieldProps) {
     label,
     supportingText,
     errorMessage,
+    errorLabel = "Error",
     leadingIcon,
     trailingIcon,
     placeholder,
@@ -182,7 +185,7 @@ export function NumberField(props: NumberFieldProps) {
           <span
             data-slot="trailing-icon"
             role="img"
-            aria-label="Error"
+            aria-label={errorLabel}
             className={s.trailingIcon()}
           >
             <ErrorIcon size={24} />

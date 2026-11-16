@@ -215,6 +215,16 @@ export type TabListProps<T extends object> = AriaTabListProps<T> & {
   isScrollable?: boolean;
 };
 
+/**
+ * The row of tabs: React Aria's `TabList`, holding the `Tab`s, with the
+ * 1dp `surface-variant` divider along its bottom edge. It needs an
+ * `aria-label` (or `aria-labelledby`) to name the set. By default the tabs
+ * divide its width equally, as Material's fixed tabs do; `isScrollable`
+ * sizes each tab to its label and scrolls the row sideways, for a set that
+ * cannot fit.
+ *
+ * Spec: https://m3.material.io/components/tabs/{overview,specs,guidelines,accessibility}
+ */
 export function TabList<T extends object>({
   isScrollable = false,
   className,
@@ -258,6 +268,16 @@ export type TabProps = AriaTabProps & {
   children?: ReactNode;
 };
 
+/**
+ * One tab: React Aria's `Tab`, its `id` matching the `TabPanel` it shows.
+ * It draws the label (`title-small`), an optional 24dp `icon` stacked above
+ * it (a 64dp tab) or, with `iconPosition="start"`, beside it (48dp), the
+ * state layer, the active indicator and an optional `badge`, all in the
+ * variant its `Tabs` set. A disabled tab fades to 38 % and is skipped by
+ * the arrow keys.
+ *
+ * Spec: https://m3.material.io/components/tabs/{overview,specs,guidelines,accessibility}
+ */
 export function Tab({
   icon,
   iconPosition = "top",
@@ -339,6 +359,13 @@ export function Tab({
 
 export type TabPanelProps = AriaTabPanelProps;
 
+/**
+ * The content a tab shows: React Aria's `TabPanel`, its `id` matching its
+ * `Tab`'s, labelled by that tab and shown only while it is selected. It
+ * draws 16dp of space above and below its content and nothing else.
+ *
+ * Spec: https://m3.material.io/components/tabs/{overview,specs,guidelines,accessibility}
+ */
 export function TabPanel({ className, ...props }: TabPanelProps) {
   const s = styles({ variant: useContext(VariantContext) });
 

@@ -234,31 +234,65 @@ always its DESIGN.md's.
 ## Taking a kit update
 
 The project's theme is in `theme/`, where no item of the kit writes, so an
-update cannot touch it. The kit's own files are another matter: the CLI keeps
-no record of what it installed, so it cannot tell a file the kit changed from
-a file the project edited. A plain `npx shadcn add @ds/ds` asks about the
-first kit file that differs, defaulting to No, even under `-y`; with no one to
-answer, it writes nothing at all, or waits for ever. So an update takes the
-kit's files whole and lets git show what moved. **Before it, ask the kit which
-of its files the project changed:**
+update cannot touch it. The kit's own files are updated with three commands,
+from the folder that holds `components.json`:
+
+```bash
+npx shadcn add @ds/ds --dry-run          # what the release would change, file by file; writes nothing
+npx shadcn add @ds/ds --diff <path>      # the change itself, in one file the dry run marked ~ overwrite
+npx shadcn add @ds/ds --overwrite -y     # take it
+```
+
+The whole install does not bring the three adapters (`@ds/next-adapter`,
+`@ds/react-router-adapter`, `@ds/react-hook-form-adapter`) or the Editorial
+preset (`@ds/preset-editorial`): a project asks for each by name, and each
+one it holds is named after `@ds/ds` on all three lines, or it stays at the
+old release:
+
+```bash
+npx shadcn add @ds/ds @ds/next-adapter --dry-run
+npx shadcn add @ds/ds @ds/next-adapter --diff <path>
+npx shadcn add @ds/ds @ds/next-adapter --overwrite -y
+```
+
+What they print:
+
+- `--dry-run` writes nothing and lists every file of what it adds:
+  `= … skip (identical)`, `~ … overwrite` for a file that differs, `+ …
+  create` for a file the release adds, then the dependencies.
+- `--diff` with no path shows the first five files of the install, not the
+  ones that change. Name the file: the path the dry run printed, or its end
+  (`--diff components/Tag.tsx`). The diff runs from the project's file to
+  the release's.
+- A plain `npx shadcn add @ds/ds`, without `--overwrite`, asks about each
+  file that differs, defaulting to No, even under `-y`; with no one to
+  answer, it writes nothing at all, or waits for ever. Never run it to
+  update.
+
+**A file the project edited reads `~ overwrite` exactly as a file the kit
+changed does.** The dry run and the diff compare the project's copy with the
+incoming release, and cannot tell the two apart; the overwrite removes the
+edit. A project that edits kit files (see the `ds-build` skill, "What a
+project may change"), or does not know whether it did, asks the kit first:
 
 ```bash
 node <kit>/changed.mjs
 ```
 
 It compares each kit file, and each skill, with the release it was installed
-from, which `<kit>/RELEASE.json` records. It writes nothing and merges
-nothing. **Its last line is the update command for what this project holds:
-keep it for step 2.** Its exit code says which answer it gave:
+from, which `<kit>/RELEASE.json` records, so it names the project's edits
+alone. It writes nothing and merges nothing. **Its last line is the update
+command for what this project holds, adapters and preset named: use it for
+step 3.** Its exit code says which answer it gave:
 
 - **0**: no recorded file of what the project holds differs or is missing.
-  Step 3 has nothing to put back.
+  Step 4 has nothing to put back.
 - **1**: it lists files in three groups. `changed`: the text differs, and
-  step 2 loses that edit: these are the files to put back in step 3.
+  step 3 loses that edit: these are the files to put back in step 4.
   `whitespace`: the same text laid out differently, which is a formatter or
   an indent, and also a change of spaces inside a string or a class list;
-  step 2 puts the kit's layout back. `missing`: a file of the whole install,
-  or of an adapter or preset the project holds, is not there; step 2 brings
+  step 3 puts the kit's layout back. `missing`: a file of the whole install,
+  or of an adapter or preset the project holds, is not there; step 3 brings
   it back, so delete it again if the project removed it on purpose. Keep the
   list.
 - **2**: it cannot tell, and says why. There is no `<kit>/RELEASE.json`: the
@@ -267,15 +301,12 @@ keep it for step 2.** Its exit code says which answer it gave:
   them (`tsx: false`, a Tailwind prefix, `cssVariables: false`). Then the
   update is as below, and `git diff` alone says what moved.
 
-The whole install does not bring the three adapters (`@ds/next-adapter`,
-`@ds/react-router-adapter`, `@ds/react-hook-form-adapter`) or the Editorial
-preset (`@ds/preset-editorial`): a project asks for each by name. The check
-knows which of them the project holds, and says two more things that do not
-change the exit code:
+It says two more things that do not change the exit code:
 
-- `Not installed, and no finding`: those of which nothing is here, in one
-  line. `node <kit>/changed.mjs --missing` names every recorded file that is
-  not here, with its item and whether the project holds it.
+- `Not installed, and no finding`: the adapters and preset of which nothing
+  is here, in one line. `node <kit>/changed.mjs --missing` names every
+  recorded file that is not here, with its item and whether the project
+  holds it.
 - `behind`: one the project holds at an earlier release than the kit's
   other files, because an update named only `@ds/ds`. The command on the
   check's last line takes it.
@@ -291,39 +322,34 @@ and `.claude/skills/` out of the project's formatter and linter (one
 (`// @ts-nocheck`) is listed like any edit. A project that has no `<kit>/changed.mjs` gets it alone, with no
 other file touched, by `npx shadcn add @ds/changed`.
 
+The steps:
+
 1. Commit, or stash, everything first. The working tree must be clean: the
-   next step's diff is the update.
-2. Take the kit's files whole, with the command the check printed. For a
-   project that holds no adapter and no preset it is
+   diff of step 4 is the update.
+2. `--dry-run`, then `--diff <path>` for a `~ overwrite` file worth
+   reading. A project that edits kit files runs `node <kit>/changed.mjs`
+   here too.
+3. Take the kit's files whole: `npx shadcn add @ds/ds --overwrite -y`, with
+   each adapter and preset the project holds named after `@ds/ds` (the line
+   `<kit>/changed.mjs` printed, where it ran). Every kit file that differs is
+   replaced. The project's `DESIGN.md`, `theme/` and the entry CSS's imports
+   are no item's target and stay as they are.
+4. Read `git status` and `git diff`: it is what the update changed. A kit
+   file the project had edited (the ones the check listed under `changed`)
+   shows the project's own edit removed, mixed with the kit's changes: put
+   the project's edit back by hand, keeping the kit's changes. A file the
+   project never edited needs nothing.
 
-   ```bash
-   npx shadcn add @ds/ds --overwrite -y
-   ```
-
-   and for one that holds some, each is named in it, or it stays at the old
-   release:
-
-   ```bash
-   npx shadcn add @ds/ds @ds/next-adapter @ds/react-hook-form-adapter --overwrite -y
-   ```
-
-   Every kit file that differs is replaced. The project's `DESIGN.md`,
-   `theme/` and the entry CSS's imports are no item's target and stay as they
-   are.
-3. Read `git status` and `git diff`: it is what the update changed. A kit
-   file the project had edited (the ones the check listed under `changed`;
-   see the `ds-build` skill) shows the project's own edit removed, mixed with
-   the kit's changes: put the project's edit back by hand, keeping the kit's
-   changes. A file the project never edited needs nothing.
-
-Steps 4 and 5 are for a project that generated a theme of its own (it has a
+Steps 5 and 6 are for a project that generated a theme of its own (it has a
 `DESIGN.md`, a `theme/` folder and the `theme:generate` script). A project
-still on the kit's default theme has none of the three and stops at step 3:
+still on the kit's default theme has none of the three and stops at step 4:
 build, then commit.
 
-4. `npm run theme:generate`. The kit's `theme.v4.css` is the template, so a
-   new scale or utility in the kit reaches the project's copy here.
-5. Lint both files again and read the diff of `theme/`: it is what the update
+5. `npm run theme:generate`. The kit's `theme.v4.css` is the template, so a
+   new scale or utility in the kit reaches the project's copy here. The
+   theme moves only when the release changed the generator, its template or
+   a default; otherwise this leaves `theme/` as it was.
+6. Lint both files again and read the diff of `theme/`: it is what the update
    changed in the project's look. Build, then commit.
 
 ## The project's design system in Claude

@@ -3,8 +3,16 @@ import { type HTMLAttributes } from "react";
 import { tv } from "../utils";
 
 const styles = tv({
-  base: "pointer-events-none inline-flex shrink-0 items-center justify-center rounded-shape-full bg-error text-on-error",
+  base: "pointer-events-none inline-flex shrink-0 items-center justify-center rounded-shape-full",
   variants: {
+    // `md.comp.badge.color` is `error`, `…large.label-text.color` `on-error`:
+    // the default. The other roles are a project's, each on its own `on-`.
+    color: {
+      primary: "bg-primary text-on-primary",
+      secondary: "bg-secondary text-on-secondary",
+      tertiary: "bg-tertiary text-on-tertiary",
+      error: "bg-error text-on-error",
+    },
     size: {
       // `md.comp.badge.size`
       small: "size-1.5",
@@ -28,8 +36,11 @@ const styles = tv({
       class: "-top-0.5 start-[calc(100%-12px)]",
     },
   ],
-  defaultVariants: { size: "small", anchored: false },
+  defaultVariants: { color: "error", size: "small", anchored: false },
 });
+
+/** The colour roles a badge is drawn in. `error` is Material's. */
+export type BadgeColor = "primary" | "secondary" | "tertiary" | "error";
 
 /** A host's `badge`: a count or a short status, or `true` for the dot. */
 export type BadgeValue = number | string | true;
@@ -71,6 +82,12 @@ export type BadgeProps = Omit<HTMLAttributes<HTMLSpanElement>, "children"> & {
   max?: number;
   /** On the top trailing corner of the positioned parent, the icon's box. */
   anchored?: boolean;
+  /**
+   * The fill, its text in the matching `on-` role. Default `error`,
+   * Material's; the others are not Material's, for a project whose colours
+   * mean something else ("waits on you" rather than "failed").
+   */
+  color?: BadgeColor;
 };
 
 /**
@@ -81,6 +98,7 @@ export type BadgeProps = Omit<HTMLAttributes<HTMLSpanElement>, "children"> & {
  *   <Badge value={3} />             large: 16dp high, the count in it
  *   <Badge value={1200} />          "999+": four characters at most
  *   <Badge value={3} anchored />    on the icon's corner (the hosts do this)
+ *   <Badge value={3} color="primary" />   not Material's: see Colour
  *
  * Spec: https://m3.material.io/components/badges/overview · .../specs ·
  * .../guidelines · .../accessibility
@@ -88,7 +106,8 @@ export type BadgeProps = Omit<HTMLAttributes<HTMLSpanElement>, "children"> & {
  * The measurements are the spec's (`md.comp.badge.*`): the small badge is a
  * 6dp circle, the large one 16dp high and 16dp wide at least, growing with its
  * text to 34dp, with 4dp of padding beside the text, both fully rounded, on
- * `error` with `label-small` text in `on-error`. A number above `max` (999 by
+ * `error` with `label-small` text in `on-error` (unless `color` says
+ * otherwise, below). A number above `max` (999 by
  * default) is shown as "999+", the spec's four characters with the "+".
  *
  * **Placement.** `anchored` sets the badge on the top trailing corner of its
@@ -109,8 +128,17 @@ export type BadgeProps = Omit<HTMLAttributes<HTMLSpanElement>, "children"> & {
  *
  * Presentational and server-safe: no React Aria, no `"use client"`.
  *
- * Deviations: none of the colours can be changed by a prop, as the
- * guidelines ask (keep the default mapping). Hiding a badge once its
+ * **Colour.** `color` draws the badge in `primary`, `secondary` or
+ * `tertiary` instead, the text in the matching `on-` role, as `Meter` and
+ * `Tag` take theirs. This is not Material's: its badge is always `error`,
+ * and its guidelines ask to keep that mapping, allowing another role only
+ * where it is needed and contrasts at least 3:1. A project needs it where
+ * its colours carry meanings of their own, so that a count of what waits on
+ * the reader is not drawn as a failure. The default stays `error`, so a
+ * badge given no colour is Material's. The hosts take it as a destination's
+ * `badgeColor`.
+ *
+ * Deviations: `color`, above. Hiding a badge once its
  * destination is opened is the app's: it owns the unread count the badge
  * shows, and passes no `badge` when there is nothing unread.
  */
@@ -118,6 +146,7 @@ export function Badge({
   value,
   max = BADGE_MAX,
   anchored = false,
+  color = "error",
   className,
   ...rest
 }: BadgeProps) {
@@ -129,9 +158,10 @@ export function Badge({
     <span
       data-slot="badge"
       data-size={size}
+      data-color={color}
       aria-hidden="true"
       {...rest}
-      className={styles({ size, anchored, className })}
+      className={styles({ color, size, anchored, className })}
     >
       {/* A count reads left to right in any page ("999+", never "+999"),
           so the text alone is isolated as such: the box keeps the page's

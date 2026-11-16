@@ -219,6 +219,18 @@ const TypographyBase = React.forwardRef(
 TypographyBase.displayName = "TypographyBase";
 
 // Display Component
+/**
+ * Material's display type role, for the largest text on a screen, short and
+ * few: a hero number, a splash line. `size` is `large`, `medium` or `small`
+ * (`large` by default), and sets `text-display-<size>` with its family,
+ * weight, line height and tracking from the theme. The element is `h1`
+ * unless `component` names another of `h1`–`h6`, `div` or `span`; the role
+ * does not choose the element, so pick the one the document's outline needs.
+ * Content colour is inherited unless `colorRole` names one. It refuses
+ * `variant`: the role is the component.
+ *
+ * Spec: https://m3.material.io/styles/typography/type-scale-tokens
+ */
 export const Display = React.forwardRef<
   Element,
   Omit<
@@ -238,6 +250,18 @@ export const Display = React.forwardRef<
 Display.displayName = "Display";
 
 // Headline Component
+/**
+ * Material's headline type role, for short, high-emphasis text: a page's or
+ * a section's heading, a dialog's or a card's. `size` is `large`, `medium`
+ * or `small` (`large` by default), and sets `text-headline-<size>` with its
+ * family, weight, line height and tracking from the theme. The element is
+ * `h2` unless `component` names another of `h1`–`h6`, `div` or `span`; the
+ * role does not choose the element, so pick the one the document's outline
+ * needs. Content colour is inherited unless `colorRole` names one. It
+ * refuses `variant`: the role is the component.
+ *
+ * Spec: https://m3.material.io/styles/typography/type-scale-tokens
+ */
 export const Headline = React.forwardRef<
   Element,
   Omit<
@@ -260,6 +284,18 @@ Headline.displayName = "Headline";
 // `h1` is in the union because the element and the type role are independent —
 // that is what `component` is for. A top app bar's title is `title-large` by
 // the spec and is usually the page's own heading, so it needs both.
+/**
+ * Material's title type role, for medium-emphasis text that heads a smaller
+ * region: a top app bar's title, a list's heading, a tab's label. `size` is
+ * `large`, `medium` or `small` (`large` by default), and sets
+ * `text-title-<size>` with its family, weight, line height and tracking from
+ * the theme. The element is `h3` unless `component` names another of
+ * `h1`–`h6`, `div` or `span`; the role does not choose the element, so pick
+ * the one the document's outline needs. Content colour is inherited unless
+ * `colorRole` names one. It refuses `variant`: the role is the component.
+ *
+ * Spec: https://m3.material.io/styles/typography/type-scale-tokens
+ */
 export const Title = React.forwardRef<
   Element,
   Omit<
@@ -279,6 +315,18 @@ export const Title = React.forwardRef<
 Title.displayName = "Title";
 
 // Label Component
+/**
+ * Material's label type role, for the text inside a component: a button's, a
+ * chip's, a field's label. `size` is `large`, `medium` or `small` (`medium`
+ * by default), and sets `text-label-<size>` with its family, weight, line
+ * height and tracking from the theme. The element is `label` unless
+ * `component` names another of `label`, `span` or `div`; the role does not
+ * choose the element, so pick the one the document's outline needs. Content
+ * colour is inherited unless `colorRole` names one. It refuses `variant`:
+ * the role is the component.
+ *
+ * Spec: https://m3.material.io/styles/typography/type-scale-tokens
+ */
 export const Label = React.forwardRef<
   Element,
   Omit<TypographyProps<"label" | "span" | "div">, "variant">
@@ -295,6 +343,18 @@ export const Label = React.forwardRef<
 Label.displayName = "Label";
 
 // Body Component
+/**
+ * Material's body type role, for running text: paragraphs, supporting text,
+ * a cell's content. `size` is `large`, `medium` or `small` (`medium` by
+ * default), and sets `text-body-<size>` with its family, weight, line height
+ * and tracking from the theme. The element is `p` unless `component` names
+ * another of `p`, `span` or `div`; the role does not choose the element, so
+ * pick the one the document's outline needs. Content colour is inherited
+ * unless `colorRole` names one. It refuses `variant`: the role is the
+ * component.
+ *
+ * Spec: https://m3.material.io/styles/typography/type-scale-tokens
+ */
 export const Body = React.forwardRef<
   Element,
   Omit<TypographyProps<"p" | "span" | "div">, "variant">

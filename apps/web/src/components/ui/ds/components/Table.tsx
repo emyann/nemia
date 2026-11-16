@@ -214,6 +214,17 @@ export type ColumnProps = Omit<AriaColumnProps, "className"> & {
   };
 };
 
+/**
+ * A column's heading cell: React Aria's `Column`, in `label-large`,
+ * `on-surface-variant`, 56dp tall (44dp in a dense table) over the
+ * `outline-variant` line. `align` sets the heading's alignment and the
+ * default of every cell under it. With `allowsSorting` it shows an arrow
+ * once the table is sorted by it, turned for ascending. Give it a width
+ * (`width`, or `className="w-64"`) when its cells `truncate`.
+ *
+ * Material 3 does not describe this component; `Table` says what it is
+ * built from instead.
+ */
 export function Column({
   className,
   classNames,
@@ -269,6 +280,16 @@ export type TableHeaderProps<T extends object> = Omit<
   "className"
 > & { className?: string };
 
+/**
+ * The table's header row: React Aria's `TableHeader`, holding the `Column`s
+ * (or `columns` and a function that renders each). It adds the columns the
+ * table needs before yours: a checkbox column, 56dp wide, when rows are
+ * selected by checkbox (holding select-all when several can be), and an
+ * empty one for the drag handle with `allowsDragging`.
+ *
+ * Material 3 does not describe this component; `Table` says what it is
+ * built from instead.
+ */
 export function TableHeader<T extends object>({
   className,
   columns,
@@ -303,6 +324,14 @@ export type TableBodyProps<T extends object> = Omit<
   "className"
 > & { className?: string };
 
+/**
+ * The table's rows: React Aria's `TableBody`, holding the `Row`s (or
+ * `items` and a function that renders each), and `renderEmptyState` for a
+ * table with none. It draws nothing of its own.
+ *
+ * Material 3 does not describe this component; `Table` says what it is
+ * built from instead.
+ */
 export function TableBody<T extends object>({
   className,
   ...props
@@ -321,6 +350,18 @@ export type RowProps<T extends object> = Omit<AriaRowProps<T>, "className"> & {
   className?: string;
 };
 
+/**
+ * One row of the table: React Aria's `Row`, 52dp tall (40dp in a dense
+ * table) on `surface`, in `body-medium`, with the `outline-variant` line
+ * under it. A row that can be selected or acted on (`href`, `onAction`, or
+ * the table's `onRowAction`) shows the `on-surface` state layer on hover,
+ * press and keyboard focus, and a selected row sits on
+ * `secondary-container`. When rows are selected by checkbox, it adds the
+ * leading cell that holds its own. A disabled row's text fades to 38 %.
+ *
+ * Material 3 does not describe this component; `Table` says what it is
+ * built from instead.
+ */
 export function Row<T extends object>({
   className,
   columns,
@@ -370,6 +411,16 @@ export type CellProps = Omit<AriaCellProps, "className" | "render"> & {
   };
 };
 
+/**
+ * One cell of a `Row`: React Aria's `Cell`, 16dp in from each side, aligned
+ * as its `Column` says unless its own `align` says otherwise. `truncate`
+ * cuts its text to one line and shows the whole of it in a tooltip while
+ * the cell is hovered or focused, as `Table` describes. It refuses
+ * `render`: the cell places its own element.
+ *
+ * Material 3 does not describe this component; `Table` says what it is
+ * built from instead.
+ */
 export function Cell({
   className,
   classNames,

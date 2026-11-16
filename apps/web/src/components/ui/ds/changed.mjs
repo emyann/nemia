@@ -47,7 +47,14 @@
    the project does not hold, once, in one line; a held item whose own record
    is of another release than `RELEASE.json` (`behind`: an update that named
    only `@ds/ds` left it there); and the update command that takes everything
-   the project holds.
+   the project holds. And each line of the project's entry CSS that keeps
+   `utils.ts` out of Tailwind's scan: since 0.4.0 the focus ring's classes
+   are written only there (`focusRing`), so with that line no kit control
+   draws a focus indicator. The entry CSS is the one `components.json`
+   names (`tailwind.css`); a line is named when its `@source not` path, from
+   that file's folder, is `utils.ts` or a folder holding it. A glob is not
+   read, and nothing is said where `components.json` names no file or the
+   file is not there.
 
    What it cannot know: a file the project wrote beside the kit is not in the
    record and is not looked at; a formatter that moves more than whitespace
@@ -74,7 +81,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const RECORD = "RELEASE.json";
@@ -219,6 +226,25 @@ export function compare({ record, read }) {
   return result;
 }
 
+/** The lines of an entry CSS (`css`, read at `cssPath`) that keep the kit's
+    `utils.ts` (the kit's folder is `kit`) out of Tailwind's scan: each
+    `@source not` whose path, from the file's folder, is that file or a
+    folder holding it. Comments are not read. Line numbers start at 1. */
+export function unscannedUtils({ css, cssPath, kit }) {
+  const utils = join(kit, "utils.ts");
+  // A comment blanked, its line breaks kept, so the lines keep their numbers.
+  const read = css.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
+  const lines = [];
+  read.split("\n").forEach((line, at) => {
+    const source = /^\s*@source\s+not\s+(["'])(.*?)\1/.exec(line);
+    if (!source) return;
+    const below = relative(resolve(dirname(cssPath), source[2]), utils);
+    if (below === ".." || below.startsWith(`..${sep}`) || isAbsolute(below)) return;
+    lines.push(at + 1);
+  });
+  return lines;
+}
+
 /** What the CLI does to a component as it installs it, read in the project's
     `components.json`. Each of these rewrites the file's text, so the record,
     taken from the kit's own files, says nothing of what landed. */
@@ -280,8 +306,8 @@ function main(args = process.argv.slice(2)) {
   }
 
   const root = projectRoot(kit);
+  let config = {};
   if (root) {
-    let config;
     try {
       config = JSON.parse(readFileSync(join(root, "components.json"), "utf8"));
     } catch {
@@ -385,6 +411,19 @@ function main(args = process.argv.slice(2)) {
     console.log(
       `${result.unread} recorded file(s) of the project's root (the skills) were not looked at: no components.json above ${shown(kit)}.`,
     );
+  }
+  const css = root && typeof config?.tailwind?.css === "string" ? join(root, config.tailwind.css) : null;
+  if (css && existsSync(css)) {
+    const lines = unscannedUtils({
+      css: readFileSync(css, "utf8"),
+      cssPath: realpathSync(css),
+      kit: realpathSync(kit),
+    });
+    for (const line of lines) {
+      console.log(
+        `${shown(css)}:${line} keeps utils.ts out of Tailwind's scan, so no kit control draws its focus ring: the ring's classes are written only in utils.ts (focusRing). Remove that line.`,
+      );
+    }
   }
   console.log(`To update, from a clean working tree: ${updateCommand(result.held)}`);
   if (!result.grouped) {

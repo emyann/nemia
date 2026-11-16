@@ -37,12 +37,17 @@ const styles = tv({
         base: "pr-3",
       },
     },
+    // Disabled: content at 38% of on-surface, and no state layer, since a
+    // disabled row answers neither hover nor press.
     isDisabled: {
       true: {
         base: "text-on-surface/38 cursor-default",
+        stateLayer: "hidden",
         label: "text-on-surface/38",
-        supportingText: "text-on-surface-variant/38",
-        shortcut: "text-on-surface-variant/38",
+        supportingText: "text-on-surface/38",
+        shortcut: "text-on-surface/38",
+        leadingIcon: "text-on-surface/38",
+        trailingIcon: "text-on-surface/38",
       },
     },
     // Baseline menu spec: selected container = surface-container-highest,
@@ -87,6 +92,13 @@ export type MenuItemProps = VariantProps<typeof styles> & {
  * (new shapes, standard / vibrant colour styles, gaps) for new designs and
  * keeps this baseline menu available; the kit follows the baseline token
  * set, and the vertical menu would be a new variant.
+ *
+ * It draws the row and holds no state of its own: hover is CSS, and the
+ * focus and pressed state layers read `data-focus-visible` and
+ * `data-pressed` from the nearest ancestor that carries the class `group`.
+ * Render it inside a React Aria item (`MenuItem`, `ListBoxItem`) whose
+ * `className` includes `group`, as `Menu` and `SelectItem` do. `isFocused`,
+ * `isHovered` and `isPressed` are accepted and not read.
  */
 export function MenuItem(props: MenuItemProps) {
   const {
@@ -100,8 +112,9 @@ export function MenuItem(props: MenuItemProps) {
     className,
   } = props;
 
-  const baseStyles = styles().base({
-    className,
+  // The variants are given once, here: a slot called on a bare `styles()`
+  // takes none of them, and a disabled row's label stayed at full colour.
+  const s = styles({
     hasLeadingIcon: !!leadingIcon,
     hasTrailingIcon: !!trailingIcon,
     isDisabled,
@@ -109,34 +122,31 @@ export function MenuItem(props: MenuItemProps) {
   });
 
   return (
-    <div data-slot="menu-item-content" className={baseStyles}>
-      <div
-        data-slot="state-layer"
-        className={styles().stateLayer({ isSelected })}
-      />
+    <div data-slot="menu-item-content" className={s.base({ className })}>
+      <div data-slot="state-layer" className={s.stateLayer()} />
       <div className="relative flex w-full items-center">
         {leadingIcon && (
-          <div className={styles().leadingIcon()}>
+          <div className={s.leadingIcon()}>
             {renderIcon(leadingIcon)}
           </div>
         )}
-        <div className={styles().content()}>
-          <Label className={styles().label()} component="div" size="large">
+        <div className={s.content()}>
+          <Label className={s.label()} component="div" size="large">
             {label}
           </Label>
           {supportingText && (
-            <Body className={styles().supportingText()} component="div">
+            <Body className={s.supportingText()} component="div">
               {supportingText}
             </Body>
           )}
         </div>
         {shortcut && (
-          <Label className={styles().shortcut()} component="div" size="large">
+          <Label className={s.shortcut()} component="div" size="large">
             {shortcut}
           </Label>
         )}
         {trailingIcon && (
-          <div className={styles().trailingIcon()}>
+          <div className={s.trailingIcon()}>
             {renderIcon(trailingIcon)}
           </div>
         )}

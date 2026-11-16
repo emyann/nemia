@@ -69,7 +69,9 @@ export type DialogContentProps =
 
 /**
  * What an MD3 dialog holds: an optional icon, the headline, supporting text
- * and the actions, or children of your own under the headline.
+ * and the actions, or children of your own in their place. With `children`
+ * nothing else is drawn, the `title` included: write the headline yourself
+ * (`<Headline size="medium">`).
  *
  * Spec: https://m3.material.io/components/dialogs/{overview,specs,guidelines,accessibility}
  */

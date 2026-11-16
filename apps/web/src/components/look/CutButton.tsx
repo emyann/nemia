@@ -36,8 +36,9 @@ const DISABLED = 'bg-on-surface/12 text-on-surface/38';
  * What the look's filled button draws inside the element that is the button, a link or a press alike: its focus ring, a band in the
  * cut shape around it, as wide and as far as the kit's ring and shown with the keyboard on it; then its words on a shape of its own,
  * the top-right and bottom-left corners cut, exactly the button's box, in the hue of what waits on a person, with a state layer in
- * its ink. `quiet` draws it smaller, with no ground, in the surface's ink inside a hairline along the whole cut shape, for a button beside what already says
- * the wait; `disabled` draws the shape in the disabled ground and ink, with no state layer and no ring.
+ * its ink. `quiet` draws it smaller, with no ground, in the surface's ink inside a hairline along the whole cut shape, both cuts
+ * too, for a button beside what already says the wait; `disabled` draws the shape in the disabled ground and ink, with no state
+ * layer and no ring.
  */
 function Body({ disabled = false, quiet = false, children }: { disabled?: boolean; quiet?: boolean; children: string }) {
   return (

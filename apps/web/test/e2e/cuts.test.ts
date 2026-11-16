@@ -282,12 +282,13 @@ async function hairlineGaps(page: Page, name: string): Promise<string[]> {
       ];
     }),
   ) as Record<string, readonly [number, number]>;
-  const found = await coloursOf(page, name, {
+  const points: Record<string, readonly [number, number]> = {
     ground: [out.left - 7, out.top - 7],
     hairline: [midX, out.top + 1],
     ...sides,
     ...cuts,
-  } as Record<string, readonly [number, number]>);
+  };
+  const found = await coloursOf(page, name, points);
   const { ground, hairline } = found;
   assert.ok(apart(hairline, ground) > 12, `the hairline is read apart from the card: ${hairline.join(' ')} on ${ground.join(' ')}`);
   return [...Object.keys(sides), ...Object.keys(cuts)].filter((where) => !(apart(found[where], hairline) < apart(found[where], ground)));

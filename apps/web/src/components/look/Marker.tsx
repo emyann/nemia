@@ -1,6 +1,7 @@
 /**
  * The look's marker: a quiet line across a conversation for what frames it rather than being said in it — a session that began, a
- * turn cut short — its words centred between two hairlines, wrapping where they run past the column with a hairline kept on either side. A link in its words is underlined, and lit on hover.
+ * turn cut short — its words centred between two hairlines, wrapping where they run past the column with a hairline kept on either
+ * side. A link in its words is underlined, and lit on hover.
  */
 import type * as React from 'react';
 import { cn } from '@/lib/utils';

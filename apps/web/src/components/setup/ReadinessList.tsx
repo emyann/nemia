@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { CircleAlert, CircleCheck, CircleDashed, CircleHelp, Play, Power, type LucideIcon } from 'lucide-react';
 import type { FixStart, Readiness, ReadinessFix, ReadinessPiece, ReadinessState } from 'objects';
-import { CutField, CutFrame, CutPress } from '@/components/look';
+import { CutField, CutFrame, CutPress, Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/ds/utils';
 import { container, dashed, ringed } from '@/lib/meaning';
@@ -178,5 +179,36 @@ export function ReadinessList({ readiness, ...starts }: { readiness: Readiness }
         </section>
       ))}
     </div>
+  );
+}
+
+/** The pieces each area is drawn with while the readiness is read. */
+const AREAS_READ = [3, 2];
+
+/**
+ * The list while what the server has in place is read: the line that says whether everything is, then its areas, each a heading over a
+ * framed list of pieces, a piece its mark, its name and what it says. Shown at once: the router holds a pending page back a second
+ * already.
+ */
+export function ReadinessReading() {
+  return (
+    <Reading label="Reading what this server has in place…" at="now" className="flex flex-col gap-6">
+      <ReadingLines widths={['w-72']} className="text-body-medium" />
+      {AREAS_READ.map((pieces, at) => (
+        <div key={at} className="flex flex-col gap-2">
+          <Skeleton className="w-32 text-title-small" />
+          <CutFrame size={12}>
+            <div className="flex flex-col divide-y divide-outline-variant px-4">
+              {Array.from({ length: pieces }, (_, piece) => (
+                <div key={piece} className="flex items-center gap-3 py-3">
+                  <Skeleton shape="circle" className="size-5" />
+                  <ReadingLines widths={['w-36', 'w-2/3']} className="flex-1 text-body-medium" />
+                </div>
+              ))}
+            </div>
+          </CutFrame>
+        </div>
+      ))}
+    </Reading>
   );
 }

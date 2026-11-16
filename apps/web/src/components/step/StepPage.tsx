@@ -5,6 +5,7 @@ import { StepPart } from '@/components/step/part/StepPart';
 import { SessionRetryingBand, SessionStoppedBand, SessionUnreadableBand } from '@/components/step/session/SessionBand';
 import { SessionComposer } from '@/components/step/session/SessionComposer';
 import { SessionQuiet, SessionTalk } from '@/components/step/session/SessionTalk';
+import { SessionReading } from '@/components/step/session/SessionReading';
 import { RunGone } from '@/components/run/RunGone';
 import { agentsQuery } from '@/lib/api/agents';
 import { readGone } from '@/lib/api/gone';
@@ -144,13 +145,13 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
 
 /**
  * The session's talk, `turns` folded off what `following` read, and the message being written after them: or why there is none — the
- * step not filed, no session of its task started (`sessionToRead`), its conversation still being read, or nothing in it the engine can
- * read, each of which the family's empty shell carries (`SessionQuiet`).
+ * step not filed, no session of its task started (`sessionToRead`), or nothing in it the engine can read, each of which the family's
+ * empty shell carries (`SessionQuiet`); while it is still being read, the shape of its turns (`SessionReading`).
  */
 function SessionBody({ step, following, turns }: { step: Step; following: Following; turns: Turn[] }) {
   if (!step.taskId) return <SessionQuiet words="Not filed yet, so there is no session to show." />;
   if (!sessionToRead(step)) return <SessionQuiet words="No session of it has started yet, so there is no conversation to show." />;
-  if (following.loading) return <SessionQuiet words="Reading the conversation…" />;
+  if (following.loading) return <SessionReading words="Reading the conversation…" />;
   if (turns.length || following.partial)
     return <SessionTalk who={step.name} turns={turns} live={following.live} writing={following.partial?.text ?? null} />;
   if (following.error !== null) return null;

@@ -915,6 +915,27 @@ test('the Activity tab draws the session compact, over the last of its turns, an
   assert.ok(textsOf(html).includes('Open the session'), 'and the whole of it is one click away');
 });
 
+test('while its conversation is first read, the Activity tab draws the shape of its turns, and says what it reads to a screen reader alone', async () => {
+  const { ActivityTail } = await import('../src/components/step/StepInspector.tsx');
+  const { unread } = await import('../src/lib/following.ts');
+  const { prerender } = await import('react-dom/static');
+  const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
+  const run = runWith(null);
+  const step = { ...run.steps[0], taskId: 't-1', attempts: ranOnce };
+  const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
+  const tab = createElement(ActivityTail, { run, step, following: unread(true) });
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const { prelude } = await prerender(createElement(RouterContextProvider, { router, children: tab }));
+  const html = await new Response(prelude).text();
+
+  const reading = /<div data-session-reading[\s\S]*$/.exec(html)?.[0] ?? '';
+  assert.match(reading, /role="status"/, 'the skeleton stands where the talk will, in a status region');
+  assert.match(reading, /<span class="sr-only">Reading its conversation…<\/span>/, 'named by the line it replaces');
+  assert.ok((reading.match(/data-slot="skeleton" data-shape="rectangle" aria-hidden="true"/g) ?? []).length >= 3, 'in the shape of turns');
+  const seen = textsOf(html.replace(/<span class="sr-only">[^<]*<\/span>/g, ''));
+  assert.deepEqual(seen, ['Open the session'], 'and a sighted person reads the way to the whole of it alone');
+});
+
 test('the message being written is drawn after the turns, until the whole of it takes its place', () => {
   const events: TranscriptEvent[] = [{ id: 'u-1:0', at, role: 'user', kind: 'text', text: 'Say how rivers end.' }];
   const writing = renderToStaticMarkup(

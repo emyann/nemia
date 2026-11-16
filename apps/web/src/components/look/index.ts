@@ -12,6 +12,7 @@ export { CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, type FrameH
 export { CutTag } from './CutTag';
 export { Pager } from './Pager';
 export { PageName, Plate, type PlateHue } from './Plate';
+export { Reading, ReadingLines } from './Reading';
 export { RunSteps } from './RunSteps';
 export { ScanLines } from './ScanLines';
 export { StatTile } from './StatTile';

@@ -8,6 +8,7 @@ import { foldTranscript, sessionToRead } from '../../lib/transcript';
 import { useStepTranscript, type Following } from '../../lib/useStepTranscript';
 import { cn } from '../../lib/utils';
 import { StepPart } from './part/StepPart';
+import { SessionReading } from './session/SessionReading';
 
 /** A step's talk, loaded once the bar draws it: the family's talk and the step's own parts are not needed to read the canvas. */
 const SessionTalk = lazy(() => import('./session/SessionTalk').then((m) => ({ default: m.SessionTalk })));
@@ -31,6 +32,9 @@ export function StepInspector({ run, step, className }: { run: RunDetail; step: 
     </div>
   );
 }
+
+/** What a screen reader hears while the bar's conversation is first read, or its talk is loaded. */
+const READING = 'Reading its conversation…';
 
 /** How many of the conversation's last turns the bar draws: its tail, with the whole of it a click away. */
 export const ACTIVITY_TURNS = 30;
@@ -61,7 +65,7 @@ export function ActivityTail({ run, step, following }: { run: RunDetail; step: S
     <>
       <div className="flex items-baseline justify-between gap-2 text-body-small text-muted-foreground">
         <p>
-          {following.loading ? 'Reading its conversation…' : following.live ? 'Followed as it runs.' : 'Not running, so not followed.'}
+          {!following.loading && (following.live ? 'Followed as it runs.' : 'Not running, so not followed.')}
           {tail.length < turns.length && ` The last ${tail.length} of ${turns.length}.`}
         </p>
         <Link
@@ -73,18 +77,19 @@ export function ActivityTail({ run, step, following }: { run: RunDetail; step: S
         </Link>
       </div>
       {following.error && <p className="text-body-small text-failure">{following.error}</p>}
-      {!following.loading &&
-        (tail.length ? (
-          <Suspense fallback={<p className="text-muted-foreground">Reading its conversation…</p>}>
-            <SessionTalk who={step.name} turns={tail} live={following.live} density="compact" />
-          </Suspense>
-        ) : (
-          !following.error && (
-            <p className="text-muted-foreground">
-              {following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}
-            </p>
-          )
-        ))}
+      {following.loading ? (
+        <SessionReading words={READING} density="compact" />
+      ) : tail.length ? (
+        <Suspense fallback={<SessionReading words={READING} density="compact" />}>
+          <SessionTalk who={step.name} turns={tail} live={following.live} density="compact" />
+        </Suspense>
+      ) : (
+        !following.error && (
+          <p className="text-muted-foreground">
+            {following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}
+          </p>
+        )
+      )}
     </>
   );
 }

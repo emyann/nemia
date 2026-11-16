@@ -23,6 +23,7 @@
 /* The look's grain: its tiles, and the rule that draws one on a part that names it. */
 @import './components/look/grain.css';
 @import './components/look/breath.css';
+@import './components/look/reading.css';
 
 /*
  * Dark follows the system, as React Flow's `colorMode="system"` does below. The CLI declares `dark`

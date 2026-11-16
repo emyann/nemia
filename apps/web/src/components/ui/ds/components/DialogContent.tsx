@@ -6,7 +6,8 @@ import Button from "./Button";
 
 export const styles = tv({
   slots: {
-    base: "bg-surface-container-high rounded-shape-extra-large p-6 min-w-[280px] w-full shadow-elevation-3 outline-hidden relative overflow-hidden",
+    // Material's basic dialog: at least 280dp wide, at most 560dp.
+    base: "bg-surface-container-high rounded-shape-extra-large p-6 min-w-[280px] max-w-[560px] w-full shadow-elevation-3 outline-hidden relative overflow-hidden",
     header: "mb-4",
     icon: "text-secondary",
     // No weight here: the headline this styles is `Headline`, and its weight
@@ -34,7 +35,13 @@ export type { IconProp };
 type ActionConfig = {
   label: string;
   onPress?: () => void;
+  /** The request this action started is running: it draws a spinner and
+   *  takes no second press. While `confirm` is loading, `cancel` is
+   *  disabled, and `ModalDialog` is not dismissed. */
   isLoading?: boolean;
+  isDisabled?: boolean;
+  /** `"error"` for an action that destroys something: "Delete", "Discard". */
+  color?: "primary" | "error";
 };
 
 type Actions = {
@@ -73,6 +80,19 @@ export type DialogContentProps =
  * nothing else is drawn, the `title` included: write the headline yourself
  * (`<Headline size="medium">`).
  *
+ * `actions` is two buttons, `{ confirm, cancel }`, each a `label`, an
+ * `onPress`, and `isLoading`, `isDisabled` and `color` where needed, or an
+ * element of your own:
+ *
+ *   actions={{
+ *     cancel: { label: "Cancel", onPress: close },
+ *     confirm: { label: "Delete", color: "error", isLoading: deleting, onPress: remove },
+ *   }}
+ *
+ * The dialog is between 280dp and 560dp wide, Material's measures: it takes
+ * the width its content asks for up to 560dp, and text wraps there. Another
+ * maximum is a `className` (`max-w-sm`, `max-w-none`).
+ *
  * Spec: https://m3.material.io/components/dialogs/{overview,specs,guidelines,accessibility}
  */
 export function DialogContent(props: DialogContentProps) {
@@ -99,12 +119,19 @@ export function DialogContent(props: DialogContentProps) {
         <>
           <Button
             variant="text"
-            onPress={cancel.onPress}
+            color={cancel.color}
+            onPress={cancel.isLoading ? undefined : cancel.onPress}
             isLoading={cancel.isLoading}
+            isDisabled={cancel.isDisabled || confirm.isLoading}
           >
             {cancel.label}
           </Button>
-          <Button onPress={confirm.onPress} isLoading={confirm.isLoading}>
+          <Button
+            color={confirm.color}
+            onPress={confirm.isLoading ? undefined : confirm.onPress}
+            isLoading={confirm.isLoading}
+            isDisabled={confirm.isDisabled || cancel.isLoading}
+          >
             {confirm.label}
           </Button>
         </>

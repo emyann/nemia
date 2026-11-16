@@ -174,6 +174,34 @@ type TypographyVariants = VariantProps<typeof typography>;
 
 export type TypographyColorRole = NonNullable<TypographyVariants["colorRole"]>;
 
+/**
+ * The elements a type role may be drawn as: the role sets how text looks,
+ * and the element says what it is in the document.
+ */
+export type TextElement =
+  | "h1"
+  | "h2"
+  | "h3"
+  | "h4"
+  | "h5"
+  | "h6"
+  | "p"
+  | "span"
+  | "div"
+  | "label"
+  | "li"
+  | "dt"
+  | "dd"
+  | "legend"
+  | "figcaption"
+  | "blockquote"
+  | "caption"
+  | "summary"
+  | "time"
+  | "strong"
+  | "em"
+  | "small";
+
 // Polymorphic type definitions
 type TypographyProps<C extends React.ElementType> = {
   component?: C;
@@ -224,7 +252,9 @@ TypographyBase.displayName = "TypographyBase";
  * few: a hero number, a splash line. `size` is `large`, `medium` or `small`
  * (`large` by default), and sets `text-display-<size>` with its family,
  * weight, line height and tracking from the theme. The element is `h1`
- * unless `component` names another of `h1`–`h6`, `div` or `span`; the role
+ * unless `component` names another
+ * element of `TextElement` (a heading, `p`, `span`, `div`, `label`, `li`,
+ * `dt`, `dd`, `legend`, `figcaption` among them); the role
  * does not choose the element, so pick the one the document's outline needs.
  * Content colour is inherited unless `colorRole` names one. It refuses
  * `variant`: the role is the component.
@@ -243,10 +273,7 @@ TypographyBase.displayName = "TypographyBase";
  */
 export const Display = React.forwardRef<
   Element,
-  Omit<
-    TypographyProps<"h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "div" | "span">,
-    "variant"
-  >
+  Omit<TypographyProps<TextElement>, "variant">
 >(({ component = "h1", size = "large", ...props }, ref) => (
   <TypographyBase
     ref={ref}
@@ -265,7 +292,9 @@ Display.displayName = "Display";
  * a section's heading, a dialog's or a card's. `size` is `large`, `medium`
  * or `small` (`large` by default), and sets `text-headline-<size>` with its
  * family, weight, line height and tracking from the theme. The element is
- * `h2` unless `component` names another of `h1`–`h6`, `div` or `span`; the
+ * `h2` unless `component` names another
+ * element of `TextElement` (a heading, `p`, `span`, `div`, `label`, `li`,
+ * `dt`, `dd`, `legend`, `figcaption` among them); the
  * role does not choose the element, so pick the one the document's outline
  * needs. Content colour is inherited unless `colorRole` names one. It
  * refuses `variant`: the role is the component.
@@ -274,10 +303,7 @@ Display.displayName = "Display";
  */
 export const Headline = React.forwardRef<
   Element,
-  Omit<
-    TypographyProps<"h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "div" | "span">,
-    "variant"
-  >
+  Omit<TypographyProps<TextElement>, "variant">
 >(({ component = "h2", size = "large", ...props }, ref) => (
   <TypographyBase
     ref={ref}
@@ -299,8 +325,9 @@ Headline.displayName = "Headline";
  * region: a top app bar's title, a list's heading, a tab's label. `size` is
  * `large`, `medium` or `small` (`large` by default), and sets
  * `text-title-<size>` with its family, weight, line height and tracking from
- * the theme. The element is `h3` unless `component` names another of
- * `h1`–`h6`, `div` or `span`; the role does not choose the element, so pick
+ * the theme. The element is `h3` unless `component` names another
+ * element of `TextElement` (a heading, `p`, `span`, `div`, `label`, `li`,
+ * `dt`, `dd`, `legend`, `figcaption` among them); the role does not choose the element, so pick
  * the one the document's outline needs. Content colour is inherited unless
  * `colorRole` names one. It refuses `variant`: the role is the component.
  *
@@ -308,10 +335,7 @@ Headline.displayName = "Headline";
  */
 export const Title = React.forwardRef<
   Element,
-  Omit<
-    TypographyProps<"h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "div" | "span">,
-    "variant"
-  >
+  Omit<TypographyProps<TextElement>, "variant">
 >(({ component = "h3", size = "large", ...props }, ref) => (
   <TypographyBase
     ref={ref}
@@ -330,7 +354,9 @@ Title.displayName = "Title";
  * chip's, a field's label. `size` is `large`, `medium` or `small` (`medium`
  * by default), and sets `text-label-<size>` with its family, weight, line
  * height and tracking from the theme. The element is `label` unless
- * `component` names another of `label`, `span` or `div`; the role does not
+ * `component` names another
+ * element of `TextElement` (a heading, `p`, `span`, `div`, `label`, `li`,
+ * `dt`, `dd`, `legend`, `figcaption` among them); the role does not
  * choose the element, so pick the one the document's outline needs. Content
  * colour is inherited unless `colorRole` names one. It refuses `variant`:
  * the role is the component.
@@ -339,7 +365,7 @@ Title.displayName = "Title";
  */
 export const Label = React.forwardRef<
   Element,
-  Omit<TypographyProps<"label" | "span" | "div">, "variant">
+  Omit<TypographyProps<TextElement>, "variant">
 >(({ component = "label", size = "medium", ...props }, ref) => (
   <TypographyBase
     ref={ref}
@@ -358,7 +384,9 @@ Label.displayName = "Label";
  * a cell's content. `size` is `large`, `medium` or `small` (`medium` by
  * default), and sets `text-body-<size>` with its family, weight, line height
  * and tracking from the theme. The element is `p` unless `component` names
- * another of `p`, `span` or `div`; the role does not choose the element, so
+ * another
+ * element of `TextElement` (a heading, `p`, `span`, `div`, `label`, `li`,
+ * `dt`, `dd`, `legend`, `figcaption` among them); the role does not choose the element, so
  * pick the one the document's outline needs. Content colour is inherited
  * unless `colorRole` names one. It refuses `variant`: the role is the
  * component.
@@ -367,7 +395,7 @@ Label.displayName = "Label";
  */
 export const Body = React.forwardRef<
   Element,
-  Omit<TypographyProps<"p" | "span" | "div">, "variant">
+  Omit<TypographyProps<TextElement>, "variant">
 >(({ component = "p", size = "medium", ...props }, ref) => (
   <TypographyBase
     ref={ref}

@@ -8,7 +8,9 @@ import { cn } from "../utils";
 export type AvatarProps = {
   /** Image URL; the fallback shows while it is missing or fails to load. */
   src?: string | null;
-  /** Accessible name of the person (also the image `alt`). */
+  /** Accessible name of the person (also the image `alt`). Leave it out
+   *  where the name is written beside the avatar: the avatar is then
+   *  decorative, hidden from a screen reader, and the name is said once. */
   alt?: string;
   /** What to show without an image — typically initials. Defaults to a person glyph. */
   fallback?: ReactNode;
@@ -29,8 +31,14 @@ export type AvatarProps = {
  * Material 3 does not describe this component. MD3 draws avatars inside list
  * items, chips and the top app bar at 40dp (lists) and 24dp (chips) on
  * `primary-container` with `on-primary-container` initials — those are the
- * colours used here. The fallback is `aria-hidden` when `alt` names the
- * person, so screen readers get the name once.
+ * colours used here.
+ *
+ * `alt` decides what a screen reader hears. With it, the avatar is an image
+ * named for the person, picture or initials alike. Without it the avatar is
+ * decorative and hidden: the form for an avatar beside the person's visible
+ * name, in a list row, a table cell or a byline.
+ *
+ *   <Avatar fallback="AM" /> <span>Ada Martin</span>
  */
 export function Avatar({
   src,
@@ -48,8 +56,11 @@ export function Avatar({
   return (
     <span
       data-slot="avatar"
-      role={showImage ? undefined : "img"}
-      aria-label={showImage ? undefined : alt}
+      // With a name the fallback is an image of that name. With none the
+      // avatar is decorative: an image role with no name says nothing useful.
+      role={showImage || !alt ? undefined : "img"}
+      aria-label={showImage || !alt ? undefined : alt}
+      aria-hidden={alt ? undefined : true}
       className={cn(
         "rounded-shape-full bg-primary-container text-on-primary-container relative inline-flex shrink-0 items-center justify-center overflow-hidden font-medium select-none",
         className,

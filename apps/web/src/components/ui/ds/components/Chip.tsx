@@ -166,7 +166,14 @@ type InputChipProps = BaseChipProps &
   Omit<ButtonProps, "children"> & {
     variant: "input";
     icon?: IconComponent;
+    /** Makes the chip removable: it draws the remove icon. With no `onPress`
+     *  the whole chip is the remove control, named "Remove <its text>"; with
+     *  one, the icon is a second button of that name beside the chip's own.
+     *  Either way Backspace or Delete on the chip removes it. */
     onRemove?: () => void;
+    /** The word before the chip's text in the remove control's name.
+     *  Default `"Remove"`: pass the word of the page's language. */
+    removeLabel?: string;
   };
 
 type ChipProps = AssistChipProps | FilterChipProps | InputChipProps;
@@ -179,6 +186,19 @@ type ChipProps = AssistChipProps | FilterChipProps | InputChipProps;
  *   <ChipGroup label="Days" selectionMode="multiple">
  *     <Chip id="mon" variant="filter">Mon</Chip>
  *   </ChipGroup>
+ *
+ * An input chip with `onRemove` is removable, by Material's accessibility
+ * page. Alone, the whole chip is one button named "Remove <its text>": a
+ * press, Space or Enter removes it. With an `onPress` of its own it is two
+ * buttons, the chip's and "Remove <its text>". Backspace or Delete on either
+ * removes it too. `removeLabel` is the word "Remove", for another language.
+ *
+ *   <Chip variant="input" onRemove={() => remove(tag)}>{tag}</Chip>
+ *
+ * The chip that is removed held the focus: move it, to the next chip or to
+ * the field the chips belong to. In the two-button form the chip is a
+ * `span` around the two: `className` is a string there, and every other
+ * prop (`id`, `aria-label`, a ref) is the first button's.
  *
  * Spec: https://m3.material.io/components/chips/{overview,specs,guidelines,accessibility}
  * — 32dp container, 8dp corners, 18dp icons, 16dp padding (8dp next to an
@@ -387,23 +407,132 @@ function InputChip({
   children,
   icon: Icon,
   onRemove,
+  removeLabel = "Remove",
   ...buttonProps
 }: InputChipProps) {
-  const baseStyles = composeRenderProps(className, (className, renderProps) =>
-    styles({
-      ...renderProps,
-      className,
-      variant: "input",
-      hasLeadingIcon: !!Icon,
-      hasTrailingIcon: !!onRemove,
-    }).base(),
+  const variants = {
+    variant: "input" as const,
+    hasLeadingIcon: !!Icon,
+    hasTrailingIcon: !!onRemove,
+  };
+  const id = useId();
+  const labelId = `${id}-label`;
+  const removeId = `${id}-remove`;
+  // Material: "Remove {chip content}". The name is the word, then the
+  // chip's own text wherever it is drawn, so content that is not a string
+  // is still said.
+  const removeName = {
+    id: removeId,
+    "aria-label": removeLabel,
+    "aria-labelledby": `${removeId} ${labelId}`,
+  };
+  // Material: Backspace or Delete removes the focused input chip.
+  const removeByKey = onRemove
+    ? (e: {
+        key: string;
+        preventDefault: () => void;
+        continuePropagation: () => void;
+      }) => {
+        if (e.key === "Backspace" || e.key === "Delete") {
+          e.preventDefault();
+          onRemove();
+        } else {
+          e.continuePropagation();
+        }
+      }
+    : undefined;
+
+  const leading = (renderProps: { isDisabled?: boolean }) =>
+    Icon && (
+      <div className={styles({ variant: "input", ...renderProps }).icon()}>
+        <Icon size={18} />
+      </div>
+    );
+  const label = (
+    <Label
+      id={labelId}
+      className="grow text-inherit"
+      size="large"
+      component="span"
+    >
+      {children}
+    </Label>
   );
 
+  // A chip that is also pressed has two actions, and Material asks for two
+  // focusable elements: the chip's own, then its remove button. Each draws
+  // its own state layer and focus ring.
+  if (onRemove && buttonProps.onPress) {
+    const { isDisabled } = buttonProps;
+    const part = focusRing({
+      className:
+        "group/part relative flex h-full items-center rounded-shape-small text-inherit -outline-offset-2",
+    });
+    const partLayer = cn(
+      "pointer-events-none absolute inset-0 bg-on-secondary-container opacity-0 transition",
+      "group-hover/part:state-opacity-hover group-data-focus-visible/part:state-opacity-focus group-data-pressed/part:state-opacity-pressed",
+    );
+    return (
+      <span
+        data-slot="chip"
+        data-variant="input"
+        data-disabled={isDisabled || undefined}
+        className={cn(
+          styles({ ...variants, isDisabled }).base(),
+          !isDisabled &&
+            "focus-within:border-on-secondary-container focus-within:bg-secondary-container focus-within:text-on-secondary-container",
+          typeof className === "string" && className,
+        )}
+      >
+        <Button
+          {...buttonProps}
+          data-slot="chip-action"
+          onKeyDown={removeByKey}
+          // The chip's own 16dp is the button's, so its focus ring and its
+          // state layer reach the chip's edge.
+          className={cn(part, !Icon && "-ml-4 pl-4")}
+        >
+          <span data-slot="state-layer" className={partLayer} />
+          {leading({ isDisabled })}
+          {label}
+        </Button>
+        <Button
+          {...removeName}
+          data-slot="chip-remove"
+          isDisabled={isDisabled}
+          onPress={onRemove}
+          onKeyDown={removeByKey}
+          className={cn(part, styles({ variant: "input", isDisabled }).icon())}
+        >
+          <span data-slot="state-layer" className={partLayer} />
+          <XIcon size={18} />
+        </Button>
+      </span>
+    );
+  }
+
+  const baseStyles = composeRenderProps(className, (className, renderProps) =>
+    styles({ ...renderProps, className, ...variants }).base(),
+  );
+
+  // With no action of its own, a removable chip is one focusable element:
+  // pressing it removes it, and it is named for that.
   return (
     <Button
       data-slot="chip"
       data-variant="input"
       {...buttonProps}
+      // After the chip's own props: an `onPress` left undefined must not
+      // take the remove away.
+      {...(onRemove
+        ? {
+            onPress: onRemove,
+            onKeyDown: removeByKey,
+            ...(buttonProps["aria-label"] || buttonProps["aria-labelledby"]
+              ? {}
+              : removeName),
+          }
+        : {})}
       className={baseStyles}
     >
       {({ isPressed: _p, isHovered: _h, ...renderProps }) => (
@@ -413,23 +542,11 @@ function InputChip({
             className={styles().stateLayer({ variant: "filter" })}
           />
           <div className="relative flex items-center">
-            {Icon && (
-              <div
-                className={styles({ variant: "input", ...renderProps }).icon()}
-              >
-                <Icon size={18} />
-              </div>
-            )}
-            <Label className="grow text-inherit" size="large" component="span">
-              {children}
-            </Label>
+            {leading(renderProps)}
+            {label}
             {onRemove && (
               <div
                 className={styles({ variant: "input", ...renderProps }).icon()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemove();
-                }}
               >
                 <XIcon size={18} />
               </div>

@@ -10,18 +10,22 @@ const emptyState = tv({
     textContainer: "mb-8",
     title: "mb-4",
     description: "mb-6 text-on-surface-variant",
-    actionsContainer: "w-full flex justify-center",
+    media: "text-primary",
+    // The two actions sit 8dp apart, and stack where they do not fit.
+    actionsContainer: "w-full flex flex-wrap justify-center gap-2",
   },
   variants: {
     size: {
       sm: {
         base: "p-6",
+        media: "size-16",
         mediaContainer: "mb-6",
         textContainer: "mb-6",
       },
-      md: {},
+      md: { media: "size-32" },
       lg: {
         base: "p-10",
+        media: "size-48",
         mediaContainer: "mb-10",
         textContainer: "mb-10",
       },
@@ -47,7 +51,11 @@ interface EmptyStateProps extends VariantProps<typeof emptyState> {
  *
  * It draws a box of its own: `surface-container-highest` with an `outline`
  * border and the medium corner, centred in what holds it (`m-auto`) and at
- * most `max-w-lg` wide, padded by `size` (`sm`, `md` the default, `lg`). To draw
+ * most `max-w-lg` wide. `size` (`sm`, `md` the default, `lg`) sets its
+ * padding and its media together: 64dp, 128dp or 192dp, the same at every
+ * window width, so `sm` suits a panel or a phone and `lg` an empty page. The
+ * media is any SVG component, drawn on `primary`. The two actions sit 8dp
+ * apart and stack where they do not fit. To draw
  * it bare inside a card or a table, pass
  * `className="border-0 bg-transparent"`.
  *
@@ -75,6 +83,7 @@ export default function EmptyState(props: EmptyStateProps) {
     title: titleClass,
     description: descriptionClass,
     actionsContainer,
+    media: mediaClass,
   } = emptyState({ size });
 
   return (
@@ -82,7 +91,7 @@ export default function EmptyState(props: EmptyStateProps) {
       <div className={content()}>
         {Media && (
           <div className={mediaContainer()}>
-            <Media className="text-primary h-32 w-32 sm:h-40 sm:w-40 md:h-48 md:w-48 lg:h-56 lg:w-56 xl:h-64 xl:w-64" />
+            <Media className={mediaClass()} />
           </div>
         )}
         <div className={textContainer()}>

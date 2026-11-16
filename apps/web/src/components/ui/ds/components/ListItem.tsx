@@ -5,7 +5,9 @@ import { focusRing, tv, type VariantProps } from "../utils";
 const styles = tv({
   extend: focusRing,
   slots: {
-    base: "w-full min-h-[56px] py-2 flex items-center relative overflow-hidden transition-colors duration-short-4 cursor-pointer",
+    // The pointer's hand only inside a `GridListItem`, which is what makes
+    // a row pressable: a row in a plain `ul` is read, not pressed.
+    base: "w-full min-h-[56px] py-2 flex items-center relative overflow-hidden transition-colors duration-short-4 in-data-[slot=grid-list-item]:cursor-pointer",
     stateLayer: [
       "absolute inset-0 transition pointer-events-none",
       "bg-on-surface opacity-0 group-hover/grid-list-item:state-opacity-hover group-data-focus-visible/grid-list-item:state-opacity-focus group-data-pressed/grid-list-item:state-opacity-pressed group-data-dragging/grid-list-item:state-opacity-dragged",
@@ -37,7 +39,7 @@ const styles = tv({
     },
     isDisabled: {
       true: {
-        base: "text-on-surface/38 cursor-default",
+        base: "text-on-surface/38 in-data-[slot=grid-list-item]:cursor-default",
         headline: "text-on-surface/38",
         supportingText: "text-on-surface-variant/38",
       },
@@ -85,6 +87,8 @@ export type ListItemProps = VariantProps<typeof styles> & {
 /**
  * MD3 list item: a headline, optional supporting text, and a leading and a
  * trailing element. It draws the row; `GridListItem` gives it its behaviour.
+ * In a plain `ul` or `li` it is a row that is read: no hover, no pointer's
+ * hand, nothing to press.
  *
  *   <ListItem
  *     headline="Design principles"

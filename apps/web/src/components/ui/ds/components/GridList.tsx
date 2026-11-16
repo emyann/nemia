@@ -12,10 +12,23 @@ import { composeTailwindRenderProps } from "../render-props";
 import { focusRing, tv } from "../utils";
 import IconButton from "./IconButton";
 
+// What a drag shows. The place between two rows where the drop will land is
+// React Aria's drop indicator, which it renders unstyled: a 2dp line on
+// `primary`. A row, or the whole list, that is dropped *onto* takes the
+// drop zone's look: a `primary` outline and its 8% tint.
+const dropLine =
+  "[&_.react-aria-DropIndicator[data-drop-target]]:outline-1 [&_.react-aria-DropIndicator[data-drop-target]]:outline-solid [&_.react-aria-DropIndicator[data-drop-target]]:outline-primary";
+const droppedOnto =
+  "data-drop-target:outline-2 data-drop-target:-outline-offset-2 data-drop-target:outline-solid data-drop-target:outline-primary data-drop-target:bg-primary/8";
+
 /**
  * The collection an MD3 list is built on: React Aria `GridList`, which gives
  * the rows their keyboard navigation, selection and actions. It draws
  * nothing of its own; render a `ListItem` inside each `GridListItem`.
+ *
+ * With `dragAndDropHooks` it shows where a drop will land: a `primary` line
+ * between two rows, and a `primary` outline with its tint on a row, or on
+ * the list, that is dropped onto.
  *
  * Spec: https://m3.material.io/components/lists/{overview,specs,guidelines,accessibility}
  */
@@ -29,7 +42,7 @@ export function GridList<T extends object>({
       {...props}
       className={composeTailwindRenderProps(
         props.className,
-        "relative overflow-auto",
+        `relative overflow-auto ${dropLine} ${droppedOnto}`,
       )}
     >
       {children}
@@ -38,7 +51,7 @@ export function GridList<T extends object>({
 }
 
 const itemStyles = tv({
-  base: [focusRing(), "group/grid-list-item"],
+  base: [focusRing(), "group/grid-list-item", droppedOnto],
 });
 
 /**

@@ -1,10 +1,10 @@
 /** The files of a step a run's page shows: each a closeout named, and each its folder holds, as the api serves them by name. */
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifactsDir } from '../record/record.store.ts';
+import { artifactsDir, statUnder } from '../record/record.store.ts';
 import { artifactPlace, filesPrunedWords, GIVEN, HANDED_CLOSEOUT, isRepositoryRun, type Run } from '../run.ts';
 import type { ArtifactKind } from 'objects';
-import { isFilePath, statUnder } from '../artifacts/artifacts.store.ts';
+import { isFilePath } from '../artifacts/artifacts.ts';
 
 /** What the board does with a file: draws it inline, links it to be read in a tab, or links it with its size. */
 export type { ArtifactKind };

@@ -17,7 +17,7 @@ import type { StepSpec } from '../step/step.ts';
 import { inside } from '../workspace/workspace.ts';
 import { artifactPlace, HANDED_CLOSEOUT, sizeOf, type ArtifactFile, type HandedFiles, type MissingArtifact } from './artifacts.ts';
 import { isRepositoryRun, type LackedFile, type Run } from '../record/record.ts';
-import { artifactsDir, lstatOf } from '../record/record.store.ts';
+import { artifactsDir, lstatOf, statUnder } from '../record/record.store.ts';
 import { presentOn } from '../branches/changes.store.ts';
 import type { Place } from '../place/place.store.ts';
 
@@ -413,34 +413,6 @@ function landedPicturesNote(
     ...pictures.map((p) => `  ${p.name}  ${sizeOf(p.bytes)}`),
     '',
   ].join('\n');
-}
-
-/**
- * Whether `rel` is a path under a folder the file routes serve: its parts split at `/`, each a name — none empty, none `.`, none with
- * `..`, a backslash or a NUL in it — so an absolute path, one that climbs out, and one spelled with the other separator are none.
- * @param rel The path asked for, from the folder.
- */
-export const isFilePath = (rel: string): boolean =>
-  rel.split('/').every((part) => Boolean(part) && part !== '.' && !/[\\\0]/.test(part) && !part.includes('..'));
-
-/**
- * The regular file at `rel` under `dir`, looked at without following a link (`lstat`), each folder on the way a folder of its own and
- * no link: a link, to a file or a folder, may lead out of `dir`, and what it leads to is not under it. Undefined for a path
- * `isFilePath` refuses, a file not there, a folder, or a link anywhere on the way.
- * @param dir The folder.
- * @param rel The file's path under it.
- */
-export function statUnder(dir: string, rel: string): fs.Stats | undefined {
-  if (!isFilePath(rel)) return undefined;
-  const parts = rel.split('/');
-  let at = dir;
-  for (const [i, part] of parts.entries()) {
-    at = path.join(at, part);
-    const stat = fs.lstatSync(at, { throwIfNoEntry: false });
-    if (i === parts.length - 1) return stat?.isFile() ? stat : undefined;
-    if (!stat?.isDirectory()) return undefined;
-  }
-  return undefined;
 }
 
 /**

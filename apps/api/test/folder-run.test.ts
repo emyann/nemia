@@ -275,47 +275,50 @@ test("a folder run read on the board: listed by its kind and place, its page wit
     const review = stepOf(run, 'review');
     assert.deepEqual([review.files, review.filesError], [[], null], 'a folder the run has not made yet is empty, and no error');
   });
-  await s.test("a folder step's file is served by its path, in a folder of it too, and a path out of it, or not in it, is refused", async () => {
-    const base = '/api/runs/f-notes/steps/write/files';
+  await s.test(
+    "a folder step's file is served by its path, in a folder of it too, and a path out of it, or not in it, is refused",
+    async () => {
+      const base = '/api/runs/f-notes/steps/write/files';
 
-    const note = await app().request(`${base}/note.md`);
-    assert.deepEqual(
-      [
-        note.status,
-        note.headers.get('content-type'),
-        note.headers.get('cache-control'),
-        note.headers.get('x-content-type-options'),
-        await note.text(),
-      ],
-      [200, 'text/plain; charset=utf-8', 'no-store', 'nosniff', 'The tides.\n'],
-    );
-    assert.ok(
-      (note.headers.get('content-security-policy') ?? '').split(/\s*;\s*/).includes('sandbox'),
-      "an agent's text on the board's origin runs no script of its, as a step's named file does not",
-    );
-    assert.deepEqual(Buffer.from(await (await app().request(`${base}/sketch.png`)).arrayBuffer()), PNG);
-
-    assert.equal(
-      await (await app().request(`${base}/scratch%2Fkept.md`)).text(),
-      'Kept.\n',
-      "a file in a folder of the step's folder is served by its path, encoded whole",
-    );
-
-    for (const name of ['..%2Foutside.md', 'scratch%2F..%2F..%2Foutside.md', 'a%5Cb.md', '..hidden.md']) {
-      const res = await app().request(`${base}/${name}`);
-      assert.equal(
-        res.status,
-        400,
-        `${name} names a file on disk: only the refusal stands between it and the response (an encoded .. alone is resolved before the route, so the separator is encoded instead)`,
+      const note = await app().request(`${base}/note.md`);
+      assert.deepEqual(
+        [
+          note.status,
+          note.headers.get('content-type'),
+          note.headers.get('cache-control'),
+          note.headers.get('x-content-type-options'),
+          await note.text(),
+        ],
+        [200, 'text/plain; charset=utf-8', 'no-store', 'nosniff', 'The tides.\n'],
       );
-      names(((await res.json()) as { error: string }).error, decodeURIComponent(name), '`/`', '`..`');
-    }
-    for (const name of ['gone.md', 'scratch', 'scratch%2Fnothing.md', 'link.md']) {
-      const res = await app().request(`${base}/${name}`);
-      assert.equal(res.status, 404, `${name} is not a regular file in the folder: absent, a directory, or a link that leads out of it`);
-      assert.match(((await res.json()) as { error: string }).error, /has no file '.*' in its folder/, name);
-    }
-  });
+      assert.ok(
+        (note.headers.get('content-security-policy') ?? '').split(/\s*;\s*/).includes('sandbox'),
+        "an agent's text on the board's origin runs no script of its, as a step's named file does not",
+      );
+      assert.deepEqual(Buffer.from(await (await app().request(`${base}/sketch.png`)).arrayBuffer()), PNG);
+
+      assert.equal(
+        await (await app().request(`${base}/scratch%2Fkept.md`)).text(),
+        'Kept.\n',
+        "a file in a folder of the step's folder is served by its path, encoded whole",
+      );
+
+      for (const name of ['..%2Foutside.md', 'scratch%2F..%2F..%2Foutside.md', 'a%5Cb.md', '..hidden.md']) {
+        const res = await app().request(`${base}/${name}`);
+        assert.equal(
+          res.status,
+          400,
+          `${name} names a file on disk: only the refusal stands between it and the response (an encoded .. alone is resolved before the route, so the separator is encoded instead)`,
+        );
+        names(((await res.json()) as { error: string }).error, decodeURIComponent(name), '`/`', '`..`');
+      }
+      for (const name of ['gone.md', 'scratch', 'scratch%2Fnothing.md', 'link.md']) {
+        const res = await app().request(`${base}/${name}`);
+        assert.equal(res.status, 404, `${name} is not a regular file in the folder: absent, a directory, or a link that leads out of it`);
+        assert.match(((await res.json()) as { error: string }).error, /has no file '.*' in its folder/, name);
+      }
+    },
+  );
   await s.test(
     "a file a step wrote called `given` is its own work, and is listed — only the run's own `given/` directory is left out",
     async () => {

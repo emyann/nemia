@@ -8,17 +8,20 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/ht
 import { BadRequest, Invalid, Missing, TooLarge } from './api-errors.ts';
 import { FILE_LIMIT, FileObject } from './file.ts';
 
-/** What a form's parts besides the file may take: its boundaries and the part's own headers, never a second file. */
+/**
+ * What a form takes beside the file's bytes: its boundaries and the part's own headers, which the parser counts in the part's size, never a
+ * second file. The handler holds the file's bytes to `FILE_LIMIT` itself.
+ */
 const FORM_FRAME = ByteSize.kibibytes(64);
 
 /**
- * A file's upload: a form of one part, `file`, of `FILE_LIMIT` at most; read as the stream of its parts, the handler writing the file's
- * bytes to disk as they come.
+ * A file's upload: a form of one part, `file`, of `FILE_LIMIT` at most, its frame beside it; read as the stream of its parts, the handler
+ * writing the file's bytes to disk as they come.
  */
 const FileForm = Schema.Unknown.pipe(
   HttpApiSchema.asMultipartStream({
     maxParts: 1,
-    maxFileSize: FILE_LIMIT,
+    maxFileSize: ByteSize.bytes(Number(FILE_LIMIT) + Number(FORM_FRAME)),
     maxTotalSize: ByteSize.bytes(Number(FILE_LIMIT) + Number(FORM_FRAME)),
   }),
 );

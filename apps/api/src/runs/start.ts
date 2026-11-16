@@ -16,10 +16,12 @@ import {
   sentInputRefusal,
   sentInputsRemoved,
   sentInputsWritten,
+  fileAt,
   startedFacts,
   startFactoryAtOnce,
   wiredRepoFor,
   type Factory,
+  type SentInput,
   type StartInput,
 } from 'agent-orchestrator';
 import { type CardStart, type CardStarted, Conflict, Invalid, Missing, type RunStart, type RunStarted } from 'objects';
@@ -60,14 +62,43 @@ const extrasOf = (body: Pick<RunStart, 'models' | 'gates' | 'noWorktree'>) => ({
 });
 
 /**
- * `start` handed the files `inputs` names, written where it reads them (`sentInputsWritten`) and removed once it has: refused (422)
- * naming `--input` where one cannot be handed (`sentInputRefusal`), before anything is written.
+ * The inputs a start's body sends, as the package hands them: each named by its file's own name, a file uploaded first (`file`, its id)
+ * found in the factory's files of `namespace` (`fileAt`) and handed by its path, its name the one it was uploaded with where the body
+ * gives none. Refused (422), before anything is written, for an id no file of `namespace` is kept under, naming the upload that makes
+ * one.
  */
-async function withInputs<A>(inputs: RunStart['inputs'], start: (files: string[] | undefined) => Promise<A>): Promise<A> {
+function sentOf(home: string, namespace: string, inputs: NonNullable<RunStart['inputs']>): SentInput[] {
+  return inputs.map(({ name, file, text, base64 }): SentInput => {
+    const kept = file === undefined ? undefined : fileAt(home, namespace, file);
+    if (file !== undefined && kept === undefined)
+      throw declaredAs(START_REFUSALS, {
+        status: 422,
+        error: `the input ${name ?? file} names the file ${file}, and ${namespace} keeps no file by that id: a file is kept a day from its upload, in the namespace it was uploaded to. Upload it again, POST /api/namespaces/${namespace}/files, or start with nemia start --input <file>, which uploads each. Nothing was started.`,
+      });
+    return {
+      name: name ?? kept?.file.name ?? '',
+      ...(kept !== undefined ? { from: kept.path } : {}),
+      ...(text !== undefined ? { text } : {}),
+      ...(base64 !== undefined ? { base64 } : {}),
+    };
+  });
+}
+
+/**
+ * `start` handed the files `inputs` names (`sentOf`), written where it reads them (`sentInputsWritten`) and removed once it has: refused
+ * (422) naming `--input` where one cannot be handed (`sentInputRefusal`), before anything is written.
+ */
+async function withInputs<A>(
+  s: Served,
+  namespace: string,
+  inputs: RunStart['inputs'],
+  start: (files: string[] | undefined) => Promise<A>,
+): Promise<A> {
   if (inputs === undefined || !inputs.length) return start(undefined);
-  const refused = sentInputRefusal(inputs);
+  const sent = sentOf(s.home, namespace, inputs);
+  const refused = sentInputRefusal(sent);
   if (refused !== null) throw declaredAs(START_REFUSALS, { status: 422, error: refused });
-  const here = sentInputsWritten(inputs);
+  const here = sentInputsWritten(sent);
   try {
     return await start(here.files);
   } finally {
@@ -135,8 +166,15 @@ function startOf(body: RunStart, repo: string, home: string, tree?: string): Ask
  * @param card The card's name.
  * @param body The start's body, as the endpoint decodes it: its workflow, brief, inputs and the rest.
  * @param factory The factory to start it in, the card's namespace's or the request's; undefined where neither names one.
+ * @param namespace The namespace the request names, whose files an input names by id.
  */
-export async function cardStart(s: Served, card: string, body: CardStart, factory: string | undefined): Promise<CardStarted> {
+export async function cardStart(
+  s: Served,
+  card: string,
+  body: CardStart,
+  factory: string | undefined,
+  namespace: string,
+): Promise<CardStarted> {
   if (s.repoNamed) throw new Refused({ message: cardRepoRefusal(card) });
   if (factory === undefined) throw new Refused({ message: noFactoryRefusal(card) });
   const handed = handedOf(body);
@@ -152,7 +190,7 @@ export async function cardStart(s: Served, card: string, body: CardStart, factor
     label: handed.label,
     ...extrasOf(body),
   };
-  const started = await withInputs(body.inputs, (inputs) => runStarted(s, { ...given, ...(inputs ? { inputs } : {}) }));
+  const started = await withInputs(s, namespace, body.inputs, (inputs) => runStarted(s, { ...given, ...(inputs ? { inputs } : {}) }));
   return { ...startedOf(started), card: started.card ?? card };
 }
 
@@ -194,8 +232,9 @@ const foundFactoryBy = (s: Served, wired: string | undefined): { repoFoundFactor
  * api's own repository.
  * @param s The request's services, its caller and the place it is answered in.
  * @param body The start's body, as the endpoint decodes it.
+ * @param namespace The namespace the request names, whose files an input names by id.
  */
-export async function runStart(s: Served, body: RunStart): Promise<RunStarted> {
+export async function runStart(s: Served, body: RunStart, namespace: string): Promise<RunStarted> {
   const { home, factory } = s;
   const wiredIn = (name: string) => wiredRepoFor(home, name, path.basename(body.workflow));
   const named = factory === undefined ? undefined : wiredIn(factory.name);
@@ -219,5 +258,5 @@ export async function runStart(s: Served, body: RunStart): Promise<RunStarted> {
     ...foundFactoryBy(s, wired),
     ...extrasOf(body),
   };
-  return startedOf(await withInputs(body.inputs, (inputs) => runStarted(s, { ...given, ...(inputs ? { inputs } : {}) })));
+  return startedOf(await withInputs(s, namespace, body.inputs, (inputs) => runStarted(s, { ...given, ...(inputs ? { inputs } : {}) })));
 }

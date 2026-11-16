@@ -43,6 +43,7 @@ import { AnswerPastBound } from './answer-bound.ts';
 import { endpointOf } from './endpoints.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
+import { filesHandlers } from '../files/files.ts';
 import { stepsHandlers } from '../steps/index.ts';
 import { type Listed, watchable } from '../watch/watch.ts';
 import { discoveryHandlers } from '../discovery/discovery.ts';
@@ -176,6 +177,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
     HttpApiBuilder.layer(Api).pipe(
       Layer.provide([
         runsHandlers,
+        filesHandlers,
         stepsHandlers,
         cardsHandlers,
         factoriesHandlers,

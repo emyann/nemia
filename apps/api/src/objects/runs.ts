@@ -284,7 +284,7 @@ export const runsHandlers = readsBounded(Api, 'runs', (handlers) =>
     .handle('list', ({ params: { namespace }, query }) => page(namespace, query))
     .handle('get', ({ params: { namespace, name } }) => one(name, namespace))
     .handle('create', ({ params: { namespace }, payload }) =>
-      answeredIn(namespace, (s) => runStart(s, payload)).pipe(Effect.tap(({ id }) => locatedAt(id))),
+      answeredIn(namespace, (s) => runStart(s, payload, namespace)).pipe(Effect.tap(({ id }) => locatedAt(id))),
     )
     .handle('delete', ({ params: { namespace, name }, query }) => removed({ namespace, name }, query))
     .handle('refresh', ({ params: { namespace, name }, payload }) => refreshed({ namespace, name }, payload))

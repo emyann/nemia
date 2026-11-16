@@ -19,6 +19,7 @@ import {
   Invalid,
   Missing,
   ReadFailed,
+  TooLarge,
   Unauthorized,
   Unjudged,
   UnsupportedMediaType,
@@ -44,7 +45,9 @@ const API_ERRORS = [
   WriteFailed,
   Unjudged,
   ReadFailed,
+  TooLarge,
   Gone,
+  TooLarge,
 ] as const;
 
 /** One of the classes the api answers with. */

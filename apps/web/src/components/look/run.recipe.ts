@@ -63,7 +63,7 @@ export const runRecipe = tv({
         ground: 'bg-card dark:bg-[color-mix(in_srgb,var(--md-sys-color-primary)_6%,var(--md-sys-color-surface-container-low))]',
         clock: 'text-yours',
       },
-      failure: { ground: 'bg-card dark:bg-[color-mix(in_srgb,var(--md-sys-color-error)_8%,var(--md-sys-color-surface-container-low))]' },
+      failure: { ground: 'bg-card dark:bg-[color-mix(in_srgb,var(--md-sys-color-error)_4%,var(--md-sys-color-surface-container-low))]' },
       waits: { ground: 'bg-card' },
       rest: { ground: 'bg-[color-mix(in_srgb,var(--md-sys-color-inverse-surface)_4%,var(--md-sys-color-surface-container-low))]' },
     },

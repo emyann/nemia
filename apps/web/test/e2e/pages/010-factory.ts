@@ -286,7 +286,7 @@ export default {
       );
     }
     await expectCount(
-      cardOf(page, running.id).locator(`time[datetime="${times.startedAt}"]`),
+      cardOf(page, running.id).locator(`[data-clock-words][data-clock-from="${times.startedAt}"]`),
       1,
       `${running.id}'s card counts from ${times.startedAt}, when it started, not ${times.createdAt}`,
     );

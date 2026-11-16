@@ -22,19 +22,20 @@ const WORDS = 'font-mono text-body-medium whitespace-nowrap';
  * The words are a button, so a resting pointer and the keyboard both open the preview over it: the breakdown the waiting card's Clock
  * tile shows, from the one function (`clockBreakdown`), its head these very words and its foot the wall time the rows add up to. A row
  * whose `clock` the api could not read has nothing to break down, and draws the words as a plain span that takes no focus, with the
- * times in full on its `title`. `className` sets the words' size where a part draws them smaller than a row.
+ * times in full on its `title`. Either carries the instant they count from, `data-clock-from`. `className` sets the words' size where a
+ * part draws them smaller than a row.
  */
 export function RunClock({ run, asOf, finished, className }: { run: Clocked; asOf: Date; finished: boolean; className?: string }) {
   const clock = runClock(run, asOf.getTime(), finished, 'row');
   if (!run.clock)
     return (
-      <span data-clock-words title={clock.title} className={cn(WORDS, className)}>
+      <span data-clock-words data-clock-from={clock.at} title={clock.title} className={cn(WORDS, className)}>
         {clock.words}
       </span>
     );
   return (
     <BreakdownPreview breakdown={clockBreakdown(run.clock, clock.words, whenWords(new Date(run.createdAt), asOf))}>
-      <Button data-clock-words className={cn(WORDS, className, 'cursor-default rounded-[4px]', focusRing())}>
+      <Button data-clock-words data-clock-from={clock.at} className={cn(WORDS, className, 'cursor-default rounded-[4px]', focusRing())}>
         {clock.words}
       </Button>
     </BreakdownPreview>

@@ -161,6 +161,17 @@ test("words said to a step's session say who said them where an agent did; REFUS
   assert.equal(Schema.decodeUnknownResult(Run)(withSaid({ ...said, from: { kind: 'agent' } }))._tag, 'Failure');
 });
 
+/** The run whose ending holds the checkout, as a step waiting on it names it. */
+const HOLD = { run: 'r-2', step: 'land' };
+
+test('a step waiting on the checkout names the run whose ending holds it, and decodes and encodes with it', () => {
+  const run = Schema.decodeUnknownSync(Run)(judged);
+  const waiting = structuredClone(run);
+  Object.assign(waiting.status.steps[0], { phase: 'pending', reason: 'Waiting', on: 'base', baseHeldBy: HOLD });
+  assert.deepEqual(Schema.decodeUnknownSync(Run)(waiting).status.steps[0]?.baseHeldBy, HOLD);
+  assert.deepEqual(Schema.decodeUnknownSync(Run)(Schema.encodeUnknownSync(Run)(waiting)).status.steps[0]?.baseHeldBy, HOLD);
+});
+
 test('REFUSED: a step, a try and a run served with codes nothing makes together, as decoded and as encoded', () => {
   const run = Schema.decodeUnknownSync(Run)(judged);
   const step = run.status.steps[0];
@@ -179,6 +190,14 @@ test('REFUSED: a step, a try and a run served with codes nothing makes together,
       planted((r) => Object.assign(r.status.steps[0], { phase: 'pending', reason: 'Waiting', on: null })),
     ],
     ['a step that says what it waits on and is no wait', planted((r) => Object.assign(r.status.steps[0], { on: 'run' }))],
+    [
+      'a step waiting on the checkout that names no run holding it',
+      planted((r) => Object.assign(r.status.steps[0], { phase: 'pending', reason: 'Waiting', on: 'base' })),
+    ],
+    [
+      'a step waiting on a run that names a run holding the checkout',
+      planted((r) => Object.assign(r.status.steps[0], { phase: 'pending', reason: 'Waiting', on: 'run', baseHeldBy: HOLD })),
+    ],
     [
       'a run that succeeded in the phase of one that waits',
       planted((r) => Object.assign(r.status, { phase: 'waiting', reason: 'Succeeded' })),

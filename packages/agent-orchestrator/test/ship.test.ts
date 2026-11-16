@@ -1295,6 +1295,12 @@ test('two runs of one repository at their endings: the oldest approval takes the
       assert.equal(runRecord(ROOT, second.id).steps.ship.workspace, repo, "and the one filed is in the repository's own checkout");
       assert.deepEqual((await at.pass(first.id)).filed, [], 'pass after pass, while that step is in the checkout');
       assert.equal((await shipOf(first.id)).message, `waiting on the checkout (${second.id}'s ship has it)`);
+      assert.deepEqual(
+        [(await shipOf(first.id)).on, (await shipOf(first.id)).baseHeldBy],
+        ['base', { run: second.id, step: 'ship' }],
+        'the step waiting on the checkout names the run whose ending has it, as a field',
+      );
+      assert.equal('baseHeldBy' in (await shipOf(second.id)), false, 'the step in the checkout waits on no checkout, and names none');
       const { decision, checkout } = await stage.runWith(e(), decideRun(first.id));
       assert.deepEqual([decision.kind, decision.kind === 'running' ? decision.waiting : []], ['running', ['ship']]);
       assert.deepEqual(checkout, { run: second.id, step: 'ship' });

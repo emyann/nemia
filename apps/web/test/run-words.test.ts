@@ -373,7 +373,7 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
     assert.equal(nowOf({ ...at, steps: [{ ...step, budget: null }] })?.budget, null, 'a step with no budget: no ring');
     assert.equal(nowOf({ ...at, steps: [{ ...step, spent: null }] })?.budget?.spent, 0, 'nothing measured yet: none spent');
   });
-  await t.test('what a wait says in NOW: the run it waits on, the checkout, a run slot, a hold until a run lands', () => {
+  await t.test('what a wait says in NOW: the run it waits on, the checkout and its holder, a run slot, a hold until a run lands', () => {
     const onRun = summary([['land', 'waiting on r-0']], {
       waiting: {
         runs: [
@@ -389,7 +389,10 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
     assert.equal(nowOf(onRun)?.tone, 'waits');
     const onBase = summary([['land', 'waiting on r-0']]);
     const base = { ...onBase, steps: [{ ...onBase.steps[0], on: 'base' as const }] };
-    assert.deepEqual(nowOf(base)?.words, [NOW_WORDS.checkout]);
+    assert.deepEqual(nowOf(base)?.words, [NOW_WORDS.checkout], 'a checkout whose holder the api did not name says none');
+    const holder = { ...onBase, steps: [{ ...onBase.steps[0], on: 'base' as const, baseHeldBy: { run: 'r-lgll', step: 'land' } }] };
+    assert.deepEqual(nowOf(holder)?.words, [NOW_WORDS.waitsOn, { run: 'r-lgll' }, NOW_WORDS.theCheckout], 'the run that has it, linked');
+    assert.equal(nowOf(holder)?.tone, 'waits');
     const slot = summary([['implement', 'waiting for a run slot']]);
     assert.deepEqual(nowOf(slot)?.words, [NOW_WORDS.slot]);
     const given = { ...slot, steps: [{ ...slot.steps[0], spec: givenAgent('Implementer') }] };

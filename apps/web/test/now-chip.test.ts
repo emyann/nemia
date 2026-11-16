@@ -83,7 +83,7 @@ const row = (id: string, on: string[] = [], until: Array<[string, boolean]> = []
           },
   });
 
-test('waitedOnBy: the runs of the page that wait on a run, or are held until it lands', async (t) => {
+test('waitedOnBy: the runs of the page that wait on a run, on its checkout, or are held until it lands', async (t) => {
   await t.test('a wait and an unlanded hold each count once', () => {
     const rows = [row('a'), row('b', ['a']), row('c', [], [['a', false]]), row('d', ['x'])];
     assert.equal(waitedOnBy(rows, 'a'), 2);
@@ -97,5 +97,15 @@ test('waitedOnBy: the runs of the page that wait on a run, or are held until it 
   });
   await t.test('a run that both waits on and is held until the run is one run', () => {
     assert.equal(waitedOnBy([row('b', ['a'], [['a', false]])], 'a'), 1);
+  });
+  await t.test('a run whose step waits on the checkout counts in the fan of the run whose ending has it, once', () => {
+    const onCheckout = (id: string, holder: string, waitsOn: string[] = []) => {
+      const r = row(id, waitsOn);
+      return { ...r, steps: [{ ...r.steps[0], on: 'base' as const, baseHeldBy: { run: holder, step: 'land' } }] };
+    };
+    const rows = [row('a'), onCheckout('b', 'a'), onCheckout('c', 'a', ['a']), row('d', ['a'])];
+    assert.equal(waitedOnBy(rows, 'a'), 3);
+    assert.equal(waitedOnBy(rows, 'b'), 0);
+    assert.equal(waitedOnBy([onCheckout('a', 'a')], 'a'), 0, 'never the run itself');
   });
 });

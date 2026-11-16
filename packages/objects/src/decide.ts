@@ -4,7 +4,7 @@
  * same read. Data, never the lines a screen prints: each sentence it carries is the package's own, without a screen's label.
  */
 import { Schema } from 'effect';
-import { RunHolding, RunWaiting, StepUsed } from './run.ts';
+import { BaseHold, RunHolding, RunWaiting, StepUsed } from './run.ts';
 import { DECIDE_LABELS, LESSON_STATES } from './words.ts';
 
 const List = <S extends Schema.Top>(item: S) => Schema.mutable(Schema.Array(item));
@@ -230,20 +230,6 @@ export const Collisions = Schema.Struct({
   description: "At an ending's decision: whether its branches merge onto the base, and the other runs in flight its branches collide with.",
 });
 export type Collisions = typeof Collisions.Type;
-
-/**
- * The run whose ending step works on the base branch in the repository's own working tree now, and that step (`CheckoutHold`, cap.ts):
- * what an ending of this run waits on, the base (`WAIT_ON`'s `base`).
- */
-export const BaseHold = Schema.Struct({
-  run: Schema.String.annotate({ description: "The run whose ending holds the base branch in the repository's own working tree." }),
-  step: Schema.String.annotate({ description: 'Its ending step that works there now.' }),
-}).annotate({
-  identifier: 'BaseHold',
-  description:
-    "The run whose ending step works on the base branch in the repository's own working tree now, which this run's ending waits on.",
-});
-export type BaseHold = typeof BaseHold.Type;
 
 /** The runs in flight a run is held at by the cap on them, and the cap (`RunSlot`, cap.ts). */
 export const RunSlot = Schema.Struct({

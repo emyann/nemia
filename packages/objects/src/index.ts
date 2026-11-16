@@ -401,10 +401,9 @@ export {
   TRANSCRIPT_ROLES,
   type TranscriptRole,
 } from './words.ts';
-export { RunHolding, RunWaiting } from './run.ts';
+export { BaseHold, RunHolding, RunWaiting } from './run.ts';
 export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState } from './words.ts';
 export {
-  BaseHold,
   Collisions,
   Decidable,
   DecideCommand,

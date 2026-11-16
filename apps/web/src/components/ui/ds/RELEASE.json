@@ -1,5 +1,5 @@
 {
-  "version": "0.9.1",
+  "version": "0.10.0",
   "kit": {
     "DESIGN.md": {
       "exact": "b69a94a40d70a369e1ea253ebb6620c9ce7d1fd1e83581ec68fcccd23c588257",
@@ -14,12 +14,12 @@
       "loose": "7e2a811b5f9755f761529a49bc547cbb9c0d4fe2b9cf9b51077b5a254d3884eb"
     },
     "adapters/react-hook-form.tsx": {
-      "exact": "4ce81798e02c277b045f5a3c0602453dea04a958a4869f73eebe6646f1c42333",
-      "loose": "da317af840182ee5c5bd758b4bacc88f13c6a7c328343d409ae9d396b9d7d26b"
+      "exact": "23fa354914ada6d137c0e391db3f6050e89bb46b37f597b11247050ebf9db325",
+      "loose": "1529dcdc7067ec7578fd3d31fd28e9d4c794619c378fa9bb843feda5a595bb8c"
     },
     "adapters/react-router.tsx": {
-      "exact": "77c38261aa88c9621ab1ac531e2a93a024cc3a88162e5c7be2af434c71442e66",
-      "loose": "9b04745931ec2c2110e9edfb7761e21f1fd38ad90143fa2e8f9a0cd46cae9646"
+      "exact": "a7ab9e810ca5bf18b33b8f8230c1f45826985cb3f35c2a859978efe731c9ab1a",
+      "loose": "d647d54d91ee61309484a7832ca9ab3da07b450ae2a5cab233a6340659b83391"
     },
     "changed.mjs": {
       "exact": "8e6aa45cdeafac353b0b8a744ff1cdeec85e07efb7457e58f3c2ef541be868cf",
@@ -46,8 +46,8 @@
       "loose": "0e92669517654444435f71dee0032b19aaddf09a5ff99e03557b95c9ee423ac2"
     },
     "components/Button.tsx": {
-      "exact": "7f5693fb7da13d126a269cb80c0ce441eaec960d8838194ebe987cd1d03443c6",
-      "loose": "aa8005748655d71c96a74ddaf42080c2927d538be059723c86ace5dd3223f47a"
+      "exact": "9ec47e720e7dd6e48c2079cb09fbe68a420295d55286cec0f682ba77df0cde89",
+      "loose": "c9a759737bf82f6bedb565450c9ee6b37bb7e70a84f4eea5ed2b6379d377698e"
     },
     "components/ButtonGroup.tsx": {
       "exact": "553f15fce4aee51f2e135475136420335eb369ede75ce0109155b0ddabfcbf04",
@@ -86,8 +86,8 @@
       "loose": "bec7d513f974cdc9301747343822832e49afb625f94f94c4e2713aef8ee6174f"
     },
     "components/DialogContent.tsx": {
-      "exact": "66aa68c854f15c137977b2760ac7535418bebfb0ba531ff7629ac48f60a97a2f",
-      "loose": "dd66bcf4d1f49c6553af39ac0be45b999ffe7d8e930b0882b293d2a534609f1d"
+      "exact": "993db0ef0f1e43f10ecacf7f25c73eec680fbb54c08bec4a3240c35effac530a",
+      "loose": "bf9fa4e9e93ddae7570368d3488e800e3cd3c7c08c48629f1cb737c15f15fae7"
     },
     "components/Disclosure.tsx": {
       "exact": "34c867c1a4f04e545e8e5f747d43e9e0d964222a4ac2f38702b1d937be78a903",
@@ -98,8 +98,8 @@
       "loose": "f17346b87379c9ca6263de1a5b4863e3a7ed0d5866da9a5ed1cb9e5efb713783"
     },
     "components/DropZone.tsx": {
-      "exact": "23f2179f04be093986c381415327cff99c42dfa1b9cd6365c0af795c060928ed",
-      "loose": "b72762b1b7170458423908199e2bd2897fcae23be20345d88a88fcc7509900bc"
+      "exact": "77ef984deec89b801dfdd80d87a5f2e08a8e3eb850377094a699f91de62b9b8c",
+      "loose": "5ed4d99b41c0eda27d40e33d5673f72c12bfb69cd8b2e0580656aaa17685d934"
     },
     "components/EmptyState.tsx": {
       "exact": "3e76474c4a227c91f29c6a26464aea0ab46a185cb4facd515b17927bc15e9661",
@@ -154,8 +154,8 @@
       "loose": "372ccb0d40aac12ebc6b1bfe98a9019acbb01705aeaa83d66898d49354abf0fa"
     },
     "components/ModalDialog.tsx": {
-      "exact": "eab9a4cb8137189d741d54e440374ea08f7e8292353fe83abfbd1bd1d899fe93",
-      "loose": "6b41d41211b28aeb9962f07bc0ba09f4bd3a22be9b7316f8320ab1265a274bc0"
+      "exact": "a502649661b6e9148a2458d55d81a3c7fa7607d50b0c04caa3da504419182973",
+      "loose": "16c026fe323a74664aa3f0a3016f3f8fb7893f8ed018823ae99b8916e0c55678"
     },
     "components/NavigationDrawer.tsx": {
       "exact": "edb92cea53c6e679e06d6fa6559e5c21f9745ea3872709e11fc760aba0d981a2",
@@ -170,8 +170,8 @@
       "loose": "c46a1b6947b06518c5f60cce34a601e02c2e465339dcb528c1e16fc15262fc22"
     },
     "components/PhoneField.tsx": {
-      "exact": "6ac73fc2cc7aa28c527c3c8a8d646bead7c368e35c30d21a4ed44eb87a50835f",
-      "loose": "13bd9e9b55323c657873d7ddc93b75320e20d2126d41bc105e4478d9b7ef70df"
+      "exact": "2c06a31467e84a968490a176259842e5ec07703f72a0a9f280d6e47f602b0bb1",
+      "loose": "11b6389cf2e5d828a013477505dcf60596d25018cba47f004c99f96cfbd7bc6e"
     },
     "components/Popover.tsx": {
       "exact": "1cc34ae45c46f53b51a35400fb5de3ad5034770a5ed3eb27c8bf5efadea0b29b",
@@ -198,16 +198,16 @@
       "loose": "575f0fc0a9fa33b065deaa6d2ace3b5731177ddef711db14c4036c9cb506348d"
     },
     "components/Select.tsx": {
-      "exact": "b3243aad280d5a9f81cbd961ba1ca2e2acd3f0c69d6c878c4e842bac44e47a1d",
-      "loose": "283d2ca99d3523efb1f84e2e342a50d7208b3122256ec95a9c355292d67e17b1"
+      "exact": "f7e20f394df70c26549338711d4912557ea13bc0c83f5916f966df95c2ef645a",
+      "loose": "57143fda8fc287500018a5053daee3604e6a27dd1e6f4f401c2511d771f5534d"
     },
     "components/SideSheet.tsx": {
-      "exact": "50aceed2ab2918c4fbeba0dbffdb9c387148a26e060c7d83d7d079cb71dca4bd",
-      "loose": "334ca970da6d0da9e32ab7a6fe70e556179be86eb142e4a095d86a8fe14ec7b7"
+      "exact": "a90b17cf1d995dc63e75c7345fdf22e001a24e78cda1580ae110505e675652a5",
+      "loose": "0711f06b5801c8656bcebc593e1e215d626236578dfd14afaadc798a88dc6718"
     },
     "components/Skeleton.tsx": {
-      "exact": "d79a2bca4cffc19b480873780c1fd34ee44dbcc9d7b27b16ac45f90827f18a0d",
-      "loose": "4b497b60b55956726d6e0ac3579cc64a182a065eda2e96f39c54b1af910f5034"
+      "exact": "8c277c18fdabc61e364c5432d09df4d00873b8be6228785f9f1ffa78e0264c9d",
+      "loose": "07891fcd929df18fda03df60f6c4dfbbaa2501665d6e39bb879e48cbe5002b2c"
     },
     "components/Slider.tsx": {
       "exact": "980f734dfbfe1df1e7aff15a48cfc9d20a7b5068d540726a7a090f94e816e975",
@@ -282,8 +282,8 @@
       "loose": "f7b4cda9634037cc53d91536e59888fc78850d27566212cdf25a176107f12440"
     },
     "components/date-picker-styles.ts": {
-      "exact": "401d8a8ae3b1c36016338a0dc20b594f86a48d9c31688df7c2b1abb433465f22",
-      "loose": "17656355b13d663ac8f8f09714d4eed35d5545f8c0fde98fdbd6a58399f0e011"
+      "exact": "d6c31a565553d97982a116e510646da6c3522de771b12d9c40ea1b5b023a2f5c",
+      "loose": "21204588b11c769c0847d21c9baa3788c5f1c2dddb330e99edef237cef36cbaa"
     },
     "components/field-styles.ts": {
       "exact": "fdc43d646e646c1cc362fec541f1d9cbdec0f6ddb07af8edd0655b716498aab2",
@@ -350,14 +350,14 @@
       "loose": "59982d344ed1ec79d95f056630deede4cb922f428cd6a8250a10bd10b034dc8a"
     },
     "utils.ts": {
-      "exact": "52799bc07af11b6f62b86aa95a71abc152d5e8f3b178054991867b94ff48deee",
-      "loose": "5372956a3f1cbdd2ac08fa00b0574c75c229fb945992946344db9ffbe9a04ce3"
+      "exact": "a81801a6a4ce973dffcbe316c01bc6bfb58eb7bac3786319795aa1aca679eb89",
+      "loose": "a91d6c3f73ffa9430d266af04552692994c715a9201594e4cabff319527d5984"
     }
   },
   "project": {
     ".claude/skills/ds-build/SKILL.md": {
-      "exact": "baaa6a5e6937fa16e215359bfac2df05bad19792c5c92349b5caf723d4e8504c",
-      "loose": "24335ee3e832baf5d666ed2e55a882b54fb643747f20982468414b77dbf90950"
+      "exact": "26a660d900c6a90dd994f74e809e9234dd43a494ddd81cf6b70e9d1c0daa7e85",
+      "loose": "f49aa90fa4cdb6455bf9e0b677220dc9e8e9d40b86524c6d7b1e9965a058ea21"
     },
     ".claude/skills/ds-spec/SKILL.md": {
       "exact": "96df5b9d9585d4dfb4f5ef97d0baa936a5d7176111ef5247d29a04670d8fd25e",

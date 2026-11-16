@@ -92,7 +92,10 @@ export type SelectProps<T extends object> = Omit<
  * React Aria's ListBox skips them (no `disabledBehavior` on ListBox in RAC
  * 1.20), so they are visible but not focusable. A closed trigger that merely
  * has keyboard focus keeps its resting label — MD3 floats the label on focus,
- * but there is nothing to type into until the menu opens.
+ * but there is nothing to type into until the menu opens. With `isRequired`
+ * the label takes the asterisk a text field draws, and "required" in the
+ * trigger's name: the trigger is a button, and a button has neither
+ * `aria-required` nor `aria-invalid`. An error is its description.
  */
 export function Select<T extends object>(props: SelectProps<T>) {
   const {
@@ -121,6 +124,7 @@ export function Select<T extends object>(props: SelectProps<T>) {
         chevronClassName={m.chevron()}
         label={label}
         leadingIcon={leadingIcon}
+        isRequired={!!selectProps.isRequired}
       />
       <div data-slot="supporting-text" className={s.supporting()}>
         <FieldError>{errorMessage}</FieldError>
@@ -148,11 +152,13 @@ function Trigger({
   chevronClassName,
   label,
   leadingIcon,
+  isRequired,
 }: {
   styles: ReturnType<typeof styles>;
   chevronClassName: string;
   label?: string;
   leadingIcon?: IconProp;
+  isRequired: boolean;
 }) {
   const state = useContext(SelectStateContext);
   const populated = (state?.selectedItems.length ?? 0) > 0;
@@ -172,6 +178,16 @@ function Trigger({
       {label && (
         <Label data-slot="label" className={s.label()}>
           {label}
+          {/* The asterisk a text field draws. The trigger is a button, which
+              has no `aria-required`: the word is in its name instead. */}
+          {isRequired && (
+            <>
+              <span aria-hidden="true" className="ml-0.5">
+                *
+              </span>
+              <span className="sr-only">, required</span>
+            </>
+          )}
         </Label>
       )}
       <ChevronDownIcon size={24} className={chevronClassName} />

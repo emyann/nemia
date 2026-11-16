@@ -68,11 +68,14 @@ function runOne(run: LookRun, children: ChildProcess[], storybook: string): Prom
 /**
  * Builds Storybook static into a folder of the temp directory, then runs what `--look` runs (`LOOK_RUNS`), one after the other, and
  * resolves once each passes; rejects where the build fails, and at the first that fails, naming how to run it again. Each child is
- * pushed onto `children`, the runner's, so a signal stops it with the workers. The folder is removed either way.
+ * pushed onto `children`, the runner's, so a signal stops it with the workers. The folder is removed either way, and on the runner's
+ * exit.
  * @param children The runner's children, which a signal stops.
  */
 export async function lookTests(children: ChildProcess[]): Promise<void> {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-look-storybook-'));
+  const away = (): void => fs.rmSync(folder, { recursive: true, force: true });
+  process.once('exit', away);
   try {
     const storybook = path.join(folder, 'static');
     console.log("e2e: Storybook's static build, which the look's tests read (storybook build)");
@@ -80,6 +83,7 @@ export async function lookTests(children: ChildProcess[]): Promise<void> {
     if (why) throw new Error(`${why}: build it by hand from apps/web, npx storybook build, and read what it says`);
     for (const run of LOOK_RUNS) await runOne(run, children, storybook);
   } finally {
-    fs.rmSync(folder, { recursive: true, force: true });
+    away();
+    process.off('exit', away);
   }
 }

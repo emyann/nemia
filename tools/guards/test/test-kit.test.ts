@@ -10,7 +10,7 @@
  * - **Every temporary root a test makes comes from `scratch`** (`test-kit/scratch`), which takes it away with whatever runs in it: a
  *   call of `os.tmpdir` in any workspace's tests outside the kit is refused, and so is a root made with `mkdtempSync` in
  *   `machineTempDir()`, the directory a test that asserts where a process runs names. A root made inside a scratch root is let
- *   through. `ROOTS_BY_HAND` names the three files that make one by hand, each saying why.
+ *   through. `ROOTS_BY_HAND` names the four files that make one by hand, each saying why.
  *
  * Each rule is a function over text, proven on a planted line first, then swept over the workspaces the root `package.json` names.
  */
@@ -85,10 +85,16 @@ const tmpdirCalls = (text: string): string[] =>
 
 /**
  * The files of a workspace's tests that make a root by hand: the fixture that shows the reaper a leak, run alone under a temp
- * directory of its own; and the e2e's runner and the served board's command, each a script and no test file, which `node:test`'s hooks
- * would make a test run of, and each removes its store and stops its servers on its own exit and signals.
+ * directory of its own; and the e2e's runner, with the module it runs the look's tests through (`look.ts`, whose static Storybook it
+ * builds into a folder of its own), and the served board's command, each a script and no test file, which `node:test`'s hooks would
+ * make a test run of, and each removes its store or its folder and stops its servers on its own exit and signals.
  */
-const ROOTS_BY_HAND = ['packages/agent-runtime/test/fixtures/leak-unguarded.ts', 'apps/web/test/e2e/run.ts', 'apps/web/test/e2e/serve.ts'];
+const ROOTS_BY_HAND = [
+  'packages/agent-runtime/test/fixtures/leak-unguarded.ts',
+  'apps/web/test/e2e/run.ts',
+  'apps/web/test/e2e/look.ts',
+  'apps/web/test/e2e/serve.ts',
+];
 
 /** The workspaces whose code and tests the sweeps read: every one the root names but the kit itself. */
 const swept = (): string[] => workspaces().filter((ws) => ws !== KIT);

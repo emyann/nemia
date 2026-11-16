@@ -107,7 +107,7 @@ test('REFUSED: a control drawn by hand, by its element or a class string of lib/
     `export const X = () => (<div className={FLOOR_BOX}><button className={BUTTON} /><input type="checkbox"/>`,
     `<select><option /></select><select></select><Button>ok</Button></div>);`,
   ].join('\n');
-  assert.deepEqual(handDrawn(file, source).toSorted(), ['<button>', '<input>', '<select>', '@/lib/classes:BUTTON']);
+  assert.deepEqual([...handDrawn(file, source)].sort(), ['<button>', '<input>', '<select>', '@/lib/classes:BUTTON']);
   assert.equal(handDrawn('apps/web/src/components/look/X.tsx', source).length, 0, 'the look draws its own');
   assert.equal(handDrawn('apps/web/src/components/ui/ds/X.tsx', source).length, 0, 'so does the kit');
 });

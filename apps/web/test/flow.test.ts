@@ -66,7 +66,6 @@ test('tilesOf: a run opened, every step a tile', async (t) => {
   });
 });
 
-
 /** Each column's points, left first, top to bottom: what the graph reads as. */
 const readGraph = (g: StepGraphLayout): string[][] => {
   const xs = [...new Set(g.points.map((p) => p.x))].sort((a, b) => a - b);

@@ -52,7 +52,7 @@ export function SkillPicker({
         <Button variant="outlined" size="xsmall" onPress={() => setOpen(true)}>
           Add a skill
         </Button>
-        <SideSheet variant="modal" title="Add a skill" isOpen={open} onClose={() => setOpen(false)} className="ml-auto min-w-0 sm:w-xl">
+        <SideSheet variant="modal" title="Add a skill" isOpen={open} onClose={() => setOpen(false)}>
           {open && (
             <div className="space-y-5">
               <p className="text-body-small text-muted-foreground">

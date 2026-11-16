@@ -157,27 +157,22 @@ async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage): P
 }
 
 /**
- * What a card may say `run` has waited this time: its present wait at each half minute from a little before the answer `asOf` was read at
- * until now, since the page's own read is another than the one the check made, and the wait grows meanwhile. None for a wait not dated.
+ * The card of `run` says how long it has waited on a person this time, since the api's `waitingSince`, and nothing where it is null:
+ * its present wait at the instant of the answer the page drew it from (`given`), never of the check's own read a moment later.
  */
-const waitsSaid = (run: WaitingRun, asOf: string): Set<string> => {
-  const said = new Set<string>();
-  const [from, now] = [Date.parse(asOf) - 90_000, Date.now()];
-  for (let at = from; at - 30_000 <= now; at += 30_000) {
-    const wait = presentWait(run, new Date(at));
-    if (wait !== null) said.add(`waited ${wait}`);
-  }
-  return said;
-};
-
-/** The card of `run` says how long it has waited on a person this time, since the api's `waitingSince`, and nothing where it is null. */
-async function waitSaid(page: Page, run: WaitingRun, asOf: string): Promise<void> {
+async function waitSaid(page: Page, run: WaitingRun, given: () => Given): Promise<void> {
   const figure = cardOf(page, run.id).locator('[data-waited]');
   if (run.waitingSince === null)
     return await expectCount(figure, 0, `the card of ${run.id}, whose wait the api does not date, says no wait`);
   await expectNone(async () => {
-    const [said, may] = [(await figure.allInnerTexts()).map((text) => text.trim().toLowerCase()), waitsSaid(run, asOf)];
-    return said.length === 1 && may.has(said[0]) ? null : `it says "${said.join(' | ')}", and its present wait is ${[...may].join(' or ')}`;
+    const open = given().open;
+    const drawn = open?.waiting.filter(judged).find((waiting) => waiting.id === run.id);
+    if (!open || !drawn) return `the page was given no RunList of the runs not finished holding ${run.id} to draw its card against`;
+    const wait = presentWait(drawn, new Date(open.asOf));
+    const said = (await figure.allInnerTexts()).map((text) => text.trim().toLowerCase());
+    return said.length === 1 && wait !== null && said[0] === `waited ${wait}`
+      ? null
+      : `it says "${said.join(' | ')}", and its present wait is ${wait}`;
   }, `the card of ${run.id} says how long it has waited this time, since ${run.waitingSince}`);
 }
 
@@ -497,32 +492,41 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promi
 }
 
 /**
- * The Clock column of both tables says the run's time at work, which is what `runClock` writes for a row, and never its wall time: a run
+ * The Clock column of both tables says the run's time at work, which is what `runClock` writes for a row at the instant of the answer
+ * the page drew it from (`given`; the finished page's clocks stand still), and never its wall time: a run
  * that waited an hour for others to land said `1h 33m` while it had worked for minutes, and one that has filed nothing says `not
  * started`. A preview over the words breaks that clock down — the rows the waiting card's Clock tile shows, with the wall time as the
  * foot — opened by the keyboard alone, with no request heard, and closed by Escape. Both tables, and the open preview, are pictured.
  */
-async function clocksSay(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
-  const tables = [
-    { where: 'in-flight' as const, at: Date.parse(open.asOf), done: false, runs: open.inFlight.filter(judged) },
-    { where: 'finished' as const, at: Date.parse(finished.asOf), done: true, runs: finished.runs },
-  ];
+async function clocksSay(page: Page, finished: FinishedPage, given: () => Given): Promise<void> {
+  type Clocked = ListedRun | FinishedPage['runs'][number];
+  const tables = ['in-flight', 'finished'] as const;
+  const drawnWith = (where: (typeof tables)[number]): { at: number; done: boolean; runs: readonly Clocked[] } | null => {
+    if (where === 'finished') return { at: Date.parse(finished.asOf), done: true, runs: finished.runs };
+    const open = given().open;
+    return open ? { at: Date.parse(open.asOf), done: false, runs: open.inFlight.filter(judged) } : null;
+  };
   let wallsDiffered = 0;
-  for (const table of tables) {
-    const words = await section(page, table.where)
-      .locator('tr[data-run] td[data-clock] [data-clock-words]')
-      .evaluateAll((all) => all.map((at) => (at.textContent ?? '').trim()));
-    const want = table.runs.map((run) => runClock(run, table.at, table.done, 'row').words);
-    if (words.join('|') !== want.join('|'))
-      throw new Refused(`the ${table.where} Clock column says the time at work — expected ${want.join(', ')}, found ${words.join(', ')}`);
-    wallsDiffered += table.runs.filter((run, i) => words[i] !== durationWords(run.wallMs, 'minute')).length;
-    await photograph(section(page, table.where), path.join(OUT, `runs-table-${table.where}-${await themeOf(page)}.png`));
+  for (const where of tables) {
+    let said: { words: string[]; runs: readonly Clocked[] } = { words: [], runs: [] };
+    await expectNone(async () => {
+      const drawn = drawnWith(where);
+      if (!drawn) return 'the page was given no RunList of the runs not finished to draw its rows against';
+      const words = await section(page, where)
+        .locator('tr[data-run] td[data-clock] [data-clock-words]')
+        .evaluateAll((all) => all.map((at) => (at.textContent ?? '').trim()));
+      said = { words, runs: drawn.runs };
+      const want = drawn.runs.map((run) => runClock(run, drawn.at, drawn.done, 'row').words);
+      return words.join('|') === want.join('|') ? null : `expected ${want.join(', ')}, found ${words.join(', ')}`;
+    }, `the ${where} Clock column says the time at work, against the instant of the answer the page drew`);
+    wallsDiffered += said.runs.filter((run, i) => said.words[i] !== durationWords(run.wallMs, 'minute')).length;
+    await photograph(section(page, where), path.join(OUT, `runs-table-${where}-${await themeOf(page)}.png`));
   }
   if (!wallsDiffered)
     throw new Refused("the seed holds a run whose wall time is not its time at work: without one the column's words prove nothing");
 
-  for (const table of tables) {
-    const row = section(page, table.where).locator('tr[data-run]').first();
+  for (const where of tables) {
+    const row = section(page, where).locator('tr[data-run]').first();
     const id = await row.getAttribute('data-run');
     const asked: string[] = [];
     const hear = (request: { url(): string }) => void (request.url().includes(`/api/runs/${id}`) && asked.push(request.url()));
@@ -530,13 +534,12 @@ async function clocksSay(page: Page, open: OpenRuns, finished: FinishedPage): Pr
     await page.mouse.move(0, 0);
     page.on('request', hear);
     await row.locator('td[data-clock] button').hover();
-    await expectVisible(tooltip(page), `the Clock cell of a ${table.where} row opens its preview on a resting pointer`);
+    await expectVisible(tooltip(page), `the Clock cell of a ${where} row opens its preview on a resting pointer`);
     const rows = await tooltip(page)
       .locator('[data-breakdown-row]')
       .evaluateAll((all) => all.map((row) => row.getAttribute('data-breakdown-row') ?? ''));
     for (const what of ['Sessions at work', 'Checks running', 'Waiting on you', 'Queued for a slot'])
-      if (!rows.includes(what))
-        throw new Refused(`the ${table.where} preview holds the waiting card's own rows — it holds ${rows.join(', ')}`);
+      if (!rows.includes(what)) throw new Refused(`the ${where} preview holds the waiting card's own rows — it holds ${rows.join(', ')}`);
     await expectVisible(tooltip(page).locator('[data-breakdown-row="Waiting on you"] dd'), 'each row with its figure');
     page.off('request', hear);
     if (asked.length)
@@ -544,11 +547,11 @@ async function clocksSay(page: Page, open: OpenRuns, finished: FinishedPage): Pr
     await page.mouse.move(0, 0);
     await expectCount(tooltip(page), 0, 'the pointer gone, it closes');
 
-    await reachClock(page, row, table.where);
-    await expectVisible(tooltip(page), `and the ${table.where} row's clock opens it on focus too, with no pointer`);
+    await reachClock(page, row, where);
+    await expectVisible(tooltip(page), `and the ${where} row's clock opens it on focus too, with no pointer`);
     const described = await focused(page).getAttribute('aria-describedby');
-    if (!described) throw new Refused(`the ${table.where} Clock cell is described by its preview while it shows`);
-    await photograph(page, path.join(OUT, `runs-clock-preview-${table.where}-${await themeOf(page)}.png`));
+    if (!described) throw new Refused(`the ${where} Clock cell is described by its preview while it shows`);
+    await photograph(page, path.join(OUT, `runs-clock-preview-${where}-${await themeOf(page)}.png`));
     await page.keyboard.press('Escape');
     await expectCount(tooltip(page), 0, 'Escape closes it');
   }
@@ -690,25 +693,29 @@ async function costSays(page: Page, where: 'in-flight' | 'finished', runs: reado
   return head;
 }
 
+/** The two RunLists by state as the page itself was last given them, the open one and the finished runs' first page. */
+type Given = { open?: OpenRuns; finished?: FinishedPage };
+
 /**
- * The finished runs' first page as the page itself was last given it, kept as each answer arrives: its `asOf` is the instant the rows
- * drew their words against. `answered` reads the api apart from the page and a moment later, so near a minute's edge its `asOf` says
- * another word than the page drew.
+ * The two RunLists by state as the page itself was last given them, kept as each answer arrives: each one's `asOf` is the instant its
+ * rows drew their words against. `answered` reads the api apart from the page and a moment later, so near a minute's edge its `asOf`
+ * says another word than the page drew.
  */
-function finishedDrawn(page: Page): { last: () => FinishedPage | undefined; stop: () => void } {
-  let last: FinishedPage | undefined;
+function answersDrawn(page: Page): { last: () => Given; stop: () => void } {
+  const last: Given = {};
   const seen = (response: Response) => {
     const url = new URL(response.url());
-    if (url.pathname !== '/api/runs' || url.searchParams.get('fieldSelector') !== FINISHED_SELECTOR || url.searchParams.has('continue'))
-      return;
-    if (response.ok())
-      response.json().then(
-        (body: RunList) => void (last = finishedOf(body)),
-        () => undefined,
-      );
+    const field = url.pathname === '/api/runs' ? url.searchParams.get('fieldSelector') : null;
+    const keep =
+      field === OPEN_SELECTOR
+        ? (body: RunList) => void (last.open = openOf(body))
+        : field === FINISHED_SELECTOR && !url.searchParams.has('continue')
+          ? (body: RunList) => void (last.finished = finishedOf(body))
+          : null;
+    if (keep && response.ok()) response.json().then(keep, () => undefined);
   };
   page.on('response', seen);
-  return { last: () => last, stop: () => page.off('response', seen) };
+  return { last: () => ({ ...last }), stop: () => page.off('response', seen) };
 }
 
 /**
@@ -716,7 +723,7 @@ function finishedDrawn(page: Page): { last: () => FinishedPage | undefined; stop
  * the chip of what it does now in the tone `nowOf` gives it, its words never cut, and its rail; finished, how it ended, red only when it
  * failed, and when.
  */
-async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given: () => FinishedPage | undefined): Promise<void> {
+async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given: () => Given): Promise<void> {
   const flying = open.inFlight.filter(judged)[0];
   const row = section(page, 'in-flight').locator(`tr[data-run="${flying.id}"]`);
   await expectTexts(row.locator(`a[href="/runs/${flying.id}"]`), [titleOf(flying)], 'a row in flight says its title, a link to the run');
@@ -775,7 +782,7 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
     "and its id's end",
   );
   await expectNone(async () => {
-    const last = given();
+    const last = given().finished;
     if (!last) return 'the page was given no first page of the finished RunList to draw its rows against';
     const asOf = new Date(last.asOf);
     const whens = finished.runs.map((run) => agoWords(new Date(run.finishedAt), asOf));
@@ -1100,7 +1107,7 @@ function regatedBack(): void {
 }
 
 /** What the page asserts while REGATED is in the store, from its two reads to the menu's places and back. */
-async function withRegated(page: Page, drawn: () => FinishedPage | undefined): Promise<void> {
+async function withRegated(page: Page, drawn: () => Given): Promise<void> {
   await regated(page);
   const open = await openAnswered(page);
   const finished = await finishedAnswered(page);
@@ -1108,7 +1115,7 @@ async function withRegated(page: Page, drawn: () => FinishedPage | undefined): P
   await threeParts(page, open, finished);
   for (const run of open.waiting.filter(judged)) {
     await cardSays(page, run);
-    await waitSaid(page, run, open.asOf);
+    await waitSaid(page, run, drawn);
   }
   const costly = open.waiting.filter(judged).find((run) => run.id === COSTLY.id);
   if (!costly?.clock || !costly.stepCosts) throw new Refused(`${COSTLY.id} waits on you, and the api breaks its clock and its cost down`);
@@ -1122,7 +1129,7 @@ async function withRegated(page: Page, drawn: () => FinishedPage | undefined): P
   await tableByKeyboard(page, finished);
   await finger(page, open, finished);
   await rowsSay(page, open, finished, drawn);
-  await clocksSay(page, open, finished);
+  await clocksSay(page, finished, drawn);
   await costsSay(page);
   await flightAligned(page);
   await lookDetails(page);
@@ -1154,7 +1161,7 @@ export default {
   route: '/runs',
   expect: async (page) => {
     await sidebar(page);
-    const drawn = finishedDrawn(page);
+    const drawn = answersDrawn(page);
     try {
       await withRegated(page, drawn.last);
     } finally {

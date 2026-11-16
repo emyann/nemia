@@ -1,7 +1,7 @@
 /*
  * The pulse of a step at work on a run's graph (`StepGraph`): a ring on a layer of its own over the node (`data-step-pulse`) grows from
  * the node's own size and fades, one pulse in 2.4 seconds, while the node's fill and size stay still. Where a person asks for reduced
- * motion the ring is still, drawn faint at the node's size.
+ * motion the ring is still, drawn half lit, half again the node's size.
  */
 @keyframes step-pulse {
   0% {
@@ -24,6 +24,7 @@
 @media (prefers-reduced-motion: reduce) {
   [data-step-pulse] {
     animation: none;
-    opacity: 0.5;
+    transform: scale(1.5);
+    opacity: 0.55;
   }
 }

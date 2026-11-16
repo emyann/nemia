@@ -2,8 +2,9 @@
  * The rules the board's stories are held to, as pure functions over file lists and sources, which `stories.test.ts` runs on fixtures
  * and on the tree against `stories.baseline.ts`: a component or page body with no story beside it (`storyless`), a story given no args
  * (`argless`), a title outside the board's categories (`offCategory`), an import of a second component system (`secondSystem`), a
- * control drawn by hand (`handDrawn`), a story whose axe only warns (`a11yTodos`), and where the map of destinations
- * (`destinations.ts`) falls short of what the board takes (`mapGaps`). Paths are from the workspace root.
+ * control drawn by hand (`handDrawn`), a story whose axe only warns (`a11yTodos`), a play that reads a part visible the moment it is
+ * found (`seenOnceFound`), and where the map of destinations (`destinations.ts`) falls short of what the board takes (`mapGaps`).
+ * Paths are from the workspace root.
  */
 import path from 'node:path';
 import ts from 'typescript';
@@ -275,3 +276,41 @@ export const mapGaps: MapGaps = (taken, mapped) => ({
   unmapped: taken.filter((key) => !mapped.includes(key)),
   unused: mapped.filter((key) => !taken.includes(key)),
 });
+
+/**
+ * The line of each `expect(await <…>.findBy…(…)).toBeVisible()` in `source`, `not` or not: a find answers once the part is in the
+ * page, which may be before it shows (a popover entering, a list behind its own read), so a play waits for what it sees,
+ * `waitFor(() => expect(<…>.getBy…(…)).toBeVisible())`.
+ * @param source A story module's text.
+ */
+export const seenOnceFound = (source: string): number[] => {
+  const tree = ts.createSourceFile('x.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const lines: number[] = [];
+  const found = (node: ts.Expression): boolean =>
+    ts.isAwaitExpression(node) &&
+    ts.isCallExpression(node.expression) &&
+    /^findBy|^findAllBy/.test(
+      ts.isPropertyAccessExpression(node.expression.expression)
+        ? node.expression.expression.name.text
+        : ts.isIdentifier(node.expression.expression)
+          ? node.expression.expression.text
+          : '',
+    );
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'toBeVisible') {
+      let on: ts.Expression = node.expression.expression;
+      if (ts.isPropertyAccessExpression(on) && on.name.text === 'not') on = on.expression;
+      if (
+        ts.isCallExpression(on) &&
+        ts.isIdentifier(on.expression) &&
+        on.expression.text === 'expect' &&
+        on.arguments[0] &&
+        found(on.arguments[0])
+      )
+        lines.push(tree.getLineAndCharacterOfPosition(node.getStart()).line + 1);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(tree);
+  return lines;
+};

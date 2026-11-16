@@ -15,7 +15,7 @@ import {
 } from 'objects';
 import type { GraphEdge, RunGraph } from './graph.ts';
 import type { StepLayers } from './layers.ts';
-import { runs, workflows as served, type Refuse } from './objects.ts';
+import { files, runs, workflows as served, type Refuse, type StartFiles } from './objects.ts';
 import { namespaceOf } from './namespace.ts';
 import { sourceOf, type SchemaFile, StepKeySchema, WorkflowStepSpecSchema, type StepKey, type WorkflowStepSpec } from './library.ts';
 
@@ -249,8 +249,12 @@ export type Started = { id: string };
  * namespace, the repository sent as `?repo=` (none for the default factory, which needs none), refused in the package's words for a
  * workflow the factory has not attached, a step its hires leave unfilled, or a repository outside it.
  *
+ * `files` hands the run files, as `--input` does: each uploaded first into the namespace the run starts in, then named among its inputs by
+ * its id (`files.uploaded`).
+ *
  * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
- * @param start What the run is: its workflow by name and where it is from, its brief, the runs it waits on, the runs it reads as context.
+ * @param start What the run is: its workflow by name and where it is from, its brief, the runs it waits on, the runs it reads as context,
+ *   the files it is handed.
  * @param place The factory and the repository it starts in; undefined, null or the default factory for the default namespace.
  */
 export const startRun = (
@@ -260,15 +264,21 @@ export const startRun = (
     brief: string;
     after?: readonly string[];
     context?: readonly string[];
+    files?: StartFiles;
   },
   place?: Place | null,
-): Promise<Started> =>
-  runs.create(
-    namespaceOf(place?.factory),
-    { ...start, from: sourceOf(start.from) },
-    'The run may have started: look on the Runs page before starting it again.',
-    !place || place.factory === DEFAULT_NAMESPACE ? undefined : place.repo,
+): Promise<Started> => {
+  const { files: given, ...run } = start;
+  const namespace = namespaceOf(place?.factory);
+  return (given === undefined || given.listed.length === 0 ? Promise.resolve([]) : files.uploaded(namespace, given)).then((inputs) =>
+    runs.create(
+      namespace,
+      { ...run, from: sourceOf(run.from), ...(inputs.length === 0 ? {} : { inputs }) },
+      'The run may have started: look on the Runs page before starting it again.',
+      !place || place.factory === DEFAULT_NAMESPACE ? undefined : place.repo,
+    ),
   );
+};
 
 /**
  * A write of the builder's the api refused: its sentence, and the steps it names — one, several for a cycle, or none for a refusal of the

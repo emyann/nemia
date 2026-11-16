@@ -16,7 +16,15 @@
  * tunnel the `Host` is the store's public name, which only a token makes safe. The token itself is judged before the guard (`callerGate`,
  * src/caller/caller.ts), a token refused there never reaching it, so presenting one here means a live one. It still says a JSON body, or
  * a form of files (`multipart/form-data`, a file uploaded for a start): a form a page on another site posts carries no `Authorization`
- * without the browser asking first, so a token's form is the client's own. With the board's cookie, or no token, a form is refused.
+ * without the browser asking first, so a token's form is the client's own. With no token, a form is refused.
+ *
+ * A form of files by the board's cookie (a file the board uploads for a start) passes where it carries the header a script sets
+ * (`scripted`): a header no form sends, which a page of another origin — another site, or another port of this host — cannot set
+ * without the browser asking the api first, as it cannot set `Authorization`, and the api answers no such question. Without it the
+ * cookie's form is refused 415, as before. Not `Sec-Fetch-Site: same-origin` alone: a browser sends no `Sec-Fetch-*` to an address that
+ * is not potentially trustworthy (a store exposed over plain http at a network's address), nor does an old one, and that store's board
+ * would upload nothing; the site is still refused first where the browser says it. So the cookie's form admits what the board's JSON
+ * writes already admit, and no more.
  *
  * A write that presents a token by the board's cookie alone (`cookie`, `objects`' `TOKEN_COOKIE`: the HttpOnly cookie the api sets
  * (`POST /api/session`) once a person pastes a token of theirs into the board, which no script of the page reads, and the one credential
@@ -36,8 +44,9 @@ import { saysForm, saysJson } from '../src/media/media.ts';
 /**
  * A request as the guard reads it: its method, its `Host`, `Sec-Fetch-Site` and `Content-Type` headers, each absent where not sent,
  * whether it presents a bearer token (`bearer`), whether it presents a token by the board's cookie alone (`cookie`, `TOKEN_COOKIE`,
- * with no bearer beside it), and whether its `Host` names a name the store marked exposed is served at (`served`), which no store not
- * marked exposed has.
+ * with no bearer beside it), whether its `Host` names a name the store marked exposed is served at (`served`), which no store not
+ * marked exposed has, and whether it sends the header a script sets (`scripted`, `objects`' `SCRIPTED_HEADER`, not empty), which no
+ * form sends.
  */
 export type WriteRequest = {
   readonly method: string;
@@ -47,6 +56,7 @@ export type WriteRequest = {
   readonly bearer: boolean;
   readonly cookie: boolean;
   readonly served: boolean;
+  readonly scripted: boolean;
 };
 
 /** Which refusal a write meets: another host, another site, or a body that is not JSON. */
@@ -87,6 +97,12 @@ const tokenForm = (r: WriteRequest): boolean => r.bearer && form(r.contentType);
 const byCookie = (r: WriteRequest): boolean => r.cookie;
 
 /**
+ * Whether a write sends a form of files by the board's cookie alone with the header a script sets (`scripted`), which no form sends
+ * and a page of another origin cannot set without the browser asking the api first.
+ */
+const boardForm = (r: WriteRequest): boolean => !r.bearer && byCookie(r) && r.scripted && form(r.contentType);
+
+/**
  * Whether a write may come from where it says it does: this machine, from no other site; with the board's cookie, from no other site at
  * whatever host; or with a bearer token, from anywhere.
  */
@@ -121,13 +137,18 @@ const writeRefusedSpec = spec<(request: WriteRequest) => WriteRefusal | null>({
     },
     aBodyNotJsonIsRefused: {
       description:
-        'A write from where it may come that does not say a JSON body is refused for its media, a token or none, but a form of files with a bearer token',
+        'A write from where it may come that does not say a JSON body is refused for its media, a token or none, but a form of files with a bearer token, or by the board’s cookie with the header a script sets',
       condition: ({ input: [r], output }) =>
-        reads(r.method) || !fromWhereItMay(r) || json(r.contentType) || tokenForm(r) || output === 'media',
+        reads(r.method) || !fromWhereItMay(r) || json(r.contentType) || tokenForm(r) || boardForm(r) || output === 'media',
     },
     aFormWithATokenPasses: {
       description: 'A write that presents a bearer token and sends a form of files (multipart/form-data) is never refused',
       condition: ({ input: [r], output }) => !tokenForm(r) || output === null,
+    },
+    aFormFromTheBoardPasses: {
+      description:
+        'A write by the board’s cookie alone that sends a form of files with the header a script sets, from no other site, is never refused, at whatever host',
+      condition: ({ input: [r], output }) => !boardForm(r) || !ours(r.site) || output === null,
     },
     aJsonWriteFromWhereItMayPasses: {
       description: 'A write from this machine and no other site, or with a token, saying a JSON body, is never refused',

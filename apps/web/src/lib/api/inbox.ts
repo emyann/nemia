@@ -16,7 +16,7 @@ import {
   DEFAULT_NAMESPACE,
 } from 'objects';
 import { selectorKey } from './selector.ts';
-import { cards } from './objects.ts';
+import { cards, files, type StartFiles } from './objects.ts';
 import { factoryIn, namespaceOf } from './namespace.ts';
 import { type KeyRow } from './library.ts';
 import type { Started } from './workflows.ts';
@@ -270,27 +270,34 @@ export const queueCard = (card: CardRef, { off = false }: { off?: boolean } = {}
  * wiring for the workflow and finds the workflow by its name. Resolves with the new run; rejects with the api's refusal in full — a card
  * not there, one started already, a workflow its factory does not offer, one its factory wires to no repository.
  * @param card The card to start: its name and its factory.
- * @param start Its run's workflow by name and its brief, the runs it waits on (`after`) and the runs it reads as context, each when given.
+ * @param start Its run's workflow by name and its brief, the runs it waits on (`after`), the runs it reads as context and the files it is
+ *   handed (`files`, each uploaded first into the card's namespace and named among its inputs by its id), each when given.
  * @param factory The factory to start it in, for a card that names none; null, undefined or the default namespace for the default factory.
  */
 export const startCard = (
   card: CardRef,
-  start: { workflow: string; brief: string; after?: readonly string[]; context?: readonly string[] },
+  start: { workflow: string; brief: string; after?: readonly string[]; context?: readonly string[]; files?: StartFiles },
   factory?: string | null,
-): Promise<Started> =>
-  cards
-    .start(
-      namespaceOf(card.factory),
-      card.name,
-      {
-        workflow: start.workflow,
-        brief: start.brief,
-        ...(start.after === undefined ? {} : { after: start.after }),
-        ...(start.context === undefined ? {} : { context: start.context }),
-      },
-      factory && factory !== DEFAULT_NAMESPACE ? factory : undefined,
+): Promise<Started> => {
+  const namespace = namespaceOf(card.factory);
+  const given = start.files;
+  return (given === undefined || given.listed.length === 0 ? Promise.resolve([]) : files.uploaded(namespace, given))
+    .then((inputs) =>
+      cards.start(
+        namespace,
+        card.name,
+        {
+          workflow: start.workflow,
+          brief: start.brief,
+          ...(start.after === undefined ? {} : { after: start.after }),
+          ...(start.context === undefined ? {} : { context: start.context }),
+          ...(inputs.length === 0 ? {} : { inputs }),
+        },
+        factory && factory !== DEFAULT_NAMESPACE ? factory : undefined,
+      ),
     )
     .then(({ id, card: started }) => ({ id, card: started }));
+};
 
 /**
  * Set the runs a card's run is handed as context, as the CLI's `inbox from <name> <run>...` does — or, with none, take its `from:` off, as

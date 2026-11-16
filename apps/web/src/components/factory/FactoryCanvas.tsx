@@ -659,12 +659,7 @@ function FloorOptions(props: { factory: FactoryPlace; showFinished: boolean; onS
         </Switch>
       </div>
       {!props.factory.default && (
-        <RouterLinkButton
-          to="/factories/$factory/settings"
-          params={{ factory: props.factory.name }}
-          variant="outlined"
-          size="xsmall"
-        >
+        <RouterLinkButton to="/factories/$factory/settings" params={{ factory: props.factory.name }} variant="outlined" size="xsmall">
           Settings
         </RouterLinkButton>
       )}

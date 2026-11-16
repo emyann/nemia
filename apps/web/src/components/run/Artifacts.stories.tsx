@@ -7,9 +7,9 @@ import { Artifacts } from './Artifacts';
 /** Where the api serves a file of the implement step's files directory: its path under it encoded whole, as the closeout's `url` says. */
 const servedAt = (rel: string) => `/api/runs/r-k2rq/steps/implement/artifacts/${encodeURIComponent(rel)}`;
 
-/** The picture the api answers for the nested file: a bar drawn on the look's dark ground. */
+/** The picture the api answers for the nested file: a bar on a dark ground, in the default paint alone, as a stand-in for a photo. */
 const PICTURE =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><rect width="480" height="360" fill="#14161a"/><rect x="24" y="300" width="432" height="36" fill="#3a6df0"/></svg>';
+  '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><rect width="480" height="360" fill-opacity="0.85"/><rect x="24" y="300" width="432" height="36" fill-opacity="0.3"/></svg>';
 
 /** A file of the step's files directory, served: at its top, or in a folder beneath it, by its path. */
 const served = (rel: string, kind: 'image' | 'text', size: number): StepArtifact => ({

@@ -91,6 +91,7 @@ fs.writeFileSync(path.join(wrote, 'sketch.png'), PNG);
 fs.writeFileSync(path.join(wrote, 'bundle.zip'), 'PK');
 fs.writeFileSync(path.join(wrote, '..hidden.md'), 'not reachable by name');
 fs.mkdirSync(path.join(wrote, 'scratch'), { recursive: true });
+fs.writeFileSync(path.join(wrote, 'scratch', 'kept.md'), 'Kept.\n');
 fs.writeFileSync(path.join(root, 'runs', 'f-notes', 'outside.md'), 'outside the folder');
 fs.symlinkSync(path.join(root, 'runs', 'f-notes', 'outside.md'), path.join(wrote, 'link.md'));
 fs.mkdirSync(path.join(wrote, 'given', 'inputs'), { recursive: true });
@@ -101,7 +102,7 @@ fs.writeFileSync(path.join(wrote, 'given', 'from', 'sketch', 'side.md'), 'what t
 /** A word about git, which a person reading a folder run must not meet: it has no repository, no branch and nothing to merge. */
 const GIT_WORD = /\b(branch|base|merge|merged|diff|commit|worktree|repository|repo|git)\b/i;
 
-test("a folder run read on the board: listed by its kind and place, its page with no repository and its step's folder, its decision with nothing about git, its files served by name", async (t) => {
+test("a folder run read on the board: listed by its kind and place, its page with no repository and its step's folder, its decision with nothing about git, its files served by their path", async (t) => {
   const s = story(t);
   await s.test('the runs list shows a folder run with no repository, and says its kind', async () => {
     const run = await listedOf(app(), 'f-notes');
@@ -274,7 +275,7 @@ test("a folder run read on the board: listed by its kind and place, its page wit
     const review = stepOf(run, 'review');
     assert.deepEqual([review.files, review.filesError], [[], null], 'a folder the run has not made yet is empty, and no error');
   });
-  await s.test("a folder step's file is served by name, and a name that is a path, or not in the folder, is refused", async () => {
+  await s.test("a folder step's file is served by its path, in a folder of it too, and a path out of it, or not in it, is refused", async () => {
     const base = '/api/runs/f-notes/steps/write/files';
 
     const note = await app().request(`${base}/note.md`);
@@ -294,7 +295,13 @@ test("a folder run read on the board: listed by its kind and place, its page wit
     );
     assert.deepEqual(Buffer.from(await (await app().request(`${base}/sketch.png`)).arrayBuffer()), PNG);
 
-    for (const name of ['..%2Foutside.md', 'scratch%2Fnothing.md', 'a%5Cb.md', '..hidden.md']) {
+    assert.equal(
+      await (await app().request(`${base}/scratch%2Fkept.md`)).text(),
+      'Kept.\n',
+      "a file in a folder of the step's folder is served by its path, encoded whole",
+    );
+
+    for (const name of ['..%2Foutside.md', 'scratch%2F..%2F..%2Foutside.md', 'a%5Cb.md', '..hidden.md']) {
       const res = await app().request(`${base}/${name}`);
       assert.equal(
         res.status,
@@ -303,7 +310,7 @@ test("a folder run read on the board: listed by its kind and place, its page wit
       );
       names(((await res.json()) as { error: string }).error, decodeURIComponent(name), '`/`', '`..`');
     }
-    for (const name of ['gone.md', 'scratch', 'link.md']) {
+    for (const name of ['gone.md', 'scratch', 'scratch%2Fnothing.md', 'link.md']) {
       const res = await app().request(`${base}/${name}`);
       assert.equal(res.status, 404, `${name} is not a regular file in the folder: absent, a directory, or a link that leads out of it`);
       assert.match(((await res.json()) as { error: string }).error, /has no file '.*' in its folder/, name);

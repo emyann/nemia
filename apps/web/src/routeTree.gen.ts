@@ -37,6 +37,7 @@ import { Route as WorkflowsFromWorkflowRouteImport } from './routes/workflows_.$
 import { Route as AgentsSkillsFromSkillRouteImport } from './routes/agents_.skills.$from.$skill'
 import { Route as FactoriesFactoryAgentsAgentRouteImport } from './routes/factories.$factory_.agents_.$agent'
 import { Route as FactoriesFactoryInboxNameRouteImport } from './routes/factories.$factory_.inbox_.$name'
+import { Route as FactoriesFactoryProposalsIndexRouteImport } from './routes/factories.$factory_.proposals.index'
 import { Route as FactoriesFactoryProposalsNameRouteImport } from './routes/factories.$factory_.proposals.$name'
 import { Route as FactoriesFactoryRunsIndexRouteImport } from './routes/factories.$factory_.runs.index'
 import { Route as FactoriesFactoryRunsRunIdRouteImport } from './routes/factories.$factory_.runs.$runId'
@@ -191,6 +192,12 @@ const FactoriesFactoryInboxNameRoute =
     path: '/factories/$factory/inbox/$name',
     getParentRoute: () => rootRouteImport,
   } as any)
+const FactoriesFactoryProposalsIndexRoute =
+  FactoriesFactoryProposalsIndexRouteImport.update({
+    id: '/factories/$factory_/proposals/',
+    path: '/factories/$factory/proposals/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const FactoriesFactoryProposalsNameRoute =
   FactoriesFactoryProposalsNameRouteImport.update({
     id: '/factories/$factory_/proposals/$name',
@@ -279,6 +286,7 @@ export interface FileRoutesByFullPath {
   '/factories/$factory/skills/$skill': typeof FactoriesFactorySkillsSkillRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
   '/workflows/$from/$workflow/$step': typeof WorkflowsFromWorkflowStepRoute
+  '/factories/$factory/proposals/': typeof FactoriesFactoryProposalsIndexRoute
   '/factories/$factory/runs/': typeof FactoriesFactoryRunsIndexRoute
   '/factories/$factory/workflows/$from/$workflow': typeof FactoriesFactoryWorkflowsFromWorkflowRoute
   '/factories/$factory/runs/$runId/steps/$step': typeof FactoriesFactoryRunsRunIdStepsStepRoute
@@ -318,6 +326,7 @@ export interface FileRoutesByTo {
   '/factories/$factory/skills/$skill': typeof FactoriesFactorySkillsSkillRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
   '/workflows/$from/$workflow/$step': typeof WorkflowsFromWorkflowStepRoute
+  '/factories/$factory/proposals': typeof FactoriesFactoryProposalsIndexRoute
   '/factories/$factory/runs': typeof FactoriesFactoryRunsIndexRoute
   '/factories/$factory/workflows/$from/$workflow': typeof FactoriesFactoryWorkflowsFromWorkflowRoute
   '/factories/$factory/runs/$runId/steps/$step': typeof FactoriesFactoryRunsRunIdStepsStepRoute
@@ -358,6 +367,7 @@ export interface FileRoutesById {
   '/factories/$factory_/skills_/$skill': typeof FactoriesFactorySkillsSkillRoute
   '/runs/$runId_/steps/$step': typeof RunsRunIdStepsStepRoute
   '/workflows_/$from/$workflow_/$step': typeof WorkflowsFromWorkflowStepRoute
+  '/factories/$factory_/proposals/': typeof FactoriesFactoryProposalsIndexRoute
   '/factories/$factory_/runs/': typeof FactoriesFactoryRunsIndexRoute
   '/factories/$factory_/workflows_/$from/$workflow': typeof FactoriesFactoryWorkflowsFromWorkflowRoute
   '/factories/$factory_/runs/$runId_/steps/$step': typeof FactoriesFactoryRunsRunIdStepsStepRoute
@@ -399,6 +409,7 @@ export interface FileRouteTypes {
     | '/factories/$factory/skills/$skill'
     | '/runs/$runId/steps/$step'
     | '/workflows/$from/$workflow/$step'
+    | '/factories/$factory/proposals/'
     | '/factories/$factory/runs/'
     | '/factories/$factory/workflows/$from/$workflow'
     | '/factories/$factory/runs/$runId/steps/$step'
@@ -438,6 +449,7 @@ export interface FileRouteTypes {
     | '/factories/$factory/skills/$skill'
     | '/runs/$runId/steps/$step'
     | '/workflows/$from/$workflow/$step'
+    | '/factories/$factory/proposals'
     | '/factories/$factory/runs'
     | '/factories/$factory/workflows/$from/$workflow'
     | '/factories/$factory/runs/$runId/steps/$step'
@@ -477,6 +489,7 @@ export interface FileRouteTypes {
     | '/factories/$factory_/skills_/$skill'
     | '/runs/$runId_/steps/$step'
     | '/workflows_/$from/$workflow_/$step'
+    | '/factories/$factory_/proposals/'
     | '/factories/$factory_/runs/'
     | '/factories/$factory_/workflows_/$from/$workflow'
     | '/factories/$factory_/runs/$runId_/steps/$step'
@@ -517,6 +530,7 @@ export interface RootRouteChildren {
   FactoriesFactorySkillsSkillRoute: typeof FactoriesFactorySkillsSkillRoute
   RunsRunIdStepsStepRoute: typeof RunsRunIdStepsStepRoute
   WorkflowsFromWorkflowStepRoute: typeof WorkflowsFromWorkflowStepRoute
+  FactoriesFactoryProposalsIndexRoute: typeof FactoriesFactoryProposalsIndexRoute
   FactoriesFactoryRunsIndexRoute: typeof FactoriesFactoryRunsIndexRoute
   FactoriesFactoryWorkflowsFromWorkflowRoute: typeof FactoriesFactoryWorkflowsFromWorkflowRoute
   FactoriesFactoryRunsRunIdStepsStepRoute: typeof FactoriesFactoryRunsRunIdStepsStepRoute
@@ -721,6 +735,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FactoriesFactoryInboxNameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/factories/$factory_/proposals/': {
+      id: '/factories/$factory_/proposals/'
+      path: '/factories/$factory/proposals'
+      fullPath: '/factories/$factory/proposals/'
+      preLoaderRoute: typeof FactoriesFactoryProposalsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/factories/$factory_/proposals/$name': {
       id: '/factories/$factory_/proposals/$name'
       path: '/factories/$factory/proposals/$name'
@@ -821,6 +842,7 @@ const rootRouteChildren: RootRouteChildren = {
   FactoriesFactorySkillsSkillRoute: FactoriesFactorySkillsSkillRoute,
   RunsRunIdStepsStepRoute: RunsRunIdStepsStepRoute,
   WorkflowsFromWorkflowStepRoute: WorkflowsFromWorkflowStepRoute,
+  FactoriesFactoryProposalsIndexRoute: FactoriesFactoryProposalsIndexRoute,
   FactoriesFactoryRunsIndexRoute: FactoriesFactoryRunsIndexRoute,
   FactoriesFactoryWorkflowsFromWorkflowRoute:
     FactoriesFactoryWorkflowsFromWorkflowRoute,

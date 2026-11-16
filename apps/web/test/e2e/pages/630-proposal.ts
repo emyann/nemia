@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { herChat, openChat, photograph, themeOf } from '../board.ts';
+import { herChat, openChat, photograph, placeLitOf, placeOf, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -95,17 +95,50 @@ async function approvedInChat(page: Page, name: string): Promise<void> {
   await photograph(panel, path.join(OUT, `proposal-chat-applied-${await themeOf(page)}.png`));
 }
 
-/** The floor lists the proposal, applied, and its link opens the proposal page with the same part. */
-async function listedOnFloor(page: Page, name: string): Promise<void> {
+/** The pane's Proposals, lit on the page at hand, and alone lit. */
+async function proposalsLit(page: Page, where: string): Promise<void> {
+  await expectVisible(placeOf(page, 'Proposals').and(placeLitOf(page)), `${where}: the pane's Proposals is lit`);
+  await expectCount(placeLitOf(page), 1, `${where}: and it alone`);
+}
+
+/**
+ * Waiting, the proposal is listed on the factory's proposals page, and the pane's Proposals counts it as one that waits on you; the floor
+ * draws no proposal and no template.
+ */
+async function listedWaiting(page: Page, name: string): Promise<void> {
   await goto(page, `/factories/${FACTORY}`);
+  await expectCount(page.locator('[data-factory-proposals], [data-factory-proposal]'), 0, 'the floor lists no proposal');
+  await expectCount(page.locator('[data-template]'), 0, 'nor any template');
+  await goto(page, `/factories/${FACTORY}/proposals`);
+  await expectVisible(
+    page.locator(`[data-factory-proposal="${name}"][data-proposal-phase="waiting"]`),
+    'the proposals page lists it, waiting',
+  );
+  await expectVisible(placeOf(page, 'Proposals').getByText('1 wait on you'), "the pane's Proposals counts it as waiting on you");
+  await proposalsLit(page, 'on the proposals page');
+  await settled(page);
+  await photograph(page, path.join(OUT, `proposal-list-${await themeOf(page)}.png`));
+  await goto(page, '/runs');
+}
+
+/**
+ * Applied, the proposals page lists it so and the pane's Proposals says none waits; its link opens the proposal page with the same part,
+ * Proposals still lit, whose way back leads to the proposals page.
+ */
+async function listedOnPage(page: Page, name: string): Promise<void> {
+  await goto(page, `/factories/${FACTORY}/proposals`);
   const row = page.locator(`[data-factory-proposal="${name}"][data-proposal-phase="applied"]`);
-  await expectVisible(row, 'the factory page lists the proposal, applied');
-  await photograph(page, path.join(OUT, `proposal-floor-${await themeOf(page)}.png`));
+  await expectVisible(row, 'the proposals page lists the proposal, applied');
+  await expectVisible(placeOf(page, 'Proposals').getByText('none waiting'), "the pane's Proposals says none waits on you now");
   await row.getByRole('link', { name }).click();
   await page.waitForURL((url) => url.pathname === `/factories/${FACTORY}/proposals/${name}`, { timeout: WAIT_MS });
   await expectVisible(page.locator(`[data-proposal-page] [data-proposal="${name}"][data-proposal-phase="applied"]`), 'its page draws it');
+  await proposalsLit(page, "on a proposal's page");
   await settled(page);
   await photograph(page, path.join(OUT, `proposal-page-${await themeOf(page)}.png`));
+  await page.locator('[data-back-to-proposals]').click();
+  await page.waitForURL((url) => url.pathname === `/factories/${FACTORY}/proposals`, { timeout: WAIT_MS });
+  await expectVisible(row, 'its way back leads to the proposals page');
 }
 
 /** On the settings, the form writes a delegation of the seeded agent over hires' updates; it is listed, then removed. */
@@ -194,8 +227,9 @@ async function ruledOverProposals(page: Page): Promise<void> {
 export default {
   /**
    * A factory's proposal on the board. In a factory the page writes, a proposal of Nemia's that widens access, which her message links: her
-   * chat draws it under her words with its mark, and Approve applies it there, after which it offers nothing. The factory page lists it,
-   * applied, and its link opens its page with the same part. On the factory's settings, the form writes a delegation, listed, then removed.
+   * chat draws it under her words with its mark, and Approve applies it there, after which it offers nothing. The factory's proposals page
+   * lists it, waiting, then applied, the pane's Proposals lit and counting what waits, and the floor lists none; its link opens its page
+   * with the same part, whose way back is the proposals page. On the factory's settings, the form writes a delegation, listed, then removed.
    * On Nemia's settings, her proposed rule over the factory's proposals is confirmed, read in force, then dropped. The page takes back the
    * factory, its folder of proposals and hires, and her chat, and her rules.
    */
@@ -210,8 +244,9 @@ export default {
       back = herChat({ session: 'up', said: [{ text: said(name) }] });
       await page.reload({ waitUntil: 'load' });
       await idle(page);
+      await listedWaiting(page, name);
       await approvedInChat(page, name);
-      await listedOnFloor(page, name);
+      await listedOnPage(page, name);
       await delegated(page);
       await ruledOverProposals(page);
     } finally {

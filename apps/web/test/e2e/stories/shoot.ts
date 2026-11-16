@@ -23,6 +23,10 @@
  * the theme it names or both, as `match-<id>-<theme>.png`; a target's story the change does not touch is pictured at the head too, and
  * a target naming no story's id is refused, exit 1, naming the file and the nearest ids. `stories.json`'s `matched` lists the stories
  * matched, and `matches` each match's files; `--list` prints the matches too, and composes nothing.
+ *
+ * Before it builds anything, it clears from `--out` what an earlier pass of it wrote there (`clearEarlier`): each `before-`, `after-`,
+ * `diff-`, `story-` and `match-*.png` and `stories.json`, no other file and no folder, so a step shooting again never removes them by
+ * hand and no picture of a story this pass no longer reaches is left beside the new ones. `--list` writes nothing, and clears nothing.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -293,10 +297,27 @@ async function boardAt(root: string, commit: string): Promise<string> {
   return path.join(dir, BOARD);
 }
 
+/** A file a pass of this tool writes into `--out`: a picture of a story, of the base, of a difference or of a match, and the report. */
+const EARLIER = /^(?:(?:before|after|diff|story|match)-.+\.png|stories\.json)$/;
+
+/**
+ * Removes from `out` each file an earlier pass wrote there (`EARLIER`), and no other file, no folder and nothing below it; a folder
+ * not there yet holds none. How many it removed.
+ * @param out The pictures' folder, `--out`.
+ */
+export const clearEarlier = (out: string): number => {
+  if (!fs.statSync(out, { throwIfNoEntry: false })?.isDirectory()) return 0;
+  const entries = fs.readdirSync(out, { withFileTypes: true });
+  const earlier = entries.filter((entry) => entry.isFile() && EARLIER.test(entry.name));
+  for (const entry of earlier) fs.rmSync(path.join(out, entry.name));
+  return earlier.length;
+};
+
 /** The words of `--help`, and of a refusal of the arguments. */
 const USAGE =
   'usage, from apps/web: node test/e2e/stories/shoot.ts --base <ref> --out <dir> [--targets <dir>] [--changed <path>…] [--list]; ' +
-  '--list prints the touched story ids, bare parts and matches as JSON and pictures nothing';
+  '--list prints the touched story ids, bare parts and matches as JSON and pictures nothing; without it, the pictures and ' +
+  'stories.json an earlier pass wrote in --out are removed first, so no step removes them by hand';
 
 /** The arguments `argv` gives: the flags, and the paths after `--changed`, which takes every path after it; refuses an unknown flag. */
 function argsOf(argv: readonly string[]) {
@@ -338,6 +359,8 @@ async function main(): Promise<number> {
   if (values.list) return 0;
   if (values.out === undefined) throw new Refusal(`name --out, the folder the pictures go to: ${USAGE}`);
   const out = path.resolve(values.out);
+  const cleared = clearEarlier(out);
+  console.log(`stories: ${cleared} file${cleared === 1 ? '' : 's'} an earlier pass wrote removed from ${out}`);
   fs.mkdirSync(out, { recursive: true });
   const head = git(root, ['rev-parse', 'HEAD']).trim();
   const report = {

@@ -30,7 +30,7 @@ import {
   contextEdges,
   runClock,
   standingOf,
-  TILES_FRAME,
+  RUN_PANEL,
   titleOf,
   toDecideOf,
   toggleOpen,
@@ -43,7 +43,6 @@ import {
 } from '../src/lib/factory.ts';
 import { ENDED } from '../src/lib/words.ts';
 import type { UnjudgedRun } from '../src/lib/api/judged.ts';
-import { tilesOf } from '../src/lib/flow.ts';
 import { instantWhole } from '../src/lib/instant.ts';
 import type { Point } from '../src/lib/layout.ts';
 
@@ -75,20 +74,6 @@ test("titleOf and repoName: a card's title and its repo", async (t) => {
     assert.equal(repoName('/'), '/');
   });
 });
-
-/** An open card's tiles, for steps each after the ones named, all waiting: their size is what the span reads. */
-const tiles = (steps: Record<string, string[]>) =>
-  tilesOf(
-    Object.keys(steps),
-    { roots: [], edges: Object.entries(steps).flatMap(([to, after]) => after.map((from) => ({ from, to, kind: 'after' as const }))) },
-    Object.keys(steps).map((name) => ({ name, state: 'waiting' as const, note: null, roundDue: false })),
-    false,
-  );
-/** A chain of `n` steps, each after the one before. */
-const chain = (n: number) => tiles(Object.fromEntries(Array.from({ length: n }, (_, i) => [`s${i}`, i ? [`s${i - 1}`] : []])));
-/** The e2e's fake run: two lanes, one a fan-in. implement → review → respond, implement → respond; tokens → theme. */
-const fake = tiles({ implement: [], review: ['implement'], respond: ['review', 'implement'], tokens: [], theme: ['tokens'] });
-const diamond = tiles({ plan: [], api: ['plan'], web: ['plan'], docs: ['plan'], merge: ['api', 'web', 'docs'], ship: ['merge'] });
 
 /**
  * Pairs of runs whose boxes on the floor overlap: a card's cell, or an open run's cells across and down.
@@ -244,61 +229,16 @@ test('placeRuns: where a closed card goes, fresh or as last left, and what is ke
 });
 
 test('openSpan, toggleOpen and unfoldingNow: the cells an open card spans, and when it opens', async (t) => {
-  await t.test('an open card spans its own cell and as many to the right as its tiles reach, and as many rows down', () => {
-    assert.deepEqual(openSpan(chain(1)), { columns: 2, rows: 1 });
-    assert.deepEqual(
-      openSpan(fake),
-      { columns: 3, rows: 1 },
-      "the e2e's fake run: three columns of tiles, two lanes and the arc over them",
-    );
-    assert.deepEqual(openSpan(chain(3)), { columns: 3, rows: 1 });
-    assert.deepEqual(openSpan(chain(5)), { columns: 4, rows: 1 });
-    assert.deepEqual(openSpan(chain(7)), { columns: 5, rows: 1 }, 'wider than the grid');
-    assert.deepEqual(openSpan(diamond), { columns: 4, rows: 2 }, 'three lanes are taller than a cell: the row below as well');
-    assert.deepEqual(
-      openSpan({ width: 0, height: 0 }),
-      { columns: 2, rows: 1 },
-      "never less than the card's own cell and the next: the tiles' frame alone reaches past its gap",
-    );
+  await t.test("an open card spans its panel's cells, across as far as its graph names its steps, and down its height", () => {
     const gap = CELL_WIDTH - CARD_WIDTH;
-    const across = 2 * CELL_WIDTH - gap - CARD_WIDTH - TILES_FRAME.across;
-    assert.deepEqual(
-      openSpan({ width: across, height: 88 }),
-      { columns: 2, rows: 1 },
-      "tiles whose right edge ends a gap short of a cell's edge",
-    );
-    assert.deepEqual(openSpan({ width: across + 1, height: 88 }), { columns: 3, rows: 1 }, 'tiles whose right edge ends a pixel past that');
-    const down = CELL_HEIGHT - gap - TILES_FRAME.down;
-    assert.deepEqual(openSpan({ width: 176, height: down }), { columns: 2, rows: 1 }, "tiles whose bottom ends a gap short of a row's");
-    assert.deepEqual(openSpan({ width: 176, height: down + 1 }), { columns: 2, rows: 2 }, 'tiles whose bottom ends a pixel past that');
-  });
-  await t.test("an open card's span reads its steps and their graph, not their words: a status that moves moves no card", () => {
-    const graph = {
-      roots: [],
-      edges: [
-        { from: 'a', to: 'b', kind: 'after' as const },
-        { from: 'b', to: 'a', kind: 'loop' as const, rounds: 2 },
-      ],
-    };
-    const now = tilesOf(
-      ['a', 'b'],
-      graph,
-      [
-        { name: 'a', state: 'working', note: null, roundDue: false },
-        { name: 'b', state: 'waiting', note: null, roundDue: false },
-      ],
-      false,
-    );
-    const later = tilesOf(
-      ['a', 'b'],
-      graph,
-      [
-        { name: 'a', state: 'verified', note: null, roundDue: false },
-        { name: 'b', state: 'blocked', note: 'round 2 of 2', roundDue: false },
-      ],
-      true,
-    );
-    assert.deepEqual(openSpan(later), openSpan(now));
+    const rows = Math.ceil((RUN_PANEL.height + gap) / CELL_HEIGHT);
+    assert.equal(rows, 3, 'the panel and its gate are taller than two cells');
+    assert.deepEqual(openSpan(1), { columns: 2, rows }, 'never narrower than the panel: one step takes two cells');
+    assert.deepEqual(openSpan(4), { columns: 2, rows }, "build's four steps: the panel's own width");
+    assert.deepEqual(openSpan(6), { columns: 2, rows }, 'six steps named end a gap short of the second cell');
+    assert.deepEqual(openSpan(7), { columns: 3, rows }, 'seven reach past it');
+    assert.deepEqual(openSpan(13), { columns: 4, rows }, 'wider than the grid');
+    assert.deepEqual(openSpan(0), { columns: 2, rows }, 'a run with no steps still opens its panel');
   });
   await t.test('a click opens a run, last in the order runs claim cells; another click closes it', () => {
     assert.deepEqual(toggleOpen([], 'a'), ['a']);

@@ -1,20 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import { ArrowUpRight, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { decisionQuery } from '@/lib/api/decision';
 import type { RunView } from '@/lib/api/judged';
 import { judged, type RunRow, type UnjudgedRun } from '@/lib/api/judged';
-import { type RunWaiting } from '@/lib/api/judged';
 import { TryTag } from './TryTag';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
-import { spentTitle } from '@/lib/cost';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
-import { clockCounts, repoName, runClock, titleOf, toDecideOf, waitsOnRuns, waitsOnYou } from '@/lib/factory';
-import { flowSteps, tilesOf } from '@/lib/flow';
+import { clockCounts, toDecideOf, waitsOnRuns, waitsOnYou } from '@/lib/factory';
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
 import { namespaceOf } from '@/lib/factories';
@@ -22,10 +19,8 @@ import { ENDED } from '@/lib/words';
 import { RouteLink } from '../agent/AgentParts';
 import { CardGate, type Taken } from '../inbox/CardGate';
 import { CardLift } from './LiftHold';
-import { StepTiles, type TilesRead } from '../step/StepRail';
 import { previewBar } from '../step/StepPreview';
-import { StepGraph } from '../look';
-import { NowChip } from './RunNow';
+import { Run, type PanelRead } from '../look';
 
 /**
  * `finished` is a run not in flight: on the floor only when finished runs are asked for, and dimmed.
@@ -36,10 +31,11 @@ import { NowChip } from './RunNow';
  */
 type RunNodeData = {
   run: RunRow;
+  among: readonly RunView[];
   reads: string[];
   finished: boolean;
   open: boolean;
-  detail: TilesRead | null;
+  detail: PanelRead | null;
   trouble: string | null;
   inspected: boolean;
   selected: string | null;
@@ -49,42 +45,29 @@ type RunNodeData = {
 export type RunFlowNode = Node<RunNodeData, 'run'>;
 
 /**
- * One run on the Factory floor: what was asked, where, what each step is doing — the step it is on and its workflow's graph
- * (`NowChip`, `StepGraph`) — and for how long.
+ * One run on the Factory floor, drawn by the look's run part (`Run`): at md at rest, the floor's card — factory / workflow, its title, the
+ * step it is on with its agent, round, words and budget, its clock, its workflow's graph and its cost — and at xl once the chevron opens
+ * it, the run's panel: each step named under the graph, a press on a node showing its step in the frame's bar (`data-tile`, pressed
+ * while shown), the facts, the runs it waits on and that wait on it, and the step's last line, once its run is read alone (`detail`).
+ * A click on the card shows the run in the bar, and the card is banded while it does (`lookOf`). The title opens the run's page.
+ * `w-88` is `CARD_WIDTH`, narrower than the grid's cell, which leaves the gap between cards; the panel is as wide as its graph.
  *
- * The chevron opens it: the card grows to the right with every step a tile
- * (`StepTiles`), and a tile shows its step in the frame's bar. A click on the card shows the run there, and the card is ringed while it
- * does (`lookOf`). The title opens the run's page, and is not preloaded on hover: only an open run reads its detail. `w-88` is
- * `CARD_WIDTH`, narrower than the grid's cell, which leaves the gap between cards.
- *
- * - Its clock (`runClock`) says how long the run took, or has been at work, from its first filing — its sessions' and checks' time,   a
- *   wait counted for nothing, the wall time on hover — or how long it has waited before that; it moves every second while it counts
- *   (`clockCounts`), and every 30 s otherwise.
- * - A card nobody has decided the result of is ringed, and not dimmed as a finished card is: it is the one finished card on the floor
- *   that waits for a person rather than for a machine.
- * - Beside its id, where its steps work: its repository, or folders the run made (`workspace: folder`); a try of an agent, a folder   run
- *   of the store's own, is tagged with its agent instead, since its folder is on no page.
- * - On whom a run started `--after` waits, and a person's hold on it (the CLI's `hold`), each in the CLI `ls`'s word, yours when only a
- *   person moves   it, with what to do on hover (`WaitingLine`). A hold is said instead of a gate: while it stands, nothing of the run is
- *   asked of anyone.
- * - A run that waits on runs that may still land, and on nothing else (`waitsOnRuns`), is a ghost until it starts: dimmed and dashed, as
- *   the queue lane draws a card not started, each run it waits on a link to that run.
+ * Under what the part says, the floor's own lines:
  * - What a person has to know to act, besides the gate's own `approve <step>`: a step's question, or a session the harness blocked, two
  *   lines each, whole on hover, each a link to its step on the run's page.
  * - The gate, answered here (`CardGate`). Once answered, what the card said, through the state the answer was given in and the one it
  *   moved the run to (the step approved, or the try asked), until the run moves on from that, the tick filing it, or back, the answer
  *   taken back; the answer kept from the last render is adjusted as the render that sees the new state runs.
- * - A result nobody decided, in a line that fits, whole on hover in the CLI `ls`'s words, a link to where it is decided on the run's page.
- * - Once opened: how far a run waiting on you reaches (`TouchedLine`), and why its record, which adds each tile's attempt and cost,   could
- *   not be read.
- * - In its footer, so the card is no taller for them than a line (`CELL_HEIGHT`): what it has cost, `≥` where an ended attempt has none
- *   on it; the tokens its sessions used, `≥` where one measured none, their split on hover; and on its right, or under them where both   do
- *   not fit, its chips; the hold lifted here, as the CLI's `hold --off` lifts it (`CardLift`); pruned; and how many runs it reads as
- *   context, which it does not wait on, each on hover.
- * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that   waits on
+ * - A result nobody decided, in a line that fits, whole on hover in the CLI `ls`'s words, a link to where it is decided on the run's page;
+ *   the card is banded yellow, the one finished card on the floor that waits for a person rather than for a machine.
+ * - Once opened: how far a run waiting on you reaches (`TouchedLine`), and why its record could not be read.
+ * - Its chips: a try of an agent, tagged with its agent; how many runs it reads as context; to decide; waiting on you; held, with the
+ *   hold lifted here, as the CLI's `hold --off` lifts it (`CardLift`); called off; pruned.
+ * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that waits on
  *   it leaves.
  *
- * A run the list could not judge (`UnjudgedRun`) is a bare card (`UnjudgedCard`).
+ * Its clock moves every second while it counts (`clockCounts`), and every 30 s otherwise. A run the list could not judge
+ * (`UnjudgedRun`) is a bare card (`UnjudgedCard`).
  */
 export function RunNode({ data }: NodeProps<RunFlowNode>) {
   const { run } = data;
@@ -134,81 +117,36 @@ function UnjudgedCard({ run, inspected }: { run: UnjudgedRun; inspected: boolean
 
 /** A run judged, on the floor: every part `RunNode` says. */
 function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
-  const { run, reads, finished, open, detail, trouble, inspected, selected, onToggle, onStep } = data;
+  const { run, among, reads, finished, open, detail, trouble, inspected, selected, onToggle, onStep } = data;
   const now = useNow(clockCounts(run, finished) ? 1_000 : 30_000);
   const cancelled = run.cancelledAt !== null;
-  const title = titleOf(run);
   const decide = toDecideOf(run);
-  const look = lookOf(run, finished, inspected);
+  const look = lookOf(run, inspected);
   const gate = gateOfSummary(run);
   const needs = needsOf(run).filter((need) => !(need.kind === 'approve' && need.step === gate?.step));
   const stamp = run.steps.map((step) => `${step.name}:${step.message}`).join('|');
   const [taken, setTaken] = useState<Taken | null>(null);
   if (taken && stamp !== taken.stamp && stamp !== taken.next) setTaken(taken.next === undefined ? { ...taken, next: stamp } : null);
   const said = taken && stamp === (taken.next ?? taken.stamp) ? taken.said : null;
-  const clock = runClock(run, now, finished);
-  const names = useMemo(() => run.steps.map((step) => step.name), [run.steps]);
-  const edgeSteps = useMemo(() => flowSteps(run), [run]);
-  const tiles = useMemo(
-    () => (open ? tilesOf(names, run.graph, edgeSteps, cancelled) : null),
-    [open, names, run.graph, edgeSteps, cancelled],
-  );
-
+  const asOf = new Date(now);
   return (
-    <Card size="sm" {...look.marks} className={`w-fit flex-row items-start gap-0 shadow-sm transition-opacity ${look.className}`}>
-      <div className="flex w-88 shrink-0 flex-col gap-3">
-        <div className="min-w-0 px-3">
-          <CardTitle run={run} title={title} open={open} onToggle={onToggle} />
-          <p className="mt-0.5 flex items-center justify-between gap-2 text-body-small text-muted-foreground">
-            <span className="truncate font-mono" title={run.id}>
-              {run.id}
-            </span>
-            {run.try ? (
-              <TryTag agent={run.try.agent} />
-            ) : (
-              <span
-                className="shrink-0"
-                title={run.repo ?? (run.work ? `Its steps work in folders under ${run.work}` : 'Its steps work in folders the run made')}
-              >
-                {run.repo ? repoName(run.repo) : 'folders'}
-              </span>
-            )}
-          </p>
-          {run.waiting && <WaitingLine waiting={run.waiting} ghost={look.ghost} />}
-          {run.holding && (
-            <p
-              data-holding={run.holding.waitingOnYou ? 'on-you' : 'on-runs'}
-              title={`${run.holding.word}\n${run.holding.advice}`}
-              className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${run.holding.waitingOnYou ? 'text-yours' : 'text-muted-foreground'}`}
-            >
-              {run.holding.word}
-            </p>
-          )}
-        </div>
-
-        <NowLine run={run} now={now} />
-
-        {needs.length > 0 && (
-          <ul aria-label="Needs" className="space-y-0.5 px-3 text-body-small">
-            {needs.map((need) => (
-              <li key={need.step} title={needLine(need)} className="line-clamp-2 break-words">
-                <RouteLink
-                  to="/runs/$runId"
-                  params={{ runId: run.id }}
-                  hash={stepAnchor(need.step)}
-                  data-need={need.kind}
-                  data-step={need.step}
-                  className="nodrag text-yours hover:underline"
-                >
-                  {needLine(need)}
-                </RouteLink>
-              </li>
-            ))}
-          </ul>
-        )}
-
+    <div {...look.marks} className={open ? 'w-fit min-w-120' : 'w-88'}>
+      <Run
+        run={run}
+        size={open ? 'xl' : 'md'}
+        layout="card"
+        asOf={asOf}
+        among={among}
+        wrap={previewBar(run, asOf)}
+        read={detail}
+        pick={{ selected, onStep: (step) => onStep(run.id, step) }}
+        ringed={look.ringed}
+        still="nodrag"
+        titleEnd={<Chevron run={run} open={open} onToggle={onToggle} />}
+      >
+        {needs.length > 0 && <Needs run={run} needs={needs} />}
         {said ? (
-          <p data-taken className="px-3 text-body-small break-words text-muted-foreground">
+          <p data-taken className="m-0 text-body-small break-words text-on-surface-variant">
             {said}
           </p>
         ) : gate ? (
@@ -220,131 +158,89 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
             onTaken={setTaken}
           />
         ) : null}
-
-        {decide?.kind === 'result' && !cancelled && (
-          <p title={decide.said} className="line-clamp-2 px-3 text-body-small break-words">
-            <RouteLink
-              to="/runs/$runId"
-              params={{ runId: run.id }}
-              hash="decide"
-              data-to-decide="result"
-              className="nodrag text-yours hover:underline"
-            >
-              {decideLine(decide.branches)}
-            </RouteLink>
-          </p>
-        )}
-
+        {decide?.kind === 'result' && !cancelled && <DecideLine run={run} said={decide.said} branches={decide.branches} />}
         {open && run.waitingOnYou.length > 0 && <TouchedLine run={run} />}
-
-        {open && trouble && <p className="px-3 text-body-small text-failure">{trouble}</p>}
-
-        <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t px-3 pt-2">
-          <Took run={run} clock={clock} />
-          <Chips run={run} decide={decide !== null} cancelled={cancelled} reads={reads} />
-        </div>
-      </div>
-
-      {tiles && <StepTiles run={run} detail={detail} flow={tiles} selected={selected} onStep={(step) => onStep(run.id, step)} />}
-
+        {open && trouble && <p className="m-0 text-body-small text-failure">{trouble}</p>}
+        <Chips run={run} decide={decide !== null} cancelled={cancelled} reads={reads} />
+      </Run>
       <Handle type="target" position={Position.Left} isConnectable={false} className="opacity-0" />
       <Handle type="source" position={Position.Right} isConnectable={false} className="opacity-0" />
-    </Card>
-  );
-}
-
-/** The step a run is on, as the runs row says it, over its workflow's graph, each node a button that opens its step's card at `now`. */
-function NowLine({ run, now }: { run: RunView; now: number }) {
-  return (
-    <div data-run-now className="flex min-w-0 flex-col gap-2 px-3">
-      <NowChip run={run} />
-      <StepGraph run={run} className="nodrag" wrap={previewBar(run, new Date(now))} />
     </div>
   );
 }
 
-/**
- * A run card's title line: its title, a link to the run's page, not preloaded; and the chevron that opens or
- * closes its steps (`onToggle`). Neither button drags the card nor shows the run in the bar.
- */
-function CardTitle({ run, title, open, onToggle }: { run: RunView; title: string; open: boolean; onToggle: (runId: string) => void }) {
+/** What a person has to know to act, besides the gate's own `approve <step>`: two lines each, whole on hover, each a link to its step. */
+function Needs({ run, needs }: { run: RunView; needs: ReturnType<typeof needsOf> }) {
   return (
-    <div className="flex items-center gap-1">
-      <Link
+    <ul aria-label="Needs" className="m-0 list-none space-y-0.5 p-0 text-body-small">
+      {needs.map((need) => (
+        <li key={need.step} title={needLine(need)} className="line-clamp-2 break-words">
+          <RouteLink
+            to="/runs/$runId"
+            params={{ runId: run.id }}
+            hash={stepAnchor(need.step)}
+            data-need={need.kind}
+            data-step={need.step}
+            className="nodrag text-yours hover:underline"
+          >
+            {needLine(need)}
+          </RouteLink>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** A result nobody decided, in a line that fits, whole on hover, a link to where it is decided on the run's page. */
+function DecideLine({ run, said, branches }: { run: RunView; said: string; branches: Parameters<typeof decideLine>[0] }) {
+  return (
+    <p title={said} className="m-0 line-clamp-2 text-body-small break-words">
+      <RouteLink
         to="/runs/$runId"
         params={{ runId: run.id }}
-        preload={false}
-        title={title}
-        className="nodrag block min-w-0 flex-1 truncate text-body-medium font-semibold hover:underline"
+        hash="decide"
+        data-to-decide="result"
+        className="nodrag text-yours hover:underline"
       >
-        {title}
-      </Link>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-label={open ? 'Hide steps' : 'Show steps'}
-        title={open ? 'Hide its steps' : 'Open its steps'}
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggle(run.id);
-        }}
-        className="nodrag -mr-1.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-      >
-        <ChevronRight aria-hidden className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-    </div>
-  );
-}
-
-/** How a ghost's card is drawn: dashed and sunk into the floor, as `QueueLane` draws a card not started, its text as readable as any. */
-const GHOST = 'border border-dashed border-outline bg-background shadow-none';
-
-/** How a run's card is drawn: whether it is a ghost, its classes, and the marks a check reads it by, a ghost's and the one inspected. */
-type Look = { ghost: boolean; className: string; marks: { 'data-ghost-run'?: true; 'data-inspected'?: true } };
-
-/**
- * How a run's card is drawn: ringed in the focus colour, and marked, while the frame's bar shows it (`inspected`), and drawn whole, so a
- * finished card or a ghost is read as clearly as the bar beside it; else ringed while a person has its result to decide (`toDecideOf`),
- * the one finished card that waits for a person; else a ghost while it waits on runs and nothing else (`waitsOnRuns`); else dimmed once
- * `finished`.
- */
-function lookOf(run: RunView, finished: boolean, inspected: boolean): Look {
-  const ghost = waitsOnRuns(run);
-  const marks = { ...(ghost && { 'data-ghost-run': true as const }), ...(inspected && { 'data-inspected': true as const }) };
-  if (inspected) return { ghost, className: 'ring-2 ring-ring', marks };
-  if (toDecideOf(run)) return { ghost: false, className: 'ring-1 ring-yours/60', marks: {} };
-  if (ghost) return { ghost, className: GHOST, marks };
-  return { ghost, className: finished ? 'bg-background shadow-none' : '', marks };
-}
-
-/**
- * What a run started `--after` runs waits on, in the CLI `ls`'s word (`waiting.word`), with what the CLI's `decide` says on hover. Yours
- * when only a person moves it; on a ghost's card (`ghost`), after the word an arrow to each run it waits on, named by its label, so the
- * word names each run once.
- */
-function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }) {
-  return (
-    <p
-      data-waiting={waiting.waitingOnYou ? 'on-you' : 'on-runs'}
-      title={waiting.advice}
-      className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${waiting.waitingOnYou ? 'text-yours' : 'text-muted-foreground'}`}
-    >
-      {waiting.word}
-      {ghost &&
-        waiting.runs.map(({ run }) => (
-          <RouteLink
-            key={run}
-            to="/runs/$runId"
-            params={{ runId: run }}
-            data-waits-on={run}
-            aria-label={`Open ${run}`}
-            className="nodrag ml-1 inline-flex align-middle text-foreground/80 hover:text-foreground"
-          >
-            <ArrowUpRight aria-hidden className="size-3.5" />
-          </RouteLink>
-        ))}
+        {decideLine(branches)}
+      </RouteLink>
     </p>
   );
+}
+
+/** The chevron after a card's title, which opens or closes its steps (`onToggle`): it neither drags the card nor shows the run in the bar. */
+function Chevron({ run, open, onToggle }: { run: RunView; open: boolean; onToggle: (runId: string) => void }) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={open ? 'Hide steps' : 'Show steps'}
+      title={open ? 'Hide its steps' : 'Open its steps'}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle(run.id);
+      }}
+      className="nodrag relative z-10 -mr-1.5 shrink-0 rounded p-0.5 text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface"
+    >
+      <ChevronRight aria-hidden className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+    </button>
+  );
+}
+
+/** How a run's card is drawn: the marks a check reads it by, a ghost's and the one inspected, and the band around it, if any. */
+type Look = { ringed?: 'focus' | 'yours'; marks: { 'data-ghost-run'?: true; 'data-inspected'?: true } };
+
+/**
+ * How a run's card is drawn: banded in the focus colour, and marked, while the frame's bar shows it (`inspected`); else banded yellow
+ * while a person has its result to decide (`toDecideOf`), the one finished card that waits for a person. A ghost, a run that waits on
+ * runs and nothing else (`waitsOnRuns`), is marked: its part's tone draws it outlined, waiting.
+ */
+function lookOf(run: RunView, inspected: boolean): Look {
+  const ghost = waitsOnRuns(run);
+  const marks = { ...(ghost && { 'data-ghost-run': true as const }), ...(inspected && { 'data-inspected': true as const }) };
+  if (inspected) return { ringed: 'focus', marks };
+  if (toDecideOf(run)) return { ringed: 'yours', marks: {} };
+  return { marks };
 }
 
 /** What a run waiting on you touched, in a line: `touched 2 packages · +979 −12`, from its decision, read once for its state. */
@@ -367,36 +263,13 @@ function TouchedLine({ run }: { run: RunView }) {
 }
 
 /**
- * What a run took, at the left of its card's footer: its clock (`runClock`), with the times in full on hover; what it has cost, `≥`
- * where an ended attempt has none on it; and the tokens its sessions used, their split on hover. Each figure only once there is one.
- */
-function Took({ run, clock }: { run: RunView; clock: ReturnType<typeof runClock> }) {
-  return (
-    <span className="flex min-w-0 items-baseline gap-1.5 font-mono text-body-small text-muted-foreground">
-      <time dateTime={clock.at} title={clock.title} className="truncate">
-        {clock.words}
-      </time>
-      {run.cost && (
-        <span data-cost title={spentTitle(run.cost, "the run's tries")} className="shrink-0 text-foreground">
-          · {run.cost.said}
-        </span>
-      )}
-      {run.tokens && (
-        <span data-tokens title={run.tokens.split} className="shrink-0 text-foreground">
-          · {run.tokens.said}
-        </span>
-      )}
-    </span>
-  );
-}
-
-/**
- * A card's chips, on the right of its footer: how many runs it reads as context, each on hover (`reads`); to decide (`decide`); waiting on
+ * A card's chips, at its foot: a try of an agent, tagged with its agent, since its folder is on no page; how many runs it reads as context, each on hover (`reads`); to decide (`decide`); waiting on
  * you; held, with the hold lifted here (`CardLift`); `cancelled`; and pruned.
  */
 function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolean; cancelled: boolean; reads: string[] }) {
   return (
-    <span className="ml-auto flex items-center gap-1">
+    <span className="ml-auto flex flex-wrap items-center justify-end gap-1 empty:hidden">
+      {run.try && <TryTag agent={run.try.agent} />}
       {run.context.length > 0 && (
         <Badge variant="outline" data-context title={reads.join('\n')} className="text-muted-foreground">
           ⧉ reads {run.context.length} {run.context.length === 1 ? 'run' : 'runs'}

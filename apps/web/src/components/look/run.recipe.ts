@@ -76,7 +76,7 @@ export const runRecipe = tv({
         base: 'flex flex-col gap-1.5 pt-[11px] pr-4 pb-2 pl-3.5',
         head: 'justify-between gap-2 text-label-small tracking-[0.1em] text-outline uppercase',
         title: 'line-clamp-2 text-body-medium',
-        agent: 'text-body-small',
+        agent: 'min-w-0 shrink truncate text-body-small',
         clock: 'text-body-small',
         foot: 'justify-between',
       },

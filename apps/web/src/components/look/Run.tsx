@@ -12,12 +12,13 @@ import { nowOf, presentWait, type Now } from '@/lib/runWords';
 import { says, type RunLayout, type RunSays, type RunSize } from '@/lib/runSays';
 import { ENDED, OPENS } from '@/lib/words';
 import { CutButton } from './CutButton';
+import { cutRing } from './cut';
 import { CutFrame, FRAMED_ROW, type FrameHue } from './CutFrame';
 import { runRecipe, type RunTone } from './run.recipe';
 import { RunClock, RunCost } from './RunFigures';
 import { Chip, Fan, Pips, Ring, RunMark, Words } from './RunMarks';
 import { RunMeta } from './RunMeta';
-import { Facts, NamedGraph, PanelFoot, RunsWaiting, type PanelRead } from './RunPanel';
+import { Facts, NamedGraph, PanelFoot, pickWrap, RunsWaiting, type PanelRead } from './RunPanel';
 import { StepGraph } from './StepGraph';
 import { TextLink } from './TextLink';
 
@@ -37,10 +38,18 @@ export type RunProps = {
   wrap?: GraphWrap;
   read?: PanelRead | null;
   titleEnd?: ReactNode;
+  pick?: StepPick;
+  ringed?: 'focus' | 'yours';
   still?: string;
   children?: ReactNode;
   className?: string;
 };
+
+/** The step a panel's press shows, and what a press on a node does with its step: the floor shows it in its bar. */
+type StepPick = { selected: string | null; onStep: (step: string) => void };
+
+/** The band around a card, in the cut's shape, a few pixels off its edge: the focus colour while it is shown, yellow while it is to decide. */
+const RING: Record<'focus' | 'yours', string> = { focus: 'bg-ring', yours: 'bg-yours/60' };
 
 /** Each tone's frame: its edge in the tone's hue where it is at work, waits on you or failed; the line's ink for the rest. */
 const HUE: Record<RunTone, FrameHue> = { alive: 'alive', yours: 'yours', failure: 'failure', waits: 'none', rest: 'none' };
@@ -83,7 +92,8 @@ const saying = (...things: RunSays[]) => ({ 'data-run-says': things.join(' ') })
  * - **xl**, a panel: and each step named under the graph, the facts, the runs it waits on and that wait on it, and the step's last line
  *   from `read`, the run read alone.
  *
- * `asOf` is the instant its clock is said at. `titleEnd` stands after the title (the floor's chevron), `children` under what the part
+ * `asOf` is the instant its clock is said at. `pick` makes each node of the panel's graph a button that shows its step (`data-tile`,
+ * pressed while it is the step shown); `ringed` draws a band in the cut's shape around a card, the focus colour or yellow. `titleEnd` stands after the title (the floor's chevron), `children` under what the part
  * says (the floor's lines), and `still` is the class of every control the part draws (`nodrag` on the floor). A finished run is drawn at
  * rest, by its last step and how it ended.
  */
@@ -248,14 +258,38 @@ function RunRow({ run, asOf, among = [], wrap, still, look }: RunProps & { look:
 }
 
 /** The run in its cut frame, in its tone: its edge, its ground, and the glow of a card at lg and up that waits on you. */
-function Framed({ run, look, size, className, children }: { run: PartRun; look: Look; size: 'md' | 'lg' | 'xl'; className?: string; children: ReactNode }) {
+function Framed({
+  run,
+  look,
+  size,
+  ringed,
+  className,
+  children,
+}: {
+  run: PartRun;
+  look: Look;
+  size: 'md' | 'lg' | 'xl';
+  ringed?: 'focus' | 'yours';
+  className?: string;
+  children: ReactNode;
+}) {
   const tone = look.now.tone;
   return (
-    <CutFrame hue={HUE[tone]} size={CUT[size]} ground={look.s.ground()} glow={tone === 'yours' && size !== 'md'} className={className}>
+    <span className="relative block">
+      {ringed && (
+        <span
+          aria-hidden="true"
+          data-ringed={ringed}
+          className={cn('pointer-events-none absolute -inset-[5px]', RING[ringed])}
+          style={{ clipPath: cutRing(CUT[size], 2, 2) }}
+        />
+      )}
+      <CutFrame hue={HUE[tone]} size={CUT[size]} ground={look.s.ground()} glow={tone === 'yours' && size !== 'md'} className={className}>
       <article aria-label={look.title} data-run={run.id} data-now={tone} data-tone={tone} data-size={size} className={look.s.base()}>
         {children}
       </article>
     </CutFrame>
+    </span>
   );
 }
 
@@ -273,11 +307,11 @@ function Eyebrow({ run }: { run: PartRun }) {
 }
 
 /** The run as a card at md, the floor's: its eyebrow, its title on two lines, its step now and its graph over its cost. */
-function RunCard({ run, asOf, among, wrap, titleEnd, still, children, className, look }: RunProps & { look: Look; among: readonly PartRun[] }) {
+function RunCard({ run, asOf, among, wrap, titleEnd, ringed, still, children, className, look }: RunProps & { look: Look; among: readonly PartRun[] }) {
   const { s, now } = look;
   const waiters = waitersOf(among, run.id).length;
   return (
-    <Framed run={run} look={look} size="md" className={className}>
+    <Framed run={run} look={look} size="md" ringed={ringed} className={className}>
       <span className={s.head()}>
         <Eyebrow run={run} />
         <span className="inline-flex shrink-0 items-center gap-2 tracking-normal normal-case">
@@ -313,12 +347,12 @@ function RunCard({ run, asOf, among, wrap, titleEnd, still, children, className,
 
 /** The run as a card at lg or a panel at xl: its meta line, its title, its step now, then its graph and Open run, or the panel's parts. */
 function RunBig(props: RunProps & { look: Look; among: readonly PartRun[] }) {
-  const { run, size, asOf, among, wrap, titleEnd, still, children, className, look } = props;
+  const { run, size, asOf, among, wrap, titleEnd, ringed, still, children, className, look } = props;
   const { s, now } = look;
   const xl = size === 'xl';
   const waiters = waitersOf(among, run.id).length;
   return (
-    <Framed run={run} look={look} size={xl ? 'xl' : 'lg'} className={className}>
+    <Framed run={run} look={look} size={xl ? 'xl' : 'lg'} ringed={ringed} className={className}>
       <span {...saying('id', 'where', 'labels')} className={cn(s.head(), 'flex')}>
         <RunMeta run={run} whole={xl} />
       </span>
@@ -357,12 +391,12 @@ function RunBig(props: RunProps & { look: Look; among: readonly PartRun[] }) {
 }
 
 /** What the panel adds under the step now: each step named under the graph, the facts, the runs, the last line and Open run. */
-function PanelParts({ run, asOf, among, wrap, read = null, still, look }: RunProps & { look: Look; among: readonly PartRun[] }) {
+function PanelParts({ run, asOf, among, wrap, pick, read = null, still, look }: RunProps & { look: Look; among: readonly PartRun[] }) {
   const waiters = waitersOf(among, run.id);
   return (
     <>
       <span {...saying('graph', 'named')} className={look.s.steps()}>
-        <NamedGraph run={run} read={read} now={asOf.getTime()} wrap={wrap} />
+        <NamedGraph run={run} read={read} now={asOf.getTime()} wrap={pick ? pickWrap(pick, still) : wrap} />
       </span>
       <span {...saying('facts', 'clock', 'cost')} className="contents">
         <Facts run={run} now={nowOf(run)} asOf={asOf} clock={<ClockSaid run={run} look={look} asOf={asOf} />} className={look.s.facts()} />

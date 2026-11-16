@@ -26,8 +26,8 @@ function Named({ name, named, mark, x, y }: { name: string; named?: StepNamed; m
   return (
     <span
       data-named={name}
-      className="absolute flex w-24 flex-col items-center text-center leading-tight"
-      style={{ left: x - 48, top: y + 2 }}
+      className="absolute flex w-22 flex-col items-center text-center leading-tight"
+      style={{ left: x - 44, top: y + 2 }}
     >
       <span className={cn('truncate text-label-small tracking-[0.08em] uppercase', (mark && NAME_INK[mark]) ?? 'text-on-surface')}>
         {name}
@@ -230,7 +230,14 @@ export function StepGraph({
         {named &&
           layout.points.map((point) =>
             point.kind === 'step' ? (
-              <Named key={point.id} name={point.names[0]} named={named.get(point.names[0])} mark={at.get(point.names[0])?.mark} x={point.x} y={layout.height} />
+              <Named
+                key={point.id}
+                name={point.names[0]}
+                named={named.get(point.names[0])}
+                mark={at.get(point.names[0])?.mark}
+                x={Math.min(Math.max(point.x, 44), layout.width - 44)}
+                y={layout.height}
+              />
             ) : null,
           )}
       </div>

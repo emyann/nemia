@@ -1,12 +1,11 @@
 /**
- * A run's steps laid out (src/lib/flow.ts), two tables: its graph drawn small, folded around its live column (`graphOf`), and the tiles
- * of a run on the Factory opened.
+ * A run's steps laid out (src/lib/flow.ts): its graph drawn small, folded around its live column (`graphOf`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { GraphEdge, RunGraph } from '../src/lib/api/graph.ts';
 import type { EdgeStep } from '../src/lib/canvas.ts';
-import { graphOf, GRAPH_SLOTS, tilesOf, TILE, UNGRAPHED, windowOf, type Flow, type StepGraphLayout } from '../src/lib/flow.ts';
+import { graphOf, GRAPH_SLOTS, UNGRAPHED, windowOf, type StepGraphLayout } from '../src/lib/flow.ts';
 import type { StepState } from '../src/lib/status.ts';
 
 const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
@@ -15,56 +14,6 @@ const graphOfEdges = (...edges: GraphEdge[]): RunGraph => ({ roots: [], edges })
 const stepsOf = (states: Record<string, StepState>, notes: Record<string, string> = {}, due: string[] = []): EdgeStep[] =>
   Object.entries(states).map(([name, state]) => ({ name, state, note: notes[name] ?? null, roundDue: due.includes(name) }));
 
-/** Each column's pills, left first, top to bottom: what the rail reads as. */
-const read = (flow: Flow): string[][] => {
-  const xs = [...new Set(flow.pills.map((p) => p.x))].sort((a, b) => a - b);
-  return xs.map((x) =>
-    flow.pills
-      .filter((p) => p.x === x)
-      .sort((a, b) => a.y - b.y)
-      .map((p) => p.label),
-  );
-};
-
-test('tilesOf: a run opened, every step a tile', async (t) => {
-  await t.test('a loop past its first round says the round it is on, under the middle of its curve, below the tiles', () => {
-    const names = ['implement', 'review'];
-    const graph = graphOfEdges(after('implement', 'review'), loop('review', 'implement'));
-    const tiles = tilesOf(
-      names,
-      graph,
-      stepsOf({ implement: 'verified', review: 'working' }, { implement: 'round 2 of 3', review: 'round 2 of 3' }),
-      false,
-    );
-    const back = tiles.arrows.find((a) => a.loop)!;
-    assert.equal(back.round?.text, 'round 2 of 3');
-    const [a, b] = tiles.pills;
-    assert.equal(back.round.x, (a.x + a.width / 2 + b.x + b.width / 2) / 2);
-    assert.ok(back.round.y > Math.max(...tiles.pills.map((p) => p.y + p.height)), 'under the tiles, where the curve is');
-    const first = tilesOf(names, graph, stepsOf({ implement: 'working', review: 'waiting' }, { implement: 'round 1 of 3' }), false);
-    assert.equal(first.arrows.find((a) => a.loop)!.round, null, 'on its first round, a loop says nothing of it');
-    assert.ok(
-      tiles.arrows.filter((a) => !a.loop).every((a) => a.round === null),
-      'an `after` arrow never says a round',
-    );
-  });
-  await t.test('opened, every step is a tile, nothing folded or counted', () => {
-    const chain = ['a', 'b', 'c', 'd', 'e', 'f'];
-    const graph = graphOfEdges(
-      ...chain.slice(1).map((name, i) => after(chain[i], name)),
-      after('a', 'x'),
-      after('a', 'y'),
-      after('a', 'z'),
-      after('a', 'w'),
-    );
-    const names = [...chain, 'x', 'y', 'z', 'w'];
-    const flow = tilesOf(names, graph, stepsOf(Object.fromEntries(names.map((n) => [n, 'waiting' as const]))), false);
-    assert.deepEqual(read(flow), [['a'], ['b', 'x', 'y', 'z', 'w'], ['c'], ['d'], ['e'], ['f']]);
-    assert.ok(flow.pills.every((p) => p.kind === 'step' && p.width === TILE.width && p.height === TILE.height));
-    assert.equal(flow.width, 6 * TILE.width + 5 * TILE.gap);
-    assert.equal(flow.height, 5 * TILE.height + 4 * TILE.lane);
-  });
-});
 
 /** Each column's points, left first, top to bottom: what the graph reads as. */
 const readGraph = (g: StepGraphLayout): string[][] => {
@@ -222,7 +171,7 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
     assert.deepEqual(readGraph(g), [['implement'], ['review']]);
     assert.equal(g.lines.length, 0);
     assert.equal(g.error, UNGRAPHED);
-    assert.equal(tilesOf(['implement'], { roots: [] } as unknown as RunGraph, stepsOf({ implement: 'working' }), false).error, UNGRAPHED);
+    assert.equal(graphOf(['implement'], { roots: [] } as unknown as RunGraph, stepsOf({ implement: 'working' }), [], false).error, UNGRAPHED);
   });
   await t.test("a cycle in the steps' after is the run's order, no lines, and says why", () => {
     const g = graphOf(['a', 'b'], graphOfEdges(after('a', 'b'), after('b', 'a')), stepsOf({ a: 'waiting', b: 'waiting' }), [], false);

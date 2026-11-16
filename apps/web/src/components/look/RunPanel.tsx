@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import type * as RunObject from 'objects';
-import { cn } from '@/components/ui/ds/utils';
+import { Button as AriaButton } from 'react-aria-components';
+import { cn, focusRing } from '@/components/ui/ds/utils';
 import type { RunView } from '@/lib/api/judged';
-import { attemptLine, isLive } from '@/lib/canvas';
+import { isLive } from '@/lib/canvas';
+import { durationWords } from '@/lib/duration';
 import { dollars } from '@/lib/money';
 import { instantWords } from '@/lib/instant';
 import { ink } from '@/lib/meaning';
@@ -24,9 +26,17 @@ export type PanelRead = {
 /** The run the panel draws beside what the part draws for every size. */
 type PanelRun = RunView;
 
+/** How long a step's latest attempt took, to the minute, or has run while it runs; none before its first or where it has no end. */
+const tookOf = (attempts: PanelRead['steps'][number]['attempts'], live: boolean, now: number): string | null => {
+  const latest = attempts.latest;
+  if (!latest) return null;
+  const end = latest.endedAt ? Date.parse(latest.endedAt) : live ? now : null;
+  return end === null ? null : durationWords(end - Date.parse(latest.startedAt), 'minute');
+};
+
 /**
  * Each step as the panel names it under its node: its agent as the run froze it, and once read its latest attempt's time and its cost
- * (`attemptLine`, `costText`), said at `now`.
+ * to the minute, and what its tries spent, said at `now`.
  */
 export function namedSteps(run: PanelRun, read: PanelRead | null, now: number): ReadonlyMap<string, StepNamed> {
   const drawn = railStates(run.steps, run.cancelledAt !== null, run.holding != null);
@@ -34,7 +44,7 @@ export function namedSteps(run: PanelRun, read: PanelRead | null, now: number): 
   return new Map(
     run.steps.map((step, i) => {
       const got = reads.get(step.name);
-      const time = got ? attemptLine(got.attempts, isLive(drawn[i]?.state ?? 'unknown'), now)?.replace(/^#\d+ · /, '') : null;
+      const time = got ? tookOf(got.attempts, isLive(drawn[i]?.state ?? 'unknown'), now) : null;
       const cost = got?.spent?.said ?? null;
       return [step.name, { agent: step.spec?.agent ?? null, said: [time, cost].filter(Boolean).join(' · ') }];
     }),
@@ -171,3 +181,24 @@ export function NamedGraph({
 }) {
   return <StepGraph run={run} wrap={wrap} width={Math.max(400, run.steps.length * 104)} named={namedSteps(run, read, now)} />;
 }
+
+/**
+ * What wraps each node of the panel's graph where a press shows its step: a button, `data-tile` its step, pressed while it is the
+ * step shown, that hands its step to `onStep`; `still` its class (`nodrag` on the floor).
+ * @param pick The step shown, and what a press does with a step.
+ * @param still The class of the button.
+ */
+export const pickWrap =
+  (pick: { selected: string | null; onStep: (step: string) => void }, still?: string) =>
+  (node: ReactNode, step: { name: string; state: string }): ReactNode => (
+    <AriaButton
+      data-tile={step.name}
+      data-state={step.state}
+      aria-label={`Inspect step ${step.name}`}
+      aria-pressed={pick.selected === step.name}
+      onPress={() => pick.onStep(step.name)}
+      className={cn('grid size-full cursor-pointer place-items-center rounded-sm aria-pressed:bg-surface-container-highest', focusRing(), still)}
+    >
+      {node}
+    </AriaButton>
+  );

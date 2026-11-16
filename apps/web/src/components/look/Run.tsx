@@ -98,6 +98,7 @@ const saying = (...things: RunSays[]) => ({ 'data-run-says': things.join(' ') })
  * pressed while it is the step shown); `ringed` draws a band in the cut's shape around a card, the focus colour or yellow. `titleEnd`
  * stands after the title (the floor's chevron), `children` under what the part says (the floor's lines), and `still` is the class of every
  * control the part draws (`nodrag` on the floor). A finished run is drawn at rest, by its last step and how it ended.
+ * @param props The run, the size to draw it at, and what the surface gives it (`RunProps`).
  */
 export function Run(props: RunProps) {
   const { run, size, among = [] } = props;

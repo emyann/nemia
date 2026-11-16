@@ -13,8 +13,21 @@ const [GAP, RING] = [2, 3];
 /** What the element that is the button wears, a link or a press alike: clipped by nothing, its ring and its shape laid inside it. */
 const HOLDER = 'group/cut relative inline-flex outline-none';
 
-/** The quiet form's ground and ink: no ground, the surface's ink, inside a hairline in the outline's colour. */
-const QUIET = 'text-on-surface ring-1 ring-outline ring-inset';
+/** The quiet form's ground and ink: no ground, the surface's ink; its hairline is a shape of its own (`HAIRLINE`). */
+const QUIET = 'text-on-surface';
+
+/**
+ * The clip that leaves the quiet form's hairline: a band one pixel wide along the inside of the button's cut shape, both cuts too, as
+ * a cut frame's edge runs outside its ground (`cutPoints(size, 1)`). `cutRing` grows the shape it rings by 2 − √2 for each pixel of
+ * its gap and its width, so the shape it is given is the button's cut less that, and its outer edge is the button's own.
+ */
+const HAIRLINE = cutRing(CUT - (2 - Math.SQRT2), 0, 1);
+
+/**
+ * The hairline's paint, the outline's colour as an image: a ground colour under the words would be taken by the accessibility check,
+ * which reads no clip, as the words' ground, where the card's shows.
+ */
+const HAIRLINE_PAINT = 'linear-gradient(var(--md-sys-color-outline), var(--md-sys-color-outline))';
 
 /** The ground and the ink of a press that is disabled, as Material draws a disabled filled button: 12 % and 38 % of the surface's ink. */
 const DISABLED = 'bg-on-surface/12 text-on-surface/38';
@@ -23,8 +36,9 @@ const DISABLED = 'bg-on-surface/12 text-on-surface/38';
  * What the look's filled button draws inside the element that is the button, a link or a press alike: its focus ring, a band in the
  * cut shape around it, as wide and as far as the kit's ring and shown with the keyboard on it; then its words on a shape of its own,
  * the top-right and bottom-left corners cut, exactly the button's box, in the hue of what waits on a person, with a state layer in
- * its ink. `quiet` draws it smaller, with no ground, in the surface's ink inside a hairline, for a button beside what already says
- * the wait; `disabled` draws the shape in the disabled ground and ink, with no state layer and no ring.
+ * its ink. `quiet` draws it smaller, with no ground, in the surface's ink inside a hairline along the whole cut shape, both cuts
+ * too, for a button beside what already says the wait; `disabled` draws the shape in the disabled ground and ink, with no state
+ * layer and no ring.
  */
 function Body({ disabled = false, quiet = false, children }: { disabled?: boolean; quiet?: boolean; children: string }) {
   return (
@@ -46,6 +60,14 @@ function Body({ disabled = false, quiet = false, children }: { disabled?: boolea
         )}
         style={{ clipPath: cutShape(CUT) }}
       >
+        {quiet && !disabled && (
+          <span
+            aria-hidden="true"
+            data-cut-hairline
+            className="pointer-events-none absolute inset-0"
+            style={{ clipPath: HAIRLINE, backgroundImage: HAIRLINE_PAINT }}
+          />
+        )}
         {!disabled && (
           <span
             aria-hidden="true"

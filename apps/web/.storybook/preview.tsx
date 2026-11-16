@@ -7,8 +7,9 @@
  * A page body's queries resolve against a query client made once for each story, retrying nothing, so a refused read is said at once;
  * its requests are answered by MSW (`mswLoader`) from the handlers a story names in `parameters.msw`, over fixtures typed by `objects`
  * (`.storybook/fixtures/`). Every story is held to axe in the accessibility addon as `error`, so a violation fails `npm run stories`; a
- * story that fails it today says `a11y: { test: 'todo' }` itself, a count `test/stories.test.ts` holds to its baseline. A story the
- * holder caught throwing fails after it is drawn (`afterEach`), so a broken story is a failing test and not a quiet `data-broken`.
+ * story that fails it today has its a11y test set to warn only, in its own file, a count `test/stories.test.ts` holds to its
+ * baseline. A story the holder caught throwing fails after it is drawn (`afterEach`), so a broken story is a failing test and not a
+ * quiet `data-broken`.
  */
 import { Component, createContext, useContext, useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import { createMemoryHistory, createRootRoute, createRouter, RouterProvider, useRouter, useRouterState } from '@tanstack/react-router';

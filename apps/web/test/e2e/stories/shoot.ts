@@ -161,7 +161,7 @@ const TYPES: Readonly<Record<string, string>> = {
   '.png': 'image/png',
 };
 
-/** Serves the built Storybook at `dir` on loopback for as long as `use` runs, handing it the address; MSW's worker needs a secure origin. */
+/** Serves the built Storybook at `dir` on loopback while `use` runs, handing it the address: MSW's worker needs a secure origin. */
 async function served<T>(dir: string, use: (at: string) => Promise<T>): Promise<T> {
   const server = http.createServer((request, response) => {
     const asked = path.join(dir, decodeURIComponent(new URL(`http://stories${request.url ?? '/'}`).pathname));

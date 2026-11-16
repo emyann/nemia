@@ -428,7 +428,7 @@ export const BASELINE = {
     'apps/web/src/routes/factories.$factory_.settings.tsx',
     'apps/web/src/routes/library.tsx',
   ],
-  /** The stories axe fails today, each saying `a11y: { test: 'todo' }`. */
+  /** The stories axe fails today, each with its a11y test set to warn only. */
   a11yTodo: [
     'apps/web/src/components/conversation/Worked.stories.tsx#Long',
     'apps/web/src/components/frame/OverviewStrip.stories.tsx#BusyDay',

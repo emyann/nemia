@@ -2,7 +2,7 @@
  * The rules the board's stories are held to, as pure functions over file lists and sources, which `stories.test.ts` runs on fixtures
  * and on the tree against `stories.baseline.ts`: a component or page body with no story beside it (`storyless`), a story given no args
  * (`argless`), a title outside the board's categories (`offCategory`), an import of a second component system (`secondSystem`) and a
- * story whose axe is `todo` (`a11yTodos`). Paths are from the workspace root.
+ * story whose axe only warns (`a11yTodos`). Paths are from the workspace root.
  */
 import path from 'node:path';
 import ts from 'typescript';
@@ -21,7 +21,7 @@ export const storyless = (files: readonly string[]): string[] => {
   return files.filter((file) => owesAStory(file) && !all.has(file.replace(/\.tsx$/, '.stories.tsx')));
 };
 
-/** One story of a module: its export's name, whether it or its meta gives args, and whether its axe is `todo`. */
+/** One story of a module: its export's name, whether it or its meta gives args, and whether its axe only warns. */
 export type StoryFact = { name: string; args: boolean; todo: boolean };
 
 /** A story module as the rules read it: its meta's title, none where it has none, and each story it exports. */
@@ -42,7 +42,7 @@ const propertyOf = (object: ts.ObjectLiteralExpression | undefined, name: string
   return undefined;
 };
 
-/** Whether `object` says `parameters: { a11y: { test: 'todo' } }`. */
+/** Whether `object` sets its a11y test to the word that only warns, under `parameters`. */
 const todoIn = (object: ts.ObjectLiteralExpression | undefined): boolean => {
   const test = propertyOf(objectOf(propertyOf(objectOf(propertyOf(object, 'parameters')), 'a11y')), 'test');
   return test !== undefined && ts.isStringLiteral(test) && test.text === 'todo';
@@ -100,7 +100,7 @@ export const offCategory = (module: StoryModule): boolean =>
   module.title === null || !CATEGORIES.some((category) => module.title?.startsWith(category));
 
 /**
- * Each story of `module` whose axe is `todo`, by its file and name (`<file>#<Story>`).
+ * Each story of `module` whose axe only warns, by its file and name (`<file>#<Story>`).
  * @param file The story file, from the workspace root.
  * @param module What `storyModuleOf` read of it.
  */

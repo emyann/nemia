@@ -253,6 +253,72 @@ test(
   },
 );
 
+const QUIET_STORY = 'look-cutbutton--quiet';
+
+/**
+ * Where the quiet cut button's hairline is not drawn, none when it runs along its whole cut shape: read in a picture, on its four
+ * straight sides a row or a column inside its box, and three places along each cut, on the pixel whose middle is half a pixel inside
+ * the cut's line, each closer to the hairline's colour, read in the middle of its top, than to the card's ground beside it.
+ */
+async function hairlineGaps(page: Page, name: string): Promise<string[]> {
+  const { box, out } = await edgesOf(page, BUTTON);
+  const [midX, midY] = [Math.round((box.left + box.right) / 2), Math.round((box.top + box.bottom) / 2)];
+  const inside = 0.5 * Math.SQRT2;
+  const [first, last] = [Math.floor(box.right - 0.5), Math.floor(box.bottom - 0.5)];
+  const sides: Record<string, readonly [number, number]> = {
+    'top, at its left': [out.left + 4, out.top + 1],
+    'right, at its foot': [first, last - 4],
+    'right, in its middle': [first, midY],
+    'bottom, at its right': [first - 4, last],
+    'left, at its head': [out.left + 1, out.top + 5],
+    'left, in its middle': [out.left + 1, midY],
+  };
+  const cuts = Object.fromEntries(
+    [3, 6, 9].flatMap((d, i) => {
+      const [right, left] = [Math.floor(box.right - 12 + d), Math.floor(box.left + d)];
+      return [
+        [`the top-right cut, ${i + 1} of 3`, [right, Math.floor(box.top + right + 0.5 - (box.right - 12) + inside)]],
+        [`the bottom-left cut, ${i + 1} of 3`, [left, Math.floor(box.bottom - 12 + left + 0.5 - box.left - inside)]],
+      ];
+    }),
+  ) as Record<string, readonly [number, number]>;
+  const points: Record<string, readonly [number, number]> = {
+    ground: [out.left - 7, out.top - 7],
+    hairline: [midX, out.top + 1],
+    ...sides,
+    ...cuts,
+  };
+  const found = await coloursOf(page, name, points);
+  const { ground, hairline } = found;
+  assert.ok(apart(hairline, ground) > 12, `the hairline is read apart from the card: ${hairline.join(' ')} on ${ground.join(' ')}`);
+  return [...Object.keys(sides), ...Object.keys(cuts)].filter((where) => !(apart(found[where], hairline) < apart(found[where], ground)));
+}
+
+/** The quiet button's hairline as a ring around its box, which its shape's clip cuts away at both cuts: how it was drawn before. */
+const RING_HAIRLINE = `${BUTTON} [data-cut-hairline] { display: none; }
+${BUTTON} [data-cut-shape] { box-shadow: inset 0 0 0 1px var(--md-sys-color-outline); }`;
+
+test(
+  "REFUSED: the quiet cut button's hairline runs along its whole shape, both cuts too; a ring its clip cuts open is seen",
+  WAITED,
+  async () => {
+    for (const theme of ['dark', 'light'] as const) {
+      const page = await open(QUIET_STORY, theme);
+      try {
+        assert.deepEqual(await hairlineGaps(page, `quiet-hairline-${theme}`), [], `the hairline is drawn whole, in ${theme}`);
+        await page.addStyleTag({ content: RING_HAIRLINE });
+        const ringed = await hairlineGaps(page, `quiet-hairline-ring-${theme}`);
+        assert.ok(
+          ringed.length === 6 && ringed.every((where) => where.startsWith('the ')),
+          `a ring cut by the clip draws the straight sides and leaves both cuts open, in ${theme}: seen (${ringed.join('; ')})`,
+        );
+      } finally {
+        await page.context().close();
+      }
+    }
+  },
+);
+
 /** The cut frame its stories draw on the page's own ground, and on another, each by its story's id and the frame there. */
 const ON = { plain: 'look-cutframe--on-the-page', other: 'look-cutframe--on-another-ground' } as const;
 const frameOn = (ground: 'plain' | 'other'): string => `[data-ground="${ground}"] [data-cut-frame]`;

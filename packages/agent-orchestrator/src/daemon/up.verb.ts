@@ -44,6 +44,7 @@ import { upgradeCarries, type Running } from '../release/index.ts';
 import { adoptBundled, atPin, harnessesHeld, pinnedHarnesses, releaseTrees, type Adopted } from '../release/carry.store.ts';
 import { startFix, FIX_DEADLINE_SECONDS } from '../needs/fix.verb.ts';
 import { fixesDir, readFixRecord } from '../needs/fix.store.ts';
+import { eventLoopWatched, EVENT_LOOP_DELAY } from './event-loop.verb.ts';
 
 /**
  * How the daemon asks a harness for its quota: the engine's `quota` unless the process hands it another. The api hands it the ask its
@@ -71,9 +72,9 @@ export type UpOptions = {
 
 /**
  * The daemon's own series a collector reads by their increase, born at zero once it holds the store (`seriesBorn`): the pass's
- * (`PASS_SERIES`) and the feed's live readers' beats, reads and lines.
+ * (`PASS_SERIES`), the feed's live readers' beats, reads and lines, and its event loop's delay (`EVENT_LOOP_DELAY`).
  */
-export const DAEMON_SERIES = [...PASS_SERIES, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOW_LINES] as const;
+export const DAEMON_SERIES = [...PASS_SERIES, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOW_LINES, EVENT_LOOP_DELAY] as const;
 
 /** How often the daemon asks each harness for its quota: the series keep it over time. */
 export const QUOTA_EVERY_MS = 600_000;
@@ -325,10 +326,16 @@ export const limitRefusal = (config: Settings, scope: (parent?: string) => strin
  * among them, and every pass reads them, so a run that has filed nothing waits on a missing need (`runNeeds`). On an eleventh, once the
  * first pass has answered and every `NEEDS_EVERY` after, it reads the store's readiness over that memory (`readied`), and hands each
  * pass the latest read, whose moves the pass writes to the feed: `not ready` while a piece a run waits on is missing, `ready` once none
- * is.
+ * is. All of it with its event loop watched (`eventLoopWatched`): the loop's delay recorded into a histogram exported with the rest
+ * (`EVENT_LOOP_DELAY`), and a stall of a second or more logged once, naming the span that was running as the loop came back.
  * @param e The engine every pass runs on, whose sessions the daemon holds.
+ * @param options Its interval, its repository, its kind and the rest of what it runs with (`UpOptions`).
  */
-export const up = (
+export const up = (e: Engine, options: UpOptions): Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot | StoreConfig> =>
+  eventLoopWatched(daemon(e, options));
+
+/** The daemon `up` runs with its event loop watched: its doc says what it does. */
+const daemon = (
   e: Engine,
   { every, repo, holder, series = [], onTaken, quota, scope }: UpOptions,
 ): Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot | StoreConfig> =>

@@ -75,7 +75,8 @@ export function loopArgsOf(args: readonly string[], env: NodeJS.ProcessEnv): Loo
     ['--every', '1000', 0],
   ] as const) {
     const raw = given[flag] ?? fallback;
-    if (!/^\d+$/.test(raw) || Number(raw) < least) return `${flag} ${raw} is not a whole number from ${least}: ${flag} ${fallback}. ${USAGE}`;
+    if (!/^\d+$/.test(raw) || Number(raw) < least)
+      return `${flag} ${raw} is not a whole number from ${least}: ${flag} ${fallback}. ${USAGE}`;
     counts[flag] = Number(raw);
   }
   const at = (flag: string) => (given[flag] === undefined ? undefined : path.resolve(given[flag]));
@@ -100,7 +101,7 @@ async function measured(asked: LoopAsked, root: string, fence: Fence) {
   const built = await appOver(api, orch, place, env);
   const listed = (await getJson(built.app, '/api/runs?limit=500', token)) as { items: { status: { status: string } }[] };
   const openRuns = listed.items.filter((r) => !FINISHED.has(r.status.status)).length;
-  const context = await built.runtime.runPromise(Effect.context<never>());
+  const context = await built.runtime.runPromise(Effect.context());
   const e = passEngine(orch.engine(env), fence);
   const program = orch
     .withProposalsPass(orch.tickRun({ repo: wf, verifyRest: false }))
@@ -118,10 +119,10 @@ async function measured(asked: LoopAsked, root: string, fence: Fence) {
   const delay = monitorEventLoopDelay({ resolution: 10 });
   const reads: number[] = [];
   let counting = false;
-  let reading = true;
+  const done = new AbortController();
   const reader = (async () => {
     let sent = performance.now();
-    while (reading) {
+    while (!done.signal.aborted) {
       sent = Math.max(sent + READ_EVERY_MS, performance.now());
       const wait = sent - performance.now();
       if (wait > 0) await sleep(wait);
@@ -141,7 +142,7 @@ async function measured(asked: LoopAsked, root: string, fence: Fence) {
     }
   } finally {
     counting = false;
-    reading = false;
+    done.abort();
     delay.disable();
     await reader;
     await built.runtime.dispose();

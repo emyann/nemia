@@ -128,7 +128,15 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
   const { steps, views, phaseOf, answers, spendOf } = base;
   const memo = statusMemo(headsOver(git), yield* PlaceService);
   const standing = how.checkout ? Effect.succeed(how.checkout) : standingSnapshot();
-  const checkout = yield* checkoutHold(home, e, run, steps, { standing, ...(how.store ? { store: how.store } : {}) }, how.config ?? (yield* StoreConfig), memo);
+  const checkout = yield* checkoutHold(
+    home,
+    e,
+    run,
+    steps,
+    { standing, ...(how.store ? { store: how.store } : {}) },
+    how.config ?? (yield* StoreConfig),
+    memo,
+  );
   const repo = isRepositoryRun(run) ? run.repo : undefined;
   const tipOf = repo === undefined ? {} : { tipOf: (branch: string) => git.heads(repo).get(branch) };
   const held = { ...base, checkout, ...tipOf };

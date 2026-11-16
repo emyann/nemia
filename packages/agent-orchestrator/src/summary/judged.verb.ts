@@ -483,7 +483,7 @@ export type JudgeHow = {
   parent?: (id: string) => ParentRun;
   /** The settings the checkout's claim reads the cap on runs in flight from (`ListReadingHow`'s `config`); left out, the program's. */
   config?: Settings;
-  /** The store's runs as the caller listed them, among which the checkout's claims are read (`ListReadingHow`'s `store`); left out, listed. */
+  /** The store's runs as the caller listed them, the checkout's claims read among them (`ListReadingHow`'s `store`); left out, listed. */
   store?: () => readonly Run[];
 };
 

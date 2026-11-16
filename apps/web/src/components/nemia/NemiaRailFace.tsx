@@ -7,9 +7,8 @@
  * look's `CutCue`, since a cue's words do not fit the narrow rail; `data-nemia-cues` counts them. The tooltip is always there, off while
  * no cue holds, so a cue that comes while the pointer rests on her face does not take the face out from under it.
  */
-import { Button, Link } from 'react-aria-components';
 import { CutCue } from '@/components/look';
-import { Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Button, Link, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cuesOf, dockWords, type FaceAt, type Presence } from '@/lib/presence';
 import { cn } from '@/lib/utils';
 import { routeLink } from '../nav/routeLink';
@@ -23,11 +22,14 @@ const FACE = 44;
 /** The dot's ground for the first cue's hue: none is rest's outline. */
 const DOT = { yours: 'bg-yours', alive: 'bg-alive', failure: 'bg-failure', none: 'bg-outline' } as const;
 
-/** What the face's press target looks like: a rounded box the face fills, ringed on surface while `ringed`, the focus ring otherwise. */
+/**
+ * What the face's press target looks like, over the kit's button or link: a rounded box the face fills, with no room of its own around
+ * it, ringed on surface while `ringed`; the kit draws the focus.
+ */
 const pressed = (ringed: boolean): string =>
   cn(
-    'relative inline-flex shrink-0 cursor-pointer rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-    ringed && 'ring-2 ring-on-surface ring-offset-3 ring-offset-surface focus-visible:ring-2 focus-visible:ring-on-surface',
+    'relative inline-flex h-auto shrink-0 cursor-pointer rounded-xl p-0',
+    ringed && 'ring-2 ring-on-surface ring-offset-3 ring-offset-surface',
   );
 
 /**
@@ -60,6 +62,7 @@ export function NemiaRailFace({
   const trigger = ownsChat ? (
     <RouterLink
       to="/chat"
+      color="inherit"
       data-nemia-face-button={at}
       data-nemia-cues={cues.length}
       aria-label={dockWords(presence, at)}
@@ -69,12 +72,14 @@ export function NemiaRailFace({
     </RouterLink>
   ) : (
     <Button
+      variant="text"
       data-nemia-face-button={at}
       data-nemia-cues={cues.length}
       aria-label={dockWords(presence, at)}
       aria-expanded={open}
       onPress={onToggle}
       className={pressed(open)}
+      classNames={{ label: 'flex' }}
     >
       {face}
     </Button>

@@ -103,7 +103,8 @@ export type Look = { scale?: number; still?: boolean };
 
 /**
  * A 1280 × 800 page in `theme`, open on the story `id` of the static build served at `at`, alone in Storybook's frame (`iframe.html`):
- * waits until it is drawn and its fonts are in, and throws where it threw or another story is drawn beside it.
+ * waits until it is drawn, Storybook has finished it (its play function run, which moves the focus: `data-story-finished`, set by
+ * `.storybook/preview.tsx`) and its fonts are in, and throws where it threw or another story is drawn beside it.
  * @param browser The browser the page is opened in.
  * @param at Where the static build is served (`serveBuilt`).
  * @param theme The colour scheme the page asks for.
@@ -121,6 +122,7 @@ export async function openStory(browser: Browser, at: string, theme: 'light' | '
   const page = await context.newPage();
   await page.goto(`${at}/iframe.html?id=${encodeURIComponent(id)}&viewMode=story`);
   await page.locator('#storybook-root [data-story-ground], #storybook-root [data-broken]').first().waitFor();
+  await page.locator(`body[data-story-finished="${id}"]`).waitFor({ state: 'attached' });
   const broken = await page.locator('#storybook-root [data-broken]').allTextContents();
   if (broken.length) throw new Error(`the story ${id} threw as it was drawn: ${broken.join(' / ')}`);
   const grounds = await page.locator('[data-story-ground]').count();

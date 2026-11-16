@@ -559,12 +559,6 @@
       }
     },
     {
-      "files": ["apps/web/src/components/step/StepRail.tsx"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 86, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["apps/web/src/components/workflow/WorkflowBuilder.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 196, "skipBlankLines": true, "skipComments": true }]

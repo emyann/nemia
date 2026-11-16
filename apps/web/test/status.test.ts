@@ -318,7 +318,10 @@ const HUE = /\b(?:sky|blue|orange|amber|yellow|emerald|green|red|violet)-\d{2,3}
 
 const STATE_DRAWERS = [
   'step/StepNode.tsx',
-  'step/StepRail.tsx',
+  'look/Run.tsx',
+  'look/run.recipe.ts',
+  'look/RunMarks.tsx',
+  'look/RunPanel.tsx',
   'run/RunNode.tsx',
   'step/CanvasLegend.tsx',
   'step/MachineNode.tsx',

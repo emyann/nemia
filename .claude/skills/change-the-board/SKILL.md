@@ -42,6 +42,8 @@ applies: ["apps/web/**"]
    `CutCue` for a cue in a small cut frame beside a face or in a header, `CutField` for a box that holds a field, whose edge lights round its cut when the focus is in it, and `cutShape`, `cutRing` and `cutPoints` for a new part that takes the cut; `Plate` for a section's heading and `PageName` for
    a page's name; `Sticker` for a tile that carries a number and `StatTile` for one over its breakdown; `BreakdownRows` for a breakdown's rows and
    `BreakdownPreview` for one hung off a focusable trigger of your own; `StepGraph` for a run's steps as its workflow's graph;
+   `Run` for a run at any of its five sizes, from its mark in a sentence to the floor's opened panel (`RunMeta`, `RunClock` and
+   `RunCost` for its parts a table draws alone);
    `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`. Each is shown in its stories beside it
    (`<Part>.stories.tsx`): `npm run storybook`, from `apps/web`, serves them to a person on port 6007, and a step looks at them
    through `storybook dev` on a port of its own (item 10). A new part of the look gets its stories in the same change, and its name

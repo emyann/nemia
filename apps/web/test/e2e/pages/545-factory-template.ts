@@ -60,8 +60,8 @@ async function pictured(page: Page, what: string): Promise<void> {
 export default {
   /**
    * A factory made from a template shows it as the first section of its Settings, read-only: where it is, the version wanted and the one
-   * its tree was applied at, each parameter, and each condition the daemon wrote, in its words, the one amiss in the destructive colour; its
-   * floor draws no template. Before the daemon renders it, the card says so and shows no condition; rendered, Applied is True; drifted,
+   * its tree was applied at, each parameter, and each condition the daemon wrote, in its words, the one amiss in the destructive colour;
+   * its floor draws no template. Before the daemon renders it, the card says so and shows no condition; rendered, Applied is True; drifted,
    * False. A factory made from none shows no template on its Settings. Each state photographed, and the floor that holds the floor alone.
    */
   name: 'factory-template',

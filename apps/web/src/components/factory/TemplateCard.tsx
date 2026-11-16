@@ -23,9 +23,9 @@ function ConditionLine({ condition }: { condition: FactoryCondition }) {
 }
 
 /**
- * The template a factory is made from, read-only, the first section of its Settings, titled by its card: where it is and the version wanted; the version its tree was applied
- * at, or that the daemon has not rendered it yet; the parameters given; and each condition the daemon wrote, a badge with why, in the
- * destructive colour where it is amiss (`conditionAmiss`).
+ * The template a factory is made from, read-only, the first section of its Settings, titled by its card: where it is and the version
+ * wanted; the version its tree was applied at, or that the daemon has not rendered it yet; the parameters given; and each condition the
+ * daemon wrote, a badge with why, in the destructive colour where it is amiss (`conditionAmiss`).
  */
 export function TemplateCard({ template }: { template: FactoryTemplate }) {
   const params = Object.entries(template.params);

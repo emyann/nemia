@@ -229,9 +229,9 @@ export default {
    * A factory's proposal on the board. In a factory the page writes, a proposal of Nemia's that widens access, which her message links: her
    * chat draws it under her words with its mark, and Approve applies it there, after which it offers nothing. The factory's proposals page
    * lists it, waiting, then applied, the pane's Proposals lit and counting what waits, and the floor lists none; its link opens its page
-   * with the same part, whose way back is the proposals page. On the factory's settings, the form writes a delegation, listed, then removed.
-   * On Nemia's settings, her proposed rule over the factory's proposals is confirmed, read in force, then dropped. The page takes back the
-   * factory, its folder of proposals and hires, and her chat, and her rules.
+   * with the same part, whose way back is the proposals page. On the factory's settings, the form writes a delegation, listed, then
+   * removed. On Nemia's settings, her proposed rule over the factory's proposals is confirmed, read in force, then dropped. The page takes
+   * back the factory, its folder of proposals and hires, and her chat, and her rules.
    */
   name: 'proposal',
   route: '/runs',

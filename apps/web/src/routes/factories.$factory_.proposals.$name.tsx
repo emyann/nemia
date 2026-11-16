@@ -6,8 +6,8 @@ import { proposalQuery } from '@/lib/api/proposals';
 
 /**
  * A factory's proposal, at /factories/$factory/proposals/$name: `$factory_` draws it on its own, not inside the floor, which has no outlet
- * for it. The address her message links a proposal by (`proposalLinkOf`), and the page the factory's proposals page opens. The loader prefetches the
- * proposal, which never throws: a proposal that is not there says so in its part.
+ * for it. The address her message links a proposal by (`proposalLinkOf`), and the page the factory's proposals page opens. The loader
+ * prefetches the proposal, which never throws: a proposal that is not there says so in its part.
  */
 export const Route = createFileRoute('/factories/$factory_/proposals/$name')({
   loader: ({ context, params }) => context.queryClient.prefetchQuery(proposalQuery(params.factory, params.name)),

@@ -11,11 +11,7 @@ import { proposalsInOrder } from '@/lib/proposals';
 import { cn } from '@/lib/utils';
 import { ProposalTags } from '@/components/gate/ProposalTags';
 
-/**
- * The proposals of the factory `factory`, listed whole; a line that it has none, or why they do not read.
- *
- * @param factory the factory's name
- */
+/** The proposals of the factory `factory`, listed whole; a line that it has none, or why they do not read. */
 export function FactoryProposals({ factory }: { factory: string }) {
   const { data, error } = useQuery(proposalsQuery(factory));
   if (error)

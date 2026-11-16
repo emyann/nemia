@@ -55,12 +55,13 @@ const OPENED = { enter: 0, stay: Infinity } as const;
 const RouterLinkButton = routeLink(LinkButton);
 
 /**
- * What a person sets of one factory: first, the template it is made from, where it has one, read-only (`TemplateCard`); then a place of it that is not trusted, with the line that trusts it (`FactoryTrust`); the folders
- * its runs reach beside its repositories, each with the line that takes it back (`FactoryVolumes`); the cost line it sets per workflow it
- * offers, which a gate whose caps pass it says (`FactoryCostLines`); its rules, what every agent hired into
- * it is told (`FactoryRules`); the agents it lets approve its proposals (`FactoryDelegations`); its instruction, what Nemia is to know
- * about it (`FactoryInstruction`); then its schedules, shown as the factories' read answers them (`FactorySchedules`). The default factory,
- * and a name no factory has, have no settings to keep, and say so: neither the rules nor the instruction is read for them.
+ * What a person sets of one factory: first, the template it is made from, where it has one, read-only (`TemplateCard`); then a place of it
+ * that is not trusted, with the line that trusts it (`FactoryTrust`); the folders its runs reach beside its repositories, each with the
+ * line that takes it back (`FactoryVolumes`); the cost line it sets per workflow it offers, which a gate whose caps pass it says
+ * (`FactoryCostLines`); its rules, what every agent hired into it is told (`FactoryRules`); the agents it lets approve its proposals
+ * (`FactoryDelegations`); its instruction, what Nemia is to know about it (`FactoryInstruction`); then its schedules, shown as the
+ * factories' read answers them (`FactorySchedules`). The default factory, and a name no factory has, have no settings to keep, and say so:
+ * neither the rules nor the instruction is read for them.
  */
 function SettingsPage() {
   const { factory: name } = Route.useParams();

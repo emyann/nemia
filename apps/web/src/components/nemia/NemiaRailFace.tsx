@@ -79,6 +79,7 @@ export function NemiaRailFace({
       aria-expanded={open}
       onPress={onToggle}
       className={pressed(open)}
+      classNames={{ label: 'flex' }}
     >
       {face}
     </Button>

@@ -229,6 +229,16 @@ TypographyBase.displayName = "TypographyBase";
  * Content colour is inherited unless `colorRole` names one. It refuses
  * `variant`: the role is the component.
  *
+ * **A size that steps with the width.** `size` is the size on the narrowest
+ * screen; name a larger one from a breakpoint with the two utilities a role
+ * is made of, its text and its font:
+ *
+ *   <Display size="small"
+ *     className="md:text-display-medium md:font-display-medium lg:text-display-large lg:font-display-large">
+ *
+ * The same holds for `Headline`, `Title`, `Body` and `Label`, and across
+ * roles (`<Headline size="small" className="lg:text-display-small lg:font-display-small">`).
+ *
  * Spec: https://m3.material.io/styles/typography/type-scale-tokens
  */
 export const Display = React.forwardRef<

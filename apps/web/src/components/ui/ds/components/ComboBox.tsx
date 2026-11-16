@@ -117,6 +117,15 @@ export type ComboBoxProps<
  *   </ComboBox>
  *   <ComboBox label="Categories" selectionMode="multiple" items={categories} …>
  *
+ * **Its value is an option, not the text.** `value` / `onChange` (single: a
+ * key or `null`; multiple: an array of keys) say which option is chosen, and
+ * text that matches no option is dropped when the field is left. For a field
+ * whose value is the text itself, with options as suggestions (an address, a
+ * tag to be created), pass `allowsCustomValue` and hold the text with
+ * `inputValue` / `onInputChange`: the text typed then stays. The field always
+ * draws the button that opens its menu, and with text that matches nothing
+ * the menu says "No matches".
+ *
  * Spec: text fields (the container —
  * https://m3.material.io/components/text-fields/{specs,guidelines,accessibility}:
  * 56dp container, 16dp padding / 12dp with icons, floating label, supporting

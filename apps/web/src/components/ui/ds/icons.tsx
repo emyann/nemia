@@ -242,6 +242,15 @@ export function ScheduleIcon(props: SvgProps) {
   );
 }
 
+/** Drag indicator: the handle a row of a list is dragged by. */
+export function DragIndicatorIcon(props: SvgProps) {
+  return (
+    <Svg {...props}>
+      <path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01" />
+    </Svg>
+  );
+}
+
 /** Keyboard: the time picker's switch to time input. */
 export function KeyboardIcon(props: SvgProps) {
   return (

@@ -115,6 +115,16 @@ export type CardProps = FilledCardProps | OutlinedCardProps | ElevatedCardProps;
  * MD3 card: elevated, filled or outlined. A container, and no more: it holds
  * actions (buttons, links) and is not one itself.
  *
+ *   <Card variant="outlined">any children</Card>
+ *   <Card><CardContent headline="Table 12" supportingText="Two orders" /></Card>
+ *
+ * **Its children** sit in the `content` part: a column (`flex flex-col`) with
+ * 16dp of padding on every side. To lay them out another way or to run them
+ * to the card's edges, say so on that part:
+ * `classNames={{ content: "p-0" }}`, `classNames={{ content: "flex-row gap-4" }}`.
+ * `className` is the card's container (its width, its margin), never its
+ * insides. `variant` is `filled` (the default), `outlined` or `elevated`.
+ *
  * **The root** is a `div`, or the `section`, `article` or `li` named by
  * `component`. It takes `ref`, `className`, and what places a card and names
  * it: `id`, `role`, `style`, every `aria-*` and `data-*` attribute. It

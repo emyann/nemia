@@ -7,6 +7,10 @@ import {
   CollectionRendererContext,
   Column as AriaColumn,
   type ColumnProps as AriaColumnProps,
+  ColumnResizer,
+  Group,
+  ResizableTableContainer as AriaResizableTableContainer,
+  type ResizableTableContainerProps as AriaResizableTableContainerProps,
   Row as AriaRow,
   type RowProps as AriaRowProps,
   Table as AriaTable,
@@ -49,6 +53,21 @@ const styles = tv({
       "border-b border-outline-variant -outline-offset-2",
     ],
     columnContent: "flex items-center gap-1",
+    // A resizable column's heading: the label and the handle side by side.
+    // The label is a focus stop of its own, between the heading and the
+    // handle, so Enter on the heading still sorts.
+    columnResizable: "flex items-center",
+    columnLabel: [focusRing(), "min-w-0 flex-1 -outline-offset-2"],
+    // The handle: a 1dp line in a 16dp strip to aim at, at the heading's
+    // trailing edge. Under the pointer, on focus and while it is dragged it
+    // is 2dp of `primary`.
+    resizer: [
+      focusRing(),
+      "box-content h-6 w-px shrink-0 translate-x-4 cursor-col-resize touch-none px-2 -outline-offset-2",
+      "bg-outline-variant bg-clip-content",
+      "data-hovered:w-0.5 data-hovered:bg-primary data-focus-visible:w-0.5 data-focus-visible:bg-primary data-resizing:w-0.5 data-resizing:bg-primary",
+    ],
+    container: "relative w-full overflow-auto",
     sortIcon:
       "inline-flex size-[18px] shrink-0 opacity-0 transition-transform duration-short-4 group-data-[sort-direction]/column:opacity-100 group-data-[sort-direction=ascending]/column:rotate-180",
     body: "",
@@ -203,10 +222,53 @@ export function Table({
   );
 }
 
+export type ResizableTableContainerProps = Omit<
+  AriaResizableTableContainerProps,
+  "className"
+> & { className?: string };
+
+/**
+ * What a `Table` with columns that are resized sits in: React Aria's
+ * `ResizableTableContainer`. It holds the columns' widths, scrolls the table
+ * sideways when they add up to more than its own, and reports them
+ * (`onResize`, `onResizeEnd`, each with a `Map` of column id to width, to
+ * keep a person's widths). Give each column that may be resized
+ * `allowsResizing`.
+ *
+ *   <ResizableTableContainer>
+ *     <Table aria-label="Files">
+ *       <TableHeader>
+ *         <Column id="name" isRowHeader allowsResizing>Name</Column>
+ *         <Column id="size" allowsResizing defaultWidth={120}>Size</Column>
+ *         <Column id="date">Modified</Column>
+ *       </TableHeader>
+ *       …
+ *     </Table>
+ *   </ResizableTableContainer>
+ *
+ * Material 3 does not describe this component; `Table` says what it is
+ * built from instead.
+ */
+export function ResizableTableContainer({
+  className,
+  ...props
+}: ResizableTableContainerProps) {
+  return (
+    <AriaResizableTableContainer
+      data-slot="table-container"
+      {...props}
+      className={styles().container({ className })}
+    />
+  );
+}
+
 export type ColumnProps = Omit<AriaColumnProps, "className"> & {
   className?: string;
   /** Text alignment of the column and its cells' default. */
   align?: TableAlign;
+  /** Draws the handle that resizes the column, by pointer and by keyboard.
+   *  The table then sits in a `ResizableTableContainer`. */
+  allowsResizing?: boolean;
   /** Classes for the named parts. */
   classNames?: {
     columnContent?: string;
@@ -222,6 +284,12 @@ export type ColumnProps = Omit<AriaColumnProps, "className"> & {
  * once the table is sorted by it, turned for ascending. Give it a width
  * (`width`, or `className="w-64"`) when its cells `truncate`.
  *
+ * With `allowsResizing`, inside a `ResizableTableContainer`, it draws a
+ * handle at its trailing edge: dragged by the pointer, or by the keyboard
+ * (from the heading, the arrow keys reach the handle; Enter, the arrows,
+ * Enter or Escape). `defaultWidth`, `width`, `minWidth` and `maxWidth` are
+ * React Aria's, in pixels, percentages or `fr`.
+ *
  * Material 3 does not describe this component; `Table` says what it is
  * built from instead.
  */
@@ -229,6 +297,7 @@ export function Column({
   className,
   classNames,
   align,
+  allowsResizing,
   children,
   ...props
 }: ColumnProps) {
@@ -245,32 +314,50 @@ export function Column({
         `group/column ${s.column()}`,
       )}
     >
-      {composeRenderProps(children, (children, { allowsSorting }) => (
-        <span
-          data-slot="table-column-content"
-          className={s.columnContent({
-            className: cn(
-              align === "end"
-                ? "flex-row-reverse"
-                : align === "center"
-                  ? "justify-center"
-                  : "",
-              classNames?.columnContent,
-            ),
-          })}
-        >
-          <span className="truncate">{children}</span>
-          {allowsSorting && (
-            <span
-              aria-hidden
-              data-slot="table-sort-icon"
-              className={s.sortIcon({ className: classNames?.sortIcon })}
+      {composeRenderProps(children, (children, { allowsSorting }) => {
+        const content = (
+          <span
+            data-slot="table-column-content"
+            className={s.columnContent({
+              className: cn(
+                align === "end"
+                  ? "flex-row-reverse"
+                  : align === "center"
+                    ? "justify-center"
+                    : "",
+                classNames?.columnContent,
+              ),
+            })}
+          >
+            <span className="truncate">{children}</span>
+            {allowsSorting && (
+              <span
+                aria-hidden
+                data-slot="table-sort-icon"
+                className={s.sortIcon({ className: classNames?.sortIcon })}
+              >
+                <ChevronDownIcon className="size-full" />
+              </span>
+            )}
+          </span>
+        );
+        if (!allowsResizing) return content;
+        return (
+          <span className={s.columnResizable()}>
+            <Group
+              role="presentation"
+              tabIndex={-1}
+              className={s.columnLabel()}
             >
-              <ChevronDownIcon className="size-full" />
-            </span>
-          )}
-        </span>
-      ))}
+              {content}
+            </Group>
+            <ColumnResizer
+              data-slot="table-column-resizer"
+              className={s.resizer()}
+            />
+          </span>
+        );
+      })}
     </AriaColumn>
   );
 }
@@ -442,18 +529,20 @@ export function Cell({
         />
       )}
     >
-      {composeRenderProps(children, (children, { isHovered, isFocusVisible }) =>
-        truncate ? (
-          <CellText
-            className={s.cellText({ className: classNames?.cellText })}
-            isHovered={isHovered}
-            isFocusVisible={isFocusVisible}
-          >
-            {children}
-          </CellText>
-        ) : (
-          children
-        ),
+      {composeRenderProps(
+        children,
+        (children, { isHovered, isFocusVisible }) =>
+          truncate ? (
+            <CellText
+              className={s.cellText({ className: classNames?.cellText })}
+              isHovered={isHovered}
+              isFocusVisible={isFocusVisible}
+            >
+              {children}
+            </CellText>
+          ) : (
+            children
+          ),
       )}
     </AriaCell>
   );

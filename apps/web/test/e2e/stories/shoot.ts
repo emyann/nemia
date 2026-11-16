@@ -6,8 +6,9 @@
  * along the first parent, and of a merge only its resolution, so a path a merged branch changed is not the work's; `--changed` names
  * them instead, each from the workspace root. A story is touched when a file its imports reach, through every import of the board's own
  * (`src` and `.storybook`), is one of them, or a file every story is drawn in: Storybook's preview, the board's files it imports and
- * the stylesheets those `@import` under `src` and `theme` (`storiesTouched`, `touched.ts`); a changed part that owes a story and that no story reaches
- * is bare, and refused, exit 1, naming each and the story file to write beside it; a part the change deleted owes none.
+ * the stylesheets those `@import` under `src` and `theme` (`storiesTouched`, `touched.ts`); a changed part that owes a story and
+ * that no story reaches is bare, and refused, exit 1, naming each and the story file to write beside it; a part the change deleted
+ * owes none.
  *
  * With `--list` it prints `{ "stories": [<id>…], "bare": [<path>…] }` and launches no browser: each id is Storybook's own
  * (`toId(title, storyNameFromExport(export))`), read off the story file's title and named exports by the TypeScript compiler. Without

@@ -253,9 +253,9 @@ test("Claude Code's prompt is a choice of what the agent does, keep drawn chosen
     /data-harness-prompt="keep"[^>]*data-selected="true"|data-selected="true"[^>]*data-harness-prompt="keep"/,
     'unset reads as keep',
   );
-  assert.match(
-    unset,
-    /data-slot="label">Claude Code&#x27;s prompt<\/span>/,
+  const label = unset.match(/<(?:label|span)[^>]*id="([^"]+)"[^>]*>Claude Code&#x27;s prompt<\/(?:label|span)>/)?.[1];
+  assert.ok(
+    label && new RegExp(`role="radiogroup"[^>]*aria-labelledby="${label}"|aria-labelledby="${label}"[^>]*role="radiogroup"`).test(unset),
     "the choice is labelled Claude Code's prompt, never System prompt",
   );
   assert.doesNotMatch(unset, /System prompt/);
@@ -420,7 +420,7 @@ test('an agent of yours is tried from its page: the fence said in one line, and 
     ),
     texts.join(' | '),
   );
-  assert.match(html, /<button type="submit" disabled=""[^>]*>Try it<\/button>/, 'no brief, no try');
+  assert.match(html, /<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>(?:<[^>]*>)*Try it</, 'no brief, no try');
   assert.match(html, /data-try-held[^>]*>Write a brief to try it on\./);
   assert.doesNotMatch(html, /data-try=/, 'an agent never tried shows no try');
 });
@@ -435,7 +435,7 @@ test('REFUSED: a second try while one moves — the button is held, and the late
     ...readsOf(tryDetail({ status: 'running' })),
   ]);
   assert.match(html, /data-try-held[^>]*>A try is still running \(r-t\): one at a time\./);
-  assert.match(html, /<button type="submit" disabled=""/);
+  assert.match(html, /<button(?=[^>]*type="submit")[^>]*disabled=""/);
   assert.match(html, /data-try="r-t"/, 'the newest try of this agent, not the older one');
   assert.match(html, /href="\/runs\/r-t"[^>]*data-try-run="r-t"|data-try-run="r-t"[^>]*href="\/runs\/r-t"/, 'linked to its run');
   assert.match(html, /data-try-status[^>]*>running</);
@@ -625,7 +625,7 @@ test('a run picked to read shows what it would hand, as markdown — badged not 
       [['runs', 'probe-b2', 'concluded'], { run: 'probe-b2', landed, section: '\n## From run probe-b2\n\nIt measured **the cache**.' }],
     ]);
   const inFlight = await preview(false);
-  assert.match(inFlight, /data-not-landed[^>]*>not landed, not judged</);
+  assert.match(inFlight, /data-not-landed[^>]*>(?:<[^>]*>)*not landed, not judged</);
   assert.match(inFlight, /<strong>the cache<\/strong>/);
   assert.doesNotMatch(await preview(true), /data-not-landed|not landed, not judged/);
 });

@@ -1,15 +1,21 @@
 import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
-import { Radio, RadioGroup, TextField, Text } from 'react-aria-components';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Textarea } from '@/components/ui/textarea';
+import {
+  Body,
+  Button,
+  Disclosure,
+  DisclosurePanel,
+  DisclosureTrigger,
+  Radio,
+  RadioGroup,
+  Select,
+  SelectItem,
+  TextField,
+} from '@/components/ui/ds';
 import type { AgentListing, AgentRoleKey } from '../../lib/api/agents.ts';
 import type { KeyForm } from '../../lib/api/builder.ts';
 import { GivenSkills, Skills } from './AgentParts';
 import { Markdown } from '../markdown/Markdown';
+import { cn } from '../../lib/utils';
 import { SkillPicker } from './SkillPicker';
 import {
   choicesOf,
@@ -188,7 +194,7 @@ export function AgentForm({
             {saving ? 'Saving…' : listing ? 'Save' : 'Create agent'}
           </Button>
           {listing && changed && (
-            <Button variant="ghost" onPress={() => setForm(formOf(listing))} isDisabled={saving}>
+            <Button variant="text" onPress={() => setForm(formOf(listing))} isDisabled={saving}>
               Discard changes
             </Button>
           )}
@@ -324,9 +330,9 @@ function Identity({
 }
 
 /**
- * A text field: a line, or `area`'s textarea. Read-only, it is drawn as text on a quiet ground, not as a box waiting for words. The skill's
- * form draws its fields with it too. `markdown` says its words are written in markdown: typed in as written in a mono textarea, and read
- * as the markdown they are (`MarkdownField`).
+ * A text field, the kit's: a line, or a growing box of several at `area`'s least height, its hint beneath it. Read-only, it takes no
+ * words. The skill's form draws its fields with it too. `markdown` says its words are written in markdown: typed in as written in mono,
+ * and read as the markdown they are (`MarkdownField`).
  */
 export function Field({
   label,
@@ -352,28 +358,23 @@ export function Field({
   className?: string;
 }) {
   if (markdown && readOnly) return <MarkdownField label={label} hint={hint} value={value} className={className} />;
-  const font = mono || markdown ? 'font-mono text-body-small md:text-body-small' : '';
-  const quiet = readOnly ? READ_ONLY : '';
+  const font = mono || markdown ? 'font-mono text-body-small' : '';
   return (
-    <TextField value={value} onChange={onChange} isReadOnly={readOnly} className={`space-y-1.5 ${className ?? ''}`}>
-      <Label className="text-body-small">{label}</Label>
-      {area ? (
-        <Textarea placeholder={readOnly ? undefined : placeholder} className={`${font} ${area} ${quiet} leading-relaxed`} />
-      ) : (
-        <Input placeholder={readOnly ? undefined : placeholder} className={`${font} ${quiet}`} />
-      )}
-      {hint && <Hint>{hint}</Hint>}
-    </TextField>
+    <TextField
+      label={label}
+      supportingText={hint || undefined}
+      value={value}
+      onChange={onChange}
+      isReadOnly={readOnly}
+      multiline={area !== undefined}
+      placeholder={readOnly ? undefined : placeholder}
+      inputClassName={cn(font, area)}
+      className={className}
+    />
   );
 }
 
-const READ_ONLY = 'border-dashed bg-surface-container focus-visible:ring-0';
-
-const Hint = ({ children }: { children: ReactNode }) => (
-  <Text slot="description" className="block text-body-small leading-snug text-muted-foreground">
-    {children}
-  </Text>
-);
+const READ_ONLY = 'border-dashed bg-surface-container';
 
 /** A field written in markdown, read and not edited: its label, its words drawn as markdown on a read-only field's ground, its hint. */
 function MarkdownField({
@@ -395,7 +396,11 @@ function MarkdownField({
       ) : (
         <p className={`rounded-md border px-3 py-2 text-body-medium text-muted-foreground italic ${READ_ONLY}`}>Nothing written</p>
       )}
-      {hint && <Hint>{hint}</Hint>}
+      {hint && (
+        <Body size="small" className="leading-snug text-muted-foreground">
+          {hint}
+        </Body>
+      )}
     </section>
   );
 }
@@ -422,30 +427,17 @@ function Choice({
   const words = value && !choices.includes(value) ? [...choices, value] : choices;
   return (
     <Select
+      label={label}
+      supportingText={hint || undefined}
       value={value || UNSET}
       onChange={(key) => onChange(key === UNSET || key == null ? '' : String(key))}
       isDisabled={readOnly}
-      className="w-full space-y-1.5"
+      className="w-full"
     >
-      <Label className="text-body-small">{label}</Label>
-      <SelectTrigger className="font-mono text-body-small">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem id={UNSET} textValue="unset">
-          <span className="text-muted-foreground">unset</span>
-        </SelectItem>
-        {words.map((word) => (
-          <SelectItem key={word} id={word} className="font-mono text-body-small">
-            {word}
-          </SelectItem>
-        ))}
-      </SelectContent>
-      {hint && (
-        <Text slot="description" className="block text-body-small leading-snug text-muted-foreground">
-          {hint}
-        </Text>
-      )}
+      <SelectItem id={UNSET} label="unset" />
+      {words.map((word) => (
+        <SelectItem key={word} id={word} label={word} />
+      ))}
     </Select>
   );
 }
@@ -476,11 +468,11 @@ function SkillToolNote({ form, setKey }: { form: Form; setKey: (key: AgentRoleKe
         )}
       </p>
       {gap === 'tools' ? (
-        <Button variant="outline" size="xs" onPress={() => setKey('tools', toolsWithSkill(form.keys.tools))}>
+        <Button variant="outlined" size="xsmall" onPress={() => setKey('tools', toolsWithSkill(form.keys.tools))}>
           Add Skill to its tools
         </Button>
       ) : (
-        <Button variant="outline" size="xs" onPress={() => setKey('disallowedTools', deniedWithoutSkill(form.keys.disallowedTools))}>
+        <Button variant="outlined" size="xsmall" onPress={() => setKey('disallowedTools', deniedWithoutSkill(form.keys.disallowedTools))}>
           Take Skill off its denied tools
         </Button>
       )}
@@ -493,6 +485,9 @@ export const RADIO =
 export const DOT =
   'mt-0.5 size-3.5 shrink-0 rounded-full border border-outline group-data-selected:border-4 group-data-selected:border-foreground';
 
+/** A choice of the prompt as its box: the kit's radio and its words, framed, the frame lit while it is chosen. */
+const CHOICE = 'items-start rounded border border-outline-variant px-3 py-2 data-selected:border-primary';
+
 /**
  * `harnessPrompt:`, as a choice of what the agent does: Claude Code's own prompt whole, less its coding section, or none — which drops its
  * safety rules, and is kept behind For experts, open where the agent already says it. Unset, `keep` is drawn chosen and nothing is written
@@ -502,9 +497,9 @@ export const DOT =
 function HarnessPrompt({ value, onChange, readOnly }: { value: string; onChange: (value: string) => void; readOnly: boolean }) {
   const shown = harnessPromptShown(value);
   const known = HARNESS_PROMPT_CHOICES.some((choice) => choice.value === shown);
+  const [experts, setExperts] = useState(shown === 'replace');
   const radio = (choice: (typeof HARNESS_PROMPT_CHOICES)[number]) => (
-    <Radio key={choice.value} value={choice.value} className={RADIO} data-harness-prompt={choice.value}>
-      <span aria-hidden className={DOT} />
+    <Radio key={choice.value} value={choice.value} className={CHOICE} data-harness-prompt={choice.value}>
       <span className="space-y-0.5">
         <span className="block text-body-small font-medium">{choice.label}</span>
         <span className="block text-body-small leading-snug text-muted-foreground">{choice.says}</span>
@@ -512,34 +507,35 @@ function HarnessPrompt({ value, onChange, readOnly }: { value: string; onChange:
     </Radio>
   );
   return (
-    <RadioGroup value={known ? shown : null} onChange={onChange} isDisabled={readOnly} className="space-y-2">
-      <Label className="text-body-small">Claude Code&apos;s prompt</Label>
+    <RadioGroup
+      label="Claude Code's prompt"
+      value={known ? shown : null}
+      onChange={onChange}
+      isDisabled={readOnly}
+      className="flex-col gap-2"
+      supportingText={
+        <>
+          <code className="font-mono">harnessPrompt:</code> — how much of Claude Code&apos;s own prompt its sessions keep, before the
+          instructions below.
+        </>
+      }
+    >
       <div className="grid gap-2 @md/page:grid-cols-2">{HARNESS_PROMPT_CHOICES.filter((choice) => !choice.expert).map(radio)}</div>
       {!known && (
         <p className="text-body-small text-failure">
           Its file says <code className="font-mono">harnessPrompt: {value}</code>, which is none of these.
         </p>
       )}
-      <Collapsible defaultExpanded={shown === 'replace'}>
-        {({ isExpanded }) => (
-          <>
-            <CollapsibleTrigger className="rounded-sm text-body-small text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
-              {isExpanded ? '▾' : '▸'} For experts
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              {isExpanded && (
-                <div className="grid gap-2 pt-2 @md/page:grid-cols-2">
-                  {HARNESS_PROMPT_CHOICES.filter((choice) => choice.expert).map(radio)}
-                </div>
-              )}
-            </CollapsibleContent>
-          </>
-        )}
-      </Collapsible>
-      <Text slot="description" className="block text-body-small leading-snug text-muted-foreground">
-        <code className="font-mono">harnessPrompt:</code> — how much of Claude Code&apos;s own prompt its sessions keep, before the
-        instructions below.
-      </Text>
+      <Disclosure isExpanded={experts} onExpandedChange={setExperts}>
+        <DisclosureTrigger>For experts</DisclosureTrigger>
+        <DisclosurePanel isUnstyled>
+          {experts && (
+            <div className="grid gap-2 pt-2 @md/page:grid-cols-2">
+              {HARNESS_PROMPT_CHOICES.filter((choice) => choice.expert).map(radio)}
+            </div>
+          )}
+        </DisclosurePanel>
+      </Disclosure>
     </RadioGroup>
   );
 }

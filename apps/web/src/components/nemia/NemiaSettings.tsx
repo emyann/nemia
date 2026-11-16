@@ -1,9 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button, Disclosure, DisclosurePanel, DisclosureTrigger, Select, SelectItem, Tag } from '@/components/ui/ds';
 import {
   levelQuery,
   nemiaFactQuery,
@@ -126,19 +123,12 @@ function LevelSelect({
         if (picked !== undefined && picked !== level) onPick(picked);
       }}
       isDisabled={pending}
+      {...marks}
+      className="w-40"
     >
-      <SelectTrigger size="sm" {...marks} className="w-28">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          {LEVELS.map((each) => (
-            <SelectItem key={each} id={each}>
-              {levelWord(each)}
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
+      {LEVELS.map((each) => (
+        <SelectItem key={each} id={each} label={levelWord(each)} />
+      ))}
     </Select>
   );
 }
@@ -213,11 +203,13 @@ function FactoryRow({ row, now, pending, onAsk }: { row: FactoryLevel; now: Date
     <div data-factory-level={row.factory} data-level={row.level} className="flex flex-col gap-2 rounded-lg border px-3 py-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-body-medium">{row.factory}</span>
-        <Badge variant={row.level === 'manual' ? 'secondary' : 'default'}>{levelWord(row.level)}</Badge>
+        <Tag variant={row.level === 'manual' ? 'tonal' : 'filled'} color={row.level === 'manual' ? 'neutral' : 'primary'}>
+          {levelWord(row.level)}
+        </Tag>
         {row.raise !== null && (
-          <Badge variant="outline" data-factory-raised>
+          <Tag variant="outlined" data-factory-raised>
             Raised
-          </Badge>
+          </Tag>
         )}
       </div>
       <p data-factory-words className="text-body-small text-muted-foreground">
@@ -237,8 +229,8 @@ function FactoryRow({ row, now, pending, onAsk }: { row: FactoryLevel; now: Date
           </span>
           {row.raise !== null ? (
             <Button
-              variant="outline"
-              size="sm"
+              variant="outlined"
+              size="xsmall"
               data-factory-end
               isDisabled={pending}
               onPress={() => onAsk({ factory: row.factory, end: true })}
@@ -268,25 +260,23 @@ function RaiseControls({ row, pending, onAsk }: { row: FactoryLevel; pending: bo
   if (!levels.length) return null;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Select aria-label="Raise for" value={stretch} onChange={(key) => setStretch(String(key))} isDisabled={pending}>
-        <SelectTrigger size="sm" data-factory-stretch className="w-20">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {RAISE_STRETCHES.map((word) => (
-              <SelectItem key={word} id={word}>
-                {word}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
+      <Select
+        aria-label="Raise for"
+        value={stretch}
+        onChange={(key) => setStretch(String(key))}
+        isDisabled={pending}
+        data-factory-stretch
+        className="w-28"
+      >
+        {RAISE_STRETCHES.map((word) => (
+          <SelectItem key={word} id={word} label={word} />
+        ))}
       </Select>
       {levels.map((level) => (
         <Button
           key={level}
-          variant="outline"
-          size="sm"
+          variant="outlined"
+          size="xsmall"
           {...RAISE_MARKS[level]}
           isDisabled={pending}
           onPress={() => onAsk({ level, factory: row.factory, for: stretch })}
@@ -325,7 +315,7 @@ function SessionPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bo
       )}
       {kind === 'stopped' && (
         <div>
-          <Button variant="outline" size="sm" data-nemia-restart isDisabled={pending} onPress={() => onAsk(freshLevel(nemia.level))}>
+          <Button variant="outlined" size="xsmall" data-nemia-restart isDisabled={pending} onPress={() => onAsk(freshLevel(nemia.level))}>
             Start a fresh session
           </Button>
         </div>
@@ -425,17 +415,12 @@ function MemoryPart() {
 
 /** One fact by name, folded; its words read and drawn only while it is open. */
 function Fact({ name }: { name: string }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Collapsible data-nemia-fact={name}>
-      {({ isExpanded }) => (
-        <>
-          <CollapsibleTrigger className="rounded-sm font-mono text-body-small outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
-            {isExpanded ? '▾' : '▸'} {name}
-          </CollapsibleTrigger>
-          <CollapsibleContent>{isExpanded && <FactText name={name} />}</CollapsibleContent>
-        </>
-      )}
-    </Collapsible>
+    <Disclosure data-nemia-fact={name} isExpanded={open} onExpandedChange={setOpen}>
+      <DisclosureTrigger className="font-mono">{name}</DisclosureTrigger>
+      <DisclosurePanel>{open && <FactText name={name} />}</DisclosurePanel>
+    </Disclosure>
   );
 }
 

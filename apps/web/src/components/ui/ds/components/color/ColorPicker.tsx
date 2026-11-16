@@ -8,6 +8,7 @@ import {
   Popover,
   ColorPicker as AriaColorPicker,
 } from "react-aria-components";
+import { cn, focusRing } from "../../utils";
 import ColorArea from "./ColorArea";
 import { ColorField } from "./ColorField";
 import { ColorSlider } from "./ColorSlider";
@@ -34,7 +35,15 @@ export default function ColorPicker(props: ColorPickerProps) {
   return (
     <AriaColorPicker {...rest}>
       <DialogTrigger>
-        <Button className="flex appearance-none items-center gap-2 rounded-shape-extra-small border-none bg-transparent p-0 align-middle text-body-large font-body-large text-on-surface outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        {/* The kit's ring. The classes this replaced set a width and a
+            colour on `:focus-visible` and never a style, so nothing was
+            drawn: the button showed no focus at all. */}
+        <Button
+          className={cn(
+            "flex appearance-none items-center gap-2 rounded-shape-extra-small border-none bg-transparent p-0 align-middle text-body-large font-body-large text-on-surface",
+            focusRing(),
+          )}
+        >
           <ColorSwatch />
           <span>{label}</span>
         </Button>

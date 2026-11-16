@@ -57,6 +57,16 @@ Until then, and for anything neither Material nor React Aria describes, a
 component the kit does not have is the project's: it is written beside the
 kit, not inside it, on `react-aria-components`, following the rules below.
 
+For some of those the kit has a block to start from: a pager, a stepper, a
+radio drawn as a tile, a carousel of content that is read, a public page's
+header (`pager-block`, `stepper-block`, `radio-tile-block`,
+`reading-carousel-block`, `site-header-block`). `npx shadcn add @ds/pager-block`
+copies one into the project's components, outside `<kit>`. It is the
+project's from then on: edit it freely, an update of the kit never replaces
+it. It imports the kit's components from `<kit>`'s barrel, so it needs the
+kit at a release that has them: if it does not type-check, update the kit
+first.
+
 What the project's own component follows:
 
 - **Its measures and its look are Material's**, where Material describes the
@@ -77,6 +87,31 @@ What the project's own component follows:
   and refresh it with `npx skills update`. Without it, every page of React
   Aria's documentation is served as markdown at its own address with `.md`
   added (`https://react-aria.adobe.com/Button.md`).
+
+### What comes straight from React Aria
+
+The kit wraps React Aria's components and leaves its hooks and utilities
+where they are. Import these from `react-aria-components`, beside the kit's
+components: using them is not leaving the kit.
+
+| For                                              | Import                                         | With the kit                                                                                              |
+| :----------------------------------------------- | :--------------------------------------------- | :-------------------------------------------------------------------------------------------------------- |
+| Moving items by drag and drop, by pointer and by keyboard | `useDragAndDrop`, `isFileDropItem`             | Pass its `dragAndDropHooks` to the kit's `GridList` or `Table`: both hand React Aria's props down.          |
+| A list of hundreds of rows                       | `Virtualizer`, `ListLayout`, `GridLayout`      | Around the kit's `GridList`. The layout takes sizes in pixels: a row's height is the kit row's.            |
+| A list that is edited, or loaded as it is scrolled | `useListData`, `useAsyncList`, `useTreeData` | Their `items` go to the kit's `GridList`, `Table`, `Select` or `ComboBox`.                                 |
+| Filtering what a field suggests                  | `useFilter`                                    | The kit's `ComboBox` filters by itself: only for a rule of your own.                                       |
+| Text only a screen reader gets                   | `VisuallyHidden`                               | For a status, or a name with no visible text.                                                             |
+| A page in another language, or right to left     | `I18nProvider`, `useLocale`                    | Once, around the app: the kit's dates, numbers and directions follow.                                      |
+
+**With react-hook-form**, the kit's adapter (`@ds/react-hook-form-adapter`,
+added beside the kit) binds each field, and passes the
+form's errors to it. A field you bind yourself with `Controller` takes
+`isInvalid` and `errorMessage` from the form's state, and
+`validationBehavior="aria"` where the form decides what is valid: the field
+is then marked invalid for assistive technology and the browser's own
+validation does not stop the submit before the form has run. The adapter's
+`FormComboBox` holds the chosen option; for a field whose value is the typed
+text, the comment above it shows the binding.
 
 ## Colour: role utilities, in pairs
 

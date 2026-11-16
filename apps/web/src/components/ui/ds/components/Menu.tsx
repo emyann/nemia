@@ -14,7 +14,7 @@ import { CheckIcon } from "../icons";
 import { tv } from "../utils";
 import MenuItem, { type MenuItemProps } from "./MenuItem";
 
-const menuStyles = tv({
+export const menuStyles = tv({
   base: "bg-surface-container-high rounded-shape-extra-small shadow-elevation-2 p-1 min-w-[112px] max-w-[280px] outline-hidden",
 });
 
@@ -81,6 +81,55 @@ const headerStyles = tv({
 const dividerStyles = tv({
   base: "-mx-1 my-2 h-px border-0 bg-outline-variant",
 });
+
+/**
+ * One entry of a menu, as a row or a divider: what `Menu` and `ContextMenu`
+ * both draw inside React Aria's `Menu`. Not a component: a collection is
+ * built from what its function returns.
+ */
+export function menuRow(
+  item: MenuItemType | MenuDividerType,
+  staysOpen: boolean,
+) {
+  return item.type === "divider" ? (
+    <Separator
+      data-slot="menu-divider"
+      id={item.id}
+      className={dividerStyles()}
+    />
+  ) : (
+    <AriaMenuItem
+      data-slot="menu-item"
+      key={item.id}
+      id={item.id}
+      onAction={item.onAction}
+      href={item.href}
+      isDisabled={item.isDisabled}
+      // Material: a multi-select menu stays open until the person dismisses
+      // it. Left to itself, React Aria closes it on Enter.
+      {...(staysOpen ? { shouldCloseOnSelect: false } : {})}
+      // `group`: MenuItem's state layer reads this element's
+      // `data-focus-visible` and `data-pressed`. Without it a row reached by
+      // the arrow keys shows no focus at all.
+      className="group outline-hidden"
+    >
+      {({ isDisabled, isSelected }) => (
+        <MenuItem
+          label={item.label}
+          leadingIcon={item.leadingIcon}
+          // The check is the second cue beside the container colour, as in
+          // `SelectItem`.
+          trailingIcon={
+            isSelected ? <CheckIcon size={24} /> : item.trailingIcon
+          }
+          shortcut={item.shortcut}
+          isDisabled={isDisabled}
+          isSelected={isSelected}
+        />
+      )}
+    </AriaMenuItem>
+  );
+}
 
 /**
  * MD3 menu: a trigger and the popover list of `MenuItem`s it opens, on React
@@ -163,48 +212,7 @@ export function Menu(props: MenuProps) {
               }
             : {})}
         >
-          {(item) =>
-            item.type === "divider" ? (
-              <Separator
-                data-slot="menu-divider"
-                id={item.id}
-                className={dividerStyles()}
-              />
-            ) : (
-              <AriaMenuItem
-                data-slot="menu-item"
-                key={item.id}
-                id={item.id}
-                onAction={item.onAction}
-                href={item.href}
-                isDisabled={item.isDisabled}
-                // Material: a multi-select menu stays open until the person
-                // dismisses it. Left to itself, React Aria closes it on Enter.
-                {...(selectionMode === "multiple"
-                  ? { shouldCloseOnSelect: false }
-                  : {})}
-                // `group`: MenuItem's state layer reads this element's
-                // `data-focus-visible` and `data-pressed`. Without it a row
-                // reached by the arrow keys shows no focus at all.
-                className="group outline-hidden"
-              >
-                {({ isDisabled, isSelected }) => (
-                  <MenuItem
-                    label={item.label}
-                    leadingIcon={item.leadingIcon}
-                    // The check is the second cue beside the container colour,
-                    // as in `SelectItem`.
-                    trailingIcon={
-                      isSelected ? <CheckIcon size={24} /> : item.trailingIcon
-                    }
-                    shortcut={item.shortcut}
-                    isDisabled={isDisabled}
-                    isSelected={isSelected}
-                  />
-                )}
-              </AriaMenuItem>
-            )
-          }
+          {(item) => menuRow(item, selectionMode === "multiple")}
         </AriaMenu>
       </Popover>
     </MenuTrigger>

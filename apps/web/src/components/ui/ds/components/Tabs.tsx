@@ -45,7 +45,10 @@ const styles = tv({
     icon: "size-6 shrink-0",
     label: "whitespace-nowrap",
     indicator: "row-start-2 opacity-0 transition-opacity duration-short-4",
-    panel: "outline-none py-4",
+    // React Aria puts a panel in the tab order when nothing in it can take
+    // focus, so it shows the ring like any stop. Drawn inside, as a table's
+    // cells draw theirs: a panel runs to the edges of what holds it.
+    panel: [focusRing(), "py-4 -outline-offset-2"],
   },
   variants: {
     variant: {

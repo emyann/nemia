@@ -9,13 +9,17 @@
  * (`.storybook/fixtures/`). Every story is held to axe in the accessibility addon as `error`, so a violation fails `npm run stories`; a
  * story that fails it today has its a11y test set to warn only, in its own file, a count `test/stories.test.ts` holds to its
  * baseline. A story the holder caught throwing, or one that draws nothing, fails after it is drawn (`afterEach`, `undrawn`), so a
- * broken story is a failing test and not a quiet `data-broken`.
+ * broken story is a failing test and not a quiet `data-broken`. Once Storybook has finished a story, its play function and `afterEach`
+ * run, the document's body says which (`data-story-finished`), so a browser test that opens it alone (`test/e2e/stories/built.ts`)
+ * presses nothing while the play still moves the focus.
  */
 import { Component, createContext, useContext, useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import { createMemoryHistory, createRootRoute, createRouter, RouterProvider, useRouter, useRouterState } from '@tanstack/react-router';
 import type { Preview } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { mswLoader } from 'msw-storybook-addon/csf3';
+import { STORY_FINISHED, type StoryFinishedPayload } from 'storybook/internal/core-events';
+import { addons } from 'storybook/preview-api';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import '../src/styles.css';
 import { ScanLines } from '../src/components/look';
@@ -94,6 +98,21 @@ function Routed({ Story, at, marked }: Drawn & { at: string }) {
   );
 }
 
+/** The attribute of the document's body that names the story Storybook last finished. */
+const FINISHED = 'data-story-finished';
+
+let marking = false;
+
+/**
+ * Has the body name each story Storybook finishes, once: its channel is listened to from the first story drawn, since it is set only
+ * after this file is read.
+ */
+function markFinished(): void {
+  if (marking) return;
+  marking = true;
+  addons.getChannel().on(STORY_FINISHED, ({ storyId }: StoryFinishedPayload) => document.body.setAttribute(FINISHED, storyId));
+}
+
 const preview: Preview = {
   parameters: { layout: 'fullscreen', a11y: { test: 'error' } },
   loaders: [mswLoader()],
@@ -104,9 +123,10 @@ const preview: Preview = {
     if (faults.length) throw new Error(`the story did not draw as it should: ${faults.join('; ')}`);
   },
   decorators: [
-    (Story, { parameters }) => (
-      <Routed Story={Story} at={typeof parameters.at === 'string' ? parameters.at : '/'} marked={parameters.scrollMark !== false} />
-    ),
+    (Story, { parameters }) => {
+      markFinished();
+      return <Routed Story={Story} at={typeof parameters.at === 'string' ? parameters.at : '/'} marked={parameters.scrollMark !== false} />;
+    },
   ],
 };
 

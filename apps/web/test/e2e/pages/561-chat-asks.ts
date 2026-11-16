@@ -63,6 +63,9 @@ export default {
       await ask.locator(`[data-chat-option="${CHOSE}"]`).click();
       await expectVisible(answer, 'a choice made, the Answer is there to press');
       if (await answer.isDisabled()) throw new Refused('and it is on, the question being answered');
+      await expectVisible(ask.locator(`[data-chat-option="${CHOSE}"][data-selected]`), 'the choice is the one drawn chosen');
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-asks-chosen-${await themeOf(page)}.png`), { fullPage: true });
       await answer.click();
       await expectVisible(
         panel.locator('[data-chat-chose]', { hasText: `You chose: ${CHOSE}` }),

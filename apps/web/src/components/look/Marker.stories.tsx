@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect } from 'storybook/test';
 import { Marker } from './Marker';
 
 /** The look's marker: a quiet line across a conversation, its words between two hairlines. */
@@ -22,6 +23,16 @@ export const Quiet: StoryObj<{ words: string }> = {
 export const Long: StoryObj<{ words: string }> = {
   args: {
     words: 'The turn was cut short: the session reached its budget, and what it had written so far is kept above this line.',
+  },
+  play: async ({ canvasElement }) => {
+    const line = canvasElement.querySelector<HTMLElement>('[data-slot="marker"]')!;
+    const words = canvasElement.querySelector<HTMLElement>('[data-slot="marker-content"]')!;
+    await expect(words.getBoundingClientRect().right, 'the words keep within the line').toBeLessThanOrEqual(
+      line.getBoundingClientRect().right,
+    );
+    await expect(words.getBoundingClientRect().height, 'and wrap onto more than one line').toBeGreaterThan(24);
+    for (const side of ['::before', '::after'])
+      await expect(parseFloat(getComputedStyle(line, side).width), `a hairline is kept ${side}`).toBeGreaterThanOrEqual(24);
   },
   render: ({ words }) => (
     <div style={PANEL}>

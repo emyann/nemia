@@ -1,4 +1,7 @@
-/** The files of a step a run's page shows: each a closeout named, and each its folder holds, as the api serves them by name. */
+/**
+ * The files of a step a run's page shows: each a closeout named, and each its folder holds, as the api serves them by their path under
+ * the step's folder.
+ */
 import fs from 'node:fs';
 import path from 'node:path';
 import { artifactsDir, statUnder } from '../record/record.store.ts';

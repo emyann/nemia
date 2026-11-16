@@ -24,7 +24,7 @@ const stepSpec = (more: readonly Positional[], keys: readonly string[]): Spec =>
   unknown: (arg) => `the board's reads of a step take no ${arg}.`,
 });
 
-/** The file's name, as the api's path names it. */
+/** The file's path under the step's folder, as the api's path names it, encoded whole as one segment. */
 const NAME: readonly Positional[] = [{ key: 'name', takes: 'required', kind: 'name' }];
 
 /** What a read of a step's file takes: the run's id, the step's name and the file's path under its folder, its parts split at `/`. */

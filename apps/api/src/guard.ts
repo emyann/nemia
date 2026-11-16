@@ -1,15 +1,19 @@
 /**
- * The guard on every write the api serves: a request refused before its body is read, whatever route it is for, by its method and three
- * headers alone (`writeRefused`, proved by `apps/api/contracts/write-guard.contract.ts`), and one Hono middleware that applies it to every
- * request under `/api/` but a GET or a HEAD (`writeGuard`, which app.ts registers before any route). No route keeps words of its own for
- * it: a refusal names the request's method and path, and where the document says what each route takes.
+ * The guard on every write the api serves: a request refused before its body is read, whatever route it is for, by its method, three
+ * headers and the names the store is served at (`writeRefused`, proved by `apps/api/contracts/write-guard.contract.ts`), and one Hono
+ * middleware that applies it to every request under `/api/` but a GET or a HEAD (`writeGuard`, which app.ts registers before any route).
+ * No route keeps words of its own for it: a refusal names the request's method and path, and where the document says what each route takes.
  *
  * Why each: a write is what an agent acts on in the repository — once a tick files it, at once, or once a person starts the card or the
  * workflow — or a person's idea or step gone, or its place, so a page on another site must not be able to make any of them; and a `fetch`
  * with a body, from any page, reaches the api without the browser asking it first, unless the body is JSON.
  *
  * - Addressed to a name that is not this machine (`Host`): a site whose name was pointed at 127.0.0.1, which the browser treats as that
- *   site's own origin. Absent — a client that sends none — is this machine. Refused 403, `Forbidden`'s reason `host`.
+ *   site's own origin. Absent — a client that sends none — is this machine, and so is the loopback on any port. On a store marked
+ *   exposed, so is a name it is served at (the contract's `served`, `servedAt` over `servedNamesOf`): the address it binds (`NEMIA_BIND`,
+ *   read off `ApiConfig`) and the names the person declares it reached by (`WF_SERVED_NAMES`, read off `StoreConfig`), so a browser on
+ *   another device asks a pairing, or claims a link, at the name it opened the board at. Refused 403, `Forbidden`'s reason `host`, in
+ *   words that name `WF_SERVED_NAMES` on an exposed store and the loopback on any other.
  * - Made by a page on another site (`Sec-Fetch-Site`, which the browser sets and no page can): anything but `same-origin`, which the board
  *   is, through vite's proxy too. `same-site` is refused: another port on localhost is the same site. Absent is a client outside a
  *   browser, such as curl. Refused 403, `Forbidden`'s reason `site`.
@@ -38,11 +42,16 @@
  * Not `Origin` against `Host`: vite's proxy rewrites `Host` to the api's (`changeOrigin`), so the board's own write would read as another
  * site's.
  */
+import { Effect } from 'effect';
 import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { Forbidden, TOKEN_COOKIE, UnsupportedMediaType } from 'objects';
 import type { WriteRefusal, WriteRefused, WriteRequest } from '../contracts/write-guard.contract.ts';
-import { loopback } from './address/address.ts';
+import { servedNamesOf } from 'agent-orchestrator';
+import { loopback, nameOf, servedAt } from './address/address.ts';
+import { ApiConfig, type ApiEnv } from './layer.ts';
+import { bindOf } from './port.ts';
+import { StoreConfig } from './store.ts';
 import { mediaOf, saysForm, saysJson } from './media/media.ts';
 
 export type { WriteRefusal, WriteRequest } from '../contracts/write-guard.contract.ts';
@@ -76,7 +85,7 @@ export const cookieTokenOf = (c: Context): string | undefined => {
  */
 export const writeRefused: WriteRefused = (request) => {
   if (request.method === 'GET' || request.method === 'HEAD') return null;
-  if (!request.bearer && !request.cookie && request.host !== undefined && !loopback(request.host)) return 'host';
+  if (!request.bearer && !request.cookie && request.host !== undefined && !loopback(request.host) && !request.served) return 'host';
   if (!request.bearer && request.site !== undefined && request.site !== 'same-origin') return 'site';
   if (request.contentType === undefined) return 'media';
   if (saysJson(request.contentType) || (request.bearer && saysForm(request.contentType))) return null;
@@ -86,13 +95,21 @@ export const writeRefused: WriteRefused = (request) => {
 /** Where every route is listed, with what it takes. */
 const DOCUMENT = 'GET /openapi/v3/nemia/v1';
 
-/** `refusal` of the request `route` names, as `objects`' error answers it: in words that say what to do instead. */
-const answerOf = (refusal: WriteRefusal, route: string, request: WriteRequest): Forbidden | UnsupportedMediaType => {
-  if (refusal === 'host')
-    return new Forbidden({
-      reason: 'host',
-      error: `${route} refuses a request addressed to ${request.host}: the api writes only for a request to this machine — localhost, 127.0.0.1 or [::1] — so that a site whose name points here cannot write through it. Reach the api at http://127.0.0.1:<port>.`,
-    });
+/**
+ * Why a request addressed to `host` is refused, in words that name the fix where it came from: on a store marked exposed (`exposed`), the
+ * setting that declares a name it is served at; on any other, the loopback, the one name it is reached at.
+ */
+const hostWords = (route: string, host: string | undefined, exposed: boolean): string =>
+  exposed
+    ? `${route} refuses a request with no token addressed to ${host}: this exposed store takes one only at the loopback, the address it binds (NEMIA_BIND) and the names declared in WF_SERVED_NAMES, so that a site whose name points here cannot write through it. If it is a name you reach this store by, declare it in the service's environment, beside the names already there: nemia service install --bind <address> --env WF_SERVED_NAMES=${host === undefined ? '<name>' : nameOf(host)}; nemia doctor says the names it takes.`
+    : `${route} refuses a request addressed to ${host}: the api writes only for a request to this machine — localhost, 127.0.0.1 or [::1] — so that a site whose name points here cannot write through it. Reach the api at http://127.0.0.1:<port>.`;
+
+/**
+ * `refusal` of the request `route` names, as `objects`' error answers it: in words that say what to do instead, a host's by whether the
+ * store is marked exposed (`exposed`).
+ */
+const answerOf = (refusal: WriteRefusal, route: string, request: WriteRequest, exposed: boolean): Forbidden | UnsupportedMediaType => {
+  if (refusal === 'host') return new Forbidden({ reason: 'host', error: hostWords(route, request.host, exposed) });
   if (refusal === 'site')
     return new Forbidden({
       reason: 'site',
@@ -105,26 +122,47 @@ const answerOf = (refusal: WriteRefusal, route: string, request: WriteRequest): 
 };
 
 /**
+ * Whether the store is marked exposed, and the names it is served at besides the loopback (`servedNamesOf`): the address the api binds,
+ * read off the app's environment (`NEMIA_BIND`, as `bindOf` reads it), and the names declared in the store's settings
+ * (`WF_SERVED_NAMES`), whose refusal of a value set wrong is thrown.
+ */
+const servingOf = Effect.gen(function* () {
+  const config = yield* StoreConfig;
+  const { env } = yield* ApiConfig;
+  const exposed = config.exposed;
+  if (!exposed) return { exposed, names: [] as readonly string[] };
+  const bind = bindOf(env.NEMIA_BIND, exposed);
+  return { exposed, names: servedNamesOf(exposed, bind.kind === 'bound' ? bind.host : '', config.servedNames) };
+});
+
+/**
  * Every request under `/api/` but a GET or a HEAD, refused before any route reads it where `writeRefused` refuses it: 403 `{ error,
- * reason }` for its host or its site, 415 `{ error }` for a body not sent as JSON.
+ * reason }` for its host or its site, 415 `{ error }` for a body not sent as JSON. The store's served names (`servingOf`) are read only
+ * for a write with no token addressed to a name that is not the loopback, the one the host decides.
  * @param c The request's context.
  * @param next The rest of the request's handling, reached where the write is not refused.
  */
-export const writeGuard: MiddlewareHandler = async (c, next) => {
+export const writeGuard: MiddlewareHandler<ApiEnv> = async (c, next) => {
   const path = new URL(c.req.url).pathname;
   if (!path.startsWith('/api/')) return next();
   const bearer = typeof bearerOf(c.req.header('authorization')) === 'string';
+  const cookie = !bearer && cookieTokenOf(c) !== undefined;
+  const host = c.req.header('host');
+  const method = c.req.method;
+  const asks = method !== 'GET' && method !== 'HEAD' && !bearer && !cookie && host !== undefined && !loopback(host);
+  const serving = asks ? await c.var.runtime.runPromise(servingOf) : { exposed: false, names: [] };
   const request: WriteRequest = {
-    method: c.req.method,
-    host: c.req.header('host'),
+    method,
+    host,
     site: c.req.header('sec-fetch-site'),
     contentType: c.req.header('content-type'),
     bearer,
-    cookie: !bearer && cookieTokenOf(c) !== undefined,
+    cookie,
+    served: host !== undefined && servedAt(host, serving.names),
   };
   const refusal = writeRefused(request);
   if (refusal === null) return next();
-  const answer = answerOf(refusal, `${request.method} ${path}`, request);
+  const answer = answerOf(refusal, `${request.method} ${path}`, request, serving.exposed);
   return c.json(Object.fromEntries(Object.entries(answer)), answer instanceof Forbidden ? 403 : 415);
 };
 

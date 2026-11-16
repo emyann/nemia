@@ -15,6 +15,7 @@ import { storeEnv } from './template.ts';
 const DAEMONS: Record<(typeof SESSION_VARIABLES)[number] | (typeof SERVING_VARIABLES)[number] | 'OTEL_EXPORTER_OTLP_ENDPOINT', string> = {
   NEMIA_BIND: '100.126.244.0',
   WF_EXPOSED: '1',
+  WF_SERVED_NAMES: 'nemia.example.ts.net',
   OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9',
   WF_SESSION_TOKEN: 'a-token-no-test-minted',
   WF_MEMORY_LIMIT: '6Gi',

@@ -985,7 +985,7 @@
     },
     {
       "term": "Serving variables",
-      "meaning": "the daemon's serving variables, declared once (`SERVING_VARIABLES`, `packages/agent-orchestrator/src/config/config.store.ts`): `NEMIA_BIND`, the address its api listens on, and `WF_EXPOSED`, the store marked exposed, which a server's unit sets and a test's seat drops."
+      "meaning": "the daemon's serving variables, declared once (`SERVING_VARIABLES`, `packages/agent-orchestrator/src/config/config.store.ts`): `NEMIA_BIND`, the address its api listens on, `WF_EXPOSED`, the store marked exposed, and `WF_SERVED_NAMES`, the names an exposed store is reached at besides the loopback and its bind (`servedNames`, `servedNamesOf`), at which its api takes a write with no token, a pairing or a first-visit link's claim, which a server's unit sets and a test's seat drops."
     },
     {
       "term": "Store floor",

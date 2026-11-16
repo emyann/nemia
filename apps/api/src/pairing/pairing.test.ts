@@ -2,7 +2,9 @@
  * The pairing routes on a store marked exposed (`WF_EXPOSED=1`): a client with no token asks for a pairing and claims it, the person lists
  * and approves it, and the token the claim answers is one the api then takes; a first-visit link sets the board's HttpOnly cookie once.
  * The person's side refuses no token (401) and a session's (403 `person-only`). Statuses, phases and cookie attributes are asserted,
- * never a sentence.
+ * never a sentence. A pairing and a link's claim, the writes with no token, are taken from another device at a name the store is served at
+ * (`WF_SERVED_NAMES`, the address it binds), and refused for their host at any other, and at every name but the loopback on a store not
+ * marked exposed.
  *
  * On the stand-ins: the runtime's test engine, a session's task filed on it and left working (its token live), and the test place; the
  * tokens minted through the package's `TokenDoor` under the harness's store.
@@ -16,6 +18,7 @@ import { testPlace } from 'agent-orchestrator/testing';
 import { boardBase, storeConfigLayer, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { TOKEN_COOKIE, type LinkClaimed, type Pairing, type PairingAsked, type PairingClaimed, type PairingList } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
+import { ApiConfig } from '../layer.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -132,4 +135,87 @@ test("a first-visit link made with no base is printed under the board's own addr
   const url = new URL(((await res.json()) as { url: string }).url);
   assert.equal(url.origin, new URL(boardBase(undefined, process.env)).origin);
   assert.ok(url.searchParams.get('link'));
+});
+
+const SERVED = 'nemia.taile26745.ts.net';
+const BOUND = '100.64.0.7';
+/** The app over the harness's store, declaring `SERVED` and bound on `BOUND`, marked exposed where `exposedStore` is. */
+const servedApp = (exposedStore: boolean) => {
+  const env = { ...process.env, WF_ROOT: root, NEMIA_BIND: BOUND, WF_SERVED_NAMES: SERVED, ...(exposedStore ? { WF_EXPOSED: '1' } : {}) };
+  return appOver(standIn(), stand(), storeConfigLayer(env), ApiConfig.layer(env));
+};
+
+/** A write with no token of `body` to `url` on `app`, addressed to `host` as a browser on another device names it. */
+const sentTo = (app: ReturnType<typeof servedApp>, host: string, url: string, body: unknown) =>
+  app.request(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host, ...NO_TOKEN },
+    body: JSON.stringify(body),
+  });
+
+/** A first-visit link made by the person under `base`, its secret. */
+const linkUnder = async (base: string): Promise<string> => {
+  const made = await send('POST', '/api/links', { base }, personToken);
+  assert.equal(made.status, 200, await made.clone().text());
+  const secret = new URL(((await made.json()) as { url: string }).url).searchParams.get('link');
+  assert.ok(secret);
+  return secret;
+};
+
+/** The status of `res` and the reason its answer gives, where it gives one. */
+const statusOf = async (res: Response): Promise<[number, string | undefined]> => [
+  res.status,
+  res.status === 200 ? undefined : ((await res.json()) as { reason?: string }).reason,
+];
+
+test('an exposed store takes a pairing and a link claim at a name it is served at, and refuses them at any other name', async (t) => {
+  const app = servedApp(true);
+  await t.test('a pairing asked at the declared name, on any port and in any case, is taken, and claimed there', async () => {
+    for (const host of [`${SERVED}:8787`, 'Nemia.Taile26745.ts.net']) {
+      const res = await sentTo(app, host, '/api/pairings', { client: 'phone' });
+      assert.equal(res.status, 200, `${host}: ${await res.clone().text()}`);
+      const pairing = (await res.json()) as PairingAsked;
+      const claimed = await sentTo(app, host, `/api/pairings/${pairing.id}/claim`, { secret: pairing.secret });
+      assert.equal(((await claimed.json()) as PairingClaimed).phase, 'waiting', host);
+    }
+  });
+  await t.test('a pairing asked at the address the store binds is taken', async () =>
+    assert.deepEqual(await statusOf(await sentTo(app, `${BOUND}:8787`, '/api/pairings', { client: 'phone' })), [200, undefined]),
+  );
+  await t.test('a pairing asked at the loopback is taken as on every store', async () => {
+    for (const host of ['127.0.0.1:8787', 'localhost:8787', '[::1]:8787'])
+      assert.deepEqual(await statusOf(await sentTo(app, host, '/api/pairings', { client: 'desk' })), [200, undefined], host);
+  });
+  await t.test(
+    'REFUSED 403 host: a pairing asked at any other name — a site whose name points here, a name beside the declared one',
+    async () => {
+      for (const host of ['evil.example:8787', `evil.${SERVED}:8787`, `${SERVED}.evil.example`, '100.64.0.70:8787'])
+        assert.deepEqual(await statusOf(await sentTo(app, host, '/api/pairings', { client: 'phone' })), [403, 'host'], host);
+    },
+  );
+  await t.test("a first-visit link printed under the declared name is claimed there, into the board's cookie", async () => {
+    const secret = await linkUnder(`http://${SERVED}:8787`);
+    const res = await sentTo(app, `${SERVED}:8787`, '/api/links/claim', { secret });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(((await res.json()) as LinkClaimed).cookie, 'set');
+  });
+  await t.test(
+    'REFUSED 403 host: a link printed under a name not declared is not claimed at that name, its base no name the store takes',
+    async () => {
+      const secret = await linkUnder('http://elsewhere.example:8787');
+      assert.deepEqual(await statusOf(await sentTo(app, 'elsewhere.example:8787', '/api/links/claim', { secret })), [403, 'host']);
+      assert.deepEqual(
+        await statusOf(await sentTo(app, `${SERVED}:8787`, '/api/links/claim', { secret })),
+        [200, undefined],
+        'claimed at a declared name',
+      );
+    },
+  );
+});
+
+test('REFUSED 403 host: a store not marked exposed takes a pairing at the loopback alone, its declared names and bind none', async () => {
+  const app = servedApp(false);
+  for (const host of [`${SERVED}:8787`, `${BOUND}:8787`])
+    assert.deepEqual(await statusOf(await sentTo(app, host, '/api/pairings', { client: 'phone' })), [403, 'host'], host);
+  assert.deepEqual(await statusOf(await sentTo(app, '127.0.0.1:8787', '/api/pairings', { client: 'desk' })), [200, undefined]);
 });

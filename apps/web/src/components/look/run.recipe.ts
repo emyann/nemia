@@ -60,7 +60,7 @@ export const runRecipe = tv({
     tone: {
       alive: { ground: 'bg-[color-mix(in_srgb,var(--md-sys-color-secondary-container)_22%,var(--md-sys-color-surface-container-low))]' },
       yours: {
-        ground: 'bg-card dark:bg-[color-mix(in_srgb,var(--md-sys-color-primary)_6%,var(--md-sys-color-surface-container-low))]',
+        ground: 'bg-card dark:bg-[color-mix(in_srgb,var(--md-sys-color-primary)_3%,var(--md-sys-color-surface-container-low))]',
         clock: 'text-yours',
       },
       failure: { ground: 'bg-card dark:bg-[color-mix(in_srgb,var(--md-sys-color-error)_4%,var(--md-sys-color-surface-container-low))]' },

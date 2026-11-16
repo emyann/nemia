@@ -441,8 +441,8 @@ export const ONE_CELL: Span = { columns: 1, rows: 1 };
 export const panelWidth = (steps: number): number => Math.max(RUN_PANEL.width, steps * STEP_ROOM + PANEL_FRAME);
 
 /**
- * The cells an open run takes: its panel's (`RUN_PANEL`, `panelWidth`), as many to the right as its width reaches and as many rows down as its
- * height, with a gap's room past them. From the count of its steps alone, never their words, so a refetch that moves a status moves no
+ * The cells an open run takes: its panel's (`RUN_PANEL`, `panelWidth`), as many to the right as its width reaches and as many rows down as
+ * its height, with a gap's room past them. From the count of its steps alone, never their words, so a refetch that moves a status moves no
  * card. Never less than the card's own cell.
  * @param steps How many steps the run has.
  */

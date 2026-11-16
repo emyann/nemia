@@ -1045,6 +1045,7 @@ const flightLines = (page: Page) =>
  * each id; and the seed holds ids of more than one length, or the rule would hold for nothing.
  */
 async function flightAligned(page: Page): Promise<void> {
+  await expectVisible(section(page, 'in-flight').locator('tr[data-run]:has([data-factory])').first(), 'the rows in flight, read again');
   const lines = await flightLines(page);
   if (new Set(lines.map((line) => line.id.length)).size < 2)
     throw new Refused(`the runs in flight hold ids of more than one length — ${lines.map((line) => line.id).join(', ')}`);

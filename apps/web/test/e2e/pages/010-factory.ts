@@ -292,8 +292,8 @@ export default {
     );
     for (const run of [bottom, orphan]) {
       await expectVisible(
-        cardOf(page, run.id).locator('time[title*="Nothing of it is filed yet"]', { hasText: /^waiting for / }),
-        `${run.id}'s card says it is waiting, and for how long, not a time at work`,
+        cardOf(page, run.id).locator('[data-run-says="clock"]', { hasText: /^(?:not started|waited .+)$/ }),
+        `${run.id}'s card says it has not started, or how long it has waited on you, never a time at work`,
       );
     }
     await expectCount(
@@ -392,7 +392,10 @@ export default {
     await showFinished(page);
     await expectVisible(unmerged, `with the finished shown too, its card once (${UNMERGED.id})`);
     for (const run of [top, landed]) {
-      await expectVisible(cardOf(page, run.id).getByText(/^took .+$/), `${run.id}, landed, is drawn finished, and says what it took`);
+      await expectVisible(
+        cardOf(page, run.id).locator('article[data-tone="rest"] [data-clock-words]'),
+        `${run.id}, landed, is drawn finished, at rest, with its clock`,
+      );
     }
     await expectDiamond(page, 'with the finished shown');
     await expectCount(

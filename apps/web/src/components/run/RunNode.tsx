@@ -11,7 +11,7 @@ import { judged, type RunRow, type UnjudgedRun } from '@/lib/api/judged';
 import { TryTag } from './TryTag';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
-import { clockCounts, panelWidth, toDecideOf, waitsOnRuns, waitsOnYou } from '@/lib/factory';
+import { CARD_WIDTH, clockCounts, panelWidth, toDecideOf, waitsOnRuns, waitsOnYou } from '@/lib/factory';
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
 import { namespaceOf } from '@/lib/factories';
@@ -50,7 +50,8 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * it, the run's panel: each step named under the graph, a press on a node showing its step in the frame's bar (`data-tile`, pressed
  * while shown), the facts, the runs it waits on and that wait on it, and the step's last line, once its run is read alone (`detail`).
  * A click on the card shows the run in the bar, and the card is banded while it does (`lookOf`). The title opens the run's page.
- * `w-88` is `CARD_WIDTH`, narrower than the grid's cell, which leaves the gap between cards; the panel is as wide as its graph.
+ * A closed card is `CARD_WIDTH` wide, narrower than the grid's cell, which leaves the gap between cards; an open one, its panel, is as
+ * wide as the cells it claims (`panelWidth`).
  *
  * Under what the part says, the floor's own lines:
  * - What a person has to know to act, besides the gate's own `approve <step>`: a step's question, or a session the harness blocked, two
@@ -130,7 +131,7 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
   const said = taken && stamp === (taken.next ?? taken.stamp) ? taken.said : null;
   const asOf = new Date(now);
   return (
-    <div {...look.marks} className={open ? undefined : 'w-88'} style={open ? { width: panelWidth(run.steps.length) } : undefined}>
+    <div {...look.marks} style={{ width: open ? panelWidth(run.steps.length) : CARD_WIDTH }}>
       <Run
         run={run}
         size={open ? 'xl' : 'md'}

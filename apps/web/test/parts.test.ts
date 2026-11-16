@@ -475,6 +475,10 @@ test('Run: each size draws what its ladder says and no more, in its tone, and on
       const element = createElement(Run, { run, size, layout, asOf, among, read: READS['1sw7'] });
       const html = await drawn(size === 'md' && layout === 'row' ? await inTable(element) : element);
       assert.deepEqual(said(html), [...says(size, layout)].filter((thing) => !none.has(thing)).sort());
+      if (layout === 'row') {
+        assert.match(html, new RegExp(`<tr[^>]*data-run="${run.id}"`), 'the row is the table row, marked by its run');
+        assert.match(html, /data-factory="/, 'and says its factory');
+      }
     });
   await t.test('each thing a card says is drawn first at its smallest size, and at every size above it', async () => {
     const ladder = ['xs', 'sm', 'md', 'lg', 'xl'] as const;

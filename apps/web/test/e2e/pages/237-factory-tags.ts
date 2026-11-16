@@ -47,11 +47,9 @@ export default {
     await open(page, `/runs?factory=${factory}`);
     await expectCount(runs, 1, `with ${factory} picked, Runs keeps its one run`);
     await expectVisible(page.locator(`tr[data-run="${FOLDER.id}"]`), `and that run is ${FOLDER.id}`);
-    await expectTexts(
-      page.locator('[data-plate-count]'),
-      ['0', '0', '1'],
-      "and each plate says the factory's own count, as the api filtered it",
-    );
+    const counts = await page.locator('[data-count-chip]').evaluateAll((all) => all.map((chip) => chip.getAttribute('data-count-chip')));
+    if (counts.join('|') !== '0|0|1')
+      throw new Refused(`and each count chip says the factory's own count, as the api filtered it — ${counts.join(', ')}`);
     await shoot('runs');
 
     await open(page, '/runs?factory=default');

@@ -54,10 +54,9 @@ async function thirdPage(page: Page, trail: string[]): Promise<void> {
     await expectTexts(page.locator('[data-pager-rows]'), [`Runs 19–19 of ${WRITTEN + 1}`], 'and says its one row');
     await expectCount(rowsOf(page), 1, 'page 3 holds one row');
     await expectVisible(rowsOf(page).locator(`[data-run-id][title="${idOf(WRITTEN)}"]`), 'the oldest finished of the factory');
-    await expectTexts(
-      page.locator('section[data-section="finished"] [data-plate-count]'),
-      [String(WRITTEN + 1)],
-      "the plate's count is the factory's",
+    await expectVisible(
+      page.locator(`section[data-section="finished"] [data-count-chip="${WRITTEN + 1}"]`),
+      "the count chip's count is the factory's",
     );
     await expectVisible(page.locator('[data-pager-older][data-disabled]'), 'Older leads nowhere from the last page');
     if (how === 'loaded by its address') {
@@ -130,11 +129,11 @@ const LONG_AGO = { id: 'finished-another-year-e2py', title: 'Finished another ye
 const LONGEST_AGO = ['11 months ago', '59 minutes ago'];
 
 /**
- * Every text of a column the owner saw run into the next: the two `how long ago` words, the Clock cell's own, and the note of a row in
- * flight, which read as one word with the clock beside it.
+ * Every text of a column the owner saw run into the next: the `how long ago` words, the Clock cell's own, and the words of what a row
+ * in flight does now, which read as one word with the clock beside it.
  */
 const tightOf = (page: Page): Locator =>
-  page.locator('td[data-created] time, td[data-finished] time, td[data-clock] [data-clock-words], tr[data-run] td [data-now-note]');
+  page.locator('td[data-finished] time, td[data-clock] [data-clock-words], tr[data-run] td [data-now-words]');
 
 /** Every such text ends inside its cell's own room, short of the cell's padding: none reaches the next column. */
 async function expectRoom(page: Page, assertion: string): Promise<void> {
@@ -155,8 +154,8 @@ async function expectRoom(page: Page, assertion: string): Promise<void> {
 /** The longest name of a workflow in use today, which the Workflow column holds uncut. */
 const LONGEST_WORKFLOW = 'build-team';
 
-/** The Workflow column's links, each cut to its cell's room. */
-const workflowsOf = (page: Page): Locator => page.locator('section[data-section="finished"] tr[data-run] td a[data-workflow]');
+/** The workflow links of the finished rows' meta lines. */
+const workflowsOf = (page: Page): Locator => page.locator('section[data-section="finished"] tr[data-run] a[data-workflow]');
 
 /** Every Workflow link shows its name whole: what it holds fits the room it is cut to. */
 async function expectWorkflowsWhole(page: Page, assertion: string): Promise<void> {
@@ -185,9 +184,7 @@ async function datesFit(page: Page): Promise<void> {
       [agoWords(new Date(Date.now() - LONG_AGO.finishedAgo * 60_000), new Date())],
       'a run finished more than a year back still says how long ago, never a date',
     );
-    const created = ((await old.locator('td[data-created]').textContent()) ?? '').trim();
-    if (!created.endsWith(' ago')) throw new Refused(`and so does the day it was created — it says "${created}"`);
-    const title = await old.locator('td[data-created] time').getAttribute('title');
+    const title = await old.locator('td[data-finished] time').getAttribute('title');
     if (!title?.match(/\d{4}, \d{1,2}:\d{2}:\d{2} [AP]M$/)) throw new Refused(`with the exact instant on hover — it says "${title}"`);
     await expectRoom(page, 'each column of the runs page has its own room');
     await settled(page);
@@ -212,7 +209,7 @@ async function datesFit(page: Page): Promise<void> {
     const named = await workflowsOf(page).evaluateAll((all) => all.map((link) => link.textContent ?? ''));
     try {
       await workflowsOf(page).evaluateAll((all, name) => all.forEach((link) => (link.textContent = name)), LONGEST_WORKFLOW);
-      await expectWorkflowsWhole(page, `the Workflow column holds the longest name in use, "${LONGEST_WORKFLOW}", uncut`);
+      await expectWorkflowsWhole(page, `the meta line holds the longest workflow name in use, "${LONGEST_WORKFLOW}", uncut`);
       if (wide) {
         await page.setViewportSize({ width: 560, height: wide.height });
         await expectWorkflowsWhole(page, `and so it does at a phone\u2019s width`);

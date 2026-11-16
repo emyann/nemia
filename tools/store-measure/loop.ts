@@ -50,7 +50,11 @@ const USAGE =
 
 const FLAGS = ['--from', '--engine', '--passes', '--every', '--json', '--compare'];
 
-/** The arguments, each store an existing folder, or the words that say how to call it. */
+/**
+ * The arguments, each store an existing folder, or the words that say how to call it.
+ * @param args The command's arguments.
+ * @param env The environment its stores default from (`WF_ROOT`, `AE_ROOT`, `HOME`).
+ */
 export function loopArgsOf(args: readonly string[], env: NodeJS.ProcessEnv): LoopAsked | string {
   const given: Record<string, string> = {};
   for (let i = 0; i < args.length; i += 2) {
@@ -83,7 +87,10 @@ export function loopArgsOf(args: readonly string[], env: NodeJS.ProcessEnv): Loo
   return { from, engine, passes: counts['--passes'], every: counts['--every'], json: at('--json'), compare: at('--compare') };
 }
 
-/** The spread of `values`, in ms, each nearest-rank. */
+/**
+ * The spread of `values`, in ms, each nearest-rank.
+ * @param values The times, in ms.
+ */
 export const spreadOf = (values: readonly number[]): Spread => {
   const sorted = [...values].sort((a, b) => a - b);
   const rank = (p: number) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1))] ?? 0;
@@ -155,7 +162,11 @@ async function measured(asked: LoopAsked, root: string, fence: Fence) {
 /** A spread as a line: its p50, p99 and max in ms, and its count. */
 const said = (s: Spread) => `p50 ${s.p50.toFixed(1)} ms, p99 ${s.p99.toFixed(1)} ms, max ${s.max.toFixed(1)} ms (n ${s.count})`;
 
-/** The report as a person reads it, beside `before` where given. */
+/**
+ * The report as a person reads it, beside `before` where given.
+ * @param report The measure now.
+ * @param before An earlier measure, read from `--compare`.
+ */
 export function loopRendered(report: LoopMeasure, before?: LoopMeasure): string {
   const rows: [string, (m: LoopMeasure) => string][] = [
     ['open runs', (m) => String(m.openRuns)],
@@ -168,7 +179,10 @@ export function loopRendered(report: LoopMeasure, before?: LoopMeasure): string 
   return [head, ...rows.map(([name, of]) => `| ${name} | ${before ? `${of(before)} | ` : ''}${of(report)} |`)].join('\n');
 }
 
-/** Run the command on `args`: the exit code. */
+/**
+ * Run the command on `args`: the exit code.
+ * @param args The command's arguments.
+ */
 export async function main(args: readonly string[]): Promise<number> {
   const asked = loopArgsOf(args, process.env);
   const refused = (words: string, code: number) => {

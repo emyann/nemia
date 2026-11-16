@@ -257,6 +257,7 @@ const DAEMON: ServiceSeed = {
       series: ['records', 'place', 'assess'].map((phase, i) => [{ phase }, 20 + i * 40]),
     }),
     restarted(lone('pass.journal_reads', 'histogram', 12)),
+    restarted(lone('nodejs.eventloop.delay', 'histogram', 15)),
     lone('store.runs', 'gauge', 24),
     lone('sessions.queued', 'gauge', 2),
     lone('sessions.admitted', 'gauge', 5),

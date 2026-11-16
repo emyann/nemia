@@ -108,7 +108,7 @@ const watched = (watch: LoopWatch, open: ReadonlySet<Tracer.Span>) =>
       if (late > watch.stallMs) {
         const running = runningOf(open);
         yield* Effect.logWarning(
-          `the event loop was held ${(late / 1000).toFixed(1)} s, so every request waited as long; ${running ? `the daemon was in ${running.chain.join(' < ')}` : 'no span of the daemon was open'} as it came back: a profile of a pass names what held it (node --cpu-prof tools/store-measure/loop.ts)`,
+          `the event loop was held ${(late / 1000).toFixed(1)} s, so every request waited as long; ${running ? `the daemon was in ${running.chain.join(' < ')}` : 'no span of the daemon was open'} as it came back: a CPU profile of the daemon (node --cpu-prof) names what held it`,
         ).pipe(Effect.annotateLogs({ heldMs: Math.round(late), span: running?.name ?? null, spans: running?.chain ?? [] }));
       }
       if (now - read < watch.everyMs) continue;

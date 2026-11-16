@@ -6,7 +6,8 @@
  * session of hers is filed.
  *
  * The usage refusals, the refused destination and the empty store's report spawn `report.ts` in a child of its own, under a timeout;
- * the rest are its functions, called here.
+ * the rest are its functions, called here. The loop's measure (`loop.ts`) beside it: what it refuses to be called with, and its report
+ * on an empty store, spawned the same way, with the passes, the loop's delay and the level's reads while they ran.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,14 +17,16 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { argsOf, invariantRefusals, MEASURES, rootAsWritten, type StoreMeasure } from '../../store-measure/report.ts';
 import { copyStore, destinationRefusal, gitVerdict, installFence, LEFT_OUT, readOnlyPlace } from '../../store-measure/fence.ts';
+import { loopArgsOf, spreadOf, type LoopMeasure } from '../../store-measure/loop.ts';
 import type { Place } from 'agent-orchestrator';
 
 const REPORT = path.join(import.meta.dirname, '..', '..', 'store-measure', 'report.ts');
+const LOOP = path.join(import.meta.dirname, '..', '..', 'store-measure', 'loop.ts');
 
 /** `report.ts` run with `args`, under a bound, in an environment of the test's own: no collector, and a home of its own. */
-const report = (args: string[], env: NodeJS.ProcessEnv = {}, gc = true) => {
+const report = (args: string[], env: NodeJS.ProcessEnv = {}, gc = true, script = REPORT) => {
   const { OTEL_EXPORTER_OTLP_ENDPOINT: _otlp, WF_ROOT: _wf, AE_ROOT: _ae, ...rest } = process.env;
-  return spawnSync(process.execPath, [...(gc ? ['--expose-gc'] : []), REPORT, ...args], {
+  return spawnSync(process.execPath, [...(gc ? ['--expose-gc'] : []), script, ...args], {
     encoding: 'utf8',
     timeout: 240_000,
     killSignal: 'SIGKILL',
@@ -250,4 +253,36 @@ test('the measure composes the api through its entry (`api/app`), and hands its 
   assert.match(text, /'api\/app'/);
   assert.doesNotMatch(text, /api\/src\//);
   assert.doesNotMatch(text, /process\.env\.WF_\w+\s*=[^=]/);
+});
+
+test("the loop's measure refuses what it cannot be called with, and reads a spread's ranks off the times it is given", () => {
+  const from = scratch('store-measure-loop-from-');
+  for (const args of [['--bogus'], ['--passes'], ['--passes', '1'], ['--every', 'x'], ['--from', path.join(from, 'not-there')]])
+    assert.equal(typeof loopArgsOf(args, {}), 'string', `refused: ${args.join(' ')}`);
+  assert.deepEqual(loopArgsOf(['--from', from, '--engine', from, '--passes', '3', '--every', '0'], {}), {
+    from,
+    engine: from,
+    passes: 3,
+    every: 0,
+    json: undefined,
+    compare: undefined,
+  });
+  assert.deepEqual(spreadOf([]), { p50: 0, p99: 0, max: 0, count: 0 });
+  assert.deepEqual(spreadOf([3, 1, 2, 4]), { p50: 2, p99: 4, max: 4, count: 4 });
+});
+
+test("on an empty store the loop's measure times the passes, the loop's delay and the level's reads while they run", () => {
+  const from = scratch('store-measure-loop-wf-');
+  const engine = scratch('store-measure-loop-ae-');
+  const json = path.join(scratch('store-measure-loop-out-'), 'loop.json');
+  const ran = report(['--from', from, '--engine', engine, '--passes', '3', '--every', '100', '--json', json], {}, false, LOOP);
+  assert.equal(ran.status, 0, ran.stderr);
+  const written = JSON.parse(fs.readFileSync(json, 'utf8')) as LoopMeasure;
+  assert.equal(written.openRuns, 0);
+  assert.equal(written.passes.warm.count, 2, 'the passes after the first are counted warm');
+  assert.ok(written.delay.count > 0, "the loop's delay was sampled");
+  assert.ok(written.level.count > 0, 'the level was read while the passes ran');
+  assert.ok(written.level.max >= written.level.p99 && written.level.p99 >= written.level.p50);
+  assert.deepEqual(written.refusals, []);
+  assert.deepEqual(fs.readdirSync(from), [], 'the store itself was not written');
 });

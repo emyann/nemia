@@ -189,22 +189,22 @@ function lineStarts(file: string): number[] {
 }
 
 /** The statuses a run has finished with. */
-const FINISHED = new Set(['succeeded', 'failed', 'cancelled']);
+export const FINISHED = new Set(['succeeded', 'failed', 'cancelled']);
 
-type Orchestrator = typeof import('agent-orchestrator');
-type Api = typeof import('api/app');
-type Built = ReturnType<Api['appOf']>;
-type App = Built['app'];
-type Place = Parameters<Orchestrator['PlaceService']['layer']>[0];
+export type Orchestrator = typeof import('agent-orchestrator');
+export type Api = typeof import('api/app');
+export type Built = ReturnType<Api['appOf']>;
+export type App = Built['app'];
+export type Place = Parameters<Orchestrator['PlaceService']['layer']>[0];
 
 /**
  * The environment the copy at `root` is read under, one record handed to every reader (`liveOf`, `storeConfigLayer`, `engine`) and never
  * written into this process's: both roots on the copy, the memo's verification off, worktrees kept, no daemon started and no collector.
  */
-type CopyEnv = Readonly<Record<string, string | undefined>>;
+export type CopyEnv = Readonly<Record<string, string | undefined>>;
 
 /** The environment of the copy at `root` (`CopyEnv`), and the workflows' store of the copy. */
-function copyEnvOf(root: string): { wf: string; env: CopyEnv } {
+export function copyEnvOf(root: string): { wf: string; env: CopyEnv } {
   const wf = path.join(root, 'wf');
   const env: Record<string, string | undefined> = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith('OTEL_')),
@@ -223,7 +223,7 @@ function copyEnvOf(root: string): { wf: string; env: CopyEnv } {
  * An api app over the copy whose environment is `env`, its runtime built and every memo of it empty, reading through `place`, saying no
  * line.
  */
-const appOver = async (api: Api, orch: Orchestrator, place: Place, env: CopyEnv): Promise<Built> => {
+export const appOver = async (api: Api, orch: Orchestrator, place: Place, env: CopyEnv): Promise<Built> => {
   const built = api.appOf(Layer.mergeAll(api.liveOf(env), orch.PlaceService.layer(place), Logger.layer([])));
   await built.runtime.runPromise(Effect.void);
   return built;
@@ -233,7 +233,7 @@ const appOver = async (api: Api, orch: Orchestrator, place: Place, env: CopyEnv)
  * A token of the person's kept in the copy's workflows' store `wf`, as the store keeps one: its record under `person-tokens/` named by
  * its sha-256 digest. Every route of the api takes a token, so each read presents it. Written on the copy alone, before the fence is armed.
  */
-function seatedOn(wf: string): string {
+export function seatedOn(wf: string): string {
   const token = crypto.randomBytes(32).toString('base64url');
   const dir = path.join(wf, 'person-tokens');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -244,7 +244,7 @@ function seatedOn(wf: string): string {
 }
 
 /** `GET url` of `app` under the person's `token`, its body read as JSON; thrown where it is not a 200. */
-async function getJson(app: App, url: string, token: string): Promise<unknown> {
+export async function getJson(app: App, url: string, token: string): Promise<unknown> {
   const res = await app.request(url, { headers: { authorization: `Bearer ${token}` } });
   const body = await res.text();
   if (res.status !== 200) throw new Error(`GET ${url} answered ${res.status} on the copy: ${body.slice(0, 300)}`);
@@ -600,7 +600,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
 }
 
 /** The commit the checkout of this file is at, or `unknown`. */
-const commitHere = (): string => {
+export const commitHere = (): string => {
   try {
     return execFileSync('git', ['rev-parse', 'HEAD'], {
       cwd: import.meta.dirname,
@@ -613,7 +613,7 @@ const commitHere = (): string => {
 };
 
 /** What the machine is, as the report says it. */
-const machineNow = (): StoreMeasure['machine'] => {
+export const machineNow = (): StoreMeasure['machine'] => {
   const cpus = os.cpus();
   return {
     cpu: cpus[0]?.model ?? 'unknown',

@@ -30,13 +30,21 @@ const canonical = (value: unknown): string =>
   });
 
 /**
+ * The schemas a field's is compared with (`sameSchema`), each written out once with its keys sorted: a module holds them as a constant, so
+ * a pass that reads every step's fields writes out only the field's own schema.
+ * @param known The schemas, as a shape's module declares them.
+ */
+export const knownSchemas = (known: readonly unknown[]): string[] => known.map(canonical);
+
+/**
  * Whether a field's schema is one of `known`, its `description` aside.
  * @param schema A field's JSON schema.
- * @param known The schemas it is compared with.
+ * @param known The schemas it is compared with, as `knownSchemas` wrote them.
  */
-export const sameSchema = (schema: unknown, known: readonly unknown[]): boolean => {
+export const sameSchema = (schema: unknown, known: readonly string[]): boolean => {
   const fields = fieldsOf(schema);
   if (!fields) return false;
   const { description: _, ...rest } = fields;
-  return known.some((k) => canonical(rest) === canonical(k));
+  const text = canonical(rest);
+  return known.includes(text);
 };

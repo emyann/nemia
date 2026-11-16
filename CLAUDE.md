@@ -266,7 +266,9 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   a cursor, on a copy of both stores in a temp folder with the run count beside them, never the live store
   (`node --expose-gc tools/store-measure/report.ts [--repeat N] [--json <file>] [--compare <baseline.json>]`); the baseline before the
   Run door is `tools/store-measure/baselines/s1.json`, the measure after it `s2.json`, and their comparison `s2-vs-s1.txt`. A
-  session's measure, held by `tools/guards/test/store-measure.test.ts`.
+  session's measure, held by `tools/guards/test/store-measure.test.ts`. Beside it, what the passes cost the daemon's event loop
+  (`node tools/store-measure/loop.ts [--passes N] [--every ms] [--json <file>] [--compare <loop.json>]`): the loop's delay and
+  `GET /api/level`'s time while passes run on a copy, run under `node --cpu-prof` to see what holds it.
 - `tools/observe/` — the side Grafana for building Nemia, never shipped: `docker compose -f tools/observe/compose.yaml up -d`, the daemon
   started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` (the live daemon alone: a probe or a measurement goes to a held throwaway,
   `node tools/observe/render/render.ts --hold`, at the collector address it prints, and `--stop <name>` ends it; a step's command that

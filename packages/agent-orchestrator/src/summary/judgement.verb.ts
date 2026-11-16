@@ -64,7 +64,9 @@ const unjudgedSteps = (run: Run, names: readonly string[], views: Views, unreada
 /**
  * `runs` judged, off one listing of their tasks and of the runs they wait on, found among `store` (`viewsFor`), through a reader that
  * answers each task off it (`seenBy`), where their branches stand as `git` gives them: each with the branches it asked git about. A run
- * whose unfrozen folder does not load or a task of which does not read is not judged, and says why (`judgedUnlessUnreadable`).
+ * whose unfrozen folder does not load or a task of which does not read is not judged, and says why (`judgedUnlessUnreadable`). The folder
+ * is read only for a run that froze no workflow: one that froze its own is judged by it (`judgedSteps`, `stepNames`), never the folder.
+ * Each run judged gives the event loop up (`Effect.yieldNow`): a list judges every run cold, and a pass every moving one, synchronously.
  */
 export const judgementsOf = Effect.fn('judgementsOf')(function* (
   e: Engine,
@@ -76,7 +78,7 @@ export const judgementsOf = Effect.fn('judgementsOf')(function* (
   const { views, reader, unreadable } = yield* viewsFor(e, runs, store);
   const out = new Map<string, JudgedOrWhy>();
   for (const run of runs) {
-    const folder = workflowsOf(run, home).steps;
+    const folder = run.workflow === undefined ? workflowsOf(run, home).steps : null;
     const names = stepNames(run, folder);
     const asked: GitAsked = { branches: [], failed: false };
     const one = yield* judgedUnlessUnreadable(run, unreadable, () =>
@@ -84,6 +86,7 @@ export const judgementsOf = Effect.fn('judgementsOf')(function* (
         reader,
         git,
         standings: (status, steps) => standingsOf(run, steps, status, git, asked),
+        ...(store ? { store } : {}),
       }),
     );
     out.set(
@@ -92,6 +95,7 @@ export const judgementsOf = Effect.fn('judgementsOf')(function* (
         ? { judgement: { run, names, steps: judgedSteps(run, folder), views, judged: one.judged, asked } }
         : { unjudged: one.unreadable, saidBy: one.saidBy, steps: unjudgedSteps(run, names, views, unreadable) },
     );
+    yield* Effect.yieldNow;
   }
   return { runs: out, views, unreadable } satisfies Judgements;
 });

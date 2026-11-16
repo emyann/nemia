@@ -10,7 +10,7 @@ import type { FieldShape } from 'objects';
 import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
 import { isObject, type StepSpec } from '../step/step.ts';
 import { BUDGETS_SCHEMA, budgetRefusals } from '../budget/budget.ts';
-import { fieldsOf, itemsOf, sameSchema } from '../shape/shape.ts';
+import { fieldsOf, itemsOf, knownSchemas, sameSchema } from '../shape/shape.ts';
 
 /** One option of a question: its label, which an answer names, and what choosing it means. */
 export type QuestionOption = { label: string; meaning: string };
@@ -142,11 +142,14 @@ export function expandShapes(
   return { properties: expanded, shapes };
 }
 
+/** `QUESTIONS_SCHEMA` and the former ones, written out once (`knownSchemas`). */
+const QUESTIONS_SCHEMAS = knownSchemas([QUESTIONS_SCHEMA, ...FORMER_QUESTIONS_SCHEMAS]);
+
 /**
  * Whether a field's schema is `QUESTIONS_SCHEMA`, or a former one a frozen run holds (`FORMER_QUESTIONS_SCHEMAS`), its `description`
  * aside.
  */
-const isQuestionsSchema = (schema: unknown): boolean => sameSchema(schema, [QUESTIONS_SCHEMA, ...FORMER_QUESTIONS_SCHEMAS]);
+const isQuestionsSchema = (schema: unknown): boolean => sameSchema(schema, QUESTIONS_SCHEMAS);
 
 /**
  * The fields a step's `output:` declares whose schema is `QUESTIONS_SCHEMA`, in the schema's order: none for a step without `output:`.

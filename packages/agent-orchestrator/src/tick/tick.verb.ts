@@ -640,7 +640,9 @@ const fullPass = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRea
  *
  * Answered from memory, it costs no journal read, no observe and no git process of its own, and is counted (`rested`). With `verify`, it is
  * judged in full as well (`verified`), and a difference is died of: a change the memo missed is a bug in what it watches. Untraced: a run
- * judged in full is traced by its full pass (`advancePass`), and one answered from memory makes no span, counted on the pass's own.
+ * judged in full is traced by its full pass (`advancePass`), and one answered from memory makes no span, counted on the pass's own. A run
+ * judged in full gives the event loop up once it is (`Effect.yieldNow`), so the api's requests are answered between two runs and not
+ * only once the pass ends: a pass's reads are synchronous, and it yields to no other fiber of its own accord (`meteredPass`).
  *
  * `pass` holds the pass's one listing, `run` among them, handed to every full pass as the runs whose claims on a repository's checkout are
  * read (`checkoutHold`): the store is not listed again, nor the cap's slots read, nor a run others wait on, twice in a pass. `slot` is
@@ -649,7 +651,11 @@ const fullPass = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRea
  * ready wants a slot (`slotNeed`), so the cap holds it on no pass and it counts on none.
  */
 const advanceResting = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRead, resting: RestingPass | undefined, slot?: RunSlot) {
-  if (!resting) return (yield* fullPass(e, run, pass, slot)).advanced;
+  if (!resting) {
+    const { advanced } = yield* fullPass(e, run, pass, slot);
+    yield* Effect.yieldNow;
+    return advanced;
+  }
   const { memo, stamps, verify } = resting;
   const stamp = stamps.get(run.id);
   const kept = memo.runs.get(run.id);
@@ -667,6 +673,7 @@ const advanceResting = Effect.fnUntraced(function* (e: Engine, run: Run, pass: P
     const { run: _, facts: __, ...answered } = advanced;
     memo.runs.set(run.id, { stamp, run, tipped: rest.tipped, advanced: answered });
   }
+  yield* Effect.yieldNow;
   return advanced;
 });
 

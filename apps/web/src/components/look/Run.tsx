@@ -185,7 +185,7 @@ function NowMarks({ look, small = false, words = false }: { look: Look; small?: 
 }
 
 /**
- * The few words of the run's wait, on its line, cut to it on a card, with on hover what `nemia ls` says of its wait or hold, else the words
+ * The few words of the run's wait, on its line, cut to it on a card, with on hover the api's words for its wait or hold, else the words
  * whole, and the advice.
  */
 function WordsSaid({ run, look, among, cut }: { run: PartRun; look: Look; among: readonly PartRun[]; cut?: boolean }) {

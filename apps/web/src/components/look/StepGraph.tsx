@@ -221,7 +221,7 @@ function Node({
     return (
       <div data-fold={point.names.join(' ')} className="absolute" style={box}>
         <Told said={said}>
-          <span className="font-mono text-label-small leading-none text-on-surface-variant">+{point.names.length}</span>
+          <span className="font-mono text-body-small leading-none text-on-surface-variant">+{point.names.length}</span>
         </Told>
       </div>
     );

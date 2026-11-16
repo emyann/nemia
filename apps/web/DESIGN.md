@@ -1,20 +1,22 @@
 ---
 version: alpha
 name: Nemia, Graphite and Yellow
-description: Nemia's board between two cyberpunks — a graphite night, nearly black and neutral, with acid yellow for what waits on a person and a pale ice for what is alive, and on it the printed labels of a retro spec sheet in amber, red and grey with black ink, every card and label under a fine grain.
+description: Nemia's board between two cyberpunks — a graphite night, nearly black and neutral, with acid yellow for what waits on a person and a violet for what is alive, and on it the printed labels of a retro spec sheet in amber, red and grey with black ink, every card and label under a fine grain.
 scheme: dark
 colors:
   seed: "#f5e61a"
   primary-key: "#f5e61a"
-  secondary-key: "#5fa8b8"
+  secondary-key: "#9b5cff"
   tertiary-key: "#e0a15e"
   neutral-key: "#2a2b2c"
   neutral-variant-key: "#34363a"
   error-key: "#e5484d"
   primary: "#f5e61a"
   on-primary: "#141300"
-  secondary: "#eaf6f8"
+  secondary: "#c4a8ff"
   on-secondary: "#0c1416"
+  secondary-container: "#45218a"
+  on-secondary-container: "#e9ddff"
   tertiary: "#e0a15e"
   on-tertiary: "#1c1105"
   error: "#ff7676"
@@ -83,7 +85,7 @@ rounded:
 
 Two cyberpunks, blended. From the night-city one: a ground that is nearly
 black, a graphite with no cast, frames with a cut corner and a hairline, acid
-yellow on whatever a person can press, a pale ice on whatever is alive. From
+yellow on whatever a person can press, a violet on whatever is alive. From
 the retro one: the printed label. An instrument is a flat matte tile, amber,
 red or grey, with black ink, a wide machine lettering and a boxed readout, as
 stuck on the equipment by whoever built it. Cards and labels carry a fine
@@ -106,10 +108,19 @@ A colour says one thing, on every page.
 - **Primary (`primary-key`, `primary`):** acid yellow, `#f5e61a`, with black
   on it. It is yours: a gate that waits on a person, and the one filled
   button.
-- **Secondary (`secondary-key`, `secondary`):** a near white that carries an
-  ice hue, `#eaf6f8`, for what is alive: a session at work, a selected
-  filter. Its key is a teal, `#5fa8b8`, so the light scheme, derived, says
-  alive in teal, and a filled tag at work is a dark teal.
+- **Secondary (`secondary-key`, `secondary`):** violet, for what is alive: a
+  session at work, the live step on a rail, a selected filter, the focus
+  ring. Purple says alive and nothing else. The dark scheme writes a pale
+  violet, `#c4a8ff` (tone 80), with a deep violet container, `#45218a`
+  (tone 30), under a near-white violet ink, `#e9ddff` (tone 90). Its key is
+  `#9b5cff`, and the light scheme is derived from it. A link between runs is
+  plain ink; only a wire carrying live work is purple.
+- **Pink, on a live link (`#ff2e97`):** the colour of what moves along a
+  live link, a packet on a wire, only while it moves: never text, never a
+  fill, about 30° from the failure red. The kit reads only the seed, the
+  six keys and the 49 roles, so pink is the board's own variable beside the
+  theme, defined by the first change that draws a moving link (the Floor's
+  or a run graph's live wires), and not before.
 - **Tertiary (`tertiary-key`, `tertiary`):** the amber of a printed label,
   `#e0a15e`, with black ink on it. It is money: what a run cost.
 - **Inverse (`inverse-surface`, `inverse-on-surface`):** the label's grey,
@@ -154,7 +165,7 @@ components.
 
 ## Elevation and motion
 
-No shadow. A raised surface is a hairline in yellow, then in pale ice as it
+No shadow. A raised surface is a hairline in yellow, then in violet as it
 rises. Motion is short and decisive.
 
 ## Scroll bars

@@ -27,7 +27,7 @@ import { Run, type PanelRead } from '../look';
  * `open` is a run whose card is opened on its steps: `detail` its record once read, which gives each tile its attempt and cost, and
  * `trouble` why it could not be read. `inspected` is a run the frame's bar shows, and `selected` the step of it the bar shows.
  * `onToggle` opens or closes the card, and `onStep` shows a step of it in the bar. `reads` is a line per run it reads as context, its id
- * and title (`readsLines`).
+ * and title (`readsLines`). `among` is the floor's runs, which its words name by their marks and which wait on it.
  */
 type RunNodeData = {
   run: RunRow;

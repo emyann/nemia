@@ -4,14 +4,16 @@ import path from 'node:path';
 import { artifactsDir } from '../record/record.store.ts';
 import { artifactPlace, filesPrunedWords, GIVEN, HANDED_CLOSEOUT, isRepositoryRun, type Run } from '../run.ts';
 import type { ArtifactKind } from 'objects';
+import { isFilePath, statUnder } from '../artifacts/artifacts.store.ts';
 
 /** What the board does with a file: draws it inline, links it to be read in a tab, or links it with its size. */
 export type { ArtifactKind };
 
 /**
- * A file a closeout named. A file in the step's files directory (`artifactsDir`), by a name the artifacts route serves, is
- * that name, where the api serves it, its kind and its size. Anything else is the path as the closeout gave it: a path on the
- * step's branch, a file the directory does not have, one in a directory under it, or an absolute path anywhere else — which
+ * A file a closeout named. A file under the step's files directory (`artifactsDir`), at its top or in a folder beneath it, by a path
+ * the artifacts route serves (`statUnder`), is that path as its `name`, where the api serves it, its kind and its size. Anything else is
+ * the path as the closeout gave it: a path on the step's branch, a file the directory does not have, one reached through a link, or an
+ * absolute path anywhere else — which
  * is not looked at, as `nemia decide` does not look at it (`artifactPlace`). A file of the files directory that is not there on a run
  * `nemia prune --artifacts` pruned is the path and what removed it, when (`filesPrunedWords`): gone, not missing. `prunedAt` is
  * that moment alone, for a page that draws it as it draws every other time.
@@ -69,16 +71,23 @@ export const typeOf = (name: string) =>
   TYPES[path.extname(name).toLowerCase()] ?? { type: 'application/octet-stream', kind: 'other' as const };
 
 /**
- * Why a name is not one the artifacts route serves, or null when it is. A name, never a path: one with a separator of either
- * kind, or `..`, is refused before the disk is touched — and one with a NUL, which no file has.
- * @param name The name the route was asked for.
+ * Why a path is not one the file routes serve under a step's folder, or null when it is (`isFilePath`): an absolute path, one with a
+ * `..`, a backslash or a NUL in it, or an empty part, is refused before the disk is touched.
+ * @param rel The path the route was asked for, from the folder.
  */
-export function refusedName(name: string): string | null {
-  if (!name || /[/\\\0]/.test(name) || name.includes('..')) {
-    return `\`${name}\` is not the name of a file: a name has no \`/\`, \`\\\`, or \`..\`. GET /api/runs/<run> lists each step's closeout, whose \`artifacts\` carry the \`url\` of every file the api serves.`;
+export function refusedPath(rel: string): string | null {
+  if (!isFilePath(rel)) {
+    return `\`${rel}\` is not the path of a file under the step's folder: its parts are split at \`/\`, and none is empty, \`.\`, or has \`..\` or \`\\\` in it. GET /api/runs/<run> lists each step's closeout, whose \`artifacts\` carry the \`url\` of every file the api serves.`;
   }
   return null;
 }
+
+/**
+ * Where the api serves the file at `rel` under a step's folder: the route, then the path encoded whole as one segment, its `/` as
+ * `%2F`, as the route takes it.
+ */
+const urlOf = (run: Pick<Run, 'id'>, step: string, route: 'files' | 'artifacts', rel: string): string =>
+  `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/${route}/${encodeURIComponent(rel)}`;
 
 /** A regular file directly in `dir` by `name`, without following a link: a link that leads out of the directory is not a file in it. */
 function fileIn(dir: string, name: string): fs.Stats | undefined {
@@ -102,12 +111,10 @@ export function artifactOf(home: string, run: Pick<Run, 'id' | 'pruned'>, step: 
   if (place !== 'files') return { path: file, ...relativeOf(file, place, work) };
   const at = { path: file, relativePath: path.relative(path.resolve(dir), path.resolve(file)) };
   if (files && !fs.existsSync(dir)) return { ...at, pruned: filesPrunedWords(files), prunedAt: files.at };
-  if (path.dirname(path.resolve(file)) !== path.resolve(dir)) return at;
-  const name = path.basename(file);
-  const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;
+  const name = at.relativePath.split(path.sep).join('/');
+  const stat = statUnder(dir, name);
   if (!stat) return files ? { ...at, pruned: filesPrunedWords(files), prunedAt: files.at } : at;
-  const url = `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/artifacts/${encodeURIComponent(name)}`;
-  return { ...at, name, url, kind: typeOf(name).kind, size: stat.size };
+  return { ...at, name, url: urlOf(run, step, 'artifacts', name), kind: typeOf(name).kind, size: stat.size };
 }
 
 /**
@@ -138,8 +145,9 @@ const isDirectory = (at: string): boolean => {
  * they are listed in name order, as a directory listing reads.
  *
  * What the route cannot serve is listed all the same, by its path alone, drawn as any path a closeout named that the api does not
- * serve: a directory, a link (`fileIn` follows none), a name with a separator or `..` in it. The route serves a name and never a
- * path, and none of those becomes reachable by being listed — but a folder holding only `notes/` is not an empty folder, and the
+ * serve here: a directory, a link (`fileIn` follows none), a name with a separator or `..` in it. A file inside a directory is served by
+ * its path where a closeout names it, and is not listed here, which lists the folder's top alone — but a folder holding only `notes/`
+ * is not an empty folder, and the
  * board, which turns an empty list into *the folder is empty*, would tell a person their step made nothing. A folder that is not
  * there is an empty list and no error — a step not filed yet has no folder. A folder that is there and cannot be read is neither:
  * the page is given the reason instead of the list, since *the folder is empty* would again say the step made nothing when the truth
@@ -178,10 +186,9 @@ export function folderFiles(
     .filter((name) => !(name === HANDED_CLOSEOUT && fileIn(dir, name)))
     .map((name) => {
       const here = path.join(dir, name);
-      const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;
+      const stat = statUnder(dir, name);
       if (!stat) return { path: here, relativePath: name };
-      const url = `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/${route}/${encodeURIComponent(name)}`;
-      return { path: here, relativePath: name, name, url, kind: typeOf(name).kind, size: stat.size };
+      return { path: here, relativePath: name, name, url: urlOf(run, step, route, name), kind: typeOf(name).kind, size: stat.size };
     });
   return { files, error: null };
 }

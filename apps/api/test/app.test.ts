@@ -2569,8 +2569,9 @@ const SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>parent.pwned = true</script><rect width="10" height="10"/></svg>\n';
 
 /**
- * r-52's `shoot`, which named its files: some in its files directory, and some not, or not by a name the api serves. `../outside.png` is
- * named as a step spells it, not as `path.join` resolves it, and `link.png` is made afresh on each call.
+ * r-52's `shoot`, which named its files: some in its files directory, at its top or in a folder beneath it, and some not, or not by a
+ * path the api serves. `../outside.png` is named as a step spells it, not as `path.join` resolves it, and `link.png` and `out`, a link
+ * to the folder beside the directory, are made afresh on each call.
  */
 function seedFiles() {
   const dir = path.join(root, 'runs', 'r-52', 'artifacts', 'shoot');
@@ -2594,6 +2595,8 @@ function seedFiles() {
   }
   fs.rmSync(path.join(dir, 'link.png'), { force: true });
   fs.symlinkSync(path.join(dir, '..', 'outside.png'), path.join(dir, 'link.png'));
+  fs.rmSync(path.join(dir, 'out'), { force: true });
+  fs.symlinkSync(path.join(dir, '..'), path.join(dir, 'out'));
   const named = [
     'shot.png',
     'notes.txt',
@@ -2604,6 +2607,7 @@ function seedFiles() {
     'link.png',
     '..shot.png',
     'gone.png',
+    'out/outside.png',
   ].map((name) => path.join(dir, name));
   named[4] = `${dir}/../outside.png`;
   settledTask('t-52-shoot', { ...done, artifacts: [...named, 'RESPONSE.md', '/etc/hosts'] });
@@ -2617,10 +2621,10 @@ function seedFiles() {
   return { dir, named };
 }
 
-test("a step's files: a closeout's files with where they are served, each served by name with its type and refused as a path, and read pruned once `nemia prune --artifacts` removed them", async (t) => {
+test("a step's files: a closeout's files with where they are served, each served by its path with its type and refused as a path out, and read pruned once `nemia prune --artifacts` removed them", async (t) => {
   const s = story(t);
   await s.test(
-    "a closeout's files in the step's files directory carry where the api serves them, their kind and size — any other path is the path alone",
+    "a closeout's files under the step's files directory, at its top or in a folder beneath it, carry where the api serves them, their kind and size — any other path is the path alone",
     async () => {
       const { dir, named } = seedFiles();
       const shoot = await closeoutOf(app, 'r-52', 'shoot');
@@ -2641,22 +2645,27 @@ test("a step's files: a closeout's files with where they are served, each served
           served('trace.zip', 'other', 2),
           served('diagram.svg', 'image', Buffer.byteLength(SVG)),
           { path: named[4] },
-          { path: named[5], relativePath: path.join('sub', 'deep.png') },
+          { ...served('sub/deep.png', 'image', PNG.length), path: named[5] },
           { path: named[6], relativePath: 'link.png' },
           { path: named[7], relativePath: '..shot.png' },
           { path: named[8], relativePath: 'gone.png' },
+          { path: named[9], relativePath: path.join('out', 'outside.png') },
           { path: 'RESPONSE.md', relativePath: 'RESPONSE.md' },
           { path: '/etc/hosts' },
         ],
-        'the path alone: outside the directory however it is spelled, under it where no name reaches, a link out of it, a name the route refuses, a file it does not have, a path on the branch, and an absolute path anywhere else, which is not looked at',
+        'a file in a folder under the directory is served by its path, as one at its top; the path alone: outside the directory however it is spelled, a link out of it to a file or through a folder, a name the route refuses, a file it does not have, a path on the branch, and an absolute path anywhere else, which is not looked at',
       );
+      const nested = shoot.closeout.artifacts[5];
+      assert.ok(nested && 'url' in nested, 'the nested file carries its url');
+      assert.equal(nested.url, '/api/runs/r-52/steps/shoot/artifacts/sub%2Fdeep.png', 'its path encoded whole, one segment');
+      assert.deepEqual(Buffer.from(await (await app.request(nested.url)).arrayBuffer()), PNG, 'and its url serves it');
       assert.deepEqual((await triesOf(app, 'r-52', 'shoot'))[0].closeout?.artifacts, shoot.closeout.artifacts);
     },
   );
   await s.test(
-    "a step's file is served by name, with its type and no caching — and a name that is a path, or not in the directory, is refused",
+    "a step's file is served by its path under the directory, with its type and no caching — and a path that climbs out, is absolute, passes a link or is not there is refused",
     async () => {
-      seedFiles();
+      const { dir } = seedFiles();
       const base = '/api/runs/r-52/steps/shoot/artifacts';
 
       const image = await app.request(`${base}/shot.png`);
@@ -2686,16 +2695,34 @@ test("a step's files: a closeout's files with where they are served, each served
         assert.match(policy, /\bdefault-src 'none'/, `${name}: ${policy}`);
       }
 
-      for (const name of ['..%2Foutside.png', 'sub%2Fdeep.png', 'a%5Cb.png', '..shot.png']) {
+      const nested = await app.request(`${base}/sub%2Fdeep.png`);
+      assert.deepEqual(
+        [nested.status, nested.headers.get('content-type'), Buffer.from(await nested.arrayBuffer())],
+        [200, 'image/png', PNG],
+        'a file in a folder under the directory is served by its path, encoded whole',
+      );
+
+      const refused = {
+        'a path that climbs out': '..%2Foutside.png',
+        'a path that climbs out from a folder': 'sub%2F..%2F..%2Foutside.png',
+        'an absolute path': encodeURIComponent(path.join(dir, '..', 'outside.png')),
+        'a path with an empty part': 'sub%2F%2Fdeep.png',
+        'a name with a backslash': 'a%5Cb.png',
+        'a name with `..` in it': '..shot.png',
+      };
+      for (const [what, name] of Object.entries(refused)) {
         const res = await app.request(`${base}/${name}`);
-        assert.equal(res.status, 400, `${name} names a file on disk: only the refusal stands between it and the response`);
-        const { error } = (await res.json()) as { error: string };
-        assert.ok(/is not the name of a file: a name has no `\/`, `\\`, or `\.\.`/.test(error), `${name}: ${error}`);
+        assert.equal(res.status, 400, `${what}, ${name}, names a file on disk: only the refusal stands between it and the response`);
       }
-      for (const name of ['gone.png', 'sub', 'link.png']) {
+      const missing = {
+        'a file not there': 'gone.png',
+        'a folder': 'sub',
+        'a link to a file out': 'link.png',
+        'a link to a folder out': 'out%2Foutside.png',
+      };
+      for (const [what, name] of Object.entries(missing)) {
         const res = await app.request(`${base}/${name}`);
-        assert.equal(res.status, 404, `${name}: not a regular file in the directory`);
-        assert.match(((await res.json()) as { error: string }).error, /has no file .* in its files directory/, name);
+        assert.equal(res.status, 404, `${what}, ${name}: not a regular file under the directory`);
       }
       const noRun = (await (await app.request('/api/runs/no-such-run/steps/shoot/artifacts/shot.png')).json()) as { error: string };
       assert.match(noRun.error, /No run 'no-such-run'/, 'no such run');
@@ -2723,7 +2750,7 @@ test("a step's files: a closeout's files with where they are served, each served
           [
             ...[0, 1, 2, 3].map(prunedOf),
             { path: named[4] },
-            ...[5, 6, 7, 8].map(prunedOf),
+            ...[5, 6, 7, 8, 9].map(prunedOf),
             { path: 'RESPONSE.md', relativePath: 'RESPONSE.md' },
             { path: '/etc/hosts' },
           ],
@@ -2743,9 +2770,9 @@ test("a step's files: a closeout's files with where they are served, each served
           assert.equal(body.pruned, files.at);
         }
         assert.equal(
-          (await app.request(`${base}/sub%2Fdeep.png`)).status,
+          (await app.request(`${base}/..%2Foutside.png`)).status,
           400,
-          'a name that is a path is refused, pruned or not: the prune answers only for a name the route would serve',
+          'a path that climbs out is refused, pruned or not: the prune answers only for a path the route would serve',
         );
 
         const decision = await app.request('/api/runs/r-52/decision');

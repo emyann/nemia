@@ -293,8 +293,13 @@ export const StepArtifact = Schema.Union([
   Schema.Struct({
     path: Schema.String.annotate({ description: 'The path of the file.' }),
     relativePath,
-    name: Schema.String.annotate({ description: "The file's name." }),
-    url: Schema.String.annotate({ description: 'Where the file is served.' }),
+    name: Schema.String.annotate({
+      description:
+        "The file's path under its step's folder, its parts split at `/`: its name for a file at the folder's top, `e2e/bar.png` for one in a folder beneath it.",
+    }),
+    url: Schema.String.annotate({
+      description: "Where the api serves the file: its step's file route, its path under the folder encoded whole as the last segment.",
+    }),
     kind: Schema.Literals(ARTIFACT_KINDS).annotate({
       description: 'What the board does with it: shows it as an image, as text, or links it.',
     }),

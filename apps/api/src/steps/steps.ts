@@ -12,7 +12,7 @@ import {
   LOGS,
   lifecycleGraph,
   phaseOfView,
-  refusedName,
+  refusedPath,
   STEP_ARTIFACT,
   STEP_FILE,
   STEP_PATH,
@@ -435,11 +435,14 @@ const logOf = (runId: string, step: string, tail: string | undefined) =>
     }
   });
 
-/** The file `name` of the step's files directory (`STEP_ARTIFACT`): `BadRequest` for a path, `Gone` once pruned, `Missing` where none. */
+/**
+ * The file at the path `name` under the step's files directory (`STEP_ARTIFACT`): `BadRequest` for a path that climbs out, is absolute
+ * or is no path (`refusedPath`), `Gone` once pruned, `Missing` where none, or where a link stands on the way.
+ */
 const artifactOf = (runId: string, step: string, name: string) =>
   answered(async (s) => {
     const { run } = stepOf(s, runId, step);
-    const refused = refusedName(name);
+    const refused = refusedPath(name);
     if (refused) throw new BadRequest({ error: refused });
     const { file } = await s.inRequest(STEP_ARTIFACT.handler({ runId, step, name }));
     const pruned = run.pruned?.artifacts;
@@ -457,11 +460,14 @@ const artifactOf = (runId: string, step: string, name: string) =>
     return servedFile(name, file);
   });
 
-/** The file `name` of a folder step's own folder (`STEP_FILE`): `BadRequest` for a path, `Missing` for a branch step or none there. */
+/**
+ * The file at the path `name` under a folder step's own folder (`STEP_FILE`): `BadRequest` for a path `refusedPath` refuses, `Missing` for
+ * a branch step, or none there, or a link on the way.
+ */
 const fileOf = (runId: string, step: string, name: string) =>
   answered(async (s) => {
     stepOf(s, runId, step);
-    const refused = refusedName(name);
+    const refused = refusedPath(name);
     if (refused) throw new BadRequest({ error: refused });
     const { folder, file } = await s.inRequest(STEP_FILE.handler({ runId, step, name }));
     if (!folder) {

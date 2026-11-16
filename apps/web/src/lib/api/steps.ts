@@ -142,7 +142,10 @@ export const stepPathQuery = (
     refetchInterval: (query) => poll(query.state.data),
   });
 
-/** The route and the name a served file's `url` ends in (`…/artifacts/<name>`, `…/files/<name>`); none for another address. */
+/**
+ * The route and the path a served file's `url` ends in, encoded whole as one segment (`…/artifacts/<path>`, `…/files/<path>`, its `/` as
+ * `%2F`); none for another address.
+ */
 const SERVED = /^\/api\/runs\/([^/]+)\/steps\/([^/]+)\/(artifacts|files)\/([^/]+)$/;
 
 /**

@@ -278,9 +278,9 @@ export default {
     await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
     const output = stepBar(page, FAKE.id, FAKE.unverified);
     const gave = partOf(output, FAKE.unverified).locator('[data-part-gave="L"]');
-    const palette = gave.locator(`img[alt="${FAKE.artifacts.image}"]`);
+    const palette = gave.locator('[data-artifact="image"]', { hasText: FAKE.artifacts.image }).locator('img');
     await expectDrawn(palette, `${FAKE.unverified}'s part in the bar draws the image it named as a thumbnail (${FAKE.artifacts.image})`);
-    const thumb = gave.locator('a[data-opens-view]', { has: page.locator(`img[alt="${FAKE.artifacts.image}"]`) });
+    const thumb = gave.locator('a[data-opens-view]', { has: page.locator('img'), hasText: FAKE.artifacts.image });
     await expectCount(thumb, 1, `${FAKE.artifacts.image} is inside a link that opens it in the viewer's sheet`);
     await expectVisible(
       gave.locator('a[data-opens-view]', { hasText: FAKE.artifacts.text }),
@@ -292,7 +292,7 @@ export default {
     );
     const row = partOf(page.locator('section[aria-label="Every step"]'), FAKE.unverified);
     await expectDrawn(
-      row.locator(`[data-part-gave] img[alt="${FAKE.artifacts.image}"]`),
+      row.locator('[data-part-gave] [data-artifact="image"]', { hasText: FAKE.artifacts.image }).locator('img'),
       `${FAKE.unverified}'s row of the ledger on the run's page draws the image too`,
     );
     await expectVisible(

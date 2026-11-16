@@ -1,4 +1,5 @@
 import type { WorkflowPageAddress } from '@/lib/api/address';
+import { CLOSED_LABEL_KEYS } from '@/lib/api/labels';
 import { workflowNameOf } from '@/lib/api/workflows';
 import { namespaceOf } from '@/lib/factories';
 import { QuietLabels } from '../field/Labels';
@@ -30,7 +31,7 @@ export function RunMeta({
 }) {
   const workflow = workflowNameOf(run.workflowDir);
   const factory = namespaceOf(run.factory);
-  const labelled = Object.keys(run.labels).some((key) => key !== 'factory' && key !== 'workflow');
+  const labelled = Object.keys(run.labels).some((key) => !CLOSED_LABEL_KEYS.includes(key));
   return (
     <span data-run-meta className="flex min-w-0 items-center gap-3.5 text-body-small font-medium whitespace-nowrap text-on-surface-variant">
       <CopyId id={run.id} short />

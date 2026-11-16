@@ -503,7 +503,11 @@ on a remote agent, whose process is not ours. Each session of the step — its f
 task's `resources.limits.memory`; the runtime runs the session's harness and every child it starts in a scope of their own under it,
 so a runaway test is killed there alone. The step's check is filed without it, and takes the engine's default: the daemon's
 `WF_MEMORY_LIMIT`, which every task filed with no limit of its own runs under, its scope made in `WF_CGROUP_PARENT`'s slice where one
-is set. A daemon started with `WF_MEMORY_LIMIT` on a host where the runtime cannot make such a scope refuses to start, naming the
+is set. What the check asks of the machine is the step's `checkMemory: 256Mi`, a container's `resources.requests.memory`, refused at
+load where the runtime reads no quantity off it and on a step with no `check:` (`checkMemoryOf`): the check is filed with it as its
+request alone, admitted by it, and run under the engine's default limit beside it, as a LimitRange's default limit lands on a container
+that names a request alone. A check that only waits on another service asks little, and is admitted while sessions that ask more wait.
+Absent, the check asks the daemon's `WF_MEMORY_REQUEST`. A daemon started with `WF_MEMORY_LIMIT` on a host where the runtime cannot make such a scope refuses to start, naming the
 variable to unset (`limitRefusal`). A session or a check the kernel killed a process of at its limit says so in its step's note — on the
 feed, `nemia ls` and the run page — with the limit, the peak, and the knob to raise: the step's `memory:` where it names one, else
 `WF_MEMORY_LIMIT` (`outOfMemoryWords`). The runtime's record tells that kill apart from the machine's: `oomKills` counts the processes
@@ -523,7 +527,9 @@ covers it: `WF_MEMORY_RESERVED`, else an eighth of the machine, 1 GiB at least (
 quantities read by `config.store.ts` (`memoryRequest`, `memoryReserved`), refused where they read none, and a request above
 `WF_MEMORY_LIMIT` is refused; a refused one gives the engine neither. A task that does not fit waits, and one behind it that fits passes
 it. `WF_MAX_CONCURRENT` still bounds each pool. A step held back says why in its note in `nemia ls` (`admissionWords`):
-`waits for memory: needs 2.5Gi, 1Gi free`, or `waits for a session slot: claude has 4 at work (WF_MAX_CONCURRENT)`.
+`waits for memory: needs 2.5Gi, 1Gi free`, or `waits for a session slot: claude has 4 at work (WF_MAX_CONCURRENT)`. A landing's
+check holds the repository's checkout from its filing, queued or not, so it is filed one above every other step's
+(`LANDING_MOMENTUM`): when room frees, it is admitted before the sessions filed ahead of it, and lets the checkout go sooner.
 `nemia service install --size auto` writes a request that fits the machine; `nemia doctor` says when the settings a daemon runs under
 cannot fit it (`memory-fit`). Admission bounds what starts, not what grows, so on systemd `--size auto` also writes
 `<name>-sessions.slice` beside the unit, its `MemoryMax=` at what the machine allocates (its memory less the floor), and points

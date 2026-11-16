@@ -508,13 +508,16 @@ test("a task that asks 64Mi is admitted while the room is under the engine's def
   );
   const plain = await Effect.runPromise(b.engine.file({ brief: 'session', cwd: '/r', queued: true }));
 
-  await s.test('on 1Gi of room, the one asking 64Mi is admitted, and the one with none waits for memory, told 2560Mi on the 960Mi the small one leaves', async () => {
-    const pass = await Effect.runPromise(b.engine.tick());
-    assert.equal(pass.views.find((v) => v.id === small)?.admission, 'admitted');
-    assert.deepEqual(pass.views.find((v) => v.id === plain)?.waits, { for: 'memory', needBytes: 2560 * MI, roomBytes: GI - 64 * MI });
-  });
+  await s.test(
+    'on 1Gi of room, the one asking 64Mi is admitted, and the one with none waits for memory, told 2560Mi on the 960Mi the small one leaves',
+    async () => {
+      const pass = await Effect.runPromise(b.engine.tick());
+      assert.equal(pass.views.find((v) => v.id === small)?.admission, 'admitted');
+      assert.deepEqual(pass.views.find((v) => v.id === plain)?.waits, { for: 'memory', needBytes: 2560 * MI, roomBytes: GI - 64 * MI });
+    },
+  );
 
-  await s.test('it starts under its own request and the engine\'s default limit beside it', async () => {
+  await s.test("it starts under its own request and the engine's default limit beside it", async () => {
     await Effect.runPromise(b.engine.tick());
     const under = { limits: { memory: '8Gi' }, requests: { memory: '64Mi' } };
     assert.deepEqual((await journal.read(small)).find((e) => e.kind === 'starting')?.resources, under);

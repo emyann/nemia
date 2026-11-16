@@ -157,7 +157,11 @@ test("build's and quick's land check asks the memory the factory sets, and the d
   for (const workflow of ['build', 'quick']) {
     assert.equal(loaded('set', workflow).find((step) => step.name === 'land')?.checkMemory, '256Mi', `set: ${workflow}/land`);
     assert.equal(loaded('plain', workflow).find((step) => step.name === 'land')?.checkMemory, undefined, `plain: ${workflow}/land`);
-    assert.equal(Object.hasOwn(stepIn(treeOf('plain'), workflow, 'land').front, 'checkMemory'), false, `plain: ${workflow}/land writes no line`);
+    assert.equal(
+      Object.hasOwn(stepIn(treeOf('plain'), workflow, 'land').front, 'checkMemory'),
+      false,
+      `plain: ${workflow}/land writes no line`,
+    );
   }
 });
 

@@ -213,7 +213,7 @@ test('each key a step has: read as written, and refused blank, twice or with a w
     ...['256Mi', '64Mi', '1G'].map((q) =>
       reads(`checkMemory: ${q} beside a check, as written`, 'land', `check: npm test\ncheckMemory: ${q}`, { checkMemory: q }),
     ),
-    reads('checkMemory: none, the daemon\'s default', 'land', 'check: npm test', { checkMemory: undefined }),
+    reads("checkMemory: none, the daemon's default", 'land', 'check: npm test', { checkMemory: undefined }),
     ...['lots', '0', '1.5Gi', '100m'].map((bad) =>
       refuses(
         `checkMemory: ${bad}, which the runtime does not read`,

@@ -507,7 +507,13 @@ const DECLARED = {
 test("a checked step, from its check's filing to `retries:` spent and the run waiting on you", async (t) => {
   const s = story(t);
   const b = stage.board();
-  const dir = implementThenReview(['output: implement.schema.json', 'check: npm test && npm run typecheck', 'retries: 1', 'memory: 4Gi', 'checkMemory: 64Mi']);
+  const dir = implementThenReview([
+    'output: implement.schema.json',
+    'check: npm test && npm run typecheck',
+    'retries: 1',
+    'memory: 4Gi',
+    'checkMemory: 64Mi',
+  ]);
   fs.writeFileSync(path.join(dir, 'implement.schema.json'), JSON.stringify(DECLARED));
   let run: RepositoryRun;
   const id = () => run.id;

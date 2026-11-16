@@ -588,7 +588,7 @@ test("a result nobody decided is asked in the inspector, with the way to the run
   const asked = await routedWith(createElement(Asked, { run, step: run.steps[0] }));
   assert.match(asked, /data-asked="result"/);
   assert.ok(textContentOf(asked).includes("The run's result waits on you: merge or drop wf/r-1/ship."), asked);
-  assert.match(asked, /<a data-answer-link="true"[^>]*href="\/runs\/r-1#decide"/);
+  assert.match(asked, /<a [^>]*data-answer-link="true"[^>]*href="\/runs\/r-1#decide"/);
 
   const called = { ...needing('succeeded', {}, { waitingOnYou: [], cancelledAt: at }), toDecide };
   assert.equal(await routedWith(createElement(Asked, { run: called, step: called.steps[0] })), '');
@@ -938,7 +938,7 @@ test('the Decide section of an ending whose landing its check refused shows its 
   );
   assert.match(
     merges,
-    /<dd data-fact="semantic" data-state="bad"[^>]*><a data-fact-link="ship"[^>]*href="\/runs\/r-1#step-ship"[^>]*>ship&#x27;s landing check refused the merged tree<\/a><\/dd>/,
+    /<dd data-fact="semantic" data-state="bad"[^>]*><a [^>]*data-fact-link="ship"[^>]*href="\/runs\/r-1#step-ship"[^>]*>ship&#x27;s landing check refused the merged tree<\/a><\/dd>/,
   );
   const none = await routedWith(createElement(DecideSection, { runId: 'r-1', decision: { ...decision, collisions: null } }));
   assert.doesNotMatch(none, /Trial merges|data-fact="(others|collides|semantic)"/, 'no trial read: nothing said of one');

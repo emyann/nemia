@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { useState } from 'react';
+import { Button, SideSheet } from '@/components/ui/ds';
 import { copySkill, skillsQuery, type SkillPlace, type SkillRow } from '../../lib/api/skills.ts';
 import { type GivenSkill } from '../../lib/api/library.ts';
 import { invalidateSkills } from '../../lib/agentWrites';
@@ -34,6 +34,7 @@ export function SkillPicker({
   const { data: places, error } = useQuery(skillsQuery);
   const names = skillList(skills);
   const rows = givenRows(names, given, places);
+  const [open, setOpen] = useState(false);
 
   return (
     <div data-skill-picker className="space-y-2">
@@ -42,26 +43,23 @@ export function SkillPicker({
         rows={rows}
         none="It gives no skills: its sessions are told its instructions alone."
         action={(row) => (
-          <Button variant="ghost" size="xs" aria-label={`Remove ${row.name}`} onPress={() => onSkills(withoutSkill(skills, row.name))}>
+          <Button variant="text" size="xsmall" aria-label={`Remove ${row.name}`} onPress={() => onSkills(withoutSkill(skills, row.name))}>
             Remove
           </Button>
         )}
       />
       <div className="flex flex-wrap items-center gap-3">
-        <SheetTrigger>
-          <Button variant="outline" size="sm">
-            Add a skill
-          </Button>
-          <Sheet className="data-[side=right]:sm:max-w-xl">
-            <SheetHeader className="border-b border-outline-variant">
-              <SheetTitle>Add a skill</SheetTitle>
-              <SheetDescription>
+        <Button variant="outlined" size="xsmall" onPress={() => setOpen(true)}>
+          Add a skill
+        </Button>
+        <SideSheet variant="modal" title="Add a skill" isOpen={open} onClose={() => setOpen(false)}>
+          {open && (
+            <div className="space-y-5">
+              <p className="text-body-small text-muted-foreground">
                 A skill is a folder with a SKILL.md. Named, a session reads its name and description every turn and loads the rest when the
                 work calls for it; one whose SKILL.md says <code className="font-mono text-body-small">preload: true</code> is loaded whole
                 every turn.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-4">
+              </p>
               {error && <p className="text-body-small text-failure">Could not list the skills: {error.message}</p>}
               {!places && !error && <p className="text-body-small text-muted-foreground">Reading the skills…</p>}
               {places?.map((place) => (
@@ -74,8 +72,8 @@ export function SkillPicker({
                 />
               ))}
             </div>
-          </Sheet>
-        </SheetTrigger>
+          )}
+        </SideSheet>
         <p className="text-body-small text-muted-foreground">
           <code className="font-mono">skills:</code> — Claude Code skills, found in your library, then the repository's{' '}
           <code className="font-mono">.claude/skills/</code>. Saved with the agent.
@@ -183,13 +181,13 @@ function Offered({
       </div>
       <div className="shrink-0">
         {offer.kind === 'add' && (
-          <Button size="xs" aria-label={`Add ${row.name}`} onPress={onAdd}>
+          <Button size="xsmall" aria-label={`Add ${row.name}`} onPress={onAdd}>
             Add
           </Button>
         )}
         {offer.kind === 'given' && <span className="text-body-small text-muted-foreground">given</span>}
         {offer.kind === 'copy' && (
-          <Button size="xs" aria-label={`Copy ${row.name} to my library and add`} onPress={onCopy} isDisabled={busy}>
+          <Button size="xsmall" aria-label={`Copy ${row.name} to my library and add`} onPress={onCopy} isDisabled={busy}>
             {copying ? 'Copying…' : 'Copy to my library and add'}
           </Button>
         )}

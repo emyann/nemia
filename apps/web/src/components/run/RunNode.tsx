@@ -182,7 +182,8 @@ function Needs({ run, needs }: { run: RunView; needs: ReturnType<typeof needsOf>
             hash={stepAnchor(need.step)}
             data-need={need.kind}
             data-step={need.step}
-            className="nodrag text-yours hover:underline"
+            underline="hover"
+            className="nodrag text-yours"
           >
             {needLine(need)}
           </RouteLink>
@@ -201,7 +202,8 @@ function DecideLine({ run, said, branches }: { run: RunView; said: string; branc
         params={{ runId: run.id }}
         hash="decide"
         data-to-decide="result"
-        className="nodrag text-yours hover:underline"
+        underline="hover"
+        className="nodrag text-yours"
       >
         {decideLine(branches)}
       </RouteLink>

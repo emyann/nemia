@@ -83,7 +83,7 @@ export function Popover({
       {...props}
       className={composeTailwindRenderProps(
         undefined,
-        "max-w-[calc(100vw-2rem)] rounded-shape-medium bg-surface-container text-body-medium font-body-medium text-on-surface shadow-elevation-2",
+        "max-w-[calc(100vw-2rem)] rounded-shape-medium [--md3-field-notch:var(--md-sys-color-surface-container)] bg-surface-container text-body-medium font-body-medium text-on-surface shadow-elevation-2",
       )}
     >
       <AriaDialog

@@ -68,6 +68,9 @@ export type PreviewCardProps = {
   /** Gap between trigger and card, in px. Default 8 (MD3's smallest space). */
   offset?: number;
   className?: string;
+  /** The card is a dialog and takes a name: what it previews ("Ada Martin",
+   *  "3 products"). "Preview" where none is given. */
+  "aria-label"?: string;
 };
 
 /** The popover surface. Must be the second child of a `PreviewTrigger`. */
@@ -76,12 +79,14 @@ export function PreviewCard({
   placement = "bottom",
   offset = 8,
   className,
+  "aria-label": ariaLabel = "Preview",
 }: PreviewCardProps) {
   return (
     <Popover
       data-slot="preview-card"
       placement={placement}
       offset={offset}
+      aria-label={ariaLabel}
       className={styles({ className })}
     >
       {children}

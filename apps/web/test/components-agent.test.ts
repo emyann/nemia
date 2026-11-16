@@ -253,9 +253,9 @@ test("Claude Code's prompt is a choice of what the agent does, keep drawn chosen
     /data-harness-prompt="keep"[^>]*data-selected="true"|data-selected="true"[^>]*data-harness-prompt="keep"/,
     'unset reads as keep',
   );
-  assert.match(
-    unset,
-    /data-slot="label">Claude Code&#x27;s prompt<\/span>/,
+  const label = unset.match(/<(?:label|span)[^>]*id="([^"]+)"[^>]*>Claude Code&#x27;s prompt<\/(?:label|span)>/)?.[1];
+  assert.ok(
+    label && new RegExp(`role="radiogroup"[^>]*aria-labelledby="${label}"|aria-labelledby="${label}"[^>]*role="radiogroup"`).test(unset),
     "the choice is labelled Claude Code's prompt, never System prompt",
   );
   assert.doesNotMatch(unset, /System prompt/);
@@ -420,7 +420,7 @@ test('an agent of yours is tried from its page: the fence said in one line, and 
     ),
     texts.join(' | '),
   );
-  assert.match(html, /<button type="submit" disabled=""[^>]*>Try it<\/button>/, 'no brief, no try');
+  assert.match(html, /<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>(?:<[^>]*>)*Try it</, 'no brief, no try');
   assert.match(html, /data-try-held[^>]*>Write a brief to try it on\./);
   assert.doesNotMatch(html, /data-try=/, 'an agent never tried shows no try');
 });
@@ -435,7 +435,7 @@ test('REFUSED: a second try while one moves — the button is held, and the late
     ...readsOf(tryDetail({ status: 'running' })),
   ]);
   assert.match(html, /data-try-held[^>]*>A try is still running \(r-t\): one at a time\./);
-  assert.match(html, /<button type="submit" disabled=""/);
+  assert.match(html, /<button(?=[^>]*type="submit")[^>]*disabled=""/);
   assert.match(html, /data-try="r-t"/, 'the newest try of this agent, not the older one');
   assert.match(html, /href="\/runs\/r-t"[^>]*data-try-run="r-t"|data-try-run="r-t"[^>]*href="\/runs\/r-t"/, 'linked to its run');
   assert.match(html, /data-try-status[^>]*>running</);
@@ -625,7 +625,7 @@ test('a run picked to read shows what it would hand, as markdown — badged not 
       [['runs', 'probe-b2', 'concluded'], { run: 'probe-b2', landed, section: '\n## From run probe-b2\n\nIt measured **the cache**.' }],
     ]);
   const inFlight = await preview(false);
-  assert.match(inFlight, /data-not-landed[^>]*>not landed, not judged</);
+  assert.match(inFlight, /data-not-landed[^>]*>(?:<[^>]*>)*not landed, not judged</);
   assert.match(inFlight, /<strong>the cache<\/strong>/);
   assert.doesNotMatch(await preview(true), /data-not-landed|not landed, not judged/);
 });
@@ -700,4 +700,17 @@ test("a link to a repository's agent, or to a node of a repository's workflow, k
     1,
     'a step both named and filled, once, whichever origin each reads it from',
   );
+});
+
+test("a route link of the board is the kit's link, underlined only where its caller's classes say so, as the bare link it replaced", async () => {
+  const { RouteLink } = await import('../src/components/agent/AgentParts.tsx');
+  const classOf = async (className?: string) =>
+    (await routedWith(createElement(RouteLink, { to: '/agents', className }, 'Agents'))).match(/<a [^>]*class="([^"]*)"/)?.[1].split(' ') ??
+    [];
+  const bare = await classOf();
+  assert.ok(bare.includes('no-underline') && !bare.includes('underline'), `a pill or a row draws no underline: ${bare.join(' ')}`);
+  const worded = await classOf('underline');
+  assert.ok(worded.includes('underline') && !worded.includes('no-underline'), `a word asks for one: ${worded.join(' ')}`);
+  const hovered = await classOf('hover:underline');
+  assert.ok(hovered.includes('no-underline') && hovered.includes('hover:underline'), `one under the pointer: ${hovered.join(' ')}`);
 });

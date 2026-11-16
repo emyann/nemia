@@ -75,12 +75,12 @@ const called = (name: string, options: Partial<ApiClientOptions> = {}) => {
 const failureOf = (exit: Exit.Exit<unknown, unknown>): unknown =>
   Exit.isFailure(exit) ? Option.getOrUndefined(Cause.findErrorOption(exit.cause)) : undefined;
 
-/** Every endpoint of the `Api` by `<group>.<endpoint>` that writes (no GET, no HEAD) and whose payload takes no key. */
+/** Every endpoint of the `Api` by `<group>.<endpoint>` that writes (no GET, no HEAD) and whose payload takes no key and is no form. */
 const BODILESS_WRITES = Object.values(Api.groups)
   .flatMap((group) => Object.values(group.endpoints).map((endpoint) => `${group.identifier}.${endpoint.identifier}`))
   .filter((name) => {
     const keys = endpointKeysOf(Api, name);
-    return !['GET', 'HEAD'].includes(keys.method) && keys.payloadKeys.length === 0;
+    return !['GET', 'HEAD'].includes(keys.method) && keys.payloadKeys.length === 0 && !keys.form;
   });
 
 test("the bodiless writes hold nemia proposals approve and decline, which the client sends, and her chat's stop, which the board sends", () => {
@@ -98,6 +98,29 @@ test('REFUSED by the write guard until mapped: every bodiless write carries `{}`
     assert.match(sent[0]?.headers['content-type'] ?? '', /^application\/json\b/, `${name} sent its body as JSON`);
     assert.deepEqual(JSON.parse(sent[0]?.body || 'null'), {}, `${name} sent \`{}\``);
   }
+});
+
+test("a file's upload, the one write sent as a form, carries the form's parts as multipart/form-data, never `{}` in its place", async () => {
+  assert.ok(endpointKeysOf(Api, 'files.upload').form);
+  answer = {
+    status: 201,
+    body: { id: 'file_0', name: 'shot.png', mediaType: 'image/png', size: 3, createdAt: '2026-11-16T00:00:00.000Z' },
+  };
+  sent.length = 0;
+  const form = new FormData();
+  form.append('file', new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }), 'shot.png');
+  const exit = await Effect.runPromiseExit(
+    apiClient({ baseUrl: base, token: 'tok' }).pipe(
+      Effect.flatMap((client) => client.files.upload({ params: { namespace: 'acme' }, payload: form })),
+      Effect.provide(FetchHttpClient.layer),
+    ),
+  );
+  assert.ok(Exit.isSuccess(exit), String(exit));
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0]?.path, '/api/namespaces/acme/files');
+  assert.match(sent[0]?.headers['content-type'] ?? '', /^multipart\/form-data; boundary=/);
+  assert.equal(sent[0]?.headers.authorization, 'Bearer tok');
+  assert.match(sent[0]?.body ?? '', /name="file"; filename="shot.png"/);
 });
 
 test('the token is presented as a bearer, the caller’s headers beside it; none where there is no token', async () => {

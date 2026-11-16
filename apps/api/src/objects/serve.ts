@@ -16,7 +16,8 @@
  * What HttpApi answers on its own is said in the api's words, as every other refusal of the api: a request its decoding refuses — a path's
  * name, a query or a body its endpoint's Schema does not take — is a 400 `BadRequest` naming the refused key (`field`,
  * `payload.spec.steps`) and pointing at the document (`decodeRefused`); an answer past the app's bound a 422 saying how to narrow it
- * (`answerRefused`); a body over `OBJECT_BODY_LIMIT` a 413 naming the limit; and a path
+ * (`answerRefused`); a body over `OBJECT_BODY_LIMIT` a 413 naming the limit, one of a content-type its endpoint does not take a 415;
+ * and a path
  * no endpoint serves the api's own 404 (`noRoute`), whatever router missed it.
  */
 import { ByteSize, Context, Effect, Layer, SchemaIssue } from 'effect';
@@ -43,6 +44,7 @@ import { AnswerPastBound } from './answer-bound.ts';
 import { endpointOf } from './endpoints.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
+import { filesHandlers } from '../files/files.ts';
 import { stepsHandlers } from '../steps/index.ts';
 import { type Listed, watchable } from '../watch/watch.ts';
 import { discoveryHandlers } from '../discovery/discovery.ts';
@@ -146,17 +148,20 @@ const saysError = async (response: Response): Promise<boolean> => {
 
 /**
  * `response`, which the web handler answered `c`'s request with, in the api's words where HttpApi answered on its own with no `{ error }`:
- * a 404 the api's `noRoute`, a 413 the limit, a 400 its decoding said nothing of where the document is. Anything else as it is.
+ * a 404 the api's `noRoute`, a 413 the limit, a 415 a body of a content-type its endpoint does not take (JSON sent to the form a file is
+ * uploaded as), a 400 its decoding said nothing of where the document is. Anything else as it is.
  */
 async function inApiWords(c: RequestContext<ApiEnv>, response: Response): Promise<Response> {
-  if (response.status !== 400 && response.status !== 404 && response.status !== 413) return response;
+  if (response.status !== 400 && response.status !== 404 && response.status !== 413 && response.status !== 415) return response;
   if (await saysError(response)) return response;
   if (response.status === 404) return noRoute(c);
   const route = `${c.req.method} ${new URL(c.req.url).pathname}`;
   const error =
     response.status === 413
       ? `${route} was sent an object too large: a body may be ${OBJECT_BODY_LIMIT_SAID} at most. Send a smaller one.`
-      : `${route} does not read as its route takes it. Send it in that shape: ${DOCUMENT} says each key and value.`;
+      : response.status === 415
+        ? `${route} does not take a body of the content-type sent (${c.req.header('content-type') ?? 'none'}): ${DOCUMENT} says what it takes.`
+        : `${route} does not read as its route takes it. Send it in that shape: ${DOCUMENT} says each key and value.`;
   return c.json({ error }, response.status);
 }
 
@@ -176,6 +181,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
     HttpApiBuilder.layer(Api).pipe(
       Layer.provide([
         runsHandlers,
+        filesHandlers,
         stepsHandlers,
         cardsHandlers,
         factoriesHandlers,

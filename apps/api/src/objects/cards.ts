@@ -161,7 +161,7 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
           await cardIn(s, namespace, name);
           const factory = factoryOf(namespace);
           const placed = factory === undefined ? s : { ...s, ...s.placedIn(namespace) };
-          const started = await cardStart(placed, name, payload, factory ?? s.factory?.name);
+          const started = await cardStart(placed, name, payload, factory ?? s.factory?.name, namespace);
           return started;
         }),
       ).pipe(Effect.tap((started) => ('id' in started ? locatedAt(started.id) : Effect.void))),

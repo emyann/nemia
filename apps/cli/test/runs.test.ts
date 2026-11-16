@@ -75,7 +75,7 @@ async function started(brief: string, ...argv: string[]): Promise<string> {
   return idIn(said);
 }
 
-test('nemia start of a brief in words, with --model, --gate and --input, starts the run with each, the file sent by its bytes', async () => {
+test('nemia start of a brief in words, with --model, --gate and --input, starts the run with each, the file uploaded first', async () => {
   const notes = path.join(DRAFTS, 'notes.md');
   write(notes, 'Read me first.\n');
   const said = await store.nemia([
@@ -100,6 +100,42 @@ test('nemia start of a brief in words, with --model, --gate and --input, starts 
   assert.deepEqual(run.inputs, ['notes.md']);
   assert.equal(fs.readFileSync(path.join(store.root, 'runs', id, 'inputs', 'notes.md'), 'utf8'), 'Read me first.\n');
   assert.match(said.out, /^gated at: implement/m);
+});
+
+test('nemia start of an inbox card with three pictures of 3 MB in all uploads each, and its run holds each byte for byte', async () => {
+  const pictures = ['screenshot.png', 'export-light.png', 'export-dark.png'].map((name, i) => {
+    const file = path.join(DRAFTS, name);
+    const bytes = Buffer.alloc(1_000_000 + i * 100_000);
+    for (let at = 0; at < bytes.length; at++) bytes[at] = (at * 31 + i) % 251;
+    fs.writeFileSync(file, bytes);
+    return { file, name, bytes };
+  });
+  write(path.join(store.root, 'inbox', 'pictured-card.md'), '---\nworkflow: dev\nfactory: acme\n---\nMatch the pictures.\n');
+  const said = await store.nemia(['start', 'pictured-card', ...pictures.flatMap((p) => ['--input', p.file])]);
+  assert.equal(said.code, 0, said.err);
+  const id = idIn(said);
+  assert.deepEqual(
+    recordOf(store.root, id).inputs,
+    pictures.map((p) => p.name),
+  );
+  for (const { name, bytes } of pictures)
+    assert.ok(fs.readFileSync(path.join(store.root, 'runs', id, 'inputs', name)).equals(bytes), `${name} byte for byte`);
+});
+
+test('REFUSED, exit 2, nothing sent: an --input past the cap, naming it, before any file is uploaded', async () => {
+  const huge = path.join(DRAFTS, 'huge.png');
+  fs.writeFileSync(huge, '');
+  fs.truncateSync(huge, 64 * 1024 * 1024 + 1);
+  const small = path.join(DRAFTS, 'small.png');
+  fs.writeFileSync(small, 'x');
+  const files = path.join(store.root, 'files');
+  const keptBefore = fs.existsSync(files) ? fs.readdirSync(files, { recursive: true }).length : 0;
+  const before = fs.readdirSync(path.join(store.root, 'runs')).length;
+  const said = await store.nemia(['start', 'Add a cache.', '--workflows', 'dev', '--factory', 'acme', '--input', small, '--input', huge]);
+  assert.equal(said.code, 2, said.err);
+  assert.match(said.err, /huge\.png/);
+  assert.equal(fs.readdirSync(path.join(store.root, 'runs')).length, before);
+  assert.equal(fs.existsSync(files) ? fs.readdirSync(files, { recursive: true }).length : 0, keptBefore, 'no file was uploaded');
 });
 
 test("nemia start of a file starts its text; of a plan card's file, its body on its own workflow:", async () => {

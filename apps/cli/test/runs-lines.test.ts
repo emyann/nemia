@@ -14,10 +14,10 @@ import { cancelLines, holdLines, refreshLines, routeLines, waitLines } from '../
 import { approveLines, budgetsOf, retryLines, sayLines } from '../src/commands/runs/answer.ts';
 import { numberedAnswers } from '../src/commands/runs/answers.ts';
 import { nowLines, pauseLines, timeoutLines } from '../src/commands/runs/pause.ts';
-import { inputOf, modelsOf, planCardOf } from '../src/commands/runs/start.ts';
+import { inputsOf, modelsOf, planCardOf } from '../src/commands/runs/start.ts';
 import { startedLines } from '../src/commands/runs/started.ts';
 import { forgottenLine } from '../src/commands/runs/forgotten.ts';
-import type { RunRemoved, RunStarted } from 'objects';
+import { FILE_LIMIT, type RunRemoved, type RunStarted } from 'objects';
 
 /** `act` refused, exit 2, its words naming each of `named`. */
 const refused = (act: () => unknown, ...named: (string | RegExp)[]): void =>
@@ -100,16 +100,37 @@ test("REFUSED, exit 2: a key a plan's card lacks, naming nemia inbox add; an aft
   refused(() => planCardOf('c.md', '---\nafter: a\n---\nDo it.\n', []), '--after');
 });
 
-test('an --input is sent as text where its bytes are UTF-8, else as base64, by its name alone; a file not there is refused', () => {
+test('an --input is read by its name and its size; a file not there, or a folder, is refused', () => {
   const dir = scratch('nemia-runs-inputs-');
   fs.writeFileSync(path.join(dir, 'notes.md'), 'hello\n');
   fs.writeFileSync(path.join(dir, 'shot.png'), Buffer.from([0x89, 0x50, 0xff, 0x00]));
-  assert.deepEqual(inputOf(path.join(dir, 'notes.md')), { name: 'notes.md', text: 'hello\n' });
-  assert.deepEqual(inputOf(path.join(dir, 'shot.png')), {
-    name: 'shot.png',
-    base64: Buffer.from([0x89, 0x50, 0xff, 0x00]).toString('base64'),
-  });
-  refused(() => inputOf(path.join(dir, 'gone.md')), 'gone.md');
+  assert.deepEqual(inputsOf([path.join(dir, 'notes.md'), path.join(dir, 'shot.png')]), [
+    { file: path.join(dir, 'notes.md'), name: 'notes.md', size: 6 },
+    { file: path.join(dir, 'shot.png'), name: 'shot.png', size: 4 },
+  ]);
+  refused(() => inputsOf([path.join(dir, 'gone.md')]), 'gone.md');
+  refused(() => inputsOf([dir]), dir);
+});
+
+test('REFUSED, exit 2, before anything is sent: a file past the cap, naming each such file, its size, the total and the cap', () => {
+  const dir = scratch('nemia-runs-inputs-');
+  const cap = Number(FILE_LIMIT);
+  const huge = path.join(dir, 'huge.png');
+  const also = path.join(dir, 'also.png');
+  const small = path.join(dir, 'small.png');
+  for (const [file, size] of [
+    [huge, cap + 1],
+    [also, cap + 2],
+    [small, 10],
+  ] as const) {
+    fs.writeFileSync(file, '');
+    fs.truncateSync(file, size);
+  }
+  assert.equal(inputsOf([path.join(dir, 'small.png')]).length, 1);
+  fs.truncateSync(small, cap);
+  assert.equal(inputsOf([small])[0]?.size, cap, 'a file at the cap is taken');
+  fs.truncateSync(small, 10);
+  refused(() => inputsOf([huge, also, small]), huge, String(cap + 1), also, String(cap + 2), String(cap), String(2 * cap + 13));
 });
 
 test('nemia retry prints the try asked for, how, with what, and when it is filed; of a round, the round and its cap', () => {

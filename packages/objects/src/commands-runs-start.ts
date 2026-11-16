@@ -46,7 +46,7 @@ const START_SPEC: Spec = {
     ),
     startFlag('--input', 'inputs', "a file to hand the run's steps: nemia start <brief> --input <file> [--input <file> ...]", {
       many: true,
-      cli: 'a file is read from where nemia start is typed, and the api is sent its bytes by name, never a path',
+      cli: 'a file is read from where nemia start is typed and uploaded first, its own request, 64 MiB at most; the start names it by id, never a path',
     }),
     startFlag(
       '--card',

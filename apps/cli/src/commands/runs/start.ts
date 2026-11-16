@@ -1,16 +1,18 @@
 /**
  * The runner of `nemia start`: a run of a workflow named by its name (the Run's `create`), from a brief in words or a file's text read
  * here — a file that opens with a plan card's frontmatter giving its body and its `workflow:` — or of an inbox card named by its name (the
- * Card's `start`). What the api cannot read from where it runs is read here and sent as data: the brief's file, each `--input` file by
- * its name and its bytes, and `--repo` as `pathSent` sends a path — else, under this machine's context and with no `--factory`, the
- * repository the start is typed in, or the folder where it is in none (`repoQueryOf`) — which only finds the factory of a brief's start
- * (its run works on the repository the factory's wiring names) and is refused on a card's, whose factory places its run. A plan folder
+ * Card's `start`). What the api cannot read from where it runs is read here and sent as data: the brief's file, each `--input` file
+ * uploaded first, its own request, and named by its id (`inputsOf`, `uploaded`), and `--repo` as `pathSent` sends a path — else, under
+ * this machine's context and with no `--factory`, the repository the start is typed in, or the folder where it is in none
+ * (`repoQueryOf`) — which only finds the factory of a brief's start (its run works on the repository the factory's wiring names) and is
+ * refused on a card's, whose factory places its run. A plan folder
  * and a workflow given as a path are refused, naming the start by name; so is a brief whose workflow is not named. It prints what the api
  * answers of the run, worded here (`startedLines`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { type Args, type CardStart, DEFAULT_NAMESPACE, type RunStart, START_WORDS } from 'objects';
+import { ByteSize } from 'effect';
+import { type Args, type CardStart, DEFAULT_NAMESPACE, FILE_LIMIT, READ_BOUND_MS, type RunStart, START_WORDS } from 'objects';
 import { asked } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
 import { listArg, repoQueryOf, said, switchArg, textArg } from '../requests.ts';
@@ -64,23 +66,77 @@ export function planCardOf(file: string, text: string, after: readonly string[])
   return { body: (m[2] ?? '').trim(), ...(workflow ? { workflow } : {}), after: waits };
 }
 
+/** A file `--input` names, read here: the path typed, its own name, and its size in bytes. */
+export type InputFile = { readonly file: string; readonly name: string; readonly size: number };
+
+/** The media type a file is uploaded with, by its extension, as a browser says it; else none, which the api keeps as octet-stream. */
+const MEDIA_TYPES: Readonly<Record<string, string>> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.pdf': 'application/pdf',
+  '.md': 'text/markdown',
+  '.txt': 'text/plain',
+  '.json': 'application/json',
+};
+
+/** A size as a refusal says it: its unit and its bytes. */
+const sizeSaid = (bytes: number): string => `${ByteSize.format(ByteSize.bytes(bytes))} (${bytes} bytes)`;
+
 /**
- * A file handed to the run's steps (`--input`), as the api takes it: its name, and its text where its bytes are UTF-8, else its bytes.
- * @param file The path of the file to hand, as `--input` typed it.
+ * The files `--input` names, each read here, before anything is sent: refused, exit 2, for one that is not there or no file, and for one
+ * past what a file may be (`FILE_LIMIT`), naming each such file's size, the total of them all, and the cap, so the person sees what to
+ * shrink or leave out before a byte is sent.
+ * @param files The paths of the files to hand, as `--input` typed them.
  */
-export function inputOf(file: string): { name: string; text?: string; base64?: string } {
-  let bytes: Buffer;
-  try {
-    bytes = fs.readFileSync(file);
-  } catch (err) {
-    throw new Refused(`nemia start cannot read --input ${path.resolve(file)}: ${(err as Error).message}. Name a file that is there.`);
+export function inputsOf(files: readonly string[]): InputFile[] {
+  const inputs = files.map((file): InputFile => {
+    const at = fs.statSync(file, { throwIfNoEntry: false });
+    if (!at?.isFile())
+      throw new Refused(
+        `nemia start cannot read --input ${path.resolve(file)}: it is ${at ? 'no file' : 'not there'}. Name a file that is there.`,
+      );
+    return { file, name: path.basename(file), size: at.size };
+  });
+  const past = inputs.filter((input) => input.size > Number(FILE_LIMIT));
+  if (past.length)
+    throw new Refused(
+      `nemia start hands a run files of ${sizeSaid(Number(FILE_LIMIT))} at most each, and ${past.map((p) => `--input ${p.file} is ${sizeSaid(p.size)}`).join(', ')}; the ${inputs.length} file${inputs.length === 1 ? '' : 's'} given are ${sizeSaid(inputs.reduce((sum, i) => sum + i.size, 0))} in all. Hand ${past.length === 1 ? 'it' : 'each'} smaller, or leave ${past.length === 1 ? 'it' : 'them'} out. Nothing was sent.`,
+    );
+  return inputs;
+}
+
+/**
+ * How long one file's upload may take, in ms: the bound of every call, and a second for each MiB of it beside, so a link of 1 MiB/s (8
+ * Mbit/s, a slow uplink) carries a file of the cap within its bound.
+ * @param size The file's size in bytes.
+ */
+export const uploadBoundMs = (size: number): number => READ_BOUND_MS + Math.ceil(size / Number(ByteSize.mebibytes(1))) * 1000;
+
+/**
+ * Each of `inputs` uploaded to `namespace`'s files (`POST /api/namespaces/<namespace>/files`), one request a file, read from disk as it is
+ * sent, never held whole: the inputs a start names, each by its name and the id it was answered.
+ * @param namespace The namespace the start is sent to, whose files it names.
+ * @param inputs The files `inputsOf` read.
+ */
+async function uploaded(namespace: string, inputs: readonly InputFile[]): Promise<{ name: string; file: string }[]> {
+  const sent: { name: string; file: string }[] = [];
+  for (const input of inputs) {
+    const form = new FormData();
+    const type = MEDIA_TYPES[path.extname(input.name).toLowerCase()] ?? '';
+    form.append('file', await fs.openAsBlob(input.file, { type }), input.name);
+    const file = await asked(
+      COMMAND,
+      (c) => c.files.upload({ params: { namespace }, payload: form }),
+      process.env,
+      uploadBoundMs(input.size),
+    );
+    sent.push({ name: input.name, file: file.id });
   }
-  const name = path.basename(file);
-  try {
-    return { name, text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) };
-  } catch {
-    return { name, base64: bytes.toString('base64') };
-  }
+  return sent;
 }
 
 /**
@@ -103,15 +159,19 @@ export function modelsOf(typed: readonly string[]): Record<string, string> | und
   );
 }
 
-/** What a start sends beside its workflow and brief, of either door: the runs and cards it is handed, its labels, gates, models, inputs. */
-function extrasOf(args: Args): Omit<RunStart, 'workflow' | 'brief' | 'from' | 'card'> {
+/**
+ * What a start sends beside its workflow and brief, of either door: the runs and cards it is handed, its labels, gates, models, and its
+ * inputs, each file uploaded first to `namespace`'s files (`uploaded`), once every other word has read, and named by its id.
+ */
+async function extrasOf(args: Args, namespace: string): Promise<Omit<RunStart, 'workflow' | 'brief' | 'from' | 'card'>> {
   const after = listArg(args, 'after');
   const context = listArg(args, 'context');
   const cards = listArg(args, 'cards');
   const label = listArg(args, 'label');
   const gates = listArg(args, 'gates');
   const models = modelsOf(listArg(args, 'models'));
-  const inputs = listArg(args, 'inputs').map(inputOf);
+  const files = inputsOf(listArg(args, 'inputs'));
+  const inputs = files.length ? await uploaded(namespace, files) : [];
   return {
     ...(after.length ? { after: [...after] } : {}),
     ...(context.length ? { context: [...context] } : {}),
@@ -160,8 +220,9 @@ async function cardStart(card: { name: string; namespace: string }, args: Args):
     );
   const factory = textArg(args, 'factory');
   const namespace = card.namespace === DEFAULT_NAMESPACE && factory !== undefined ? factory : card.namespace;
+  const extras = await extrasOf(args, namespace);
   const payload: CardStart = {
-    ...extrasOf(args),
+    ...extras,
     ...(workflows !== undefined ? { workflow: byName(workflows, card.name) } : {}),
     ...(instead !== undefined ? { brief: insteadOf(instead) } : {}),
   };
@@ -199,7 +260,7 @@ export async function start(args: Args): Promise<number> {
   const factory = textArg(args, 'factory');
   const namespace = factory ?? DEFAULT_NAMESPACE;
   const query = repoQueryOf(textArg(args, 'repo'), factory);
-  const payload: RunStart = { ...extrasOf(args), workflow, brief };
+  const payload: RunStart = { ...(await extrasOf(args, namespace)), workflow, brief };
   said(startedLines(await asked(COMMAND, (c) => c.runs.create({ params: { namespace }, query, payload }))));
   return 0;
 }

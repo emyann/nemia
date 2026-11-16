@@ -1,6 +1,7 @@
 /**
  * Where a call's input goes on an endpoint of an `HttpApi`, read off its Schemas: the keys of its path, of its query (all but `watch`,
- * which turns an answer into a stream) and of its JSON payload, its method and path, and whether it answers a stream. One reading for
+ * which turns an answer into a stream) and of its JSON payload, whether its payload is a form of parts instead, its method and path, and
+ * whether it answers a stream. One reading for
  * every caller that joins an endpoint's parts into one input and splits it again: the api's MCP port. Pure, over the Schemas.
  */
 import { Schema } from 'effect';
@@ -29,6 +30,7 @@ export type EndpointKeys = {
   readonly pathKeys: readonly string[];
   readonly queryKeys: readonly string[];
   readonly payloadKeys: readonly string[];
+  readonly form: boolean;
   readonly streams: boolean;
 };
 
@@ -59,6 +61,12 @@ function keysOf(schema: Schema.Top | undefined): string[] {
   return [...new Set(members.flatMap((m) => (isRecord(m.properties) ? Object.keys(m.properties) : [])))];
 }
 
+/** Whether `schema` is sent as a form of parts (`multipart/form-data`), as HttpApi marks a multipart payload, buffered or streamed. */
+const formOf = (schema: Schema.Top): boolean => {
+  const encoding: unknown = schema.ast.annotations?.['~httpApiEncoding'];
+  return isRecord(encoding) && encoding._tag === 'Multipart';
+};
+
 /**
  * Whether `schema`, or the one it carries headers on, is a stream of server-sent events.
  * @param schema An endpoint's success schema.
@@ -79,6 +87,7 @@ export function keysOfEndpoint(endpoint: EndpointShape): EndpointKeys {
     pathKeys: keysOf(endpoint.params),
     queryKeys: keysOf(endpoint.query).filter((k) => !UNTAKEN_QUERY.includes(k)),
     payloadKeys: [...new Set([...endpoint.payload.values()].flatMap((p) => p.schemas).flatMap((s) => keysOf(s)))],
+    form: [...endpoint.payload.values()].flatMap((p) => p.schemas).some(formOf),
     streams: [...endpoint.success].some(streamsOf),
   };
 }

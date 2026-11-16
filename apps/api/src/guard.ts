@@ -19,7 +19,9 @@
  * A write that presents a bearer token (`Authorization: Bearer <token>`) passes the host and the site: a page on another site cannot send
  * that header without the browser asking the api first, which it never answers, and cannot know a token; behind a proxy or a tunnel the
  * `Host` is the store's public name, which only a token makes safe. The token itself is judged before the guard (`callerGate`,
- * src/caller/caller.ts), so one refused there never reaches it. It still says a JSON body.
+ * src/caller/caller.ts), so one refused there never reaches it. It still says a JSON body, or a form of files (`multipart/form-data`): the
+ * one write that sends one, a file uploaded for a start (`POST /api/namespaces/<namespace>/files`), is a client's with a token, and a
+ * form a page on another site posts carries no `Authorization` without the browser asking first. The board's cookie sends no form.
  *
  * A write that presents a token by the board's cookie alone (`TOKEN_COOKIE`, the HttpOnly cookie `POST /api/session` sets,
  * server/session.ts) passes the host, but not the site: a site whose name was pointed at this machine is another origin, which the
@@ -41,7 +43,7 @@ import { getCookie } from 'hono/cookie';
 import { Forbidden, TOKEN_COOKIE, UnsupportedMediaType } from 'objects';
 import type { WriteRefusal, WriteRefused, WriteRequest } from '../contracts/write-guard.contract.ts';
 import { loopback } from './address/address.ts';
-import { mediaOf, saysJson } from './media/media.ts';
+import { mediaOf, saysForm, saysJson } from './media/media.ts';
 
 export type { WriteRefusal, WriteRequest } from '../contracts/write-guard.contract.ts';
 export { loopback } from './address/address.ts';
@@ -68,15 +70,17 @@ export const cookieTokenOf = (c: Context): string | undefined => {
 
 /**
  * Why a write is refused before its body is read, or null: its host first, neither where it presents a bearer token or the board's
- * cookie; then its site, not where it presents a bearer token; then its body's type; a read never.
+ * cookie; then its site, not where it presents a bearer token; then its body's type, JSON, or a form of files with a bearer token; a read
+ * never.
  * @param request The request's method, host, site, content type and whether it presents a bearer token or the board's cookie.
  */
 export const writeRefused: WriteRefused = (request) => {
   if (request.method === 'GET' || request.method === 'HEAD') return null;
   if (!request.bearer && !request.cookie && request.host !== undefined && !loopback(request.host)) return 'host';
   if (!request.bearer && request.site !== undefined && request.site !== 'same-origin') return 'site';
-  if (request.contentType === undefined || !saysJson(request.contentType)) return 'media';
-  return null;
+  if (request.contentType === undefined) return 'media';
+  if (saysJson(request.contentType) || (request.bearer && saysForm(request.contentType))) return null;
+  return 'media';
 };
 
 /** Where every route is listed, with what it takes. */

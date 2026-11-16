@@ -168,7 +168,7 @@ export const Wide: StoryObj = {
     const link = article.querySelector('h3 a')!;
     const button = article.querySelector('[data-copy-id] button')!.getBoundingClientRect();
     const x = button.left + button.width / 2;
-    const row = [...link.getClientRects()][0]!;
+    const row = [...link.getClientRects()][0];
     const at = document.elementFromPoint(x, row.top + 1);
     await expect(x > row.left && x < row.right, 'the title runs under the copy control').toBe(true);
     await expect(at?.closest('a'), `the point a pixel inside the title, under the copy control, answers ${at?.tagName ?? 'nothing'}`).toBe(

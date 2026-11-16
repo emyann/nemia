@@ -648,7 +648,7 @@ const RouterLinkButton = routeLink(Button);
  */
 function FloorOptions(props: { factory: FactoryPlace; showFinished: boolean; onShowFinished: (on: boolean) => void }) {
   return (
-    <div className="flex items-center gap-4 text-body-medium">
+    <div data-floor-options className="flex items-center gap-4 text-body-medium">
       <div
         className="flex items-center gap-2"
         title={`Shows the newest ${FINISHED_SIZE} finished runs of this factory. Every finished run is on Runs.`}
@@ -664,7 +664,6 @@ function FloorOptions(props: { factory: FactoryPlace; showFinished: boolean; onS
           params={{ factory: props.factory.name }}
           variant="outlined"
           size="xsmall"
-          data-factory-settings-link
         >
           Settings
         </RouterLinkButton>

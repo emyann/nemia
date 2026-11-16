@@ -48,16 +48,28 @@ const Answers = Schema.Array(
 });
 
 /**
- * A file handed to a run's steps (`nemia start --input <file>`), read where the start is typed and sent by its name, never its path: its
- * `text` where its bytes are UTF-8 text, else its bytes in `base64` (a picture); one of the two. Its name is a file's own, no folder in it.
+ * A file handed to a run's steps (`nemia start --input <file>`), read where the start is typed and sent by its name, never its path: the
+ * `file` it was uploaded as (`POST /api/namespaces/<namespace>/files`, file.ts), uploaded before the start, each file its own request; or,
+ * for a small one inside the start's body, its `text` where its bytes are UTF-8 text, else its bytes in `base64`. One of the three. Its
+ * name is a file's own, no folder in it: given with text or base64, and, with a file, the name it was uploaded with where left out.
  */
 export const RunInput = Schema.Struct({
-  name: notBlank("The file's own name, no folder in it: what the run's steps find it by."),
+  name: Schema.optionalKey(
+    notBlank(
+      "The file's own name, no folder in it: what the run's steps find it by. Given with text or base64; with a file, its uploaded name where left out.",
+    ),
+  ),
+  file: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        "The id of a file uploaded to the same namespace (POST /api/namespaces/:namespace/files, file_…), whose bytes the run's steps are handed; else left out, and text or base64 given.",
+    }),
+  ),
   text: Schema.optionalKey(
-    Schema.String.annotate({ description: 'Its text, where its bytes are UTF-8 text; else left out, and base64 given.' }),
+    Schema.String.annotate({ description: 'Its text, where its bytes are UTF-8 text and no file is given; else left out.' }),
   ),
   base64: Schema.optionalKey(
-    Schema.String.annotate({ description: 'Its bytes in base64, where they are no text (a picture); else left out, and text given.' }),
+    Schema.String.annotate({ description: 'Its bytes in base64, where they are no text and no file is given; else left out.' }),
   ),
 }).annotate({ identifier: 'RunInput' });
 export type RunInput = typeof RunInput.Type;

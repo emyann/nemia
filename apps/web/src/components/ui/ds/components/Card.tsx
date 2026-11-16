@@ -20,13 +20,15 @@ const styles = tv({
   variants: {
     variant: {
       filled: {
-        base: "bg-surface-container-highest",
+        base: "[--md3-field-notch:var(--md-sys-color-surface-container-highest)] bg-surface-container-highest",
       },
       outlined: {
-        base: "bg-surface border border-outline-variant",
+        // Said here too: an outlined card in a dialog or a sheet would
+        // otherwise take the colour that one sets.
+        base: "[--md3-field-notch:var(--md-sys-color-surface)] bg-surface border border-outline-variant",
       },
       elevated: {
-        base: "bg-surface-container-low",
+        base: "[--md3-field-notch:var(--md-sys-color-surface-container-low)] bg-surface-container-low",
       },
     },
     elevation: {

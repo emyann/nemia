@@ -100,6 +100,12 @@ export type TreeProps<T extends object> = Omit<AriaTreeProps<T>, "className"> & 
  * Aria's `Collection` (`<Collection items={item.children}>`).
  * `dragAndDropHooks` is React Aria's, as on `GridList`.
  *
+ * Escape clears the selection, React Aria's default, and the key goes no
+ * further. Where the selection is where the app is (the folder that is
+ * open, the row a pane shows) and is never cleared, pass
+ * `escapeKeyBehavior="none"`: left as it is, Escape would never reach the
+ * dialog or the sheet around the list, and never close it.
+ *
  * Material 3 does not describe this component. What it borrows:
  *
  * - **The row**: https://m3.material.io/components/lists/specs — a list

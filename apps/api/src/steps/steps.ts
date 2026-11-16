@@ -12,7 +12,7 @@ import {
   LOGS,
   lifecycleGraph,
   phaseOfView,
-  refusedName,
+  refusedPath,
   STEP_ARTIFACT,
   STEP_FILE,
   STEP_PATH,
@@ -435,11 +435,14 @@ const logOf = (runId: string, step: string, tail: string | undefined) =>
     }
   });
 
-/** The file `name` of the step's files directory (`STEP_ARTIFACT`): `BadRequest` for a path, `Gone` once pruned, `Missing` where none. */
+/**
+ * The file at the path `name` under the step's files directory (`STEP_ARTIFACT`): `BadRequest` for a path that climbs out, is absolute
+ * or is no path (`refusedPath`), `Gone` once pruned, `Missing` where none, or where a link stands on the way.
+ */
 const artifactOf = (runId: string, step: string, name: string) =>
   answered(async (s) => {
     const { run } = stepOf(s, runId, step);
-    const refused = refusedName(name);
+    const refused = refusedPath(name);
     if (refused) throw new BadRequest({ error: refused });
     const { file } = await s.inRequest(STEP_ARTIFACT.handler({ runId, step, name }));
     const pruned = run.pruned?.artifacts;
@@ -457,11 +460,14 @@ const artifactOf = (runId: string, step: string, name: string) =>
     return servedFile(name, file);
   });
 
-/** The file `name` of a folder step's own folder (`STEP_FILE`): `BadRequest` for a path, `Missing` for a branch step or none there. */
+/**
+ * The file at the path `name` under a folder step's own folder (`STEP_FILE`): `BadRequest` for a path `refusedPath` refuses, `Missing` for
+ * a branch step, or none there, or a link on the way.
+ */
 const fileOf = (runId: string, step: string, name: string) =>
   answered(async (s) => {
     stepOf(s, runId, step);
-    const refused = refusedName(name);
+    const refused = refusedPath(name);
     if (refused) throw new BadRequest({ error: refused });
     const { folder, file } = await s.inRequest(STEP_FILE.handler({ runId, step, name }));
     if (!folder) {
@@ -556,13 +562,14 @@ const followedFrom = (runId: string, step: string, after: string | undefined) =>
  * - `log` — the end of the step's session output as text, its last `?tail=` lines (`LOG_TAIL`), read by `nemia logs`' entry (`LOGS`),
  *   which reads it whole; empty for a step not filed yet; `ReadFailed` (502) when the engine could not read it. The board reads the
  *   conversation from the transcript.
- * - `artifact` — one file of the step's files directory, by name and never by path (`STEP_ARTIFACT`), as its closeout's `artifacts` link
- *   it; read on each request and never kept, since a step that runs again writes its files again. `BadRequest` (400) for a name that is
- *   not one; `Gone` (410) for a file gone because `nemia prune --artifacts` removed the run's files, leaving its record, closeouts and
- *   branches; `Missing` for a file the directory does not have.
- * - `file` — one file of a folder step's own folder, by name and never by path (`STEP_FILE`), as `files` on the step links it: what the
- *   step made, named in its closeout or not. `BadRequest` for a name that is not one; `Missing` for a step that works on a branch, or a
- *   file the folder does not have.
+ * - `artifact` — one file under the step's files directory, at its top or in a folder beneath it, by its path there encoded whole as
+ *   one segment (`e2e%2Fbar.png`; `STEP_ARTIFACT`), as its closeout's `artifacts` link it; read on each request and never kept, since a
+ *   step that runs again writes its files again. `BadRequest` (400) for a path `refusedPath` refuses (absolute, climbing out with `..`,
+ *   an empty part); `Gone` (410) for a file gone because `nemia prune --artifacts` removed the run's files, leaving its record,
+ *   closeouts and branches; `Missing` for a file the directory does not have, or one reached through a link.
+ * - `file` — one file under a folder step's own folder, by its path there encoded whole (`STEP_FILE`), as `files` on the step links it:
+ *   what the step made, named in its closeout or not. `BadRequest` for a path `refusedPath` refuses; `Missing` for a step that works on
+ *   a branch, or a file the folder does not have, or one reached through a link.
  * - `transcript` — a page of the step's conversation read once from the cursor `after` (an empty one is none, read from the start): the
  *   engine's events for the step's current task — the first `limit`, or the `last`, of the `kinds` asked, `TRANSCRIPT_PAGE`'s default
  *   page where neither count is asked — whether events are left after the page (`more`), whether it is live and whether it may yet say

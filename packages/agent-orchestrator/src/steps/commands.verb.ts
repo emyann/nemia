@@ -6,7 +6,7 @@ import { Effect, Schema } from 'effect';
 import { EngineService, asked, tried, type Engine } from '../runtime-client.ts';
 import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { artifactFile, fileIn } from '../artifacts/artifacts.store.ts';
+import { artifactFile, fileUnder } from '../artifacts/artifacts.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { isRepositoryRun } from '../record/record.ts';
@@ -24,10 +24,10 @@ const stepSpec = (more: readonly Positional[], keys: readonly string[]): Spec =>
   unknown: (arg) => `the board's reads of a step take no ${arg}.`,
 });
 
-/** The file's name, as the api's path names it. */
+/** The file's path under the step's folder, as the api's path names it, encoded whole as one segment. */
 const NAME: readonly Positional[] = [{ key: 'name', takes: 'required', kind: 'name' }];
 
-/** What a read of a step's file takes: the run's id, the step's name and the file's, never a path. */
+/** What a read of a step's file takes: the run's id, the step's name and the file's path under its folder, its parts split at `/`. */
 export const StepFileInput = Schema.Struct({ runId: Schema.String, step: Schema.String, name: Schema.String });
 export type StepFileInput = typeof StepFileInput.Type;
 
@@ -55,7 +55,10 @@ export const StepTranscriptInput = Schema.Struct({
 });
 export type StepTranscriptInput = typeof StepTranscriptInput.Type;
 
-/** The file `name` of the files directory of the step `step` of the run `id` (`artifactFile`), or null where there is none. */
+/**
+ * The file at the path `name` under the files directory of the step `step` of the run `id` (`artifactFile`), or null where there is
+ * none.
+ */
 export const STEP_ARTIFACT: Command<{ file: Buffer | null }, StepFileInput> = {
   name: 'step artifact',
   served: [{ endpoint: 'steps.artifact' }],
@@ -76,7 +79,7 @@ export const STEP_ARTIFACT: Command<{ file: Buffer | null }, StepFileInput> = {
 
 /**
  * The folder the step `step` of the run `id` works in — null for a step of a repository run, which works on a branch, and for one not filed
- * yet — and its file `name` (`fileIn`), or null where there is none.
+ * yet — and its file at the path `name` under it (`fileUnder`), or null where there is none.
  */
 export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }, StepFileInput> = {
   name: 'step file',
@@ -91,7 +94,7 @@ export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }, 
   handler: Effect.fnUntraced(function* ({ runId, step, name }: StepFileInput) {
     const run = yield* (yield* RunDoor).runs.find(RunId.read(runId), () => {});
     const folder = run && !isRepositoryRun(run) ? (run.steps[step]?.workspace ?? null) : null;
-    return yield* tried(() => ({ folder, file: folder === null ? null : fileIn(folder, name) }));
+    return yield* tried(() => ({ folder, file: folder === null ? null : fileUnder(folder, name) }));
   }),
   print: () => [],
 };

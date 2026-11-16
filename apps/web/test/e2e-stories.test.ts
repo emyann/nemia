@@ -217,3 +217,44 @@ test('REFUSED: a target naming no story id, exit 1, naming its file and the near
   assert.ok(ran.stderr.includes('target-run-card--wid.png'), 'the file named');
   assert.ok(ran.stderr.includes('run-card--wide'), 'the nearest id named');
 });
+
+/** `shoot.ts --out <out>` with a change touching no story, from the planted board, so no browser is launched: its exit. */
+const shotNothing = (root: string, out: string) =>
+  spawnSync(process.execPath, [SHOOT, '--changed', KIT_THEME, '--out', out], {
+    cwd: path.join(root, 'apps', 'web'),
+    encoding: 'utf8',
+    env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: path.join(root, 'no-browsers') },
+  }).status;
+
+const EARLIER_PASS = [
+  'story-run-card--wide-light.png',
+  'story-gone--plain-dark.png',
+  'before-run-card--wide-dark.png',
+  'after-run-card--wide-dark.png',
+  'diff-run-card--wide-dark.png',
+  'match-run-card--wide-light.png',
+];
+
+const NOT_ITS_OWN = ['notes.md', 'target-run-card--wide.png', 'story-notes.txt', 'e2e/story-run-card--wide-light.png'];
+
+test('a pass clears the pictures and stories.json an earlier pass wrote in --out, and no other file or folder of it', () => {
+  const { root } = planted();
+  const out = path.join(root, 'files');
+  write(out, Object.fromEntries([...EARLIER_PASS, 'stories.json', ...NOT_ITS_OWN].map((file) => [file, 'earlier'])));
+  fs.mkdirSync(path.join(out, 'story-folder.png'));
+  assert.equal(shotNothing(root, out), 0);
+  const left = fs.readdirSync(out, { recursive: true, encoding: 'utf8' }).sort();
+  assert.deepEqual(left, ['e2e', ...NOT_ITS_OWN, 'stories.json', 'story-folder.png'].sort(), "only this pass's report besides");
+  assert.notEqual(fs.readFileSync(path.join(out, 'stories.json'), 'utf8'), 'earlier', "this pass's report");
+});
+
+test('a pass into an empty --out, or one not there yet, clears nothing and passes', () => {
+  const { root } = planted();
+  const empty = path.join(root, 'empty');
+  fs.mkdirSync(empty);
+  assert.equal(shotNothing(root, empty), 0);
+  assert.deepEqual(fs.readdirSync(empty), ['stories.json']);
+  const absent = path.join(root, 'absent', 'files');
+  assert.equal(shotNothing(root, absent), 0);
+  assert.deepEqual(fs.readdirSync(absent), ['stories.json']);
+});

@@ -69,11 +69,11 @@ export const STEP_CODES = Schema.makeFilter((step: StepCodes) => stepCodesLegal(
 const TRY_CODES = Schema.makeFilter((tried: TryCodes) => tryCodesLegal(tried) || codesRefused('a try', tried));
 const RUN_CODES = Schema.makeFilter((run: RunCodes) => runCodesLegal(run) || codesRefused('a run', run));
 
-/** The check that a step names the run holding the checkout (`baseHeldBy`) exactly when it waits on it (`on: base`). */
+/** The check that a step names the run whose ending holds the base (`baseHeldBy`) exactly when it waits on it (`on: base`). */
 const BASE_HELD = Schema.makeFilter(
   (step: { on: (typeof WAIT_ON)[number] | null; baseHeldBy?: unknown }) =>
     (step.on === 'base') === (step.baseHeldBy !== undefined) ||
-    `a step is served ${step.on === 'base' ? 'waiting on the base with no baseHeldBy' : `with a baseHeldBy while it waits on ${String(step.on)}`}: set baseHeldBy, the run whose ending holds the checkout, exactly where on is base.`,
+    `a step is served ${step.on === 'base' ? 'waiting on the base with no baseHeldBy' : `with a baseHeldBy while it waits on ${String(step.on)}`}: set baseHeldBy, the run whose ending holds the base, exactly where on is base.`,
 );
 
 const StepStatusWord = Schema.Literals(STEP_STATUSES);
@@ -270,7 +270,7 @@ export const RunStepStatus = Schema.Struct({
   via: Schema.NullOr(Schema.Literals(ANSWER_VIA)).annotate({
     description: 'Where an awaited answer is asked, set only when its reason is AwaitingAnswer: session or closeout. Null otherwise.',
   }),
-  /** The run whose ending holds the checkout the step waits on, and that ending (`BaseHold`): present exactly when `on` is `base`. */
+  /** The run whose ending holds the base the step waits on, and that ending (`BaseHold`): present exactly when `on` is `base`. */
   baseHeldBy: Schema.optionalKey(BaseHold),
   message: Schema.String.annotate({ description: 'Where the step stands, in the sentence a person reads.' }),
   verdict: Schema.NullOr(CheckVerdict).annotate({

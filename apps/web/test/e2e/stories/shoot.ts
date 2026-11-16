@@ -184,8 +184,12 @@ const builtIds = (dir: string): Set<string> => {
   return new Set(Object.entries(index.entries).flatMap(([id, entry]) => (entry.type === 'story' ? [id] : [])));
 };
 
-/** Pictures each of `ids` the Storybook at `dir` holds, in each theme, into `out` as `<prefix><id>-<theme>.png`; the ids pictured. */
+/**
+ * Pictures each of `ids` the Storybook at `dir` holds, in each theme, into `out` as `<prefix><id>-<theme>.png`, by the e2e's
+ * `photograph`, which stills every animation for the shot; the ids pictured.
+ */
 async function shootAll(browser: Browser, dir: string, ids: readonly string[], out: string, prefix: string): Promise<string[]> {
+  const { photograph } = await import('../board.ts');
   const held = builtIds(dir);
   const shot = ids.filter((id) => held.has(id));
   await served(dir, async (at) => {
@@ -197,7 +201,7 @@ async function shootAll(browser: Browser, dir: string, ids: readonly string[], o
         await page.locator('[data-story-ground], [data-broken]').first().waitFor();
         await page.waitForLoadState('networkidle');
         await page.evaluate(() => document.fonts.ready.then(() => undefined));
-        await page.screenshot({ path: path.join(out, `${prefix}${id}-${theme}.png`), fullPage: true, animations: 'disabled' });
+        await photograph(page, path.join(out, `${prefix}${id}-${theme}.png`), { fullPage: true, always: true });
       }
       await context.close();
     }

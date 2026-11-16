@@ -61,7 +61,7 @@ function keysOf(schema: Schema.Top | undefined): string[] {
   return [...new Set(members.flatMap((m) => (isRecord(m.properties) ? Object.keys(m.properties) : [])))];
 }
 
-/** Whether `schema` is sent as a form of parts (`multipart/form-data`), as `HttpApiSchema.asMultipart` and its stream mark one. */
+/** Whether `schema` is sent as a form of parts (`multipart/form-data`), as HttpApi marks a multipart payload, buffered or streamed. */
 const formOf = (schema: Schema.Top): boolean => {
   const encoding: unknown = schema.ast.annotations?.['~httpApiEncoding'];
   return isRecord(encoding) && encoding._tag === 'Multipart';

@@ -608,14 +608,14 @@ export async function tipsOf(triggers: Locator, what: string): Promise<string[]>
   for (const trigger of await triggers.all()) {
     const box = await trigger.boundingBox();
     await trigger.hover({ position: { x: 2, y: (box?.height ?? 4) / 2 } });
-    const until = performance.now() + WAIT_MS;
-    let tip: string | null = null;
-    while (tip === null && performance.now() < until) {
-      const id = await trigger.getAttribute('aria-describedby');
-      const found = id ? page.locator(`[role="tooltip"][id="${id}"]`) : null;
-      tip = found && (await found.count()) === 1 ? await found.textContent() : null;
-      if (tip === null) await page.waitForTimeout(50);
-    }
+    const tip = await trigger
+      .and(page.locator('[aria-describedby]'))
+      .waitFor({ timeout: WAIT_MS })
+      .then(
+        async () =>
+          page.locator(`[role="tooltip"][id="${await trigger.getAttribute('aria-describedby')}"]`).textContent({ timeout: WAIT_MS }),
+        () => null,
+      );
     if (tip === null) throw new Refused(`${what} each say their words in the kit's tooltip — no tooltip describes one`);
     said.push(tip);
   }

@@ -210,10 +210,11 @@ test('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each wears
 
 test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page', async (t) => {
   await t.test(
-    'the steps rail: one bar a step by its state, its names in the hue of what waits or failed, and read aloud as one picture',
+    'the steps rail: one bar a step by its state, its names in the hue of what waits or failed, read aloud as a group named, each name a stop of the keyboard',
     async () => {
       const html = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: false, names: true }));
-      assert.match(tagWith(html, 'data-run-steps'), /role="img"/);
+      assert.match(tagWith(html, 'data-run-steps'), /role="group"/, 'with names, a group, so each name can take the focus');
+      assert.match(tagWith(html, 'data-step-name="review"'), /role="img"[^>]*aria-label="review"[^>]*tabindex="0"/);
       assert.match(html, /aria-label="design verified, implement at work, review failed its check, land waits on you"/);
       assert.deepEqual(
         [...html.matchAll(/data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]),
@@ -246,6 +247,7 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
       assert.doesNotMatch(tagWith(html, 'data-step="review"'), /bg-failure-container/);
       const bare = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: true }));
       assert.doesNotMatch(bare, /data-step-name/, 'no names unless asked');
+      assert.match(tagWith(bare, 'data-run-steps'), /role="img"/, 'and without them, one picture');
       assert.match(tagWith(bare, 'data-step="land"'), /data-state="held"/, "a held run's gate is drawn held");
     },
   );

@@ -109,7 +109,7 @@ const importsIn = (text: string): string[] => specifiersIn(withoutComments(text)
 const leavesWeb = (file: string, mod: string): boolean =>
   mod.startsWith('.') && path.posix.normalize(path.posix.join(path.posix.dirname(file), mod)).startsWith('../');
 
-/** Whether a relative module named in `file` of `src` is under the board's `test/`: a fixture, a helper, the page of the look's stories. */
+/** Whether a relative module named in `file` of `src` is under the board's `test/`: a fixture, a helper, `test/e2e/stories/built.ts`. */
 const reachesTests = (file: string, mod: string): boolean =>
   mod.startsWith('.') && path.posix.normalize(path.posix.join(path.posix.dirname(file), mod)).startsWith('test/');
 

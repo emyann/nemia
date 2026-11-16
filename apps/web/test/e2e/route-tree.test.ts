@@ -1,8 +1,10 @@
 /**
  * The stories' Vitest writes no route tree: with a route file added under `src/routes`, `npm run stories` run on one story file leaves
  * `src/routeTree.gen.ts` byte for byte as it was, the router's plugin being left out of its config as Storybook's is
- * (`.storybook/router.ts`); the board's build alone writes the tree. The route file is taken back however the run ends.
- * `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it launches Chromium, through Vitest.
+ * (`.storybook/router.ts`); the board's build alone writes the tree. The route file is taken back however the test ends,
+ * but not when its process is killed (for memory, say): then `src/routes/zz-route-tree-probe.tsx` is left in the workspace, which a
+ * step's run would commit: delete it. `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it launches Chromium,
+ * through Vitest.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

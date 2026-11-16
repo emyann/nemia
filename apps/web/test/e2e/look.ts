@@ -10,8 +10,9 @@
  * Storybook is built static once, into a folder of the machine's temp directory, before the tests, which read it through
  * `LOOK_STORYBOOK` (`stories/built.ts`) and build none of their own; the folder goes once they have run. Each file launches Chromium:
  * so they run at most two files at once, the bound of every package's `test` script, and each test at `WAITED`'s timeout (held by
- * `test/e2e-look.test.ts`). The build runs before them and the stories' Vitest after them, never beside them, so no two hold their
- * memory at once.
+ * `test/e2e-look.test.ts`). The build runs before them and the whole stories' Vitest after them, never beside them. One test file
+ * runs a Vitest of its own, on one story file (route-tree.test.ts), and so beside whichever other file runs with it: a Vitest and a
+ * Chromium of a test at once, the peak of the run's tree.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';

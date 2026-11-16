@@ -12,7 +12,8 @@
  *   --outDir`), puts back the route tree the build regenerates (`keeping`), refuses when the workspace's `git status` changed over the
  *   build (`changedOver`), starts a holder of its own (`hold`) and prints the three lines the holder wrote (`linesOf`): the board's
  *   address, the api's, and the person's token the store keeps, which a browser pastes on the board's token page: every api route asks
- *   for one, loopback too. The look's stories are not served here: a step looks at them through `npm run storybook`.
+ *   for one, loopback too. The look's stories are not served here: a step looks at them through `npx storybook dev -p <a port of
+ *   its own>`, never `npm run storybook`, the person's on 6007 (`apps/web/CLAUDE.md`).
  * - `hold`, the holder, started by `serve` alone and detached from it: seeds the store, serves it (served.ts), writes where each listens,
  *   its pid and the tree it was built from into the folder (`served.json`), and ends by itself after `HOLD_MS` (`BOARD_HOLD_MS` in a
  *   test), sooner when `stop` asks, a server dies or a signal comes. On its way out it stops both servers by the handles it kept and

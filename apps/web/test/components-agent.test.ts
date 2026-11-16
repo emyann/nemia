@@ -701,3 +701,15 @@ test("a link to a repository's agent, or to a node of a repository's workflow, k
     'a step both named and filled, once, whichever origin each reads it from',
   );
 });
+
+test("a route link of the board is the kit's link, underlined only where its caller's classes say so, as the bare link it replaced", async () => {
+  const { RouteLink } = await import('../src/components/agent/AgentParts.tsx');
+  const classOf = async (className?: string) =>
+    (await routedWith(createElement(RouteLink, { to: '/agents', className }, 'Agents'))).match(/<a [^>]*class="([^"]*)"/)?.[1].split(' ') ?? [];
+  const bare = await classOf();
+  assert.ok(bare.includes('no-underline') && !bare.includes('underline'), `a pill or a row draws no underline: ${bare.join(' ')}`);
+  const worded = await classOf('underline');
+  assert.ok(worded.includes('underline') && !worded.includes('no-underline'), `a word asks for one: ${worded.join(' ')}`);
+  const hovered = await classOf('hover:underline');
+  assert.ok(hovered.includes('no-underline') && hovered.includes('hover:underline'), `one under the pointer: ${hovered.join(' ')}`);
+});

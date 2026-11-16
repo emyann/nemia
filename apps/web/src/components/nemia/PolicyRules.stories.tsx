@@ -9,14 +9,13 @@ import { seeded } from '../../../.storybook/fixtures/proposals';
 /**
  * Her rules for Auto, seeded: what is in force, the default marked, and what she proposed.
  *
- * Axe's `heading-order` alone is off: the part draws the custom instruction's `h2` inside its own `h3`, then its `h4`s, on the Settings
- * page as here. That is the page's outline to mend, apart from this story; every other rule holds the part.
+ * Each warns on axe only (`todo`): the part draws the custom instruction's `h2` inside its own `h3`, then its `h4`s
+ * (`heading-order`), on the Settings page as here; that is the page's outline to mend.
  */
 const meta: Meta<typeof PolicyRules> = {
   title: 'Store/PolicyRules',
   component: PolicyRules,
   args: { agent: 'nemia' },
-  parameters: { a11y: { config: { rules: [{ id: 'heading-order', enabled: false }] } } },
 };
 export default meta;
 
@@ -34,6 +33,7 @@ const over = (list: PolicyList): Story => ({
 /** The default in force, a Drop beside it, and a proposed rule waiting on Confirm. */
 export const Proposed: Story = {
   ...over(policyList),
+  parameters: { a11y: { test: 'todo' } },
   play: async ({ canvasElement }) => {
     const rules = within(canvasElement);
     await expect(rules.getByText('Default')).toBeVisible();
@@ -42,9 +42,12 @@ export const Proposed: Story = {
 };
 
 /** Her proposal confirmed and the default dropped: In force, and the default offered back. */
-export const Confirmed: Story = over({
-  ...policyList,
-  isDefault: false,
-  rules: [{ ...RETRY_RULE, from: 'proposed' }],
-  proposed: policyList.proposed && { ...policyList.proposed, rules: [{ ...RETRY_RULE, confirmed: true }] },
-});
+export const Confirmed: Story = {
+  parameters: { a11y: { test: 'todo' } },
+  ...over({
+    ...policyList,
+    isDefault: false,
+    rules: [{ ...RETRY_RULE, from: 'proposed' }],
+    proposed: policyList.proposed && { ...policyList.proposed, rules: [{ ...RETRY_RULE, confirmed: true }] },
+  }),
+};

@@ -11,7 +11,7 @@ import { routeLink } from '../nav/routeLink';
 import { usePagePlace } from '../nav/useSeat';
 import { definitionLink, workflowLink } from '../../lib/factoryAddress';
 import { container, hairline } from '../../lib/meaning';
-import { Link, type LinkProps } from '../ui/ds';
+import { composeTailwindRenderProps, Link, type LinkProps } from '../ui/ds';
 
 /**
  * A link to a route, as the kit draws one (`routeLink`), in the colour of the text around it: what the Agents pages link a node and an
@@ -19,11 +19,14 @@ import { Link, type LinkProps } from '../ui/ds';
  */
 export const RouteLink = routeLink(InheritedLink);
 
-const LINK = 'decoration-outline hover:decoration-foreground';
+const LINK = 'underline decoration-outline hover:decoration-foreground';
 
-/** The kit's link in the colour of the text around it, which the Agents pages set in their own roles. */
-function InheritedLink(props: LinkProps) {
-  return <Link color="inherit" {...props} />;
+/**
+ * The kit's link in the colour of the text around it, and with no underline unless the caller's classes give one: the board's route
+ * links are pills, rows and words alike, and each says its own underline, as the bare link they were drawn with did.
+ */
+function InheritedLink({ className, ...props }: LinkProps) {
+  return <Link color="inherit" {...props} className={composeTailwindRenderProps(className, 'no-underline')} />;
 }
 
 /** The word for each origin an agent is read from. */

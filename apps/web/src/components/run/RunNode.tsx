@@ -195,7 +195,8 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
                   hash={stepAnchor(need.step)}
                   data-need={need.kind}
                   data-step={need.step}
-                  className="nodrag text-yours hover:underline"
+                  underline="hover"
+                  className="nodrag text-yours"
                 >
                   {needLine(need)}
                 </RouteLink>
@@ -225,7 +226,8 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
               params={{ runId: run.id }}
               hash="decide"
               data-to-decide="result"
-              className="nodrag text-yours hover:underline"
+              underline="hover"
+              className="nodrag text-yours"
             >
               {decideLine(decide.branches)}
             </RouteLink>

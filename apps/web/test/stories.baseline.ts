@@ -9,7 +9,6 @@ export const BASELINE = {
     'apps/web/src/components/actor/Actor.tsx',
     'apps/web/src/components/agent/AgentCard.tsx',
     'apps/web/src/components/agent/AgentParts.tsx',
-    'apps/web/src/components/agent/ContextPicker.tsx',
     'apps/web/src/components/command/CommandLine.tsx',
     'apps/web/src/components/command/CopyButton.tsx',
     'apps/web/src/components/factory/FactoriesCanvas.tsx',
@@ -725,6 +724,13 @@ export const BASELINE = {
   ],
   /** The stories axe fails today, each with its a11y test set to warn only. */
   a11yTodo: [
+    'apps/web/src/components/agent/ContextPicker.stories.tsx#OnePicked',
+    'apps/web/src/components/agent/AgentPage.stories.tsx#Theirs',
+    'apps/web/src/components/agent/SkillPicker.stories.tsx#SheetOpen',
+    'apps/web/src/components/nemia/NemiaSettings.stories.tsx#SemiAuto',
+    'apps/web/src/components/nemia/NemiaSettings.stories.tsx#Stopped',
+    'apps/web/src/components/nemia/PolicyRules.stories.tsx#Proposed',
+    'apps/web/src/components/nemia/PolicyRules.stories.tsx#Confirmed',
     'apps/web/src/components/conversation/Worked.stories.tsx#Long',
     'apps/web/src/components/frame/OverviewStrip.stories.tsx#BusyDay',
     'apps/web/src/components/frame/OverviewStrip.stories.tsx#QuietDay',

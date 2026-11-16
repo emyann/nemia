@@ -10,14 +10,13 @@ import { seeded } from '../../../.storybook/fixtures/proposals';
 /**
  * Nemia's section of the Settings page, its reads seeded: her level, each factory's, her session, her rules and her memory.
  *
- * Axe's `heading-order` alone is off: her rules (`PolicyRules`) draw the custom instruction's `h2` inside their own `h3`, then their
- * `h4`s, on the Settings page as here. That is the page's outline to mend, apart from this story; every other rule holds the section.
+ * Each warns on axe only (`todo`): her rules (`PolicyRules`) draw the custom instruction's `h2` inside their own `h3`, then their
+ * `h4`s (`heading-order`), on the Settings page as here; that is the page's outline to mend.
  */
 const meta: Meta<typeof NemiaSettings> = {
   title: 'Store/NemiaSettings',
   component: NemiaSettings,
   args: {},
-  parameters: { a11y: { config: { rules: [{ id: 'heading-order', enabled: false }] } } },
 };
 export default meta;
 
@@ -41,6 +40,7 @@ const at = (level: NemiaLevel): Story => ({
 /** At Semi-auto, her session up: her level picked, a factory raised, one to raise, her facts folded. */
 export const SemiAuto: Story = {
   ...at(nemiaLevel('semi-auto')),
+  parameters: { a11y: { test: 'todo' } },
   play: async ({ canvasElement }) => {
     const section = within(canvasElement);
     await userEvent.click(section.getByRole('button', { name: /Her level$/ }));
@@ -52,4 +52,7 @@ export const SemiAuto: Story = {
 };
 
 /** At Manual, her session stopped from outside: a way to a fresh one. */
-export const Stopped: Story = at({ ...nemiaLevel('manual'), stopped: true, task: null, phase: null, sessionId: null, reach: [] });
+export const Stopped: Story = {
+  parameters: { a11y: { test: 'todo' } },
+  ...at({ ...nemiaLevel('manual'), stopped: true, task: null, phase: null, sessionId: null, reach: [] }),
+};

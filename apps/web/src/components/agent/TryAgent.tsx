@@ -104,7 +104,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
 export function TryRun({ id }: { id: string }) {
   const { view: run, error } = useRunRead(id);
   const link = (
-    <RouteLink to="/runs/$runId" params={{ runId: id }} data-try-run={id} className="font-mono text-body-small">
+    <RouteLink to="/runs/$runId" params={{ runId: id }} data-try-run={id} className="font-mono text-body-small underline">
       {id}
     </RouteLink>
   );

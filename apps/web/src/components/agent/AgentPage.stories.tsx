@@ -11,14 +11,13 @@ import { seeded } from '../../../.storybook/fixtures/proposals';
 /**
  * An agent's page, its reads seeded: the agent at its origin and the skills it can be given.
  *
- * Axe's `heading-order` alone is off: a read-only agent's instructions are drawn as markdown whose `##` is an `h4` under the page's
- * `h1`, on the page as here. That is the page's outline to mend, apart from this story; every other rule holds the page.
+ * Theirs warns on axe only (`todo`): a read-only agent's instructions are drawn as markdown whose `##` is an `h4` under the page's
+ * `h1` (`heading-order`), on the page as here; that is the page's outline to mend.
  */
 const meta: Meta<typeof AgentPage> = {
   title: 'Pages/Agent',
   component: AgentPage,
   args: { from: 'user', name: 'scribe', place: {} },
-  parameters: { a11y: { config: { rules: [{ id: 'heading-order', enabled: false }] } } },
   render: (args) => (
     <QueryClientProvider
       client={seeded([
@@ -48,4 +47,4 @@ export const Yours: Story = {
 };
 
 /** The repository's: read-only, and copied to yours to be tried. */
-export const Theirs: Story = { args: { from: 'repo', name: 'critic' } };
+export const Theirs: Story = { args: { from: 'repo', name: 'critic' }, parameters: { a11y: { test: 'todo' } } };

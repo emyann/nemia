@@ -238,6 +238,11 @@ async function byThePointer(page: Page, bar: Locator, run: string, step: string,
   await page.mouse.move(0, 0);
   await bar.hover();
   await expectVisible(previewOf(page), 'a bar the pointer rests on opens its step card');
+  const name = (await bar.getAttribute('aria-label')) ?? '';
+  await expectVisible(
+    page.getByRole('dialog', { name, exact: true }).locator('[data-step-card]'),
+    'the card is a dialog named as its bar is',
+  );
   await readsAsExpected(previewOf(page), want, 'by the pointer');
   await glowHasRoom(page, 'by the pointer');
   await photographCard(page, 'card');

@@ -430,6 +430,20 @@ export const files = {
     }
     return inputs;
   },
+  /**
+   * Each file of `sent` whose id the start's `refusal` says its namespace keeps no more, forgotten there, so the next press uploads it
+   * again: a 422 that names the id, the api's answer to a start naming a file it no longer keeps (gone past `FILE_KEPT_FOR`, or never
+   * kept). Told apart by its status and the id it names, which is random, never by its words. The files forgotten, none for any other
+   * refusal.
+   * @param sent The ids an earlier press of the form uploaded, by their file.
+   * @param refusal What the start was refused with.
+   */
+  unkept: (sent: Map<File, string>, refusal: unknown): File[] => {
+    if (!(refusal instanceof WriteRefusal) || refusal.status !== 422) return [];
+    const gone = [...sent].filter(([, id]) => refusal.message.includes(id)).map(([file]) => file);
+    for (const file of gone) sent.delete(file);
+    return gone;
+  },
 };
 
 /** What a card's start answers: its new run, and the card's name. */

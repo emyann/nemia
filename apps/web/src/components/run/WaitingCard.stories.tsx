@@ -5,7 +5,7 @@ import { atRest } from '../../../.storybook/play';
 import type { WaitingRun } from '@/lib/api/runs';
 import { WaitingCard } from './WaitingCard';
 
-/** A run that waits on a person, as a card of the runs page: in a box too narrow to hold its tiles and its button, and in one that does. */
+/** A run that waits on a person, as a card of the runs page: in a box as narrow as a card where the page is narrow, and wide. */
 const meta: Meta = { title: 'Run/WaitingCard' };
 export default meta;
 
@@ -126,28 +126,28 @@ const RUN: WaitingRun = {
   waitingSince: '2026-10-12T16:40:00.000Z',
 };
 
-/** A box as wide as a card of the runs page where the page is narrow: the foot wraps in it. */
+/** A box as wide as a card of the runs page where the page is narrow. */
 const NARROW: CSSProperties = { width: 360 };
 
-/** A box as wide as a card where the page is wide: the foot holds the tiles and the button on one line. */
+/** A box as wide as a card where the page is wide. */
 const WIDE: CSSProperties = { width: 760 };
 
-/** Where the button of the card drawn in `canvas` stands against its tiles, and how far its right edge is from the foot's. */
-const footOf = (canvas: HTMLElement): { under: boolean; beside: boolean; fromRight: number } => {
+/** Where the button of the card drawn in `canvas` stands against its rail, and how far its right edge is from the foot's. */
+const footOf = (canvas: HTMLElement): { beside: boolean; fromRight: number } => {
   const foot = canvas.querySelector('[data-foot]')!;
-  const [tiles, button] = ['[data-tiles]', '[data-cut-button]'].map((part) => foot.querySelector(part)!.getBoundingClientRect());
+  const [rail, button] = ['[data-run-steps]', '[data-cut-button]'].map((part) => foot.querySelector(part)!.getBoundingClientRect());
   return {
-    under: button.top >= tiles.bottom,
-    beside: button.top < tiles.bottom && button.bottom > tiles.top,
+    beside: button.top < rail.bottom && button.bottom > rail.top,
     fromRight: Math.round(foot.getBoundingClientRect().right - button.right),
   };
 };
 
-/** The card where it cannot hold its tiles and its button side by side: the button under the tiles, at the card's right. */
+/** The card where the page is narrow: its rail, its cost and its one button on one line, the button at the card's right. */
 export const Narrow: StoryObj = {
   play: async ({ canvasElement }) => {
     await document.fonts.ready;
-    await expect(footOf(canvasElement), 'narrow, the button wraps under the tiles').toEqual({ under: true, beside: false, fromRight: 0 });
+    await expect(footOf(canvasElement), 'the button beside the rail, at the right').toEqual({ beside: true, fromRight: 0 });
+    await expect(canvasElement.querySelectorAll('[data-cut-button]').length, 'one button').toBe(1);
   },
   render: () => (
     <div data-card-box style={NARROW}>
@@ -157,26 +157,21 @@ export const Narrow: StoryObj = {
 };
 
 /**
- * The card where it holds both: the button beside the tiles, at the card's right, and the title on one line over the copy control,
- * whose lowest pixels over the control answer the title's link: a press there opens the run, and copies nothing.
+ * The card where the page is wide: the button at the card's right, and the title under the meta line, raised over the copy control's
+ * target, so its highest pixels under the control answer the title's link: a press there opens the run, and copies nothing.
  */
 export const Wide: StoryObj = {
   play: async ({ canvasElement, userEvent }) => {
     await document.fonts.ready;
-    await expect(footOf(canvasElement), 'wide, it stands beside them').toEqual({ under: false, beside: true, fromRight: 0 });
+    await expect(footOf(canvasElement), 'the button beside the rail, at the right').toEqual({ beside: true, fromRight: 0 });
     const article = canvasElement.querySelector('article[data-run]')!;
     const link = article.querySelector('h3 a')!;
     const button = article.querySelector('[data-copy-id] button')!.getBoundingClientRect();
-    const [x, cy] = [button.left + button.width / 2, button.top + button.height / 2];
-    const rows = [...link.getClientRects()];
-    const row = rows.at(-1)!;
-    const at = document.elementFromPoint(x, row.bottom - 1);
-    const hit = { rows: rows.length, over: x > row.left && x < row.right, above: Math.round(cy - row.bottom) };
-    await expect(
-      hit.rows === 1 && hit.over && hit.above < 24,
-      `the title runs over the copy control, within its reach: ${JSON.stringify(hit)}`,
-    ).toBe(true);
-    await expect(at?.closest('a'), `the point a pixel inside the title, over the copy control, answers ${at?.tagName ?? 'nothing'}`).toBe(
+    const x = button.left + button.width / 2;
+    const row = [...link.getClientRects()][0]!;
+    const at = document.elementFromPoint(x, row.top + 1);
+    await expect(x > row.left && x < row.right, 'the title runs under the copy control').toBe(true);
+    await expect(at?.closest('a'), `the point a pixel inside the title, under the copy control, answers ${at?.tagName ?? 'nothing'}`).toBe(
       link,
     );
     await userEvent.click(at!);

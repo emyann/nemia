@@ -342,10 +342,10 @@ export default {
         'and drawn once, as a thumbnail among the files it named',
       );
       await expectVisible(
-        gave.locator('li[data-answer="fixed"] [data-slot="badge"]', { hasText: 'fixed' }),
-        'its replies answer with a badge: fixed',
+        gave.locator('li[data-answer="fixed"] [data-slot="tag"]', { hasText: 'fixed' }),
+        'its replies answer with a tag: fixed',
       );
-      await expectVisible(gave.locator(`li[data-answer="won't fix"] [data-slot="badge"]`, { hasText: "won't fix" }), "and won't fix");
+      await expectVisible(gave.locator(`li[data-answer="won't fix"] [data-slot="tag"]`, { hasText: "won't fix" }), "and won't fix");
       await photographInspector(page, implement, 'implement');
 
       const ask = await outputOf(page, 'ask');

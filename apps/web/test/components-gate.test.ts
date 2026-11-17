@@ -521,12 +521,10 @@ test('a loop out of rounds is approved as it stands from the Answer section, wit
     "the step's approve line, with the reason a loop's requires",
   );
   assert.ok(row.includes(`<form aria-label="${OFFERS.enough.form('review')}"`), row);
-  const label = new RegExp(`<label for="([^"]+)"[^>]*>${OFFERS.enough.field('review').replace("'", '&#x27;')}</label>`).exec(row);
-  assert.ok(label, row);
-  assert.match(row, new RegExp(`<textarea id="${label[1]}"`));
+  assert.match(row, new RegExp(`<textarea[^>]*aria-label="${OFFERS.enough.field('review').replace("'", '&#x27;')}"`), 'the box named');
   assert.match(
     row,
-    new RegExp(`<button type="submit" disabled=""[^>]*>${OFFERS.enough.button}</button>`),
+    new RegExp(`<button[^>]*type="submit"[^>]*disabled=""[^>]*>(?:(?!</button>)[\\s\\S])*>${OFFERS.enough.button}<`),
     'blank, the button waits for a reason, as `nemia approve` of a loop waits for `--message`',
   );
   const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];

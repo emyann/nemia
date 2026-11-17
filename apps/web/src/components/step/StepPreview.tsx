@@ -1,7 +1,7 @@
-import { useContext, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { Button, PopoverContext } from 'react-aria-components';
+import { useContext, useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { PopoverContext } from 'react-aria-components';
 import { useQuery } from '@tanstack/react-query';
-import { BottomSheet, PreviewCard, PreviewTrigger } from '@/components/ui/ds';
+import { BottomSheet, PreviewCard, PreviewTrigger, Pressable } from '@/components/ui/ds';
 import { agentsQuery } from '@/lib/api/agents';
 import type { RunView } from '@/lib/api/judged';
 import { type WaitOn } from 'objects';
@@ -10,7 +10,6 @@ import { barSaid } from '@/lib/runWords';
 import type { StepState } from '@/lib/status';
 import { headOf } from '@/lib/stepPart';
 import { cardOpened, previewSide, useACardOpen, useSheetPreview, type PreviewSide } from '@/lib/useSheetPreview';
-import { cn, focusRing } from '@/components/ui/ds/utils';
 import { CutFrame } from '../look';
 import { PartHead } from './part/PartHead';
 import { StepPart } from './part/StepPart';
@@ -21,8 +20,8 @@ type RailRun = Pick<RunView, 'id' | 'cancelledAt' | 'holding' | 'steps'>;
 /** A node of the graph as the graph hands it: its step's name, state and wait. */
 type RailStep = { name: string; state: StepState; on: WaitOn | null };
 
-/** A node's button: the whole of its holder on the graph, 24 pixels square on a row, its mark drawn in its middle. */
-const BAR_BUTTON = cn('grid size-full cursor-pointer place-items-center outline-none', focusRing());
+/** A node's button, the kit's pressable: the whole of its holder on the graph, 24 pixels square on a row, its mark drawn in its middle. */
+const BAR_BUTTON = 'grid size-full place-items-center rounded-none';
 
 /**
  * The card of a step, its part at M, read once it opens: the run's own answer (one read a run, held by the query's cache) and the agents,
@@ -79,21 +78,27 @@ function ByTheRail({ children }: { children: ReactNode }) {
  */
 function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
   const id = useId();
-  const bar = useRef<HTMLButtonElement>(null);
   const [side, setSide] = useState<PreviewSide>('end top');
   const warm = useACardOpen();
   const said = barSaid(step.name, step.state, step.on, run.holding != null);
   useEffect(() => () => cardOpened(id, false), [id]);
   const opened = (open: boolean): void => {
     cardOpened(id, open);
-    const rail = railOf(bar.current);
+    const rail = railOf(document.querySelector(`[data-bar-of="${CSS.escape(id)}"]`));
     if (open && rail) setSide(previewSide(rail.getBoundingClientRect(), innerWidth));
   };
   return (
     <PreviewTrigger delay={warm ? 0 : undefined} onOpenChange={opened}>
-      <Button ref={bar} aria-label={said} data-step-bar={step.name} data-step-preview="card" className={BAR_BUTTON} onKeyDown={intoTheCard}>
+      <Pressable
+        data-bar-of={id}
+        aria-label={said}
+        data-step-bar={step.name}
+        data-step-preview="card"
+        className={BAR_BUTTON}
+        onKeyDown={intoTheCard}
+      >
         {children}
-      </Button>
+      </Pressable>
       <ByTheRail>
         <PreviewCard
           aria-label={said}
@@ -114,9 +119,9 @@ function SheetPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
   const said = barSaid(step.name, step.state, step.on, run.holding != null);
   return (
     <>
-      <Button aria-label={said} data-step-bar={step.name} data-step-preview="sheet" className={BAR_BUTTON} onPress={() => setOpen(true)}>
+      <Pressable aria-label={said} data-step-bar={step.name} data-step-preview="sheet" className={BAR_BUTTON} onPress={() => setOpen(true)}>
         {children}
-      </Button>
+      </Pressable>
       <BottomSheet variant="modal" isOpen={open} onClose={() => setOpen(false)} aria-label={said} heights={['partial', 'expanded']}>
         <OpenedCard run={run} step={step.name} asOf={asOf} />
       </BottomSheet>

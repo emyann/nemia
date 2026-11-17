@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { Tag } from '@/components/ui/ds';
 import { type Outcome, outcomeWord } from '../../lib/outcome';
-import { cn } from '../../lib/utils';
 import { Markdown } from '../markdown/Markdown';
 import { container } from '../../lib/meaning';
 
@@ -30,11 +29,7 @@ export function OutcomeHead({ outcome, aside }: { outcome: Outcome; aside?: Reac
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
         <p data-outcome={word} data-by={outcome.by} className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Badge
-            className={cn('text-body-medium', BADGE[outcome.by === 'agent' && outcome.outcome === 'blocked' ? 'blocked' : outcome.by])}
-          >
-            {word}
-          </Badge>{' '}
+          <Tag className={BADGE[outcome.by === 'agent' && outcome.outcome === 'blocked' ? 'blocked' : outcome.by]}>{word}</Tag>{' '}
           <span className="text-body-small text-muted-foreground">{BY[outcome.by]}</span>
         </p>
         {aside}
@@ -71,7 +66,7 @@ export function Replies({ replies }: { replies: ReadonlyArray<Record<string, unk
             <Markdown>{text(reply.finding ?? '')}</Markdown>{' '}
             <div className="flex items-start gap-1.5 text-muted-foreground">
               <span className="shrink-0">
-                → <Badge className={ANSWER[answer] ?? ANSWER["won't fix"]}>{answer}</Badge>
+                → <Tag className={ANSWER[answer] ?? ANSWER["won't fix"]}>{answer}</Tag>
               </span>
               {why && (
                 <>

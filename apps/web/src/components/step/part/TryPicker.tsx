@@ -4,17 +4,11 @@
  * Nothing for a step of one try or none.
  */
 import { useNavigate } from '@tanstack/react-router';
-import { ToggleButton, ToggleButtonGroup } from 'react-aria-components';
 import type { StepTry } from '@/lib/api/tries';
 import type { Frozen } from '@/lib/frozen';
 import { setTry } from '@/lib/tryAddress';
-import { cn, focusRing } from '@/components/ui/ds/utils';
+import { Segment, SegmentedButton } from '@/components/ui/ds';
 import { triesByRound } from '../Closeout';
-
-const TOGGLE = cn(
-  'border border-outline-variant px-1.5 py-0.5 font-mono text-body-small text-on-surface-variant hover:text-on-surface data-selected:border-on-surface data-selected:text-on-surface',
-  focusRing(),
-);
 
 /** The picker of the tries of the step `step`, showing `shown`. */
 export function TryPicker({ step, tries, shown }: { step: string; tries: readonly Frozen<StepTry>[]; shown: number | null }) {
@@ -29,7 +23,7 @@ export function TryPicker({ step, tries, shown }: { step: string; tries: readonl
       resetScroll: false,
     });
   return (
-    <ToggleButtonGroup
+    <SegmentedButton
       aria-label={`Which try of ${step}`}
       data-try-picker={step}
       selectionMode="single"
@@ -39,15 +33,15 @@ export function TryPicker({ step, tries, shown }: { step: string; tries: readonl
       className="flex flex-wrap items-center gap-x-3 gap-y-1"
     >
       {triesByRound(tries).map(({ round, tries: ofRound }) => (
-        <span key={round} data-round={round} className="flex items-center gap-1">
-          <span className="text-label-small text-on-surface-variant uppercase">round {round}</span>
+        <span key={round} data-round={round} className="flex items-center">
+          <span className="me-2 text-label-small text-on-surface-variant uppercase">round {round}</span>
           {ofRound.map((t) => (
-            <ToggleButton key={t.try} id={String(t.try)} data-try={t.try} className={TOGGLE}>
+            <Segment key={t.try} id={String(t.try)} data-try={t.try} className="flex-none">
               {t.current ? `try ${t.try} (current)` : `try ${t.try}`}
-            </ToggleButton>
+            </Segment>
           ))}
         </span>
       ))}
-    </ToggleButtonGroup>
+    </SegmentedButton>
   );
 }

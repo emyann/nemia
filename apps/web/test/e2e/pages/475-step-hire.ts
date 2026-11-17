@@ -36,7 +36,7 @@ function written(): () => void {
 
 /** Picks `agent` in the hire's picker on the step's page, and hires it; refuses unless FACTORY then hires it, with Fire. */
 async function hire(page: Page, agent: string): Promise<void> {
-  await page.locator('[data-hire-picker]').click();
+  await page.locator('[data-hire-picker] [data-slot="select-trigger"]').click();
   await page.getByRole('option', { name: new RegExp(`^${agent}`) }).click();
   await page.locator('[data-hire]').click();
   await expectVisible(

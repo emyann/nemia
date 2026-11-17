@@ -11,7 +11,7 @@
  * it is edited, and the task left to the brief a run is started with.
  */
 import type { ReactNode } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { Tag } from '@/components/ui/ds';
 import type { StepLayers, TaskPart } from '../../lib/api/layers.ts';
 import { RouteLink } from '../agent/AgentParts';
 import { Markdown } from '../markdown/Markdown';
@@ -308,9 +308,9 @@ export function Skills({ word, skills, link }: { word: string; skills: readonly 
     <p className="flex flex-wrap items-center gap-1 text-body-small text-muted-foreground">
       {word}{' '}
       {skills.map((skill) => (
-        <Badge key={skill} variant="outline" data-skill={skill}>
+        <Tag key={skill} variant="outlined" data-skill={skill}>
           {link ? link(skill) : skill}
-        </Badge>
+        </Tag>
       ))}
     </p>
   );

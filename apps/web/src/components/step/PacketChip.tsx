@@ -5,7 +5,7 @@
 import { useNavigate } from '@tanstack/react-router';
 import { stepAnchor } from '@/lib/asks';
 import type { Packet } from '@/lib/canvas';
-import { cn, focusRing } from '@/components/ui/ds/utils';
+import { Button } from '@/components/ui/ds';
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -25,19 +25,18 @@ export const packetWords = (packet: Pick<Packet, 'label' | 'fields' | 'files'>):
 export function PacketChip({ packet, x, y }: { packet: Packet; x: number; y: number }) {
   const navigate = useNavigate();
   return (
-    <button
-      type="button"
+    <Button
+      variant="outlined"
+      size="xsmall"
+      shape="square"
       data-packet={packet.from}
       data-packet-to={packet.to}
-      title={`What ${packet.from} handed ${packet.to}: read it in ${packet.from}'s part`}
-      onClick={() => void navigate({ to: '.', search: true, hash: stepAnchor(packet.from), resetScroll: false })}
+      onPress={() => void navigate({ to: '.', search: true, hash: stepAnchor(packet.from), resetScroll: false })}
       style={{ position: 'absolute', transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`, pointerEvents: 'all', zIndex: 1001 }}
-      className={cn(
-        'nodrag nopan border border-outline-variant bg-surface-container px-1.5 py-0.5 font-mono text-body-small text-on-surface hover:border-on-surface',
-        focusRing(),
-      )}
+      className="nodrag nopan bg-surface-container text-on-surface"
+      classNames={{ label: 'font-mono text-body-small' }}
     >
-      {packetWords(packet)}
-    </button>
+      <span title={`What ${packet.from} handed ${packet.to}: read it in ${packet.from}'s part`}>{packetWords(packet)}</span>
+    </Button>
   );
 }

@@ -68,9 +68,9 @@ export default {
     if (gated.join() !== order.join()) throw new Refused(`${GATED.gated}, at its gate, draws all six slots — it draws ${gated.join(', ')}`);
 
     const receipts = page.locator('section[aria-label="Receipts"]');
-    const triggers = receipts.locator('[data-fold] > [data-slot="collapsible-trigger"]');
+    const triggers = receipts.locator('[data-fold] > [data-slot="disclosure-trigger"]');
     if ((await triggers.count()) === 0) throw new Refused('the receipts are drawn as folds');
-    await expectCount(receipts.locator('[data-fold] > [data-slot="collapsible-trigger"][aria-expanded="true"]'), 0, 'every receipt closed');
+    await expectCount(receipts.locator('[data-fold] > [data-slot="disclosure-trigger"][aria-expanded="true"]'), 0, 'every receipt closed');
     await expectVisible(triggers.first(), 'the receipts show their folds, closed');
     await settled(page);
     await photograph(page, path.join(OUT, `run-ledger-whole-${await themeOf(page)}.png`), { fullPage: true });

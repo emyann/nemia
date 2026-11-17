@@ -205,7 +205,7 @@ export const secondSystem = (file: string, source: string): Taken[] => {
 export const CONTROL_ELEMENTS = ['button', 'input', 'select', 'textarea'] as const;
 
 /** The class strings of `lib/classes.ts` that draw a control by hand; `FLOOR_BOX`, a canvas's frame, is none. */
-export const CONTROL_STRINGS: readonly (keyof typeof Classes)[] = ['BUTTON', 'BUTTON_SECONDARY', 'BUTTON_SMALL', 'POPOVER'];
+export const CONTROL_STRINGS: readonly (keyof typeof Classes)[] = ['BUTTON', 'BUTTON_SECONDARY'];
 
 /** The input kinds the kit draws with a part of their own, each keyed apart from the other inputs. */
 const INPUT_KINDS = ['checkbox', 'radio'];

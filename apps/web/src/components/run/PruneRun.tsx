@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Dialog, DialogTrigger, Heading, Popover, Radio, RadioGroup, Text } from 'react-aria-components';
-import { Button } from '@/components/ui/button';
 import { decisionQuery } from '../../lib/api/decision.ts';
 import { pruneRun } from '../../lib/api/runs.ts';
 import { runNamespace } from '@/lib/runNamespace';
@@ -9,13 +7,11 @@ import type { RunDetail } from '../../lib/runView';
 import { decidableRun, decisionStamp } from '../../lib/decide';
 import { awaitingOf, firstChoice, prunable, pruneOffer, pruneQuestion, type PruneChoice, type PruneOffer } from '../../lib/prune.ts';
 import { cn } from '../../lib/utils';
-import { focusRing } from '@/components/ui/ds/utils';
-import { DOT, RADIO } from '../agent/AgentForm';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
-import { POPOVER } from '../../lib/classes';
 import { Reading, ReadingLines } from '@/components/look';
-import { Skeleton } from '@/components/ui/ds';
+import { Button, Popover, PopoverTrigger, Radio, RadioGroup, Skeleton, Title } from '@/components/ui/ds';
+import { CHOICE } from '@/lib/classes';
 import { runActionsOf } from '@/lib/runActions';
 
 /**
@@ -27,16 +23,14 @@ import { runActionsOf } from '@/lib/runActions';
 export function PruneRun({ run }: { run: RunDetail }) {
   if (!prunable(run)) return null;
   return (
-    <DialogTrigger>
-      <Button variant="outline" size="sm" data-prune-open>
+    <PopoverTrigger>
+      <Button variant="outlined" size="xsmall" data-prune-open>
         {pruneLabel(run)}
       </Button>
-      <Popover placement="bottom end" offset={6} className={cn(POPOVER, 'w-96')}>
-        <Dialog aria-label={`Prune ${run.id}`} className="space-y-3 outline-none">
-          {({ close }) => <PruneQuestion run={run} onClose={close} />}
-        </Dialog>
+      <Popover aria-label={`Prune ${run.id}`} placement="bottom end" offset={6} className="w-96 space-y-3">
+        {({ close }) => <PruneQuestion run={run} onClose={close} />}
       </Popover>
-    </DialogTrigger>
+    </PopoverTrigger>
   );
 }
 
@@ -59,7 +53,7 @@ export function PruneQuestion({ run, onClose }: { run: PruneAsked; onClose: () =
         <div role="alert" data-prune-unread>
           <Refusal error={error} not="Whether it was merged could not be read" />
         </div>
-        <Button variant="ghost" size="sm" onPress={onClose}>
+        <Button variant="text" size="xsmall" onPress={onClose}>
           Close
         </Button>
       </div>
@@ -98,9 +92,10 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
   });
   return (
     <div data-prune={id} className="space-y-3">
-      <Heading slot="title" className="font-semibold">{`Prune ${id}`}</Heading>
+      <Title size="small" component="h2">{`Prune ${id}`}</Title>
       <RadioGroup
-        aria-label="What to give back"
+        label="What to give back"
+        supportingText="Its record and its branches are kept: no branch is ever deleted."
         value={choice.key}
         onChange={(value) => {
           setKey(value as PruneChoice['key']);
@@ -108,21 +103,11 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
           prune.reset();
         }}
         isDisabled={asking || prune.isPending}
-        className="space-y-2"
+        className="gap-2"
       >
-        <Text slot="description" className="block text-body-small text-muted-foreground">
-          What to give back. Its record and its branches are kept: no branch is ever deleted.
-        </Text>
         {offer.choices.map((c) => (
-          <Radio
-            key={c.key}
-            value={c.key}
-            isDisabled={c.unavailable !== null}
-            data-prune-choice={c.key}
-            className={({ isFocusVisible }) => cn(RADIO, focusRing(), isFocusVisible && 'outline-solid', 'data-disabled:opacity-60')}
-          >
-            <span aria-hidden className={DOT} />
-            <span className="space-y-0.5">
+          <Radio key={c.key} value={c.key} isDisabled={c.unavailable !== null} data-prune-choice={c.key} className={CHOICE}>
+            <span className="min-w-0 space-y-0.5">
               <span className="block text-body-small font-medium">{c.label}</span>
               <span className={cn('block text-body-small leading-snug', c.how.unmerged ? 'text-yours' : 'text-muted-foreground')}>
                 {c.says}
@@ -138,12 +123,12 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
             {pruneQuestion(id, choice, offer)}
           </p>
           <div className="flex items-center gap-2">
-            <Button variant="destructive" size="sm" onPress={() => prune.mutate()} isDisabled={prune.isPending}>
+            <Button variant="tonal" color="error" size="xsmall" onPress={() => prune.mutate()} isDisabled={prune.isPending}>
               {prune.isPending ? 'Pruning…' : 'Prune'}
             </Button>
             <Button
-              variant="ghost"
-              size="sm"
+              variant="text"
+              size="xsmall"
               onPress={() => {
                 prune.reset();
                 setAsking(false);
@@ -156,10 +141,10 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onPress={() => setAsking(true)} isDisabled={prune.isSuccess}>
+          <Button variant="outlined" size="xsmall" onPress={() => setAsking(true)} isDisabled={prune.isSuccess}>
             Prune…
           </Button>
-          <Button variant="ghost" size="sm" onPress={onClose}>
+          <Button variant="text" size="xsmall" onPress={onClose}>
             Close
           </Button>
         </div>

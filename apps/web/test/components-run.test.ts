@@ -449,11 +449,11 @@ test("the run bar: the run's title and id, what it asks of a person (`AsksOfYou`
   assert.ok(html.includes(`>${runTitle(run)}</h2>`), html);
   assert.ok(textsOf(html).includes(run.id), `the bar says the run's id\n${html}`);
   assert.match(html, /<section aria-label="Asks of you"/);
-  assert.match(html, /<button type="button" data-ask-link="review"/, "a step a line names opens that step's bar");
+  assert.match(html, /<button [^>]*data-ask-link="review"/, "a step a line names opens that step's bar");
   assert.doesNotMatch(html, /data-fold="decide"/, "what there is to decide is the page's, not the bar's");
   const steps = /<section aria-label="Steps"[\s\S]*?<\/section>/.exec(html)![0];
   assert.deepEqual(
-    [...steps.matchAll(/<button type="button" data-step="([^"]+)"[\s\S]*?data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+    [...steps.matchAll(/<button [^>]*data-step="([^"]+)"[\s\S]*?data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]),
     [
       ['review', 'awaiting-approval'],
       ['theme', 'failed-check'],
@@ -462,7 +462,7 @@ test("the run bar: the run's title and id, what it asks of a person (`AsksOfYou`
   assert.match(/<section aria-label="Brief"[\s\S]*?<\/section>/.exec(html)![0], /<strong>floor<\/strong>/);
 
   const decide = await pagedWith(createElement(RunBar, { run: 'r-1' }), readsOf(endingRun()));
-  assert.match(decide, /<li data-ask="decide" data-step="ship"[^>]*><button type="button" data-ask-link="ship"/);
+  assert.match(decide, /<li data-ask="decide" data-step="ship"[^>]*><button [^>]*data-ask-link="ship"/);
 });
 
 test('the run bar says a run not read yet, a read that failed, and a run gone from the store, and draws nothing of it under them', async () => {
@@ -627,7 +627,7 @@ test("AsksOfYou lists each ask as one line linked to its step's part on the page
 
   const bar = withClient(createElement(AsksOfYou, { run, onStep: () => {} }));
   assert.doesNotMatch(bar, /href=/, 'in the bar a hash would point nowhere');
-  assert.match(bar, /<button type="button" data-ask-link="review"/);
+  assert.match(bar, /<button [^>]*data-ask-link="review"/);
 
   const quiet = needing('running (working)', {}, { waitingOnYou: [] });
   assert.equal(await routedWith(createElement(AsksOfYou, { run: { ...quiet, status: 'running' } })), '', 'nothing for a run at work');

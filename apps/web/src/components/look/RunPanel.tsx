@@ -5,6 +5,7 @@ import { cn, focusRing } from '@/components/ui/ds/utils';
 import type { RunView } from '@/lib/api/judged';
 import { isLive } from '@/lib/canvas';
 import { durationWords } from '@/lib/duration';
+import { repoName } from '@/lib/factory';
 import { dollars } from '@/lib/money';
 import { instantWords } from '@/lib/instant';
 import { ink } from '@/lib/meaning';
@@ -71,7 +72,27 @@ function gatesUnder(run: PanelRun): { value: string; under: string | null } {
   return { value: String(run.gates.length), under: passed.length > 0 ? `${passed.join(', ')} approved` : null };
 }
 
-/** The panel's facts: the clock with its start, the cost against the step's budget, the tokens and what was read, and the gates. */
+/** Where a run's steps work: its repository by name, or `folders` where it has none, the whole path or the folders' home on hover. */
+function WorksIn({ run }: { run: PanelRun }) {
+  const where = run.repo ?? (run.work ? `Its steps work in folders under ${run.work}` : 'Its steps work in folders the run made');
+  return (
+    <span data-fact="works-in" className="col-span-4 grid grid-cols-[120px_1fr] items-baseline gap-3 pt-2">
+      <span className="text-label-small text-on-surface-variant uppercase">Works in</span>
+      <span
+        data-works-in={run.repo ? 'repository' : 'folders'}
+        title={where}
+        className="truncate font-mono text-body-medium text-on-surface"
+      >
+        {run.repo ? repoName(run.repo) : 'folders'}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The panel's facts: the clock with its start, the cost against the step's budget, the tokens and what was read, the gates, and where
+ * its steps work.
+ */
 export function Facts({
   run,
   now,
@@ -94,6 +115,7 @@ export function Facts({
       <Fact name="Cost" value={<span className={ink.money}>{run.cost?.said ?? '—'}</span>} under={step} />
       <Fact name="Tokens" value={run.tokens?.said ?? '—'} under={run.read ? `${run.read.said} context` : null} />
       <Fact name="Gates" value={gates.value} under={gates.under} />
+      <WorksIn run={run} />
     </span>
   );
 }

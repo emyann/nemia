@@ -98,12 +98,12 @@ export default {
       await settingsOf(page, SHAPED);
       await expectVisible(card.locator(`[data-template-applied="${TEMPLATE.version}"]`), 'rendered, the version its tree was applied at');
       await expectVisible(
-        card.locator('[data-condition="Applied"][data-condition-status="True"]:not([data-amiss]) [data-variant="secondary"]'),
+        card.locator('[data-condition="Applied"][data-condition-status="True"]:not([data-amiss]) [data-color="secondary"]'),
         'Applied True is as it should be',
       );
       await expectVisible(card.getByText(RENDERED.message), "in the daemon's words");
       await expectVisible(
-        card.locator('[data-condition="ConflictsPending"]:not([data-amiss]) [data-variant="secondary"]'),
+        card.locator('[data-condition="ConflictsPending"]:not([data-amiss]) [data-color="secondary"]'),
         'no upgrade under way is as it should be',
       );
       await expectVisible(card.getByText(NO_UPGRADE.message), "in the daemon's words too");
@@ -112,7 +112,7 @@ export default {
       writeStatus(DRIFTED);
       await settingsOf(page, SHAPED);
       await expectVisible(
-        card.locator('[data-condition="Applied"][data-condition-status="False"][data-amiss] [data-variant="destructive"]'),
+        card.locator('[data-condition="Applied"][data-condition-status="False"][data-amiss] [data-color="error"]'),
         'Applied False, the template drifted, is amiss, in the destructive colour',
       );
       await expectVisible(card.getByText(DRIFTED.message), 'with what the daemon says to do');

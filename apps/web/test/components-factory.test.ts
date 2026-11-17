@@ -153,7 +153,11 @@ test('REFUSED: the start in no factory yet offers each factory a run starts in, 
   );
   assert.match(html, /data-start-factory="quay"[\s\S]*disabled=""[\s\S]*data-why-not[^>]*>The factory quay&#x27;s file does not read/);
   assert.doesNotMatch(html.slice(0, html.indexOf('data-start-factory="quay"')), /disabled=""|data-why-not/);
-  assert.equal([...html.matchAll(/<button[^>]*>(nemia|quay)<\/button>/g)].length, 2, 'each factory a button, which a press picks');
+  assert.equal(
+    [...html.matchAll(/<button[^>]*data-slot="button"[\s\S]*?data-slot="button-label"[^>]*>(nemia|quay)<\/span>/g)].length,
+    2,
+    "each factory the kit's button, which a press picks",
+  );
   assert.doesNotMatch(html, /type="radio"/, 'refused: a radio, which an arrow key checks, and so picks, while moving past it');
   assert.match(await pagedWith(createElement(FactoryChoice, { factories: [factories[0]] })), /No factory is filed to start a run in/);
 });
@@ -163,7 +167,12 @@ test("REFUSED: the floor's start in a factory of several repositories offers no 
   const factory = filed('quay', { repos: ['/code/a', '/code/b'], workflows: ['dev'], workflowRepos: { dev: 'b' } });
   const html = await pagedWith(createElement(StartBar, { factory: 'quay' }), [[['factories'], [factory]], STORE_ANSWER]);
   assert.doesNotMatch(html, /<option value="\/code\/a"/, 'refused: a repository a person picks, which the api would not run on');
-  assert.match(html, /<option value="" disabled="" selected="">Pick what runs<\/option><option value="dev">dev<\/option>/);
+  assert.match(
+    html,
+    /data-pick-workflow[\s\S]*data-placeholder="true">Pick what runs<\/span>[\s\S]*>Workflow<\/span>/,
+    "the kit's select, nothing picked",
+  );
+  assert.match(html, /<option value="dev">dev<\/option><\/select>/, 'the workflows the factory offers, by name');
 });
 
 /** A factory's rules as its settings page draws them over the api's answer `read`: the file is `/store/factories/hiring/RULES.md`. */
@@ -237,7 +246,7 @@ test('no factory and Nemia off: Turn Nemia on, beside the line that does it from
   assert.match(off, /No factory yet[\s\S]*<code>nemia factory new &lt;name&gt;<\/code>/);
   assert.match(
     off,
-    /data-nemia-off[\s\S]*<button[^>]*data-nemia-turn-on[^>]*>Turn Nemia on<\/button>[\s\S]*<code[^>]*>nemia level semi-auto<\/code>/,
+    /data-nemia-off[\s\S]*<button[^>]*data-nemia-turn-on[^>]*>[\s\S]*?>Turn Nemia on<\/span>[\s\S]*<code[^>]*>nemia level semi-auto<\/code>/,
   );
   assert.doesNotMatch(off, /data-nemia-on=/);
 
@@ -286,9 +295,9 @@ test("a factory's Template card: where it is, the version wanted and applied, ea
   assert.match(html, /data-template-applied="v1">applied at <span[^>]*>v1</);
   assert.match(html, /data-param="repo"><dt[^>]*>repo<\/dt><dd[^>]*>\/work\/repo</);
   assert.match(html, /data-param="retries"><dt[^>]*>retries<\/dt><dd[^>]*>2</);
-  assert.match(html, /data-condition="Applied" data-condition-status="False" data-amiss=""><span[^>]*data-variant="destructive"/);
+  assert.match(html, /data-condition="Applied" data-condition-status="False" data-amiss=""><span[^>]*data-color="error"/);
   assert.match(html, /VersionDrift<\/span><span[^>]*>the template is at v2, applied at v1</);
-  assert.match(html, /data-condition="ConflictsPending" data-condition-status="False"><span[^>]*data-variant="secondary"/);
+  assert.match(html, /data-condition="ConflictsPending" data-condition-status="False"><span[^>]*data-color="secondary"/);
   assert.doesNotMatch(html, /<(button|input|textarea)/, 'read-only: nothing to press or type in');
 });
 
@@ -358,8 +367,8 @@ test("REFUSED: FactoryVolumes says the caveat on a writable volume alone — eac
     "each volume, in the api's order",
   );
   const [, notes = '', scratch = ''] = html.split(/data-factory-volume="/);
-  assert.match(notes, /data-volume-mark="ro"[^>]*>:ro</);
-  assert.match(scratch, /data-volume-mark="rw"[^>]*>:rw</);
+  assert.match(notes, /data-volume-mark="ro"[^>]*><span[^>]*>:ro</);
+  assert.match(scratch, /data-volume-mark="rw"[^>]*><span[^>]*>:rw</);
   assert.doesNotMatch(notes, /data-volume-caveat/, 'a read-only volume carries no caveat');
   assert.match(scratch, /data-volume-caveat/, "the writable one says it is not the run's workspace");
   assert.ok(notes.includes('nemia factory volume rm nemia /home/me/notes'), "the api's line that takes it back");
@@ -408,8 +417,10 @@ test('REFUSED: the start of a card that names no factory draws no start form bef
   assert.match(html, /data-start-unassigned="true"/);
   assert.match(
     html,
-    /<option value="" disabled="" selected="">Pick the factory it runs in<\/option><option value="solo">solo<\/option><option value="pair">pair<\/option>/,
+    /data-pick-factory[\s\S]*data-placeholder="true">Pick the factory it runs in<\/span>/,
+    "the kit's select, nothing picked",
   );
+  assert.match(html, /<option value="solo">solo<\/option><option value="pair">pair<\/option><\/select>/);
   assert.doesNotMatch(html, /<form|>Workflow<|aria-label="Start idea"/);
   const none = await start([LISTED[0]]);
   assert.match(none, /data-no-factory="true"[^>]*>A card starts in a factory, and the store has none yet: file one with /);

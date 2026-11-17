@@ -6,7 +6,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { TriangleAlert } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Tag } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { openRunsQuery } from '@/lib/api/runs';
 import { offerOf, openBlockOf, runsOf, type FactoryBlock } from '@/lib/factories';
@@ -29,7 +29,7 @@ export function FactoryBar({ factory: name }: { factory: string }) {
       title={
         <span className="flex items-center gap-2">
           <span className="min-w-0 break-all">{name}</span>
-          {block?.default && <Badge variant="secondary">default</Badge>}
+          {block?.default && <Tag>default</Tag>}
         </span>
       }
       description={block && <span className="break-all">on {repos || 'no repository'}</span>}

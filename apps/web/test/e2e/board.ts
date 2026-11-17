@@ -114,6 +114,26 @@ export async function pick(page: Page, choice: string): Promise<void> {
     .click();
 }
 
+/**
+ * Opens the kit's Select `select`, its root as the page marks it, and picks the option said `word` among its options.
+ * @param page The page the Select's options open over.
+ * @param select The Select's root.
+ * @param word The option's words.
+ */
+export async function pickIn(page: Page, select: Locator, word: string): Promise<void> {
+  await select.locator('[data-slot="select-trigger"]').click();
+  await page.locator('[data-slot="select-popover"]').getByRole('option', { name: word, exact: true }).click();
+}
+
+/**
+ * The words of the option the kit's Select `select` holds picked, `''` while it holds none.
+ * @param select The Select's root.
+ */
+export async function heldIn(select: Locator): Promise<string> {
+  if ((await select.locator('[data-slot="select-trigger"]').getAttribute('data-populated')) === null) return '';
+  return ((await select.locator('[data-slot="select-value"]').textContent()) ?? '').trim();
+}
+
 /** Opens the Select pressed at `trigger` and picks the level said `word` among its options. */
 export async function pickLevel(page: Page, trigger: Locator, word: 'Manual' | 'Semi-auto' | 'Auto'): Promise<void> {
   await trigger.click();

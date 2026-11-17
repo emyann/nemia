@@ -494,6 +494,17 @@ test('Run: each size draws what its ladder says and no more, in its tone, and on
       );
     }
   });
+  await t.test("xs: a run's mark is the mark its own graph draws on the step it is on, in every staged state, finished too", async () => {
+    for (const one of among) {
+      const xs = await drawn(createElement(Run, { run: one, size: 'xs', layout: 'card', asOf, among }));
+      const mark = /data-mark="([^"]+)"/.exec(xs)?.[1];
+      const step = nowOf(one)?.step ?? one.steps.at(-1)!.name;
+      const graph = await drawn(createElement(StepGraph, { run: one }));
+      const node = new RegExp(`data-step="${step}" data-state="[^"]+" data-mark="([^"]+)"`).exec(graph)?.[1];
+      assert.ok(node, `${one.id}: its graph draws ${step}`);
+      assert.equal(mark, node, `${one.id}: on ${step}`);
+    }
+  });
   await t.test('its words where it has some: 649a waits on a run, by its mark', async () => {
     const waits = among.find((one) => one.id.endsWith('649a'))!;
     const html = await drawn(createElement(Run, { run: waits, size: 'md', layout: 'card', asOf, among }));

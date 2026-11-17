@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { commandLine, TOKEN_ADD_WORDS } from 'objects';
 import { Refusal } from '@/components/gate/Ask';
-import { TokenTable } from '@/components/token/TokenTable';
+import { TokenTable, TokensReading } from '@/components/token/TokenTable';
 import { tokensQuery } from '@/lib/api/tokens';
 
 /** The command that mints a token, typed on the machine the store is on: its token is printed once there, and kept nowhere else. */
@@ -37,7 +37,7 @@ function TokensPage() {
       {read.isError ? (
         <Refusal error={read.error} not="Not listed" />
       ) : !read.data ? (
-        <p className="text-body-medium text-muted-foreground">Reading the tokens…</p>
+        <TokensReading />
       ) : read.data.tokens.length === 0 ? (
         <p data-tokens-none className="text-body-medium text-muted-foreground">
           No token is kept.

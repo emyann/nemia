@@ -44,7 +44,10 @@ applies: ["apps/web/**"]
    `BreakdownPreview` for one hung off a focusable trigger of your own; `StepGraph` for a run's steps as its workflow's graph;
    `Run` for a run at any of its five sizes, from its mark in a sentence to the floor's opened panel (`RunMeta`, `RunClock` and
    `RunCost` for its parts a table draws alone, `QuietLabels` for a run's labels said quietly, `RunMark` for
-   another run named in a run's words);
+   another run named in a run's words); `Reading`
+   for what a page or a part draws while its first read is out, the kit's `SkeletonGroup` named by the line it replaces around the kit's
+   `Skeleton`s in the shape of what is coming, held back a moment so a fast read draws nothing (`reading.css`), and `ReadingLines` for its
+   lines of text;
    `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`; `Trace` for
    what an agent did, a line a step (`TraceLine`, with `TraceIcon`, `TraceTitle` and `TraceDescription`; `TraceCollapsible`, its
    `TraceCollapsibleTrigger` and `TraceCollapsibleContent`, for a step that opens), and `Marker` for a quiet line across a conversation. Each is shown in its stories beside it

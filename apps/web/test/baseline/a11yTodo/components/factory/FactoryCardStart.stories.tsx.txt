@@ -1,2 +1,3 @@
 apps/web/src/components/factory/FactoryCardStart.stories.tsx#NamesItsFactory
 apps/web/src/components/factory/FactoryCardStart.stories.tsx#NamesNone
+apps/web/src/components/factory/FactoryCardStart.stories.tsx#ReadingTheWorkflow

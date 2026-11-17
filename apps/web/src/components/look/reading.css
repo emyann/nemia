@@ -1,0 +1,21 @@
+/*
+ * A read still out draws its skeleton only once it has taken `--reading-after`: one that answers sooner draws nothing in between, so a
+ * fast page does not flash grey. The kit's `Skeleton` keeps no delay of its own. The shapes are hidden, never taken out of the layout,
+ * so the page does not move when they show; the group's status is read at once. It is no motion, so reduced motion keeps it.
+ */
+:root {
+  --reading-after: 400ms;
+}
+
+@keyframes reading-shows {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.reading-late {
+  animation: reading-shows 1ms linear var(--reading-after) both;
+}

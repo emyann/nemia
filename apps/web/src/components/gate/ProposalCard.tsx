@@ -17,6 +17,8 @@ import { ink } from '@/lib/meaning';
 import { proposalOffers, widensHue, type ProposalOffers } from '@/lib/proposals';
 import { cn } from '@/lib/utils';
 import { ProposalTags } from './ProposalTags';
+import { Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /** What a change does to its object, in the person's words. */
 const VERB_WORDS: Record<ChangeVerb, string> = { create: 'makes', update: 'changes', delete: 'removes' };
@@ -49,10 +51,27 @@ export function ProposalCard({ factory, name }: { factory: string; name: string 
           {factory} has no proposal named {name}: it was never made, or its factory is gone.
         </p>
       );
+    if (error)
+      return (
+        <p data-proposal-reading={name} className="text-body-medium text-muted-foreground">
+          Could not read the proposal: {error.message}
+        </p>
+      );
     return (
-      <p data-proposal-reading={name} className="text-body-medium text-muted-foreground">
-        {error ? `Could not read the proposal: ${error.message}` : 'Reading the proposal…'}
-      </p>
+      <div data-proposal-reading={name}>
+        <Reading label="Reading the proposal…" className="flex flex-col gap-3">
+          <Skeleton className="w-1/2 text-title-medium" />
+          <div className="flex gap-2">
+            <Skeleton shape="rectangle" className="h-6 w-20 rounded-none" />
+            <Skeleton shape="rectangle" className="h-6 w-16 rounded-none" />
+          </div>
+          <ReadingLines widths={['w-full', 'w-5/6', 'w-2/3']} className="text-body-medium" />
+          <div className="flex gap-2">
+            <Skeleton shape="rectangle" className="h-10 w-28 rounded-none" />
+            <Skeleton shape="rectangle" className="h-10 w-24 rounded-none" />
+          </div>
+        </Reading>
+      </div>
     );
   }
   const ask = (asked: Judgement) => {

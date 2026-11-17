@@ -12,6 +12,8 @@ import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
 import { MachineCanvas } from './MachineCanvas';
 import { focusRing } from '@/components/ui/ds/utils';
+import { Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 type Step = StepView;
 
@@ -93,7 +95,10 @@ function PathOf({ run, step, shown }: { run: RunDetail; step: Step; shown: numbe
       {read.error ? (
         <p className="text-body-medium text-failure">Could not read the path: {read.error.message}</p>
       ) : !read.data ? (
-        <p className="text-body-medium text-muted-foreground">Reading the path…</p>
+        <Reading label="Reading the path…" className="flex flex-col gap-3">
+          <Skeleton shape="rectangle" className="h-24 rounded-none" />
+          <ReadingLines widths={['w-full', 'w-5/6', 'w-full', 'w-2/3']} className="gap-1 font-mono text-body-small" />
+        </Reading>
       ) : (
         <PathDrawn read={read.data} reading={read.isPlaceholderData} at={at} lit={lit} taken={taken} onScrub={onScrub} />
       )}

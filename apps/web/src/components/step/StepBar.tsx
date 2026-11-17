@@ -8,6 +8,8 @@ import { titleOf } from '@/lib/factory';
 import { BarPanel } from '../frame/BarPanel';
 import { RunGone } from '../run/RunGone';
 import { StepInspector } from './StepInspector';
+import { Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /**
  * The bar for the step `step` of the run `run`, titled by the step and described by its run's title. While the run is read it says so; a
@@ -45,6 +47,10 @@ export function Unread({ id, error }: { id: string; error: unknown }) {
       Could not read the run {id}: {error instanceof Error ? error.message : 'the api gave no reason'}
     </p>
   ) : (
-    <p className="text-body-small text-muted-foreground">Reading the run…</p>
+    <Reading label="Reading the run…" className="flex flex-col gap-4">
+      <Skeleton className="w-1/2 text-title-medium" />
+      <ReadingLines widths={['w-full', 'w-5/6', 'w-2/3']} className="text-body-medium" />
+      <Skeleton shape="rectangle" className="h-40 rounded-none" />
+    </Reading>
   );
 }

@@ -11,6 +11,8 @@ import {
   type CustomInstructions as Words,
 } from '../../lib/api/agents.ts';
 import { AgentRefused } from '../agent/AgentParts';
+import { Reading } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /**
  * What a panel of custom instructions says of where the words reach and when a save takes effect: `told`, who is told them; `takes`, when
@@ -124,10 +126,13 @@ export function CustomInstructions({ name, repo, reach = HIRED }: { name: string
             clear.mutate();
           }}
         />
+      ) : error instanceof Error ? (
+        <p className="text-body-small text-muted-foreground">Could not read the custom instructions: {error.message}</p>
       ) : (
-        <p className="text-body-small text-muted-foreground">
-          {error instanceof Error ? `Could not read the custom instructions: ${error.message}` : 'Reading the custom instructions…'}
-        </p>
+        <Reading label="Reading the custom instructions…" className="flex flex-col gap-2">
+          <Skeleton shape="rectangle" className="h-24 rounded-none" />
+          <Skeleton shape="rectangle" className="h-9 w-20 rounded-none" />
+        </Reading>
       )}
       {done && (
         <p data-custom-done className="text-body-small text-muted-foreground">

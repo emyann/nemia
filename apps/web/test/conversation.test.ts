@@ -63,7 +63,7 @@ test('REFUSED: a family part that names a conversation itself; a mark built from
     .sort();
   assert.deepEqual(
     parts,
-    ['Composer.tsx', 'ConversationBand.tsx', 'Jump.tsx', 'Said.tsx', 'Talk.tsx', 'Worked.tsx'],
+    ['Composer.tsx', 'ConversationBand.tsx', 'Jump.tsx', 'Said.tsx', 'Talk.tsx', 'TalkReading.tsx', 'Worked.tsx'],
     'the folder is read off the tree, so a part added to it is held to the rule too, and holds the shared family alone',
   );
   for (const part of parts)

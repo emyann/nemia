@@ -9,8 +9,8 @@ import { runLinesQuery } from '@/lib/api/run';
 import { ReadRefusal } from '@/lib/api/read';
 import { trailOf } from '@/lib/finished';
 import { ink } from '@/lib/meaning';
-import { CutTag, ScanLines } from '../look';
-import { Button, Tag } from '../ui/ds';
+import { CutTag, Reading, ScanLines } from '../look';
+import { Button, Skeleton, Tag } from '../ui/ds';
 import { judged } from '@/lib/api/judged';
 import { useBar } from '@/lib/useBar';
 
@@ -47,13 +47,49 @@ function Frame({ state, children }: { state: string; children: ReactNode }) {
   );
 }
 
-/** The page while its two reads are on their way. */
+/** A section still being read: its count chip's place, then what it holds. */
+function SectionReading({ chip, children }: { chip: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3.5">
+      <Skeleton shape="rectangle" className={`h-8 rounded-none ${chip}`} />
+      {children}
+    </div>
+  );
+}
+
+/** A table's rows still being read, each the height of a row of the runs' tables. */
+function RowsReading({ rows }: { rows: number }) {
+  return (
+    <div className="flex flex-col gap-px">
+      {Array.from({ length: rows }, (_, at) => (
+        <Skeleton key={at} shape="rectangle" className="h-10 rounded-none" />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The page while its two reads are on their way: the shape of its three parts — the label field, the cards that wait on you, the rows in
+ * flight and the finished rows — named once for a screen reader. Shown at once: the router holds a pending page back a second already.
+ */
 export function RunsLoading() {
   return (
     <Frame state="loading">
-      <p role="status" className="m-0 text-body-medium text-on-surface-variant">
-        Loading the runs…
-      </p>
+      <Reading label="Loading the runs…" at="now" className="flex flex-col gap-10">
+        <Skeleton shape="rectangle" className="h-11 max-w-xl rounded-none" />
+        <SectionReading chip="w-52">
+          <div className="grid grid-cols-1 gap-4 @5xl/page:grid-cols-2">
+            <Skeleton shape="rectangle" className="h-44 rounded-none" />
+            <Skeleton shape="rectangle" className="h-44 rounded-none" />
+          </div>
+        </SectionReading>
+        <SectionReading chip="w-36">
+          <RowsReading rows={3} />
+        </SectionReading>
+        <SectionReading chip="w-36">
+          <RowsReading rows={6} />
+        </SectionReading>
+      </Reading>
     </Frame>
   );
 }

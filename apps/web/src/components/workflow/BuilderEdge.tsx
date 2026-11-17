@@ -1,5 +1,6 @@
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type Edge, type EdgeProps } from '@xyflow/react';
 import { X } from 'lucide-react';
+import { Button } from '@/components/ui/ds';
 import { edgeLine, edgeStroke, loopPath } from '../../lib/canvas';
 
 /** An edge the builder drew from a key: which key it is, in words, and what taking it away does to the draft. */
@@ -37,16 +38,15 @@ export function BuilderEdge({
       <BaseEdge path={path} markerEnd={markerEnd} style={{ stroke: edgeStroke('to-come', loop), ...edgeLine('to-come', loop) }} />
       {data && (
         <EdgeLabelRenderer>
-          <button
-            type="button"
-            onClick={data.remove}
+          <Button
+            variant="outlined"
+            size="xsmall"
+            icon={X}
+            onPress={data.remove}
             aria-label={`Remove ${data.said}`}
-            title={`Remove ${data.said}`}
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-            className="nodrag nopan pointer-events-auto absolute flex size-5 items-center justify-center rounded-full border border-outline bg-card text-muted-foreground shadow-sm hover:border-on-surface-variant hover:text-foreground"
-          >
-            <X className="size-3" aria-hidden />
-          </button>
+            className="nodrag nopan pointer-events-auto absolute bg-surface-container"
+          />
         </EdgeLabelRenderer>
       )}
     </>

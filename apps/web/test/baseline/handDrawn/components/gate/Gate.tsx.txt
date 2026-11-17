@@ -1,6 +1,0 @@
-apps/web/src/components/gate/Gate.tsx#<textarea>
-apps/web/src/components/gate/Gate.tsx#<button>
-apps/web/src/components/gate/Gate.tsx#<input type="radio">
-apps/web/src/components/gate/Gate.tsx#@/lib/classes:BUTTON
-apps/web/src/components/gate/Gate.tsx#@/lib/classes:BUTTON_SECONDARY
-apps/web/src/components/gate/Gate.tsx#@/lib/classes:TEXTAREA

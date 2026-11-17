@@ -6,7 +6,7 @@
 import type { StepView } from '../../lib/runView';
 import type { Frozen } from '../../lib/frozen';
 import { budgetWord } from '../../lib/money';
-import { focusRing } from '../ui/ds/utils';
+import { NumberField } from '@/components/ui/ds';
 
 /** The budgets a gated step proposed for the steps after it, or the caps its approval set, as the api says each. */
 export type GateBudgets = NonNullable<NonNullable<StepView['gate']>['budgets']>;
@@ -54,7 +54,6 @@ export function GateBudgetFields({
   budgets: Frozen<GateBudgets> | null | undefined;
   amounts: Amounts;
   onAmounts: (next: Amounts) => void;
-  field: string;
 }) {
   return budgets?.from === 'proposed' ? <GateBudgetRows budgets={budgets} {...rest} /> : null;
 }
@@ -71,13 +70,11 @@ export function GateBudgetRows({
   budgets,
   amounts = {},
   onAmounts,
-  field = 'budget',
 }: {
   step: string;
   budgets: Frozen<GateBudgets>;
   amounts?: Amounts;
   onAmounts?: (next: Amounts) => void;
-  field?: string;
 }) {
   const proposed = budgets.from === 'proposed';
   const editing = proposed && onAmounts ? (step: string, text: string) => onAmounts({ ...amounts, [step]: text }) : null;
@@ -99,7 +96,7 @@ export function GateBudgetRows({
       </h3>
       <ul className="space-y-2">
         {budgets.steps.map((row) => (
-          <BudgetRow key={row.step} row={row} typed={amounts[row.step]} onTyped={editing} field={field} />
+          <BudgetRow key={row.step} row={row} typed={amounts[row.step]} onTyped={editing} />
         ))}
       </ul>
       <p data-said className="break-words border-t border-outline-variant pt-2 text-body-small">
@@ -122,37 +119,28 @@ function BudgetRow({
   row,
   typed,
   onTyped,
-  field,
 }: {
   row: Frozen<GateBudgets['steps'][number]>;
   typed: string | undefined;
   onTyped: ((step: string, text: string) => void) | null;
-  field: string;
 }) {
   const usd = typed === undefined ? row.usd : (amountOf(typed) ?? row.usd);
   const above = typed === undefined ? row.above : row.workflow !== null && usd > row.workflow;
-  const id = `${field}-budget-${row.step}`;
   return (
     <li data-budget={row.step} data-above={above ? '' : undefined} className="min-w-0 space-y-0.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium">{row.step}</span>{' '}
         {onTyped ? (
-          <label htmlFor={id} className="flex items-center gap-1 text-body-small">
-            <span className="sr-only">{`The budget of ${row.step}, in dollars`}</span>
-            <span aria-hidden className="font-mono text-money">
-              $
-            </span>
-            <input
-              id={id}
-              type="number"
-              step="any"
-              min="0"
-              inputMode="decimal"
-              value={typed ?? String(row.usd)}
-              onChange={(event) => onTyped(row.step, event.target.value)}
-              className={AMOUNT}
-            />
-          </label>
+          <NumberField
+            aria-label={`The budget of ${row.step}, in dollars`}
+            prefix="$"
+            minValue={0}
+            formatOptions={{ maximumFractionDigits: 6, useGrouping: false }}
+            value={typed === undefined ? row.usd : typed.trim() === '' ? Number.NaN : Number(typed)}
+            onChange={(value) => onTyped(row.step, Number.isNaN(value) ? '' : String(value))}
+            className="w-36"
+            inputClassName="font-mono text-money"
+          />
         ) : (
           <span data-amount className="font-mono text-money">
             {row.said}
@@ -175,5 +163,3 @@ function BudgetRow({
     </li>
   );
 }
-
-const AMOUNT = `w-24 rounded border border-outline bg-background px-2 py-1 font-mono text-body-medium focus:border-on-surface-variant ${focusRing()}`;

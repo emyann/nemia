@@ -1,2 +1,0 @@
-apps/web/src/components/inbox/CardFrom.tsx#<button>
-apps/web/src/components/inbox/CardFrom.tsx#@/lib/classes:BUTTON_OUTLINED

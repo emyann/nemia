@@ -44,7 +44,7 @@ test('a field holding no amount above zero gives nothing and holds Approve; caps
 
 test("the gate's budgets are drawn per step: its amount, its own budget, the 'above' words where it is above, its why, and the run line", () => {
   const html = renderToStaticMarkup(
-    createElement(GateBudgetRows, { step: 'design', budgets: proposal(), amounts: {}, onAmounts: () => {}, field: 'f' }),
+    createElement(GateBudgetRows, { step: 'design', budgets: proposal(), amounts: {}, onAmounts: () => {} }),
   );
   assert.match(html, /data-gate-budgets="proposed"/);
   assert.match(html, /data-budget="implement" data-above=""/);

@@ -86,15 +86,11 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '<button>': kit('Button'),
   '<input>': kit('TextField', "a text input; an input whose type is spread from props, as Markdown's task list, is read here too"),
   '<input type="checkbox">': kit('Checkbox'),
-  '<input type="radio">': kit('Radio'),
-  '<select>': kit('Select'),
   '<textarea>': kit('TextField', 'multiline'),
   '@/lib/classes:BUTTON': kit('Button'),
-  '@/lib/classes:BUTTON_OUTLINED': kit('Button', 'outlined'),
   '@/lib/classes:BUTTON_SECONDARY': kit('Button', 'tonal'),
   '@/lib/classes:BUTTON_SMALL': kit('Button', 'small'),
   '@/lib/classes:POPOVER': kit('Popover'),
-  '@/lib/classes:TEXTAREA': kit('TextField', 'multiline'),
 };
 
 /** The keys a file may go on taking: the map's `exempt` destinations, never held to a baseline. */

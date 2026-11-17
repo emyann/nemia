@@ -24,7 +24,7 @@ import { EnoughRow } from '../step/Enough';
 import { RaiseRow } from './Raise';
 import { container, dashed, hairline, ringed } from '../../lib/meaning';
 import { OFFERS } from '../../lib/words';
-import { BUTTON, TEXTAREA } from '../../lib/classes';
+import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 
 /**
  * What the command line's decide shows a person of the run `run`, under the run's asks (`AsksOfYou`): read once for the run's state
@@ -235,17 +235,13 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
           ask.mutate({ mode, ...said });
         }}
       >
-        <label htmlFor={field} className="sr-only">
-          {words.field(offer.step)}
-        </label>
-        <textarea
-          id={field}
+        <TextField
+          aria-label={words.field(offer.step)}
+          multiline
           value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          rows={offer.case === 'answer' ? 3 : 2}
-          disabled={rechecking}
+          onChange={setMessage}
+          isDisabled={rechecking}
           placeholder={rechecking ? recheck.placeholder : words.placeholder}
-          className={cn(TEXTAREA, 'disabled:cursor-not-allowed disabled:opacity-50')}
         />
         {rechecking && message.trim() && (
           <p data-recheck-note className="text-body-small text-muted-foreground">
@@ -253,18 +249,23 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
           </p>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button type="submit" disabled={ask.isPending || (offer.case === 'answer' && !message.trim())} className={BUTTON}>
+          <Button type="submit" isDisabled={ask.isPending || (offer.case === 'answer' && !message.trim())}>
             {ask.isPending ? 'Asking…' : words.button}
-          </button>
-          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
-            <legend className="sr-only">How to try {offer.step} again</legend>
+          </Button>
+          <RadioGroup
+            aria-label={`How to try ${offer.step} again`}
+            name={`${field}-mode`}
+            orientation="horizontal"
+            value={mode}
+            onChange={(m) => setMode(m as RetryMode)}
+            className="gap-x-3 gap-y-1 text-body-small"
+          >
             {modes.map((m) => (
-              <label key={m} className="flex cursor-pointer items-center gap-1.5">
-                <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
+              <Radio key={m} value={m}>
                 {MODES[m]} <code className="text-muted-foreground">--{m}</code>
-              </label>
+              </Radio>
             ))}
-          </fieldset>
+          </RadioGroup>
         </div>
       </form>
       {ask.isError && <Refusal error={ask.error} />}
@@ -281,7 +282,6 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
  */
 export function Continue({ runId, step, line }: { runId: string; step: string; line: string }) {
   const [message, setMessage] = useState('');
-  const field = useId();
   const ask = useAsk(runId, step, () => setMessage(''));
   if (ask.isSuccess) {
     return (
@@ -300,21 +300,17 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
           ask.mutate({ mode: 'continue', ...(message.trim() ? { message } : {}) });
         }}
       >
-        <label htmlFor={field} className="sr-only">
-          {OFFERS.continue.field(step)}
-        </label>
-        <textarea
-          id={field}
+        <TextField
+          aria-label={OFFERS.continue.field(step)}
+          multiline
           value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          rows={2}
+          onChange={setMessage}
           placeholder={OFFERS.continue.placeholder}
-          className={TEXTAREA}
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button type="submit" disabled={ask.isPending} className={BUTTON}>
+          <Button type="submit" isDisabled={ask.isPending}>
             {ask.isPending ? 'Asking…' : OFFERS.continue.button}
-          </button>
+          </Button>
           <p className="text-body-small">
             as <code>{line}</code> {OFFERS.continue.said}
           </p>

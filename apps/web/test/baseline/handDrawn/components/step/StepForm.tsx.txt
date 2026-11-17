@@ -1,0 +1,5 @@
+apps/web/src/components/step/StepForm.tsx#<textarea>
+apps/web/src/components/step/StepForm.tsx#<button>
+apps/web/src/components/step/StepForm.tsx#<input type="checkbox">
+apps/web/src/components/step/StepForm.tsx#<select>
+apps/web/src/components/step/StepForm.tsx#<input>

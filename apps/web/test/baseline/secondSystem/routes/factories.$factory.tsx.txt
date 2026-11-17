@@ -1,0 +1,6 @@
+apps/web/src/routes/factories.$factory.tsx#@/components/ui/button:LinkButton
+apps/web/src/routes/factories.$factory.tsx#@/components/ui/card:Card
+apps/web/src/routes/factories.$factory.tsx#@/components/ui/card:CardContent
+apps/web/src/routes/factories.$factory.tsx#@/components/ui/card:CardDescription
+apps/web/src/routes/factories.$factory.tsx#@/components/ui/card:CardHeader
+apps/web/src/routes/factories.$factory.tsx#@/components/ui/card:CardTitle

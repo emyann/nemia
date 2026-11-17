@@ -1,0 +1,3 @@
+apps/web/src/components/frame/QuotaLine.stories.tsx#Asked
+apps/web/src/components/frame/QuotaLine.stories.tsx#HeardByASession
+apps/web/src/components/frame/QuotaLine.stories.tsx#TokenNoneYet

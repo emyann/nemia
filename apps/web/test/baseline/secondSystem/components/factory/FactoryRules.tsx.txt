@@ -1,0 +1,9 @@
+apps/web/src/components/factory/FactoryRules.tsx#@/components/ui/alert:Alert
+apps/web/src/components/factory/FactoryRules.tsx#@/components/ui/alert:AlertDescription
+apps/web/src/components/factory/FactoryRules.tsx#@/components/ui/alert:AlertTitle
+apps/web/src/components/factory/FactoryRules.tsx#@/components/ui/button:Button
+apps/web/src/components/factory/FactoryRules.tsx#@/components/ui/field:Field
+apps/web/src/components/factory/FactoryRules.tsx#@/components/ui/field:FieldDescription
+apps/web/src/components/factory/FactoryRules.tsx#@/components/ui/field:FieldGroup
+apps/web/src/components/factory/FactoryRules.tsx#@/components/ui/field:FieldLabel
+apps/web/src/components/factory/FactoryRules.tsx#@/components/ui/textarea:Textarea

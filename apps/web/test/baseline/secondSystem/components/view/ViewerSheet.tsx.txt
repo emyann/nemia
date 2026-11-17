@@ -1,0 +1,4 @@
+apps/web/src/components/view/ViewerSheet.tsx#@/components/ui/sheet:Sheet
+apps/web/src/components/view/ViewerSheet.tsx#@/components/ui/sheet:SheetDescription
+apps/web/src/components/view/ViewerSheet.tsx#@/components/ui/sheet:SheetHeader
+apps/web/src/components/view/ViewerSheet.tsx#@/components/ui/sheet:SheetTitle

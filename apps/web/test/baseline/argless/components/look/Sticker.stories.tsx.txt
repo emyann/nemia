@@ -1,0 +1,3 @@
+apps/web/src/components/look/Sticker.stories.tsx#Clock
+apps/web/src/components/look/Sticker.stories.tsx#Cost
+apps/web/src/components/look/Sticker.stories.tsx#Tokens

@@ -86,13 +86,16 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   fails the typecheck there; no file of `src` gains a seam for a story. MSW's worker, `.storybook/public/mockServiceWorker.js`, is
   written by `npx msw init .storybook/public --no-save` and served to Storybook alone.
 - `test/stories.test.ts` holds the stories (`test/stories.ts`, the rules): a title opens with `Look/`, `Frame/`, `Store/`,
-  `Factory/`, `Run/` or `Pages/`, by where the part sits, with no exception; and, each against `test/stories.baseline.ts`, whose
+  `Factory/`, `Run/` or `Pages/`, by where the part sits, with no exception; and, each against the baseline, whose
   lists only shrink, a component or page body of `src/components` with no story beside it (never `ui/` or `ai-elements/`), a story
   given no args, each name a file takes from shadcn's `components/ui/*` or React Aria outside the kit and the look
   (`<file>#<module>:<name>`), each control a file draws by hand (a raw `<button>`, `<input>`, `<select>` or `<textarea>`, or an
   import of `lib/classes.ts`'s control strings, `handDrawn`; an input whose literal `type` is `checkbox` or `radio` is keyed by it, the kit
-  drawing each with its own part), and the `todo` stories. A file you mend is cut from its list in the same
-  change; the test refuses a list that keeps it. `test/destinations.ts` maps each name and control to where it moves (a part of the
+  drawing each with its own part), and the `todo` stories. The baseline is a folder,
+  `test/baseline/<list>/<path under src>.txt`, a file per list and source file holding that file's entries one a line (`shardOf`,
+  `test/baseline.ts`, proved by `contracts/baseline-shard.contract.ts`), so that a cut deletes a file and two runs' cuts never meet in one
+  file, which git merges clean. A file you mend is cut from its list in the same change: its line, or the file where it is the last
+  (never left empty); the test refuses a list that keeps it, an entry in another file's place, an empty file and any other file there. `test/destinations.ts` maps each name and control to where it moves (a part of the
   kit, of the look, the frame's own state, plain markup, an ask of the kit, or exempt: `RouterProvider` alone), and the test refuses a
   key taken that it does not map and a key it maps that nothing takes (`mapGaps`, proved by `contracts/destinations.contract.ts`).
 - One component system: the ds kit. shadcn's `components/ui/*` is retired, a page at a time, and React Aria is imported only inside

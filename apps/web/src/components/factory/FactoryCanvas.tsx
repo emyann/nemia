@@ -72,6 +72,7 @@ import { useNow } from '@/lib/useNow';
 import type { Point } from '@/lib/layout';
 import { CanvasLegend } from '../step/CanvasLegend';
 import { QueueLane } from '../inbox/QueueLane';
+import { RunActions, type FoundRun } from '../run/RunActions';
 import { RunNode, type RunFlowNode } from '../run/RunNode';
 import { StateEdge } from '../step/StateEdge';
 import { afterEdges, readEdges } from '../step/stepGraph';
@@ -132,6 +133,18 @@ const REVEAL_MIN_ZOOM = 0.4;
 /** The view that brings `box` into the floor's `frame` from `transform`, clear of the panels at the frame's top (`revealView`). */
 const revealIn = (frame: HTMLElement, box: Box, transform: Transform) =>
   revealView(box, transform, sizeOf(frame), REVEAL_MIN_ZOOM, panelsOver(frame).top + FIT_GAP);
+
+/**
+ * The judged run whose card holds `target`, and its card, from the floor's `nodes`: null on the floor itself, and on a card the list could
+ * not judge. Asked of the area around the whole canvas, outside the viewport's transform, where the kit's menu is placed at the pointer.
+ * @param nodes the floor's cards
+ * @param target what the menu was asked for on
+ */
+const cardRunOf = (nodes: readonly RunFlowNode[], target: Element): FoundRun | null => {
+  const node = target.closest('.react-flow__node[data-id]');
+  const run = node && nodes.find((n) => n.id === node.getAttribute('data-id'))?.data.run;
+  return node && run && judged(run) ? { run, at: node.querySelector('article[data-run]') ?? node } : null;
+};
 
 /** A handful of cells fits on a screen; past that, the minimap says where the rest are. */
 const HANDFUL = 5;
@@ -518,44 +531,46 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
         {shown.length ? (
           <div className="flex min-h-0 min-w-0 flex-1">
             <div ref={frame} className="@container min-h-0 min-w-0 flex-1">
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                onNodesChange={onNodesChange}
-                onNodeMouseEnter={onNodeMouseEnter}
-                onNodeMouseLeave={onNodeMouseLeave}
-                {...press}
-                nodesConnectable={false}
-                elementsSelectable={false}
-                edgesFocusable={false}
-                deleteKeyCode={null}
-                selectionKeyCode={null}
-                multiSelectionKeyCode={null}
-                colorMode="system"
-                defaultMarkerColor={null}
-                minZoom={0.2}
-              >
-                <Panel position="top-left" className="hidden text-body-small text-muted-foreground @4xl:block">
-                  Click a run to inspect it · double-click to open its page · drag a card, and it moves alone · kept in this browser
-                </Panel>
-                <Panel position="top-right" className="flex flex-wrap justify-end gap-2">
-                  <Button variant="outlined" size="xsmall" onPress={resetLayout}>
-                    Reset layout
-                  </Button>
-                  <Button variant="outlined" size="xsmall" onPress={collapseAll} isDisabled={!open.length}>
-                    Collapse all
-                  </Button>
-                  <Button variant="outlined" size="xsmall" onPress={() => setFits((n) => n + 1)}>
-                    Fit view
-                  </Button>
-                </Panel>
-                <Background variant={BackgroundVariant.Dots} gap={16} />
-                <Controls showInteractive={false} showFitView={false} />
-                <CanvasLegend cards className={cells > HANDFUL ? 'mr-40 ml-12' : 'mr-4 ml-12'} />
-                {cells > HANDFUL && <MiniMap<RunFlowNode> pannable zoomable style={{ width: 128, height: 88 }} nodeColor={minimapFill} />}
-              </ReactFlow>
+              <RunActions runOf={(target) => cardRunOf(nodes, target)} className="contents">
+                <ReactFlow
+                  nodes={nodes}
+                  edges={edges}
+                  nodeTypes={nodeTypes}
+                  edgeTypes={edgeTypes}
+                  onNodesChange={onNodesChange}
+                  onNodeMouseEnter={onNodeMouseEnter}
+                  onNodeMouseLeave={onNodeMouseLeave}
+                  {...press}
+                  nodesConnectable={false}
+                  elementsSelectable={false}
+                  edgesFocusable={false}
+                  deleteKeyCode={null}
+                  selectionKeyCode={null}
+                  multiSelectionKeyCode={null}
+                  colorMode="system"
+                  defaultMarkerColor={null}
+                  minZoom={0.2}
+                >
+                  <Panel position="top-left" className="hidden text-body-small text-muted-foreground @4xl:block">
+                    Click a run to inspect it · double-click to open its page · drag a card, and it moves alone · kept in this browser
+                  </Panel>
+                  <Panel position="top-right" className="flex flex-wrap justify-end gap-2">
+                    <Button variant="outlined" size="xsmall" onPress={resetLayout}>
+                      Reset layout
+                    </Button>
+                    <Button variant="outlined" size="xsmall" onPress={collapseAll} isDisabled={!open.length}>
+                      Collapse all
+                    </Button>
+                    <Button variant="outlined" size="xsmall" onPress={() => setFits((n) => n + 1)}>
+                      Fit view
+                    </Button>
+                  </Panel>
+                  <Background variant={BackgroundVariant.Dots} gap={16} />
+                  <Controls showInteractive={false} showFitView={false} />
+                  <CanvasLegend cards className={cells > HANDFUL ? 'mr-40 ml-12' : 'mr-4 ml-12'} />
+                  {cells > HANDFUL && <MiniMap<RunFlowNode> pannable zoomable style={{ width: 128, height: 88 }} nodeColor={minimapFill} />}
+                </ReactFlow>
+              </RunActions>
             </div>
           </div>
         ) : (

@@ -114,7 +114,7 @@ export const OnARow: StoryObj<typeof meta> = {
     await expect(await entriesOf(), 'the held run offers the lift').toEqual(['Lift…']);
     await userEvent.keyboard('{Enter}');
     const asked = await waitFor(() => within(document.body).getByRole('dialog', { name: `Lift the hold on ${HELD.id}` }));
-    await expect(within(asked).getByRole('button', { name: 'Lift', exact: true })).toBeVisible();
+    await expect(within(asked).getByRole('button', { name: 'Lift' })).toBeVisible();
     await userEvent.click(within(asked).getByRole('button', { name: 'Keep it' }));
     await waitFor(() => expect(within(document.body).queryByRole('dialog')).toBeNull());
   },

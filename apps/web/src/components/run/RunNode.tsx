@@ -19,7 +19,6 @@ import { ENDED } from '@/lib/words';
 import { RouteLink } from '../agent/AgentParts';
 import { CardGate, type Taken } from '../inbox/CardGate';
 import { CardLift } from './LiftHold';
-import { RunActions } from './RunActions';
 import { previewBar } from '../step/StepPreview';
 import { Run, type PanelRead } from '../look';
 
@@ -50,8 +49,7 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * step it is on with its agent, round, words and budget, its clock, its workflow's graph and its cost — and at xl once the chevron opens
  * it, the run's panel: each step named under the graph, a press on a node showing its step in the frame's bar (`data-tile`, pressed
  * while shown), the facts, the runs it waits on and that wait on it, and the step's last line, once its run is read alone (`detail`).
- * A click on the card shows the run in the bar, and the card is banded while it does (`lookOf`). The title opens the run's page. A
- * right-click, a long press or the keyboard's menu key on the card opens the run's actions (`RunActions`), and not the canvas's menu.
+ * A click on the card shows the run in the bar, and the card is banded while it does (`lookOf`). The title opens the run's page.
  * A closed card is `CARD_WIDTH` wide, narrower than the grid's cell, which leaves the gap between cards; an open one, its panel, is as
  * wide as the cells it claims (`panelWidth`).
  *
@@ -134,40 +132,38 @@ function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
   const asOf = new Date(now);
   return (
     <div {...look.marks} style={{ width: open ? panelWidth(run.steps.length) : CARD_WIDTH }}>
-      <RunActions runOf={(target) => ({ run, at: target.closest('article[data-run]') ?? target })}>
-        <Run
-          run={run}
-          size={open ? 'xl' : 'md'}
-          layout="card"
-          asOf={asOf}
-          among={among}
-          wrap={previewBar(run, asOf)}
-          read={detail}
-          pick={{ selected, onStep: (step) => onStep(run.id, step) }}
-          ringed={look.ringed}
-          still="nodrag"
-          titleEnd={<Chevron run={run} open={open} onToggle={onToggle} />}
-        >
-          {needs.length > 0 && <Needs run={run} needs={needs} />}
-          {said ? (
-            <p data-taken className="m-0 text-body-small break-words text-on-surface-variant">
-              {said}
-            </p>
-          ) : gate ? (
-            <CardGate
-              run={{ id: run.id, namespace: namespaceOf(run.factory) }}
-              gate={gate}
-              title={decide?.kind === 'approve' && decide.step === gate.step ? decide.said : `approve ${gate.step}`}
-              stamp={stamp}
-              onTaken={setTaken}
-            />
-          ) : null}
-          {decide?.kind === 'result' && !cancelled && <DecideLine run={run} said={decide.said} branches={decide.branches} />}
-          {open && run.waitingOnYou.length > 0 && <TouchedLine run={run} />}
-          {open && trouble && <p className="m-0 text-body-small text-failure">{trouble}</p>}
-          <Chips run={run} decide={decide !== null} cancelled={cancelled} reads={reads} />
-        </Run>
-      </RunActions>
+      <Run
+        run={run}
+        size={open ? 'xl' : 'md'}
+        layout="card"
+        asOf={asOf}
+        among={among}
+        wrap={previewBar(run, asOf)}
+        read={detail}
+        pick={{ selected, onStep: (step) => onStep(run.id, step) }}
+        ringed={look.ringed}
+        still="nodrag"
+        titleEnd={<Chevron run={run} open={open} onToggle={onToggle} />}
+      >
+        {needs.length > 0 && <Needs run={run} needs={needs} />}
+        {said ? (
+          <p data-taken className="m-0 text-body-small break-words text-on-surface-variant">
+            {said}
+          </p>
+        ) : gate ? (
+          <CardGate
+            run={{ id: run.id, namespace: namespaceOf(run.factory) }}
+            gate={gate}
+            title={decide?.kind === 'approve' && decide.step === gate.step ? decide.said : `approve ${gate.step}`}
+            stamp={stamp}
+            onTaken={setTaken}
+          />
+        ) : null}
+        {decide?.kind === 'result' && !cancelled && <DecideLine run={run} said={decide.said} branches={decide.branches} />}
+        {open && run.waitingOnYou.length > 0 && <TouchedLine run={run} />}
+        {open && trouble && <p className="m-0 text-body-small text-failure">{trouble}</p>}
+        <Chips run={run} decide={decide !== null} cancelled={cancelled} reads={reads} />
+      </Run>
       <Handle type="target" position={Position.Left} isConnectable={false} className="opacity-0" />
       <Handle type="source" position={Position.Right} isConnectable={false} className="opacity-0" />
     </div>

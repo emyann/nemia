@@ -96,7 +96,7 @@ const describing = (trigger: Element): Promise<HTMLElement> =>
  * @param user The user the play function is handed.
  * @param element What has the focus when the key is pressed.
  */
-export async function menuKey(user: Keys, element: HTMLElement): Promise<void> {
+export async function menuKey(user: { keyboard: (keys: string) => Promise<unknown> }, element: HTMLElement): Promise<void> {
   element.focus();
   await user.keyboard('{Shift>}{F10}{/Shift}');
   element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: -1 }));

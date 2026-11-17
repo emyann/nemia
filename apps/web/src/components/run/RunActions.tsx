@@ -124,7 +124,7 @@ export function RunActions({
         }}
         placement="bottom end"
         aria-label={asked ? ASKED[asked.action](asked.run.id) : 'Actions on the run'}
-        className="w-96 space-y-3"
+        className="max-h-[inherit] w-96 space-y-3 overflow-y-auto"
       >
         {asked && <RunQuestion run={asked.run} action={asked.action} onClose={() => setAsked(null)} />}
       </Popover>

@@ -137,7 +137,6 @@ const revealIn = (frame: HTMLElement, box: Box, transform: Transform) =>
 /**
  * The floor's corners: how to use it, top left on a wide frame, and Reset layout, Collapse all (disabled while no card is open) and Fit
  * view, top right.
- * @param props the props: what each button does, and whether every card is collapsed already
  */
 function FloorButtons({
   onReset,

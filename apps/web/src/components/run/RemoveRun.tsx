@@ -14,7 +14,6 @@ import { ACTION_LABEL } from '@/lib/runActions';
  *
  * Asked where the run is listed (`onClose` given), the menu's press was the first: it asks at once, Keep it closes the surface it is asked
  * in, and once removed it closes it and stays where it is, the list read again.
- * @param props the props: the try to remove, and what closes the surface it is asked in where the run is listed
  */
 export function RemoveRun({ id, onClose }: { id: string; onClose?: () => void }) {
   const [asking, setAsking] = useState(onClose !== undefined);

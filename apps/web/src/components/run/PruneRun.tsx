@@ -48,7 +48,7 @@ type PruneAsked = Parameters<typeof decisionStamp>[0] & Parameters<typeof pruneO
  * own reading, which the CLI's `prune` refuses without `--unmerged` — before anything is offered, then the choice and the two presses. The
  * same query as the Decide section's, under the same key, so a page that shows the decision reads nothing more; a run called off has
  * nothing to decide, and is not asked. A decision read for an earlier state of the run (`keepPreviousData`) is not taken for this one's.
- * @param props the props: the run to prune, and what closes the surface the question is asked in, once pruned or closed
+ * `onClose` closes the surface it is asked in, once pruned or closed.
  */
 export function PruneQuestion({ run, onClose }: { run: PruneAsked; onClose: () => void }) {
   const decidable = decidableRun(run);

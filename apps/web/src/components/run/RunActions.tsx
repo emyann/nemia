@@ -83,9 +83,8 @@ function useLongPress() {
  *
  * Opened by the pointer's secondary press, a long press on Android and the keyboard's menu key or Shift+F10 on what has the focus inside
  * it, which the kit gives; and a long press on iOS, which it adds (`useLongPress`). A press on what holds no run (`runOf` answers null), or
- * on a run that offers no action, leaves the browser's own menu.
- * @param props the props: `runOf`, the run under what the menu was asked for on and the element its question opens beside, null where
- *   none; what the area holds; and the area's classes
+ * on a run that offers no action, leaves the browser's own menu. `runOf` finds the run under what the menu was asked for on and the
+ * element its question opens beside; `className` lays out the area, a `div`, as what it wraps needs.
  */
 export function RunActions({
   runOf,

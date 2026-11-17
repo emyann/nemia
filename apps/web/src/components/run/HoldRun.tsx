@@ -47,9 +47,7 @@ export function HoldRun({ run }: { run: RunDetail }) {
 /**
  * The hold's question, wherever it is asked: the runs a hold may wait on (`holdCandidates`), read before the form is drawn — those not
  * finished, newest created first, then the finished, newest finished first, a page at a time with Show older for the next
- * (`usePickerRuns`) — and the form.
- * @param props the props: the run to hold (its id and its repository), and what closes the surface the question is asked in, once held
- *   or cancelled
+ * (`usePickerRuns`) — and the form. `onClose` closes the surface it is asked in, once held or cancelled.
  */
 export function HoldQuestion({ run, onClose }: { run: Pick<RunView, 'id' | 'repo'>; onClose: () => void }) {
   const { open, finished, more, older, reading, error } = usePickerRuns();

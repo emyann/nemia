@@ -43,7 +43,6 @@ export function RunMenu({ run }: { run: RunDetail }) {
  * The question an action asks once its press in a menu was made, as the run's page asks it: Remove and Lift their second press with Keep
  * it, Hold its form, Prune its choice and its second press. `onClose` closes the surface it is asked in, on Keep it, Cancel or Close, and
  * once the write is done; each write reads the run and the lists again (`runsMoved`).
- * @param props the props: the run, the action pressed, and what closes the surface the question is asked in
  */
 export function RunQuestion({ run, action, onClose }: { run: RunView; action: RunAction; onClose: () => void }) {
   if (action === 'remove') return <RemoveRun id={run.id} onClose={onClose} />;

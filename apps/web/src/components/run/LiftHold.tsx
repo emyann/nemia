@@ -37,7 +37,6 @@ function useLift(id: string, namespace: string | undefined, onLifted: () => void
  *
  * Asked where the run is listed (`onClose` given), the menu's press was the first: it asks at once, and Keep it, or the lift, closes the
  * surface it is asked in.
- * @param props the props: the held run, and what closes the surface it is asked in where the run is listed
  */
 export function LiftHold({ id, onClose }: { id: string; onClose?: () => void }) {
   const [asking, setAsking] = useState(onClose !== undefined);

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Response } from 'playwright';
-import { cardsPath, photograph, themeOf } from '../board.ts';
+import { cardsPath, heldIn, optionsIn, photograph, pickIn, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, hiringStarts, noFactories, onSeveralRepos, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -65,14 +65,17 @@ async function severalRepos(page: Page, theme: string): Promise<void> {
   try {
     await open(page, `/inbox?factory=${factory}`);
     const box = page.locator('form[aria-label="File a card"]');
-    const workflows = box.getByRole('combobox', { name: 'Workflow' });
-    await expectCount(box.getByRole('combobox', { name: 'Repository' }), 0, `${factory}, on two repositories, offers no list of them`);
-    await expectTexts(
-      workflows.locator('option'),
-      ['None: chosen at start', WORKFLOWS.good.name],
-      `and its workflows by name, none picked, with no repository to pick first`,
+    const workflows = box.locator('[data-workflow-field]');
+    await expectCount(
+      box.locator('[data-slot="select"]', { hasText: 'Repository' }),
+      0,
+      `${factory}, on two repositories, offers no list of them`,
     );
-    if (!(await workflows.isEnabled())) throw new Refused('the Workflow list waits for nothing — it was disabled');
+    if (!(await workflows.locator('[data-slot="select-trigger"]').isEnabled()))
+      throw new Refused('the Workflow list waits for nothing — it was disabled');
+    const offered = await optionsIn(page, workflows);
+    if (offered.join('|') !== ['None: chosen at start', WORKFLOWS.good.name].join('|') || (await heldIn(workflows)) !== '')
+      throw new Refused(`and its workflows by name, none picked, with no repository to pick first — it offers ${JSON.stringify(offered)}`);
     await expectCount(box.locator('[data-needs-repo]'), 0, 'and never asks for a repository');
     await expectCount(box.locator('[data-factory-repo]'), 1, "the repository is said as text, the workflow's to decide");
     await settled(page);
@@ -86,7 +89,7 @@ async function severalRepos(page: Page, theme: string): Promise<void> {
       'with no workflow picked the box sends the factory alone, and the card names no repo:',
     );
 
-    await workflows.selectOption({ label: WORKFLOWS.good.name });
+    await pickIn(page, workflows, WORKFLOWS.good.name);
     const unwired = box.locator('[data-unwired="unwired"]');
     await expectVisible(unwired, `${WORKFLOWS.good.name} picked, wired to neither, the box says it is not wired`);
     const said = ((await unwired.textContent()) ?? '').trim();
@@ -98,9 +101,9 @@ async function severalRepos(page: Page, theme: string): Promise<void> {
     const found = JSON.parse(fs.readFileSync(file, 'utf8')) as object;
     fs.writeFileSync(file, JSON.stringify({ ...found, workflowRepos: { [WORKFLOWS.good.name]: 'checkout' } }, null, 2));
     await open(page, `/inbox?factory=${factory}`);
-    await workflows.selectOption({ label: WORKFLOWS.good.name });
+    await pickIn(page, workflows, WORKFLOWS.good.name);
     await expectTexts(box.locator('[data-factory-repo]'), [checkout], `wired to checkout, the box says ${checkout} as text`);
-    await expectCount(box.getByRole('combobox', { name: 'Repository' }), 0, 'never a list of the two');
+    await expectCount(box.locator('[data-slot="select"]', { hasText: 'Repository' }), 0, 'never a list of the two');
     await box.getByRole('textbox', { name: 'An idea' }).fill(SOMEWHERE);
     await settled(page);
     await photograph(box, path.join(OUT, `inbox-file-places-picked-${theme}.png`));
@@ -125,11 +128,9 @@ async function noFactory(page: Page, theme: string): Promise<void> {
   try {
     await open(page, '/inbox');
     const box = page.locator('form[aria-label="File a card"]');
-    await expectTexts(
-      box.getByRole('combobox', { name: 'Factory' }).locator('option'),
-      ['No factory: chosen at start'],
-      'with no factory on file, the Factory list holds the one choice',
-    );
+    const factories = await optionsIn(page, box.locator('[data-factory-field]'));
+    if (factories.join('|') !== 'No factory: chosen at start')
+      throw new Refused(`with no factory on file, the Factory list holds the one choice — it offers ${JSON.stringify(factories)}`);
     const line = box.locator('[data-no-factory]');
     await expectVisible(line, 'and the box says the store has no factory yet');
     const said = ((await line.textContent()) ?? '').trim();
@@ -164,21 +165,23 @@ async function reading(page: Page, theme: string): Promise<void> {
     );
     await other.goto(new URL(`/inbox?factory=${factory}`, page.url()).href, { waitUntil: 'load' });
     const box = other.locator('form[aria-label="File a card"]');
-    const list = box.getByRole('combobox', { name: 'Factory' });
+    const list = box.locator('[data-factory-field]');
     await expectTexts(
       box.locator('[data-reading-factories]'),
       ['Reading the factories…'],
       'while the factories are held, the box says it reads them',
     );
-    await expectTexts(list.locator('option'), ['No factory: chosen at start'], 'beside a list that holds the one choice so far');
+    const soFar = await optionsIn(other, list);
+    if (soFar.join('|') !== 'No factory: chosen at start')
+      throw new Refused(`beside a list that holds the one choice so far — it offers ${JSON.stringify(soFar)}`);
     await expectCount(box.locator('[data-no-factory]'), 0, 'and never says the store has no factory: it does not know yet');
     await settled(other);
     await photograph(box, path.join(OUT, `inbox-file-places-reading-${theme}.png`));
     release();
     await expectCount(box.locator('[data-reading-factories]'), 0, 'let go, the line goes');
     await idle(other);
-    if ((await list.inputValue()) !== factory)
-      throw new Refused(`and the list is preset to the factory the address names (${factory}) — it held ${await list.inputValue()}`);
+    if ((await heldIn(list)) !== factory)
+      throw new Refused(`and the list is preset to the factory the address names (${factory}) — it held ${await heldIn(list)}`);
   } finally {
     release();
     await other.close();

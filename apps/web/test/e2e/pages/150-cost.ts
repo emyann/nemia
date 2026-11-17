@@ -169,7 +169,7 @@ export default {
     );
     const raiseRow = (p: Page, name: string) => partOf(p, name).locator(`[data-part-asks] [data-offer="raise"][data-step="${name}"]`);
     const amountOf = (row: Locator, name: string) =>
-      row.getByRole('spinbutton', { name: new RegExp(`^The cap to raise ${name} to, in dollars`) });
+      row.getByRole('textbox', { name: new RegExp(`^The cap to raise ${name} to, in dollars`) });
     for (const [name, startsAt, button] of [
       [over.step, over.startsAt, 'Raise the budget and try again'],
       [held.step, held.startsAt, 'Raise the budget and go round again'],

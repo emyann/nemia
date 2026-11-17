@@ -126,6 +126,21 @@ export async function pickIn(page: Page, select: Locator, word: string): Promise
 }
 
 /**
+ * The words of each option the kit's Select `select` offers, in order: it opens the Select, reads its menu, and closes it with Escape.
+ * @param page The page the Select's options open over.
+ * @param select The Select's root.
+ */
+export async function optionsIn(page: Page, select: Locator): Promise<string[]> {
+  await select.locator('[data-slot="select-trigger"]').click();
+  const menu = page.locator('[data-slot="select-popover"]');
+  await menu.getByRole('option').first().waitFor();
+  const words = (await menu.getByRole('option').allTextContents()).map((said) => said.trim());
+  await page.keyboard.press('Escape');
+  await menu.waitFor({ state: 'detached' });
+  return words;
+}
+
+/**
  * The words of the option the kit's Select `select` holds picked, `''` while it holds none.
  * @param select The Select's root.
  */

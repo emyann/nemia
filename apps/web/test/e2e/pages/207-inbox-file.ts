@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { cardsPath, photograph, heldIn, pickIn, themeOf } from '../board.ts';
+import { cardsPath, photograph, heldIn, optionsIn, pickIn, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { CARDS, FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -135,14 +135,14 @@ async function unreadSaid(page: Page, theme: string): Promise<void> {
   const factory = FACTORIES.hiring.name;
   const workflow = WORKFLOWS.good.name;
   const box = page.locator('form[aria-label="File a card"]');
-  await box.getByRole('combobox', { name: 'Factory' }).selectOption(factory);
-  await expectTexts(
-    box.getByRole('combobox', { name: 'Workflow' }).locator('option'),
-    ['None: chosen at start', workflow],
-    `${factory} offers ${workflow} in the box by its name, as its file attaches it: a card names a workflow, the factory finds it`,
-  );
+  await pickIn(page, box.locator('[data-factory-field]'), factory);
+  const offered = await optionsIn(page, box.locator('[data-workflow-field]'));
+  if (offered.join('|') !== ['None: chosen at start', workflow].join('|'))
+    throw new Refused(
+      `${factory} offers ${workflow} in the box by its name, as its file attaches it: a card names a workflow, the factory finds it — it offers ${JSON.stringify(offered)}`,
+    );
   await expectCount(box.locator('[data-workflows-unread]'), 0, 'the box reads no workflow, so says none is left out');
-  await box.getByRole('combobox', { name: 'Factory' }).selectOption('');
+  await pickIn(page, box.locator('[data-factory-field]'), 'No factory: chosen at start');
 
   const card = cardIn(page, CARDS.rich.name);
   await card.getByRole('button', { name: 'Start' }).click();
@@ -176,20 +176,20 @@ export default {
     const checkout = path.join(store!, 'checkout');
     const theme = await themeOf(page);
     const box = page.locator('form[aria-label="File a card"]');
-    const list = box.getByRole('combobox', { name: 'Factory' });
+    const list = box.locator('[data-factory-field]');
     const written: string[] = [];
     await unreadSaid(page, theme);
     const unhire = hiringStarts(store!);
     try {
-      await expectTexts(
-        list.locator('option'),
-        ['No factory: chosen at start', ...[factory, FACTORIES.bare, ...FACTORIES.others].sort()],
-        `the Factory list offers no factory, then each factory that reads: never default, never ${FACTORIES.broken}`,
-      );
-      if ((await list.inputValue()) !== '')
-        throw new Refused(`no factory is chosen until a person picks — it held ${await list.inputValue()}`);
-      await expectCount(box.getByRole('combobox', { name: 'Workflow' }), 0, 'with no factory, the box has no Workflow list');
-      await expectCount(box.getByRole('combobox', { name: 'Repository' }), 0, 'no Repository list');
+      const factories = await optionsIn(page, list);
+      const listed = ['No factory: chosen at start', ...[factory, FACTORIES.bare, ...FACTORIES.others].sort()];
+      if (factories.join('|') !== listed.join('|'))
+        throw new Refused(
+          `the Factory list offers no factory, then each factory that reads: never default, never ${FACTORIES.broken} — it offers ${JSON.stringify(factories)}`,
+        );
+      if ((await heldIn(list)) !== '') throw new Refused(`no factory is chosen until a person picks — it held ${await heldIn(list)}`);
+      await expectCount(box.locator('[data-workflow-field]'), 0, 'with no factory, the box has no Workflow list');
+      await expectCount(box.locator('[data-slot="select"]', { hasText: 'Repository' }), 0, 'no Repository list');
       await expectCount(box.locator('input'), 0, 'and no field to type a path into');
       await expectVisible(
         box.locator('[data-parked]', {
@@ -206,12 +206,12 @@ export default {
       await expectCount(line.locator('[data-factory-tag]'), 0, 'and wears no tag, the default one least of all');
 
       await open(page, `/inbox?factory=${factory}`);
-      if ((await list.inputValue()) !== factory)
-        throw new Refused(`the list is preset to the factory the address names (${factory}) — it held ${await list.inputValue()}`);
+      if ((await heldIn(list)) !== factory)
+        throw new Refused(`the list is preset to the factory the address names (${factory}) — it held ${await heldIn(list)}`);
       await expectTexts(box.locator('[data-factory-repo]'), [checkout], "the box says the factory's one repository as text");
-      await expectCount(box.getByRole('combobox', { name: 'Repository' }), 0, 'with no Repository list');
+      await expectCount(box.locator('[data-slot="select"]', { hasText: 'Repository' }), 0, 'with no Repository list');
       await expectCount(box.locator('input'), 0, 'and no field to type a path into');
-      await box.getByRole('combobox', { name: 'Workflow' }).selectOption({ label: WORKFLOWS.good.name });
+      await pickIn(page, box.locator('[data-workflow-field]'), WORKFLOWS.good.name);
       await box.getByRole('textbox', { name: 'An idea' }).fill(ASSIGNED);
       await settled(page);
       await photograph(box, path.join(OUT, `inbox-file-box-${theme}.png`));
@@ -233,7 +233,7 @@ export default {
       );
       await expectCount(box.locator('[data-filed-hidden]'), 0, 'a card filed where the filter keeps it says nothing more');
 
-      await list.selectOption('');
+      await pickIn(page, list, 'No factory: chosen at start');
       const hidden = await fileFrom(page, HIDDEN);
       written.push(hidden.file);
       expectSent(hidden.sent, { body: HIDDEN }, 'back on no factory, the idea alone: nothing picked under the factory is sent');

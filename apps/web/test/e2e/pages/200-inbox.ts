@@ -198,10 +198,10 @@ async function visit(page: Page): Promise<void> {
     await expectVisible(idea, 'the box has a field for the idea');
     if (await fileIt.isEnabled()) throw new Refused('File is disabled while there is no idea — it was enabled with none');
     await expectCount(box.locator('input'), 0, 'the box has no field to type a repository into');
-    await box.getByRole('combobox', { name: 'Factory' }).selectOption(FACTORY);
+    await pickIn(page, box.locator('[data-factory-field]'), FACTORY);
     await expectTexts(box.locator('[data-factory-repo]'), [checkout], `the repository is the factory's own (${checkout}), said as text`);
     await idea.fill(FILED);
-    await box.getByRole('combobox', { name: 'Workflow' }).selectOption({ label: WORKFLOWS.good.name });
+    await pickIn(page, box.locator('[data-workflow-field]'), WORKFLOWS.good.name);
     const [filed] = await Promise.all([
       page.waitForResponse((r) => r.request().method() === 'POST' && cardsPath().test(new URL(r.url()).pathname), { timeout: WAIT_MS }),
       fileIt.click(),
@@ -533,7 +533,7 @@ async function visit(page: Page): Promise<void> {
         [checkout],
         `its start says the repository ${FACTORY} gives its workflow (${checkout}), never the card's`,
       );
-      await expectCount(item.getByRole('combobox', { name: 'Repository' }), 0, 'with no Repository list');
+      await expectCount(item.locator('[data-slot="select"]', { hasText: 'Repository' }), 0, 'with no Repository list');
       await expectVisible(item.locator(`form[aria-label="Start ${elsewhereName}"]`), 'and its Start');
       await settled(other);
       await photograph(other, path.join(OUT, `inbox-elsewhere-${await themeOf(other)}.png`), { fullPage: true });

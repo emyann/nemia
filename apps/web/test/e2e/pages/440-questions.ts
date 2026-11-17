@@ -208,7 +208,7 @@ export default {
 
       const whereField = form.locator(`fieldset[data-question="${where.title}"]`);
       await whereField.locator(`label[data-option="${where.options[0].label}"]`).click();
-      await whereField.locator('textarea[data-own]').fill(QUESTIONS.own);
+      await whereField.locator('[data-own] textarea').fill(QUESTIONS.own);
       await expectVisible(form.locator('button[type="submit"]:enabled'), 'every question answered, Answer and continue is offered');
       await settled(page);
       await photograph(row, path.join(OUT, `questions-form-${theme}.png`));

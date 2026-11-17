@@ -45,8 +45,7 @@ export function CardGate({
   onTaken: (taken: Taken) => void;
 }) {
   const approval = useApprove(run.id, gate.step, { namespace: run.namespace });
-  const line = gateCardLine(gate);
-  const read = readLink(gate);
+  const [line, read] = [gateCardLine(gate), readLink(gate)];
   const anchor = useRef<HTMLDivElement>(null);
   const [asked, setAsked] = useState<Asked | null>(null);
   const close = () => setAsked(null);
@@ -78,6 +77,7 @@ export function CardGate({
         <div ref={anchor} data-gate-answer={gate.step}>
           <SplitButton
             size="xsmall"
+            icon={approval.isPending ? Pending : undefined}
             onPress={() => (gate.ends ? setAsked('approve') : approve(''))}
             isDisabled={approval.isPending}
             menuLabel={`Other answers to ${gate.step}`}

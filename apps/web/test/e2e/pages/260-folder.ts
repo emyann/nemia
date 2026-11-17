@@ -60,18 +60,18 @@ export default {
       );
       const files = section.locator('[aria-label="Files"]');
       await expectVisible(
-        files.locator('a[data-opens-view]', { hasText: FOLDER.note }),
+        files.locator('[data-opens-view]', { hasText: FOLDER.note }),
         `${step} lists ${FOLDER.note}, which the folder holds, opening its viewer`,
       );
       await expectVisible(
-        files.locator('a[data-opens-view]', { hasText: FOLDER.outline }),
+        files.locator('[data-opens-view]', { hasText: FOLDER.outline }),
         `${step} lists ${FOLDER.outline}, which no closeout named`,
       );
       await expectCount(files.locator('[data-artifact="text"]'), 2, `${step}'s folder holds two files, and the page lists both`);
       await expectVisible(files.getByText(/· \d+ B$/).first(), `${step}'s files carry their sizes`);
     }
 
-    const note = article.locator(`[aria-label="Files"] a[data-opens-view]`, { hasText: FOLDER.note }).first();
+    const note = article.locator(`[aria-label="Files"] [data-opens-view]`, { hasText: FOLDER.note }).first();
     const [served] = await Promise.all([
       page.waitForResponse(
         (r) => r.request().method() === 'GET' && decodeURIComponent(new URL(r.url()).pathname).endsWith(`/${FOLDER.note}`),

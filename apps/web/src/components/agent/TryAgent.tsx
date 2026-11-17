@@ -9,7 +9,7 @@ import { pace } from '../../lib/feed.ts';
 import { latestTryOf, TRY_FENCE, TRY_TERMS, tryHeld } from '../../lib/agents';
 import { costText } from '../../lib/cost';
 import { AgentRefused, RouteLink } from './AgentParts';
-import { Artifacts } from '../run/Artifacts';
+import { FolderTree } from '../run/FolderTree';
 import { CopyButton } from '../command/CopyButton';
 import { StatusChip } from '../step/StatusChip';
 import { runsMoved } from '@/lib/runWrites';
@@ -145,7 +145,7 @@ export function TryRun({ id }: { id: string }) {
           {step.filesError === null ? (
             <>
               Files it wrote:
-              <Artifacts artifacts={step.files} size none="the folder is empty" />
+              <FolderTree files={step.files} label="Files it wrote" />
             </>
           ) : (
             <span data-files-error>{step.filesError}</span>

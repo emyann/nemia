@@ -17,7 +17,7 @@ import type { RunDetail, StepView } from '@/lib/runView';
 import { stepState } from '@/lib/status';
 import type { StepPartModel } from '@/lib/stepPart';
 import { Approved, endsTheRun, gateWord } from '../../gate/Gate';
-import { Artifacts, AsItCame, attemptsWord, CheckVerdictWords, tryLabel } from '../Closeout';
+import { AsItCame, attemptsWord, CheckVerdictWords, tryLabel } from '../Closeout';
 import { DebugPanel } from '../DebugPanel';
 import { Check, code, Facts, pathRow, readRows, specRows, spentRows, unreadRows, when } from '../Facts';
 import { OutcomeHead } from '../Outcome';
@@ -25,6 +25,7 @@ import { StepNote } from '../StatusChip';
 import { StepPageLink } from '../StepParts';
 import { StepBody, Told } from '../Told';
 import { Fold } from './Fold';
+import { FolderTree } from '../../run/FolderTree';
 
 /** The detail, as its part's model has it. */
 type Detail = Exclude<StepPartModel['detail'], 'none'>;
@@ -105,7 +106,7 @@ function FolderFiles({ step }: { step: StepView }) {
       {step.filesError === null ? (
         <>
           Files in its folder:
-          <Artifacts artifacts={step.files} step={step.name} size none="the folder is empty" />
+          <FolderTree files={step.files} step={step.name} />
         </>
       ) : (
         <span data-files-error>{step.filesError}</span>

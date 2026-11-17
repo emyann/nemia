@@ -62,6 +62,7 @@ const FILES = [
   'components/markdown/Markdown.tsx',
   'components/nav/Trail.tsx',
   'components/run/Artifacts.tsx',
+  'components/run/FolderTree.tsx',
   'components/step/Closeout.tsx',
   'components/step/DebugPanel.tsx',
   'components/step/Enough.tsx',

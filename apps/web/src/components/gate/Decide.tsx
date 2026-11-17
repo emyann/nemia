@@ -25,6 +25,7 @@ import { RaiseRow } from './Raise';
 import { container, dashed, hairline, ringed } from '../../lib/meaning';
 import { OFFERS } from '../../lib/words';
 import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
+import { Pending } from '@/components/look';
 
 /**
  * What the command line's decide shows a person of the run `run`, under the run's asks (`AsksOfYou`): read once for the run's state
@@ -250,9 +251,9 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
           </p>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Button type="submit" isDisabled={ask.isPending || (offer.case === 'answer' && !message.trim())}>
-            {ask.isPending ? 'Asking…' : words.button}
-          </Button>
+          <AskPress pending={ask.isPending} held={offer.case === 'answer' && !message.trim()}>
+            {words.button}
+          </AskPress>
           <RadioGroup
             aria-label={`How to try ${offer.step} again`}
             name={`${field}-mode`}
@@ -310,9 +311,9 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
           supportingText={OFFERS.continue.placeholder}
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Button type="submit" isDisabled={ask.isPending}>
-            {ask.isPending ? 'Asking…' : OFFERS.continue.button}
-          </Button>
+          <AskPress pending={ask.isPending} held={false}>
+            {OFFERS.continue.button}
+          </AskPress>
           <p className="text-body-small">
             as <code>{line}</code> {OFFERS.continue.said}
           </p>
@@ -552,5 +553,14 @@ function Commands({ commands }: { commands: readonly DecideCommand[] }) {
         <p className="text-body-medium text-muted-foreground">None yet: the run is still moving.</p>
       )}
     </section>
+  );
+}
+
+/** An ask's submit: `Asking…` while its press is out, the kit's small ProgressIndicator in it, else its words; disabled then or `held`. */
+function AskPress({ pending, held, children }: { pending: boolean; held: boolean; children: string }) {
+  return (
+    <Button icon={pending ? Pending : undefined} type="submit" isDisabled={pending || held}>
+      {pending ? 'Asking…' : children}
+    </Button>
   );
 }

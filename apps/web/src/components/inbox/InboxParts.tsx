@@ -15,6 +15,7 @@ import { useNow } from '../../lib/useNow';
 import { FactoryTag } from '../factory/FactoryTag';
 import { Instant } from '../time/Instant';
 import { Button } from '@/components/ui/ds';
+import { Pending } from '@/components/look';
 
 /**
  * A card's line under its title: its name; the factory it names, linked to its floor, or, for a card that names none (`unassigned`),
@@ -71,14 +72,14 @@ export function QueueButtons({ entry, pending, onQueue }: { entry: InboxEntry; p
     <>
       {queueable(entry) && (
         <span title="Start it on its own, in its factory and on its workflow, when a run slot frees" className="inline-flex">
-          <Button variant="outlined" isDisabled={pending} onPress={() => onQueue(false)}>
+          <Button icon={pending ? Pending : undefined} variant="outlined" isDisabled={pending} onPress={() => onQueue(false)}>
             {pending ? 'Queueing…' : 'Queue'}
           </Button>
         </span>
       )}
       {entry.queued && (
         <span title="Take it off the queue: it waits on you to start it" className="inline-flex">
-          <Button variant="outlined" isDisabled={pending} onPress={() => onQueue(true)}>
+          <Button icon={pending ? Pending : undefined} variant="outlined" isDisabled={pending} onPress={() => onQueue(true)}>
             {pending ? 'Unqueueing…' : 'Unqueue'}
           </Button>
         </span>

@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { Pending } from '@/components/look';
 import { Button } from '@/components/ui/ds';
 import { signOut } from '@/lib/api/session';
 
@@ -20,7 +21,13 @@ export function ForgetToken() {
         it to leave this browser sending none: the token itself stays the store's until it is retired, on the Tokens tab or at its machine.
       </p>
       <div>
-        <Button variant="outlined" data-forget-token-press isDisabled={forget.isPending} onPress={() => forget.mutate()}>
+        <Button
+          variant="outlined"
+          icon={forget.isPending ? Pending : undefined}
+          data-forget-token-press
+          isDisabled={forget.isPending}
+          onPress={() => forget.mutate()}
+        >
           Forget this browser's token
         </Button>
       </div>

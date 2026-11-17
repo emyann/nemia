@@ -14,7 +14,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { delegableAgentsQuery, delegationsKey, delegationsQuery, putDelegation, removeDelegation } from '@/lib/api/proposals';
 import { DELEGABLE } from '@/lib/proposals';
-import { Reading, ReadingLines } from '@/components/look';
+import { Pending, Reading, ReadingLines } from '@/components/look';
 
 /** One grant as the form holds it: resources and verbs picked, and the names typed, comma-separated. */
 type Draft = { resources: readonly string[]; names: string; verbs: readonly ChangeVerb[] };
@@ -177,6 +177,7 @@ function DelegationForm({
         <FieldDescription>Each grant needs a resource and a verb.</FieldDescription>
         <Field orientation="horizontal" className="flex-wrap">
           <Button type="submit" data-delegation-save isDisabled={write.isPending || !agent.trim() || !whole}>
+            {write.isPending && <Pending size={16} />}
             {write.isPending ? 'Writing…' : 'Save'}
           </Button>
           <Button variant="outline" isDisabled={write.isPending} onPress={() => setDrafts([...drafts, EMPTY])}>

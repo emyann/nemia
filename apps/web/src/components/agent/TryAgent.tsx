@@ -13,7 +13,7 @@ import { Artifacts } from '../run/Artifacts';
 import { CopyButton } from '../command/CopyButton';
 import { StatusChip } from '../step/StatusChip';
 import { runsMoved } from '@/lib/runWrites';
-import { Reading, ReadingLines } from '@/components/look';
+import { Pending, Reading, ReadingLines } from '@/components/look';
 import { Button, TextField } from '@/components/ui/ds';
 
 const code = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
@@ -82,7 +82,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
           className="w-full"
         />
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" isDisabled={held !== null || start.isPending}>
+          <Button icon={start.isPending ? Pending : undefined} type="submit" isDisabled={held !== null || start.isPending}>
             {start.isPending ? 'Starting…' : 'Try it'}
           </Button>
           {held && (

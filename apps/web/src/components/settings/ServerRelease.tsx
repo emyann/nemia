@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowUpCircle, CircleAlert, CircleCheck, ExternalLink, LoaderCircle, RotateCcw, Undo2, type LucideIcon } from 'lucide-react';
+import { ArrowUpCircle, CircleAlert, CircleCheck, ExternalLink, RotateCcw, Undo2, type LucideIcon } from 'lucide-react';
 import type {
   Fix,
   FixStart,
@@ -13,7 +13,7 @@ import type {
   UpgradesRead,
   VersionAnswer,
 } from 'objects';
-import { CutFrame, CutPress, Reading, ReadingLines, type FrameHue } from '@/components/look';
+import { CutFrame, CutPress, Pending, Reading, ReadingLines, type FrameHue } from '@/components/look';
 import { FollowedFix } from '@/components/setup/FollowedFix';
 import { ReadinessList } from '@/components/setup/ReadinessList';
 import { Instant } from '@/components/time/Instant';
@@ -31,11 +31,14 @@ import { Skeleton } from '@/components/ui/ds';
 /** Which of the two presses a confirm or a start is of: Upgrade to the newer release, or Back to the previous one. */
 type Which = 'upgrade' | 'back';
 
-/** How an upgrade's phase is drawn while it runs and once it ended: a word and a glyph, read without colour, its tag's hue and frame's. */
-const PHASE: Record<UpgradePhase | 'restarting', { word: string; icon: LucideIcon; className: string; hue: FrameHue }> = {
-  pending: { word: 'Waiting for a slot', icon: LoaderCircle, className: container.grey, hue: 'none' },
-  running: { word: 'Upgrading', icon: LoaderCircle, className: ringed.alive, hue: 'alive' },
-  restarting: { word: 'Restarting', icon: LoaderCircle, className: ringed.alive, hue: 'alive' },
+/**
+ * How an upgrade's phase is drawn while it runs and once it ended: a word and a glyph (none while at work, which `Pending` draws), read
+ * without colour, its tag's hue and frame's.
+ */
+const PHASE: Record<UpgradePhase | 'restarting', { word: string; icon: LucideIcon | null; className: string; hue: FrameHue }> = {
+  pending: { word: 'Waiting for a slot', icon: null, className: container.grey, hue: 'none' },
+  running: { word: 'Upgrading', icon: null, className: ringed.alive, hue: 'alive' },
+  restarting: { word: 'Restarting', icon: null, className: ringed.alive, hue: 'alive' },
   succeeded: { word: 'Upgraded', icon: CircleCheck, className: container.sage, hue: 'none' },
   failed: { word: 'Failed', icon: CircleAlert, className: ringed.failure, hue: 'failure' },
 };
@@ -53,17 +56,16 @@ function Output({ output, empty }: { output: string; empty: string }) {
   );
 }
 
-/** An upgrade's phase in a word and a glyph, spinning while it is at work. */
+/** An upgrade's phase in a word and a glyph, the kit's small ProgressIndicator while it is at work (`Pending`). */
 function PhaseTag({ phase }: { phase: keyof typeof PHASE }) {
   const drawn = PHASE[phase];
   const Icon = drawn.icon;
-  const going = phase === 'pending' || phase === 'running' || phase === 'restarting';
   return (
     <span
       data-upgrade-word
       className={cn('inline-flex items-center gap-1 rounded-shape-full px-2 py-0.5 text-label-medium', drawn.className)}
     >
-      <Icon aria-hidden className={cn('size-3.5', going && 'motion-safe:animate-spin')} />
+      {Icon === null ? <Pending size={14} /> : <Icon aria-hidden className="size-3.5" />}
       {drawn.word}
     </span>
   );
@@ -236,7 +238,7 @@ function Presses({ shown, onStart }: { shown: ServerReleaseShown; onStart: (whic
       {(tags.upgrade !== undefined || (offers.back !== 'none' && previous !== null)) && (
         <div className="flex flex-wrap items-center gap-2">
           {tags.upgrade !== undefined && (
-            <CutPress data-upgrade-press isDisabled={busy} onPress={() => setConfirming('upgrade')}>
+            <CutPress pending={shown.starting === 'upgrade'} data-upgrade-press isDisabled={busy} onPress={() => setConfirming('upgrade')}>
               {shown.starting === 'upgrade' ? 'Upgrading…' : `Upgrade to ${tags.upgrade}`}
             </CutPress>
           )}
@@ -244,7 +246,7 @@ function Presses({ shown, onStart }: { shown: ServerReleaseShown; onStart: (whic
             <Button
               variant="outlined"
               size="xsmall"
-              icon={Undo2}
+              icon={shown.starting === 'back' ? Pending : Undo2}
               data-back-press={offers.back}
               isDisabled={offers.back === 'refused' || busy}
               onPress={() => setConfirming('back')}

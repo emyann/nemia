@@ -30,7 +30,7 @@ import { PolicyRules } from './PolicyRules';
 import { CopyButton } from '../command/CopyButton';
 import { BridgeWords } from '../step/Facts';
 import { TrustLine } from './NemiaTrust';
-import { Reading, ReadingLines } from '@/components/look';
+import { Pending, Reading, ReadingLines } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
 
 /**
@@ -54,6 +54,7 @@ export function NemiaSettings() {
     write.mutate(level);
   };
   const askLevel = (level: Level) => ask({ level });
+  const out = write.isPending ? write.variables : undefined;
   return (
     <section aria-label="Nemia" data-nemia-section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -67,7 +68,7 @@ export function NemiaSettings() {
       {data ? (
         <>
           <LevelPart nemia={data} pending={write.isPending} onAsk={askLevel} />
-          <FactoriesPart factories={data.factories} pending={write.isPending} onAsk={ask} />
+          <FactoriesPart factories={data.factories} pending={write.isPending} out={out} onAsk={ask} />
           {write.error && (
             <div data-nemia-refused className="flex flex-col gap-1 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">
               <p className="text-body-medium font-medium text-destructive">Not set:</p>
@@ -75,7 +76,7 @@ export function NemiaSettings() {
             </div>
           )}
           <PolicyRules agent="nemia" />
-          <SessionPart nemia={data} pending={write.isPending} onAsk={askLevel} />
+          <SessionPart nemia={data} pending={write.isPending} out={out} onAsk={ask} />
           <ReachPart reach={data.reach} bridge={data.bridge} />
           <SpendPart nemia={data} />
         </>
@@ -173,15 +174,18 @@ const LEVEL_LINES: Record<Level, string> = {
 
 /**
  * Each factory's level: she works on one at Semi-auto, and one at Manual is left alone, its runs and its lines not hers. The default
- * factory's is the store's, set above; each other has its default and a raise for a stretch, which ends by itself.
+ * factory's is the store's, set above; each other has its default and a raise for a stretch, which ends by itself. `out` is the ask
+ * still out, which the press that sent it draws.
  */
 function FactoriesPart({
   factories,
   pending,
+  out,
   onAsk,
 }: {
   factories: readonly FactoryLevel[];
   pending: boolean;
+  out: LevelAsk | undefined;
   onAsk: (ask: LevelAsk) => void;
 }) {
   const now = useNow(60_000);
@@ -194,7 +198,13 @@ function FactoriesPart({
       <ul className="flex flex-col gap-2">
         {factories.map((row) => (
           <li key={row.factory}>
-            <FactoryRow row={row} now={new Date(now)} pending={pending} onAsk={onAsk} />
+            <FactoryRow
+              row={row}
+              now={new Date(now)}
+              pending={pending}
+              out={out?.factory === row.factory ? out : undefined}
+              onAsk={onAsk}
+            />
           </li>
         ))}
       </ul>
@@ -204,9 +214,22 @@ function FactoriesPart({
 
 /**
  * One factory's level, its words, and what a person sets of it: its default, picked among the three, a raise to a level over its default
- * for a chosen stretch, and the end of a raise in force. The default factory's level is the store's, picked above.
+ * for a chosen stretch, and the end of a raise in force. The default factory's level is the store's, picked above. `out` is this
+ * factory's ask still out, whose press draws the kit's small ProgressIndicator.
  */
-function FactoryRow({ row, now, pending, onAsk }: { row: FactoryLevel; now: Date; pending: boolean; onAsk: (ask: LevelAsk) => void }) {
+function FactoryRow({
+  row,
+  now,
+  pending,
+  out,
+  onAsk,
+}: {
+  row: FactoryLevel;
+  now: Date;
+  pending: boolean;
+  out: LevelAsk | undefined;
+  onAsk: (ask: LevelAsk) => void;
+}) {
   const byDefault = row.factory === DEFAULT_NAMESPACE;
   return (
     <div data-factory-level={row.factory} data-level={row.level} className="flex flex-col gap-2 rounded-lg border px-3 py-2">
@@ -241,13 +264,14 @@ function FactoryRow({ row, now, pending, onAsk }: { row: FactoryLevel; now: Date
               variant="outlined"
               size="xsmall"
               data-factory-end
+              icon={out?.end ? Pending : undefined}
               isDisabled={pending}
               onPress={() => onAsk({ factory: row.factory, end: true })}
             >
               End the raise
             </Button>
           ) : (
-            <RaiseControls row={row} pending={pending} onAsk={onAsk} />
+            <RaiseControls row={row} pending={pending} raising={out?.for === undefined ? undefined : out.level} onAsk={onAsk} />
           )}
         </div>
       )}
@@ -262,8 +286,21 @@ const RAISE_MARKS: Record<Level, Record<`data-${string}`, boolean>> = {
   auto: { 'data-factory-raise-auto': true },
 };
 
-/** A factory's raise for a chosen stretch, a button for each level over its default; none at Auto by default. */
-function RaiseControls({ row, pending, onAsk }: { row: FactoryLevel; pending: boolean; onAsk: (ask: LevelAsk) => void }) {
+/**
+ * A factory's raise for a chosen stretch, a button for each level over its default; none at Auto by default. The one to the level
+ * `raising`, its raise still out, draws the kit's small ProgressIndicator.
+ */
+function RaiseControls({
+  row,
+  pending,
+  raising,
+  onAsk,
+}: {
+  row: FactoryLevel;
+  pending: boolean;
+  raising: Level | undefined;
+  onAsk: (ask: LevelAsk) => void;
+}) {
   const [stretch, setStretch] = useState<string>(RAISE_STRETCHES[0]);
   const levels = raisesOver(row.default);
   if (!levels.length) return null;
@@ -287,6 +324,7 @@ function RaiseControls({ row, pending, onAsk }: { row: FactoryLevel; pending: bo
           variant="outlined"
           size="xsmall"
           {...RAISE_MARKS[level]}
+          icon={raising === level ? Pending : undefined}
           isDisabled={pending}
           onPress={() => onAsk({ level, factory: row.factory, for: stretch })}
         >
@@ -299,10 +337,26 @@ function RaiseControls({ row, pending, onAsk }: { row: FactoryLevel; pending: bo
 
 /**
  * Her session's state in the board's words; once her task is filed, its name and its phase as the runtime says it; stopped from outside, a
- * way to a fresh one.
+ * way to a fresh one, which draws the kit's small ProgressIndicator while the ask it sent is the one still out (`out`).
  */
-function SessionPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: boolean; onAsk: (level: Level) => void }) {
+function SessionPart({
+  nemia,
+  pending,
+  out,
+  onAsk,
+}: {
+  nemia: NemiaLevel;
+  pending: boolean;
+  out: LevelAsk | undefined;
+  onAsk: (ask: LevelAsk) => void;
+}) {
   const { kind, words } = sessionOf(nemia);
+  const [sent, setSent] = useState<LevelAsk | null>(null);
+  const fresh = () => {
+    const ask = { level: freshLevel(nemia.level) };
+    setSent(ask);
+    onAsk(ask);
+  };
   return (
     <Part heading="Her session" data-nemia-session data-state={kind}>
       <p className="text-body-medium">{words}</p>
@@ -324,7 +378,14 @@ function SessionPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bo
       )}
       {kind === 'stopped' && (
         <div>
-          <Button variant="outlined" size="xsmall" data-nemia-restart isDisabled={pending} onPress={() => onAsk(freshLevel(nemia.level))}>
+          <Button
+            variant="outlined"
+            size="xsmall"
+            icon={out !== undefined && out === sent ? Pending : undefined}
+            data-nemia-restart
+            isDisabled={pending}
+            onPress={fresh}
+          >
             Start a fresh session
           </Button>
         </div>

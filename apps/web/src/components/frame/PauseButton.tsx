@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { useNow } from '@/lib/useNow';
 import type { Actor as ActorRead } from 'objects';
 import { Actor } from '../actor/Actor';
-import { Reading, ReadingLines } from '@/components/look';
+import { Pending, Reading, ReadingLines } from '@/components/look';
 
 /** The popover's heading: the pause's state. */
 const HEADINGS: Record<PauseState, string> = {
@@ -28,14 +28,27 @@ function WhyField({ why, setWhy }: { why: string; setWhy: (why: string) => void 
   );
 }
 
-/** Cancel, which puts nothing (`onClose`), and the form's submit, `label`; both off while the api is asked. */
-function FormActions({ label, onClose, isPending }: { label: string; onClose: () => void; isPending: boolean }) {
+/**
+ * Cancel, which puts nothing (`onClose`), and the form's submit, `label`; both off while the api is asked (`isPending`, the submit drawing
+ * the kit's small ProgressIndicator then) or while what the form says is still read (`held`).
+ */
+function FormActions({
+  label,
+  onClose,
+  isPending,
+  held = false,
+}: {
+  label: string;
+  onClose: () => void;
+  isPending: boolean;
+  held?: boolean;
+}) {
   return (
     <div className="flex justify-end gap-2">
-      <Button type="button" variant="outlined" size="xsmall" onPress={onClose} isDisabled={isPending}>
+      <Button type="button" variant="outlined" size="xsmall" onPress={onClose} isDisabled={isPending || held}>
         Cancel
       </Button>
-      <Button type="submit" size="xsmall" isDisabled={isPending}>
+      <Button type="submit" size="xsmall" icon={isPending ? Pending : undefined} isDisabled={isPending || held}>
         {label}
       </Button>
     </div>
@@ -125,7 +138,7 @@ export function NowForm({
         </>
       )}
       {!standing && <WhyField why={why} setWhy={setWhy} />}
-      <FormActions label="Stop now" onClose={onClose} isPending={isPending || !read.data} />
+      <FormActions label="Stop now" onClose={onClose} isPending={isPending} held={!read.data} />
     </form>
   );
 }
@@ -185,7 +198,14 @@ function PauseFacts({
         )}
         {(words.state === 'pausing' || words.state === 'paused') && (
           <li>
-            <Button variant="outlined" size="xsmall" icon={Play} className="w-full justify-start" onPress={onResume} isDisabled={isPending}>
+            <Button
+              variant="outlined"
+              size="xsmall"
+              icon={isPending ? Pending : Play}
+              className="w-full justify-start"
+              onPress={onResume}
+              isDisabled={isPending}
+            >
               Resume
             </Button>
           </li>

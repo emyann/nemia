@@ -10,7 +10,7 @@ import { Refusal } from '../gate/Ask';
 import { ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
 import { sayWritten } from '@/lib/written';
-import { Reading } from '@/components/look';
+import { Pending, Reading } from '@/components/look';
 import { Body, Button, Checkbox, CheckboxGroup, Skeleton, TextField, Title } from '@/components/ui/ds';
 
 /**
@@ -111,7 +111,7 @@ function HoldForm({ id, runs, older, onClose }: { id: string; runs: RunView[]; o
         <Button type="button" variant="outlined" size="xsmall" onPress={onClose} isDisabled={hold.isPending}>
           Cancel
         </Button>
-        <Button type="submit" size="xsmall" isDisabled={hold.isPending}>
+        <Button icon={hold.isPending ? Pending : undefined} type="submit" size="xsmall" isDisabled={hold.isPending}>
           {hold.isPending ? 'Holding…' : 'Hold'}
         </Button>
       </div>

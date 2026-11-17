@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/ds';
 import { removeRun } from '../../lib/api/runs.ts';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
+import { Pending } from '@/components/look';
 import { sayWritten } from '@/lib/written';
 
 /**
@@ -30,7 +31,14 @@ export function RemoveRun({ id, onClose, leave = false }: { id: string; onClose:
   return (
     <span data-remove-run className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
       Remove this try, its record and its folders?
-      <Button variant="tonal" color="error" size="xsmall" onPress={() => remove.mutate()} isDisabled={remove.isPending}>
+      <Button
+        icon={remove.isPending ? Pending : undefined}
+        variant="tonal"
+        color="error"
+        size="xsmall"
+        onPress={() => remove.mutate()}
+        isDisabled={remove.isPending}
+      >
         {remove.isPending ? 'Removing…' : 'Remove'}
       </Button>
       <Button

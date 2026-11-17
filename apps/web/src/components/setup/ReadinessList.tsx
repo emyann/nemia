@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CircleAlert, CircleCheck, CircleDashed, CircleHelp, Play, Power, type LucideIcon } from 'lucide-react';
 import type { FixStart, Readiness, ReadinessFix, ReadinessPiece, ReadinessState } from 'objects';
-import { CutField, CutFrame, CutPress, Reading, ReadingLines } from '@/components/look';
+import { CutField, CutFrame, CutPress, Pending, Reading, ReadingLines } from '@/components/look';
 import { Button, Skeleton } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
 import { container, dashed, ringed } from '@/lib/meaning';
@@ -71,7 +71,7 @@ function StartableFix({ piece, fix, i, starts }: { piece: ReadinessPiece; fix: R
             </label>
           ))}
           <div className="flex flex-wrap items-center gap-2">
-            <CutPress type="submit" isDisabled={pending || !answered(asks, answers)}>
+            <CutPress pending={pending} type="submit" isDisabled={pending || !answered(asks, answers)}>
               {pending ? 'Starting…' : 'Start the fix'}
             </CutPress>
             <Button variant="text" size="xsmall" isDisabled={pending} onPress={() => setOpen(false)}>
@@ -84,7 +84,7 @@ function StartableFix({ piece, fix, i, starts }: { piece: ReadinessPiece; fix: R
           <Button
             variant="outlined"
             size="xsmall"
-            icon={fix.kind === 'removes' ? Power : Play}
+            icon={pending ? Pending : fix.kind === 'removes' ? Power : Play}
             data-fix-press
             isDisabled={pending}
             onPress={asks.length > 0 ? () => setOpen(true) : start}

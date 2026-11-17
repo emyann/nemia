@@ -9,7 +9,7 @@ import { cn } from '../../lib/utils';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
 import { sayWritten } from '@/lib/written';
-import { Reading, ReadingLines } from '@/components/look';
+import { Pending, Reading, ReadingLines } from '@/components/look';
 import { Button, Radio, RadioGroup, Skeleton, Title } from '@/components/ui/ds';
 import { CHOICE } from '@/lib/classes';
 
@@ -113,9 +113,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
             {pruneQuestion(id, choice, offer)}
           </p>
           <div className="flex items-center gap-2">
-            <Button variant="tonal" color="error" size="xsmall" onPress={() => prune.mutate()} isDisabled={prune.isPending}>
-              {prune.isPending ? 'Pruning…' : 'Prune'}
-            </Button>
+            <PrunePress pending={prune.isPending} onPress={() => prune.mutate()} />
             <Button
               variant="text"
               size="xsmall"
@@ -150,5 +148,14 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
         </pre>
       )}
     </div>
+  );
+}
+
+/** The Prune that answers the question: `Pruning…` while its press is out, the kit's small ProgressIndicator in it, and disabled then. */
+function PrunePress({ pending, onPress }: { pending: boolean; onPress: () => void }) {
+  return (
+    <Button icon={pending ? Pending : undefined} variant="tonal" color="error" size="xsmall" onPress={onPress} isDisabled={pending}>
+      {pending ? 'Pruning…' : 'Prune'}
+    </Button>
   );
 }

@@ -59,17 +59,19 @@ export function ServerState({ state }: { state: string | null }) {
 
 /**
  * One recorded server: its name, its state, its address, its headers, its sign-in where it signs in through an OAuth client
- * (`signIn`, `ServerSignIn`), and the press that takes it off the record. Exported for its stories, which draw a state a node test
- * cannot judge.
+ * (`signIn`, `ServerSignIn`), and the press that takes it off the record, off while a change is out (`pending`) and drawing the kit's small
+ * ProgressIndicator while its own removal is (`removing`). Exported for its stories, which draw a state a node test cannot judge.
  */
 export function ServerRow({
   server,
   pending,
+  removing = false,
   onRemove,
   signIn,
 }: {
   server: FactoryServer;
   pending: boolean;
+  removing?: boolean;
   onRemove: (name: string) => void;
   signIn?: ReactNode;
 }) {
@@ -84,7 +86,7 @@ export function ServerRow({
           <span className="text-body-small text-muted-foreground">{server.tools === 1 ? '1 tool' : `${server.tools} tools`}</span>
         )}
         <span className="ml-auto">
-          <CutPress isDisabled={pending} onPress={() => onRemove(server.name)}>
+          <CutPress pending={removing} isDisabled={pending} onPress={() => onRemove(server.name)}>
             Remove
           </CutPress>
         </span>
@@ -206,18 +208,20 @@ const writeOf = (draft: Draft, type: McpServerWrite['type']): McpServerWrite => 
 };
 
 /**
- * The form that records a remote server: its name, address, transport, headers and the facts of its OAuth client. Exported for its
- * stories.
+ * The form that records a remote server: its name, address, transport, headers and the facts of its OAuth client. Record is off while a
+ * change is out (`pending`), and draws the kit's small ProgressIndicator while the record is (`recording`). Exported for its stories.
  */
 export function ServerForm({
   builtin,
   recorded = [],
   pending,
+  recording = false,
   onRecord,
 }: {
   builtin: readonly BuiltinServer[];
   recorded?: readonly BuiltinServer[];
   pending: boolean;
+  recording?: boolean;
   onRecord: (server: string, body: McpServerWrite) => void;
 }) {
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -281,25 +285,35 @@ export function ServerForm({
         <HeaderField draft={draft} set={set} />
         <SignInFields draft={draft} set={set} />
       </FieldGroup>
-      <div className="flex items-center gap-3">
-        <CutPress isDisabled={pending || type === null || !draft.name.trim() || !draft.url.trim()} onPress={send}>
-          Record
-        </CutPress>
-      </div>
+      <RecordPress recording={recording} held={pending || type === null || !draft.name.trim() || !draft.url.trim()} onPress={send} />
     </form>
   );
 }
 
-/** The record's rows in a cut frame, each with its sign-in where it signs in through an OAuth client; nothing for an empty record. */
+/** The form's Record: off while `held`, and drawing the kit's small ProgressIndicator while the record is out (`recording`). */
+function RecordPress({ recording, held, onPress }: { recording: boolean; held: boolean; onPress: () => void }) {
+  return (
+    <CutPress pending={recording} isDisabled={held} onPress={onPress} className="self-start">
+      Record
+    </CutPress>
+  );
+}
+
+/**
+ * The record's rows in a cut frame, each with its sign-in where it signs in through an OAuth client, the one named `removing` being
+ * removed; nothing for an empty record.
+ */
 function ServerList({
   factory,
   servers,
   pending,
+  removing,
   onRemove,
 }: {
   factory: string;
   servers: readonly FactoryServer[];
   pending: boolean;
+  removing: string | undefined;
   onRemove: (name: string) => void;
 }) {
   if (servers.length === 0) return null;
@@ -311,6 +325,7 @@ function ServerList({
             key={server.name}
             server={server}
             pending={pending}
+            removing={server.name === removing}
             onRemove={onRemove}
             signIn={server.oauth && <ServerSignIn factory={factory} server={server.name} state={server.state} />}
           />
@@ -357,11 +372,18 @@ export function FactoryServers({ name }: { name: string }) {
       </p>
       {data ? (
         <>
-          <ServerList factory={name} servers={servers} pending={change.isPending} onRemove={(server) => ask({ kind: 'remove', server })} />
+          <ServerList
+            factory={name}
+            servers={servers}
+            pending={change.isPending}
+            removing={change.isPending && change.variables.kind === 'remove' ? change.variables.server : undefined}
+            onRemove={(server) => ask({ kind: 'remove', server })}
+          />
           <ServerForm
             builtin={data.builtin}
             recorded={servers}
             pending={change.isPending}
+            recording={change.isPending && change.variables.kind === 'record'}
             onRecord={(server, body) => ask({ kind: 'record', server, body })}
           />
         </>

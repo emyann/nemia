@@ -89,7 +89,7 @@ export function TokenPage({ asked }: { asked: TokenAsked }) {
             </p>
           )}
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <CutPress type="submit" isDisabled={pending || token.trim() === ''}>
+            <CutPress pending={send.isPending} type="submit" isDisabled={pending || token.trim() === ''}>
               {send.isPending ? 'Sending…' : 'Use this token'}
             </CutPress>
           </div>

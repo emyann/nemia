@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/ds';
 import type { SkillDetail, SkillDraft } from '../../lib/api/skills.ts';
 import { draftOfForm, EMPTY_SKILL_FORM, skillEdited, skillFormOf, type SkillForm as Form } from '../../lib/skills';
 import { Field } from './AgentForm';
+import { Pending } from '@/components/look';
 
 /**
  * A skill's form: its name — its folder, set once — a title, what it does, its card's tags and examples, and its instructions, the body of
@@ -111,7 +112,7 @@ export function SkillForm({
 
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" isDisabled={saving || !changed}>
+          <Button icon={saving ? Pending : undefined} type="submit" isDisabled={saving || !changed}>
             {saving ? 'Saving…' : detail ? 'Save' : 'Create skill'}
           </Button>
           {detail && changed && (

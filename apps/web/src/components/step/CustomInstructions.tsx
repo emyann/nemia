@@ -7,7 +7,7 @@ import {
   type CustomInstructions as Words,
 } from '../../lib/api/agents.ts';
 import { AgentRefused } from '../agent/AgentParts';
-import { Reading } from '@/components/look';
+import { Pending, Reading } from '@/components/look';
 import { Button, Skeleton, TextField } from '@/components/ui/ds';
 
 /**
@@ -187,7 +187,7 @@ function CustomForm({
       )}
       <TextField label="Words" multiline value={draft} onChange={setDraft} placeholder={reach.placeholder(custom.name)} />
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" isDisabled={pending || !draft.trim() || unchanged}>
+        <Button icon={pending ? Pending : undefined} type="submit" isDisabled={pending || !draft.trim() || unchanged}>
           {pending ? 'Writing…' : 'Save'}
         </Button>
         {held && (
@@ -230,7 +230,7 @@ function Clear({
   return (
     <span data-custom-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
       {asks}
-      <Button color="error" onPress={onClear} isDisabled={pending}>
+      <Button icon={pending ? Pending : undefined} color="error" onPress={onClear} isDisabled={pending}>
         {pending ? 'Clearing…' : 'Clear'}
       </Button>
       <Button variant="text" onPress={() => onAsk(false)} isDisabled={pending}>

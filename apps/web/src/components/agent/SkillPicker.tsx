@@ -7,7 +7,7 @@ import { invalidateSkills } from '../../lib/agentWrites';
 import { skillList, withoutSkill, withSkill } from '../../lib/agents';
 import { costWords, givenRows, offerOf, PLACE_LABELS } from '../../lib/skills';
 import { GivenSkills, SkillSourceBadge } from './AgentParts';
-import { Reading, ReadingLines } from '@/components/look';
+import { Pending, Reading, ReadingLines } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
 
 /**
@@ -196,7 +196,13 @@ function Offered({
         )}
         {offer.kind === 'given' && <span className="text-body-small text-muted-foreground">given</span>}
         {offer.kind === 'copy' && (
-          <Button size="xsmall" aria-label={`Copy ${row.name} to my library and add`} onPress={onCopy} isDisabled={busy}>
+          <Button
+            icon={copying ? Pending : undefined}
+            size="xsmall"
+            aria-label={`Copy ${row.name} to my library and add`}
+            onPress={onCopy}
+            isDisabled={busy}
+          >
             {copying ? 'Copying…' : 'Copy to my library and add'}
           </Button>
         )}

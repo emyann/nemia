@@ -23,6 +23,7 @@ import { invalidateAgents } from '@/lib/agentWrites';
 import { FACTORY_WAY } from '@/lib/factories';
 import type { PagePlace } from '@/lib/api/workflows';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
+import { Pending } from '@/components/look';
 
 /**
  * What an agent's page loads before it draws: the agent read in `place`, the form's keys, and for one of yours its custom instructions.
@@ -224,7 +225,7 @@ function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: bo
         </>
       )}
       ?
-      <Button color="error" onPress={onRemove} isDisabled={pending}>
+      <Button icon={pending ? Pending : undefined} color="error" onPress={onRemove} isDisabled={pending}>
         {pending ? 'Removing…' : 'Remove'}
       </Button>
       <Button variant="text" onPress={() => setAsking(false)} isDisabled={pending}>

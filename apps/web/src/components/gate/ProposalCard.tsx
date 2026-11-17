@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Instant } from '@/components/time/Instant';
+import { Pending } from '@/components/look';
 import { approveProposal, declineProposal, proposalKey, proposalQuery, proposalsKey } from '@/lib/api/proposals';
 import { readGone } from '@/lib/api/gone';
 import { ink } from '@/lib/meaning';
@@ -81,7 +82,14 @@ export function ProposalCard({ factory, name }: { factory: string; name: string 
     judge.reset();
     judge.mutate(asked);
   };
-  return <ProposalView proposal={proposal} pending={judge.isPending} refused={judge.error?.message ?? null} onJudge={ask} />;
+  return (
+    <ProposalView
+      proposal={proposal}
+      judging={judge.isPending ? judge.variables : undefined}
+      refused={judge.error?.message ?? null}
+      onJudge={ask}
+    />
+  );
 }
 
 /** One change of a proposal: its object, what it does to it and what it does to access. */
@@ -118,15 +126,18 @@ const approverOf = (proposal: Proposal): string | null => {
   return `${by.agent ?? 'an agent'}, under ${by.rule ? `the rule ${by.rule}` : 'a rule you confirmed'}`;
 };
 
-/** A proposal as it reads, with the buttons its phase offers; a refusal of the last click in the api's words. */
+/**
+ * A proposal as it reads, with the buttons its phase offers, `judging` the judgement still out; a refusal of the last click in the api's
+ * words.
+ */
 function ProposalView({
   proposal,
-  pending,
+  judging,
   refused,
   onJudge,
 }: {
   proposal: Proposal;
-  pending: boolean;
+  judging: Judgement | undefined;
   refused: string | null;
   onJudge: (asked: Judgement) => void;
 }) {
@@ -167,35 +178,41 @@ function ProposalView({
             {message}
           </p>
         )}
-        <Judge offers={offers} pending={pending} refused={refused} onJudge={onJudge} />
+        <Judge offers={offers} judging={judging} refused={refused} onJudge={onJudge} />
       </CardContent>
     </Card>
   );
 }
 
-/** Approve and Decline as `offers` says, and a refusal of the last click in the api's words. */
+/**
+ * Approve and Decline as `offers` says, both off while a judgement is out (`judging`) and the one it is drawing the kit's small
+ * ProgressIndicator, and a refusal of the last click in the api's words.
+ */
 function Judge({
   offers,
-  pending,
+  judging,
   refused,
   onJudge,
 }: {
   offers: ProposalOffers;
-  pending: boolean;
+  judging: Judgement | undefined;
   refused: string | null;
   onJudge: (asked: Judgement) => void;
 }) {
+  const pending = judging !== undefined;
   return (
     <>
       {(offers.approve || offers.decline) && (
         <div className="flex flex-wrap gap-2">
           {offers.approve && (
             <Button data-proposal-approve isDisabled={pending} onPress={() => onJudge('approve')}>
+              {judging === 'approve' && <Pending size={16} />}
               Approve
             </Button>
           )}
           {offers.decline && (
             <Button data-proposal-decline variant="outline" isDisabled={pending} onPress={() => onJudge('decline')}>
+              {judging === 'decline' && <Pending size={16} />}
               Decline
             </Button>
           )}

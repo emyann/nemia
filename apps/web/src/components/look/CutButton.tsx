@@ -2,6 +2,7 @@ import { Button as AriaButton, Link as AriaLink, type ButtonProps, type LinkProp
 import { filled } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 import { cutRing, cutShape } from './cut';
+import { Pending } from './Pending';
 import { routeLink } from '../nav/routeLink';
 
 /** How long the button's cut is along each side, in pixels. */
@@ -38,9 +39,19 @@ const DISABLED = 'bg-on-surface/12 text-on-surface/38';
  * the top-right and bottom-left corners cut, exactly the button's box, in the hue of what waits on a person, with a state layer in
  * its ink. `quiet` draws it smaller, with no ground, in the surface's ink inside a hairline along the whole cut shape, both cuts
  * too, for a button beside what already says the wait; `disabled` draws the shape in the disabled ground and ink, with no state
- * layer and no ring.
+ * layer and no ring; `pending` draws the kit's small ProgressIndicator (`Pending`) before its words, which stay its name.
  */
-function Body({ disabled = false, quiet = false, children }: { disabled?: boolean; quiet?: boolean; children: string }) {
+function Body({
+  disabled = false,
+  quiet = false,
+  pending = false,
+  children,
+}: {
+  disabled?: boolean;
+  quiet?: boolean;
+  pending?: boolean;
+  children: string;
+}) {
   return (
     <>
       {!disabled && (
@@ -54,7 +65,7 @@ function Body({ disabled = false, quiet = false, children }: { disabled?: boolea
       <span
         data-cut-shape
         className={cn(
-          'relative inline-flex items-center text-label-large whitespace-nowrap uppercase',
+          'relative inline-flex items-center gap-2 text-label-large whitespace-nowrap uppercase',
           quiet ? 'h-8 px-4' : 'h-10 px-6',
           disabled ? DISABLED : quiet ? QUIET : filled.yours,
         )}
@@ -74,6 +85,7 @@ function Body({ disabled = false, quiet = false, children }: { disabled?: boolea
             className="absolute inset-0 bg-current opacity-0 group-hover/cut:state-opacity-hover group-data-pressed/cut:state-opacity-pressed"
           />
         )}
+        {pending && <Pending size={18} className="relative" />}
         <span className="relative">{children}</span>
       </span>
     </>
@@ -102,14 +114,16 @@ export const CutButton = routeLink(Cut);
 
 /**
  * The look's filled button with two cut corners, as a button that is pressed: `onPress` runs on a click, on Enter and on Space, and
- * its ring is the link's own. With `isDisabled` it takes no press and no focus, and is drawn in the disabled ground and ink.
+ * its ring is the link's own. With `isDisabled` it takes no press and no focus, and is drawn in the disabled ground and ink. With
+ * `pending`, its press still out, it draws the kit's small ProgressIndicator before its words.
  */
 export function CutPress({
   className,
   children,
   isDisabled = false,
+  pending = false,
   ...props
-}: Omit<ButtonProps, 'className' | 'children' | 'style'> & { className?: string; children: string }) {
+}: Omit<ButtonProps, 'className' | 'children' | 'style' | 'isPending'> & { className?: string; pending?: boolean; children: string }) {
   return (
     <AriaButton
       {...props}
@@ -117,7 +131,9 @@ export function CutPress({
       data-cut-button="press"
       className={cn(HOLDER, 'cursor-pointer disabled:cursor-default', className)}
     >
-      <Body disabled={isDisabled}>{children}</Body>
+      <Body disabled={isDisabled} pending={pending}>
+        {children}
+      </Body>
     </AriaButton>
   );
 }

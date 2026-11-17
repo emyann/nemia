@@ -19,7 +19,7 @@ import type { Frozen } from '../../lib/frozen';
 import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type GateBudgets, type GivenBudget } from './GateBudgets';
 import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 import { Actor } from '../actor/Actor';
-import { Reading, ReadingLines } from '@/components/look';
+import { Pending, Reading, ReadingLines } from '@/components/look';
 
 /** A gated step's gate, as its object's status holds it. */
 type StepGate = NonNullable<StepView['gate']>;
@@ -231,7 +231,11 @@ function ApproveForm({
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span title={approveWaits(left, budgeting.unread)} className="inline-flex">
-          <Button type="submit" isDisabled={busy || left.length > 0 || budgeting.unread.length > 0}>
+          <Button
+            icon={approval.isPending ? Pending : undefined}
+            type="submit"
+            isDisabled={busy || left.length > 0 || budgeting.unread.length > 0}
+          >
             {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
           </Button>
         </span>
@@ -310,7 +314,12 @@ function SendBackForm({
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span title={notAnswered(waits)} className="inline-flex">
-          <Button type="submit" variant="tonal" isDisabled={busy || waits.length > 0 || !(body.message?.trim() || body.answers)}>
+          <Button
+            icon={sendBack.isPending ? Pending : undefined}
+            type="submit"
+            variant="tonal"
+            isDisabled={busy || waits.length > 0 || !(body.message?.trim() || body.answers)}
+          >
             {sendBack.isPending ? 'Sending back…' : 'Send back'}
           </Button>
         </span>

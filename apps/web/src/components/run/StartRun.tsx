@@ -10,7 +10,7 @@ import { afterFor } from '../../lib/inbox';
 import { usePickerRuns } from '../../lib/pickerRuns.ts';
 import { ContextPicker, ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
-import { Reading } from '@/components/look';
+import { Pending, Reading } from '@/components/look';
 import { Button, Checkbox, Skeleton, TextField } from '@/components/ui/ds';
 import { pastLimit, StartInputs } from './StartInputs';
 
@@ -113,14 +113,23 @@ export function StartRun({
       {!inFolders && <AfterPicker selected={after} onChange={setAfter} repo={repo} />}
       <ContextPicker selected={context} onChange={setContext} />
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" size="xsmall" isDisabled={!brief.trim() || start.isPending || handed.files.some(pastLimit)}>
+        <StartPress pending={start.isPending} held={!brief.trim() || handed.files.some(pastLimit)}>
           {startWords(start.isPending, handed.files.length, handed.sent)}
-        </Button>
+        </StartPress>
         <Where workflow={workflow} repo={repo} factory={place?.factory} card={!!card} />
       </div>
       {start.isSuccess && <StartedLine id={start.data.id} after={start.variables.after} />}
       {start.isError && !onRefused && <StartRefused message={start.error.message} />}
     </form>
+  );
+}
+
+/** The form's Start: disabled while its press is out (`pending`, the kit's small ProgressIndicator drawn in it) or while `held`. */
+function StartPress({ pending, held, children }: { pending: boolean; held: boolean; children: string }) {
+  return (
+    <Button icon={pending ? Pending : undefined} type="submit" size="xsmall" isDisabled={pending || held}>
+      {children}
+    </Button>
   );
 }
 

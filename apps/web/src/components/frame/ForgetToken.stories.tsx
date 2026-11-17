@@ -34,5 +34,6 @@ export const Forgetting: Story = {
     const press = within(canvasElement).getByRole('button', { name: "Forget this browser's token" });
     await userEvent.click(press);
     await expect(press).toBeDisabled();
+    await expect(press.querySelector('[data-pending]'), 'the press draws the indicator, its label still its name').not.toBeNull();
   },
 };

@@ -35,6 +35,7 @@ import {
   toolsWithSkill,
   type AgentForm as Form,
 } from '../../lib/agents';
+import { Pending } from '@/components/look';
 
 /**
  * The option of a choice that leaves the key unset: the agent then says nothing of it, and a step that names it runs on its own or the
@@ -191,7 +192,7 @@ export function AgentForm({
 
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" isDisabled={saving || !changed}>
+          <Button icon={saving ? Pending : undefined} type="submit" isDisabled={saving || !changed}>
             {saving ? 'Saving…' : listing ? 'Save' : 'Create agent'}
           </Button>
           {listing && changed && (

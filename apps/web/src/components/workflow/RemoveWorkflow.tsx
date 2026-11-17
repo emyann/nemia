@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/ds';
 import { removeWorkflow, type WorkflowListing } from '../../lib/api/workflows.ts';
 import { rereadWorkflows } from '../../lib/placed';
+import { Pending } from '@/components/look';
 
 /**
  * Remove, on a workflow of yours, asked twice: the first press asks, saying what goes — the folder, its steps and every file in it — and
@@ -35,7 +36,14 @@ export function RemoveWorkflow({ workflow, onRemoved }: { workflow: WorkflowList
         Remove <code className="font-mono break-all">{dir}</code>, {held}? A run started on it goes on from the steps it froze at its start;
         a card that names it and is not queued is refused when it starts.
       </p>
-      <Button variant="tonal" color="error" size="xsmall" onPress={() => remove.mutate()} isDisabled={remove.isPending}>
+      <Button
+        icon={remove.isPending ? Pending : undefined}
+        variant="tonal"
+        color="error"
+        size="xsmall"
+        onPress={() => remove.mutate()}
+        isDisabled={remove.isPending}
+      >
         {remove.isPending ? 'Removing…' : 'Remove'}
       </Button>
       <Button

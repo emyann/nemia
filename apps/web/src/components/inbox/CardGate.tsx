@@ -6,6 +6,7 @@ import { RouteLink } from '../agent/AgentParts';
 import { Refusal, useAsk } from '../gate/Ask';
 import { useApprove } from '../../lib/useApprove';
 import type { RunAt } from '@/lib/runNamespace';
+import { Pending } from '@/components/look';
 
 /**
  * What a card says once a person's word is taken there, the run's state it was taken in, and the state the answer moved it to once the
@@ -44,8 +45,7 @@ export function CardGate({
   onTaken: (taken: Taken) => void;
 }) {
   const approval = useApprove(run.id, gate.step, { namespace: run.namespace });
-  const line = gateCardLine(gate);
-  const read = readLink(gate);
+  const [line, read] = [gateCardLine(gate), readLink(gate)];
   const anchor = useRef<HTMLDivElement>(null);
   const [asked, setAsked] = useState<Asked | null>(null);
   const close = () => setAsked(null);
@@ -77,6 +77,7 @@ export function CardGate({
         <div ref={anchor} data-gate-answer={gate.step}>
           <SplitButton
             size="xsmall"
+            icon={approval.isPending ? Pending : undefined}
             onPress={() => (gate.ends ? setAsked('approve') : approve(''))}
             isDisabled={approval.isPending}
             menuLabel={`Other answers to ${gate.step}`}
@@ -229,7 +230,7 @@ function ApproveForm({
         onChange={setWords}
       />
       <div className="flex items-center gap-2">
-        <Button type="submit" size="xsmall" isDisabled={pending}>
+        <Button icon={pending ? Pending : undefined} type="submit" size="xsmall" isDisabled={pending}>
           {pending ? 'Approving…' : gate.ends ? `Run ${gate.step} now` : 'Approve'}
         </Button>
         <Button variant="text" size="xsmall" onPress={onCancel}>
@@ -290,7 +291,7 @@ function SendBackForm({
         </RadioGroup>
       )}
       <div className="flex items-center gap-2">
-        <Button type="submit" size="xsmall" isDisabled={pending || !message.trim()}>
+        <Button icon={pending ? Pending : undefined} type="submit" size="xsmall" isDisabled={pending || !message.trim()}>
           {pending ? 'Sending back…' : 'Send back'}
         </Button>
         <Button variant="text" size="xsmall" onPress={onCancel}>

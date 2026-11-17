@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Pending } from '@/components/look';
 import { Button, Select, SelectItem } from '@/components/ui/ds';
 import { fireAgent, hireAgent } from '../../lib/api/factories.ts';
 import { stepQuery, type PagePlace, type WorkflowStepPage } from '../../lib/api/workflows.ts';
@@ -63,7 +64,14 @@ function Hiring({ page, where, place }: { page: WorkflowStepPage; where: 'page' 
           <span className="text-muted-foreground">
             {factory} hires <AgentLink from={page.from} name={hired} place={place} className="text-foreground" /> into this step.
           </span>
-          <Button variant="outlined" size="xsmall" data-fire={hired} isDisabled={write.isPending} onPress={() => send({ kind: 'fire' })}>
+          <Button
+            variant="outlined"
+            size="xsmall"
+            icon={write.isPending ? Pending : undefined}
+            data-fire={hired}
+            isDisabled={write.isPending}
+            onPress={() => send({ kind: 'fire' })}
+          >
             Fire
           </Button>
         </p>
@@ -122,7 +130,13 @@ function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: bo
           />
         ))}
       </Select>
-      <Button data-hire className="mt-2" isDisabled={pending || picked === null} onPress={() => picked !== null && onHire(picked)}>
+      <Button
+        data-hire
+        className="mt-2"
+        icon={pending ? Pending : undefined}
+        isDisabled={pending || picked === null}
+        onPress={() => picked !== null && onHire(picked)}
+      >
         Hire
       </Button>
     </div>

@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page, Response } from 'playwright';
 import { LIST_PAGE } from 'objects';
 import { fed, openFold, partOf, photograph, stepBar, themeOf, isRunAction } from '../board.ts';
-import { cardOf, expectClearOfEachOther, showFinished } from '../canvas.ts';
+import { cardOf, expectClearOfEachOther, gateAnswer, gateApprove, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ENDING, FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -14,9 +14,9 @@ export default {
    * A gate answered on the Factory, from the floor as the grid lays it out: the ending's card says what approving does and where a
    * send-back goes, and answers it; the ending's inspector says it in full, first, with the facts to decide on, FAKE's run in flight on
    * main its branch collides with among them; the step not filed says so rather than a table of dashes. In a page of its own whose one
-   * refusal is the point, an approval made elsewhere first is refused; then the gate is approved on the card, confirmed, and sent back with
-   * words. The page takes each file back and lays the floor out again, each card still clear of the one beneath it, so each page after it
-   * reads the store and the floor as seeded.
+   * refusal is the point, an approval with words made elsewhere first is refused; then the gate is approved on the card, its Approve
+   * asking a second press at an ending, and sent back… with words from its split button's menu. The page takes each file back and lays
+   * the floor out again, each card still clear of the one beneath it, so each page after it reads the store and the floor as seeded.
    */
   name: 'factory-gate',
   route: '/factories/default',
@@ -27,7 +27,7 @@ export default {
       r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${ending}/approve`);
     const retried = (r: Response) => r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${back}/retry`);
     const lineOf = (p: Page) => cardOf(p, id).locator(`[data-gate-line="${ending}"]`);
-    const answerOf = (p: Page, label: 'Approve' | 'Send back') => cardOf(p, id).locator(`[data-answer="${label}"]`);
+    const approveOf = (p: Page) => gateApprove(cardOf(p, id));
     const approval = (p: Page) => p.getByRole('dialog', { name: `Approve ${ending}` });
     const runNow = (p: Page) => approval(p).getByRole('button', { name: `Run ${ending} now`, exact: true });
     await page.getByRole('button', { name: 'Reset layout' }).click();
@@ -49,14 +49,11 @@ export default {
       );
       await refused.goto(page.url(), { waitUntil: 'load' });
       await idle(refused);
-      await expectVisible(
-        answerOf(refused, 'Approve'),
-        'Approve on the card, on a page of its own that holds the list as the card read it',
-      );
+      await expectVisible(approveOf(refused), 'Approve on the card, on a page of its own that holds the list as the card read it');
       fs.mkdirSync(asks, { recursive: true });
       fs.writeFileSync(path.join(asks, `approve-${ending}-1`), JSON.stringify({ step: ending, try: 1, at: new Date().toISOString() }));
-      await answerOf(refused, 'Approve').click();
-      await expectVisible(approval(refused), 'Approve opens a popover to confirm it in');
+      await gateAnswer(refused, cardOf(refused, id), ending, 'Approve with words…');
+      await expectVisible(approval(refused), 'Approve with words… opens a popover to confirm it in');
       await approval(refused)
         .getByRole('textbox', { name: `Words to approve ${ending} with, if any` })
         .fill(ENDING.objection);
@@ -91,7 +88,7 @@ export default {
       fs.rmSync(asks, { recursive: true, force: true });
       await refused.close();
     }
-    await expectVisible(answerOf(page, 'Approve'), 'the gate is on the card again once the approval is taken back');
+    await expectVisible(approveOf(page), 'the gate is on the card again once the approval is taken back');
 
     await card.getByRole('button', { name: 'Show steps' }).click();
     const node = card.locator(`[data-tile="${ending}"]`);
@@ -144,10 +141,10 @@ export default {
     await inspector.getByRole('button', { name: 'Close', exact: true }).click();
     await card.getByRole('button', { name: 'Hide steps' }).click();
 
-    await answerOf(page, 'Approve').click();
+    await approveOf(page).click();
     await expectVisible(
       approval(page).getByText(`This runs ${ending} in the repository's own checkout on main, and it cannot be taken back.`),
-      'the popover says what approving runs',
+      'Approve at an ending is the first of two presses: its popover says what approving runs',
     );
     await settled(page);
     await photograph(page, path.join(OUT, `factory-gate-confirm-${await themeOf(page)}.png`), { fullPage: true });
@@ -166,15 +163,20 @@ export default {
       card.locator('[data-taken]', { hasText: `approved — the next pass files ${ending}` }),
       'the card says it is approved, and what comes next',
     );
-    await expectCount(answerOf(page, 'Approve'), 0, 'and offers the gate no more');
+    await expectCount(approveOf(page), 0, 'and offers the gate no more');
     await settled(page);
     await photograph(page, path.join(OUT, `factory-gate-approved-${await themeOf(page)}.png`), { fullPage: true });
     fs.rmSync(asks, { recursive: true, force: true });
     fed(id, ending, 'awaiting approval');
-    await expectVisible(answerOf(page, 'Approve'), 'with the approval taken back, the card offers the gate again');
+    await expectVisible(approveOf(page), 'with the approval taken back, the card offers the gate again');
     await expectCount(card.locator('[data-taken]'), 0, 'and says nothing of the answer taken back');
 
-    await answerOf(page, 'Send back').click();
+    await card.getByRole('button', { name: `Other answers to ${ending}`, exact: true }).click();
+    const answers = page.getByRole('menu');
+    await expectVisible(answers.getByRole('menuitem', { name: 'Approve with words…', exact: true }), 'the menu offers Approve with words…');
+    await settled(page);
+    await photograph(page, path.join(OUT, `factory-gate-menu-${await themeOf(page)}.png`), { fullPage: true });
+    await answers.getByRole('menuitem', { name: 'Send back…', exact: true }).click();
     const sending = page.getByRole('dialog', { name: `Send ${back} back` });
     const send = sending.getByRole('button', { name: 'Send back', exact: true });
     await expectVisible(send, `the popover sends it to ${back}`);
@@ -196,10 +198,7 @@ export default {
     await photograph(page, path.join(OUT, `factory-gate-sent-back-${await themeOf(page)}.png`), { fullPage: true });
     fs.rmSync(asks, { recursive: true, force: true });
     fed(id, ending, 'awaiting approval');
-    await expectVisible(
-      answerOf(page, 'Approve'),
-      'with the send-back taken back, the card offers the gate again, and the page ends as it began',
-    );
+    await expectVisible(approveOf(page), 'with the send-back taken back, the card offers the gate again, and the page ends as it began');
 
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);

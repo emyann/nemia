@@ -55,6 +55,24 @@ export const wordsSaying = (card: Locator, word: string): Locator =>
 /** A run's card on the Factory. */
 export const cardOf = (page: Page, id: string): Locator => page.locator(`.react-flow__node[data-id="${id}"]`);
 
+/**
+ * The main press of a card's gate, its split button's Approve, which approves with no words.
+ * @param card the run's card on the floor (`cardOf`)
+ */
+export const gateApprove = (card: Locator): Locator => card.getByRole('button', { name: 'Approve', exact: true });
+
+/**
+ * Choose one of a card's gate's other answers from its split button's menu, which opens that answer's form in a popover over the card.
+ * @param page the page the card is drawn on, where the menu is drawn
+ * @param card the run's card on the floor (`cardOf`)
+ * @param step the step that waits at the gate, which names the menu's button
+ * @param answer the item to choose
+ */
+export async function gateAnswer(page: Page, card: Locator, step: string, answer: 'Approve with words…' | 'Send back…'): Promise<void> {
+  await card.getByRole('button', { name: `Other answers to ${step}`, exact: true }).click();
+  await page.getByRole('menuitem', { name: answer, exact: true }).click();
+}
+
 /** Where a node is on its canvas, in the canvas's own units, whatever the zoom or the pan: where React Flow put it (`translate(x, y)`). */
 export const placeOf = (node: Locator): Promise<{ x: number; y: number }> =>
   node.evaluate((el) => {

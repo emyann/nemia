@@ -4,6 +4,11 @@ Of what you are told, your instructions are layer 1, the custom instructions 2, 
 
 add a flag
 
+## Gates after you
+
+This run waits on a person's approval (`nemia approve`) at `ship`, after you: a person reads the work there before it
+goes further.
+
 ## Before you sign off
 
 This must exit 0 in this workspace: `npm test && npm run typecheck && npm run lint`

@@ -2,7 +2,8 @@
  * A gate's pure facts, as tables: which steps a run is gated at (`gatesOf`, `hasGate`), the approval of the try a step is on
  * (`approvalOf`) and those it is past (`spentApprovals`), whether a step's task stays held open for a person's word (`holdsOpen`,
  * `holdsOpenOn`), what `--gate` and a card's `gate:` refuse (`gateRefusal`), what `nemia approve` refuses (`approvalRefusal`,
- * `approvalWordsRefusal`) and what `nemia decide` prints under a gated step (`gateLines`). The functions of `status/`, `ending/` and
+ * `approvalWordsRefusal`), what `nemia decide` prints under a gated step (`gateLines`) and what a step's brief says of the gates after it
+ * (`gatesAfterSection`). The functions of `status/`, `ending/` and
  * `brief/` that a gate turns on are held here, beside the verb that reads them; a gate on disk is `test/gate.test.ts`.
  */
 import { test } from 'node:test';
@@ -24,6 +25,7 @@ import {
   type TaskPhase,
 } from '../run.ts';
 import type { Closeout } from '../closeout/closeout.ts';
+import { gatesAfterSection } from '../brief/brief-sections.ts';
 import type { RetryAsk } from '../retry/retry-ask.ts';
 import type { StepSpec } from '../workflow.ts';
 import { names, phases, run, step } from '../../test/assessed.ts';
@@ -65,6 +67,27 @@ test('gatesOf, hasGate', async (t) => {
   });
   await t.test('a step neither gates is not gated', () => {
     assert.equal(hasGate(steps[1], { gates: ['plan'] }), false);
+  });
+});
+
+/** `implement → review → land`, as quick is: land gated by the run alone. */
+const QUICK: StepSpec[] = [step('implement'), step('review', ['implement']), step('land', ['review'])];
+
+test("gatesAfterSection: a step is told the gates after it, the run's own and its workflow's", async (t) => {
+  const named = (section: string): string[] => [...section.matchAll(/`([a-z]+)`/g)].map((m) => m[1] ?? '').filter((n) => n !== 'nemia');
+  await t.test('a run started with `--gate land` tells each step before land of it', () => {
+    for (const s of QUICK.slice(0, 2)) assert.deepEqual(named(gatesAfterSection(s, { gates: ['land'] }, QUICK)), ['land'], s.name);
+  });
+  await t.test('a run gated nowhere after the step tells it nothing', () => {
+    assert.equal(gatesAfterSection(QUICK[1], {}, QUICK), '');
+    assert.equal(gatesAfterSection(QUICK[1], { gates: [] }, QUICK), '');
+  });
+  await t.test('nor of a gate at the step itself, or before it', () => {
+    assert.equal(gatesAfterSection(QUICK[1], { gates: ['implement', 'review'] }, QUICK), '');
+  });
+  await t.test("the workflow's own `gate: true` after the step, in the order the steps run", () => {
+    const gated: StepSpec[] = [step('plan'), { ...step('implement', ['plan']), gate: true }, step('review', ['implement'])];
+    assert.deepEqual(named(gatesAfterSection(gated[0], { gates: ['review'] }, gated)), ['implement', 'review']);
   });
 });
 

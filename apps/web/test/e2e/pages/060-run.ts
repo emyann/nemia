@@ -170,6 +170,8 @@ export default {
       `Try again for ${FAKE.refused}, whose check refused, in its part`,
     );
     await expectVisible(again.getByRole('radio', { name: /^its check again/ }), 'its check run again as an option');
+    await photograph(answer, path.join(OUT, `run-answer-offer-${await themeOf(page)}.png`));
+    await photograph(again, path.join(OUT, `run-try-again-offer-${await themeOf(page)}.png`));
     await expectCount(decide.locator('[data-offer]'), 0, "the Decide section holds no answer: each is in its step's part");
 
     const tokens = partOf(page, FAKE.unverified);

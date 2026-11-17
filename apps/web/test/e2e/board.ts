@@ -115,14 +115,17 @@ export async function pick(page: Page, choice: string): Promise<void> {
 }
 
 /**
- * Opens the kit's Select `select`, its root as the page marks it, and picks the option said `word` among its options.
+ * Opens the kit's Select `select`, its root as the page marks it, picks the option said `word` among its options, and waits for its
+ * menu to leave the page, so the next Select opened finds its own menu alone.
  * @param page The page the Select's options open over.
  * @param select The Select's root.
  * @param word The option's words.
  */
 export async function pickIn(page: Page, select: Locator, word: string): Promise<void> {
   await select.locator('[data-slot="select-trigger"]').click();
-  await page.locator('[data-slot="select-popover"]').getByRole('option', { name: word, exact: true }).click();
+  const menu = page.locator('[data-slot="select-popover"]');
+  await menu.getByRole('option', { name: word, exact: true }).click();
+  await menu.waitFor({ state: 'detached' });
 }
 
 /**

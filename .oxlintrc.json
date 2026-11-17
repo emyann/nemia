@@ -499,7 +499,7 @@
     {
       "files": ["apps/web/src/components/run/PruneRun.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 94, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 85, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -526,12 +526,6 @@
       "files": ["apps/web/src/components/agent/SkillForm.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 111, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["apps/web/src/components/run/StartRun.tsx"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 87, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

@@ -12,14 +12,12 @@ import { container } from '@/lib/meaning';
 import { runAsksOf, type RunAsk } from '@/lib/runAsks';
 import type { RunDetail } from '@/lib/runView';
 import { setTry } from '@/lib/tryAddress';
-import { cn, focusRing } from '@/components/ui/ds/utils';
+import { Pressable } from '@/components/ui/ds';
+import { cn } from '@/components/ui/ds/utils';
 import { TextLink } from '../look';
 import { Decide } from '../gate/Decide';
 import { Fold } from '../step/part/Fold';
 import { RunWait } from './RunWait';
-
-/** How a line points to its step: underlined, in the line's ink. */
-const POINT = cn('rounded-sm underline underline-offset-2', focusRing());
 
 /**
  * The link of a line to the step `step`: on the run's page, the step's part (`#step-<name>`), showing its current try, the one that asks;
@@ -28,9 +26,9 @@ const POINT = cn('rounded-sm underline underline-offset-2', focusRing());
 function ToStep({ run, step, onStep, children }: { run: string; step: string; onStep?: (step: string) => void; children: ReactNode }) {
   if (onStep)
     return (
-      <button type="button" data-ask-link={step} className={POINT} onClick={() => onStep(step)}>
+      <Pressable data-ask-link={step} className="inline rounded-sm underline underline-offset-2" onPress={() => onStep(step)}>
         {children}
-      </button>
+      </Pressable>
     );
   return (
     <TextLink

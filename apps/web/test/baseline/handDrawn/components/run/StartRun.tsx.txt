@@ -1,3 +1,0 @@
-apps/web/src/components/run/StartRun.tsx#<textarea>
-apps/web/src/components/run/StartRun.tsx#<button>
-apps/web/src/components/run/StartRun.tsx#<input type="checkbox">

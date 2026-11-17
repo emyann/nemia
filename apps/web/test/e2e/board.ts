@@ -432,12 +432,16 @@ export const filesIn = (dir: string): Array<[string, string]> =>
     .sort()
     .map((name) => [name, fs.statSync(path.join(dir, name)).isFile() ? fs.readFileSync(path.join(dir, name), 'utf8') : '(a folder)']);
 
-/** A text's markdown, rendered: its `##` a heading two levels down, an h4 — the page's own are h1 and h2 — and its list, a list. */
+/**
+ * A text's markdown, rendered: its `##` a heading two levels down, an h4 — the page's own are h1 and h2 — or at `level` where the page
+ * places the text's shallowest heading itself, and its list, a list.
+ */
 export async function expectRendered(
   body: Locator,
   text: { heading: string; items: readonly string[]; cells?: readonly string[]; code?: string },
+  level = 4,
 ): Promise<void> {
-  await expectVisible(body.getByRole('heading', { level: 4, name: text.heading }), `its ## is a heading, an h4 (${text.heading})`);
+  await expectVisible(body.getByRole('heading', { level, name: text.heading }), `its ## is a heading, an h${level} (${text.heading})`);
   await expectTexts(body.locator('ul > li'), text.items, `its list is a list (${text.items.join(' · ')})`);
   for (const cell of text.cells ?? [])
     await expectVisible(body.getByRole('cell', { name: cell, exact: true }), `its table is a table, with a cell ${cell}`);

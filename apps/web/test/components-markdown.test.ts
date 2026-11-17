@@ -149,6 +149,20 @@ test('given a level, `#` is drawn as that heading and deeper ones follow it, siz
   assert.match(md('# A\n## B'), /<h3[^>]*>A<\/h3>\s*<h4[^>]*>B<\/h4>/, 'without a level, `#` is an h3');
 });
 
+test("given `top`, the text's shallowest heading is drawn at the level, whatever it is written as, deeper ones following and sized as written", () => {
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const under = renderToStaticMarkup(createElement(Markdown, { level: 3, top: true, children: '### A\n#### B\n### C' }));
+  assert.match(
+    under,
+    /<h3[^>]*>A<\/h3>\s*<h4[^>]*>B<\/h4>\s*<h3[^>]*>C<\/h3>/,
+    'a `###` stands at the level, with nothing skipped above it',
+  );
+  assert.doesNotMatch(under, /text-\[1\.15em\]/, 'its size is still a `###`');
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const hashed = renderToStaticMarkup(createElement(Markdown, { level: 4, top: true, children: '# A\n## B' }));
+  assert.match(hashed, /<h4[^>]*>A<\/h4>\s*<h5[^>]*>B<\/h5>/, 'a text that writes a `#` is drawn as without `top`');
+});
+
 test('a code block keeps its lines as written: a long one scrolls inside the block, never wraps', () => {
   const html = md('```\n' + 'x'.repeat(300) + '\n```');
   const block = /<div class="([^"]*)" data-language="text"/.exec(html);

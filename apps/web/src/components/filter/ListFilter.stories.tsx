@@ -28,7 +28,7 @@ export const Empty: Story = {
   play: async ({ canvasElement, userEvent }) => {
     const part = within(canvasElement);
     const field = part.getByRole('searchbox', { name: 'Filter workflows' });
-    await expect(part.queryByRole('button', { name: 'Clear search' })).not.toBeVisible();
+    await expect(part.queryByRole('button', { name: 'Clear search' })).toBeNull();
     await userEvent.type(field, 'dev');
     await expect(field).toHaveValue('dev');
   },

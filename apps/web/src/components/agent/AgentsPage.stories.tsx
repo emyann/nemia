@@ -54,8 +54,8 @@ export const Filtered: Story = {
     await expect(canvasElement.querySelector('[data-skill-row="write-a-note"]')).toBeNull();
     await expect(page.queryByRole('region', { name: 'Yours' })).toBeNull();
     await userEvent.clear(page.getByRole('searchbox', { name: 'Filter agents and skills' }));
-    await userEvent.type(page.getByRole('searchbox', { name: 'Filter agents and skills' }), 'NOTES');
-    await expect(args.onQuery).toHaveBeenLastCalledWith('NOTES');
+    await userEvent.type(page.getByRole('searchbox', { name: 'Filter agents and skills' }), 'NOTE');
+    await expect(args.onQuery).toHaveBeenLastCalledWith('NOTE');
     await expect(page.getByRole('region', { name: 'Yours' })).toBeVisible();
     await expect(canvasElement.querySelector('[data-skill-row="write-a-note"]')).not.toBeNull();
     await expect(canvasElement.querySelector('[data-skill-row="grill-me"]')).toBeNull();

@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, waitFor, within } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
 import { storeQuery } from '@/lib/api/store';
 import { workflowsQuery, type WorkflowListing } from '@/lib/api/workflows';
@@ -51,7 +51,7 @@ export const Filtered: Story = {
   args: { query: 'INTENT' },
   play: async ({ canvasElement, args, userEvent }) => {
     const page = within(canvasElement);
-    await expect(await page.findByRole('region', { name: 'Workflow build' })).toBeVisible();
+    await waitFor(() => expect(page.getByRole('region', { name: 'Workflow build' })).toBeVisible());
     await expect(page.queryByRole('region', { name: 'Workflow quick' })).toBeNull();
     const field = page.getByRole('searchbox', { name: 'Filter workflows' });
     await userEvent.clear(field);

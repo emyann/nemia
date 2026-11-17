@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, waitFor, within } from 'storybook/test';
 import { agentSourcesQuery, libraryQuery, type LibraryItem } from '@/lib/api/storeLibrary';
 import { seeded } from '../../../.storybook/fixtures/proposals';
 import { LibraryPage } from './LibraryPage';
@@ -61,7 +61,7 @@ export const Filtered: Story = {
   args: { query: 'notes' },
   play: async ({ canvasElement, args, userEvent }) => {
     const page = within(canvasElement);
-    await expect(await page.findByRole('region', { name: 'Skills' })).toBeVisible();
+    await waitFor(() => expect(page.getByRole('region', { name: 'Skills' })).toBeVisible());
     await expect(page.getByRole('region', { name: 'Agents' })).toBeVisible();
     await expect(page.queryByRole('region', { name: 'MCP servers' })).toBeNull();
     await expect(page.queryByRole('region', { name: 'Workflows' })).toBeNull();
@@ -79,7 +79,7 @@ export const NothingMatches: Story = {
   args: { query: 'zzz' },
   play: async ({ canvasElement, args, userEvent }) => {
     const page = within(canvasElement);
-    await expect(await page.findByText('zzz')).toBeVisible();
+    await waitFor(() => expect(page.getByText('zzz')).toBeVisible());
     await userEvent.click(page.getByRole('button', { name: 'Clear the filter' }));
     await expect(args.onQuery).toHaveBeenLastCalledWith('');
     await expect(page.getByRole('region', { name: 'Workflows' })).toBeVisible();

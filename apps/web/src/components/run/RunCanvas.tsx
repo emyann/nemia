@@ -26,6 +26,7 @@ import { useCanvasPress } from '../../lib/useCanvasPress';
 import { useFrameSize } from '../../lib/useFrameSize';
 import { FLOOR_BOX } from '../../lib/classes';
 import { cn } from '../../lib/utils';
+import { Button } from '@/components/ui/ds';
 import { CanvasLegend } from '../step/CanvasLegend';
 import { StateEdge } from '../step/StateEdge';
 import { stepData, stepEdges, stepMinimapFill } from '../step/stepGraph';
@@ -63,9 +64,6 @@ function useRefit(frame: RefObject<HTMLDivElement | null>, resets: number, flow:
     void flow.fitView({ ...FIT, duration: 300 });
   }, [resets, flow]);
 }
-
-const button =
-  'rounded border border-outline bg-card px-2 py-1 text-body-small text-foreground shadow-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-card';
 
 /**
  * The run as the graph it froze: a node per step, an edge per `after`, and the edge back that `loop:` makes — as the api's
@@ -137,18 +135,14 @@ function Buttons({ running, onReset }: { running: string[]; onReset: () => void 
   const focusRunning = () => void flow.fitView({ nodes: running.map((id) => ({ id })), padding: 0.5, maxZoom: 1.25, duration: 400 });
   return (
     <Panel position="top-right" className="flex gap-2">
-      <button type="button" className={button} onClick={onReset}>
+      <Button variant="elevated" size="xsmall" onPress={onReset}>
         Reset layout
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={focusRunning}
-        disabled={!running.length}
-        title={running.length ? undefined : 'No step is running'}
-      >
-        Focus running step
-      </button>
+      </Button>
+      <span title={running.length ? undefined : 'No step is running'}>
+        <Button variant="elevated" size="xsmall" onPress={focusRunning} isDisabled={!running.length}>
+          Focus running step
+        </Button>
+      </span>
     </Panel>
   );
 }

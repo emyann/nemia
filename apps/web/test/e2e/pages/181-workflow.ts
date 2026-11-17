@@ -186,7 +186,8 @@ export default {
         await form.getByRole('textbox', { name: 'Start a run' }).fill('Wait on a run that was called off');
         const pick = form.locator(`ul[aria-label="Runs to wait on"] input[type="checkbox"][value="${DIAMOND.cancelled.id}"]`);
         await expectVisible(pick, `${DIAMOND.cancelled.id} is offered to wait on`);
-        await pick.check();
+        await form.locator(`ul[aria-label="Runs to wait on"] li[data-run="${DIAMOND.cancelled.id}"] label`).click();
+        if (!(await pick.isChecked())) throw new Refused(`${DIAMOND.cancelled.id} is ticked once its row is pressed — it was not`);
         const [answered] = await Promise.all([
           refused.waitForResponse((r) => r.request().method() === 'POST' && isRunStart(new URL(r.url()).pathname), { timeout: WAIT_MS }),
           form.getByRole('button', { name: 'Start' }).click(),

@@ -1,10 +1,5 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckboxGroup, Dialog, DialogTrigger, Form, Heading, Label as AriaLabel, Popover, Text, TextField } from 'react-aria-components';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { putHold } from '../../lib/api/runs.ts';
 import type { RunView } from '../../lib/api/judged.ts';
 import { useRunNamespace } from '@/lib/runNamespace';
@@ -12,14 +7,12 @@ import type { RunDetail } from '../../lib/runView';
 import { titleOf } from '../../lib/factory';
 import { holdable, holdCandidates } from '../../lib/hold.ts';
 import { usePickerRuns } from '../../lib/pickerRuns.ts';
-import { cn } from '../../lib/utils';
 import { Refusal } from '../gate/Ask';
 import { ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
-import { POPOVER } from '../../lib/classes';
 import { Reading } from '@/components/look';
-import { Skeleton } from '@/components/ui/ds';
 import { ACTION_LABEL } from '@/lib/runActions';
+import { Body, Button, Checkbox, CheckboxGroup, Popover, PopoverTrigger, Skeleton, TextField, Title } from '@/components/ui/ds';
 
 /**
  * Hold, on a run's page: the button opens a popover where a person ticks the runs to wait on, or none, and may say why, and the hold is
@@ -31,16 +24,14 @@ import { ACTION_LABEL } from '@/lib/runActions';
 export function HoldRun({ run }: { run: RunDetail }) {
   if (!holdable(run)) return null;
   return (
-    <DialogTrigger>
-      <Button variant="outline" size="sm" data-hold-open>
+    <PopoverTrigger>
+      <Button variant="outlined" size="xsmall" data-hold-open>
         {ACTION_LABEL.hold}
       </Button>
-      <Popover placement="bottom end" offset={6} className={cn(POPOVER, 'w-96')}>
-        <Dialog aria-label={`Hold ${run.id}`} className="space-y-3 outline-none">
-          {({ close }) => <HoldQuestion run={run} onClose={close} />}
-        </Dialog>
+      <Popover aria-label={`Hold ${run.id}`} placement="bottom end" offset={6} className="w-96 space-y-3">
+        {({ close }) => <HoldQuestion run={run} onClose={close} />}
       </Popover>
-    </DialogTrigger>
+    </PopoverTrigger>
   );
 }
 
@@ -57,7 +48,7 @@ export function HoldQuestion({ run, onClose }: { run: Pick<RunView, 'id' | 'repo
         <div role="alert" data-hold-unread>
           <Refusal error={error} not="The runs to wait on could not be read" />
         </div>
-        <Button variant="ghost" size="sm" onPress={onClose}>
+        <Button variant="text" size="xsmall" onPress={onClose}>
           Close
         </Button>
       </div>
@@ -96,7 +87,7 @@ function HoldForm({ id, runs, older, onClose }: { id: string; runs: RunView[]; o
     },
   });
   return (
-    <Form
+    <form
       data-hold={id}
       className="space-y-3"
       onSubmit={(event) => {
@@ -104,11 +95,11 @@ function HoldForm({ id, runs, older, onClose }: { id: string; runs: RunView[]; o
         hold.mutate();
       }}
     >
-      <Heading slot="title" className="font-semibold">{`Hold ${id}`}</Heading>
-      <p className="text-body-small text-muted-foreground">
+      <Title size="small" component="h2">{`Hold ${id}`}</Title>
+      <Body size="small" colorRole="on-surface-variant">
         Nothing more of it is filed, and nothing is asked of you, until every run ticked has landed, or, with none ticked, until you lift
         the hold. What runs now finishes.
-      </p>
+      </Body>
       <WaitFor
         runs={runs}
         until={until}
@@ -120,6 +111,9 @@ function HoldForm({ id, runs, older, onClose }: { id: string; runs: RunView[]; o
         }}
       />
       <TextField
+        data-hold-why
+        label="Why (optional)"
+        placeholder="merge conflicts with the run it waits on"
         value={why}
         onChange={(value) => {
           setWhy(value);
@@ -127,25 +121,22 @@ function HoldForm({ id, runs, older, onClose }: { id: string; runs: RunView[]; o
         }}
         maxLength={200}
         isDisabled={hold.isPending}
-        className="flex flex-col gap-1"
-      >
-        <Label className="text-body-small">Why (optional)</Label>
-        <Input data-hold-why placeholder="merge conflicts with the run it waits on" />
-      </TextField>
+        className="w-full"
+      />
       {hold.isError && (
         <div role="alert" data-hold-refused>
           <Refusal error={hold.error} not="Not held" />
         </div>
       )}
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onPress={onClose} isDisabled={hold.isPending}>
+        <Button type="button" variant="outlined" size="xsmall" onPress={onClose} isDisabled={hold.isPending}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" isDisabled={hold.isPending}>
+        <Button type="submit" size="xsmall" isDisabled={hold.isPending}>
           {hold.isPending ? 'Holding…' : 'Hold'}
         </Button>
       </div>
-    </Form>
+    </form>
   );
 }
 
@@ -167,17 +158,23 @@ function WaitFor({
   onChange: (until: string[]) => void;
 }) {
   return (
-    <CheckboxGroup value={until} onChange={onChange} isDisabled={isDisabled} className="space-y-1.5">
-      <AriaLabel className="text-body-small font-medium">Wait for</AriaLabel>
-      {runs.length === 0 && older ? null : runs.length === 0 ? (
-        <Text slot="description" data-hold-none className="block text-body-small text-muted-foreground">
-          No other run of its repository may still land: it is held until you lift it.
-        </Text>
-      ) : (
-        <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
+    <CheckboxGroup
+      label="Wait for"
+      value={until}
+      onChange={onChange}
+      isDisabled={isDisabled}
+      supportingText={
+        runs.length === 0 && !older ? (
+          <span data-hold-none>No other run of its repository may still land: it is held until you lift it.</span>
+        ) : null
+      }
+      className="gap-1.5"
+    >
+      {runs.length > 0 && (
+        <div className="max-h-56 overflow-y-auto pr-1">
           {runs.map((r) => (
-            <Checkbox key={r.id} value={r.id} data-hold-run={r.id} className="items-start">
-              <span className="min-w-0">
+            <Checkbox key={r.id} value={r.id} data-hold-run={r.id} className="flex w-full">
+              <span className="min-w-0 flex-1">
                 <span className="block truncate text-body-small" title={titleOf(r)}>
                   {titleOf(r)}
                 </span>

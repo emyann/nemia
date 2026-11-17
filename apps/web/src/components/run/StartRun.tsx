@@ -11,7 +11,7 @@ import { usePickerRuns } from '../../lib/pickerRuns.ts';
 import { ContextPicker, ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
 import { Reading } from '@/components/look';
-import { Skeleton } from '@/components/ui/ds';
+import { Button, Checkbox, Skeleton, TextField } from '@/components/ui/ds';
 import { pastLimit, StartInputs } from './StartInputs';
 
 /**
@@ -91,7 +91,6 @@ export function StartRun({
       if (card) void queryClient.invalidateQueries({ queryKey: ['inbox'] });
     },
   });
-  const field = useId();
 
   return (
     <form
@@ -102,28 +101,21 @@ export function StartRun({
         start.mutate({ brief, after: afterFor(workflow, after), context, files: handed.files });
       }}
     >
-      <label htmlFor={field} className="block text-body-medium font-medium">
-        {card ? 'Brief' : 'Start a run'}
-      </label>
-      <textarea
-        id={field}
+      <TextField
+        multiline
+        label={card ? 'Brief' : 'Start a run'}
         value={brief}
-        onChange={(event) => setBrief(event.target.value)}
-        rows={card ? 5 : 3}
+        onChange={setBrief}
         placeholder="What to do: the brief each step is told, under “What was asked for”."
-        className="block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none"
+        className="w-full"
       />
       <StartInputs {...handed.drawn(start.isPending)} />
       {!inFolders && <AfterPicker selected={after} onChange={setAfter} repo={repo} />}
       <ContextPicker selected={context} onChange={setContext} />
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          disabled={!brief.trim() || start.isPending || handed.files.some(pastLimit)}
-          className="rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
-        >
+        <Button type="submit" size="xsmall" isDisabled={!brief.trim() || start.isPending || handed.files.some(pastLimit)}>
           {startWords(start.isPending, handed.files.length, handed.sent)}
-        </button>
+        </Button>
         <Where workflow={workflow} repo={repo} factory={place?.factory} card={!!card} />
       </div>
       {start.isSuccess && <StartedLine id={start.data.id} after={start.variables.after} />}
@@ -268,22 +260,22 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
         <ul aria-label="Runs to wait on" className="max-h-44 divide-y divide-outline-variant overflow-y-auto rounded border border-outline">
           {onRepo.map((run) => (
             <li key={run.id} data-run={run.id}>
-              <label className="flex cursor-pointer items-baseline gap-2 px-2 py-1 text-body-medium hover:bg-accent">
-                <input
-                  type="checkbox"
-                  value={run.id}
-                  checked={selected.includes(run.id)}
-                  onChange={(event) => onChange(event.target.checked ? [...selected, run.id] : selected.filter((id) => id !== run.id))}
-                  className="translate-y-0.5 self-start"
-                />
-                <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={titleOf(run)}>
-                  {titleOf(run)}
+              <Checkbox
+                value={run.id}
+                isSelected={selected.includes(run.id)}
+                onChange={(checked) => onChange(checked ? [...selected, run.id] : selected.filter((id) => id !== run.id))}
+                className="flex w-full cursor-pointer px-2 hover:bg-accent"
+              >
+                <span className="flex min-w-0 flex-1 items-baseline gap-2 text-body-medium">
+                  <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={titleOf(run)}>
+                    {titleOf(run)}
+                  </span>
+                  <span className="hidden shrink-0 font-mono text-body-small text-muted-foreground @md/page:inline">{run.id}</span>
+                  <span data-standing className="shrink-0 text-body-small text-muted-foreground" title={run.waiting?.advice}>
+                    {standingOf(run)}
+                  </span>
                 </span>
-                <span className="hidden shrink-0 font-mono text-body-small text-muted-foreground @md/page:inline">{run.id}</span>
-                <span data-standing className="shrink-0 text-body-small text-muted-foreground" title={run.waiting?.advice}>
-                  {standingOf(run)}
-                </span>
-              </label>
+              </Checkbox>
             </li>
           ))}
         </ul>

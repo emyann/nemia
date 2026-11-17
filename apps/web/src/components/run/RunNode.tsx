@@ -3,8 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { ChevronRight } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
+import { Card, IconButton, Tag } from '@/components/ui/ds';
 import { decisionQuery } from '@/lib/api/decision';
 import type { RunView } from '@/lib/api/judged';
 import { judged, type RunRow, type UnjudgedRun } from '@/lib/api/judged';
@@ -83,9 +82,10 @@ export function RunNode({ data }: NodeProps<RunFlowNode>) {
 function UnjudgedCard({ run, inspected }: { run: UnjudgedRun; inspected: boolean }) {
   return (
     <Card
-      size="sm"
+      variant="outlined"
       {...(inspected && { 'data-inspected': true as const })}
-      className={`w-fit flex-row items-start gap-0 shadow-sm transition-opacity ${inspected ? 'ring-2 ring-ring' : ''}`}
+      className={`w-fit shadow-sm transition-opacity ${inspected ? 'ring-2 ring-ring' : ''}`}
+      classNames={{ content: 'flex-row items-start gap-0 px-0 py-3' }}
     >
       <div className="flex w-88 shrink-0 flex-col gap-3">
         <div className="min-w-0 px-3">
@@ -104,9 +104,9 @@ function UnjudgedCard({ run, inspected }: { run: UnjudgedRun; inspected: boolean
         </div>
         <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t px-3 pt-2">
           <span className="ml-auto flex items-center gap-1">
-            <Badge variant="outline" data-unreadable title={run.unjudged} className="border-failure text-failure">
+            <Tag variant="outlined" data-unreadable title={run.unjudged} className="border-failure text-failure">
               unreadable
-            </Badge>
+            </Tag>
           </span>
         </div>
       </div>
@@ -216,19 +216,16 @@ function DecideLine({ run, said, branches }: { run: RunView; said: string; branc
  */
 function Chevron({ run, open, onToggle }: { run: RunView; open: boolean; onToggle: (runId: string) => void }) {
   return (
-    <button
-      type="button"
+    <IconButton
+      icon={ChevronRight}
+      variant="standard"
+      size="xsmall"
       aria-expanded={open}
       aria-label={open ? 'Hide steps' : 'Show steps'}
-      title={open ? 'Hide its steps' : 'Open its steps'}
-      onClick={(event) => {
-        event.stopPropagation();
-        onToggle(run.id);
-      }}
-      className="nodrag relative z-10 -mr-1.5 shrink-0 rounded p-0.5 text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface"
-    >
-      <ChevronRight aria-hidden className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
-    </button>
+      onPress={() => onToggle(run.id)}
+      className="nodrag relative z-10 -mr-1.5 h-6 w-6 shrink-0 before:h-6 before:w-6"
+      classNames={{ icon: `size-4 transition-transform ${open ? 'rotate-180' : ''}` }}
+    />
   );
 }
 
@@ -276,23 +273,23 @@ function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolea
     <span className="ml-auto flex flex-wrap items-center justify-end gap-1 empty:hidden">
       {run.try && <TryTag agent={run.try.agent} />}
       {run.context.length > 0 && (
-        <Badge variant="outline" data-context title={reads.join('\n')} className="text-muted-foreground">
+        <Tag variant="outlined" data-context title={reads.join('\n')} className="text-muted-foreground">
           ⧉ reads {run.context.length} {run.context.length === 1 ? 'run' : 'runs'}
-        </Badge>
+        </Tag>
       )}
-      {decide && <Badge className="bg-yours text-on-yours">to decide</Badge>}
-      {waitsOnYou(run) && <Badge className="bg-yours-container text-on-yours-container">waiting on you</Badge>}
+      {decide && <Tag className="bg-yours text-on-yours">to decide</Tag>}
+      {waitsOnYou(run) && <Tag className="bg-yours-container text-on-yours-container">waiting on you</Tag>}
       {run.holding && !cancelled && (
-        <Badge title={run.holding.advice} className="bg-rest text-on-rest">
+        <Tag title={run.holding.advice} className="bg-rest text-on-rest">
           held
-        </Badge>
+        </Tag>
       )}
       {run.holding && !cancelled && <CardLift id={run.id} namespace={namespaceOf(run.factory)} />}
-      {cancelled && <Badge variant="outline">{ENDED.cancelled.word}</Badge>}
+      {cancelled && <Tag variant="outlined">{ENDED.cancelled.word}</Tag>}
       {run.pruned && (
-        <Badge variant="outline" data-pruned title={run.pruned.said ?? ''} className="text-on-surface-variant">
+        <Tag variant="outlined" data-pruned title={run.pruned.said ?? ''} className="text-on-surface-variant">
           pruned
-        </Badge>
+        </Tag>
       )}
     </span>
   );

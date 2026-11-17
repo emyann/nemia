@@ -113,3 +113,29 @@ export const RunsOnTheFloor: Story = {
     await expect(underPanels, 'no card under a panel of the floor, once it is fitted').toEqual([]);
   },
 };
+
+/** A run the list could not judge, a task it reads having a journal that does not read. */
+const UNREADABLE = {
+  id: 'give-the-floor-a-legend-u7r2',
+  factory: FACTORY,
+  unjudged: "give-the-floor-a-legend-u7r2-implement's journal does not read: entry 5 is a `measured` event whose usage no runtime wrote",
+};
+
+/** A run whose record the list could not judge: a bare card, its id for its title, saying it is unreadable and why on hover. */
+export const AnUnreadableRun: Story = {
+  args: { open: { ...openRuns(0), counts: { waiting: 0, inFlight: 1, finished: 0 }, inFlight: [UNREADABLE] } },
+  beforeEach: () => {
+    forgetFactoryLayout();
+    return () => forgetFactoryLayout();
+  },
+  render: (args) => drawn(args, []),
+  play: async ({ canvasElement }) => {
+    const said = await waitFor(() => {
+      const found = canvasElement.querySelector('[data-unreadable]');
+      if (!found) throw new Error('the unreadable run is not drawn yet');
+      return found;
+    });
+    await expect(said.getAttribute('title')).toBe(UNREADABLE.unjudged);
+    await expect(canvasElement.querySelector('[data-slot="card"]')).not.toBeNull();
+  },
+};

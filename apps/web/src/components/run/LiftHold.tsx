@@ -1,14 +1,11 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button as AriaButton, Dialog, DialogTrigger, Heading, Popover } from 'react-aria-components';
-import { Button } from '@/components/ui/button';
+import { Body, Button, Popover, PopoverTrigger, Title } from '@/components/ui/ds';
 import { liftHold } from '../../lib/api/runs.ts';
-import { cn } from '../../lib/utils';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
 import { ACTION_LABEL } from '@/lib/runActions';
-import { BUTTON, BUTTON_SECONDARY, BUTTON_SMALL, POPOVER } from '../../lib/classes';
 
 /** What a lift does, said before the second press: the package's `unhold`, as the CLI's `hold <run> --off` runs it. */
 const LIFTS = 'It goes on at the next tick, and what its steps asked while it was held is asked again.';
@@ -46,12 +43,12 @@ export function LiftHold({ id, onClose }: { id: string; onClose?: () => void }) 
       {asking ? (
         <>
           {`Lift the hold on ${id}? ${LIFTS}`}
-          <Button variant="default" size="sm" onPress={() => lift.mutate()} isDisabled={lift.isPending}>
+          <Button size="xsmall" onPress={() => lift.mutate()} isDisabled={lift.isPending}>
             {lift.isPending ? 'Lifting…' : 'Lift'}
           </Button>
           <Button
-            variant="outline"
-            size="sm"
+            variant="outlined"
+            size="xsmall"
             onPress={() => {
               lift.reset();
               if (onClose) onClose();
@@ -63,7 +60,7 @@ export function LiftHold({ id, onClose }: { id: string; onClose?: () => void }) 
           </Button>
         </>
       ) : (
-        <Button variant="outline" size="sm" onPress={() => setAsking(true)}>
+        <Button variant="outlined" size="xsmall" onPress={() => setAsking(true)}>
           {ACTION_LABEL.lift}
         </Button>
       )}
@@ -88,16 +85,14 @@ export function CardLift({ id, namespace }: { id: string; namespace: string }) {
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
     >
-      <DialogTrigger>
-        <AriaButton data-lift={id} className={cn(BUTTON_SMALL, 'bg-card text-foreground ring-1 ring-outline ring-inset hover:bg-accent')}>
+      <PopoverTrigger>
+        <Button variant="outlined" size="xsmall" data-lift={id} className="h-6 px-2">
           Lift…
-        </AriaButton>
-        <Popover placement="bottom end" offset={6} className={POPOVER}>
-          <Dialog aria-label={`Lift the hold on ${id}`} className="space-y-2 outline-none">
-            {({ close }) => <LiftForm id={id} namespace={namespace} onClose={close} />}
-          </Dialog>
+        </Button>
+        <Popover aria-label={`Lift the hold on ${id}`} placement="bottom end" offset={6} className="w-72">
+          {({ close }) => <LiftForm id={id} namespace={namespace} onClose={close} />}
         </Popover>
-      </DialogTrigger>
+      </PopoverTrigger>
     </span>
   );
 }
@@ -107,20 +102,17 @@ function LiftForm({ id, namespace, onClose }: { id: string; namespace: string; o
   const lift = useLift(id, namespace, onClose);
   return (
     <div className="space-y-2">
-      <Heading slot="title" className="font-semibold">{`Lift the hold on ${id}?`}</Heading>
-      <p className="text-body-small text-muted-foreground">{LIFTS}</p>
+      <Title size="small" component="h2">{`Lift the hold on ${id}?`}</Title>
+      <Body size="small" colorRole="on-surface-variant">
+        {LIFTS}
+      </Body>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={() => lift.mutate()} disabled={lift.isPending} className={cn(BUTTON, 'px-2.5 py-1 text-body-small')}>
+        <Button size="xsmall" onPress={() => lift.mutate()} isDisabled={lift.isPending}>
           {lift.isPending ? 'Lifting…' : 'Lift'}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={lift.isPending}
-          className={cn(BUTTON, BUTTON_SECONDARY, 'px-2.5 py-1 text-body-small')}
-        >
+        </Button>
+        <Button variant="tonal" size="xsmall" onPress={onClose} isDisabled={lift.isPending}>
           Keep it
-        </button>
+        </Button>
       </div>
       {lift.isError && (
         <div role="alert" data-lift-refused>

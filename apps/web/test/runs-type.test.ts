@@ -86,9 +86,7 @@ const FILES = [
   'components/run/LiftHold.tsx',
   'components/run/PruneRun.tsx',
   'components/run/RemoveRun.tsx',
-  'components/agent/AgentForm.tsx',
   'components/agent/ContextPicker.tsx',
-  'components/agent/SkillPicker.tsx',
 ];
 
 /** The files a folder's door exports from, when `at` is a folder with a door (`index.ts`): each sibling it names, as a component's file. */

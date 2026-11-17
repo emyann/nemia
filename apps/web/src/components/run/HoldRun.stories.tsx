@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, waitFor, within } from 'storybook/test';
-import { HoldRun } from './HoldRun';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { HoldQuestion } from './HoldRun';
 import { noRuns, oneWaits } from '../../../.storybook/fixtures/runs';
 import { CODES, runOf, stepOf, tryOf } from '../../../.storybook/fixtures/steps';
 import { saysReading, Unread } from '../../../.storybook/unread';
@@ -8,42 +8,43 @@ import { saysReading, Unread } from '../../../.storybook/unread';
 /** A run at work, which a hold may hold. */
 const AT_WORK = runOf(stepOf(CODES.work, [tryOf(1, CODES.work, false, null)]));
 
-/** A run's Hold…: opened while the runs it may wait on are read, the shape of their list; once read, the runs to tick, and none. */
-const meta: Meta<typeof HoldRun> = {
+/**
+ * A run's Hold…, asked once its menu's press was made: while the runs it may wait on are read, the shape of their list; once read, the
+ * runs to tick, and none.
+ */
+const meta: Meta<typeof HoldQuestion> = {
   title: 'Run/HoldRun',
-  component: HoldRun,
-  args: { run: AT_WORK },
+  component: HoldQuestion,
+  args: { run: AT_WORK, onClose: fn() },
   render: (args) => (
     <Unread>
       <div style={{ width: 480, minHeight: 320 }}>
-        <HoldRun {...args} />
+        <HoldQuestion {...args} />
       </div>
     </Unread>
   ),
 };
 export default meta;
 
-/** Opened, the runs still read. */
+/** Asked, the runs still read. */
 export const Reading: StoryObj<typeof meta> = {
   play: async (context) => {
-    await userEvent.click(within(context.canvasElement).getByRole('button', { name: 'Hold…' }));
     await saysReading('Reading the runs to wait on…')(context);
   },
 };
 
 /** Hold…'s form, drawn whole with its reads answered (`parameters.msw`), not under `Unread`. */
-const answered = (args: { run: typeof AT_WORK }) => (
+const answered = (args: Parameters<typeof HoldQuestion>[0]) => (
   <div style={{ width: 480, minHeight: 520 }}>
-    <HoldRun {...args} />
+    <HoldQuestion {...args} />
   </div>
 );
 
-/** Opened on the runs of its repository: the runs to wait on, each a box to tick, one ticked, the why and Hold. */
+/** Asked on the runs of its repository: the runs to wait on, each a box to tick, one ticked, the why and Hold. */
 export const Picks: StoryObj<typeof meta> = {
   parameters: { msw: oneWaits },
   render: answered,
   play: async ({ canvasElement }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Hold…' }));
     const form = within(canvasElement.ownerDocument.body);
     const boxes = await waitFor(() => {
       const found = form.getAllByRole('checkbox');
@@ -57,12 +58,11 @@ export const Picks: StoryObj<typeof meta> = {
   },
 };
 
-/** Opened where no other run of its repository may still land: held until a person lifts it, which the form says. */
+/** Asked where no other run of its repository may still land: held until a person lifts it, which the form says. */
 export const NoneToWaitOn: StoryObj<typeof meta> = {
   parameters: { msw: noRuns },
   render: answered,
   play: async ({ canvasElement }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Hold…' }));
     await waitFor(() => expect(canvasElement.ownerDocument.body.querySelector('[data-hold-none]')).not.toBeNull());
     await expect(within(canvasElement.ownerDocument.body).queryAllByRole('checkbox')).toHaveLength(0);
   },

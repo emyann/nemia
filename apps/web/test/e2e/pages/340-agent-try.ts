@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, openFold, openRunMenu, photograph, runMenuActions, themeOf, isRunAction } from '../board.ts';
+import { askRunAction, fed, openFold, photograph, runMenuActions, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS, checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -242,8 +242,7 @@ export default {
       await idle(page);
       await settled(page);
       await photograph(page, path.join(OUT, `agent-try-run-${await themeOf(page)}.png`), { fullPage: true });
-      const menu = await openRunMenu(page);
-      await menu.getByRole('button', { name: 'Remove…' }).click();
+      const menu = await askRunAction(page, 'Remove…', `Remove ${id}`);
       const [removed] = await Promise.all([removal(page, id), menu.getByRole('button', { name: 'Remove', exact: true }).click()]);
       if (removed.status() !== 200) throw new Refused(`the api removes the try — it answered ${removed.status()}: ${await removed.text()}`);
       await page.waitForURL((url) => url.pathname === '/runs', { timeout: WAIT_MS });

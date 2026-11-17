@@ -582,12 +582,26 @@ export async function openFold(scope: Locator, name: string): Promise<Locator> {
   return fold;
 }
 
-/** The run page's menu of actions on `page`, opened: its one button pressed and the dialog that holds Remove, Hold or Lift, and Prune. */
+/** The run page's menu of actions on `page`, opened: its button pressed and the kit's menu that holds Remove, Hold or Lift, and Prune. */
 export async function openRunMenu(page: Page): Promise<Locator> {
-  const actions = page.locator('[data-run-actions]');
-  if (!(await actions.isVisible())) await page.locator('button[data-run-menu]').click();
-  await expectVisible(actions, "the run's menu opens on its actions");
-  return actions;
+  const menu = page.getByRole('menu', { name: /^Actions on / });
+  if (!(await menu.isVisible())) await page.locator('button[data-run-menu]').click();
+  await expectVisible(menu, "the run's menu opens on its actions");
+  return menu;
+}
+
+/**
+ * The question the run page's action `label` asks (`Remove…`, `Hold…`, `Lift…`, `Prune…`), opened: the menu opened, its item pressed, and
+ * the dialog named `asked` that opens beside the menu's button once the menu closes.
+ * @param page The run's page.
+ * @param label What the action's item says.
+ * @param asked The name the question's dialog is given (`Hold <run>`, `Lift the hold on <run>`).
+ */
+export async function askRunAction(page: Page, label: string, asked: string): Promise<Locator> {
+  await (await openRunMenu(page)).getByRole('menuitem', { name: label, exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: asked });
+  await expectVisible(dialog, `${label} asks its question once the menu closes`);
+  return dialog;
 }
 
 /**

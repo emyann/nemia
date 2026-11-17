@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, openRunMenu, partOf, photograph, themeOf } from '../board.ts';
+import { askRunAction, fed, partOf, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard, wordsSaying } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
@@ -66,9 +66,8 @@ export default {
       await idle(page);
       const section = page.locator('section[aria-label="Held"]');
       await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${literal(word)}$`) }), `the run's page says ${word}`);
-      const menu = await openRunMenu(page);
-      await menu.getByRole('button', { name: 'Lift…', exact: true }).click();
-      await expectVisible(menu.getByText(`Lift the hold on ${id}?`), "the first press, in the run's menu, asks");
+      const menu = await askRunAction(page, 'Lift…', `Lift the hold on ${id}`);
+      await expectVisible(menu.getByText(`Lift the hold on ${id}?`), "the press in the run's menu asks");
       if (!fs.existsSync(hold)) throw new Refused('the first press lifts nothing: the hold is still on disk');
       await settled(page);
       await photograph(page, path.join(OUT, `lift-run-asking-${theme}.png`), { fullPage: true });

@@ -3,36 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { decisionQuery } from '../../lib/api/decision.ts';
 import { pruneRun } from '../../lib/api/runs.ts';
 import { runNamespace } from '@/lib/runNamespace';
-import type { RunDetail } from '../../lib/runView';
 import { decidableRun, decisionStamp } from '../../lib/decide';
-import { awaitingOf, firstChoice, prunable, pruneOffer, pruneQuestion, type PruneChoice, type PruneOffer } from '../../lib/prune.ts';
+import { awaitingOf, firstChoice, pruneOffer, pruneQuestion, type PruneChoice, type PruneOffer } from '../../lib/prune.ts';
 import { cn } from '../../lib/utils';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
 import { Reading, ReadingLines } from '@/components/look';
-import { Button, Popover, PopoverTrigger, Radio, RadioGroup, Skeleton, Title } from '@/components/ui/ds';
+import { Button, Radio, RadioGroup, Skeleton, Title } from '@/components/ui/ds';
 import { CHOICE } from '@/lib/classes';
-import { runActionsOf } from '@/lib/runActions';
-
-/**
- * Prune, on a finished repository run's page: the button opens a popover with a choice of what to give back — its worktrees; its files
- * too; and, for a run nobody decided, the same though its branch becomes the only copy of its work — and the prune is asked twice, the
- * second time in words that say what goes. The api prunes through the package's `prune`, as the CLI's `prune <run> --yes` does, and
- * refuses in its words, shown here. Nothing is offered where the package would prune nothing (`prunable`).
- */
-export function PruneRun({ run }: { run: RunDetail }) {
-  if (!prunable(run)) return null;
-  return (
-    <PopoverTrigger>
-      <Button variant="outlined" size="xsmall" data-prune-open>
-        {pruneLabel(run)}
-      </Button>
-      <Popover aria-label={`Prune ${run.id}`} placement="bottom end" offset={6} className="w-96 space-y-3">
-        {({ close }) => <PruneQuestion run={run} onClose={close} />}
-      </Popover>
-    </PopoverTrigger>
-  );
-}
 
 /** What of a run its prune's question reads: whether it may be decided, the stamp of its decision, and what it left on disk. */
 type PruneAsked = Parameters<typeof decisionStamp>[0] & Parameters<typeof pruneOffer>[0];
@@ -162,6 +140,3 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
     </div>
   );
 }
-
-/** What the prune's press says of `run`, as the list of its actions says it (`runActionsOf`). */
-const pruneLabel = (run: RunDetail): string => runActionsOf(run).find((action) => action.key === 'prune')?.label ?? '';

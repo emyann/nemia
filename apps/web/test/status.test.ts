@@ -441,7 +441,7 @@ test("the meanings of a state's colour: one thing each, read from the look's rol
             label: 'Held',
             wait: { runs: runs.slice(0, 1), word: 'held until a-1 lands', advice: 'lift it with hold --off', waitingOnYou: false },
           },
-          createElement(LiftHold, { id: 'r-1' }),
+          createElement(LiftHold, { id: 'r-1', onClose: () => {} }),
         ),
       );
       assert.match(held, /<section aria-label="Held"/);

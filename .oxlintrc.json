@@ -493,7 +493,7 @@
     {
       "files": ["apps/web/src/components/run/PruneRun.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 85, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 83, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -593,7 +593,7 @@
     {
       "files": ["apps/web/src/components/inbox/InboxPage.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 99, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 95, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

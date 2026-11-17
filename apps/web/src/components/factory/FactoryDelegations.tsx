@@ -267,21 +267,10 @@ function GrantFields({
 }
 
 /**
- * Why the agent typed is refused: it names none of the factory's `agents`, once they are read; undefined where it names one, or the field
- * is blank, or they are still out.
- * @param typed What the agent's field holds.
- * @param agents The factory's agents, undefined while their read is out.
- */
-export const agentRefusal = (typed: string, agents: readonly DelegableAgent[] | undefined): string | undefined => {
-  const name = typed.trim();
-  if (name === '' || agents === undefined || agents.some((a) => a.name === name)) return undefined;
-  return `This factory serves no agent named ${name}: pick one from the list.`;
-};
-
-/**
  * The agent a delegation names, in the kit's ComboBox: typing narrows the factory's agents, each named as the agents page names it (its
- * person, its role and its file's name), and a pick writes its file's name; a name that is no agent of the factory is refused under the
- * field when the form is sent.
+ * person, its role and its file's name), and a pick writes its file's name. A name typed that the list does not hold is kept and sent as
+ * it is: a delegation may name an agent the factory serves none of (the store's own, one of the person's library), and a refusal is the
+ * api's, shown under the form.
  */
 function AgentField({
   agents,
@@ -304,7 +293,6 @@ function AgentField({
       onChange={(key) => {
         if (key !== null) onAgent(String(key));
       }}
-      validate={({ inputValue }) => agentRefusal(inputValue, agents) ?? null}
       className="[--md3-field-notch:var(--background)]"
     >
       {(a) => (

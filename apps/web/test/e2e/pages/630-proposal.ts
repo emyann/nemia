@@ -226,19 +226,51 @@ async function listedOnPage(page: Page, name: string): Promise<void> {
 }
 
 /**
+ * The settings' agent field, centred in the window, with `text` typed in it: the window has finished its scroll before the list opens,
+ * since a scroll closes an open list.
+ * @param page The page on the factory's settings.
+ * @param text What is typed.
+ */
+async function agentTyped(page: Page, text: string): Promise<Locator> {
+  const field = page.locator('[data-delegation-form]').getByRole('combobox', { name: 'Agent' });
+  await idle(page);
+  await field.evaluate(async (input) => {
+    input.scrollIntoView({ block: 'center', behavior: 'instant' });
+    for (let frame = 0; frame < 2; frame++) await new Promise((next) => requestAnimationFrame(next));
+  });
+  await field.fill(text);
+  return field;
+}
+
+/**
+ * Her delegation, written through the factory's settings: `nemia` is no agent the factory serves, so the list holds nothing it names,
+ * and the name typed is written as it is.
+ */
+async function herDelegationWritten(page: Page): Promise<void> {
+  await goto(page, `/factories/${FACTORY}/settings`);
+  const form = page.locator('[data-delegation-form]');
+  await agentTyped(page, 'nemia');
+  await expectVisible(page.getByText('No matches'), 'the list holds no agent of the factory named so');
+  await settled(page);
+  await photograph(page, path.join(OUT, `proposal-delegation-unlisted-${await themeOf(page)}.png`));
+  await page.keyboard.press('Tab');
+  await form.locator('[data-delegation-resource="hires"]').click();
+  await form.locator('[data-delegation-verb="update"]').click();
+  await form.locator('[data-delegation-save]').click();
+  await expectVisible(
+    page.locator('[data-delegation="nemia"]').filter({ hasText: 'update hires, any name' }),
+    'her delegation, a name the list does not hold, is written as typed',
+  );
+}
+
+/**
  * On the settings, the form writes a delegation of the seeded agent, picked from the list its first letters narrow, over hires' updates; it
  * is listed, then removed.
  */
 async function delegated(page: Page): Promise<void> {
   await goto(page, `/factories/${FACTORY}/settings`);
   const form = page.locator('[data-delegation-form]');
-  const field = form.getByRole('combobox', { name: 'Agent' });
-  await idle(page);
-  await field.evaluate(async (input) => {
-    input.scrollIntoView({ block: 'center', behavior: 'instant' });
-    for (let frame = 0; frame < 2; frame++) await new Promise((next) => requestAnimationFrame(next));
-  });
-  await field.fill(AGENTS.seeded.name.slice(0, 3));
+  const field = await agentTyped(page, AGENTS.seeded.name.slice(0, 3));
   const option = page.getByRole('option').filter({ hasText: `· ${AGENTS.seeded.name}` });
   await expectVisible(option, "typing narrows the agent's list to the factory's agents it names");
   await settled(page);
@@ -287,8 +319,8 @@ async function ruleWritten(page: Page, control: Locator, method: 'PUT' | 'DELETE
 
 /**
  * Her policy on Nemia's settings: her proposed rule over FACTORY's proposals waits on a Confirm; confirmed, it is in force over proposals
- * with a Drop, and reads in force among what she proposed, once her delegation grants what it reaches; dropped, it is out of force again.
- * The folder of her rules is taken back.
+ * with a Drop, and reads in force among what she proposed, once her delegation, written through the factory's settings, grants what it
+ * reaches; dropped, it is out of force again. The folder of her rules is taken back.
  */
 async function ruledOverProposals(page: Page): Promise<void> {
   const auto = path.join(store!, 'auto');
@@ -299,9 +331,7 @@ async function ruledOverProposals(page: Page): Promise<void> {
   );
   const delegation = `/api/namespaces/${FACTORY}/delegations/nemia`;
   try {
-    const granted = await send(page, 'PUT', delegation, { rules: [{ resources: ['hires'], resourceNames: [], verbs: ['update'] }] });
-    if (granted !== 200)
-      throw new Refused(`the api writes her delegation, which a rule of hers needs to be confirmed — it answered ${granted}`);
+    await herDelegationWritten(page);
     await goto(page, '/settings');
     const part = page.locator('[data-nemia-section] [data-auto-rules]');
     const proposedRule = part.locator(`[data-auto-proposed="true"] [data-auto-proposal-rule="${PROPOSAL_RULE.id}"]`);

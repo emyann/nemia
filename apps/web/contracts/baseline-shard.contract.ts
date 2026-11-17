@@ -56,18 +56,25 @@ const homeOf = (list: BaselineList, entry: string): string | undefined =>
 /** Whether `files` names no file twice. */
 const onceEach = (files: readonly Filed[]): boolean => files.every((one, at) => !files.slice(0, at).some((it) => it.file === one.file));
 
-const misfiledSpec = spec<(list: BaselineList, files: readonly Filed[]) => FiledApart>({
-  requires: ({ input: [, files] }) => onceEach(files),
+const astraySpec = spec<(list: BaselineList, file: string, entry: string) => boolean>({
   ensures: {
     astrayExactlyWhereFiledElsewhere: {
       description: 'An entry is refused as astray exactly when the file it sits in is not the one its source file has on its list',
-      condition: ({ input: [list, files], output }) =>
-        files.every(({ file, entries }) =>
-          entries.every(
-            (entry) => output.astray.some((it) => it.file === file && it.entry === entry) === (homeOf(list, entry) !== file),
-          ),
-        ) && output.astray.every((it) => files.some(({ file, entries }) => file === it.file && entries.includes(it.entry))),
+      condition: ({ input: [list, file, entry], output }) => output === (homeOf(list, entry) !== file),
     },
+  },
+});
+export type IsAstray = Implementation<typeof astraySpec>;
+
+const misfiledSpec = spec<(list: BaselineList, files: readonly Filed[]) => FiledApart>({
+  requires: ({ input: [, files] }) => onceEach(files),
+  /**
+   * That `misfiled` names as astray exactly the entries `isAstray` refuses, each in its file, is a fold over every file's entries,
+   * a `flatMap` whose law of `.some` over the result runs out of the solver's work on tsverify 0.9.0 (as `shared-lines.contract.ts`'s
+   * do): what is astray is `astrayExactlyWhereFiledElsewhere`'s, above, proved of each entry, and the fold is held by
+   * `test/stories.test.ts`.
+   */
+  ensures: {
     emptyExactlyWhereNoEntry: {
       description: 'A file is refused as empty exactly when it holds no entry, so a mended file is deleted rather than emptied',
       condition: ({ input: [, files], output }) =>

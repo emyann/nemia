@@ -6,7 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Astray, BaselineList, Filed, Misfiled, ShardOf } from '../contracts/baseline-shard.contract.ts';
+import type { Astray, BaselineList, Filed, IsAstray, Misfiled, ShardOf } from '../contracts/baseline-shard.contract.ts';
 
 /** The baseline's lists, in the order the stories test holds them. */
 export const LISTS: readonly BaselineList[] = ['storyless', 'argless', 'secondSystem', 'handDrawn', 'a11yTodo'];
@@ -34,14 +34,22 @@ const homeOf = (list: BaselineList, entry: string): string | undefined =>
     : undefined;
 
 /**
+ * Whether `entry` sits astray in `file`: the file is not the one its source file has on `list`.
+ * @param list The list whose folder `file` is in.
+ * @param file The file the entry sits in, from the workspace root.
+ * @param entry The entry, one line of the file.
+ */
+export const isAstray: IsAstray = (list, file, entry) => homeOf(list, entry) !== file;
+
+/**
  * What a list's folder holds against its layout: each entry sitting in a file other than its own, and each file with no entry.
  * @param list The list whose folder `files` are.
  * @param files Each file of the list's folder, with its lines.
  */
 export const misfiled: Misfiled = (list, files) => ({
-  astray: files.flatMap(({ file, entries }) =>
-    entries.flatMap((entry): Astray[] => (homeOf(list, entry) === file ? [] : [{ file, entry }])),
-  ),
+  astray: files
+    .flatMap(({ file, entries }) => entries.map((entry): Astray => ({ file, entry })))
+    .filter(({ file, entry }) => isAstray(list, file, entry)),
   empty: files.filter(({ entries }) => entries.length === 0).map(({ file }) => file),
 });
 

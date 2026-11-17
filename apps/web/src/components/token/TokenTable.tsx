@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bot, UserRound } from 'lucide-react';
-import { Cell, Column, Row, Skeleton, Table, TableBody, TableHeader } from '@/components/ui/ds';
+import { Button, Cell, Column, Row, Skeleton, Table, TableBody, TableHeader } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
-import { Button } from '@/components/ui/button';
 import { CutFrame, CutPress, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, Reading } from '@/components/look';
 import { Refusal } from '@/components/gate/Ask';
 import { Instant } from '@/components/time/Instant';
@@ -35,7 +34,7 @@ function TokenRow({ token, onRetire, busy }: { token: Token; onRetire: (name: st
         <Instant at={token.createdAt} about="Minted" />
       </Cell>
       <Cell>
-        <Button variant="outline" size="sm" data-token-retire={token.name} isDisabled={busy} onPress={() => onRetire(token.name)}>
+        <Button variant="outlined" size="xsmall" data-token-retire={token.name} isDisabled={busy} onPress={() => onRetire(token.name)}>
           Retire
         </Button>
       </Cell>
@@ -65,7 +64,7 @@ function ConfirmRetire({
         <CutPress data-token-confirm-press isDisabled={pending} onPress={onConfirm}>
           {pending ? 'Retiring…' : `Retire ${name}`}
         </CutPress>
-        <Button variant="ghost" isDisabled={pending} onPress={onCancel}>
+        <Button variant="text" size="xsmall" isDisabled={pending} onPress={onCancel}>
           Cancel
         </Button>
       </div>

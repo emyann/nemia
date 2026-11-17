@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { CutField } from '@/components/look';
 import { checkSelector } from '@/lib/api/inbox';
 
@@ -50,7 +50,7 @@ export function SelectorField({
             onChange={(event) => setText(event.target.value)}
             className="min-w-0 flex-1 bg-transparent py-1.5 text-body-medium text-on-surface outline-none placeholder:text-on-surface-variant"
           />
-          <Button type="submit" size="sm" variant="secondary">
+          <Button type="submit" size="xsmall" variant="tonal">
             Filter
           </Button>
         </div>

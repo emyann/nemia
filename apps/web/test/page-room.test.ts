@@ -58,7 +58,7 @@ const KEPT: readonly Kept[] = [
   },
   {
     file: 'src/components/view/ViewerSheet.tsx',
-    token: 'data-[side=right]:sm:max-w-3xl',
+    token: 'sm:w-3xl',
     why: "A sheet portaled over the window, out of the page column: its width is the window's.",
   },
 ];

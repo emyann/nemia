@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { KeyRound } from 'lucide-react';
 import type { Pairing } from 'objects';
 import { CutField, CutFrame, CutPress, Reading, ReadingLines } from '@/components/look';
-import { Skeleton } from '@/components/ui/ds';
-import { Button } from '@/components/ui/button';
+import { Button, Skeleton } from '@/components/ui/ds';
 import { Instant } from '@/components/time/Instant';
 
 /** What the list is told to do: approve the pairing by the code typed, and what it says of one: being approved, approved, refused. */
@@ -58,14 +57,13 @@ function PendingPairing({ pairing, approves }: { pairing: Pairing; approves: App
           <CutPress type="submit" isDisabled={pending || code.trim() === ''}>
             {pending ? 'Approving…' : 'Approve'}
           </CutPress>
-          <Button variant="ghost" isDisabled={pending} onPress={() => setOpen(false)}>
+          <Button variant="text" size="xsmall" isDisabled={pending} onPress={() => setOpen(false)}>
             Cancel
           </Button>
         </form>
       ) : (
         <div>
-          <Button variant="outline" data-pairing-approve onPress={() => setOpen(true)}>
-            <KeyRound aria-hidden />
+          <Button variant="outlined" size="xsmall" icon={KeyRound} data-pairing-approve onPress={() => setOpen(true)}>
             Approve…
           </Button>
         </div>

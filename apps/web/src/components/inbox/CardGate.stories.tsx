@@ -10,6 +10,9 @@ const RUN = { id: 'ship-it-k2rq', namespace: 'nemia' };
 /** The ending `land`, which a send-back returns to `implement` or `review`. */
 const ENDING = { step: 'land', ends: true, back: ['implement', 'review'], onto: 'main' };
 
+/** A gate in the run's middle, `plan`, which a send-back asks again. */
+const MID = { step: 'plan', ends: false, back: ['plan'], onto: null };
+
 /** The approval's address, as the api serves it. */
 const APPROVE = '/api/namespaces/:namespace/runs/:name/steps/:step/approve';
 
@@ -20,8 +23,8 @@ const menuOf = async (canvasElement: HTMLElement, userEvent: { click: (element: 
 };
 
 /**
- * The gate on the Factory's card, one story a state: on the card, Approve pressed and taken, Approve refused, Approve with words… opened,
- * and Send back… opened on an ending that waits on two.
+ * The gate on the Factory's card, one story a state: on the card, its menu, Approve pressed at an ending and asking its second press,
+ * Approve pressed mid-run and taken or refused, Approve with words… opened, and Send back… opened on an ending that waits on two.
  */
 const meta: Meta<typeof CardGate> = {
   title: 'Factory/CardGate',
@@ -69,14 +72,28 @@ export const ApprovalAlone: Story = {
   },
 };
 
-/** Approve pressed: the approval is sent at once, with no words, and the card is told it was taken. */
-export const Approved: Story = {
+/** Approve pressed at an ending: the first of two presses, it opens the approval's form, which says what running it does. */
+export const ConfirmingAnEnding: Story = {
   args: { onTaken: fn() },
+  play: async ({ args, canvasElement, userEvent }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Approve' }));
+    const approval = await screen.findByRole('dialog', { name: 'Approve land' });
+    const asks = within(approval);
+    await waitFor(() => expect(asks.getByText(/cannot be taken back/)).toBeVisible());
+    await expect(asks.getByRole('button', { name: 'Run land now' })).toBeEnabled();
+    await expect(args.onTaken).not.toHaveBeenCalled();
+    atRest();
+  },
+};
+
+/** Approve pressed at a gate mid-run: the approval is sent at once, with no words, and the card is told it was taken. */
+export const Approved: Story = {
+  args: { gate: MID, title: 'plan waits on your approval', stamp: 'plan|1', onTaken: fn() },
   parameters: {
     msw: [
       http.post(APPROVE, ({ params }) =>
         HttpResponse.json(
-          { step: String(params.step), try: 1, at: '2026-11-17T10:00:00Z', message: null, file: 'approve-land-1' },
+          { step: String(params.step), try: 1, at: '2026-11-17T10:00:00Z', message: null, file: 'approve-plan-1' },
           { status: 202 },
         ),
       ),
@@ -90,15 +107,16 @@ export const Approved: Story = {
   },
 };
 
-/** Approve pressed and refused: the approval's form opens over the card to say the refusal in the api's words. */
+/** Approve pressed at a gate mid-run and refused: the approval's form opens over the card to say the refusal in the api's words. */
 export const ApprovalRefused: Story = {
+  args: { gate: MID, title: 'plan waits on your approval', stamp: 'plan|1' },
   parameters: {
-    msw: [http.post(APPROVE, () => HttpResponse.json({ error: 'land is not waiting at its gate' }, { status: 409 }))],
+    msw: [http.post(APPROVE, () => HttpResponse.json({ error: 'plan is not waiting at its gate' }, { status: 409 }))],
   },
   play: async ({ canvasElement, userEvent }) => {
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Approve' }));
-    const approval = await screen.findByRole('dialog', { name: 'Approve land' });
-    await waitFor(() => expect(within(approval).getByText('land is not waiting at its gate')).toBeVisible());
+    const approval = await screen.findByRole('dialog', { name: 'Approve plan' });
+    await waitFor(() => expect(within(approval).getByText('plan is not waiting at its gate')).toBeVisible());
     atRest();
   },
 };

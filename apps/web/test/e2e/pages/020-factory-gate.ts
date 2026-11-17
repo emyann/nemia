@@ -14,9 +14,9 @@ export default {
    * A gate answered on the Factory, from the floor as the grid lays it out: the ending's card says what approving does and where a
    * send-back goes, and answers it; the ending's inspector says it in full, first, with the facts to decide on, FAKE's run in flight on
    * main its branch collides with among them; the step not filed says so rather than a table of dashes. In a page of its own whose one
-   * refusal is the point, an approval with words made elsewhere first is refused; then the gate is approved on the card with words…,
-   * confirmed, and sent back… with words, each from its split button's menu. The page takes each file back and lays the floor out
-   * again, each card still clear of the one beneath it, so each page after it reads the store and the floor as seeded.
+   * refusal is the point, an approval with words made elsewhere first is refused; then the gate is approved on the card, its Approve
+   * asking a second press at an ending, and sent back… with words from its split button's menu. The page takes each file back and lays
+   * the floor out again, each card still clear of the one beneath it, so each page after it reads the store and the floor as seeded.
    */
   name: 'factory-gate',
   route: '/factories/default',
@@ -141,10 +141,10 @@ export default {
     await inspector.getByRole('button', { name: 'Close', exact: true }).click();
     await card.getByRole('button', { name: 'Hide steps' }).click();
 
-    await gateAnswer(page, card, ending, 'Approve with words…');
+    await approveOf(page).click();
     await expectVisible(
       approval(page).getByText(`This runs ${ending} in the repository's own checkout on main, and it cannot be taken back.`),
-      'the popover says what approving runs',
+      'Approve at an ending is the first of two presses: its popover says what approving runs',
     );
     await settled(page);
     await photograph(page, path.join(OUT, `factory-gate-confirm-${await themeOf(page)}.png`), { fullPage: true });
@@ -171,7 +171,12 @@ export default {
     await expectVisible(approveOf(page), 'with the approval taken back, the card offers the gate again');
     await expectCount(card.locator('[data-taken]'), 0, 'and says nothing of the answer taken back');
 
-    await gateAnswer(page, card, ending, 'Send back…');
+    await card.getByRole('button', { name: `Other answers to ${ending}`, exact: true }).click();
+    const answers = page.getByRole('menu');
+    await expectVisible(answers.getByRole('menuitem', { name: 'Approve with words…', exact: true }), 'the menu offers Approve with words…');
+    await settled(page);
+    await photograph(page, path.join(OUT, `factory-gate-menu-${await themeOf(page)}.png`), { fullPage: true });
+    await answers.getByRole('menuitem', { name: 'Send back…', exact: true }).click();
     const sending = page.getByRole('dialog', { name: `Send ${back} back` });
     const send = sending.getByRole('button', { name: 'Send back', exact: true });
     await expectVisible(send, `the popover sends it to ${back}`);

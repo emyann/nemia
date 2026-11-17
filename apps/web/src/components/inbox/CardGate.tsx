@@ -20,10 +20,11 @@ type Asked = 'approve' | 'send';
  * A gate on the Factory's card: what approving does and where a send-back goes, in one row whatever the names (`gateCardLine`), since a
  * card taller than its cell reaches over the card beneath it (`CELL_HEIGHT`) — cut short where the names are long and whole on hover and in
  * the inspector; a link to what is being approved, a page away, since a card has no room for a plan; and the answer beside it — the kit's
- * `SplitButton`, through the same api as the run page's gate (`useApprove`, `useAsk`). Its main press approves, with no words, as `nemia
- * approve` does; its menu holds Approve with words… and Send back…, each opening its form in a popover over the card. At an ending the
- * form's approval says what it runs (`Run ship now`), and a send-back needs words, as the CLI's `retry --message` does. A refusal shows in
- * the popover in the api's words, the words kept in the box: one of the main press opens the approval's form to say it.
+ * `SplitButton`, through the same api as the run page's gate (`useApprove`, `useAsk`). Its main press approves a gate mid-run at once, with
+ * no words, as `nemia approve` does; at an ending, which cannot be taken back, it is the first of two presses, as on the run's own gate:
+ * it opens the approval's form, which says what running it does (`endingWarning`) over `Run ship now`. Its menu holds Approve with words…
+ * and Send back…, each opening its form in a popover over the card; a send-back needs words, as the CLI's `retry --message` does. A
+ * refusal shows in the popover in the api's words, the words kept in the box: one of the main press opens the approval's form to say it.
  *
  * Clicks inside are the card's own: they neither toggle the card's steps nor drag it (`nodrag`), and the menu and the popovers, which React
  * draws outside the card, bubble through it as React does, so the stop is on the wrapper.
@@ -76,7 +77,7 @@ export function CardGate({
         <div ref={anchor} data-gate-answer={gate.step}>
           <SplitButton
             size="xsmall"
-            onPress={() => approve('')}
+            onPress={() => (gate.ends ? setAsked('approve') : approve(''))}
             isDisabled={approval.isPending}
             menuLabel={`Other answers to ${gate.step}`}
             items={[

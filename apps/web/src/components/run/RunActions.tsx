@@ -1,9 +1,9 @@
 import { useRef, useState, type PointerEvent, type ReactNode, type SyntheticEvent } from 'react';
-import { ContextMenu, Popover } from '@/components/ui/ds';
+import { ContextMenu } from '@/components/ui/ds';
 import type { RunView } from '@/lib/api/judged';
 import { runActionsOf, type RunAction } from '@/lib/runActions';
 import { cn } from '@/lib/utils';
-import { RunQuestion } from './RunMenu';
+import { QuestionPopover } from './RunMenu';
 
 /** A run found under what a menu was asked for on, and the element its question opens beside: its row, its card. */
 export type FoundRun = { run: RunView; at: Element };
@@ -13,14 +13,6 @@ export const LONG_PRESS_MS = 500;
 
 /** How far a finger may wander, in pixels, and still be resting: past it, it is panning or scrolling. */
 const SLOP = 10;
-
-/** The name each question's surface is given, as the run's page names it. */
-const ASKED: Record<RunAction, (id: string) => string> = {
-  remove: (id) => `Remove ${id}`,
-  lift: (id) => `Lift the hold on ${id}`,
-  hold: (id) => `Hold ${id}`,
-  prune: (id) => `Prune ${id}`,
-};
 
 /** A finger resting on the area: where it came down, its timer, whether the menu was opened for it. */
 type Press = { x: number; y: number; timer: number; fired: boolean };
@@ -78,8 +70,9 @@ function useLongPress() {
 
 /**
  * The actions of a run, opened where the run is listed, through the kit's `ContextMenu`: the same list as the run page's menu
- * (`runActionsOf`), and each, pressed, asks the question the page asks (`RunQuestion`) in a popover beside the run's row or card, every
- * write reading the run and the lists again (`runsMoved`). Nothing on screen says it is there: the run's page keeps its menu.
+ * (`runActionsOf`), and each, pressed, asks the question the page asks in the popover it asks it in (`QuestionPopover`), beside the
+ * run's row or card, every write reading the run and the lists again (`runsMoved`). Nothing on screen says it is there: the run's page
+ * keeps its menu.
  *
  * Opened by the pointer's secondary press, a long press on Android and the keyboard's menu key or Shift+F10 on what has the focus inside
  * it, which the kit gives; and a long press on iOS, which it adds (`useLongPress`). A press on what holds no run (`runOf` answers null), or
@@ -115,18 +108,7 @@ export function RunActions({
       <ContextMenu aria-label="Actions on the run" items={items} className={className}>
         {children}
       </ContextMenu>
-      <Popover
-        triggerRef={anchor}
-        isOpen={asked !== null}
-        onOpenChange={(open) => {
-          if (!open) setAsked(null);
-        }}
-        placement="bottom end"
-        aria-label={asked ? ASKED[asked.action](asked.run.id) : 'Actions on the run'}
-        className="max-h-[inherit] w-96 space-y-3 overflow-y-auto"
-      >
-        {asked && <RunQuestion run={asked.run} action={asked.action} onClose={() => setAsked(null)} />}
-      </Popover>
+      <QuestionPopover anchor={anchor} asked={asked} onClose={() => setAsked(null)} />
     </div>
   );
 }

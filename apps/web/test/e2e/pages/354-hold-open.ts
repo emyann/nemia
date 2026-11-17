@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { waitsOnYou } from '../../../src/lib/factory.ts';
-import { fed, openRunMenu, partOf, photograph, themeOf, isRunAction, rowsAnswered } from '../board.ts';
+import { askRunAction, fed, partOf, photograph, themeOf, isRunAction, rowsAnswered } from '../board.ts';
 import { cardOf, wordsSaying } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
@@ -34,8 +34,7 @@ export default {
     if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page puts one — ${hold} is there`);
 
     try {
-      await (await openRunMenu(page)).locator('[data-hold-open]').click();
-      const dialog = page.getByRole('dialog', { name: `Hold ${id}` });
+      const dialog = await askRunAction(page, 'Hold…', `Hold ${id}`);
       const put = dialog.getByRole('button', { name: 'Hold', exact: true });
       await expectVisible(put, 'the form offers Hold');
       if (await put.isDisabled()) throw new Refused('Hold is offered with no run ticked: the run is then held until a person lifts it');
@@ -72,9 +71,8 @@ export default {
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
 
-      const menu = await openRunMenu(page);
-      await menu.getByRole('button', { name: 'Lift…', exact: true }).click();
-      await menu.getByRole('button', { name: 'Lift', exact: true }).click();
+      const lift = await askRunAction(page, 'Lift…', `Lift the hold on ${id}`);
+      await lift.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(section, 0, 'the lift takes it back, and the page says no hold');
       if (fs.existsSync(hold)) throw new Refused(`the lift removed ${hold} — it is still there`);
       await expectVisible(approve, `and ${gated}'s Approve is offered again`);

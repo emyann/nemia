@@ -267,6 +267,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     memory: '4Gi',
     budget: '2.50',
     check: 'npm test && npm run typecheck',
+    checkMemory: '256Mi',
     checkFailurePolicy: '{ rules: [ { action: FailStep, onExitCodes: { operator: In, values: [78] } } ] }',
     retries: '1',
     gate: 'true',

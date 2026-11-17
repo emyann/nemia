@@ -17,7 +17,7 @@ async function expectDown(page: Parameters<PageSpec['expect']>[0], words: string
   if (!said.includes('Your factories still tick; gates still come to you. What you write waits for her.'))
     throw new Refused(`it says what still runs without her — it says ${JSON.stringify(said)}`);
   if (!said.includes(words)) throw new Refused(`and why she stopped (${words}) — it says ${JSON.stringify(said)}`);
-  const start = panel.locator('[data-chat-start]');
+  const start = panel.getByRole('link', { name: 'Start her session' });
   await expectTexts(start, ['Start her session'], 'and offers to start her session');
   if ((await start.getAttribute('href')) !== '/settings') throw new Refused('which leads to her settings, where her level is set');
   const placeholder = await chatFieldOf(page).getAttribute('placeholder');

@@ -253,7 +253,9 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
         ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
         ...(spec.labels !== undefined && Object.keys(spec.labels).length ? { labels: spec.labels } : {}),
         ...(spec.traceparent !== undefined ? { traceparent: spec.traceparent } : {}),
-        ...(spec.resources?.limits?.memory !== undefined ? { resources: spec.resources } : {}),
+        ...(spec.resources?.limits?.memory !== undefined || spec.resources?.requests?.memory !== undefined
+          ? { resources: spec.resources }
+          : {}),
       },
       spec.briefParts,
     )

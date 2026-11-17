@@ -6,9 +6,7 @@
  */
 import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import KitButton from '@/components/ui/ds/components/Button';
-import { PlusIcon } from '@/components/ui/ds/icons';
+import { Button, PlusIcon, Radio, RadioGroup, Select, SelectItem, Skeleton } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { factoryWorkflowsQuery, type Place, type WorkflowListing } from '@/lib/api/workflows';
 import { floorPlace, startRepo, whyNotStarted } from '@/lib/factories';
@@ -16,9 +14,7 @@ import { workflowKey } from '@/lib/inbox';
 import { useBar } from '@/lib/useBar';
 import { BarPanel } from '../frame/BarPanel';
 import { StartRun } from '../run/StartRun';
-import { FIELD } from '../workflow/WorkflowOptions';
 import { Reading, ReadingLines } from '@/components/look';
-import { Skeleton } from '@/components/ui/ds';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 const path = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
@@ -39,7 +35,7 @@ export function PaneStart({ name }: { name: string }) {
   const factory = startIn(factories.data, name);
   const expanded = open?.kind === 'start' && open.factory === factory;
   return (
-    <KitButton
+    <Button
       variant="tonal"
       icon={PlusIcon}
       data-pane-start
@@ -48,7 +44,7 @@ export function PaneStart({ name }: { name: string }) {
       className="w-full"
     >
       Start a run
-    </KitButton>
+    </Button>
   );
 }
 
@@ -147,11 +143,11 @@ export function FactoryChoice({ factories }: { factories: readonly Factory[] }) 
           {places.map(({ name, why }) => (
             <li key={name} data-start-factory={name} className="px-1 py-1">
               <Button
-                variant="ghost"
+                variant="text"
                 isDisabled={why !== null}
                 aria-describedby={why ? `${legend}-${name}` : undefined}
                 onPress={() => show({ kind: 'start', factory: name })}
-                className="h-auto w-full justify-start px-2 py-1"
+                className="w-full justify-start"
               >
                 {name}
               </Button>
@@ -194,35 +190,31 @@ function OnRepo({ place }: { place: { factory: string; repos: string[]; repo: st
 /** The start in `factory`, of `repos` repositories: the workflow picked by name, then the repository its wiring gives it. */
 function Unfixed({ factory, repos }: { factory: Factory; repos: number }) {
   const [picked, setPicked] = useState<string | null>(null);
-  const field = useId();
   const offered = factory.workflows ?? [];
   const on = picked === null ? null : startRepo(factory, picked);
   return (
     <>
       <div className="space-y-1.5">
-        <label htmlFor={field} className="block text-body-medium font-medium">
-          Workflow
-        </label>
         {offered.length === 0 ? (
-          <p data-no-workflow className="text-body-small text-yours">
-            The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
-          </p>
+          <>
+            <p className="text-body-medium font-medium">Workflow</p>
+            <p data-no-workflow className="text-body-small text-yours">
+              The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
+            </p>
+          </>
         ) : (
-          <select
-            id={field}
-            value={picked ?? ''}
-            onChange={(event) => setPicked(event.target.value)}
-            className={`${FIELD} @md/page:max-w-xs`}
+          <Select
+            label="Workflow"
+            placeholder="Pick what runs"
+            value={picked}
+            onChange={(key) => setPicked(key === null ? null : String(key))}
+            data-pick-workflow
+            className="@md/page:max-w-xs"
           >
-            <option value="" disabled>
-              Pick what runs
-            </option>
             {offered.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
+              <SelectItem key={name} id={name} label={name} />
             ))}
-          </select>
+          </Select>
         )}
         <p className="text-body-small text-muted-foreground">
           The factory {code(factory.name)} works on {repos} repositories: its wiring says which one each workflow runs on.
@@ -278,11 +270,13 @@ function Workflows({ place, only }: { place: Place; only?: string }) {
             No workflow the factory attaches is on {path(place.repo)}: attach one there{attach ? <> with {code(attach)}</> : null}.
           </p>
         ) : (
-          <ul className="divide-y divide-outline-variant rounded border border-outline">
-            {workflows.data.map((w) => (
-              <WorkflowRow key={workflowKey(w)} workflow={w} group={legend} picked={picked} onPick={setPicked} />
-            ))}
-          </ul>
+          <RadioGroup aria-labelledby={legend} value={picked} onChange={setPicked}>
+            <ul className="divide-y divide-outline-variant rounded border border-outline">
+              {workflows.data.map((w) => (
+                <WorkflowRow key={workflowKey(w)} workflow={w} />
+              ))}
+            </ul>
+          </RadioGroup>
         )}
       </fieldset>
       {workflow && <StartRun workflow={workflow} repo={place.repo} place={place} />}
@@ -290,34 +284,17 @@ function Workflows({ place, only }: { place: Place; only?: string }) {
   );
 }
 
-/** One workflow the factory offers, a radio in the group `group`: its name, whether it is yours, its description, why it cannot start. */
-function WorkflowRow({
-  workflow,
-  group,
-  picked,
-  onPick,
-}: {
-  workflow: WorkflowListing;
-  group: string;
-  picked: string | null;
-  onPick: (key: string) => void;
-}) {
+/** One workflow the factory offers, the kit's radio in its group: its name, whether it is yours, its description, why it cannot start. */
+function WorkflowRow({ workflow }: { workflow: WorkflowListing }) {
   const key = workflowKey(workflow);
   const why = whyNotStarted(workflow);
   return (
     <li data-workflow={key}>
-      <label
-        className={`flex items-baseline gap-2 px-2 py-1.5 text-body-medium ${why ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-accent'}`}
+      <Radio
+        value={key}
+        isDisabled={why !== null}
+        className={`flex w-full items-start gap-2 px-2 py-1.5 text-body-medium ${why ? 'cursor-not-allowed' : 'cursor-pointer'}`}
       >
-        <input
-          type="radio"
-          name={group}
-          value={key}
-          checked={picked === key}
-          disabled={why !== null}
-          onChange={() => onPick(key)}
-          className="translate-y-0.5 self-start"
-        />
         <span className="min-w-0 flex-1 space-y-0.5">
           <span className={`block font-medium ${why ? 'text-muted-foreground' : ''}`}>
             {workflow.name}
@@ -330,7 +307,7 @@ function WorkflowRow({
             </span>
           )}
         </span>
-      </label>
+      </Radio>
     </li>
   );
 }

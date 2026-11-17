@@ -48,6 +48,7 @@ export const STEP_KEYS = [
   'memory',
   'budget',
   'check',
+  'checkMemory',
   'retries',
   'checkFailurePolicy',
   'gate',
@@ -122,6 +123,7 @@ export const STEP_KEY_FORM = {
   memory: 'text',
   budget: 'dollars',
   check: 'text',
+  checkMemory: 'text',
   retries: 'count',
   checkFailurePolicy: 'text',
   gate: 'flag',
@@ -249,6 +251,12 @@ const stepKeyFields = {
   check: Schema.optionalKey(
     Text.annotate({
       description: "A shell command the run executes in the step's workspace after it hands off; exit 0 makes the step verified.",
+    }),
+  ),
+  checkMemory: Schema.optionalKey(
+    Text.annotate({
+      description:
+        "The memory the step's check asks of the machine, as a container's request such as 256Mi; it keeps the daemon's default limit, and unset asks the daemon's default request.",
     }),
   ),
   retries: Schema.optionalKey(

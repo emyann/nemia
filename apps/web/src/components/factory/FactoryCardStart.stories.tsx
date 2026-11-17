@@ -1,65 +1,101 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
+import type { InboxEntry } from '@/lib/api/inbox';
 import { storeQuery } from '@/lib/api/store';
-import { fn } from 'storybook/test';
+import { factoryWorkflowsQuery } from '@/lib/api/workflows';
 import { FactoryCardStart, UnassignedStart } from './FactoryCardStart';
-import { factoryView, seeded, unstartedCard } from '../../../.storybook/fixtures/proposals';
+import { FACTORY, seeded, unstartedCard } from '../../../.storybook/fixtures/proposals';
+import { yourStore } from '../../../.storybook/fixtures/agents';
+import { listing, offering, unfilled } from '../../../.storybook/fixtures/factories';
 import { saysReading, Unread } from '../../../.storybook/unread';
 
-/** A card's start: here while the factory it starts in is read, the shape of its field. */
-const meta: Meta<typeof FactoryCardStart> = {
-  title: 'Store/FactoryCardStart',
-  component: FactoryCardStart,
-  args: { entry: unstartedCard('flag', 'nemia'), onStarted: fn(), onRefused: fn() },
-  render: (args) => (
-    <Unread>
-      <div style={{ width: 560 }}>
-        <FactoryCardStart {...args} />
-      </div>
-    </Unread>
-  ),
+/** The start of `entry`, the factories, the store's lines and `build` on the factory's repository read. */
+const drawn = (entry: InboxEntry) => (
+  <QueryClientProvider
+    client={seeded([
+      [factoriesQuery.queryKey, [offering()]],
+      [storeQuery.queryKey, yourStore],
+      [factoryWorkflowsQuery({ factory: FACTORY, repo: '/work/nemia' }).queryKey, [listing('build', unfilled('build'))]],
+    ])}
+  >
+    {entry.factory === null ? (
+      <UnassignedStart entry={entry} onStarted={() => {}} onRefused={() => {}} />
+    ) : (
+      <FactoryCardStart entry={entry} onStarted={() => {}} onRefused={() => {}} />
+    )}
+  </QueryClientProvider>
+);
+
+/**
+ * A card's start on the Inbox page, one story a state: a card that names its factory, its workflow picked in the kit's select; and one
+ * that names none, the factory to pick first. Axe's check of them waits: the kit's select trigger is named by its value and its
+ * label, which axe reads as visible text left out of its name (`label-content-name-mismatch`), an ask of the kit.
+ */
+const meta: Meta<{ entry: InboxEntry }> = {
+  title: 'Factory/FactoryCardStart',
+  args: { entry: unstartedCard('decode-the-reads', FACTORY) },
+  render: ({ entry }) => drawn(entry),
 };
 export default meta;
 
+type Story = StoryObj<typeof meta>;
+
+/** A card of the factory: its workflow preset in the select, the repository wired for it, and why it cannot start yet. */
+export const NamesItsFactory: Story = {
+  parameters: { a11y: { test: 'todo' } },
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelector('[data-pick-workflow] [data-slot="select-value"]')?.textContent).toBe('build');
+    await expect(canvasElement.querySelector('[data-unfilled]')).not.toBeNull();
+  },
+};
+
+/** A card of no factory: the Factory select, nothing picked, and no start form before one is. */
+export const NamesNone: Story = {
+  parameters: { a11y: { test: 'todo' } },
+  args: { entry: { ...unstartedCard('measure-the-list', FACTORY), factory: null } },
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelector('[data-pick-factory] [data-populated]')).toBeNull();
+    await expect(canvasElement.querySelector('[data-pick-workflow]')).toBeNull();
+  },
+};
+
 /** A card that names its factory, the factory still read. */
-export const ReadingTheFactory: StoryObj<typeof meta> = {
+export const ReadingTheFactory: Story = {
+  render: ({ entry }) => (
+    <Unread>
+      <FactoryCardStart entry={entry} onStarted={() => {}} onRefused={() => {}} />
+    </Unread>
+  ),
   play: saysReading('Reading the factory…'),
 };
 
 /** A card that names none, the factories it may start in still read. */
-export const ReadingTheFactories: StoryObj<typeof meta> = {
-  render: (args) => (
+export const ReadingTheFactories: Story = {
+  args: { entry: { ...unstartedCard('measure-the-list', FACTORY), factory: null } },
+  render: ({ entry }) => (
     <Unread>
-      <div style={{ width: 560 }}>
-        <UnassignedStart {...args} />
-      </div>
+      <UnassignedStart entry={entry} onStarted={() => {}} onRefused={() => {}} />
     </Unread>
   ),
   play: saysReading('Reading the factories…'),
 };
 
-/** The store and its factory read, the workflow the card names still read: the shape of what it says and its Start. */
-export const ReadingTheWorkflow: StoryObj<typeof meta> = {
-  render: (args) => (
+/**
+ * The store and its factory read, the workflow the card names still read: the shape of what it says and its Start. Its axe check waits
+ * as the stories above do: the kit's select above it is named by its value and its label (`label-content-name-mismatch`), an ask of the kit.
+ */
+export const ReadingTheWorkflow: Story = {
+  parameters: { a11y: { test: 'todo' } },
+  render: ({ entry }) => (
     <QueryClientProvider
       client={seeded([
-        [factoriesQuery.queryKey, [factoryView('nemia')]],
-        [
-          storeQuery.queryKey,
-          {
-            workflows: '/store/workflows',
-            agents: '/store/agents',
-            skills: '/store/skills',
-            fileFactory: 'the line that files a factory',
-            turnOnNemia: 'the line that turns her on',
-          },
-        ],
+        [factoriesQuery.queryKey, [offering()]],
+        [storeQuery.queryKey, yourStore],
       ])}
     >
-      <div style={{ width: 560 }}>
-        <FactoryCardStart {...args} />
-      </div>
+      <FactoryCardStart entry={entry} onStarted={() => {}} onRefused={() => {}} />
     </QueryClientProvider>
   ),
   play: saysReading('Reading the workflow…'),

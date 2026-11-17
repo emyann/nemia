@@ -7,7 +7,7 @@
  *
  * `drawnAsk` says when an ask is drawn this way; one whose choices explain themselves is `ChatAsk`, and several questions `ChatAskMany`.
  */
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import type { AskPick } from '@/lib/api/chat';
 import type { ChatAsk as Ask } from '@/lib/chatFollowing';
 import { AskChose, AskHead, AskWords } from './ChatAsk';
@@ -26,8 +26,8 @@ export function ChatActions({ ask, onAnswer }: { ask: Ask; onAnswer: (id: string
             <Button
               key={option.label}
               data-chat-action={option.label}
-              size="sm"
-              variant={i === 0 ? 'default' : 'outline'}
+              size="xsmall"
+              variant={i === 0 ? 'filled' : 'outlined'}
               onPress={() => onAnswer(ask.call, [{ question: question.question, labels: [option.label] }])}
             >
               {option.label}

@@ -4,14 +4,13 @@
  */
 import { ExternalLinkIcon, XIcon } from 'lucide-react';
 import { IconButton } from '@/components/ui/ds';
-import { LinkButton } from '@/components/ui/button';
 import { chatHeaderLine, spendWords } from '@/lib/nemia';
 import type { NemiaLevel } from '@/lib/api/nemia';
 import type { Presence } from '@/lib/presence';
 import { NemiaFace } from '../NemiaFace';
 import { routeLink } from '../../nav/routeLink';
 
-const RouterLinkButton = routeLink(LinkButton);
+const RouterIconButton = routeLink(IconButton);
 
 /** How the panel stands: in her side sheet beside the page, or the page of its own at `/chat`. */
 export type ChatMode = 'sheet' | 'page';
@@ -48,9 +47,7 @@ export function ChatHeader({
       </div>
       {mode !== 'page' && (
         <>
-          <RouterLinkButton to="/chat" variant="ghost" size="icon-sm" aria-label="Open as a page" onPress={onClose}>
-            <ExternalLinkIcon />
-          </RouterLinkButton>
+          <RouterIconButton to="/chat" variant="standard" icon={ExternalLinkIcon} aria-label="Open as a page" onPress={onClose} />
           <IconButton variant="standard" icon={XIcon} aria-label="Close" onPress={onClose} />
         </>
       )}

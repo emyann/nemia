@@ -54,7 +54,7 @@ export const OnePicked: Story = {
   play: async ({ canvasElement }) => {
     const picker = within(canvasElement);
     await waitFor(() => expect(canvasElement.querySelector(`[data-concluded="${LGLL}"] [data-not-landed]`)).not.toBeNull());
-    await expect(picker.getAllByRole('checkbox').filter((box) => (box as HTMLInputElement).checked)).toHaveLength(1);
+    await waitFor(() => expect(picker.getAllByRole('checkbox').filter((box) => (box as HTMLInputElement).checked)).toHaveLength(1));
   },
 };
 

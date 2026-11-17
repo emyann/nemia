@@ -9,7 +9,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { files, REPO } from 'test-kit/repo';
 import { DESTINATIONS, EXEMPT } from './destinations.ts';
-import { a11yTodos, argless, handDrawn, mapGaps, offCategory, secondSystem, storyless, storyModuleOf } from './stories.ts';
+import { a11yTodos, argless, handDrawn, mapGaps, offCategory, secondSystem, seenOnceFound, storyless, storyModuleOf } from './stories.ts';
 import { BASELINE } from './stories.baseline.ts';
 
 /** The board's files that are there, from the workspace root. */
@@ -141,6 +141,19 @@ test('REFUSED: a story whose axe is todo, by its meta or itself', () => {
   assert.deepEqual(a11yTodos('x.stories.tsx', meta), ['x.stories.tsx#A']);
 });
 
+test('REFUSED: a play that reads a part visible the moment a find answers; a wait for it to show passes', () => {
+  const source = [
+    `await expect(await screen.findByRole('option', { name: 'Auto' })).toBeVisible();`,
+    `await expect(await within(page).findByText('x')).not.toBeVisible();`,
+    `await expect(await findAllByText('x')).toBeVisible();`,
+    `await waitFor(() => expect(screen.getByRole('option')).toBeVisible());`,
+    `await expect(await page.findByRole('switch')).not.toBeChecked();`,
+    `const found = await page.findByText('x');`,
+    `await expect(found).toBeVisible();`,
+  ].join('\n');
+  assert.deepEqual(seenOnceFound(source), [1, 2, 3]);
+});
+
 test('REFUSED: a baseline that grows, and one that keeps an entry since mended', () => {
   assert.deepEqual(against(['a', 'b'], ['a']).added, ['b']);
   assert.deepEqual(against(['a'], ['a', 'b']).stale, ['b']);
@@ -179,6 +192,11 @@ test("the board's stories: every story titled in a category, and each other rule
   const { unmapped, unused } = mapGaps([...new Set([...imported, ...drawn].map(({ key }) => key))], Object.keys(DESTINATIONS));
   assert.deepEqual([...unmapped], [], 'give each of these its destination in test/destinations.ts');
   assert.deepEqual([...unused], [], 'nothing takes these any more: cut each from test/destinations.ts');
+  assert.deepEqual(
+    modules.flatMap(({ file }) => seenOnceFound(textOf(file)).map((line) => `${file}:${line}`)),
+    [],
+    'wait for each part to show, waitFor(() => expect(<…>.getBy…(…)).toBeVisible()), never on the find alone',
+  );
   heldTo(
     modules.flatMap(({ file, module }) => a11yTodos(file, module)),
     BASELINE.a11yTodo,

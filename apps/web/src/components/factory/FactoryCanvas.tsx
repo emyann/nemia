@@ -135,6 +135,42 @@ const revealIn = (frame: HTMLElement, box: Box, transform: Transform) =>
   revealView(box, transform, sizeOf(frame), REVEAL_MIN_ZOOM, panelsOver(frame).top + FIT_GAP);
 
 /**
+ * The floor's corners: how to use it, top left on a wide frame, and Reset layout, Collapse all (disabled while no card is open) and Fit
+ * view, top right.
+ * @param props the props: what each button does, and whether every card is collapsed already
+ */
+function FloorButtons({
+  onReset,
+  onCollapse,
+  collapsed,
+  onFit,
+}: {
+  onReset: () => void;
+  onCollapse: () => void;
+  collapsed: boolean;
+  onFit: () => void;
+}) {
+  return (
+    <>
+      <Panel position="top-left" className="hidden text-body-small text-muted-foreground @4xl:block">
+        Click a run to inspect it · double-click to open its page · drag a card, and it moves alone · kept in this browser
+      </Panel>
+      <Panel position="top-right" className="flex flex-wrap justify-end gap-2">
+        <Button variant="outlined" size="xsmall" onPress={onReset}>
+          Reset layout
+        </Button>
+        <Button variant="outlined" size="xsmall" onPress={onCollapse} isDisabled={collapsed}>
+          Collapse all
+        </Button>
+        <Button variant="outlined" size="xsmall" onPress={onFit}>
+          Fit view
+        </Button>
+      </Panel>
+    </>
+  );
+}
+
+/**
  * The judged run whose card holds `target`, and its card, from the floor's `nodes`: null on the floor itself, and on a card the list could
  * not judge. Asked of the area around the whole canvas, outside the viewport's transform, where the kit's menu is placed at the pointer.
  * @param nodes the floor's cards
@@ -551,20 +587,12 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
                   defaultMarkerColor={null}
                   minZoom={0.2}
                 >
-                  <Panel position="top-left" className="hidden text-body-small text-muted-foreground @4xl:block">
-                    Click a run to inspect it · double-click to open its page · drag a card, and it moves alone · kept in this browser
-                  </Panel>
-                  <Panel position="top-right" className="flex flex-wrap justify-end gap-2">
-                    <Button variant="outlined" size="xsmall" onPress={resetLayout}>
-                      Reset layout
-                    </Button>
-                    <Button variant="outlined" size="xsmall" onPress={collapseAll} isDisabled={!open.length}>
-                      Collapse all
-                    </Button>
-                    <Button variant="outlined" size="xsmall" onPress={() => setFits((n) => n + 1)}>
-                      Fit view
-                    </Button>
-                  </Panel>
+                  <FloorButtons
+                    onReset={resetLayout}
+                    onCollapse={collapseAll}
+                    collapsed={!open.length}
+                    onFit={() => setFits((n) => n + 1)}
+                  />
                   <Background variant={BackgroundVariant.Dots} gap={16} />
                   <Controls showInteractive={false} showFitView={false} />
                   <CanvasLegend cards className={cells > HANDFUL ? 'mr-40 ml-12' : 'mr-4 ml-12'} />

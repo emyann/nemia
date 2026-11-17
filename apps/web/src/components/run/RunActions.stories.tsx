@@ -134,7 +134,7 @@ export const OnACard: StoryObj<typeof meta> = {
   play: async ({ canvasElement }) => {
     const card = (run: RunView) => canvasElement.querySelector(`article[data-run="${run.id}"]`) as HTMLElement;
     await userEvent.tab();
-    await menuKey(userEvent, within(card(AT_WORK)).getAllByRole('link')[0] as HTMLElement);
+    await menuKey(userEvent, within(card(AT_WORK)).getAllByRole('link')[0]);
     await expect(await entriesOf(), 'the run at work offers its hold').toEqual(['Hold…']);
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(within(document.body).queryByRole('menu')).toBeNull());

@@ -13,9 +13,10 @@ import { ACTION_LABEL } from '@/lib/runActions';
  * and refuses one still in flight in the package's words, which are shown here.
  *
  * Asked where the run is listed (`onClose` given), the menu's press was the first: it asks at once, Keep it closes the surface it is asked
- * in, and once removed it closes it and stays where it is, the list read again.
+ * in, and once removed it closes it and stays where it is, the list read again; or, asked on the run's own page (`leave`), goes back to
+ * Runs.
  */
-export function RemoveRun({ id, onClose }: { id: string; onClose?: () => void }) {
+export function RemoveRun({ id, onClose, leave = false }: { id: string; onClose?: () => void; leave?: boolean }) {
   const [asking, setAsking] = useState(onClose !== undefined);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -24,7 +25,7 @@ export function RemoveRun({ id, onClose }: { id: string; onClose?: () => void })
     mutationFn: () => namespaceNow().then((ns) => removeRun(ns, id)),
     onSuccess: async () => {
       if (onClose) onClose();
-      else await navigate({ to: '/runs' });
+      if (!onClose || leave) await navigate({ to: '/runs' });
       queryClient.removeQueries({ queryKey: ['runs', id], exact: true });
       await runsMoved(queryClient);
     },

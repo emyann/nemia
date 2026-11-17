@@ -48,7 +48,7 @@ applies: ["apps/web/**"]
    for what a page or a part draws while its first read is out, the kit's `SkeletonGroup` named by the line it replaces around the kit's
    `Skeleton`s in the shape of what is coming, held back a moment so a fast read draws nothing (`reading.css`), and `ReadingLines` for its
    lines of text;
-   `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`; `Trace` for
+   `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`; `RadioTileGroup` and `RadioTile` for one choice among a few, each a tile with its title and its line (the kit's `radio-tile-block`, copied in); `Trace` for
    what an agent did, a line a step (`TraceLine`, with `TraceIcon`, `TraceTitle` and `TraceDescription`; `TraceCollapsible`, its
    `TraceCollapsibleTrigger` and `TraceCollapsibleContent`, for a step that opens), and `Marker` for a quiet line across a conversation. Each is shown in its stories beside it
    (`<Part>.stories.tsx`): `npm run storybook`, from `apps/web`, serves them to a person on port 6007, and a step looks at them

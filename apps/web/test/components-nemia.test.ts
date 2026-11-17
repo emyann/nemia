@@ -135,7 +135,7 @@ test('Nemia up: her level picked at Semi-auto, her task and phase, the attach li
   assert.match(html, /data-state="up"/);
   assert.match(html, /data-nemia-task[^>]*>nemia-1</);
   assert.match(html, /data-nemia-phase[^>]*>running</);
-  assert.match(html, /data-nemia-attach[^>]*>attach 01234567<\/code><button[^>]*data-copy/);
+  assert.match(html, /data-nemia-attach[^>]*>attach 01234567<\/code><span title="Copy the command"[^>]*><button[^>]*data-copy/);
   assert.match(html, /<a href="https:\/\/example\.test\/code\/session_0123" target="_blank" rel="noreferrer"[^>]*data-nemia-bridge="true"/);
   assert.equal(
     html.split('https://example.test/code/session_0123</').length,
@@ -159,7 +159,11 @@ test('Nemia asked bridged and not up: why, in place of her link; not asked: her 
   assert.match(down, /data-bridge-why[^>]*>The web link is not up: no `bridgeSessionId` yet\.</);
   assert.equal(down.split('is not up: no `bridgeSessionId`').length, 2, 'said once');
   assert.match(down, /data-bridge-why[^>]*class="[^"]*\bwrap-anywhere\b/, 'a word it quotes breaks where it must, on a phone too');
-  assert.match(down, /data-nemia-attach[^>]*>attach 01234567<\/code><button[^>]*data-copy/, 'the attach line still to copy');
+  assert.match(
+    down,
+    /data-nemia-attach[^>]*>attach 01234567<\/code><span title="Copy the command"[^>]*><button[^>]*data-copy/,
+    'the attach line still to copy',
+  );
 
   const unasked = await nemiaWith({ ...nemiaUp, reach: ['attach 01234567'], bridge: null });
   assert.match(unasked, /data-nemia-attach[^>]*>attach 01234567</);

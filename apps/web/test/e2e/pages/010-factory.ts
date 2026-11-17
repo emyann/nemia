@@ -698,11 +698,8 @@ export default {
     await expectCount(loopOpen.locator('[data-tile]'), LOOPING.steps.length, `${LOOPING.id} opens on its steps`);
     await expectCount(loopOpen.locator(back), 1, `the panel's graph draws the arrow back from ${LOOPING.exhausted} into ${LOOPING.target}`);
     await expectVisible(
-      loopOpen
-        .getByLabel(LOOPING.round, { exact: true })
-        .or(loopOpen.getByText(LOOPING.round, { exact: true }))
-        .first(),
-      `and says the loop is on ${LOOPING.round}, as the run's page labels its edge`,
+      loopOpen.locator('[data-pips="3/3"]').and(loopOpen.getByLabel(LOOPING.round, { exact: true })),
+      `and its chip's pips say the loop is on ${LOOPING.round}: the panel's graph draws no round on its arrow back`,
     );
     await settled(page);
     await photographCard(page, looping, path.join(OUT, `factory-loop-open-${await themeOf(page)}.png`));

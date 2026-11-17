@@ -9,6 +9,7 @@ import {
   AT_WORK,
   CHECKED,
   DONE,
+  FORKED,
   GATE,
   graphRun,
   LONG,
@@ -23,7 +24,7 @@ import {
 
 /**
  * A run's steps as its workflow's graph drawn small, one story a state: done, at work, checked, at its gate, refused, waiting, held,
- * looped, routed, folded, ungraphed, pressable.
+ * looped, routed, folded, ungraphed, named in a fork, pressable.
  */
 const meta: Meta<typeof StepGraph> = {
   title: 'Look/StepGraph',
@@ -79,6 +80,26 @@ export const Folded: Story = { args: { run: LONG } };
 
 /** A run listed without its graph: its steps in a row, and what to do. */
 export const Ungraphed: Story = { args: { run: UNGRAPHED_RUN } };
+
+/**
+ * A forked graph naming its steps, as the opened floor card does: each under its own node, a fork's two lanes one row each, so no two
+ * names share a box.
+ */
+export const Named: Story = {
+  args: {
+    run: FORKED,
+    width: 600,
+    named: new Map(FORKED.steps.map((step) => [step.name, { agent: `${step.name} agent`, said: '4m · $1.00' }])),
+  },
+  play: async ({ canvasElement }) => {
+    const boxes = [...canvasElement.querySelectorAll<HTMLElement>('[data-named]')].map((one) => {
+      const box = one.getBoundingClientRect();
+      return `${Math.round(box.left)},${Math.round(box.top)}`;
+    });
+    await expect(boxes).toHaveLength(FORKED.steps.length);
+    await expect(new Set(boxes).size).toBe(boxes.length);
+  },
+};
 
 /** A node as a button, as the runs page wraps it to open its step's card, named by its step and its word. */
 function pressable(node: ReactNode, step: { name: string; state: string }) {

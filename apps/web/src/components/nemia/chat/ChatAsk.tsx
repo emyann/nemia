@@ -11,10 +11,9 @@
  * Her one-question ask whose choices need no explanation is `ChatActions` (boards 5 and 6), and several questions take
  * `ChatAskMany` (board 7b); `drawnAsk` says which of the three an ask takes.
  */
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { CheckIcon } from 'lucide-react';
-import { Checkbox, Radio, RadioGroup } from 'react-aria-components';
-import { Button } from '@/components/ui/button';
+import { Button, Checkbox, Radio, RadioGroup } from '@/components/ui/ds';
 import { CutTag, cutShape, TEXT_LINK } from '@/components/look';
 import { container } from '@/lib/meaning';
 import { askAnswered, linksOf, type ChatAsk as Ask } from '@/lib/chatFollowing';
@@ -25,11 +24,12 @@ import { Markdown } from '../../markdown/Markdown';
 /** How far an ask's bubble is cut, in pixels: her words' own cut. */
 const ASK_CUT = 10;
 
-/** One option row, the canvas's `opt`: a hairline box that becomes the tonal container once it is the choice. */
-const OPTION = 'grid grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 gap-y-1 px-3 py-2.5 outline-none cursor-pointer';
-
-/** The same row chosen, and not. */
-const [OPTION_ON, OPTION_OFF] = [`bg-secondary-container text-on-secondary-container`, 'ring-1 ring-outline-variant ring-inset'];
+/**
+ * One option row, the canvas's `opt`, laid over the kit's radio or checkbox: the kit's mark in the first column, the option's words in
+ * the second, a hairline box that becomes the tonal container once it is the choice.
+ */
+export const OPTION =
+  'grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2.5 gap-y-1 px-3 py-2.5 cursor-pointer ring-1 ring-outline-variant ring-inset data-selected:bg-secondary-container data-selected:text-on-secondary-container data-selected:ring-0';
 
 /**
  * What the tag over an ask says, by what it is and whether it is answered: a permission asks to run a call of hers.
@@ -128,23 +128,13 @@ function AskLinks({ text }: { text: string }) {
   ));
 }
 
-/** One choice: its number where the drawing numbers them, its label, the Recommended tag her words marked it with, and why. */
-export function AskOption({
-  n,
-  label,
-  why,
-  recommended,
-  children,
-}: {
-  n?: number;
-  label: string;
-  why?: string;
-  recommended: boolean;
-  children: ReactNode;
-}) {
+/**
+ * One choice's words, beside the kit's mark: its number where the drawing numbers them, its label, the Recommended tag her words marked
+ * it with, and why.
+ */
+export function AskOption({ n, label, why, recommended }: { n?: number; label: string; why?: string; recommended: boolean }) {
   return (
     <>
-      {children}
       <span className="col-start-2 text-title-small font-title-small">
         {n !== undefined && <span className="mr-1.5 font-mono text-on-surface-variant">{`${n}.`}</span>}
         {label}
@@ -180,23 +170,11 @@ function Options({ question, pick, onPick }: { question: AskQuestion; pick: AskP
         aria-label={question.question}
         value={chosen[0] ?? null}
         onChange={(label) => onPick({ question: question.question, labels: [label] })}
-        className="flex flex-col gap-2"
+        className="gap-2"
       >
         {question.options.map((option) => (
-          <Radio
-            key={option.label}
-            value={option.label}
-            data-chat-option={option.label}
-            className={({ isSelected }) => `${OPTION} ${isSelected ? OPTION_ON : OPTION_OFF}`}
-          >
-            {({ isSelected }) => (
-              <AskOption label={option.label} why={option.description} recommended={option.recommended}>
-                <span
-                  aria-hidden="true"
-                  className={`mt-1 size-4 rounded-full border-2 ${isSelected ? 'border-alive bg-alive' : 'border-outline'}`}
-                />
-              </AskOption>
-            )}
+          <Radio key={option.label} value={option.label} data-chat-option={option.label} className={OPTION}>
+            <AskOption label={option.label} why={option.description} recommended={option.recommended} />
           </Radio>
         ))}
       </RadioGroup>
@@ -214,18 +192,9 @@ function Options({ question, pick, onPick }: { question: AskQuestion; pick: AskP
               labels: on ? [...chosen, option.label] : chosen.filter((label) => label !== option.label),
             })
           }
-          className={({ isSelected }) => `${OPTION} ${isSelected ? OPTION_ON : OPTION_OFF}`}
+          className={OPTION}
         >
-          {({ isSelected }) => (
-            <AskOption label={option.label} why={option.description} recommended={option.recommended}>
-              <span
-                aria-hidden="true"
-                className={`mt-1 grid size-4 place-items-center border-2 ${isSelected ? 'border-alive bg-alive text-on-alive' : 'border-outline'}`}
-              >
-                {isSelected && <CheckIcon className="size-3" />}
-              </span>
-            </AskOption>
-          )}
+          <AskOption label={option.label} why={option.description} recommended={option.recommended} />
         </Checkbox>
       ))}
     </div>
@@ -252,7 +221,7 @@ export function ChatAsk({ ask, onAnswer }: { ask: Ask; onAnswer: (id: string, pi
             <Options question={question} pick={pick} onPick={setPick} />
           </fieldset>
           <div className="flex flex-wrap items-center gap-2">
-            <Button data-chat-answer size="sm" isDisabled={!askAnswered(pick)} onPress={() => onAnswer(ask.call, [pick])}>
+            <Button data-chat-answer size="xsmall" isDisabled={!askAnswered(pick)} onPress={() => onAnswer(ask.call, [pick])}>
               Answer
             </Button>
             <AskLinks text={ask.text} />

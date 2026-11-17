@@ -10,7 +10,7 @@
  * `chatItems` in `lib/chatFollowing.ts` — so the family in `components/conversation/` draws one thing and names neither.
  */
 import { durationWords } from './duration.ts';
-import type { TraceStatus } from '@/components/ui/trace';
+import type { TraceStatus } from '@/components/look';
 
 /** What a line of a turn is doing: done draws plain, the other four each in their own state. */
 export type ConversationState = 'done' | 'running' | 'error' | 'pending' | 'waits';

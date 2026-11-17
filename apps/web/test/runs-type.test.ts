@@ -35,6 +35,8 @@ const FILES = [
   'components/look/CutFrame.tsx',
   'components/look/CutTag.tsx',
   'components/look/ScanLines.tsx',
+  'components/look/Marker.tsx',
+  'components/look/Trace.tsx',
   'components/step/StepPreview.tsx',
   'components/field/Labels.tsx',
   'components/field/SelectorField.tsx',

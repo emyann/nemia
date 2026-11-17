@@ -139,7 +139,7 @@ export const OneWaitsOnYou: Story = {
   parameters: { msw: oneWaits },
   play: async ({ canvasElement }) => {
     const page = await loaded(canvasElement);
-    await expect(await within(page).findByText(TARGET_RUNS.vqvd.spec.brief)).toBeVisible();
+    await waitFor(() => expect(within(page).getByText(TARGET_RUNS.vqvd.spec.brief)).toBeVisible());
     await expect(page.querySelector('[data-section="waiting"] [data-nothing]')).toBeNull();
     await expect(chipsOf(page)).toEqual({ waiting: '1 yours', 'in-flight': '3 alive', finished: '123 rest' });
     const card = page.querySelector<HTMLElement>('[data-section="waiting"] article[data-run]')!;
@@ -190,7 +190,7 @@ export const NoRuns: Story = {
   parameters: { msw: noRuns },
   play: async ({ canvasElement }) => {
     const page = within(canvasElement);
-    await expect(await page.findByText('Nothing waits on you.')).toBeVisible();
+    await waitFor(() => expect(page.getByText('Nothing waits on you.')).toBeVisible());
     await expect(page.getByText('Nothing is in flight.')).toBeVisible();
     await expect(page.getByText('No run has finished yet.')).toBeVisible();
   },
@@ -202,7 +202,7 @@ export const ReadRefused: Story = {
   parameters: { msw: refused },
   play: async ({ canvasElement }) => {
     const page = within(canvasElement);
-    await expect(await page.findByRole('alert')).toBeVisible();
+    await waitFor(() => expect(page.getByRole('alert')).toBeVisible());
     await expect(page.getByText(REFUSED_WORDS)).toBeVisible();
   },
 };

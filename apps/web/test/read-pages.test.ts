@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 import { BODY_PAGE, LIST_PAGE, TRANSCRIPT_PAGE } from 'objects';
 import { decisionQuery, type RunDecision } from '../src/lib/api/decision.ts';
 import { everyPage, runs, steps, workflows } from '../src/lib/api/objects.ts';
-import { readTranscript } from '../src/lib/api/steps.ts';
+import { QueryClient } from '@tanstack/react-query';
+import { readTranscript, transcriptQuery } from '../src/lib/api/steps.ts';
 import { listOfItems, workflow, workflowObject } from './library-fixtures.ts';
 import { decidable, step, transcript } from './run-fixtures.ts';
 
@@ -115,6 +116,37 @@ test("a step's conversation is read on at once from each cursor while the api sa
     [null, 'c-1~1', 'c-1~2'],
   );
   assert.ok(asked.every((url) => url.searchParams.get('limit') === String(TRANSCRIPT_PAGE.most)));
+});
+
+test("a step's conversation read through its query is read once by the readers that come while it is out, and none that leaves aborts it", async (t) => {
+  const signals: (AbortSignal | null | undefined)[] = [];
+  let answer: () => void = () => {};
+  const held = new Promise<void>((done) => {
+    answer = done;
+  });
+  const before = globalThis.fetch;
+  globalThis.fetch = async (_input, init) => {
+    signals.push(init?.signal);
+    await held;
+    return new Response(JSON.stringify(transcript({ live: false })), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  const client = new QueryClient();
+  const query = transcriptQuery('r-1', 'tokens', 'task-1');
+  const first = client.fetchQuery(query);
+  const second = client.fetchQuery(query);
+  await new Promise((done) => setTimeout(done, 0));
+  assert.equal(signals.length, 1, 'the reader that comes while the read is out shares it');
+  await client.cancelQueries({ queryKey: query.queryKey });
+  first.catch(() => {});
+  second.catch(() => {});
+  assert.equal(signals[0]?.aborted ?? false, false, 'a reader that leaves while the read is out leaves it to answer');
+  answer();
+  await new Promise((done) => setTimeout(done, 0));
+  assert.equal(signals[0]?.aborted ?? false, false, 'and it answers, never aborted');
+  assert.notDeepEqual(query.queryKey, transcriptQuery('r-1', 'tokens', 'task-2').queryKey, 'a step tried again is read afresh');
 });
 
 test("a step's tries are asked with every output field, and a closeout's body read on from its bodyNext until none is left", async (t) => {

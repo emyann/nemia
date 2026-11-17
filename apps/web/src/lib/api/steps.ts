@@ -80,7 +80,7 @@ export const transcriptPath = (runId: string, step: string) =>
   `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/transcript`;
 
 /** A page of a step's conversation, of the most a page holds, from `after` (the cursor a page before answered), the start for none. */
-const transcriptPage = (runId: string, step: string, after: string | undefined, signal?: AbortSignal) =>
+const transcriptPage = (runId: string, step: string, after: string | undefined) =>
   call(
     (c) =>
       c.steps.transcript({
@@ -88,7 +88,6 @@ const transcriptPage = (runId: string, step: string, after: string | undefined, 
         query: { limit: String(TRANSCRIPT_PAGE.most), ...(after === undefined ? {} : { after }) },
       }),
     read(StepTranscriptAnswer),
-    signal,
   );
 
 /**
@@ -98,20 +97,36 @@ const transcriptPage = (runId: string, step: string, after: string | undefined, 
  * it was asked from is an api that would be asked forever, refused naming the restart.
  * @param runId The run's id.
  * @param step The step's name.
- * @param signal Aborts the read; none for a read that runs to its end.
  */
-export async function readTranscript(runId: string, step: string, signal?: AbortSignal): Promise<StepTranscript> {
-  let page = await transcriptPage(runId, step, undefined, signal);
+export async function readTranscript(runId: string, step: string): Promise<StepTranscript> {
+  let page = await transcriptPage(runId, step, undefined);
   const events = [...page.events];
   while (page.more === true && page.cursor !== null) {
     const from = page.cursor;
-    page = await transcriptPage(runId, step, from, signal);
+    page = await transcriptPage(runId, step, from);
     events.push(...page.events);
     if (page.more === true && page.cursor === from)
       throw new Error('The api answered a page of the conversation from the cursor it was asked from: restart the api (npm run dev).');
   }
   return { ...page, events };
 }
+
+/**
+ * One read of the conversation of the task `taskId` of a step (`readTranscript`), keyed by run, step and task, so a step tried again is
+ * read afresh. It is given no signal: a reader that leaves while it is out — a bar closed, or switched to another step — leaves it to
+ * answer into the cache, never aborts it, and a reader that comes while it is out shares it rather than starting another. Stale at once:
+ * a reader that comes after it answered reads again, the conversation having moved since. A read that fails is said, never made again.
+ * @param runId The run's id.
+ * @param step The step's name.
+ * @param taskId The task whose conversation is read (`sessionToRead`).
+ */
+export const transcriptQuery = (runId: string, step: string, taskId: string) =>
+  queryOptions({
+    queryKey: ['transcript', runId, step, taskId] as const,
+    queryFn: () => readTranscript(runId, step),
+    staleTime: 0,
+    retry: false,
+  });
 
 /**
  * The path of a step's try: the current one for a `tryNumber` of null, keyed by `stamp` (`stepStamp`), so the feed's `step` event, which

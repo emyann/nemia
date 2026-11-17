@@ -244,17 +244,36 @@ async function keepsTheStart(page: Page): Promise<void> {
   await expectClosed(page, 'its Close closes it');
 }
 
+/** How long the page holds each read of a step's conversation before the api is asked it. */
+const SLOW_MS = 600;
+
+/**
+ * Holds each read of a step's conversation `SLOW_MS` before it reaches the api, as a slow api would: the bar is closed on a step, and
+ * switched off it, while its conversation is still read, and the watch counts a read the board then abandons as a failed request.
+ */
+async function slowConversations(page: Page): Promise<void> {
+  await page.route(
+    (url) => TRANSCRIPT.test(url.pathname) && !url.pathname.endsWith('/stream'),
+    async (route) => {
+      await new Promise((done) => setTimeout(done, SLOW_MS));
+      await route.continue();
+    },
+  );
+}
+
 export default {
   /**
    * A run's canvas and the frame's side sheet: an old `?step=` link lands on the bar, the canvas the page's whole width; a click on a node
    * shows it, the same node again closes it, another switches it, the bar one scroll with no tabs, and the nodes are fitted clear of the
    * bar; the empty canvas closes it, but never the start of a run; Enter and Escape do as a click and Close, and Escape gives the focus
    * back to the node; Open and a double click open the step's session, its second click landing where the narrowed canvas put it, and a
-   * step with no session asks no conversation.
+   * step with no session asks no conversation. Each read of a conversation is held a moment, so the bar closed or switched while one is
+   * out proves the board leaves it to answer rather than abort it.
    */
   name: 'run-bar',
   route: RUN,
   expect: async (page) => {
+    await slowConversations(page);
     await oldLink(page);
     await presses(page);
     await keys(page);

@@ -88,8 +88,8 @@ export default {
           throw new Refused(`the gate's sentence names the line, its factory and its workflow: ${named} — it says ${JSON.stringify(said)}`);
       const field = (step: string) => proposed.getByRole('textbox', { name: `The budget of ${step}, in dollars` });
       for (const one of [above, under])
-        if ((await field(one.step).inputValue()) !== String(one.usd))
-          throw new Refused(`${one.step}'s field holds the proposal, ${one.usd} — it holds ${await field(one.step).inputValue()}`);
+        if ((await field(one.step).inputValue()) !== dollars(one.usd))
+          throw new Refused(`${one.step}'s field holds the proposal, ${dollars(one.usd)} — it holds ${await field(one.step).inputValue()}`);
       await settled(page);
       await photograph(gate, path.join(OUT, `gate-budgets-proposed-${theme}.png`));
 

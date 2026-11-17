@@ -6,7 +6,7 @@
  */
 import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button, PlusIcon, Radio, RadioGroup, Select, SelectItem, Skeleton } from '@/components/ui/ds';
+import { Button, PlusIcon, Select, SelectItem, Skeleton } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { factoryWorkflowsQuery, type Place, type WorkflowListing } from '@/lib/api/workflows';
 import { floorPlace, startRepo, whyNotStarted } from '@/lib/factories';
@@ -14,7 +14,7 @@ import { workflowKey } from '@/lib/inbox';
 import { useBar } from '@/lib/useBar';
 import { BarPanel } from '../frame/BarPanel';
 import { StartRun } from '../run/StartRun';
-import { Reading, ReadingLines } from '@/components/look';
+import { RadioTile, RadioTileGroup, Reading, ReadingLines } from '@/components/look';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 const path = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
@@ -238,7 +238,7 @@ function Unfixed({ factory, repos }: { factory: Factory; repos: number }) {
 }
 
 /**
- * The workflows `place`'s factory offers on its repository, read with its hires, one a radio: one that cannot start says why, in the
+ * The workflows `place`'s factory offers on its repository, read with its hires, one a radio tile: one that cannot start says why, in the
  * package's words (`whyNotStarted`), and cannot be picked. Then `StartRun` in the factory for the one picked. Where it offers none there,
  * the line that attaches one, as the api answers it on the factory (`commands.attach`). With `only`, the workflow of that name alone.
  */
@@ -270,13 +270,11 @@ function Workflows({ place, only }: { place: Place; only?: string }) {
             No workflow the factory attaches is on {path(place.repo)}: attach one there{attach ? <> with {code(attach)}</> : null}.
           </p>
         ) : (
-          <RadioGroup aria-labelledby={legend} value={picked} onChange={setPicked}>
-            <ul className="divide-y divide-outline-variant rounded border border-outline">
-              {workflows.data.map((w) => (
-                <WorkflowRow key={workflowKey(w)} workflow={w} />
-              ))}
-            </ul>
-          </RadioGroup>
+          <RadioTileGroup aria-labelledby={legend} value={picked} onChange={setPicked} layout="column">
+            {workflows.data.map((w) => (
+              <WorkflowTile key={workflowKey(w)} workflow={w} />
+            ))}
+          </RadioTileGroup>
         )}
       </fieldset>
       {workflow && <StartRun workflow={workflow} repo={place.repo} place={place} />}
@@ -284,30 +282,36 @@ function Workflows({ place, only }: { place: Place; only?: string }) {
   );
 }
 
-/** One workflow the factory offers, the kit's radio in its group: its name, whether it is yours, its description, why it cannot start. */
-function WorkflowRow({ workflow }: { workflow: WorkflowListing }) {
+/**
+ * One workflow the factory offers, a tile of the group: its name and whether it is yours, its description, and why it cannot start, the
+ * tile then disabled.
+ */
+function WorkflowTile({ workflow }: { workflow: WorkflowListing }) {
   const key = workflowKey(workflow);
   const why = whyNotStarted(workflow);
   return (
-    <li data-workflow={key}>
-      <Radio
-        value={key}
-        isDisabled={why !== null}
-        className={`flex w-full items-start gap-2 px-2 py-1.5 text-body-medium ${why ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-      >
-        <span className="min-w-0 flex-1 space-y-0.5">
-          <span className={`block font-medium ${why ? 'text-muted-foreground' : ''}`}>
-            {workflow.name}
-            {workflow.from === 'user' && <span className="font-normal text-muted-foreground"> (yours)</span>}
-          </span>
-          {workflow.description && <span className="block text-body-small text-muted-foreground">{workflow.description}</span>}
-          {why && (
-            <span data-why-not className="block text-body-small whitespace-pre-wrap break-words text-yours">
-              {why}
-            </span>
-          )}
-        </span>
-      </Radio>
-    </li>
+    <RadioTile
+      value={key}
+      isDisabled={why !== null}
+      data-workflow={key}
+      title={
+        <>
+          {workflow.name}
+          {workflow.from === 'user' && <span className="text-on-surface-variant"> (yours)</span>}
+        </>
+      }
+      description={
+        workflow.description || why ? (
+          <>
+            {workflow.description && <span className="block">{workflow.description}</span>}
+            {why && (
+              <span data-why-not className="block whitespace-pre-wrap break-words text-yours">
+                {why}
+              </span>
+            )}
+          </>
+        ) : undefined
+      }
+    />
   );
 }

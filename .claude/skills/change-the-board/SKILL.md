@@ -49,7 +49,7 @@ applies: ["apps/web/**"]
    `Skeleton`s in the shape of what is coming, held back a moment so a fast read draws nothing (`reading.css`), and `ReadingLines` for its
    lines of text; `Pending` for a wait still out drawn small, the kit's circular `ProgressIndicator` in the ink of what holds it: a kit
    `Button`'s `icon` while its press is out (`CutPress` takes `pending`), or a tag's glyph while a fix or an upgrade is at work;
-   `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`; `Trace` for
+   `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`; `RadioTileGroup` and `RadioTile` for one choice among a few, each a tile with its title and its line (the kit's `radio-tile-block`, copied in); `Trace` for
    what an agent did, a line a step (`TraceLine`, with `TraceIcon`, `TraceTitle` and `TraceDescription`; `TraceCollapsible`, its
    `TraceCollapsibleTrigger` and `TraceCollapsibleContent`, for a step that opens), and `Marker` for a quiet line across a conversation. Each is shown in its stories beside it
    (`<Part>.stories.tsx`): `npm run storybook`, from `apps/web`, serves them to a person on port 6007, and a step looks at them

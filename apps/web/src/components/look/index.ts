@@ -14,6 +14,7 @@ export { Marker } from './Marker';
 export { Pager } from './Pager';
 export { PageName, Plate, type PlateHue } from './Plate';
 export { Pending } from './Pending';
+export { RadioTile, RadioTileGroup } from './RadioTile';
 export { Reading, ReadingLines } from './Reading';
 export { Run, type RunProps } from './Run';
 export { RunClock, RunCost } from './RunFigures';

@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect } from 'storybook/test';
+import { expect, waitFor } from 'storybook/test';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { factoryWorkflowsQuery } from '@/lib/api/workflows';
 import { StartBar } from './FactoryStart';
@@ -33,11 +33,25 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** On its one repository: each workflow a radio, the one whose step no agent fills disabled, saying why. */
+/** On its one repository: each workflow a radio tile, none picked, the one whose step no agent fills disabled, saying why. */
 export const OneRepository: Story = {
   play: async ({ canvasElement }) => {
-    await expect(canvasElement.querySelectorAll('[data-workflow] [data-slot="radio"]').length).toBe(2);
+    await expect(canvasElement.querySelectorAll('[data-workflow][data-slot="radio"]').length).toBe(2);
     await expect(canvasElement.querySelector('[data-workflow="repo:quick"] [data-why-not]')).not.toBeNull();
+    await expect(canvasElement.querySelector('[data-workflow="repo:quick"] input')).toBeDisabled();
+    await expect(canvasElement.querySelector('form[aria-label^="Start a run of"]')).toBeNull();
+  },
+};
+
+/** A workflow picked from the keyboard: Tab reaches the group's first tile, Space picks it, and the start of that workflow follows. */
+export const WorkflowPicked: Story = {
+  play: async ({ canvasElement, userEvent }) => {
+    const build = canvasElement.querySelector('[data-workflow="repo:build"] input');
+    for (let at = 0; at < 5 && document.activeElement !== build; at += 1) await userEvent.tab();
+    await expect(build).toHaveFocus();
+    await userEvent.keyboard(' ');
+    await expect(canvasElement.querySelector('[data-workflow="repo:build"]')).toHaveAttribute('data-selected', 'true');
+    await waitFor(() => expect(canvasElement.querySelector('form[aria-label="Start a run of build"]')).not.toBeNull());
   },
 };
 

@@ -1,10 +1,10 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import type { Answer } from '../../lib/asks';
 import { OFFERS } from '../../lib/words';
 import { Refusal } from '../gate/Ask';
 import { useApprove } from '../../lib/useApprove';
 import { AskedRow } from '../gate/Questions';
-import { BUTTON, TEXTAREA } from '../../lib/classes';
+import { Button, TextField } from '@/components/ui/ds';
 
 /**
  * A loop out of rounds, approved as it stands: the step's own `approve` line with the reason it requires (`--message`), a box for that
@@ -14,7 +14,6 @@ import { BUTTON, TEXTAREA } from '../../lib/classes';
  */
 export function EnoughRow({ runId, offer, line }: { runId: string; offer: Extract<Answer, { case: 'enough' }>; line: string }) {
   const [message, setMessage] = useState('');
-  const field = useId();
   const approve = useApprove(runId, offer.step);
   const words = OFFERS.enough;
   if (approve.isSuccess) return <AskedRow step={offer.step} said={`try ${approve.data.try} ${words.approved(offer.step)}`} />;
@@ -39,20 +38,10 @@ export function EnoughRow({ runId, offer, line }: { runId: string; offer: Extrac
           approve.mutate({ message });
         }}
       >
-        <label htmlFor={field} className="sr-only">
-          {words.field(offer.step)}
-        </label>
-        <textarea
-          id={field}
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          rows={3}
-          placeholder={words.placeholder}
-          className={TEXTAREA}
-        />
-        <button type="submit" disabled={approve.isPending || !message.trim()} className={BUTTON}>
+        <TextField aria-label={words.field(offer.step)} multiline value={message} onChange={setMessage} placeholder={words.placeholder} />
+        <Button type="submit" isDisabled={approve.isPending || !message.trim()}>
           {approve.isPending ? 'Approving…' : words.button}
-        </button>
+        </Button>
       </form>
       {approve.isError && <Refusal error={approve.error} not="Not approved" />}
     </li>

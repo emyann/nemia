@@ -5,9 +5,7 @@
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button, Select, SelectItem } from '@/components/ui/ds';
 import { fireAgent, hireAgent } from '../../lib/api/factories.ts';
 import { stepQuery, type PagePlace, type WorkflowStepPage } from '../../lib/api/workflows.ts';
 import { invalidateHires } from '../../lib/agentWrites';
@@ -65,7 +63,7 @@ function Hiring({ page, where, place }: { page: WorkflowStepPage; where: 'page' 
           <span className="text-muted-foreground">
             {factory} hires <AgentLink from={page.from} name={hired} place={place} className="text-foreground" /> into this step.
           </span>
-          <Button variant="outline" size="xs" data-fire={hired} isDisabled={write.isPending} onPress={() => send({ kind: 'fire' })}>
+          <Button variant="outlined" size="xsmall" data-fire={hired} isDisabled={write.isPending} onPress={() => send({ kind: 'fire' })}>
             Fire
           </Button>
         </p>
@@ -104,30 +102,28 @@ function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: bo
       </p>
     );
   return (
-    <div className="flex flex-wrap items-end gap-2">
+    <div className="flex flex-wrap items-start gap-2">
       <Select
+        label={`Hire into this step in ${page.factory}`}
         placeholder="Pick an agent"
         value={picked}
         onChange={(key) => setPicked(key == null ? null : String(key))}
         isDisabled={pending}
-        className="w-64 max-w-full space-y-1"
+        data-hire-picker
+        className="w-64 max-w-full"
       >
-        <Label className="text-body-small text-muted-foreground">Hire into this step in {page.factory}</Label>
-        <SelectTrigger data-hire-picker className="w-full font-mono text-body-small">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {agents.map((agent) => (
-            <SelectItem key={agent.name} id={agent.name} textValue={agent.name} data-hire-agent={agent.name}>
-              <span className="flex min-w-0 flex-col">
-                <span className="font-mono text-body-small">{agent.name}</span>
-                {agent.description && <span className="truncate text-body-small text-muted-foreground">{agent.description}</span>}
-              </span>
-            </SelectItem>
-          ))}
-        </SelectContent>
+        {agents.map((agent) => (
+          <SelectItem
+            key={agent.name}
+            id={agent.name}
+            textValue={agent.name}
+            data-hire-agent={agent.name}
+            label={<span className="font-mono">{agent.name}</span>}
+            supportingText={agent.description || undefined}
+          />
+        ))}
       </Select>
-      <Button size="sm" data-hire isDisabled={pending || picked === null} onPress={() => picked !== null && onHire(picked)}>
+      <Button data-hire className="mt-2" isDisabled={pending || picked === null} onPress={() => picked !== null && onHire(picked)}>
         Hire
       </Button>
     </div>

@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button as AriaButton, Slider, SliderThumb, SliderTrack } from 'react-aria-components';
-import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Sheet, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { stepPathQuery, type LifecycleTransition, type MachineGraph, type StepPath } from '@/lib/api/steps';
 import type { RunDetail, StepView } from '@/lib/runView';
 import { byPerson, centredScroll, litAt, pathPoll, stepStamp, takenRoutes } from '@/lib/lifecyclePath';
@@ -11,9 +7,8 @@ import { clockWord } from '@/lib/quota';
 import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
 import { MachineCanvas } from './MachineCanvas';
-import { focusRing } from '@/components/ui/ds/utils';
 import { Reading, ReadingLines } from '@/components/look';
-import { Skeleton } from '@/components/ui/ds';
+import { Button, Disclosure, DisclosurePanel, DisclosureTrigger, Pressable, SideSheet, Skeleton, Slider, Title } from '@/components/ui/ds';
 
 type Step = StepView;
 
@@ -33,20 +28,15 @@ const PATH_TITLE = "The task's path through the runtime's lifecycle";
  * it is closed.
  */
 export function DebugPanel({ run, step, shown }: { run: RunDetail; step: Step; shown: number | null }) {
+  const [isExpanded, setExpanded] = useState(false);
   return (
     <section aria-label="Debug" className="shrink-0">
-      <Collapsible>
-        {({ isExpanded }) => (
-          <>
-            <CollapsibleTrigger
-              className={cn('w-full px-4 py-1.5 text-left text-body-small text-muted-foreground hover:text-foreground', focusRing())}
-            >
-              {isExpanded ? '▾' : '▸'} Debug
-            </CollapsibleTrigger>
-            <CollapsibleContent>{isExpanded && <PathOf run={run} step={step} shown={shown} />}</CollapsibleContent>
-          </>
-        )}
-      </Collapsible>
+      <Disclosure isExpanded={isExpanded} onExpandedChange={setExpanded}>
+        <DisclosureTrigger className="min-h-0 py-1.5">
+          <span className="text-body-small font-body-small text-muted-foreground">Debug</span>
+        </DisclosureTrigger>
+        <DisclosurePanel isUnstyled>{isExpanded && <PathOf run={run} step={step} shown={shown} />}</DisclosurePanel>
+      </Disclosure>
     </section>
   );
 }
@@ -159,26 +149,33 @@ function WideGraph({
   taken: readonly string[];
   onScrub: (i: number) => void;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <SheetTrigger>
-      <Button variant="outline" size="xs">
+    <>
+      <Button variant="outlined" size="xsmall" onPress={() => setOpen(true)}>
         Full width
       </Button>
-      <Sheet className="data-[side=right]:w-full data-[side=right]:sm:max-w-none">
-        <SheetHeader className="gap-2 border-b border-outline-variant pr-14">
-          <SheetTitle>{PATH_TITLE}</SheetTitle>
-          <SheetDescription>
-            <code className="font-mono text-body-small">{taskId}</code>
-          </SheetDescription>
-          <div className="max-w-xl">
-            <Scrubber path={path} at={at} onScrub={onScrub} />
+      <SideSheet
+        variant="modal"
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        aria-label={PATH_TITLE}
+        className="w-screen rounded-none sm:w-screen"
+        title={
+          <div className="min-w-0 flex-1 space-y-2">
+            <Title component="h2">{PATH_TITLE}</Title>
+            <code className="block font-mono text-body-small text-on-surface-variant">{taskId}</code>
+            <div className="max-w-xl">
+              <Scrubber path={path} at={at} onScrub={onScrub} />
+            </div>
           </div>
-        </SheetHeader>
+        }
+      >
         <LitInView lit={lit}>
           <MachineCanvas machine={machine} {...LIFECYCLE} id="debug-lifecycle-wide" lit={lit} taken={taken} />
         </LitInView>
-      </Sheet>
-    </SheetTrigger>
+      </SideSheet>
+    </>
   );
 }
 
@@ -207,7 +204,7 @@ function LitInView({ lit, children }: { lit: string | undefined; children: React
     return () => observer.disconnect();
   }, [lit]);
   return (
-    <div ref={body} data-wide-body className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+    <div ref={body} data-wide-body className="h-full overflow-y-auto">
       {children}
     </div>
   );
@@ -224,13 +221,9 @@ function Scrubber({ path, at, onScrub }: { path: readonly LifecycleTransition[];
         value={at}
         onChange={(v) => onScrub(Math.min(v, path.length - 1))}
         isDisabled={path.length < 2}
+        showOutput={false}
         className="px-2"
-      >
-        <SliderTrack className="relative h-5 w-full">
-          <div className="absolute top-1/2 h-1 w-full -translate-y-1/2 rounded bg-surface-container-highest" />
-          <SliderThumb className={cn('top-1/2 size-4 rounded-full border-2 border-alive bg-card', focusRing())} />
-        </SliderTrack>
-      </Slider>
+      />
       <p data-shown className="text-body-small text-muted-foreground">
         Entry {at + 1} of {path.length}
         {at === path.length - 1 ? ', the newest' : ''}
@@ -267,11 +260,10 @@ function Timeline({
           const offGraph = !verb && i > 0 && path[i - 1].state !== s.state && !routes.has(`${path[i - 1].state}->${s.state}`);
           return (
             <li key={i} data-entry={i} data-state-at={s.state} aria-current={i === at ? 'step' : undefined}>
-              <AriaButton
+              <Pressable
                 onPress={() => onScrub(i)}
                 className={cn(
-                  'flex w-full items-baseline gap-2 rounded px-1.5 py-0.5 text-left hover:bg-accent',
-                  focusRing(),
+                  'flex w-full items-baseline gap-2 rounded-shape-extra-small px-1.5 py-0.5',
                   i === at && 'bg-alive-container text-on-alive-container',
                   i > at && 'text-muted-foreground',
                 )}
@@ -288,7 +280,7 @@ function Timeline({
                   {offGraph && <span className="text-muted-foreground">(no edge)</span>}
                 </span>
                 <span className="shrink-0 text-muted-foreground">{clockWord(new Date(s.at), now)}</span>
-              </AriaButton>
+              </Pressable>
             </li>
           );
         })}

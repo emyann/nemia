@@ -1,7 +1,0 @@
-apps/web/src/components/step/StepHire.tsx#@/components/ui/button:Button
-apps/web/src/components/step/StepHire.tsx#@/components/ui/label:Label
-apps/web/src/components/step/StepHire.tsx#@/components/ui/select:Select
-apps/web/src/components/step/StepHire.tsx#@/components/ui/select:SelectContent
-apps/web/src/components/step/StepHire.tsx#@/components/ui/select:SelectItem
-apps/web/src/components/step/StepHire.tsx#@/components/ui/select:SelectTrigger
-apps/web/src/components/step/StepHire.tsx#@/components/ui/select:SelectValue

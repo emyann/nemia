@@ -1,9 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { TextField } from 'react-aria-components';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   clearCustomInstructions,
   customInstructionsQuery,
@@ -12,7 +8,7 @@ import {
 } from '../../lib/api/agents.ts';
 import { AgentRefused } from '../agent/AgentParts';
 import { Reading } from '@/components/look';
-import { Skeleton } from '@/components/ui/ds';
+import { Button, Skeleton, TextField } from '@/components/ui/ds';
 
 /**
  * What a panel of custom instructions says of where the words reach and when a save takes effect: `told`, who is told them; `takes`, when
@@ -189,10 +185,7 @@ function CustomForm({
           <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{custom.error}</p>
         </div>
       )}
-      <TextField value={draft} onChange={setDraft} className="space-y-1.5">
-        <Label className="text-body-small">Words</Label>
-        <Textarea placeholder={reach.placeholder(custom.name)} className="min-h-24 leading-relaxed" />
-      </TextField>
+      <TextField label="Words" multiline value={draft} onChange={setDraft} placeholder={reach.placeholder(custom.name)} />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" isDisabled={pending || !draft.trim() || unchanged}>
           {pending ? 'Writing…' : 'Save'}
@@ -230,17 +223,17 @@ function Clear({
 }) {
   if (!asking)
     return (
-      <Button variant="outline" onPress={() => onAsk(true)} isDisabled={pending}>
+      <Button variant="outlined" onPress={() => onAsk(true)} isDisabled={pending}>
         Clear…
       </Button>
     );
   return (
     <span data-custom-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
       {asks}
-      <Button variant="destructive" onPress={onClear} isDisabled={pending}>
+      <Button color="error" onPress={onClear} isDisabled={pending}>
         {pending ? 'Clearing…' : 'Clear'}
       </Button>
-      <Button variant="ghost" onPress={() => onAsk(false)} isDisabled={pending}>
+      <Button variant="text" onPress={() => onAsk(false)} isDisabled={pending}>
         Keep them
       </Button>
     </span>

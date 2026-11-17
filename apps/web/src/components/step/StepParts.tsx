@@ -3,7 +3,7 @@
  * file; the layers, each beside where it is edited; and its newest runs, each linked to what that run was told. And the way back from a
  * run's step to this page (`StepPageLink`).
  */
-import { Badge } from '@/components/ui/badge';
+import { Tag } from '@/components/ui/ds';
 import type { PagePlace, WorkflowStepPage } from '../../lib/api/workflows.ts';
 import type { WorkflowPageAddress } from '../../lib/api/address.ts';
 import { stepAnchor } from '../../lib/asks';
@@ -33,9 +33,9 @@ export function StepAgent({ page, place = {} }: { page: WorkflowStepPage; place?
     return (
       <p data-step-agent className="text-body-small leading-6 text-muted-foreground">
         Its agent: <AgentLink from={from} name={hired} place={place} className="text-foreground" />{' '}
-        <Badge variant="outline" data-hired={factory}>
+        <Tag variant="outlined" data-hired={factory}>
           hired by {factory}
-        </Badge>
+        </Tag>
         , whose instructions it is told first.
       </p>
     );

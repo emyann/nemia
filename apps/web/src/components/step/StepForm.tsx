@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { KeyField, KeyForm } from '../../lib/api/builder.ts';
 import type { StepLayers } from '../../lib/api/layers.ts';
 import type { WorkflowStepSpec } from '../../lib/api/library.ts';
@@ -15,18 +15,21 @@ import {
   tokensOf,
   type DraftStep,
 } from '../../lib/builder';
+import { Button, Checkbox, Select, SelectItem, TextField } from '@/components/ui/ds';
 import { Markdown } from '../markdown/Markdown';
 import { AgentLayers, PolicyLayer } from './StepLayers';
 
 /** A change to the whole draft, made in one step so a key and what comes with it land together. */
 export type DraftUpdate = (change: (steps: DraftStep[]) => DraftStep[]) => void;
 
-const INPUT =
-  'block w-full rounded border border-outline bg-background px-2 py-1 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
-const MONO_INPUT = `${INPUT} font-mono text-body-small`;
+/** The input of a field whose value is a command, a list of names or a schema: in the mono face. */
+const MONO_INPUT = 'font-mono';
 
 /** The option of a `schema` field that opens the box a schema is pasted into: no schema's file, which ends in .json. */
 const PASTE = '(paste)';
+
+/** The key of a select's option that sets nothing: no name a key takes, which has no parentheses. */
+const UNSET = '(unset)';
 
 /**
  * A step's form on the builder: what it is told, then a field per key the api's form has (`KeyForm`), in the package's order, each with
@@ -58,26 +61,19 @@ export function StepForm({
   update: DraftUpdate;
   onRemoved: () => void;
 }) {
-  const body = useId();
   const others = steps.filter((s) => s.name !== step.name).map((s) => s.name);
   const agent = step.own ? (step.spec.agent ?? '') : null;
   const input = (field: KeyField) => (
     <KeyInput key={`${step.name}:${field.key}`} field={field} step={step} others={others} form={form} schemas={schemas} update={update} />
   );
   const note = (
-    <>
-      <label htmlFor={body} className="block text-body-small font-medium">
-        {agent === null ? 'What it is told' : 'Its words'}
-      </label>
-      <textarea
-        id={body}
-        value={step.own ? step.own.body : step.body}
-        rows={5}
-        placeholder={agent === null ? undefined : `Nothing of its own: ${agent}'s instructions are all it is told.`}
-        onChange={(event) => update((all) => setBody(all, step.name, event.target.value))}
-        className={`${INPUT} resize-y`}
-      />
-    </>
+    <TextField
+      label={agent === null ? 'What it is told' : 'Its words'}
+      multiline
+      value={step.own ? step.own.body : step.body}
+      placeholder={agent === null ? undefined : `Nothing of its own: ${agent}'s instructions are all it is told.`}
+      onChange={(words) => update((all) => setBody(all, step.name, words))}
+    />
   );
 
   return (
@@ -122,16 +118,17 @@ function StepHead({
           {name}
           <span className="font-sans text-body-small font-normal text-muted-foreground">.md</span>
         </h3>
-        <button
-          type="button"
-          onClick={() => {
+        <Button
+          variant="outlined"
+          size="xsmall"
+          onPress={() => {
             update((all) => removeStep(all, name));
             onRemoved();
           }}
-          className="shrink-0 rounded border border-outline px-2 py-0.5 text-body-small text-muted-foreground hover:border-on-surface-variant hover:text-foreground"
+          className="shrink-0"
         >
           Remove step
-        </button>
+        </Button>
       </div>
 
       {refused && (
@@ -168,7 +165,6 @@ function KeyInput({
   schemas: readonly string[];
   update: DraftUpdate;
 }) {
-  const id = useId();
   const { key, kind, meaning } = field;
   const inherited = step.own !== null && form.roleKeys.includes(key) && !step.own.keys.includes(key);
   const value = inherited ? (Array.isArray(step.spec[key]) ? [] : null) : step.spec[key];
@@ -185,14 +181,13 @@ function KeyInput({
       control = others.length ? (
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           {others.map((name) => (
-            <label key={name} className="flex items-center gap-1.5 font-mono text-body-small">
-              <input
-                type="checkbox"
-                checked={chosen.includes(name)}
-                onChange={(event) => set(key, (event.target.checked ? [...chosen, name] : chosen.filter((x) => x !== name)) as never)}
-              />
-              {name}
-            </label>
+            <Checkbox
+              key={name}
+              isSelected={chosen.includes(name)}
+              onChange={(checked) => set(key, (checked ? [...chosen, name] : chosen.filter((x) => x !== name)) as never)}
+            >
+              <span className="font-mono text-body-small">{name}</span>
+            </Checkbox>
           ))}
         </div>
       ) : (
@@ -209,7 +204,7 @@ function KeyInput({
     case 'step':
       control = (
         <Choose
-          id={id}
+          label={key}
           value={(value as string | null) ?? ''}
           onChange={(v) => set(key, (v || null) as never)}
           options={others}
@@ -220,7 +215,7 @@ function KeyInput({
     case 'choice':
       control = (
         <Choose
-          id={id}
+          label={key}
           value={(value as string | null) ?? ''}
           onChange={(v) => set(key, (v || null) as never)}
           options={field.choices ?? []}
@@ -232,7 +227,7 @@ function KeyInput({
     case 'harness-word':
       control = (
         <Choose
-          id={id}
+          label={key}
           value={(value as string | null) ?? ''}
           onChange={(v) => set(key, (v || null) as never)}
           options={field.byHarness?.[harness] ?? []}
@@ -244,7 +239,7 @@ function KeyInput({
     case 'text':
       control = (
         <Typed
-          id={id}
+          label={key}
           value={(value as string | null) ?? ''}
           mono={key === 'check'}
           placeholder={given ?? undefined}
@@ -257,7 +252,7 @@ function KeyInput({
       const listed = value as string[] | null;
       control = (
         <Typed
-          id={id}
+          label={key}
           mono
           value={listed ? listed.join(', ') : ''}
           placeholder={given ?? listUnsetWords(key)}
@@ -271,9 +266,8 @@ function KeyInput({
     case 'dollars':
       control = (
         <Typed
-          id={id}
+          label={key}
           type="number"
-          step={kind === 'dollars' ? '0.01' : '1'}
           value={value === null ? '' : String(value)}
           placeholder={given ?? undefined}
           canon={(typed) => String(numberOf(typed) ?? '')}
@@ -285,7 +279,7 @@ function KeyInput({
       const tokens = value as number | null;
       control = (
         <Typed
-          id={id}
+          label={key}
           mono
           value={tokens === null ? '' : contextText(tokens)}
           placeholder={given ?? "the model's whole window"}
@@ -301,20 +295,14 @@ function KeyInput({
     case 'flag':
       control =
         (field.choices ?? []).length === 1 ? (
-          <label className="flex items-center gap-1.5 text-body-small">
-            <input
-              id={id}
-              type="checkbox"
-              checked={value === true}
-              onChange={(event) => set(key, (event.target.checked ? true : null) as never)}
-            />
-            <span className="font-mono">
+          <Checkbox isSelected={value === true} onChange={(checked) => set(key, (checked ? true : null) as never)}>
+            <span className="font-mono text-body-small">
               {key}: {field.choices![0]}
             </span>
-          </label>
+          </Checkbox>
         ) : (
           <Choose
-            id={id}
+            label={key}
             value={value === null ? '' : String(value)}
             onChange={(v) => set(key, (v === '' ? null : v === 'true') as never)}
             options={field.choices ?? []}
@@ -323,15 +311,12 @@ function KeyInput({
         );
       break;
     case 'schema':
-      control = <SchemaInput form={form} id={id} step={step} schemas={schemas} update={update} given={given} />;
+      control = <SchemaInput form={form} label={key} step={step} schemas={schemas} update={update} given={given} />;
       break;
   }
 
   return (
     <div data-field={key} className="space-y-1">
-      <label htmlFor={id} className="block font-mono text-body-small font-medium">
-        {key}
-      </label>
       {control}
       <Meaning>{meaning}</Meaning>
     </div>
@@ -359,14 +344,14 @@ const asIs = (value: string) => value;
  * A select of `options`, `unset` first; a value the options lack is kept as one, said by `stray`, so what the file says is never hidden.
  */
 function Choose({
-  id,
+  label,
   value,
   onChange,
   options,
   unset,
   stray = asIs,
 }: {
-  id: string;
+  label: string;
   value: string;
   onChange: (value: string) => void;
   options: readonly string[];
@@ -374,56 +359,52 @@ function Choose({
   stray?: (value: string) => string;
 }) {
   return (
-    <select id={id} value={value} onChange={(event) => onChange(event.target.value)} className={INPUT}>
-      <option value="">{unset}</option>
-      {value && !options.includes(value) && <option value={value}>{stray(value)}</option>}
+    <Select label={label} value={value || UNSET} onChange={(key) => onChange(key === UNSET || key == null ? '' : String(key))}>
+      <SelectItem id={UNSET} label={unset} />
+      {value && !options.includes(value) && <SelectItem id={value} label={stray(value)} />}
       {options.map((option) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
+        <SelectItem key={option} id={option} label={option} />
       ))}
-    </select>
+    </Select>
   );
 }
 
 /**
  * A field typed into: what is typed stays as typed — `Read, ` on its way to `Read, Grep` — and each keystroke is committed to the draft as
  * the key reads it. `value` is the draft's, as `canon` writes what is typed: when the draft changes under the field — a loop drawn gives it
- * rounds — the field shows the draft's.
+ * rounds — the field shows the draft's. While it is empty, what it stands unset at is said under it too: the kit's field shows its
+ * placeholder only under the focus.
  */
 function Typed({
-  id,
+  label,
   value,
   commit,
   canon,
   mono = false,
   type = 'text',
-  step,
   placeholder,
 }: {
-  id: string;
+  label: string;
   value: string;
   commit: (typed: string) => void;
   canon: (typed: string) => string;
   mono?: boolean;
   type?: 'text' | 'number';
-  step?: string;
   placeholder?: string;
 }) {
   const [typed, setTyped] = useState(value);
   return (
-    <input
-      id={id}
-      type={type}
-      step={step}
-      min={type === 'number' ? 0 : undefined}
+    <TextField
+      label={label}
+      inputMode={type === 'number' ? 'decimal' : undefined}
       value={canon(typed) === value ? typed : value}
       placeholder={placeholder ?? 'not set'}
-      onChange={(event) => {
-        setTyped(event.target.value);
-        commit(event.target.value);
+      supportingText={value === '' ? (placeholder ?? 'not set') : undefined}
+      onChange={(words) => {
+        setTyped(words);
+        commit(words);
       }}
-      className={mono ? MONO_INPUT : INPUT}
+      inputClassName={mono ? MONO_INPUT : undefined}
     />
   );
 }
@@ -433,72 +414,60 @@ function Typed({
  * draft is saved and replaces a file of that name. Picking a file or none takes a paste back.
  */
 function SchemaInput({
-  id,
+  label,
   step,
   form,
   schemas,
   update,
   given,
 }: {
-  id: string;
+  label: string;
   step: DraftStep;
   form: KeyForm;
   schemas: readonly string[];
   update: DraftUpdate;
   given: string | null;
 }) {
-  const text = useId();
-  const file = useId();
   const pasted = step.schema;
   const value = pasted ? PASTE : given !== null ? '' : (step.spec.output ?? '');
+  const stray = step.spec.output && !pasted && given === null && !schemas.includes(step.spec.output) ? step.spec.output : null;
 
   return (
     <div className="space-y-1.5">
-      <select
-        id={id}
-        value={value}
-        onChange={(event) => {
-          const picked = event.target.value;
+      <Select
+        label={label}
+        value={value || UNSET}
+        onChange={(key) => {
+          const picked = key === UNSET || key == null ? '' : String(key);
           update((all) =>
             picked === PASTE
               ? setSchema(all, step.name, { file: `${step.name}.schema.json`, text: '' })
               : setKey(setSchema(all, step.name, null), step.name, 'output', picked || null, form),
           );
         }}
-        className={INPUT}
       >
-        <option value="">{given ?? 'not set'}</option>
-        {step.spec.output && !pasted && given === null && !schemas.includes(step.spec.output) && (
-          <option value={step.spec.output}>{step.spec.output} — not in the folder</option>
-        )}
+        <SelectItem id={UNSET} label={given ?? 'not set'} />
+        {stray !== null && <SelectItem id={stray} label={`${stray} — not in the folder`} />}
         {schemas.map((schema) => (
-          <option key={schema} value={schema}>
-            {schema}
-          </option>
+          <SelectItem key={schema} id={schema} label={schema} />
         ))}
-        <option value={PASTE}>Paste a schema…</option>
-      </select>
+        <SelectItem id={PASTE} label="Paste a schema…" />
+      </Select>
       {pasted && (
-        <div className="space-y-1 rounded border border-dashed border-outline p-2">
-          <label htmlFor={file} className="block text-body-small text-muted-foreground">
-            Written on save as
-          </label>
-          <input
-            id={file}
+        <div className="space-y-2 rounded-shape-small border border-dashed border-outline p-2">
+          <TextField
+            label="Written on save as"
             value={pasted.file}
-            onChange={(event) => update((all) => setSchema(all, step.name, { ...pasted, file: event.target.value }))}
-            className={MONO_INPUT}
+            onChange={(file) => update((all) => setSchema(all, step.name, { ...pasted, file }))}
+            inputClassName={MONO_INPUT}
           />
-          <label htmlFor={text} className="block text-body-small text-muted-foreground">
-            The JSON Schema{schemas.includes(pasted.file) ? `, replacing ${pasted.file}` : ''}
-          </label>
-          <textarea
-            id={text}
+          <TextField
+            label={`The JSON Schema${schemas.includes(pasted.file) ? `, replacing ${pasted.file}` : ''}`}
+            multiline
             value={pasted.text}
-            rows={6}
             placeholder={'{ "type": "object", "properties": { … }, "required": [ … ], "additionalProperties": false }'}
-            onChange={(event) => update((all) => setSchema(all, step.name, { ...pasted, text: event.target.value }))}
-            className={`${MONO_INPUT} resize-y`}
+            onChange={(text) => update((all) => setSchema(all, step.name, { ...pasted, text }))}
+            inputClassName={MONO_INPUT}
           />
         </div>
       )}

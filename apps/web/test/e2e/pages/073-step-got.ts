@@ -52,12 +52,12 @@ export default {
       await expectVisible(handed.getByRole('link', { name: `What ${giver} gave` }), `with a link to what ${giver} gave`);
 
       const check = await opened(got, 'check');
-      await expectVisible(check.locator('[data-slot="collapsible-trigger"]', { hasText: `From the check of ${giver}` }), 'a check line');
+      await expectVisible(check.locator('[data-slot="disclosure-trigger"]', { hasText: `From the check of ${giver}` }), 'a check line');
       await expectVisible(check.getByText('The check passed', { exact: false }), "that opens to the check's verdict");
 
       const other = await opened(got, 'other-run');
       await expectVisible(
-        other.locator('[data-slot="collapsible-trigger"]', { hasText: `From the run ${SHAPED.other.id}` }),
+        other.locator('[data-slot="disclosure-trigger"]', { hasText: `From the run ${SHAPED.other.id}` }),
         'a line from the other run',
       );
       await expectVisible(other.getByText(`asked: ${SHAPED.other.asked}`, { exact: false }), 'saying what it was asked');

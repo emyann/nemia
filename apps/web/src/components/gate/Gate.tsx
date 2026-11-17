@@ -17,7 +17,7 @@ import { useApprove } from '../../lib/useApprove';
 import { backName, endingWarning } from '../../lib/gate';
 import type { Frozen } from '../../lib/frozen';
 import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type GateBudgets, type GivenBudget } from './GateBudgets';
-import { BUTTON, BUTTON_SECONDARY, TEXTAREA } from '../../lib/classes';
+import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 import { Actor } from '../actor/Actor';
 import { Reading, ReadingLines } from '@/components/look';
 
@@ -115,13 +115,12 @@ export function Gate({
 
       <div className="min-w-0 space-y-4">
         {questions.length > 0 && <GateQuestions step={step} questions={questions} draft={draft} onDraft={setDraft} />}
-        <GateBudgetFields step={step} budgets={budgets} amounts={amounts} onAmounts={setAmounts} field={field} />
+        <GateBudgetFields step={step} budgets={budgets} amounts={amounts} onAmounts={setAmounts} />
         <ApproveForm
           step={step}
           acts={acts}
           onto={onto}
           approveLine={approveLine}
-          field={field}
           approval={approval}
           busy={busy}
           budgeting={budgeting}
@@ -189,7 +188,6 @@ function ApproveForm({
   acts,
   onto,
   approveLine,
-  field,
   approval,
   busy,
   budgeting,
@@ -201,7 +199,6 @@ function ApproveForm({
   acts: boolean;
   onto: string | null;
   approveLine: string;
-  field: string;
   approval: ReturnType<typeof useApprove>;
   busy: boolean;
   /** The budgets the person changed, and those whose field holds no amount (`budgetsGiven`). */
@@ -211,6 +208,9 @@ function ApproveForm({
   const [confirming, setConfirming] = useState(false);
   const handed = (what: string) =>
     acts ? `the step is handed ${what} as the terms it acts on` : `every step after the gate is handed ${what}`;
+  const hint = questions.length
+    ? `A note beside the answers (optional): ${handed('it with the answers')}, under “Approved”.`
+    : `Your words (optional): ${handed('them')}, under “Approved”.`;
   return (
     <form
       aria-label={`Approve ${step}`}
@@ -221,34 +221,24 @@ function ApproveForm({
         approval.mutate(approvalBody(questions, draft, words, budgeting.given));
       }}
     >
-      <label htmlFor={`${field}-words`} className="sr-only">
-        {questions.length ? `A note beside the answers to ${step}, if any` : `Words to approve ${step} with, if any`}
-      </label>
-      <textarea
-        id={`${field}-words`}
+      <TextField
+        aria-label={questions.length ? `A note beside the answers to ${step}, if any` : `Words to approve ${step} with, if any`}
+        multiline
         value={words}
-        onChange={(event) => setWords(event.target.value)}
-        rows={2}
-        placeholder={
-          questions.length
-            ? `A note beside the answers (optional): ${handed('it with the answers')}, under “Approved”.`
-            : `Your words (optional): ${handed('them')}, under “Approved”.`
-        }
-        className={TEXTAREA}
+        onChange={setWords}
+        placeholder={hint}
+        supportingText={hint}
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <button
-          type="submit"
-          disabled={busy || left.length > 0 || budgeting.unread.length > 0}
-          title={approveWaits(left, budgeting.unread)}
-          className={BUTTON}
-        >
-          {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
-        </button>
+        <span title={approveWaits(left, budgeting.unread)} className="inline-flex">
+          <Button type="submit" isDisabled={busy || left.length > 0 || budgeting.unread.length > 0}>
+            {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
+          </Button>
+        </span>
         {confirming && !approval.isPending && (
-          <button type="button" onClick={() => setConfirming(false)} className={cn(BUTTON, BUTTON_SECONDARY)}>
+          <Button variant="tonal" onPress={() => setConfirming(false)}>
             Not yet
-          </button>
+          </Button>
         )}
         <p className="text-body-small">
           as <code>{approveLine}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
@@ -276,6 +266,8 @@ export function EndingConfirm({ step, onto }: { step: string; onto: string | nul
  * Send back, the answer box: an objection the next try is told, continuing its session or in a new one, to one of `back`. Sent back to the
  * gated step itself where it asks questions, it carries the answers, all or none: held, naming those left, while only some are answered.
  */
+const SEND_BACK_HINT = 'What to change: its next try is told it, under “Your answer”, and waits at its gate again.';
+
 function SendBackForm({
   step,
   back,
@@ -308,26 +300,20 @@ function SendBackForm({
         sendBack.mutate(body);
       }}
     >
-      <label htmlFor={`${field}-objection`} className="sr-only">
-        {`What to change, sent back to ${backName(back)}`}
-      </label>
-      <textarea
-        id={`${field}-objection`}
+      <TextField
+        aria-label={`What to change, sent back to ${backName(back)}`}
+        multiline
         value={objection}
-        onChange={(event) => setObjection(event.target.value)}
-        rows={2}
-        placeholder="What to change: its next try is told it, under “Your answer”, and waits at its gate again."
-        className={TEXTAREA}
+        onChange={setObjection}
+        placeholder={SEND_BACK_HINT}
+        supportingText={SEND_BACK_HINT}
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <button
-          type="submit"
-          disabled={busy || waits.length > 0 || !(body.message?.trim() || body.answers)}
-          title={notAnswered(waits)}
-          className={cn(BUTTON, BUTTON_SECONDARY)}
-        >
-          {sendBack.isPending ? 'Sending back…' : 'Send back'}
-        </button>
+        <span title={notAnswered(waits)} className="inline-flex">
+          <Button type="submit" variant="tonal" isDisabled={busy || waits.length > 0 || !(body.message?.trim() || body.answers)}>
+            {sendBack.isPending ? 'Sending back…' : 'Send back'}
+          </Button>
+        </span>
         <Choice
           legend={`How to send ${backName(back)} back`}
           name={`${field}-mode`}
@@ -375,15 +361,20 @@ function Choice<T extends string>({
   label: (option: T) => ReactNode;
 }) {
   return (
-    <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
-      <legend className="sr-only">{legend}</legend>
+    <RadioGroup
+      aria-label={legend}
+      name={name}
+      orientation="horizontal"
+      value={value}
+      onChange={(next) => onChange(next as T)}
+      className="gap-x-3 gap-y-1 text-body-small"
+    >
       {options.map((o) => (
-        <label key={o} className="flex cursor-pointer items-center gap-1.5">
-          <input type="radio" name={name} value={o} checked={value === o} onChange={() => onChange(o)} />
+        <Radio key={o} value={o}>
           {label(o)}
-        </label>
+        </Radio>
       ))}
-    </fieldset>
+    </RadioGroup>
   );
 }
 

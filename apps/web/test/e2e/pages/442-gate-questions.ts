@@ -69,8 +69,9 @@ export default {
       const sendBack = gate.getByRole('button', { name: 'Send back', exact: true });
       if (await approve.isEnabled()) throw new Refused('Approve waits for every answer — it was enabled with none');
       const unanswered = `Not answered: ${cut.title} · ${where.title}`;
-      if ((await approve.getAttribute('title')) !== unanswered)
-        throw new Refused(`Approve says what is not answered, ${unanswered} — it says ${await approve.getAttribute('title')}`);
+      const hint = (button: Locator) => button.locator('xpath=..').getAttribute('title');
+      if ((await hint(approve)) !== unanswered)
+        throw new Refused(`Approve says on hover what is not answered, ${unanswered} — it says ${await hint(approve)}`);
       if (await sendBack.isEnabled()) throw new Refused('Send back waits for words or answers — it was enabled with neither');
       await settled(page);
       await photograph(gate, path.join(OUT, `gate-questions-unanswered-${theme}.png`));
@@ -82,8 +83,8 @@ export default {
       const approveThere = inspected.getByRole('button', { name: 'Approve', exact: true });
       if (await approveThere.isEnabled())
         throw new Refused("the inspector's Approve waits for every answer too — it was enabled with none");
-      if ((await approveThere.getAttribute('title')) !== unanswered)
-        throw new Refused(`the inspector's Approve says what is not answered — it says ${await approveThere.getAttribute('title')}`);
+      if ((await hint(approveThere)) !== unanswered)
+        throw new Refused(`the inspector's Approve says what is not answered — it says ${await hint(approveThere)}`);
       await approveThere.scrollIntoViewIfNeeded();
       await settled(page);
       await photograph(inspector, path.join(OUT, `gate-questions-inspector-${theme}.png`));

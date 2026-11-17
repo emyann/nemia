@@ -8,12 +8,11 @@ import { useId, useState } from 'react';
 import type { Question } from '../../lib/api/tries.ts';
 import type { QuestionAnswer, RetryMode } from '../../lib/api/asks.ts';
 import { askedSaid, type Answer } from '../../lib/asks';
-import { cn } from '../../lib/utils';
 import { OFFERS } from '../../lib/words';
 import { MODES, Refusal, useAsk } from './Ask';
 import { Markdown } from '../markdown/Markdown';
 import type { Frozen } from '../../lib/frozen';
-import { BUTTON, TEXTAREA } from '../../lib/classes';
+import { Button, Checkbox, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 
 /** What a person has said so far of each question, by its title: the labels chosen, and words of their own. */
 export type Draft = Readonly<Record<string, { chose: readonly string[]; own: string }>>;
@@ -129,30 +128,43 @@ function QuestionField({ q, n, draft, onDraft }: { q: Frozen<Question>; n: numbe
         {q.multiple && <span className="font-normal text-muted-foreground"> (choose any)</span>}
       </legend>
       <Markdown className="text-foreground">{q.body}</Markdown>
-      {q.options.map((o) => (
-        <label key={o.label} data-option={o.label} className="flex cursor-pointer items-start gap-2">
-          <input
-            type={q.multiple ? 'checkbox' : 'radio'}
-            name={`${id}-choice`}
-            value={o.label}
-            checked={chose.includes(o.label)}
-            onChange={(event) => onDraft(chosenDraft(draft, q, o.label, event.target.checked))}
-            className="mt-1"
-          />
-          <OptionText q={q} label={o.label} meaning={o.meaning} />
-        </label>
-      ))}
-      <label htmlFor={`${id}-own`} className="sr-only">
-        Your own words on {q.title}
-      </label>
-      <textarea
-        id={`${id}-own`}
+      {q.multiple ? (
+        <div className="flex flex-col gap-1.5">
+          {q.options.map((o) => (
+            <Checkbox
+              key={o.label}
+              data-option={o.label}
+              value={o.label}
+              isSelected={chose.includes(o.label)}
+              onChange={(checked) => onDraft(chosenDraft(draft, q, o.label, checked))}
+            >
+              <OptionText q={q} label={o.label} meaning={o.meaning} />
+            </Checkbox>
+          ))}
+        </div>
+      ) : (
+        <RadioGroup
+          aria-label={q.title}
+          name={`${id}-choice`}
+          value={chose[0] ?? null}
+          onChange={(label) => onDraft(chosenDraft(draft, q, label, true))}
+          className="gap-1.5"
+        >
+          {q.options.map((o) => (
+            <Radio key={o.label} value={o.label} data-option={o.label}>
+              <OptionText q={q} label={o.label} meaning={o.meaning} />
+            </Radio>
+          ))}
+        </RadioGroup>
+      )}
+      <TextField
+        aria-label={`Your own words on ${q.title}`}
         data-own
-        rows={1}
+        multiline
         value={own}
-        onChange={(event) => onDraft({ ...draft, [q.title]: { chose, own: event.target.value } })}
+        onChange={(words) => onDraft({ ...draft, [q.title]: { chose, own: words } })}
         placeholder="In your own words — beside a choice, or instead of one"
-        className={TEXTAREA}
+        supportingText="In your own words — beside a choice, or instead of one"
       />
     </fieldset>
   );
@@ -202,14 +214,9 @@ export function RecommendButton({
 }) {
   if (!questions.some((q) => recommendedOf(q).length)) return null;
   return (
-    <button
-      type="button"
-      data-recommend-all
-      onClick={() => onDraft(recommendedDraft(questions, draft))}
-      className={cn(BUTTON, 'bg-card text-foreground ring-1 ring-outline hover:bg-accent')}
-    >
+    <Button variant="outlined" data-recommend-all onPress={() => onDraft(recommendedDraft(questions, draft))}>
       Choose the recommended answers
-    </button>
+    </Button>
   );
 }
 
@@ -228,15 +235,20 @@ export function AskedRow({ step, said }: { step: string; said: string }) {
 /** How the answers reach the step: its session continued, or a new one — a recheck files no session to read them. */
 function ModeChoice({ name, step, mode, onMode }: { name: string; step: string; mode: RetryMode; onMode: (m: RetryMode) => void }) {
   return (
-    <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
-      <legend className="sr-only">How to try {step} again</legend>
+    <RadioGroup
+      aria-label={`How to try ${step} again`}
+      name={name}
+      orientation="horizontal"
+      value={mode}
+      onChange={(m) => onMode(m as RetryMode)}
+      className="gap-x-3 gap-y-1 text-body-small"
+    >
       {(['continue', 'fresh'] as const).map((m) => (
-        <label key={m} className="flex cursor-pointer items-center gap-1.5">
-          <input type="radio" name={name} value={m} checked={mode === m} onChange={() => onMode(m)} />
+        <Radio key={m} value={m}>
           {MODES[m]} <code className="text-muted-foreground">--{m}</code>
-        </label>
+        </Radio>
       ))}
-    </fieldset>
+    </RadioGroup>
   );
 }
 
@@ -275,27 +287,21 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
         }}
       >
         <QuestionFields questions={offer.questions} draft={draft} onDraft={setDraft} />
-        <label htmlFor={`${field}-note`} className="sr-only">
-          A note to {offer.step} beside the answers
-        </label>
-        <textarea
-          id={`${field}-note`}
+        <TextField
+          aria-label={`A note to ${offer.step} beside the answers`}
           data-note-box
-          rows={2}
+          multiline
           value={note}
-          onChange={(event) => setNote(event.target.value)}
+          onChange={setNote}
           placeholder={OFFERS.answer.note}
-          className={TEXTAREA}
+          supportingText={OFFERS.answer.note}
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button
-            type="submit"
-            disabled={ask.isPending || left.length > 0}
-            title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined}
-            className={BUTTON}
-          >
-            {ask.isPending ? 'Asking…' : OFFERS.answer.button}
-          </button>
+          <span title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined} className="inline-flex">
+            <Button type="submit" isDisabled={ask.isPending || left.length > 0}>
+              {ask.isPending ? 'Asking…' : OFFERS.answer.button}
+            </Button>
+          </span>
           <RecommendButton questions={offer.questions} draft={draft} onDraft={setDraft} />
           <ModeChoice name={`${field}-mode`} step={offer.step} mode={mode} onMode={setMode} />
         </div>

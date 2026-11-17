@@ -115,14 +115,32 @@ export async function pick(page: Page, choice: string): Promise<void> {
 }
 
 /**
- * Opens the kit's Select `select`, its root as the page marks it, and picks the option said `word` among its options.
+ * Opens the kit's Select `select`, its root as the page marks it, picks the option said `word` among its options, and waits for its
+ * menu to leave the page, so the next Select opened finds its own menu alone.
  * @param page The page the Select's options open over.
  * @param select The Select's root.
  * @param word The option's words.
  */
 export async function pickIn(page: Page, select: Locator, word: string): Promise<void> {
   await select.locator('[data-slot="select-trigger"]').click();
-  await page.locator('[data-slot="select-popover"]').getByRole('option', { name: word, exact: true }).click();
+  const menu = page.locator('[data-slot="select-popover"]');
+  await menu.getByRole('option', { name: word, exact: true }).click();
+  await menu.waitFor({ state: 'detached' });
+}
+
+/**
+ * The words of each option the kit's Select `select` offers, in order: it opens the Select, reads its menu, and closes it with Escape.
+ * @param page The page the Select's options open over.
+ * @param select The Select's root.
+ */
+export async function optionsIn(page: Page, select: Locator): Promise<string[]> {
+  await select.locator('[data-slot="select-trigger"]').click();
+  const menu = page.locator('[data-slot="select-popover"]');
+  await menu.getByRole('option').first().waitFor();
+  const words = (await menu.getByRole('option').allTextContents()).map((said) => said.trim());
+  await page.keyboard.press('Escape');
+  await menu.waitFor({ state: 'detached' });
+  return words;
 }
 
 /**

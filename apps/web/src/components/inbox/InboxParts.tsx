@@ -14,7 +14,7 @@ import { CARD_WORDS } from '../../lib/words';
 import { useNow } from '../../lib/useNow';
 import { FactoryTag } from '../factory/FactoryTag';
 import { Instant } from '../time/Instant';
-import { BUTTON_OUTLINED } from '../../lib/classes';
+import { Button } from '@/components/ui/ds';
 
 /**
  * A card's line under its title: its name; the factory it names, linked to its floor, or, for a card that names none (`unassigned`),
@@ -70,26 +70,18 @@ export function QueueButtons({ entry, pending, onQueue }: { entry: InboxEntry; p
   return (
     <>
       {queueable(entry) && (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => onQueue(false)}
-          className={BUTTON_OUTLINED}
-          title="Start it on its own, in its factory and on its workflow, when a run slot frees"
-        >
-          {pending ? 'Queueing…' : 'Queue'}
-        </button>
+        <span title="Start it on its own, in its factory and on its workflow, when a run slot frees" className="inline-flex">
+          <Button variant="outlined" isDisabled={pending} onPress={() => onQueue(false)}>
+            {pending ? 'Queueing…' : 'Queue'}
+          </Button>
+        </span>
       )}
       {entry.queued && (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => onQueue(true)}
-          className={BUTTON_OUTLINED}
-          title="Take it off the queue: it waits on you to start it"
-        >
-          {pending ? 'Unqueueing…' : 'Unqueue'}
-        </button>
+        <span title="Take it off the queue: it waits on you to start it" className="inline-flex">
+          <Button variant="outlined" isDisabled={pending} onPress={() => onQueue(true)}>
+            {pending ? 'Unqueueing…' : 'Unqueue'}
+          </Button>
+        </span>
       )}
     </>
   );
@@ -172,9 +164,9 @@ export function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; ref
             <span>Gone from the inbox since this page listed it.</span>
           </p>
         </div>
-        <button type="button" onClick={onDismiss} className={`${BUTTON_OUTLINED} shrink-0`}>
+        <Button variant="outlined" onPress={onDismiss} className="shrink-0">
           Dismiss
-        </button>
+        </Button>
       </div>
       <Refused refusal={refusal} />
     </li>

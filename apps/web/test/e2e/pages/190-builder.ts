@@ -390,7 +390,8 @@ export default {
         throw new Refused('the form makes nothing until a person chooses where the steps work: none is chosen');
       await expectCount(form.getByRole('radio', { checked: true }), 0, 'neither place chosen for them');
       await photograph(form, path.join(OUT, `builder-new-unchosen-${await themeOf(page)}.png`));
-      await form.getByRole('radio', { name: /^On a repository's branches/ }).check();
+      await form.locator('label[data-slot="radio"]', { hasText: /^On a repository's branches/ }).click();
+      await expectCount(form.getByRole('radio', { name: /^On a repository's branches/, checked: true }), 1, 'the place chosen');
       await photograph(form, path.join(OUT, `builder-new-chosen-${await themeOf(page)}.png`));
       const [created] = await Promise.all([
         page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/workflows', {

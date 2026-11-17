@@ -1,4 +1,0 @@
-apps/web/src/components/inbox/FileCard.tsx#<button>
-apps/web/src/components/inbox/FileCard.tsx#<textarea>
-apps/web/src/components/inbox/FileCard.tsx#<select>
-apps/web/src/components/inbox/FileCard.tsx#@/lib/classes:BUTTON

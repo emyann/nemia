@@ -40,6 +40,9 @@ import {
   UNMEASURED,
   WAIT,
   where,
+  kitBoxes,
+  kitButtons,
+  kitRadios,
 } from './markup-fixtures.ts';
 
 const { createElement } = await import('react');
@@ -2092,28 +2095,19 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
       ['review', 'raise'],
     ],
   );
-  const buttons = (name: string) =>
-    [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [
-      m[1],
-      Boolean(m[2]),
-      m[3],
-    ]);
-  const radios = (name: string) =>
-    [...rows.get(name)!.html.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
-  const input = (name: string) => /<input [^>]*type="number"[^>]*>/.exec(rows.get(name)!.html)?.[0] ?? '';
+  const buttons = (name: string) => kitButtons(rows.get(name)!.html);
+  const radios = (name: string) => kitRadios(rows.get(name)!.html);
+  const input = (name: string) => /<input [^>]*inputMode="decimal"[^>]*>/.exec(rows.get(name)!.html)?.[0] ?? '';
   const box = (name: string) => /\bvalue="([^"]*)"/.exec(input(name))?.[1];
   const boxClosed = (name: string) => /\bdisabled=""/.test(input(name));
-  const said = (name: string) => {
-    const label = /<label for="[^"]+" class="sr-only">([^<]*)<\/label><textarea [^>]*>/.exec(rows.get(name)!.html);
-    return label ? [unescaped(label[1]), /\bdisabled=""/.test(label[0])] : null;
-  };
+  const said = (name: string) => kitBoxes(rows.get(name)!.html)[0] ?? null;
 
   const tokens = textsOf(rows.get('tokens')!.html);
   assert.ok(
     tokens.includes('over budget $4.25 of $3') && tokens.join(' ').includes(': the button below raises it.') && tokens.includes('$4.25'),
     tokens.join(' | '),
   );
-  assert.equal(box('tokens'), '5', 'the number box starts above what it cost, whatever order a server render writes its attributes in');
+  assert.equal(box('tokens'), '5', 'the amount box starts above what it cost, whatever order a server render writes its attributes in');
   assert.deepEqual(buttons('tokens'), [['submit', false, 'Raise the budget and try again']]);
   assert.deepEqual(
     radios('tokens'),
@@ -2127,7 +2121,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   assert.ok(rows.get('tokens')!.html.includes('Its check again costs nothing, and needs no raise.'), rows.get('tokens')!.html);
   assert.deepEqual(said('tokens'), ['What to tell tokens, if anything', false]);
   assert.equal(boxClosed('tokens'), false);
-  assert.match(rows.get('tokens')!.html, /<span class="sr-only">The cap to raise tokens to, in dollars<\/span>/);
+  assert.match(input('tokens'), /aria-label="The cap to raise tokens to, in dollars"/);
 
   const palette = textsOf(rows.get('palette')!.html);
   assert.ok(

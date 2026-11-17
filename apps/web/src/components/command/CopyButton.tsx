@@ -1,4 +1,5 @@
 import { Check as Done, Copy } from 'lucide-react';
+import { Button } from '@/components/ui/ds';
 import { useCopy } from '@/lib/useCopy';
 
 /**
@@ -9,15 +10,11 @@ import { useCopy } from '@/lib/useCopy';
 export function CopyButton({ text, what = 'the command' }: { text: string; what?: string }) {
   const { said, copy } = useCopy(text);
   return (
-    <button
-      type="button"
-      data-copy
-      onClick={copy}
-      aria-label={`Copy: ${text}`}
+    <span
       title={said === 'failed' ? 'Could not copy: select the line and copy it' : said === 'copied' ? 'Copied' : `Copy ${what}`}
-      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+      className="inline-flex shrink-0"
     >
-      {said === 'copied' ? <Done aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />}
-    </button>
+      <Button variant="text" size="xsmall" icon={said === 'copied' ? Done : Copy} data-copy onPress={copy} aria-label={`Copy: ${text}`} />
+    </span>
   );
 }

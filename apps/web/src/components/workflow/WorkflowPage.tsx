@@ -16,6 +16,7 @@ import { specStep, barOf } from '@/lib/bar';
 import { listPlace, pagePlaceOf, whyNotStarted, workflowFactories } from '@/lib/factories';
 import { workflowLink, workflowsLink } from '@/lib/factoryAddress';
 import { loadWorkflowsIn } from '@/lib/placed';
+import { Button } from '@/components/ui/ds';
 import type { QueryClient } from '@tanstack/react-query';
 
 /**
@@ -264,13 +265,9 @@ function WorkflowHeader({
         )}
         {(onBuild || removable) && <span aria-hidden className="ml-auto" />}
         {onBuild && (
-          <button
-            type="button"
-            onClick={onBuild}
-            className="rounded border border-outline px-2 py-0.5 text-body-small font-medium hover:bg-accent"
-          >
+          <Button variant="outlined" size="xsmall" onPress={onBuild}>
             Build
-          </button>
+          </Button>
         )}
         {removable && <RemoveWorkflow workflow={removable} onRemoved={onRemoved} />}
       </div>

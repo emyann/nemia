@@ -1,4 +1,4 @@
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Background, BackgroundVariant, MarkerType, Position, ReactFlow, type Connection } from '@xyflow/react';
 import { BuildRefusal, saveWorkflow, workflowsQuery, type WorkflowListing } from '../../lib/api/workflows.ts';
@@ -33,7 +33,7 @@ import { ringed } from '../../lib/meaning';
 import { FLOOR_BOX } from '../../lib/classes';
 import { cn } from '../../lib/utils';
 import { Reading } from '@/components/look';
-import { Skeleton } from '@/components/ui/ds';
+import { Button, Skeleton, TextField } from '@/components/ui/ds';
 
 /** The builder's node types for React Flow, one object for the module's life. */
 const nodeTypes = { spec: SpecNode };
@@ -44,13 +44,6 @@ const FIT = { padding: 0.2, maxZoom: 1 };
 
 /** Room under the lowest row for an edge drawn beneath it — a loop's, or one of steps that wait on each other — and its button. */
 const UNDER_ROOM = 100;
-
-const BUTTON =
-  'rounded border border-outline px-2.5 py-1 text-body-medium font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
-const PRIMARY =
-  'rounded bg-primary px-3 py-1 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
-const INPUT =
-  'block w-full rounded border border-outline bg-background px-2 py-1 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
 
 /**
  * A folder of yours, built on the board: its steps as blocks with handles, drawn left to right by `after`. Drag from a block's right-hand
@@ -304,19 +297,19 @@ function BuilderToolbar(props: {
       >
         {dirty ? 'Unsaved changes' : 'Saved'}
       </span>
-      <button type="button" onClick={props.onAdd} disabled={props.adding} className={BUTTON}>
+      <Button variant="outlined" size="xsmall" onPress={props.onAdd} isDisabled={props.adding}>
         Add a step
-      </button>
+      </Button>
       <span className="flex-1" />
-      <button type="button" disabled={!dirty || saving} onClick={props.onDiscard} className={BUTTON}>
+      <Button variant="outlined" size="xsmall" isDisabled={!dirty || saving} onPress={props.onDiscard}>
         Discard changes
-      </button>
-      <button type="button" onClick={props.onClose} className={BUTTON}>
+      </Button>
+      <Button variant="outlined" size="xsmall" onPress={props.onClose}>
         {dirty ? 'Discard and close' : 'Close'}
-      </button>
-      <button type="button" disabled={!dirty || saving || props.empty} onClick={props.onSave} className={PRIMARY}>
+      </Button>
+      <Button size="xsmall" isDisabled={!dirty || saving || props.empty} onPress={props.onSave}>
         {saving ? 'Saving…' : 'Save'}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -326,10 +319,9 @@ function BuilderToolbar(props: {
  * folder was read.
  */
 function ReadmeField({ text, changed, onChange }: { text: string; changed: boolean; onChange: (text: string) => void }) {
-  const id = useId();
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="flex items-baseline gap-2 text-body-small font-medium text-foreground">
+      <p className="flex items-baseline gap-2 text-body-small font-medium text-foreground">
         README
         <span className="font-normal text-muted-foreground">what the workflow is for, its first paragraph its description</span>
         {changed && (
@@ -337,14 +329,15 @@ function ReadmeField({ text, changed, onChange }: { text: string; changed: boole
             unsaved
           </span>
         )}
-      </label>
-      <textarea
-        id={id}
+      </p>
+      <TextField
+        aria-label="README"
+        multiline
         value={text}
-        onChange={(e) => onChange(e.target.value)}
-        rows={Math.min(Math.max(text.split('\n').length, 3), 12)}
+        onChange={onChange}
         placeholder="What this workflow is for, in markdown."
-        className={`${INPUT} font-mono text-body-small`}
+        supportingText="What this workflow is for, in markdown."
+        inputClassName="font-mono text-body-small"
       />
     </div>
   );
@@ -410,9 +403,9 @@ export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRe
       <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{refusal.message}</p>
       {(!nothingWritten || refusal.status === 409) && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <button type="button" disabled={rereading} onClick={onReread} className={BUTTON}>
+          <Button variant="outlined" size="xsmall" isDisabled={rereading} onPress={onReread}>
             {rereading ? 'Reading…' : 'Read the folder again'}
-          </button>
+          </Button>
           <span className="text-body-small text-yours">The changes drawn here are let go; copy what you need first.</span>
         </div>
       )}
@@ -442,8 +435,6 @@ function AddStep({
 }) {
   const [name, setName] = useState('');
   const [body, setBody] = useState('');
-  const nameId = useId();
-  const bodyId = useId();
   const refused = name ? nameRefusal(steps, name) : null;
 
   return (
@@ -457,32 +448,18 @@ function AddStep({
     >
       <div className="grid gap-2 @md/page:grid-cols-[12rem_minmax(0,1fr)]">
         <div className="space-y-1">
-          <label htmlFor={nameId} className="block text-body-small font-medium">
-            Step name
-          </label>
-          <input
-            id={nameId}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="review"
-            className={`${INPUT} font-mono`}
-          />
+          <TextField label="Step name" value={name} onChange={setName} placeholder="review" inputClassName="font-mono" />
           {refused && <p className="text-body-small text-failure">{refused}</p>}
         </div>
-        <div className="space-y-1">
-          <label htmlFor={bodyId} className="block text-body-small font-medium">
-            What it is told
-          </label>
-          <textarea id={bodyId} value={body} rows={3} onChange={(event) => setBody(event.target.value)} className={`${INPUT} resize-y`} />
-        </div>
+        <TextField label="What it is told" multiline value={body} onChange={setBody} />
       </div>
       <div className="flex gap-2">
-        <button type="submit" disabled={Boolean(nameRefusal(steps, name)) || !body.trim()} className={PRIMARY}>
+        <Button type="submit" size="xsmall" isDisabled={Boolean(nameRefusal(steps, name)) || !body.trim()}>
           Add
-        </button>
-        <button type="button" onClick={onCancel} className={BUTTON}>
+        </Button>
+        <Button variant="outlined" size="xsmall" onPress={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

@@ -20,7 +20,3 @@ export function WorkflowsUnread({ workflows }: { workflows: readonly WorkflowLis
     </div>
   );
 }
-
-/** A select's field, as the inbox draws its inputs. */
-export const FIELD =
-  'block w-full rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';

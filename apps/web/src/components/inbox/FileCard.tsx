@@ -3,7 +3,7 @@
  * are those it offers, by name, and the repository is the one its wiring gives the workflow picked, said and never picked; with none, the
  * idea is filed alone.
  */
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { factoriesQuery, type Factory } from '../../lib/api/factories.ts';
@@ -11,8 +11,7 @@ import { fileCard } from '../../lib/api/inbox.ts';
 import { storeQuery } from '../../lib/api/store.ts';
 import { keptBy, startRepo } from '../../lib/factories';
 import { cardFiling, factoriesOffered, factoryPreset } from '../../lib/inbox';
-import { FIELD } from '../workflow/WorkflowOptions';
-import { BUTTON } from '../../lib/classes';
+import { Button, Select, SelectItem, TextField } from '@/components/ui/ds';
 import { Reading, ReadingLines } from '@/components/look';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
@@ -69,9 +68,9 @@ export function FileCard({ shown }: { shown: string | undefined }) {
       />
       {factory && <InFactory factory={factory} picked={picked} onWorkflow={setWorkflow} />}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={!idea.trim() || file.isPending} className={BUTTON}>
+        <Button type="submit" isDisabled={!idea.trim() || file.isPending}>
           {file.isPending ? 'Filing…' : 'File'}
-        </button>
+        </Button>
         <span className="text-body-small text-muted-foreground">Parked, not started: nothing runs until you start it.</span>
       </div>
       {filed && !keptBy(shown)(filed) && <Hidden name={filed.name} shown={shown!} />}
@@ -80,23 +79,19 @@ export function FileCard({ shown }: { shown: string | undefined }) {
   );
 }
 
+/** The key of the option that picks nothing: no factory's or workflow's name, which has no parentheses. */
+const NONE = '(none)';
+
 /** The idea's field: its first line names the card. */
 function IdeaField({ idea, onIdea }: { idea: string; onIdea: (idea: string) => void }) {
-  const field = useId();
   return (
-    <div className="space-y-1.5">
-      <label htmlFor={field} className="block text-body-medium font-medium">
-        An idea
-      </label>
-      <textarea
-        id={field}
-        value={idea}
-        onChange={(event) => onIdea(event.target.value)}
-        rows={3}
-        placeholder="What it is about: its first line names the card, and the rest is its body."
-        className={`${FIELD} resize-y`}
-      />
-    </div>
+    <TextField
+      label="An idea"
+      multiline
+      value={idea}
+      onChange={onIdea}
+      placeholder="What it is about: its first line names the card, and the rest is its body."
+    />
   );
 }
 
@@ -128,20 +123,21 @@ function FactoryField({
   onPick: (name: string) => void;
 }) {
   const { data: store } = useQuery(storeQuery);
-  const field = useId();
   return (
     <div className="space-y-1.5">
-      <label htmlFor={field} className="block text-body-medium font-medium">
-        Factory
-      </label>
-      <select id={field} value={picked} onChange={(event) => onPick(event.target.value)} className={`${FIELD} @md/page:max-w-xs`}>
-        <option value="">No factory: chosen at start</option>
+      <Select
+        label="Factory"
+        data-factory-field
+        placeholder="No factory: chosen at start"
+        value={picked === '' ? null : picked}
+        onChange={(key) => onPick(key === NONE || key === null ? '' : String(key))}
+        className="@md/page:max-w-xs"
+      >
+        <SelectItem id={NONE} label="No factory: chosen at start" />
         {offered.map((f) => (
-          <option key={f.name} value={f.name}>
-            {f.name}
-          </option>
+          <SelectItem key={f.name} id={f.name} label={f.name} />
         ))}
-      </select>
+      </Select>
       {error && <p className="text-body-small text-failure">Could not list the factories: {error.message}</p>}
       {picked === '' && (
         <p data-parked className="text-body-small text-muted-foreground">
@@ -170,30 +166,25 @@ function FactoryField({
  * the attach; with no workflow picked, its only one, or that the workflow picked at start decides.
  */
 function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: string | null; onWorkflow: (name: string) => void }) {
-  const field = useId();
   const offered = factory.workflows ?? [];
   const on = picked === null ? null : startRepo(factory, picked);
   const [only, ...more] = factory.repos;
   return (
     <div className="grid gap-3 @md/page:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
       <div className="space-y-1.5">
-        <label htmlFor={field} className="block text-body-medium font-medium">
-          Workflow
-        </label>
-        <select
-          id={field}
-          value={picked ?? ''}
-          disabled={offered.length === 0}
-          onChange={(event) => onWorkflow(event.target.value)}
-          className={`${FIELD} disabled:cursor-not-allowed`}
+        <Select
+          label="Workflow"
+          data-workflow-field
+          placeholder="None: chosen at start"
+          value={picked === null || picked === '' ? null : picked}
+          isDisabled={offered.length === 0}
+          onChange={(key) => onWorkflow(key === NONE || key === null ? '' : String(key))}
         >
-          <option value="">None: chosen at start</option>
+          <SelectItem id={NONE} label="None: chosen at start" />
           {offered.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
+            <SelectItem key={name} id={name} label={name} />
           ))}
-        </select>
+        </Select>
         {offered.length === 0 && (
           <p data-no-workflow className="text-body-small text-muted-foreground">
             {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.

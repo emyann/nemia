@@ -4,7 +4,7 @@ import { Link } from '@tanstack/react-router';
 import { setCardFrom, type InboxEntry } from '../../lib/api/inbox.ts';
 import type { CardRefusal } from '../../lib/inbox';
 import { ContextPicker } from '../agent/ContextPicker';
-import { BUTTON_OUTLINED } from '../../lib/classes';
+import { Button } from '@/components/ui/ds';
 
 /**
  * A card's `from:`, the runs its run is handed as context: each linked to its page, and, on a card that can still start (`editable`), a
@@ -51,14 +51,9 @@ export function CardFrom({
           <span>reads no run as context</span>
         )}
         {editable && (
-          <button
-            type="button"
-            aria-expanded={editing}
-            onClick={() => setEditing(!editing)}
-            className={`${BUTTON_OUTLINED} px-2 py-0.5 text-body-small`}
-          >
+          <Button variant="outlined" size="xsmall" aria-expanded={editing} onPress={() => setEditing(!editing)}>
             {editing ? 'Done' : 'Change'}
-          </button>
+          </Button>
         )}
       </p>
       {editing && editable && (

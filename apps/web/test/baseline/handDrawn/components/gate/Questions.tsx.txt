@@ -1,6 +1,0 @@
-apps/web/src/components/gate/Questions.tsx#<input>
-apps/web/src/components/gate/Questions.tsx#<textarea>
-apps/web/src/components/gate/Questions.tsx#<button>
-apps/web/src/components/gate/Questions.tsx#<input type="radio">
-apps/web/src/components/gate/Questions.tsx#@/lib/classes:BUTTON
-apps/web/src/components/gate/Questions.tsx#@/lib/classes:TEXTAREA

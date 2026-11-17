@@ -28,11 +28,11 @@ export default {
       await expectCount(row.getByRole('textbox', { name: `Your answer to ${raised}` }), 0, 'answered by choosing, not in a box of words');
       const button = row.getByRole('button', { name: 'Raise the budget and answer' });
       if (await button.isEnabled()) throw new Refused('Raise the budget and answer waits for the answer — it was enabled with none');
-      if ((await button.getAttribute('title')) !== `Not answered: ${tone.title}`)
-        throw new Refused(`the button says what is not answered — it says ${await button.getAttribute('title')}`);
+      if ((await button.locator('xpath=..').getAttribute('title')) !== `Not answered: ${tone.title}`)
+        throw new Refused(`the button says what is not answered — it says ${await button.locator('xpath=..').getAttribute('title')}`);
       await row.getByRole('button', { name: 'Choose the recommended answers' }).click();
       await expectVisible(row.locator('button[type="submit"]:enabled'), 'answered, the raise is offered');
-      const amount = await row.getByRole('spinbutton', { name: new RegExp(`^The cap to raise ${raised} to, in dollars`) }).inputValue();
+      const amount = await row.getByRole('textbox', { name: new RegExp(`^The cap to raise ${raised} to, in dollars`) }).inputValue();
       if (amount !== '2') throw new Refused(`the box starts at the first whole dollar above ${ASKING.spent} — it starts at ${amount}`);
       await settled(page);
       await photograph(row, path.join(OUT, `raise-questions-answered-${await themeOf(page)}.png`));

@@ -26,7 +26,7 @@ import {
   unassigned,
   type CardRefusal,
 } from '@/lib/inbox';
-import { BUTTON, BUTTON_OUTLINED } from '@/lib/classes';
+import { Button } from '@/components/ui/ds';
 
 /** What the Inbox reads of its address: the factory its path names (none for every factory's), its label selector and its cards' kind. */
 type InboxAt = { factory?: string; l?: string; cards?: 'ended' };
@@ -289,20 +289,15 @@ function CardItem({
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           {startable && (
-            <button
-              type="button"
-              aria-expanded={starting}
-              onClick={() => setStarting(!starting)}
-              className={starting ? BUTTON_OUTLINED : BUTTON}
-            >
+            <Button variant={starting ? 'outlined' : 'filled'} aria-expanded={starting} onPress={() => setStarting(!starting)}>
               {starting ? 'Close' : 'Start'}
-            </button>
+            </Button>
           )}
           <QueueButtons entry={entry} pending={queue.isPending} onQueue={(off) => queue.mutate(off)} />
           {entry.file.endsWith('.md') && (
-            <button type="button" disabled={remove.isPending} onClick={() => remove.mutate()} className={BUTTON_OUTLINED}>
+            <Button variant="outlined" isDisabled={remove.isPending} onPress={() => remove.mutate()}>
               {remove.isPending ? 'Removing…' : 'Remove'}
-            </button>
+            </Button>
           )}
         </div>
       </div>

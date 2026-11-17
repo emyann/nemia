@@ -125,16 +125,17 @@ test("REFUSED: a part of shadcn's ui/ or React Aria imported outside the kit and
   assert.equal(secondSystem('apps/web/src/components/ui/ds/X.tsx', source).length, 0, 'so does the kit');
 });
 
-test('REFUSED: a control drawn by hand, by its element or a class string of lib/classes.ts, once each', () => {
+test("REFUSED: a control drawn by hand, by its element, an input by the look's CutField that frames it, or a class string of lib/classes.ts, once each", () => {
   const file = 'apps/web/src/components/gate/X.tsx';
   const source = [
     `import { BUTTON, FLOOR_BOX } from '../../lib/classes';`,
     `import { Button } from '@/components/ui/ds';`,
     `export const X = () => (<div className={FLOOR_BOX}><button className={BUTTON} /><input type="checkbox"/>`,
     `<input value="x" /><input type="radio" /><input type={'radio'} /><input {...props} />`,
-    `<select><option /></select><select></select><Button>ok</Button></div>);`,
+    `<select><option /></select><select></select><Button>ok</Button><CutField><label><input value="y" /></label></CutField></div>);`,
   ].join('\n');
   assert.deepEqual([...handDrawn(file, source)].sort(), [
+    '<CutField><input>',
     '<button>',
     '<input type="checkbox">',
     '<input type="radio">',

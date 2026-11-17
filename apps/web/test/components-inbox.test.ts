@@ -22,6 +22,16 @@ const { instantWords } = await import('../src/lib/instant.ts');
 const InboxParts = await import('../src/components/inbox/InboxParts.tsx');
 const { FileCard } = await import('../src/components/inbox/FileCard.tsx');
 
+/**
+ * The options of each of the kit's Selects in `html`, in order, as the hidden native list it renders for a form holds them: each option's
+ * key, its words, and whether it is the one picked; React Aria's own empty option, which stands for none picked, is left out.
+ * @param html The markup the Selects are rendered in.
+ */
+const selectsOf = (html: string): [string, string, boolean][][] =>
+  [...html.matchAll(/<select tabindex="-1">(.*?)<\/select>/g)].map((list) =>
+    [...list[1].matchAll(/<option value="([^"]+)"( selected="")?>([^<]*)</g)].map((m) => [m[1], m[3], m[2] !== undefined]),
+  );
+
 test("REFUSED: a queued card's last try says when as the board writes an instant, its date before its time on another day", async () => {
   const { Tried } = await import('../src/components/inbox/InboxParts.tsx');
   const tried = { at: new Date(Date.now() - 3 * 24 * 60 * 60_000).toISOString(), refused: true, why: 'no such workflow', repo: '/r' };
@@ -82,22 +92,25 @@ test('REFUSED: the box says the factories are being read until they are, and nev
 test('the box that files a card lists No factory and each factory offered; under No factory it draws no Workflow and no Repository control, and says the card is parked', async () => {
   const html = await routedWith(createElement(FileCard, { shown: undefined }), [[['factories'], LISTED], STORE_ANSWER]);
   assert.deepEqual(
-    [...html.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]]),
+    selectsOf(html),
     [
-      ['', 'No factory: chosen at start'],
-      ['solo', 'solo'],
-      ['pair', 'pair'],
+      [
+        ['(none)', 'No factory: chosen at start', false],
+        ['solo', 'solo', false],
+        ['pair', 'pair', false],
+      ],
     ],
-    'never the default factory',
+    'never the default factory, and none picked: the one Select, the Factory',
   );
   assert.match(html, /data-parked="true"[^>]*>Parked with no factory: it gets its factory, workflow and repository when you start it\./);
   assert.doesNotMatch(html, />Workflow<|>Repository<|<input/, 'nothing to type or pick but the idea and the factory');
+  assert.match(html, /<textarea[^>]*id="[^"]+"/, 'the idea is the one box to type in');
   assert.doesNotMatch(html, /data-no-factory/);
 });
 
 test('the box with no factory to offer has the one choice, and the line that files a factory', async () => {
   const html = await routedWith(createElement(FileCard, { shown: 'default' }), [[['factories'], [LISTED[0]]], STORE_ANSWER]);
-  assert.equal([...html.matchAll(/<option /g)].length, 1);
+  assert.deepEqual(selectsOf(html), [[['(none)', 'No factory: chosen at start', false]]]);
   assert.match(
     html,
     /data-no-factory="true"[^>]*>The store has no factory yet: file one with <code[^>]*>nemia factory add &lt;name&gt; --repo &lt;path&gt;<\/code>/,
@@ -106,18 +119,30 @@ test('the box with no factory to offer has the one choice, and the line that fil
 
 test("the box preset to the address's factory lists the workflows it offers by name, and says the repository as text — never a Repository list", async () => {
   const solo = await routedWith(createElement(FileCard, { shown: 'solo' }), [[['factories'], LISTED], STORE_ANSWER]);
-  assert.match(solo, /<option value="solo" selected="">solo<\/option>/);
+  const [factories, workflows] = selectsOf(solo);
+  assert.deepEqual(
+    factories.filter(([, , picked]) => picked),
+    [['solo', 'solo', true]],
+  );
   assert.match(solo, /data-factory-repo="true"[^>]*>\/r\/a<\/p>/);
   assert.doesNotMatch(solo, /<input|data-parked/, 'no repository to type');
-  assert.match(
-    solo,
-    />Workflow<\/label><select[^>]*><option value="" selected="">None: chosen at start<\/option><option value="dev">dev<\/option><\/select>/,
+  assert.match(solo, /data-workflow-field="true"/);
+  assert.deepEqual(
+    workflows,
+    [
+      ['(none)', 'None: chosen at start', false],
+      ['dev', 'dev', false],
+    ],
+    'its workflows by name, none picked',
   );
 
   const pair = await routedWith(createElement(FileCard, { shown: 'pair' }), [[['factories'], LISTED], STORE_ANSWER]);
   assert.doesNotMatch(pair, />Repository<\/label>|<option value="\/r\/a">/, 'no repository picker: the factory places the run');
   assert.doesNotMatch(pair, /data-needs-repo/, 'and its workflows are offered with none picked');
-  assert.match(pair, /<option value="dev">dev<\/option>/);
+  assert.deepEqual(selectsOf(pair)[1], [
+    ['(none)', 'None: chosen at start', false],
+    ['dev', 'dev', false],
+  ]);
 });
 
 test("a queued card's ghost says how long ago it was queued as every page says an age: just now under a minute, then in minutes", async () => {

@@ -205,7 +205,7 @@ export const secondSystem = (file: string, source: string): Taken[] => {
 export const CONTROL_ELEMENTS = ['button', 'input', 'select', 'textarea'] as const;
 
 /** The class strings of `lib/classes.ts` that draw a control by hand; `FLOOR_BOX`, a canvas's frame, is none. */
-export const CONTROL_STRINGS: readonly (keyof typeof Classes)[] = ['BUTTON', 'BUTTON_SECONDARY', 'BUTTON_OUTLINED', 'TEXTAREA'];
+export const CONTROL_STRINGS: readonly (keyof typeof Classes)[] = ['BUTTON', 'BUTTON_SECONDARY'];
 
 /** The input kinds the kit draws with a part of their own, each keyed apart from the other inputs. */
 const INPUT_KINDS = ['checkbox', 'radio'];
@@ -230,8 +230,18 @@ const typeOf = (element: ts.JsxOpeningElement | ts.JsxSelfClosingElement): strin
 };
 
 /**
+ * Whether a JSX element sits inside the look's `CutField`, which draws the frame of a field and leaves its input to the page.
+ */
+const framedByCutField = (element: ts.Node): boolean => {
+  for (let at = element.parent; at; at = at.parent)
+    if (ts.isJsxElement(at) && ts.isIdentifier(at.openingElement.tagName) && at.openingElement.tagName.text === 'CutField') return true;
+  return false;
+};
+
+/**
  * Each control `file`'s source draws by hand, once each: a JSX element of `CONTROL_ELEMENTS` (`<button>`), an input whose literal
- * `type` is a checkbox or a radio keyed by it (`<input type="radio">`), since the kit draws each with its own part, and a class string of
+ * `type` is a checkbox or a radio keyed by it (`<input type="radio">`), since the kit draws each with its own part, an input inside the
+ * look's `CutField` keyed by the frame (`<CutField><input>`), since the kit has no field without its own container, and a class string of
  * `CONTROL_STRINGS` it imports (`@/lib/classes:BUTTON`). None for a file of the kit, shadcn's own `ui/`, `ai-elements/` or the look.
  * It reads JSX tags and static imports alone: a control made by `createElement`, or a tag held in a variable, escapes it, and none
  * exists.
@@ -249,7 +259,11 @@ export const handDrawn = (file: string, source: string): string[] => {
       ts.isIdentifier(node.tagName) &&
       controls.includes(node.tagName.text)
     )
-      found.add(`<${node.tagName.text}${node.tagName.text === 'input' ? typeOf(node) : ''}>`);
+      found.add(
+        node.tagName.text === 'input' && framedByCutField(node)
+          ? '<CutField><input>'
+          : `<${node.tagName.text}${node.tagName.text === 'input' ? typeOf(node) : ''}>`,
+      );
     ts.forEachChild(node, visit);
   };
   visit(tree);

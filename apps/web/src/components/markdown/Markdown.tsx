@@ -3,6 +3,7 @@ import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown'
 import remarkGfm from 'remark-gfm';
 import { fencedCode, labelFootnotes, languageOf } from '../../lib/markdown';
 import { cn } from '../../lib/utils';
+import { Checkbox } from '@/components/ui/ds';
 import { CodeBlock } from '../ai-elements/code-block';
 
 const PLUGINS = [remarkGfm];
@@ -90,7 +91,14 @@ const COMPONENTS: Components = {
       {...props}
     />
   ),
-  input: ({ node: _node, className, ...props }) => <input {...props} disabled className={cn('mr-1.5 align-[-1px]', className)} />,
+  input: ({ node: _node, className, checked }) => (
+    <Checkbox
+      isSelected={Boolean(checked)}
+      isDisabled
+      aria-label={checked ? 'Done' : 'Not done'}
+      className={cn('mr-1.5 inline-flex min-h-0 align-middle', className)}
+    />
+  ),
   blockquote: ({ node: _node, className, ...props }) => (
     <blockquote className={cn('my-2 border-l-2 border-outline pl-3 text-muted-foreground', className)} {...props} />
   ),

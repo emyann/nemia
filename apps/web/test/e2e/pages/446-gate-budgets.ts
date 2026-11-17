@@ -86,7 +86,7 @@ export default {
       for (const named of [dollars(line.past), BUDGETING.factory, BUDGETING.workflow])
         if (!said.includes(named))
           throw new Refused(`the gate's sentence names the line, its factory and its workflow: ${named} — it says ${JSON.stringify(said)}`);
-      const field = (step: string) => proposed.getByRole('spinbutton', { name: `The budget of ${step}, in dollars` });
+      const field = (step: string) => proposed.getByRole('textbox', { name: `The budget of ${step}, in dollars` });
       for (const one of [above, under])
         if ((await field(one.step).inputValue()) !== String(one.usd))
           throw new Refused(`${one.step}'s field holds the proposal, ${one.usd} — it holds ${await field(one.step).inputValue()}`);

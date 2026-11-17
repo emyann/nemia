@@ -1,12 +1,10 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createWorkflow, workflowsQuery } from '../../lib/api/workflows.ts';
 import type { WorkflowStepSpec } from '../../lib/api/library.ts';
 import { firstStep, listedWith } from '../../lib/builder';
 import { rereadWorkflows } from '../../lib/placed';
-
-const INPUT =
-  'block w-full rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
+import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 
 /** Where a workflow's steps may work, each with the words a person chooses it by: none is chosen for them. */
 const PLACES: ReadonlyArray<{ place: NonNullable<WorkflowStepSpec['place']>; label: string; hint: string }> = [
@@ -14,39 +12,30 @@ const PLACES: ReadonlyArray<{ place: NonNullable<WorkflowStepSpec['place']>; lab
   { place: 'folder', label: 'In folders the run makes', hint: 'each step in a folder of its own, with no git repository' },
 ];
 
-/** The places a person chooses a new workflow's steps to work in, as radios under `name`: `place` checked, none while it is null. */
+/** The places a person chooses a new workflow's steps to work in, as radios: `place` chosen, none while it is null. */
 function PlaceChoice({
-  name,
   place,
   onChange,
 }: {
-  name: string;
   place: WorkflowStepSpec['place'];
   onChange: (place: NonNullable<WorkflowStepSpec['place']>) => void;
 }) {
   return (
-    <fieldset className="space-y-1">
-      <legend className="block text-body-small font-medium">Where its steps work</legend>
-      <div className="grid gap-2 @md/page:grid-cols-2">
-        {PLACES.map((p) => (
-          <label
-            key={p.place}
-            className="grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-2 gap-y-0.5 rounded border border-outline px-2 py-1.5 text-body-medium has-checked:border-on-surface-variant has-checked:bg-accent"
-          >
-            <input
-              type="radio"
-              name={name}
-              value={p.place}
-              checked={place === p.place}
-              onChange={() => onChange(p.place)}
-              className="mt-1"
-            />
-            <span className="font-medium">{p.label}</span>
-            <span className="col-start-2 text-body-small text-muted-foreground">{p.hint}</span>
-          </label>
-        ))}
-      </div>
-    </fieldset>
+    <RadioGroup
+      label="Where its steps work"
+      value={place}
+      onChange={(next) => onChange(next as NonNullable<WorkflowStepSpec['place']>)}
+      className="grid gap-2 @md/page:grid-cols-2"
+    >
+      {PLACES.map((p) => (
+        <Radio key={p.place} value={p.place}>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-body-medium font-medium">{p.label}</span>
+            <span className="text-body-small text-muted-foreground">{p.hint}</span>
+          </span>
+        </Radio>
+      ))}
+    </RadioGroup>
   );
 }
 
@@ -72,7 +61,6 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
   const [step, setStep] = useState('');
   const [body, setBody] = useState('');
   const [place, setPlace] = useState<WorkflowStepSpec['place']>(null);
-  const ids = { name: useId(), step: useId(), body: useId(), place: useId() };
   const first = firstStep(step, body, place);
   const create = useMutation({
     mutationFn: (made: NonNullable<typeof first>) => createWorkflow(name, made),
@@ -90,13 +78,9 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="rounded border border-outline px-3 py-1.5 text-body-medium font-medium hover:bg-accent"
-      >
+      <Button variant="outlined" onPress={() => setOpen(true)}>
         New workflow
-      </button>
+      </Button>
     );
   }
   return (
@@ -115,56 +99,24 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
         </p>
       </div>
       <div className="grid gap-3 @md/page:grid-cols-2">
-        <div className="space-y-1">
-          <label htmlFor={ids.name} className="block text-body-small font-medium">
-            Workflow name
-          </label>
-          <input
-            id={ids.name}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="triage"
-            className={`${INPUT} font-mono`}
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor={ids.step} className="block text-body-small font-medium">
-            First step
-          </label>
-          <input
-            id={ids.step}
-            value={step}
-            onChange={(event) => setStep(event.target.value)}
-            placeholder="plan"
-            className={`${INPUT} font-mono`}
-          />
-        </div>
+        <TextField label="Workflow name" value={name} onChange={setName} placeholder="triage" inputClassName="font-mono" />
+        <TextField label="First step" value={step} onChange={setStep} placeholder="plan" inputClassName="font-mono" />
       </div>
-      <div className="space-y-1">
-        <label htmlFor={ids.body} className="block text-body-small font-medium">
-          What it is told
-        </label>
-        <textarea id={ids.body} value={body} rows={3} onChange={(event) => setBody(event.target.value)} className={`${INPUT} resize-y`} />
-      </div>
-      <PlaceChoice name={ids.place} place={place} onChange={setPlace} />
+      <TextField label="What it is told" multiline value={body} onChange={setBody} />
+      <PlaceChoice place={place} onChange={setPlace} />
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="submit"
-          disabled={!name.trim() || !first || create.isPending}
-          className="rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
-        >
+        <Button type="submit" isDisabled={!name.trim() || !first || create.isPending}>
           {create.isPending ? 'Making…' : 'Make it'}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
+        </Button>
+        <Button
+          variant="outlined"
+          onPress={() => {
             setOpen(false);
             create.reset();
           }}
-          className="rounded border border-outline px-3 py-1.5 text-body-medium font-medium hover:bg-accent"
         >
           Cancel
-        </button>
+        </Button>
       </div>
       {create.isError && <Refused message={create.error.message} />}
     </form>

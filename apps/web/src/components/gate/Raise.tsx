@@ -7,15 +7,11 @@ import type { RaiseBy } from 'objects';
 import type { Question } from '../../lib/api/tries.ts';
 import type { QuestionAnswer, RetryMode } from '../../lib/api/asks.ts';
 import { askedSaid, raiseTo, type Answer } from '../../lib/asks';
-import { cn } from '../../lib/utils';
 import { OFFERS } from '../../lib/words';
 import { MODES, Refusal, useAsk, useRound } from './Ask';
 import { answersFrom, Asks, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import type { Frozen } from '../../lib/frozen';
-import { BUTTON, TEXTAREA } from '../../lib/classes';
-import { focusRing } from '../ui/ds/utils';
-
-const AMOUNT = `w-24 rounded border border-outline bg-background px-2 py-1 font-mono text-body-medium focus:border-on-surface-variant ${focusRing()}`;
+import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 
 /**
  * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes
@@ -83,7 +79,6 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
         {offer.by === 'retry' && (
           <RaiseWords
             step={offer.step}
-            field={field}
             asks={asks}
             rechecking={rechecking}
             questions={offer.questions}
@@ -94,15 +89,12 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
           />
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <AmountBox step={offer.step} field={field} amount={amount} onAmount={setAmount} disabled={rechecking} />
-          <button
-            type="submit"
-            disabled={ask.isPending || left.length > 0 || (asks && !offer.questions.length && !message.trim())}
-            title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined}
-            className={BUTTON}
-          >
-            {ask.isPending ? 'Asking…' : raiseWord(offer.by, rechecking, asks)}
-          </button>
+          <AmountBox step={offer.step} amount={amount} onAmount={setAmount} disabled={rechecking} />
+          <span title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined} className="inline-flex">
+            <Button type="submit" isDisabled={ask.isPending || left.length > 0 || (asks && !offer.questions.length && !message.trim())}>
+              {ask.isPending ? 'Asking…' : raiseWord(offer.by, rechecking, asks)}
+            </Button>
+          </span>
           {offer.by === 'retry' && <RaiseModes step={offer.step} name={`${field}-mode`} modes={offer.modes} mode={mode} onMode={setMode} />}
         </div>
       </form>
@@ -138,34 +130,26 @@ function RaiseHead({ offer, asks }: { offer: Extract<Answer, { case: 'raise' }>;
 /** The box for the cap to raise a step to, in dollars: closed while its check again is chosen, which takes no budget. */
 function AmountBox({
   step,
-  field,
   amount,
   onAmount,
   disabled,
 }: {
   step: string;
-  field: string;
   amount: string;
   onAmount: (next: string) => void;
   disabled: boolean;
 }) {
   return (
-    <label htmlFor={field} className="flex items-center gap-1 text-body-small">
-      <span className="sr-only">{`The cap to raise ${step} to, in dollars`}</span>
-      <span aria-hidden className="font-mono">
-        $
-      </span>
-      <input
-        id={field}
-        type="number"
-        step="any"
-        inputMode="decimal"
-        value={amount}
-        disabled={disabled}
-        onChange={(event) => onAmount(event.target.value)}
-        className={cn(AMOUNT, 'disabled:cursor-not-allowed disabled:opacity-50')}
-      />
-    </label>
+    <TextField
+      aria-label={`The cap to raise ${step} to, in dollars`}
+      prefix="$"
+      inputMode="decimal"
+      value={amount}
+      isDisabled={disabled}
+      onChange={onAmount}
+      className="w-36"
+      inputClassName="font-mono"
+    />
   );
 }
 
@@ -184,15 +168,20 @@ function RaiseModes({
   onMode: (next: RetryMode) => void;
 }) {
   return (
-    <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
-      <legend className="sr-only">How to try {step} again</legend>
+    <RadioGroup
+      aria-label={`How to try ${step} again`}
+      name={name}
+      orientation="horizontal"
+      value={mode}
+      onChange={(m) => onMode(m as RetryMode)}
+      className="gap-x-3 gap-y-1 text-body-small"
+    >
       {modes.map((m) => (
-        <label key={m} className="flex cursor-pointer items-center gap-1.5">
-          <input type="radio" name={name} value={m} checked={mode === m} onChange={() => onMode(m)} />
+        <Radio key={m} value={m}>
           {MODES[m]} <code className="text-muted-foreground">--{m}</code>
-        </label>
+        </Radio>
       ))}
-    </fieldset>
+    </RadioGroup>
   );
 }
 
@@ -221,7 +210,6 @@ const raiseWord = (by: RaiseBy, rechecking: boolean, asks: boolean): string => {
  */
 function RaiseWords({
   step,
-  field,
   asks,
   rechecking,
   questions,
@@ -231,7 +219,6 @@ function RaiseWords({
   onDraft,
 }: {
   step: string;
-  field: string;
   asks: boolean;
   rechecking: boolean;
   questions: readonly Frozen<Question>[];
@@ -241,29 +228,27 @@ function RaiseWords({
   onDraft: (next: Draft) => void;
 }) {
   const choosing = asks && questions.length > 0;
+  const hint = rechecking
+    ? OFFERS['try-again'].recheck.placeholder
+    : choosing
+      ? OFFERS.answer.note
+      : asks
+        ? OFFERS.answer.placeholder
+        : OFFERS.raise.placeholder;
   return (
     <>
       {choosing && <QuestionFields questions={questions} draft={draft} onDraft={onDraft} />}
       {choosing && <RecommendButton questions={questions} draft={draft} onDraft={onDraft} />}
-      <label htmlFor={`${field}-message`} className="sr-only">
-        {choosing ? `A note to ${step} beside the answers` : asks ? `Your answer to ${step}` : `What to tell ${step}, if anything`}
-      </label>
-      <textarea
-        id={`${field}-message`}
-        value={message}
-        onChange={(event) => onMessage(event.target.value)}
-        rows={asks && !choosing ? 3 : 2}
-        disabled={rechecking}
-        placeholder={
-          rechecking
-            ? OFFERS['try-again'].recheck.placeholder
-            : choosing
-              ? OFFERS.answer.note
-              : asks
-                ? OFFERS.answer.placeholder
-                : OFFERS.raise.placeholder
+      <TextField
+        aria-label={
+          choosing ? `A note to ${step} beside the answers` : asks ? `Your answer to ${step}` : `What to tell ${step}, if anything`
         }
-        className={cn(TEXTAREA, 'disabled:cursor-not-allowed disabled:opacity-50')}
+        multiline
+        value={message}
+        onChange={onMessage}
+        isDisabled={rechecking}
+        placeholder={hint}
+        supportingText={hint}
       />
     </>
   );

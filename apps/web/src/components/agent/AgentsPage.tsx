@@ -1,11 +1,13 @@
 import { useQuery, useSuspenseQuery, type QueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { AgentCard } from './AgentCard';
-import { SkillLink } from './AgentParts';
+import { personOf, SkillLink } from './AgentParts';
+import { ListFilter, NothingMatches } from '../filter/ListFilter';
 import { Button } from '@/components/ui/ds';
 import { agentsQuery, type LibraryAgent } from '@/lib/api/agents';
 import { skillsQuery, type SkillPlace } from '@/lib/api/skills';
 import { storeQuery } from '@/lib/api/store';
+import { matches, useFilterText } from '@/lib/listFilter';
 import { PLACE_LABELS } from '@/lib/skills';
 
 /**
@@ -21,13 +23,24 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
  * Your agents, beside the workflows, which the board writes: the default factory works on no repository, so a repository's agents are
  * read on their own pages in the factory that works on it, never listed here. An agent is one kind of thing a workflow's node may have
  * attached — what that node's work is told first and runs with — and each lists the nodes that name it. Then the skills an agent can be
- * given, by place, each linked to its page. Your folders are the api's (`storeQuery`).
+ * given, by place, each linked to its page. Your folders are the api's (`storeQuery`). Both lists are filtered by the address's `query`
+ * (`?q=`) as a person types, each keystroke handed to `onQuery`: while it holds a text, a list it keeps nothing of is not drawn, and
+ * where it keeps nothing of either, once the skills are read, the page says nothing matches.
  */
-export function AgentsPage() {
+export function AgentsPage({ query, onQuery }: { query: string; onQuery: (query: string) => void }) {
   const { data: agents } = useSuspenseQuery(agentsQuery);
   const { data: store } = useSuspenseQuery(storeQuery);
   const { data: skills } = useQuery(skillsQuery);
-  const yours = agents.filter((a) => a.from === 'user');
+  const [text, setText] = useFilterText(query, onQuery);
+  const filtering = text.trim() !== '';
+  const yours = agents
+    .filter((a) => a.from === 'user')
+    .filter((a) => matches(text, a.name, a.description) || matches(text, personOf(a.name)));
+  const places = skills?.map((place) => ({
+    ...place,
+    skills: place.skills.filter((one) => matches(text, one.name, one.entry?.description)),
+  }));
+  const keptPlaces = filtering ? places?.filter((place) => place.skills.length > 0) : places;
 
   return (
     <article className="space-y-8">
@@ -48,8 +61,12 @@ export function AgentsPage() {
         </div>
       </div>
 
-      <Place title="Yours" agents={yours} empty={<>None yet. New agent makes one in {code(`${store.agents}/`)}.</>} />
-      {skills && <SkillPlaces places={skills} library={store.skills} />}
+      <ListFilter label="Filter agents and skills" text={text} onText={setText} />
+      {filtering && yours.length === 0 && keptPlaces?.length === 0 && <NothingMatches text={text} onClear={() => setText('')} />}
+      {(!filtering || yours.length > 0) && (
+        <Place title="Yours" agents={yours} empty={<>None yet. New agent makes one in {code(`${store.agents}/`)}.</>} />
+      )}
+      {keptPlaces && keptPlaces.length > 0 && <SkillPlaces places={keptPlaces} library={store.skills} />}
     </article>
   );
 }

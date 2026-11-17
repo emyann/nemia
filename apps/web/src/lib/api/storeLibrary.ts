@@ -9,19 +9,25 @@ export const LIBRARY_KINDS = ['Skill', 'Agent', 'McpServer', 'Workflow'] as cons
 export type LibraryKind = (typeof LIBRARY_KINDS)[number];
 
 /**
- * One item of the store's library, as its page draws it: its kind and name, whose it is (the user library's or Nemia's builtin), the
- * factories that use it, and whether the builtin it was copied from has changed since.
+ * One item of the store's library, as its page draws it: its kind and name, what it says it is for (`null` where it says nothing, and
+ * for an MCP server, which says nothing), whose it is (the user library's or Nemia's builtin), the factories that use it, and whether the
+ * builtin it was copied from has changed since.
  */
 export type LibraryItem = {
   kind: LibraryKind;
   name: string;
+  description: string | null;
   origin: 'user' | 'builtin';
   factories: readonly string[];
   builtinChanged: boolean;
 };
 
 /** The parts of a definition's status the library's page reads. */
-type Held = { metadata: { name: string }; status: { origin: string; factories?: readonly string[]; builtinChanged?: boolean } };
+type Held = {
+  metadata: { name: string };
+  spec?: { description?: string | null };
+  status: { origin: string; factories?: readonly string[]; builtinChanged?: boolean };
+};
 
 /** `one` of `kind` as a library item, the builtin's origin kept and every other said the user library's. */
 const itemOf =
@@ -29,6 +35,7 @@ const itemOf =
   (one: Held): LibraryItem => ({
     kind,
     name: one.metadata.name,
+    description: one.spec?.description ?? null,
     origin: one.status.origin === 'builtin' ? 'builtin' : 'user',
     factories: one.status.factories ?? [],
     builtinChanged: one.status.builtinChanged === true,

@@ -1,6 +1,7 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { RouteLink } from '../agent/AgentParts';
+import { ListFilter, NothingMatches } from '../filter/ListFilter';
 import { FactoryTags } from '../factory/FactoryTag';
 import { Markdown } from '../markdown/Markdown';
 import { NewWorkflow } from './NewWorkflow';
@@ -10,6 +11,7 @@ import { storeQuery } from '@/lib/api/store';
 import { workflowsInQuery, workflowsQuery, type PagePlace, type Place, type WorkflowListing } from '@/lib/api/workflows';
 import { listPlace, workflowFactories } from '@/lib/factories';
 import { workflowLink, workflowsLink } from '@/lib/factoryAddress';
+import { matches, useFilterText } from '@/lib/listFilter';
 
 const LINK = 'underline underline-offset-2';
 
@@ -26,13 +28,16 @@ const folder = <code className="font-mono text-body-small">workflows/</code>;
  * The workflows of the address's place (`listPlace`), a card each, linked to its page — and yours made on the board, the one just made
  * opened on its page in its builder. With no factory picked, or the default one, every workflow the repository carries, then yours; with
  * a factory's path, what the api lists in it on its repository, from the folders the api names; and where it lists
- * nowhere — several repositories and none named, no such factory, a file that does not read — why, with the way out (`Unplaced`).
+ * nowhere — several repositories and none named, no such factory, a file that does not read — why, with the way out (`Unplaced`). A
+ * listed place is filtered by the address's `query` (`?q=`) as a person types, each keystroke handed to `onQuery`.
  */
-export function WorkflowsPage({ place: address }: { place: PagePlace }) {
+export function WorkflowsPage({ place: address, query, onQuery }: { place: PagePlace; query: string; onQuery: (query: string) => void }) {
   const { data: store } = useSuspenseQuery(storeQuery);
   const { data: factories } = useQuery(factoriesQuery);
   const navigate = useNavigate();
   const where = listPlace(address, factories ?? []);
+  const [text, setText] = useFilterText(query, onQuery);
+  const filter = { text, onClear: () => setText('') };
 
   return (
     <article className="space-y-6">
@@ -59,8 +64,9 @@ export function WorkflowsPage({ place: address }: { place: PagePlace }) {
           }
         />
       </div>
-      {where.kind === 'every' && <Every address={address} />}
-      {where.kind === 'in' && <InFactory place={where.place} address={address} />}
+      {(where.kind === 'every' || where.kind === 'in') && <ListFilter label="Filter workflows" text={text} onText={setText} />}
+      {where.kind === 'every' && <Every address={address} filter={filter} />}
+      {where.kind === 'in' && <InFactory place={where.place} address={address} filter={filter} />}
       <Unplaced
         where={where}
         back={everyFactory}
@@ -74,16 +80,25 @@ export function WorkflowsPage({ place: address }: { place: PagePlace }) {
   );
 }
 
+/** The page's filter, as each list reads it: what it holds, and how it is cleared. */
+type Filter = { text: string; onClear: () => void };
+
+/** The workflows of `all` the filter keeps, by name and description. */
+const kept = (all: readonly WorkflowListing[], { text }: Filter) => all.filter((one) => matches(text, one.name, one.description));
+
 /**
- * Every workflow read with no factory, each tagged with the factories it is in (`workflowFactories`), linked to their floors — nothing
- * while they are unread or for one in none; or, with none at all, how one is added.
+ * Every workflow read with no factory that the filter keeps, each tagged with the factories it is in (`workflowFactories`), linked to
+ * their floors — nothing while they are unread or for one in none; or, with none at all, how one is added; or, where the filter keeps
+ * none, that nothing matches.
  */
-function Every({ address }: { address: PagePlace }) {
+function Every({ address, filter }: { address: PagePlace; filter: Filter }) {
   const { data: all } = useSuspenseQuery(workflowsQuery);
   const { data: factories } = useQuery(factoriesQuery);
+  const shown = kept(all, filter);
   return (
     <>
-      {all.map((workflow) => (
+      {all.length > 0 && shown.length === 0 && <NothingMatches {...filter} />}
+      {shown.map((workflow) => (
         <WorkflowCard
           key={`${workflow.from}:${workflow.name}`}
           workflow={workflow}
@@ -102,11 +117,13 @@ function Every({ address }: { address: PagePlace }) {
 }
 
 /**
- * The workflows the api lists in `place`, a factory on one of its repositories, each tagged with that factory alone and reached at
- * `address`, the page's own; or, where the api lists none there, that no workflow is in the factory, and how to show every factory's.
+ * The workflows the api lists in `place`, a factory on one of its repositories, that the filter keeps, each tagged with that factory
+ * alone and reached at `address`, the page's own; or, where the api lists none there, that no workflow is in the factory, and how to
+ * show every factory's; or, where the filter keeps none, that nothing matches.
  */
-function InFactory({ place, address }: { place: Place; address: PagePlace }) {
+function InFactory({ place, address, filter }: { place: Place; address: PagePlace; filter: Filter }) {
   const { data: listed } = useSuspenseQuery(workflowsInQuery(place));
+  const shown = kept(listed, filter);
   return (
     <>
       {listed.length === 0 && (
@@ -114,7 +131,8 @@ function InFactory({ place, address }: { place: Place; address: PagePlace }) {
           No workflow is in the factory <span className="font-mono">{place.factory}</span>. {everyFactory}.
         </p>
       )}
-      {listed.map((workflow) => (
+      {listed.length > 0 && shown.length === 0 && <NothingMatches {...filter} />}
+      {shown.map((workflow) => (
         <WorkflowCard
           key={`${workflow.from}:${workflow.name}`}
           workflow={workflow}

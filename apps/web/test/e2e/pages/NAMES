@@ -154,5 +154,6 @@ try-address
 debug-detail
 step-sizes
 library
+list-filter
 factory-paths
 hold-listed

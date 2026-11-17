@@ -47,6 +47,11 @@ test("the library's items, each kind in its order and each by name, with their o
     ],
     'a server that says no origin is the user library’s',
   );
+  assert.deepEqual(
+    items.map((one) => one.description),
+    ['Read a diff.', 'Reviews a change.', null, null, 'An intent to main.'],
+    'each says what it is for as its object does; a server says nothing',
+  );
 });
 
 test('a factory may add each agent, skill or MCP server it has not added; a workflow is attached, never added', () => {
@@ -65,6 +70,7 @@ test('a factory may add each agent, skill or MCP server it has not added; a work
 const item = (kind: LibraryItem['kind'], name: string): LibraryItem => ({
   kind,
   name,
+  description: null,
   origin: 'user',
   factories: [],
   builtinChanged: false,

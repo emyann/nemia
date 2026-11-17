@@ -18,5 +18,8 @@ export const BUTTON_OUTLINED =
 export const TEXTAREA =
   'block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
 
+/** A choice drawn as its box: the kit's radio and its words, framed, the frame lit while it is chosen (an agent's prompt, a prune). */
+export const CHOICE = 'items-start rounded border border-outline-variant px-3 py-2 data-selected:border-primary';
+
 /** The frame a floor (a canvas of nodes) is drawn in. */
 export const FLOOR_BOX = 'overflow-hidden rounded border border-outline-variant';

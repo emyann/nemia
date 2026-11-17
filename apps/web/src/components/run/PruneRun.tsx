@@ -11,9 +11,7 @@ import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
 import { Reading, ReadingLines } from '@/components/look';
 import { Button, Popover, PopoverTrigger, Radio, RadioGroup, Skeleton, Title } from '@/components/ui/ds';
-
-/** A choice of what to give back as its box: the kit's radio and its words, framed, the frame lit while it is chosen. */
-const CHOICE = 'items-start rounded border border-outline-variant px-3 py-2 data-selected:border-primary';
+import { CHOICE } from '@/lib/classes';
 
 /**
  * Prune, on a finished repository run's page: the button opens a popover with a choice of what to give back — its worktrees; its files

@@ -1,11 +1,9 @@
-import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Body, Button, Popover, PopoverTrigger, Title } from '@/components/ui/ds';
 import { liftHold } from '../../lib/api/runs.ts';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
-import { ACTION_LABEL } from '@/lib/runActions';
 
 /** What a lift does, said before the second press: the package's `unhold`, as the CLI's `hold <run> --off` runs it. */
 const LIFTS = 'It goes on at the next tick, and what its steps asked while it was held is asked again.';
@@ -29,41 +27,29 @@ function useLift(id: string, namespace: string | undefined, onLifted: () => void
 }
 
 /**
- * Lift, where the run's page says it is held, asked twice: the first press asks, the second lifts the hold as the CLI's `hold --off` does.
- * A refusal — a run nobody holds — is shown in the package's words.
- *
- * Asked where the run is listed (`onClose` given), the menu's press was the first: it asks at once, and Keep it, or the lift, closes the
- * surface it is asked in.
+ * Lift, asked once a menu's Lift… was pressed (the run page's, or the one a right-click opens where the run is listed): it asks at
+ * once, and Lift lifts the hold as the CLI's `hold --off` does. Keep it, or the lift, closes the surface it is asked in (`onClose`). A
+ * refusal — a run nobody holds — is shown in the package's words.
  */
-export function LiftHold({ id, onClose }: { id: string; onClose?: () => void }) {
-  const [asking, setAsking] = useState(onClose !== undefined);
+export function LiftHold({ id, onClose }: { id: string; onClose: () => void }) {
   const lift = useLift(id, undefined, onClose);
   return (
     <span data-lift className="flex flex-wrap items-center gap-2 pt-1 text-body-small">
-      {asking ? (
-        <>
-          {`Lift the hold on ${id}? ${LIFTS}`}
-          <Button size="xsmall" onPress={() => lift.mutate()} isDisabled={lift.isPending}>
-            {lift.isPending ? 'Lifting…' : 'Lift'}
-          </Button>
-          <Button
-            variant="outlined"
-            size="xsmall"
-            onPress={() => {
-              lift.reset();
-              if (onClose) onClose();
-              else setAsking(false);
-            }}
-            isDisabled={lift.isPending}
-          >
-            Keep it
-          </Button>
-        </>
-      ) : (
-        <Button variant="outlined" size="xsmall" onPress={() => setAsking(true)}>
-          {ACTION_LABEL.lift}
-        </Button>
-      )}
+      {`Lift the hold on ${id}? ${LIFTS}`}
+      <Button size="xsmall" onPress={() => lift.mutate()} isDisabled={lift.isPending}>
+        {lift.isPending ? 'Lifting…' : 'Lift'}
+      </Button>
+      <Button
+        variant="outlined"
+        size="xsmall"
+        onPress={() => {
+          lift.reset();
+          onClose();
+        }}
+        isDisabled={lift.isPending}
+      >
+        Keep it
+      </Button>
       {lift.isError && (
         <span role="alert" data-lift-refused className="basis-full font-mono whitespace-pre-wrap break-words text-failure">
           {lift.error.message}

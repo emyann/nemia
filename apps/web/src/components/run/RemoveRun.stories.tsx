@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { RemoveRun } from './RemoveRun';
 
-/** Remove, on a try's page, asked twice: the first press asks, the second removes. */
+/** Remove, asked once a menu's Remove… was pressed: Remove removes, Keep it closes the question. */
 const meta: Meta<typeof RemoveRun> = {
   title: 'Run/RemoveRun',
   component: RemoveRun,
-  args: { id: 'try-scribe-notes-c3d4' },
+  args: { id: 'try-scribe-notes-c3d4', onClose: fn() },
   render: (args) => (
     <div style={{ width: 400 }}>
       <RemoveRun {...args} />
@@ -15,12 +15,12 @@ const meta: Meta<typeof RemoveRun> = {
 };
 export default meta;
 
-/** Remove… pressed: the question, Remove and Keep it. */
+/** Asked: the question, Remove and Keep it, which closes it. */
 export const Asking: StoryObj<typeof meta> = {
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const page = within(canvasElement);
-    await userEvent.click(page.getByRole('button', { name: 'Remove…' }));
     await expect(page.getByRole('button', { name: 'Remove' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Keep it' })).toBeEnabled();
+    await userEvent.click(page.getByRole('button', { name: 'Keep it' }));
+    await expect(args.onClose).toHaveBeenCalled();
   },
 };

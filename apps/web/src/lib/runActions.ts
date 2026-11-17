@@ -5,8 +5,8 @@ import { prunable } from './prune.ts';
 /** An action on a whole run: remove a try, lift its hold, hold it, prune what it left on disk. */
 export type RunAction = 'remove' | 'lift' | 'hold' | 'prune';
 
-/** What each action's press says, wherever it is offered: the run page's menu and the menu a right-click opens on a listed run. */
-export const ACTION_LABEL: Record<RunAction, string> = {
+/** What each action's item says, in both menus that offer it: the run page's and the one a right-click opens on a listed run. */
+const ACTION_LABEL: Record<RunAction, string> = {
   remove: 'Remove…',
   lift: 'Lift…',
   hold: 'Hold…',

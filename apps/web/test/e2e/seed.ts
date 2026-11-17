@@ -402,17 +402,17 @@ export const COSTLY = {
     status: 'over budget $1.50 of $1',
     of: '$1.50 of $1',
     needs: 'Warm colours for the dark theme, or cool ones?',
-    startsAt: '2',
+    startsAt: '$2.00',
   },
   /** The step over its own budget, raised with its try: its word, what its tries cost of its cap, and the amount its raise starts at. */
-  over: { step: 'tokens', status: 'over budget $4.25 of $3', of: '$4.25 of $3', startsAt: '5' },
+  over: { step: 'tokens', status: 'over budget $4.25 of $3', of: '$4.25 of $3', startsAt: '$5.00' },
   /** A raise the package refuses: not above the $4.25 tokens' tries cost. */
   refused: 4,
   /** The loop held on implement's budget: its looping step, its word, the amount its round's raise starts at, and implement's own word. */
   held: {
     step: 'review',
     status: 'over budget — implement $2.10 of $2',
-    startsAt: '3',
+    startsAt: '$3.00',
     target: 'implement',
     targetStatus: 'over budget $2.10 of $2',
   },

@@ -522,17 +522,6 @@ export function tokensOf(typed: string): number | null {
 export const contextText = (tokens: number): string => (tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens));
 
 /**
- * A count or an amount typed into the form, as the listing has it: null for nothing typed, and otherwise the number, which the package
- * judges.
- * @param typed The count or amount as typed.
- */
-export function numberOf(typed: string): number | null {
-  if (!typed.trim()) return null;
-  const n = Number(typed);
-  return Number.isFinite(n) ? n : null;
-}
-
-/**
  * A folder written, put into the page's listing in the listing's order — the repository's first, then yours, each by name — for the next
  * read to confirm.
  * @param list The page's listing, or undefined before it is read.

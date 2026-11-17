@@ -6,7 +6,6 @@ import {
   contextText,
   listOf,
   listUnsetWords,
-  numberOf,
   removeStep,
   setBody,
   setKey,
@@ -17,6 +16,7 @@ import {
 } from '../../lib/builder';
 import { Button, Checkbox, Select, SelectItem, TextField } from '@/components/ui/ds';
 import { Markdown } from '../markdown/Markdown';
+import { AmountField } from '../field/AmountField';
 import { AgentLayers, PolicyLayer } from './StepLayers';
 
 /** A change to the whole draft, made in one step so a key and what comes with it land together. */
@@ -265,14 +265,7 @@ function KeyInput({
     case 'count':
     case 'dollars':
       control = (
-        <Typed
-          label={key}
-          type="number"
-          value={value === null ? '' : String(value)}
-          placeholder={given ?? undefined}
-          canon={(typed) => String(numberOf(typed) ?? '')}
-          commit={(typed) => set(key, numberOf(typed) as never)}
-        />
+        <AmountKey label={key} kind={kind} value={value as number | null} given={given} onAmount={(amount) => set(key, amount as never)} />
       );
       break;
     case 'tokens': {
@@ -370,6 +363,36 @@ function Choose({
 }
 
 /**
+ * A step's amount — its budget in dollars, or a count — in an amount field, each keystroke committed to the draft; while it is unset, what
+ * it stands at (`given`, the agent's, or `not set`) said under it too.
+ */
+function AmountKey({
+  label,
+  kind,
+  value,
+  given,
+  onAmount,
+}: {
+  label: string;
+  kind: 'count' | 'dollars';
+  value: number | null;
+  given: string | null;
+  onAmount: (amount: number | null) => void;
+}) {
+  const unset = given ?? 'not set';
+  return (
+    <AmountField
+      label={label}
+      kind={kind}
+      value={value}
+      placeholder={unset}
+      supportingText={value === null ? unset : undefined}
+      onAmount={onAmount}
+    />
+  );
+}
+
+/**
  * A field typed into: what is typed stays as typed — `Read, ` on its way to `Read, Grep` — and each keystroke is committed to the draft as
  * the key reads it. `value` is the draft's, as `canon` writes what is typed: when the draft changes under the field — a loop drawn gives it
  * rounds — the field shows the draft's. While it is empty, what it stands unset at is said under it too: the kit's field shows its
@@ -381,7 +404,6 @@ function Typed({
   commit,
   canon,
   mono = false,
-  type = 'text',
   placeholder,
 }: {
   label: string;
@@ -389,14 +411,12 @@ function Typed({
   commit: (typed: string) => void;
   canon: (typed: string) => string;
   mono?: boolean;
-  type?: 'text' | 'number';
   placeholder?: string;
 }) {
   const [typed, setTyped] = useState(value);
   return (
     <TextField
       label={label}
-      inputMode={type === 'number' ? 'decimal' : undefined}
       value={canon(typed) === value ? typed : value}
       placeholder={placeholder ?? 'not set'}
       supportingText={value === '' ? (placeholder ?? 'not set') : undefined}

@@ -140,12 +140,15 @@ function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
 
 /**
  * The step's file: its own words, rendered — the policy, never the agent's words the loader fills its body with — and every key as the
- * loader reads them, the `agent` row the hire's where the factory picked hires one; or, with Source, the file as written.
+ * loader reads them, the `agent` row the hire's where the factory picked hires one; or, with Source, the file as written. The words'
+ * shallowest heading is an h3, under the page's h2s, whatever depth the file writes it at.
  */
 export function StepWritten({ page }: { page: WorkflowStepPage }) {
   return (
     <AsWritten file={`${page.dir}/${page.step}.md`} source={page.source}>
-      <Markdown className="text-body-medium">{page.layers.policy}</Markdown>
+      <Markdown top className="text-body-medium">
+        {page.layers.policy}
+      </Markdown>
       <KeyTable
         rows={page.keys}
         note={
@@ -166,9 +169,12 @@ export function StepWritten({ page }: { page: WorkflowStepPage }) {
   );
 }
 
-/** What a run of the step will be told, read now: the layers, each beside where it lives (`homesOf`). */
+/**
+ * What a run of the step will be told, read now: the layers, each beside where it lives (`homesOf`), each headed an h2, straight under
+ * the page's h1.
+ */
 export function StepTold({ page, place }: { page: WorkflowStepPage; place: PagePlace }) {
-  return <Told told={null} layers={page.layers} filed={false} homes={homesOf(page, place)} />;
+  return <Told told={null} layers={page.layers} filed={false} homes={homesOf(page, place)} level={2} />;
 }
 
 /**

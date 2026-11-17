@@ -112,3 +112,9 @@ export const snackbarShown = (body: HTMLElement): Promise<HTMLElement> =>
     if (!shown) throw new Error('no snackbar is shown');
     return shown;
   });
+
+/** Where `root`'s headings go more than one level deeper than the one before them, each said `h<from> to h<to>`: none, in order. */
+export const skippedHeadings = (root: Element): string[] => {
+  const levels = [...root.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((heading) => Number(heading.tagName.slice(1)));
+  return levels.flatMap((level, i) => (i > 0 && level > levels[i - 1] + 1 ? [`h${levels[i - 1]} to h${level}`] : []));
+};

@@ -1,11 +1,12 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { expect, within } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 import type { PartSize } from '@/lib/stepPart';
 import type { RunDetail } from '@/lib/runView';
 import { StepPart } from './StepPart';
-import { CODES, NOW, PLAN, measured, runOf, stepOf, tryOf } from '../../../../.storybook/fixtures/steps';
+import { CODES, NOW, PLAN, measured, runOf, stepOf, toldInLayers, tryOf } from '../../../../.storybook/fixtures/steps';
+import { skippedHeadings } from '../../../../.storybook/play';
 
 /**
  * A step's part at each of its three sizes — the graph's node (S), the preview card (M) and whole (L) — in each of the five places a
@@ -22,6 +23,7 @@ const RUNS = {
   atWork: runOf(stepOf(CODES.work, [tryOf(1, CODES.work, false, null)])),
   waitsOnYou: runOf(measured(stepOf(CODES.gate, [tryOf(1, CODES.gate, true, PLAN)], true))),
   done: runOf(measured(stepOf(CODES.done, [tryOf(1, CODES.done, true, PLAN)]))),
+  told: runOf(toldInLayers(stepOf(CODES.work, [tryOf(1, CODES.work, false, null)]))),
   tryAgain: runOf(
     stepOf(CODES.work, [tryOf(1, CODES.refused, true, { ...PLAN, summary: 'A first plan.' }, false), tryOf(2, CODES.work, false, null)]),
   ),
@@ -100,3 +102,29 @@ export const Done: StoryObj = {
 
 /** A step tried again after its check failed the first try: the picker of its tries, the second at work. */
 export const TryAgain: StoryObj = { render: () => <Sizes run={RUNS.tryAgain} /> };
+
+/**
+ * A step's detail opened on what it was told: each layer an h4 under the part's h3s, the words of each at the level under it whatever
+ * depth they write their headings at, and the run it waited on a block under the task's, so axe's `heading-order` holds the part.
+ */
+export const Told: StoryObj<{ step: string }> = {
+  args: { step: 'design' },
+  render: ({ step }) => (
+    <QueryClientProvider client={client}>
+      <div style={WHOLE}>
+        <StepPart view={RUNS.told} step={step} size="L" now={NOW} />
+      </div>
+    </QueryClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const user = userEvent.setup();
+    await user.click(within(canvasElement).getByRole('button', { name: 'Detail' }));
+    await user.click(await within(canvasElement).findByText('What it was told'));
+    const fold = canvasElement.querySelector('[data-told]')!;
+    await expect(fold.querySelector('[data-layer="policy"] h4')?.textContent, 'each layer an h4').toBe("5. The step's policy");
+    await expect(fold.querySelector('[data-layer="policy"] [data-markdown] h5')?.textContent, 'its `###` one under').toBe(
+      'true — on GitHub',
+    );
+    await expect(skippedHeadings(canvasElement), 'no level skipped').toEqual([]);
+  },
+};

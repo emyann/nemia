@@ -2862,9 +2862,49 @@ test("a layer the run froze none of says so; a step with no agent draws no agent
 
   const whole = toldMarkup({ told: 'Write the note.\n\n## What was asked for', layers: null, filed: false });
   assert.match(whole, /What it would be told now/);
-  assert.match(whole, /<p[^>]*>Write the note\.<\/p>\s*<h6[^>]*>What was asked for<\/h6>/, 'the brief whole, as the markdown it is');
+  assert.match(
+    whole,
+    /<p[^>]*>Write the note\.<\/p>\s*<h4[^>]*>What was asked for<\/h4>/,
+    "the brief whole, as the markdown it is, its shallowest heading an h4 under the part's h3s",
+  );
   assert.doesNotMatch(whole, /data-layer/);
   assert.equal(toldMarkup({ told: null, layers: null, filed: true }), '', 'nothing to fold, no fold');
+});
+
+/** Each heading's level, in the order the markup draws them. */
+const headingLevels = (html: string): number[] => [...html.matchAll(/<h([1-6])[\s>]/g)].map(([, level]) => Number(level));
+
+/** Where a heading goes more than one level deeper than the one before it: none, in an outline kept in order. */
+const skipped = (levels: number[]): string[] =>
+  levels.flatMap((level, i) => (i > 0 && level > levels[i - 1] + 1 ? [`h${levels[i - 1]} to h${level}`] : []));
+
+/** Layers whose words write their headings at every depth a step's file does: `##`, `###`, and a run handed in a `## From run` block. */
+const HEADED: StepLayers = {
+  ...LAYERS,
+  instructions: '## Your role\n\nYou are the writer.\n\n### Its traps\n\nNone.',
+  custom: '### Mine\n\nBe terse.',
+  factory: '# The rules\n\n## Git\n\nNo push.',
+  policy: '### true — on GitHub\n\nOpen the pull request.',
+};
+
+test('what a step was told keeps its headings in order under the heading it sits beneath, whatever depth each layer writes its own at', async () => {
+  const parts: TaskPart[] = [
+    { kind: 'text', text: '## What was asked for\n\nA note.' },
+    { kind: 'from', run: 'cache-a1', asked: 'Build the cache.', body: '### Its work\n\nIt built the cache.', how: 'waited' },
+    { kind: 'from', run: 'old-c3', asked: '', body: 'An older section.' },
+  ];
+  const run = await routedWith(createElement(Told, { told: null, layers: HEADED, parts, filed: true }));
+  const levels = headingLevels(run);
+  assert.equal(levels[0], 4, "on a run's part, under its h3s, each layer is an h4");
+  assert.deepEqual(skipped([3, ...levels]), [], 'no level skipped under the part');
+
+  const { StepTold } = await import('../src/components/step/StepParts.tsx');
+  const page = await routedWith(
+    createElement(StepTold, { page: await hiredPage({ layers: { ...HEADED, task: null } }), place: { factory: 'hiring' } }),
+  );
+  const pageLevels = headingLevels(page);
+  assert.equal(pageLevels[0], 2, "on a step's page, straight under its h1, each layer is an h2");
+  assert.deepEqual(skipped([1, ...pageLevels]), [], 'no level skipped under the page');
 });
 
 /** A step of yours, `w/review`, read in the factory `hiring`, which hires `writer` into it: what its page draws. */

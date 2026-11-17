@@ -1,13 +1,11 @@
-import { useId, useState, type ReactNode } from 'react';
-import { Button as AriaButton, Dialog, DialogTrigger, Heading, Popover } from 'react-aria-components';
+import { useState, type ReactNode } from 'react';
+import { Button, Popover, PopoverTrigger, Radio, RadioGroup, TextField, Title } from '@/components/ui/ds';
 import { barValue } from '../../lib/bar';
 import { backName, endingWarning, gateCardLine, readLink, takenLine, type GateAsk } from '../../lib/gate';
-import { cn } from '../../lib/utils';
 import { RouteLink } from '../agent/AgentParts';
 import { Refusal, useAsk } from '../gate/Ask';
 import { useApprove } from '../../lib/useApprove';
 import type { RunAt } from '@/lib/runNamespace';
-import { BUTTON, BUTTON_SECONDARY, BUTTON_SMALL, TEXTAREA, POPOVER } from '../../lib/classes';
 
 /**
  * What a card says once a person's word is taken there, the run's state it was taken in, and the state the answer moved it to once the
@@ -132,24 +130,14 @@ function Answer({
   children: (close: () => void) => ReactNode;
 }) {
   return (
-    <DialogTrigger>
-      <AriaButton
-        data-answer={label}
-        className={cn(
-          BUTTON_SMALL,
-          primary
-            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-            : 'bg-card text-foreground ring-1 ring-outline ring-inset hover:bg-accent',
-        )}
-      >
+    <PopoverTrigger>
+      <Button data-answer={label} variant={primary ? 'filled' : 'outlined'} size="xsmall">
         {primary ? label : `${label}…`}
-      </AriaButton>
-      <Popover placement="bottom start" offset={6} className={POPOVER}>
-        <Dialog aria-label={name} className="space-y-2 outline-none">
-          {({ close }) => <>{children(close)}</>}
-        </Dialog>
+      </Button>
+      <Popover aria-label={name} placement="bottom start" offset={6} className="w-80">
+        {({ close }) => <>{children(close)}</>}
       </Popover>
-    </DialogTrigger>
+    </PopoverTrigger>
   );
 }
 
@@ -171,35 +159,32 @@ function ApproveForm({
   onApprove: (words: string) => void;
 }) {
   const [words, setWords] = useState('');
-  const field = useId();
   return (
     <form
-      className="space-y-2"
+      className="flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         onApprove(words);
       }}
     >
-      <Heading slot="title" className="font-semibold">{`Approve ${gate.step}?`}</Heading>
-      <p className="text-body-small text-muted-foreground">
+      <Title size="small" component="h3">{`Approve ${gate.step}?`}</Title>
+      <p className="text-body-small text-on-surface-variant">
         {gate.ends ? endingWarning(gate.step, gate.onto) : `What waits on ${gate.step} is filed next, handed what it handed on.`}
       </p>
-      <label htmlFor={field} className="sr-only">{`Words to approve ${gate.step} with, if any`}</label>
-      <textarea
-        id={field}
-        value={words}
-        onChange={(e) => setWords(e.target.value)}
-        rows={2}
+      <TextField
+        multiline
+        label={`Words to approve ${gate.step} with, if any`}
         placeholder="Your words (optional)"
-        className={TEXTAREA}
+        value={words}
+        onChange={setWords}
       />
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={pending} className={cn(BUTTON, 'px-2.5 py-1 text-body-small')}>
+        <Button type="submit" size="xsmall" isDisabled={pending}>
           {pending ? 'Approving…' : gate.ends ? `Run ${gate.step} now` : 'Approve'}
-        </button>
-        <button type="button" onClick={onCancel} className={cn(BUTTON, BUTTON_SECONDARY, 'px-2.5 py-1 text-body-small')}>
+        </Button>
+        <Button variant="text" size="xsmall" onPress={onCancel}>
           Not yet
-        </button>
+        </Button>
       </div>
       {error && <Refusal error={error} not="Not approved" />}
     </form>
@@ -225,47 +210,42 @@ function SendBackForm({
   onSend: (message: string) => void;
 }) {
   const [message, setMessage] = useState('');
-  const field = useId();
   const name = gate.ends ? backName(gate.back) : gate.step;
   return (
     <form
-      className="space-y-2"
+      className="flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         onSend(message);
       }}
     >
-      <Heading slot="title" className="font-semibold">{`Send ${name} back`}</Heading>
-      <p className="text-body-small text-muted-foreground">
+      <Title size="small" component="h3">{`Send ${name} back`}</Title>
+      <p className="text-body-small text-on-surface-variant">
         {`Its next try is told your words, and ${gate.step} waits at its gate again once it signs off.`}
       </p>
-      <label htmlFor={field} className="sr-only">{`What to change, sent back to ${name}`}</label>
-      <textarea
-        id={field}
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        rows={3}
+      <TextField
+        multiline
+        label={`What to change, sent back to ${name}`}
         placeholder="What to change (needed)"
-        className={TEXTAREA}
+        value={message}
+        onChange={setMessage}
       />
       {gate.ends && gate.back.length > 1 && (
-        <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
-          <legend className="sr-only">Which step to send back</legend>
+        <RadioGroup aria-label="Which step to send back" orientation="horizontal" value={to} onChange={onTo}>
           {gate.back.map((step) => (
-            <label key={step} className="flex cursor-pointer items-center gap-1.5">
-              <input type="radio" name={`${field}-to`} value={step} checked={to === step} onChange={() => onTo(step)} />
+            <Radio key={step} value={step}>
               {step}
-            </label>
+            </Radio>
           ))}
-        </fieldset>
+        </RadioGroup>
       )}
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={pending || !message.trim()} className={cn(BUTTON, 'px-2.5 py-1 text-body-small')}>
+        <Button type="submit" size="xsmall" isDisabled={pending || !message.trim()}>
           {pending ? 'Sending back…' : 'Send back'}
-        </button>
-        <button type="button" onClick={onCancel} className={cn(BUTTON, BUTTON_SECONDARY, 'px-2.5 py-1 text-body-small')}>
+        </Button>
+        <Button variant="text" size="xsmall" onPress={onCancel}>
           Not yet
-        </button>
+        </Button>
       </div>
       {error && <Refusal error={error} />}
     </form>

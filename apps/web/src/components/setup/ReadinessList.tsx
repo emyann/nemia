@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { CircleAlert, CircleCheck, CircleDashed, CircleHelp, Play, Power, type LucideIcon } from 'lucide-react';
 import type { FixStart, Readiness, ReadinessFix, ReadinessPiece, ReadinessState } from 'objects';
 import { CutField, CutFrame, CutPress } from '@/components/look';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
 import { container, dashed, ringed } from '@/lib/meaning';
 import { answered, AREA_WORDS, fixKeyOf, piecesByArea, shownFixes, startOf } from '@/lib/setup';
@@ -74,15 +74,21 @@ function StartableFix({ piece, fix, i, starts }: { piece: ReadinessPiece; fix: R
             <CutPress type="submit" isDisabled={pending || !answered(asks, answers)}>
               {pending ? 'Starting…' : 'Start the fix'}
             </CutPress>
-            <Button variant="ghost" isDisabled={pending} onPress={() => setOpen(false)}>
+            <Button variant="text" size="xsmall" isDisabled={pending} onPress={() => setOpen(false)}>
               Cancel
             </Button>
           </div>
         </form>
       ) : (
         <div>
-          <Button variant="outline" data-fix-press isDisabled={pending} onPress={asks.length > 0 ? () => setOpen(true) : start}>
-            {fix.kind === 'removes' ? <Power aria-hidden /> : <Play aria-hidden />}
+          <Button
+            variant="outlined"
+            size="xsmall"
+            icon={fix.kind === 'removes' ? Power : Play}
+            data-fix-press
+            isDisabled={pending}
+            onPress={asks.length > 0 ? () => setOpen(true) : start}
+          >
             {pressWord(fix, pending)}
           </Button>
         </div>

@@ -1,0 +1,95 @@
+import { QueryClientProvider } from '@tanstack/react-query';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { Run, RunLines } from 'objects';
+import { expect, screen, within } from 'storybook/test';
+import { runLinesQuery, runObjectQuery, stepToldQuery, stepTriesQuery } from '@/lib/api/run';
+import { stepFileQuery } from '@/lib/api/steps';
+import type { StepArtifact } from '@/lib/api/tries';
+import { barValue } from '@/lib/bar';
+import { stepStamp } from '@/lib/lifecyclePath';
+import { seeded } from '../../../.storybook/fixtures/proposals';
+import { onTheFloor } from '../../../.storybook/fixtures/runs';
+import { ViewerSheet } from './ViewerSheet';
+
+/** The run whose step's files the sheet shows: the first on the floor, its first step holding two files. */
+const FLOOR_RUN = onTheFloor.items[0];
+
+/** The step whose files are viewed. */
+const STEP = FLOOR_RUN.status.steps[0];
+
+/** Where the api serves a file of the step's folder. */
+const servedAt = (rel: string) => `/api/runs/${FLOOR_RUN.metadata.name}/steps/${STEP.name}/files/${encodeURIComponent(rel)}`;
+
+/** A text file of the step's folder, served. */
+const served = (rel: string, size: number): StepArtifact => ({
+  path: `/wf/runs/${FLOOR_RUN.metadata.name}/${STEP.name}/${rel}`,
+  relativePath: rel,
+  name: rel,
+  url: servedAt(rel),
+  kind: 'text',
+  size,
+});
+
+/** The step's notes and its findings. */
+const FILES = [served('notes.md', 812), served('findings.json', 214)];
+
+/** The run, its step holding the two files. */
+const RUN: Run = { ...FLOOR_RUN, status: { ...FLOOR_RUN.status, steps: [{ ...STEP, files: FILES }] } };
+
+/** The run's lines, as the api builds them. */
+const LINES: RunLines = {
+  decide: `nemia decide ${RUN.metadata.name}`,
+  refresh: `nemia refresh ${RUN.metadata.name}`,
+  fromNote: null,
+  steps: {},
+  workflowPage: null,
+};
+
+/** The notes, as the file holds them. */
+const NOTES = '# Notes\n\nThe sheet draws with the kit: its **side sheet**, its title and its close.';
+
+/** The sheet over a page's room, the run's reads and the notes seeded, open on `path` of the step. */
+const meta: Meta<typeof ViewerSheet> = {
+  title: 'Run/ViewerSheet',
+  component: ViewerSheet,
+  args: {},
+  parameters: { at: `/?bar=${barValue({ kind: 'run', run: RUN.metadata.name })}&view=${STEP.name}/notes.md` },
+  render: () => (
+    <QueryClientProvider
+      client={seeded([
+        [runObjectQuery(RUN.metadata.name).queryKey, RUN],
+        [runLinesQuery(RUN.metadata.name).queryKey, LINES],
+        [stepTriesQuery(RUN.metadata.name, STEP.name, stepStamp(STEP)).queryKey, []],
+        [stepToldQuery(RUN.metadata.name, STEP.name, stepStamp(STEP)).queryKey, null],
+        [stepFileQuery(servedAt('notes.md')).queryKey, NOTES],
+      ])}
+    >
+      <div style={{ height: 640 }}>
+        <ViewerSheet />
+      </div>
+    </QueryClientProvider>
+  ),
+};
+export default meta;
+
+type Story = StoryObj<typeof ViewerSheet>;
+
+/** A markdown file, the first of two: the kit's modal side sheet titled by its path, Next to the other, and the notes drawn. */
+export const Markdown: Story = {
+  play: async () => {
+    const sheet = await screen.findByRole('dialog', { name: 'notes.md' });
+    await expect(sheet).toHaveAttribute('data-slot', 'side-sheet');
+    await expect(within(sheet).getByText(`${STEP.name} · 812 B · file 1 of 2`, { exact: false })).toBeVisible();
+    await expect(sheet.querySelector('[data-viewer="markdown"]')).not.toBeNull();
+    await expect(within(sheet).getByRole('button', { name: 'Close' })).toBeVisible();
+  },
+};
+
+/** A path the step has no file at: said in place of the file. */
+export const Missing: Story = {
+  parameters: { at: `/?bar=${barValue({ kind: 'run', run: RUN.metadata.name })}&view=${STEP.name}/gone.txt` },
+  play: async () => {
+    const sheet = await screen.findByRole('dialog', { name: 'gone.txt' });
+    await expect(sheet.querySelector('[data-viewer="missing"]')).not.toBeNull();
+  },
+};

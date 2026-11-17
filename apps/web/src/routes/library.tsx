@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { Badge } from '@/components/ui/badge';
+import { Tag } from '@/components/ui/ds';
 import { TextLink } from '@/components/look';
 import { HarnessImport } from '@/components/library/HarnessImport';
 import { LIBRARY_KINDS, libraryQuery, type LibraryItem, type LibraryKind } from '../lib/api/storeLibrary.ts';
@@ -52,14 +52,10 @@ function LibrarySection({ kind, items }: { kind: LibraryKind; items: readonly Li
           {items.map((item) => (
             <li key={item.name} data-library-item={`${kind}.${item.name}`} className="flex flex-wrap items-center gap-2 text-body-medium">
               <span className="font-mono">{item.name}</span>
-              <Badge variant="outline" data-library-origin={item.origin}>
+              <Tag variant="outlined" data-library-origin={item.origin}>
                 {item.origin === 'builtin' ? "Nemia's" : 'the user library'}
-              </Badge>
-              {item.builtinChanged && (
-                <Badge variant="secondary" data-builtin-changed>
-                  the builtin changed since this copy
-                </Badge>
-              )}
+              </Tag>
+              {item.builtinChanged && <Tag data-builtin-changed>the builtin changed since this copy</Tag>}
               <span className="text-body-small text-muted-foreground">
                 {item.factories.length === 0 ? 'used by no factory' : 'used by'}
               </span>

@@ -17,7 +17,7 @@ import { CutFrame, CutPress, type FrameHue } from '@/components/look';
 import { FollowedFix } from '@/components/setup/FollowedFix';
 import { ReadinessList } from '@/components/setup/ReadinessList';
 import { Instant } from '@/components/time/Instant';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
 import { readinessQuery, startFix } from '@/lib/api/readiness';
 import { startUpgrade, upgradesQuery } from '@/lib/api/upgrades';
@@ -143,8 +143,7 @@ export function UpgradeOutcome({ upgrade, running, reload }: { upgrade: Upgrade;
               {reload ? ' This page is still the board of the release before: reload it to read the new one.' : ''}
             </p>
             {reload && (
-              <Button variant="outline" data-upgrade-reload onPress={() => window.location.reload()}>
-                <RotateCcw aria-hidden />
+              <Button variant="outlined" size="xsmall" icon={RotateCcw} data-upgrade-reload onPress={() => window.location.reload()}>
                 Reload
               </Button>
             )}
@@ -167,7 +166,7 @@ function Confirm({ which, tag, onConfirm, onCancel }: { which: Which; tag: strin
         <CutPress data-upgrade-confirm-press onPress={onConfirm}>
           {which === 'upgrade' ? `Upgrade to ${tag}` : `Go back to ${tag}`}
         </CutPress>
-        <Button variant="ghost" onPress={onCancel}>
+        <Button variant="text" size="xsmall" onPress={onCancel}>
           Cancel
         </Button>
       </div>
@@ -242,12 +241,13 @@ function Presses({ shown, onStart }: { shown: ServerReleaseShown; onStart: (whic
           )}
           {offers.back !== 'none' && previous !== null && (
             <Button
-              variant="outline"
+              variant="outlined"
+              size="xsmall"
+              icon={Undo2}
               data-back-press={offers.back}
               isDisabled={offers.back === 'refused' || busy}
               onPress={() => setConfirming('back')}
             >
-              <Undo2 aria-hidden />
               {shown.starting === 'back' ? 'Going back…' : `Back to ${previous.tag}`}
             </Button>
           )}

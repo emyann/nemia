@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Tag, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Button, Tag, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { CutField, CutTag, TextLink } from '@/components/look';
 import { CLOSED_LABEL_KEYS, type Labels as LabelMap } from '@/lib/api/labels';
 
@@ -87,7 +86,7 @@ export function Labels({ labels, edit }: { labels: Readonly<LabelMap>; edit: (ed
           <li key={key} className="inline-flex items-center gap-1">
             <LabelTag name={key} value={value} />
             {CLOSED_LABEL_KEYS.includes(key) ? null : (
-              <Button type="button" size="xs" variant="ghost" aria-label={`Remove ${key}`} onClick={() => void send([`${key}-`])}>
+              <Button size="xsmall" variant="text" aria-label={`Remove ${key}`} onPress={() => void send([`${key}-`])}>
                 Remove
               </Button>
             )}
@@ -112,7 +111,7 @@ export function Labels({ labels, edit }: { labels: Readonly<LabelMap>; edit: (ed
               onChange={(event) => setText(event.target.value)}
               className="min-w-0 flex-1 bg-transparent py-1.5 text-body-medium text-on-surface outline-none placeholder:text-on-surface-variant"
             />
-            <Button type="submit" size="sm" variant="secondary">
+            <Button type="submit" size="xsmall" variant="tonal">
               Add
             </Button>
           </div>

@@ -15,7 +15,7 @@ import { fileKey, viewedFilesOf } from '@/lib/stepPart';
 import { viewClosed, viewOf, viewOpened } from '@/lib/viewAddress';
 import { extensionOf, viewerOf, type Viewer } from '@/lib/viewers';
 import { cn, focusRing } from '@/components/ui/ds/utils';
-import { Sheet, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Body, SideSheet, Title } from '@/components/ui/ds';
 import { Markdown } from '../markdown/Markdown';
 import { Json } from '../step/Outcome';
 import { bytesWord } from '../run/Artifacts';
@@ -46,9 +46,19 @@ export function ViewerSheet() {
   const close = () =>
     void navigate({ to: '.', search: (prev: Record<string, unknown>) => viewClosed(prev), replace: true, resetScroll: false });
   return (
-    <Sheet isOpen onOpenChange={(open) => !open && close()} className="data-[side=right]:w-full data-[side=right]:sm:max-w-3xl">
+    <SideSheet
+      variant="modal"
+      isOpen
+      onClose={close}
+      title={
+        <Title size="medium" component="h2" className="min-w-0 font-mono break-all">
+          {view.path}
+        </Title>
+      }
+      className="w-full sm:w-3xl"
+    >
       <Viewed run={run} step={view.step} path={view.path} />
-    </Sheet>
+    </SideSheet>
   );
 }
 
@@ -60,22 +70,21 @@ function Viewed({ run, step: name, path }: { run: string; step: string; path: st
   const at = files.findIndex((f) => fileKey(f) === path);
   const file = files[at];
   return (
-    <div data-viewer-sheet={`${name}/${path}`} className="flex h-full min-h-0 flex-col">
-      <SheetHeader className="gap-2 border-b border-outline-variant pr-14">
-        <SheetTitle className="font-mono break-all">{path}</SheetTitle>
-        <SheetDescription>
+    <div data-viewer-sheet={`${name}/${path}`} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2 border-b border-outline-variant pb-4">
+        <Body size="medium" colorRole="on-surface-variant">
           {name}
           {file && 'url' in file ? ` · ${bytesWord(file.size)}` : ''}
           {files.length > 1 && at >= 0 ? ` · file ${at + 1} of ${files.length}` : ''}
-        </SheetDescription>
+        </Body>
         {files.length > 1 && at >= 0 && (
           <nav aria-label="The step's other files" className="flex gap-2">
             <Step step={name} to={files[(at - 1 + files.length) % files.length]} words="Previous" />
             <Step step={name} to={files[(at + 1) % files.length]} words="Next" />
           </nav>
         )}
-      </SheetHeader>
-      <div className="min-h-0 flex-1 overflow-auto p-4">
+      </div>
+      <div>
         {!view ? (
           <p className="text-body-medium text-on-surface-variant">Reading the run…</p>
         ) : !file ? (

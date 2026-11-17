@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { ProposalCard } from '@/components/gate/ProposalCard';
 import { routeLink } from '@/components/nav/routeLink';
-import { LinkButton } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { proposalQuery } from '@/lib/api/proposals';
 
 /**
@@ -15,7 +15,7 @@ export const Route = createFileRoute('/factories/$factory_/proposals/$name')({
 });
 
 /** A button to a route, as the router draws its links (`routeLink`). */
-const RouterLinkButton = routeLink(LinkButton);
+const RouterLinkButton = routeLink(Button);
 
 /** The proposal, as its own part draws it (`ProposalCard`), with the way back to its factory's proposals. */
 function ProposalPage() {
@@ -24,7 +24,7 @@ function ProposalPage() {
     <article data-proposal-page={name} className="mx-auto flex max-w-3xl flex-col gap-6">
       <header className="flex flex-col gap-3">
         <div>
-          <RouterLinkButton to="/factories/$factory/proposals" params={{ factory }} variant="ghost" size="sm" data-back-to-proposals>
+          <RouterLinkButton to="/factories/$factory/proposals" params={{ factory }} variant="text" size="xsmall" data-back-to-proposals>
             ← Back to the proposals
           </RouterLinkButton>
         </div>

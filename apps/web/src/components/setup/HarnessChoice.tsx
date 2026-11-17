@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { ReadinessPiece } from 'objects';
 import { CutFrame, CutPress } from '@/components/look';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { fixKeyOf, type HarnessChoiceRow, shownFixes, startOf } from '@/lib/setup';
 import { PieceFixes, type Starts } from './ReadinessList';
 
@@ -86,7 +86,7 @@ export function HarnessChoice({
             </ul>
             {onSkip !== undefined && (
               <div>
-                <Button variant="ghost" data-harness-skip onPress={onSkip}>
+                <Button variant="text" size="xsmall" data-harness-skip onPress={onSkip}>
                   Skip for now
                 </Button>
               </div>
@@ -118,7 +118,7 @@ export function HarnessSkipped({ onAskAgain }: { onAskAgain: () => void }) {
   return (
     <p data-harness-choice="skipped" className="flex flex-wrap items-center gap-2 text-body-medium text-on-surface-variant">
       No harness is activated, and the question is skipped in this browser: activate one from the list below, or
-      <Button variant="ghost" size="sm" data-harness-ask-again onPress={onAskAgain}>
+      <Button variant="text" size="xsmall" data-harness-ask-again onPress={onAskAgain}>
         ask again
       </Button>
     </p>

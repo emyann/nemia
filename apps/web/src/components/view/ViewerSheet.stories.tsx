@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import type { Run, RunLines } from 'objects';
+import type { Run } from 'objects';
 import { expect, screen, within } from 'storybook/test';
 import { runLinesQuery, runObjectQuery, stepToldQuery, stepTriesQuery } from '@/lib/api/run';
 import { stepFileQuery } from '@/lib/api/steps';
@@ -8,7 +8,7 @@ import type { StepArtifact } from '@/lib/api/tries';
 import { barValue } from '@/lib/bar';
 import { stepStamp } from '@/lib/lifecyclePath';
 import { seeded } from '../../../.storybook/fixtures/proposals';
-import { onTheFloor } from '../../../.storybook/fixtures/runs';
+import { linesOf, onTheFloor } from '../../../.storybook/fixtures/runs';
 import { ViewerSheet } from './ViewerSheet';
 
 /** The run whose step's files the sheet shows: the first on the floor, its first step holding two files. */
@@ -36,15 +36,6 @@ const FILES = [served('notes.md', 812), served('findings.json', 214)];
 /** The run, its step holding the two files. */
 const RUN: Run = { ...FLOOR_RUN, status: { ...FLOOR_RUN.status, steps: [{ ...STEP, files: FILES }] } };
 
-/** The run's lines, as the api builds them. */
-const LINES: RunLines = {
-  decide: `nemia decide ${RUN.metadata.name}`,
-  refresh: `nemia refresh ${RUN.metadata.name}`,
-  fromNote: null,
-  steps: {},
-  workflowPage: null,
-};
-
 /** The notes, as the file holds them. */
 const NOTES = '# Notes\n\nThe sheet draws with the kit: its **side sheet**, its title and its close.';
 
@@ -58,7 +49,7 @@ const meta: Meta<typeof ViewerSheet> = {
     <QueryClientProvider
       client={seeded([
         [runObjectQuery(RUN.metadata.name).queryKey, RUN],
-        [runLinesQuery(RUN.metadata.name).queryKey, LINES],
+        [runLinesQuery(RUN.metadata.name).queryKey, linesOf(RUN.metadata.name)],
         [stepTriesQuery(RUN.metadata.name, STEP.name, stepStamp(STEP)).queryKey, []],
         [stepToldQuery(RUN.metadata.name, STEP.name, stepStamp(STEP)).queryKey, null],
         [stepFileQuery(servedAt('notes.md')).queryKey, NOTES],

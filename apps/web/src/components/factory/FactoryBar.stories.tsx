@@ -6,6 +6,7 @@ import { factoriesQuery } from '@/lib/api/factories';
 import { openRunsQuery } from '@/lib/api/runs';
 import { FactoryBar } from './FactoryBar';
 import { FACTORY, factoryView, openRuns, seeded } from '../../../.storybook/fixtures/proposals';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** The bar of `factory`, the factories and its runs read: the factory `nemia`, and the default one. */
 const drawn = (factory: string) => (
@@ -43,4 +44,16 @@ export const DefaultFactory: Story = {
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-slot="tag"]')?.textContent).toBe('default');
   },
+};
+
+/** The factories still read: the shape of the bar's facts. */
+export const Reading: Story = {
+  render: (args) => (
+    <Unread>
+      <div style={{ width: 420 }}>
+        <FactoryBar {...args} />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading the factories…'),
 };

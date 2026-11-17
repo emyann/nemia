@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bot, UserRound } from 'lucide-react';
-import { Button, Cell, Column, Row, Table, TableBody, TableHeader } from '@/components/ui/ds';
+import { Button, Cell, Column, Row, Skeleton, Table, TableBody, TableHeader } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
-import { CutFrame, CutPress, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE } from '@/components/look';
+import { CutFrame, CutPress, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, Reading } from '@/components/look';
 import { Refusal } from '@/components/gate/Ask';
 import { Instant } from '@/components/time/Instant';
 import { retireToken, tokensQuery, type Token } from '@/lib/api/tokens';
@@ -139,5 +139,21 @@ export function TokenTable({ tokens }: { tokens: readonly Token[] }) {
       )}
       {retire.isError && <Refusal error={retire.error} not="Not retired" />}
     </div>
+  );
+}
+
+/** The tokens while they are read: the table's frame, its head's place and three rows. */
+export function TokensReading() {
+  return (
+    <Reading label="Reading the tokens…">
+      <CutFrame size={24}>
+        <div className="flex flex-col gap-px p-2">
+          <Skeleton shape="rectangle" className="h-8 rounded-none" />
+          {[0, 1, 2].map((at) => (
+            <Skeleton key={at} shape="rectangle" className="h-10 rounded-none" />
+          ))}
+        </div>
+      </CutFrame>
+    </Reading>
   );
 }

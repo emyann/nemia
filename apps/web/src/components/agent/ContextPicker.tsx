@@ -6,6 +6,8 @@ import type { RunView } from '../../lib/api/judged.ts';
 import { standingOf, titleOf } from '../../lib/factory';
 import { usePickerRuns } from '../../lib/pickerRuns.ts';
 import { Markdown } from '../markdown/Markdown';
+import { Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /**
  * The runs a run reads as context (the CLI's `start --from`, a card's `from:`): the runs not finished, newest created first, then the
@@ -40,7 +42,15 @@ export function ContextPicker({
       {runs.error ? (
         <p className="text-body-small text-failure">Could not list the runs to read: {runs.error.message}</p>
       ) : !listed ? (
-        <p className="text-body-small text-muted-foreground">Reading the runs…</p>
+        <Reading label="Reading the runs…" className="divide-y divide-outline-variant rounded border border-outline">
+          {[0, 1, 2].map((at) => (
+            <div key={at} className="flex items-center gap-2 px-2 py-1 text-body-medium">
+              <Skeleton shape="rectangle" className="size-4 rounded-none" />
+              <Skeleton className="flex-1" />
+              <Skeleton className="w-16" />
+            </div>
+          ))}
+        </Reading>
       ) : !listed.length ? (
         <p className="text-body-small text-muted-foreground">No run to read.</p>
       ) : (
@@ -97,7 +107,9 @@ export function ConcludedPreview({ run }: { run: string }) {
       {concluded.error ? (
         <p className="text-body-small text-failure">Could not read what it concluded: {concluded.error.message}</p>
       ) : !concluded.data ? (
-        <p className="text-body-small text-muted-foreground">Reading what it concluded…</p>
+        <Reading label="Reading what it concluded…" className="rounded p-2">
+          <ReadingLines widths={['w-full', 'w-5/6', 'w-1/2']} className="text-body-small" />
+        </Reading>
       ) : (
         <Markdown level={5} className="max-h-60 overflow-y-auto rounded bg-muted/60 p-2 text-body-small">
           {concluded.data.section}

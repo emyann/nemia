@@ -1,0 +1,4 @@
+apps/web/src/components/look/CopyId.stories.tsx#Short
+apps/web/src/components/look/CopyId.stories.tsx#Whole
+apps/web/src/components/look/CopyId.stories.tsx#UnderTitle
+apps/web/src/components/look/CopyId.stories.tsx#Lined

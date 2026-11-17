@@ -1,0 +1,5 @@
+apps/web/src/components/step/part/StepPart.stories.tsx#ToCome
+apps/web/src/components/step/part/StepPart.stories.tsx#AtWork
+apps/web/src/components/step/part/StepPart.stories.tsx#WaitsOnYou
+apps/web/src/components/step/part/StepPart.stories.tsx#Done
+apps/web/src/components/step/part/StepPart.stories.tsx#TryAgain

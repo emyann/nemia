@@ -10,8 +10,9 @@ import { OUT } from '../world.ts';
 const EMPTY = FACTORIES.others[0];
 
 /**
- * The page while its reads are on their way: a visit of its own whose reads of the runs are held says it is loading, under the page's
- * name in the top bar, and draws its three parts once they are let go.
+ * The page while its reads are on their way: a visit of its own whose reads of the runs are held draws the kit's skeleton of its parts
+ * — the label field, two cards, three rows in flight and six finished, under three count chips' places — and says it is loading to a
+ * screen reader alone, under the page's name in the top bar, and draws its three parts once they are let go.
  */
 async function loading(page: Page): Promise<void> {
   const other = await page.context().newPage();
@@ -30,6 +31,7 @@ async function loading(page: Page): Promise<void> {
       state.locator('[role="status"]', { hasText: /^Loading the runs…$/ }),
       'while its reads are held, the page says it is loading',
     );
+    await expectCount(state.locator('[role="status"] [data-slot="skeleton"]'), 15, 'in the shape of its parts, inside the status');
     await expectTexts(
       other.locator('header[data-frame-header]').getByRole('heading', { level: 1 }),
       ['Runs'],
@@ -38,7 +40,6 @@ async function loading(page: Page): Promise<void> {
     await expectCount(other.locator('[data-count-chip]'), 0, 'and draws no part yet');
     await settled(other);
     await photographBothWidths(other, OUT, 'runs-states', 'loading');
-    await contrastHolds(other, ['[role="status"]']);
     release();
     await expectCount(other.locator('[data-runs-page="loaded"] [data-count-chip]'), 3, 'let go, it draws its three parts');
     await idle(other);
@@ -51,8 +52,9 @@ async function loading(page: Page): Promise<void> {
 export default {
   /**
    * The states nobody drew, built plain: with nothing to show, a factory that holds no run, each part says so under a quiet count chip
-   * that counts none; and while its reads are on their way the page says it is loading. Each pictured at 1280 and at 390 wide, and no text
-   * pair of either is under 4.5:1 in either scheme. Writes nothing.
+   * that counts none; and while its reads are on their way the page draws the shape of its parts, saying it is loading to a screen reader
+   * alone. Each pictured at 1280 and at 390 wide, and no text pair of the empty page, the one of the two that shows text, is under 4.5:1
+   * in either scheme. Writes nothing.
    */
   name: 'runs-states',
   route: `/factories/${EMPTY}/runs`,

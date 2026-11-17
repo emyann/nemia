@@ -20,7 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { CutFrame, CutPress, CutTag, FRAMED_BOX, Plate } from '@/components/look';
+import { CutFrame, CutPress, CutTag, FRAMED_BOX, Plate, Reading, ReadingLines } from '@/components/look';
 import { container, hairline } from '@/lib/meaning';
 import { CHIP } from '../step/Reach';
 import { ServerSignIn } from './ServerSignIn';
@@ -34,6 +34,7 @@ import {
   type FactoryServer,
   type McpServerWrite,
 } from '../../lib/api/factories.ts';
+import { Skeleton } from '@/components/ui/ds';
 
 /** What a person asks of a factory's record: one server recorded, or one taken off. */
 type Change = { kind: 'record'; server: string; body: McpServerWrite } | { kind: 'remove'; server: string };
@@ -364,10 +365,21 @@ export function FactoryServers({ name }: { name: string }) {
             onRecord={(server, body) => ask({ kind: 'record', server, body })}
           />
         </>
+      ) : error instanceof Error ? (
+        <p className="text-body-medium text-muted-foreground">Could not read the servers: {error.message}</p>
       ) : (
-        <p className="text-body-medium text-muted-foreground">
-          {error instanceof Error ? `Could not read the servers: ${error.message}` : 'Reading the servers…'}
-        </p>
+        <Reading label="Reading the servers…">
+          <CutFrame size={12}>
+            <div className="flex flex-col divide-y divide-outline-variant px-4">
+              {[0, 1].map((at) => (
+                <div key={at} className="flex items-center gap-3 py-3">
+                  <ReadingLines widths={['w-40', 'w-2/3']} className="flex-1 text-body-medium" />
+                  <Skeleton shape="rectangle" className="h-6 w-20 rounded-none" />
+                </div>
+              ))}
+            </div>
+          </CutFrame>
+        </Reading>
       )}
       {change.isSuccess && said && (
         <p data-servers-done className="text-body-medium text-muted-foreground">

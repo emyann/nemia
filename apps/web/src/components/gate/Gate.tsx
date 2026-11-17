@@ -19,6 +19,7 @@ import type { Frozen } from '../../lib/frozen';
 import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type GateBudgets, type GivenBudget } from './GateBudgets';
 import { BUTTON, BUTTON_SECONDARY, TEXTAREA } from '../../lib/classes';
 import { Actor } from '../actor/Actor';
+import { Reading, ReadingLines } from '@/components/look';
 
 /** A gated step's gate, as its object's status holds it. */
 type StepGate = NonNullable<StepView['gate']>;
@@ -537,15 +538,16 @@ export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
             )}
           </p>
         ))}
-        {!standings.length && (
-          <p className="text-body-small text-muted-foreground">
-            {error
-              ? `The branch could not be read: ${error.message}`
-              : isDecidable(data)
-                ? 'No result branch of its own: the work is on the base branch.'
-                : 'Reading the branch…'}
-          </p>
-        )}
+        {!standings.length &&
+          (error || isDecidable(data) ? (
+            <p className="text-body-small text-muted-foreground">
+              {error ? `The branch could not be read: ${error.message}` : 'No result branch of its own: the work is on the base branch.'}
+            </p>
+          ) : (
+            <Reading label="Reading the branch…">
+              <ReadingLines widths={['w-2/3', 'w-1/3']} className="font-mono text-body-small" />
+            </Reading>
+          ))}
       </div>
 
       {work.length > 0 && (

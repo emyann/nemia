@@ -9,7 +9,8 @@ import { barValue } from '@/lib/bar';
 import { stepStamp } from '@/lib/lifecyclePath';
 import { seeded } from '../../../.storybook/fixtures/proposals';
 import { linesOf, onTheFloor } from '../../../.storybook/fixtures/runs';
-import { ViewerSheet } from './ViewerSheet';
+import { TextFile, ViewerSheet } from './ViewerSheet';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** The run whose step's files the sheet shows: the first on the floor, its first step holding two files. */
 const FLOOR_RUN = onTheFloor.items[0];
@@ -83,4 +84,38 @@ export const Missing: Story = {
     const sheet = await screen.findByRole('dialog', { name: 'gone.txt' });
     await expect(sheet.querySelector('[data-viewer="missing"]')).not.toBeNull();
   },
+};
+
+/** The run still read: the sheet over the page, the shape of the file's lines while it waits. */
+export const ReadingTheRun: Story = {
+  parameters: { at: '/?bar=run:r-1&view=design/plan.md' },
+  render: () => (
+    <Unread>
+      <p className="text-body-medium">The run's page, under the sheet.</p>
+      <ViewerSheet />
+    </Unread>
+  ),
+  play: saysReading('Reading the run…'),
+};
+
+/** The run read and the file opened, its text still read. */
+export const ReadingTheFile: Story = {
+  render: () => (
+    <Unread>
+      <div style={{ width: 640 }}>
+        <TextFile
+          viewer="markdown"
+          file={{
+            path: '/wf/runs/r-1/artifacts/design/plan.md',
+            relativePath: 'plan.md',
+            name: 'plan.md',
+            url: '/api/runs/r-1/steps/design/artifacts/plan.md',
+            kind: 'text',
+            size: 2_048,
+          }}
+        />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading plan.md…'),
 };

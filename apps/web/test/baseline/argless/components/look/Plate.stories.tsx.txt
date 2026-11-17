@@ -1,0 +1,6 @@
+apps/web/src/components/look/Plate.stories.tsx#Yours
+apps/web/src/components/look/Plate.stories.tsx#Alive
+apps/web/src/components/look/Plate.stories.tsx#Grey
+apps/web/src/components/look/Plate.stories.tsx#Quiet
+apps/web/src/components/look/Plate.stories.tsx#NameOfAPage
+apps/web/src/components/look/Plate.stories.tsx#LongNameOfAPage

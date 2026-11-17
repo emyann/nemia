@@ -4,8 +4,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import type { Fix, FixPhase, FixStart } from 'objects';
 import { FollowedFix } from '@/components/setup/FollowedFix';
 import { HarnessChoice, HarnessSkipped } from '@/components/setup/HarnessChoice';
-import { PairingApprovals } from '@/components/setup/PairingApprovals';
-import { ReadinessList } from '@/components/setup/ReadinessList';
+import { PairingApprovals, PairingsReading } from '@/components/setup/PairingApprovals';
+import { ReadinessList, ReadinessReading } from '@/components/setup/ReadinessList';
 import { approvePairing, pairingsQuery } from '@/lib/api/pairing';
 import { readinessQuery, startFix } from '@/lib/api/readiness';
 import { forgetHarnessSkip, keepHarnessSkip, readHarnessSkipped } from '@/lib/harnessSkip';
@@ -15,7 +15,7 @@ import { harnessAsked, harnessChoices } from '@/lib/setup';
 export const Route = createFileRoute('/setup')({
   loader: ({ context }) => context.queryClient.ensureQueryData(readinessQuery),
   component: SetupPage,
-  pendingComponent: () => <p className="text-body-medium text-muted-foreground">Reading what this server has in place…</p>,
+  pendingComponent: SetupReading,
   errorComponent: ({ error }) => (
     <p className="text-body-medium text-failure">
       Could not read what this server has in place: {error instanceof Error ? error.message : String(error)}. Read it at the server's shell,
@@ -124,7 +124,7 @@ function Pairings() {
           Could not read the pairings: {pairings.error.message}. Read them at the server's shell, or reload the page once the api answers.
         </p>
       ) : pairings.data === undefined ? (
-        <p className="text-body-medium text-muted-foreground">Reading the pairings…</p>
+        <PairingsReading />
       ) : (
         <PairingApprovals
           pairings={pairings.data.pairings}
@@ -138,16 +138,33 @@ function Pairings() {
   );
 }
 
+/** The page's name and what it is for, which need no read. */
+function SetupHead() {
+  return (
+    <header className="flex flex-col gap-1">
+      <h1 className="text-title-large">Setup</h1>
+      <p className="text-body-medium text-muted-foreground">
+        What this server needs to run its factories, each piece in place or with the fix that puts it there.
+      </p>
+    </header>
+  );
+}
+
+/** Setup while its readiness is read: its head, and the shape of the readiness list. */
+function SetupReading() {
+  return (
+    <article data-setup-reading className="mx-auto flex max-w-3xl flex-col gap-8">
+      <SetupHead />
+      <ReadinessReading />
+    </article>
+  );
+}
+
 /** Setup: what the server needs to run its factories, each piece's fix, and the clients that wait to pair. */
 function SetupPage() {
   return (
     <article data-setup className="mx-auto flex max-w-3xl flex-col gap-8">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-title-large">Setup</h1>
-        <p className="text-body-medium text-muted-foreground">
-          What this server needs to run its factories, each piece in place or with the fix that puts it there.
-        </p>
-      </header>
+      <SetupHead />
       <Readiness />
       <Pairings />
     </article>

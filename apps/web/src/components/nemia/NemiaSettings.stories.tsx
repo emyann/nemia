@@ -6,6 +6,7 @@ import { policyQuery } from '@/lib/api/policy';
 import { NemiaSettings } from './NemiaSettings';
 import { nemiaLevel, nemiaMemory, policyList } from '../../../.storybook/fixtures/agents';
 import { seeded } from '../../../.storybook/fixtures/proposals';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /**
  * Nemia's section of the Settings page, its reads seeded: her level, each factory's, her session, her rules and her memory.
@@ -55,4 +56,36 @@ export const SemiAuto: Story = {
 export const Stopped: Story = {
   parameters: { a11y: { test: 'todo' } },
   ...at({ ...nemiaLevel('manual'), stopped: true, task: null, phase: null, sessionId: null, reach: [] }),
+};
+
+/** Nothing read yet. */
+const unread: Story = {
+  render: () => (
+    <Unread>
+      <div style={{ width: 720 }}>
+        <NemiaSettings />
+      </div>
+    </Unread>
+  ),
+};
+
+/** Where she is still read: the shape of her level. */
+export const ReadingWhereSheIs: Story = { ...unread, play: saysReading('Reading where she is…') };
+
+/** Her memory still read: the shape of its facts. */
+export const ReadingHerMemory: Story = { ...unread, play: saysReading('Reading her memory…') };
+
+/** Her memory read, one fact opened while its words are read: the shape of the fact's lines. */
+export const ReadingAFact: Story = {
+  render: () => (
+    <QueryClientProvider client={seeded([[nemiaMemoryQuery.queryKey, { dir: '/store/nemia/memory', facts: ['team'], fact: null }]])}>
+      <div style={{ width: 720 }}>
+        <NemiaSettings />
+      </div>
+    </QueryClientProvider>
+  ),
+  play: async (context) => {
+    await userEvent.click(within(context.canvasElement).getByRole('button', { name: /team/ }));
+    await saysReading('Reading the fact…')(context);
+  },
 };

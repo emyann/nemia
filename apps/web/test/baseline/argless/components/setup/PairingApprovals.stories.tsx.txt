@@ -1,0 +1,4 @@
+apps/web/src/components/setup/PairingApprovals.stories.tsx#Waiting
+apps/web/src/components/setup/PairingApprovals.stories.tsx#Phone
+apps/web/src/components/setup/PairingApprovals.stories.tsx#None
+apps/web/src/components/setup/PairingApprovals.stories.tsx#Refused

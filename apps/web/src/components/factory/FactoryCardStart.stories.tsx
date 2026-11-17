@@ -9,6 +9,7 @@ import { FactoryCardStart, UnassignedStart } from './FactoryCardStart';
 import { FACTORY, seeded, unstartedCard } from '../../../.storybook/fixtures/proposals';
 import { yourStore } from '../../../.storybook/fixtures/agents';
 import { listing, offering, unfilled } from '../../../.storybook/fixtures/factories';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** The start of `entry`, the factories, the store's lines and `build` on the factory's repository read. */
 const drawn = (entry: InboxEntry) => (
@@ -58,4 +59,45 @@ export const NamesNone: Story = {
     await expect(canvasElement.querySelector('[data-pick-factory] [data-populated]')).toBeNull();
     await expect(canvasElement.querySelector('[data-pick-workflow]')).toBeNull();
   },
+};
+
+/** A card that names its factory, the factory still read. */
+export const ReadingTheFactory: Story = {
+  render: ({ entry }) => (
+    <Unread>
+      <FactoryCardStart entry={entry} onStarted={() => {}} onRefused={() => {}} />
+    </Unread>
+  ),
+  play: saysReading('Reading the factory…'),
+};
+
+/** A card that names none, the factories it may start in still read. */
+export const ReadingTheFactories: Story = {
+  args: { entry: { ...unstartedCard('measure-the-list', FACTORY), factory: null } },
+  render: ({ entry }) => (
+    <Unread>
+      <UnassignedStart entry={entry} onStarted={() => {}} onRefused={() => {}} />
+    </Unread>
+  ),
+  play: saysReading('Reading the factories…'),
+};
+
+/**
+ * The store and its factory read, the workflow the card names still read: the shape of what it says and its Start. Its axe check
+ * waits as the stories above do: the kit's select above it is named by its value and its label (`label-content-name-mismatch`), an
+ * ask of the kit.
+ */
+export const ReadingTheWorkflow: Story = {
+  parameters: { a11y: { test: 'todo' } },
+  render: ({ entry }) => (
+    <QueryClientProvider
+      client={seeded([
+        [factoriesQuery.queryKey, [offering()]],
+        [storeQuery.queryKey, yourStore],
+      ])}
+    >
+      <FactoryCardStart entry={entry} onStarted={() => {}} onRefused={() => {}} />
+    </QueryClientProvider>
+  ),
+  play: saysReading('Reading the workflow…'),
 };

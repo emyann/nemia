@@ -13,6 +13,7 @@ import { Artifacts } from '../run/Artifacts';
 import { CopyButton } from '../command/CopyButton';
 import { StatusChip } from '../step/StatusChip';
 import { runsMoved } from '@/lib/runWrites';
+import { Reading, ReadingLines } from '@/components/look';
 import { Button, TextField } from '@/components/ui/ds';
 
 const code = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
@@ -116,10 +117,14 @@ export function TryRun({ id }: { id: string }) {
     );
   }
   if (!run)
-    return (
+    return error instanceof Error ? (
       <p className="text-body-small text-muted-foreground">
-        {error instanceof Error ? `Could not read the try ${id}: ${error.message}` : 'Reading the try…'}
+        Could not read the try {id}: {error.message}
       </p>
+    ) : (
+      <Reading label="Reading the try…" className="rounded border border-outline-variant px-3 py-2">
+        <ReadingLines widths={['w-1/2', 'w-5/6']} className="text-body-small" />
+      </Reading>
     );
   const step = run.steps[0];
   const spent = step ? costText(step) : null;

@@ -2,7 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
 import type { Token } from '@/lib/api/tokens';
 import { atRest } from '../../../.storybook/play';
-import { TokenTable } from './TokenTable';
+import { TokensReading, TokenTable } from './TokenTable';
+import { saysReading } from '../../../.storybook/unread';
 
 /** The store's standing tokens: the person's laptop, store-wide, and an agent's, bound to a factory and narrowed. */
 const TOKENS: Token[] = [
@@ -43,4 +44,14 @@ export const Asking: Story = {
     await expect(canvasElement.querySelector('[data-token-retire="grace"]')).toHaveAttribute('data-disabled');
     atRest();
   },
+};
+
+/** The tokens still read: the shape of their table. */
+export const Reading: Story = {
+  render: () => (
+    <div style={{ width: 880 }}>
+      <TokensReading />
+    </div>
+  ),
+  play: saysReading('Reading the tokens…'),
 };

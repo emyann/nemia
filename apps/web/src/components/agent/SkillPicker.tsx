@@ -7,6 +7,8 @@ import { invalidateSkills } from '../../lib/agentWrites';
 import { skillList, withoutSkill, withSkill } from '../../lib/agents';
 import { costWords, givenRows, offerOf, PLACE_LABELS } from '../../lib/skills';
 import { GivenSkills, SkillSourceBadge } from './AgentParts';
+import { Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /**
  * The skills an agent of yours gives, composed from a list: each given one with where it is found and what it costs a turn, and Remove; and
@@ -61,7 +63,14 @@ export function SkillPicker({
                 every turn.
               </p>
               {error && <p className="text-body-small text-failure">Could not list the skills: {error.message}</p>}
-              {!places && !error && <p className="text-body-small text-muted-foreground">Reading the skills…</p>}
+              {!places && !error && (
+                <Reading label="Reading the skills…" className="flex flex-col gap-3">
+                  <Skeleton className="w-32 text-title-small" />
+                  {[0, 1, 2].map((at) => (
+                    <ReadingLines key={at} widths={['w-40', 'w-5/6']} className="text-body-small" />
+                  ))}
+                </Reading>
+              )}
               {places?.map((place) => (
                 <Place
                   key={place.from}

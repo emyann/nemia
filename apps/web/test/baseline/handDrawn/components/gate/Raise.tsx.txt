@@ -1,0 +1,6 @@
+apps/web/src/components/gate/Raise.tsx#<button>
+apps/web/src/components/gate/Raise.tsx#<input>
+apps/web/src/components/gate/Raise.tsx#<input type="radio">
+apps/web/src/components/gate/Raise.tsx#<textarea>
+apps/web/src/components/gate/Raise.tsx#@/lib/classes:BUTTON
+apps/web/src/components/gate/Raise.tsx#@/lib/classes:TEXTAREA

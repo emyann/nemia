@@ -13,6 +13,7 @@ import { keptBy, startRepo } from '../../lib/factories';
 import { cardFiling, factoriesOffered, factoryPreset } from '../../lib/inbox';
 import { FIELD } from '../workflow/WorkflowOptions';
 import { BUTTON } from '../../lib/classes';
+import { Reading, ReadingLines } from '@/components/look';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
@@ -148,9 +149,11 @@ function FactoryField({
         </p>
       )}
       {!error && !read && (
-        <p data-reading-factories className="text-body-small text-muted-foreground">
-          Reading the factories…
-        </p>
+        <div data-reading-factories>
+          <Reading label="Reading the factories…">
+            <ReadingLines widths={['w-64']} className="text-body-small" />
+          </Reading>
+        </div>
       )}
       {!error && read && offered.length === 0 && store && (
         <p data-no-factory className="text-body-small text-muted-foreground">

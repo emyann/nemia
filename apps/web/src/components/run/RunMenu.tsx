@@ -1,34 +1,25 @@
 /**
  * What a person can do to a whole run, behind one button in its header: Remove (a try), Hold or Lift (a hold standing), and Prune (a run
- * over that holds something on disk), each the existing control with its own question and refusal. None where the run offers none.
+ * over that holds something on disk), each the existing control with its own question and refusal. None where the run offers none. The
+ * list is `runActionsOf`, which the menu a right-click opens where the run is listed reads too (`RunActions`), each action asking there
+ * the same question (`RunQuestion`).
  */
 import { Dialog, DialogTrigger, Popover } from 'react-aria-components';
 import { Ellipsis } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { holdable } from '@/lib/hold';
-import { prunable } from '@/lib/prune';
+import type { RunView } from '@/lib/api/judged';
+import { runActionsOf, type RunAction } from '@/lib/runActions';
 import type { RunDetail } from '@/lib/runView';
 import { cn } from '@/lib/utils';
 import { POPOVER } from '@/lib/classes';
-import { HoldRun } from './HoldRun';
+import { HoldQuestion, HoldRun } from './HoldRun';
 import { LiftHold } from './LiftHold';
-import { PruneRun } from './PruneRun';
+import { PruneQuestion, PruneRun } from './PruneRun';
 import { RemoveRun } from './RemoveRun';
-
-/**
- * The run's actions: Remove for a try, Lift while held, else Hold where it can be held, and Prune where it would take anything.
- *
- * @param run the run the actions are on
- */
-export const runActionsOf = (run: RunDetail): Array<'remove' | 'hold' | 'lift' | 'prune'> => [
-  ...(run.try ? (['remove'] as const) : []),
-  ...(run.holding ? (['lift'] as const) : holdable(run) ? (['hold'] as const) : []),
-  ...(prunable(run) ? (['prune'] as const) : []),
-];
 
 /** The run's menu: one button opening the run's actions (`runActionsOf`), each opening its own question; nothing where it offers none. */
 export function RunMenu({ run }: { run: RunDetail }) {
-  const actions = runActionsOf(run);
+  const actions = runActionsOf(run).map((action) => action.key);
   if (!actions.length) return null;
   return (
     <DialogTrigger>
@@ -46,4 +37,16 @@ export function RunMenu({ run }: { run: RunDetail }) {
       </Popover>
     </DialogTrigger>
   );
+}
+
+/**
+ * The question an action asks once its press in a menu was made, as the run's page asks it: Remove and Lift their second press with Keep
+ * it, Hold its form, Prune its choice and its second press. `onClose` closes the surface it is asked in, on Keep it, Cancel or Close, and
+ * once the write is done; each write reads the run and the lists again (`runsMoved`).
+ */
+export function RunQuestion({ run, action, onClose }: { run: RunView; action: RunAction; onClose: () => void }) {
+  if (action === 'remove') return <RemoveRun id={run.id} onClose={onClose} />;
+  if (action === 'lift') return <LiftHold id={run.id} onClose={onClose} />;
+  if (action === 'hold') return <HoldQuestion run={run} onClose={onClose} />;
+  return <PruneQuestion run={run} onClose={onClose} />;
 }

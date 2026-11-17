@@ -80,6 +80,7 @@ export function TokenPage({ asked }: { asked: TokenAsked }) {
               setToken(typed);
               send.reset();
             }}
+            className="[--md3-field-notch:var(--card)]"
             inputClassName="font-mono"
           />
           {send.isError && (

@@ -1,9 +1,10 @@
 /**
- * A factory's proposal, as its page draws it and as her chat draws it under her words (`ChatProposal`): one part, read live, never a
- * copy. Its phase in the person's words (`PROPOSAL_WORDS`), a *Widens access* mark where the machinery says it widens, each object it
- * changes (resource, name, verb, and what it does to access), why, who proposed it and who approved it, the machinery's message as it
- * comes, and Approve and Decline wherever the api takes them (`proposalOffers`). The board sends no session token, so a click is the
- * person's: the answer is set as the proposal's own read, and the factory's list is read again; a decline, which takes the proposal out of what waits, is said in the frame's snackbar.
+ * A factory's proposal, as its page draws it and as her chat draws it under her words (`ChatProposal`): one part, read live, never a copy.
+ * Its phase in the person's words (`PROPOSAL_WORDS`), a *Widens access* mark where the machinery says it widens, each object it changes
+ * (resource, name, verb, and what it does to access), why, who proposed it and who approved it, the machinery's message as it comes, and
+ * Approve and Decline wherever the api takes them (`proposalOffers`). The board sends no session token, so a click is the person's: the
+ * answer is set as the proposal's own read, and the factory's list is read again; a decline, which takes the proposal out of what waits, is
+ * said in the frame's snackbar.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AccessChange, ChangeVerb, Proposal, ProposalChange, ProposalPhase } from 'objects';

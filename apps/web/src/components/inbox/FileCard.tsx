@@ -19,8 +19,8 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
 
 /**
  * The box: the idea, the Factory list (`FactoryField`) and, under a factory, the workflow it runs and the repository the factory gives it
- * (`InFactory`); File; once filed, the frame's snackbar names the card and offers Open, to its page; then the api's refusal in full, with the idea kept to send again, or a note for a card filed where the page's
- * filter hides it (`Hidden`).
+ * (`InFactory`); File; once filed, the frame's snackbar names the card and offers Open, to its page; then the api's refusal in full, with
+ * the idea kept to send again, or a note for a card filed where the page's filter hides it (`Hidden`).
  *
  * `shown` is the factory the address names, which the list starts on when it is offered (`factoryPreset`), until a person picks. Picking
  * a factory forgets the workflow picked under the last one, and what is sent is what the lists offer now (`cardFiling`): the factory and

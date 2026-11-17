@@ -53,8 +53,19 @@ export function PruneQuestion({ run, onClose }: { run: PruneAsked; onClose: () =
 }
 
 /**
+ * Close the prune's surface once nothing of the run was left behind, as the frame's snackbar says the run `id` is pruned.
+ * @param id The run's id.
+ * @param onClose Closes the surface the prune is asked in.
+ */
+function closePruned(id: string, onClose: () => void): void {
+  onClose();
+  sayWritten('pruned', id);
+}
+
+/**
  * The choice and the two presses. The run is read again once pruned, its record and the list each alone (`exact`), as an approval reads
- * them; the popover closes as the frame's snackbar says it is pruned, unless the CLI's `prune` kept something it could not remove, which its lines then say.
+ * them; the popover closes as the frame's snackbar says it is pruned, unless the CLI's `prune` kept something it could not remove, which
+ * its lines then say.
  */
 function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onClose: () => void }) {
   const [key, setKey] = useState<PruneChoice['key']>(firstChoice(offer).key);
@@ -65,10 +76,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
     mutationFn: () => runNamespace(queryClient, id).then((ns) => pruneRun(ns, id, choice.how)),
     onSuccess: async (done) => {
       setAsking(false);
-      if (done.left === 0) {
-        onClose();
-        sayWritten('pruned', id);
-      }
+      if (done.left === 0) closePruned(id, onClose);
       await runsMoved(queryClient, id);
     },
   });

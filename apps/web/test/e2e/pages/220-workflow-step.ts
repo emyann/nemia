@@ -31,7 +31,7 @@ export default {
 
       const file = page.locator('section[aria-label="The file"]');
       const body = file.locator('[data-markdown]').first();
-      await expectRendered(body, good.review);
+      await expectRendered(body, good.review, 3);
       await expectKeys(
         page,
         file,

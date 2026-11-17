@@ -76,7 +76,7 @@ export const placeOf = (page: Page, name: (typeof PANE_PLACES)[number]): Locator
 export const placeLitOf = (page: Page): Locator => paneOf(page).locator('a[data-pane-place][aria-current="page"]');
 
 /** The frame's strip of Settings' tabs, under the page's head and above the page. */
-export const frameTabsOf = (page: Page): Locator => page.locator('[data-slot="tabs-list"][role="tablist"]');
+export const frameTabsOf = (page: Page): Locator => page.getByRole('tablist', { name: 'Settings', exact: true });
 
 /** The page's head, one line over the page's column. */
 export const topBarOf = (page: Page): Locator => page.locator('header[data-frame-header]');

@@ -87,7 +87,7 @@ export default {
       await expectVisible(stalled.locator('code', { hasText: /^npm start in apps\/api$/ }), "the api's start set apart as code");
       await expectCount(line, 1, 'one line, and no other');
       await dot('stalled', 'warn', "the gauges button's dot warns: the next daemon takes the store over");
-      const title = await page.locator('[data-daemon-dot="stalled"]').getAttribute('title');
+      const title = await page.locator('[data-daemon-dot="stalled"] > [title]').getAttribute('title');
       if (!title?.startsWith(`Nothing ticks this store, so no run moves: the nemia up of pid ${process.pid} is alive but silent`))
         throw new Refused(`the dot's hover says the gauges' sentence — its title is ${JSON.stringify(title)}`);
       if (!(await stalled.getAttribute('title'))?.startsWith(`nemia up: stalled, pid ${process.pid}`)) {
@@ -142,7 +142,7 @@ export default {
         warned.and(page.getByRole('button', { name: /^This machine: daemon ticking, harness unread/ })),
         'and its name says so',
       );
-      const hover = (await warned.getAttribute('title'))?.split(String.fromCharCode(10)) ?? [];
+      const hover = (await warned.locator(':scope > [title]').getAttribute('title'))?.split(String.fromCharCode(10)) ?? [];
       const [said = '', ...why] = hover;
       if (!said.startsWith(`api: ticking, pid ${process.pid}`) || why.join() !== unobserved.join()) {
         throw new Refused(`the dot's hover says the api's line, then each reason on its own line — ${JSON.stringify(hover)}`);

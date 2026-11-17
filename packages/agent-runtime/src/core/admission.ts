@@ -136,11 +136,17 @@ export type AdmissionRule = {
 /**
  * What a task's process tree runs under, and so what admission counts it at: an attempt in flight keeps what its `starting` entry
  * recorded (one an older runtime started recorded none, and runs under its filing); with none in flight, the task's own resources,
- * else the engine's defaults in force now, as a LimitRange's land on a Pod only when it is created. Proved by
+ * else the engine's defaults in force now, as a LimitRange's land on a Pod only when it is created; a task that names a memory request
+ * and no memory limit takes the engine's default limit beside its request, as a LimitRange's default limit lands. Proved by
  * `contracts/runs-under.contract.ts`.
  */
-export const runsUnder: RunsUnder = ({ filed, inFlight, defaults }: Sizing) =>
-  inFlight !== null ? (inFlight.resources ?? filed) : (filed ?? defaults);
+export const runsUnder: RunsUnder = ({ filed, inFlight, defaults }: Sizing) => {
+  if (inFlight !== null) return inFlight.resources ?? filed;
+  const request = filed?.requests?.memory;
+  const limit = defaults?.limits?.memory;
+  if (request === undefined || filed?.limits?.memory !== undefined || limit === undefined) return filed ?? defaults;
+  return { limits: { memory: limit }, requests: { memory: request } };
+};
 
 /** The attempt of a task's view still in flight, its last while it has not ended, or `null`. */
 const inFlightOf = (view: AdmissionView): { resources: TaskResources | undefined } | null => {

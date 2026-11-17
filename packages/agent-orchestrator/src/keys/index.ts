@@ -2,6 +2,7 @@
 export {
   BUDGET_EXAMPLE,
   budgetOf,
+  checkMemoryOf,
   checkOf,
   composedRefusal,
   contextOf,

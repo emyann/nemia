@@ -38,15 +38,20 @@ export function BuilderEdge({
       <BaseEdge path={path} markerEnd={markerEnd} style={{ stroke: edgeStroke('to-come', loop), ...edgeLine('to-come', loop) }} />
       {data && (
         <EdgeLabelRenderer>
-          <Button
-            variant="outlined"
-            size="xsmall"
-            icon={X}
-            onPress={data.remove}
-            aria-label={`Remove ${data.said}`}
+          <span
+            title={`Remove ${data.said}`}
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-            className="nodrag nopan pointer-events-auto absolute bg-surface-container"
-          />
+            className="nodrag nopan pointer-events-auto absolute inline-flex"
+          >
+            <Button
+              variant="outlined"
+              size="xsmall"
+              icon={X}
+              onPress={data.remove}
+              aria-label={`Remove ${data.said}`}
+              className="bg-surface-container"
+            />
+          </span>
         </EdgeLabelRenderer>
       )}
     </>

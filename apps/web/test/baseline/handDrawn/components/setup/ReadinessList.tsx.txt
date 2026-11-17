@@ -1,1 +1,1 @@
-apps/web/src/components/setup/ReadinessList.tsx#<input>
+apps/web/src/components/setup/ReadinessList.tsx#<CutField><input>

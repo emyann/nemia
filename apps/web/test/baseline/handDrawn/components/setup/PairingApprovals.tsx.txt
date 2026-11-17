@@ -1,1 +1,1 @@
-apps/web/src/components/setup/PairingApprovals.tsx#<input>
+apps/web/src/components/setup/PairingApprovals.tsx#<CutField><input>

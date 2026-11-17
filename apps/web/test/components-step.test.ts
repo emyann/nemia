@@ -2097,7 +2097,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   );
   const buttons = (name: string) => kitButtons(rows.get(name)!.html);
   const radios = (name: string) => kitRadios(rows.get(name)!.html);
-  const input = (name: string) => /<input [^>]*aria-roledescription="Number field"[^>]*>/.exec(rows.get(name)!.html)?.[0] ?? '';
+  const input = (name: string) => /<input [^>]*inputMode="decimal"[^>]*>/.exec(rows.get(name)!.html)?.[0] ?? '';
   const box = (name: string) => /\bvalue="([^"]*)"/.exec(input(name))?.[1];
   const boxClosed = (name: string) => /\bdisabled=""/.test(input(name));
   const said = (name: string) => kitBoxes(rows.get(name)!.html)[0] ?? null;
@@ -2107,7 +2107,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     tokens.includes('over budget $4.25 of $3') && tokens.join(' ').includes(': the button below raises it.') && tokens.includes('$4.25'),
     tokens.join(' | '),
   );
-  assert.equal(box('tokens'), '5', 'the number box starts above what it cost, whatever order a server render writes its attributes in');
+  assert.equal(box('tokens'), '5', 'the amount box starts above what it cost, whatever order a server render writes its attributes in');
   assert.deepEqual(buttons('tokens'), [['submit', false, 'Raise the budget and try again']]);
   assert.deepEqual(
     radios('tokens'),

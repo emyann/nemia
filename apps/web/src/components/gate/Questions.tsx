@@ -164,6 +164,7 @@ function QuestionField({ q, n, draft, onDraft }: { q: Frozen<Question>; n: numbe
         value={own}
         onChange={(words) => onDraft({ ...draft, [q.title]: { chose, own: words } })}
         placeholder="In your own words — beside a choice, or instead of one"
+        supportingText="In your own words — beside a choice, or instead of one"
       />
     </fieldset>
   );
@@ -293,6 +294,7 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
           value={note}
           onChange={setNote}
           placeholder={OFFERS.answer.note}
+          supportingText={OFFERS.answer.note}
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <span title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined} className="inline-flex">

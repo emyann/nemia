@@ -336,6 +336,7 @@ function ReadmeField({ text, changed, onChange }: { text: string; changed: boole
         value={text}
         onChange={onChange}
         placeholder="What this workflow is for, in markdown."
+        supportingText="What this workflow is for, in markdown."
         inputClassName="font-mono text-body-small"
       />
     </div>

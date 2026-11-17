@@ -208,6 +208,9 @@ function ApproveForm({
   const [confirming, setConfirming] = useState(false);
   const handed = (what: string) =>
     acts ? `the step is handed ${what} as the terms it acts on` : `every step after the gate is handed ${what}`;
+  const hint = questions.length
+    ? `A note beside the answers (optional): ${handed('it with the answers')}, under “Approved”.`
+    : `Your words (optional): ${handed('them')}, under “Approved”.`;
   return (
     <form
       aria-label={`Approve ${step}`}
@@ -223,11 +226,8 @@ function ApproveForm({
         multiline
         value={words}
         onChange={setWords}
-        placeholder={
-          questions.length
-            ? `A note beside the answers (optional): ${handed('it with the answers')}, under “Approved”.`
-            : `Your words (optional): ${handed('them')}, under “Approved”.`
-        }
+        placeholder={hint}
+        supportingText={hint}
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span title={approveWaits(left, budgeting.unread)} className="inline-flex">
@@ -266,6 +266,8 @@ export function EndingConfirm({ step, onto }: { step: string; onto: string | nul
  * Send back, the answer box: an objection the next try is told, continuing its session or in a new one, to one of `back`. Sent back to the
  * gated step itself where it asks questions, it carries the answers, all or none: held, naming those left, while only some are answered.
  */
+const SEND_BACK_HINT = 'What to change: its next try is told it, under “Your answer”, and waits at its gate again.';
+
 function SendBackForm({
   step,
   back,
@@ -303,7 +305,8 @@ function SendBackForm({
         multiline
         value={objection}
         onChange={setObjection}
-        placeholder="What to change: its next try is told it, under “Your answer”, and waits at its gate again."
+        placeholder={SEND_BACK_HINT}
+        supportingText={SEND_BACK_HINT}
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span title={notAnswered(waits)} className="inline-flex">

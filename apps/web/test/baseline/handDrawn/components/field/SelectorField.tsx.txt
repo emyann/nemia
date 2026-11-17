@@ -1,1 +1,1 @@
-apps/web/src/components/field/SelectorField.tsx#<input>
+apps/web/src/components/field/SelectorField.tsx#<CutField><input>

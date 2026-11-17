@@ -242,6 +242,7 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
           onChange={setMessage}
           isDisabled={rechecking}
           placeholder={rechecking ? recheck.placeholder : words.placeholder}
+          supportingText={rechecking ? recheck.placeholder : words.placeholder}
         />
         {rechecking && message.trim() && (
           <p data-recheck-note className="text-body-small text-muted-foreground">
@@ -306,6 +307,7 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
           value={message}
           onChange={setMessage}
           placeholder={OFFERS.continue.placeholder}
+          supportingText={OFFERS.continue.placeholder}
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <Button type="submit" isDisabled={ask.isPending}>

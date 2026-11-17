@@ -2,8 +2,9 @@
  * Where each part of a second component system the board takes, and each control it draws by hand, moves to: the plan of the move
  * onto the one system, the ds kit, a part at a time. A key is `<module>:<name>` for an import, the module by its canonical spelling
  * and the name as the module exports it (`@/components/ui/button:Button`, `react-aria-components:Dialog`), `<element>` for a raw
- * element (`<button>`), and `@/lib/classes:<NAME>` for a shared class string that draws a control. `stories.test.ts` holds the map to
- * the tree through `mapGaps` (`stories.ts`): a key the board takes with no destination is refused, and so is a destination nothing
+ * element (`<button>`), `<CutField><input>` for an input the look's CutField frames, and `@/lib/classes:<NAME>` for a shared class
+ * string that draws a control. `stories.test.ts` holds the map to the tree through `mapGaps` (`stories.ts`): a key the board takes
+ * with no destination is refused, and so is a destination nothing
  * takes any more, so the map is cut in the move that takes the last file off a key. Only `RouterProvider` is exempt, and stays.
  */
 import type * as Kit from '../src/components/ui/ds/index.ts';
@@ -84,7 +85,11 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   'react-aria-components:Text': kit('Body'),
   'react-aria-components:TextField': kit('TextField'),
   '<button>': kit('Button'),
-  '<input>': kit('TextField', "a text input; an input whose type is spread from props, as Markdown's task list, is read here too"),
+  '<CutField><input>': {
+    kind: 'ask',
+    what: "a text field with no container of its own, for a frame the page draws (the look's CutField): the kit's TextField draws its filled or outlined box around the input",
+    run: null,
+  },
   '<input type="checkbox">': kit('Checkbox'),
   '<textarea>': kit('TextField', 'multiline'),
   '@/lib/classes:BUTTON': kit('Button'),

@@ -11,7 +11,7 @@ import { OFFERS } from '../../lib/words';
 import { MODES, Refusal, useAsk, useRound } from './Ask';
 import { answersFrom, Asks, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import type { Frozen } from '../../lib/frozen';
-import { Button, NumberField, Radio, RadioGroup, TextField } from '@/components/ui/ds';
+import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 
 /**
  * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes
@@ -140,22 +140,18 @@ function AmountBox({
   disabled: boolean;
 }) {
   return (
-    <NumberField
+    <TextField
       aria-label={`The cap to raise ${step} to, in dollars`}
       prefix="$"
-      minValue={0}
-      formatOptions={{ maximumFractionDigits: 6, useGrouping: false }}
-      value={amountValue(amount)}
+      inputMode="decimal"
+      value={amount}
       isDisabled={disabled}
-      onChange={(value) => onAmount(Number.isNaN(value) ? '' : String(value))}
+      onChange={onAmount}
       className="w-36"
       inputClassName="font-mono"
     />
   );
 }
-
-/** An amount typed as text, as the number field holds it: `NaN` while the box is empty, as the kit's field takes none. */
-const amountValue = (amount: string): number => (amount.trim() === '' ? Number.NaN : Number(amount));
 
 /** How a raise's try is filed: each mode the package takes for it, with its flag. */
 function RaiseModes({
@@ -232,6 +228,13 @@ function RaiseWords({
   onDraft: (next: Draft) => void;
 }) {
   const choosing = asks && questions.length > 0;
+  const hint = rechecking
+    ? OFFERS['try-again'].recheck.placeholder
+    : choosing
+      ? OFFERS.answer.note
+      : asks
+        ? OFFERS.answer.placeholder
+        : OFFERS.raise.placeholder;
   return (
     <>
       {choosing && <QuestionFields questions={questions} draft={draft} onDraft={onDraft} />}
@@ -244,15 +247,8 @@ function RaiseWords({
         value={message}
         onChange={onMessage}
         isDisabled={rechecking}
-        placeholder={
-          rechecking
-            ? OFFERS['try-again'].recheck.placeholder
-            : choosing
-              ? OFFERS.answer.note
-              : asks
-                ? OFFERS.answer.placeholder
-                : OFFERS.raise.placeholder
-        }
+        placeholder={hint}
+        supportingText={hint}
       />
     </>
   );

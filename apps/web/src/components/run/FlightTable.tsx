@@ -5,6 +5,7 @@ import { namespaceOf } from '@/lib/factories';
 import { ink } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 import { previewBar } from '../step/StepPreview';
+import { RunActions, type FoundRun } from './RunActions';
 import { CopyId, CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, Run, TextLink } from '../look';
 
 /** A column's heading, in the look's small caps. */
@@ -47,10 +48,22 @@ function UnjudgedRow({ run }: { run: UnjudgedRun }) {
 }
 
 /**
+ * The judged run whose row holds `target`, and the row, from `runs`: null under the table's head, and on a row the list could not judge.
+ * @param runs the rows' runs
+ * @param target what the menu was asked for on
+ */
+const rowRunOf = (runs: readonly (ListedRun | UnjudgedRun)[], target: Element): FoundRun | null => {
+  const row = target.closest('[role="row"][data-run]');
+  const run = row && runs.find((r) => r.id === row.getAttribute('data-run'));
+  return row && run && judged(run) ? { run, at: row } : null;
+};
+
+/**
  * The runs in flight, as the kit's dense table in the look's cut frame, quiet: each judged run the run part at md as a row (`Run`,
  * `layout="row"`) — its title over its meta line, what it does now in marks over its steps' graph, each node a button that opens its
  * step's card, how many of `among` wait on it, its time at work at `asOf` and its cost, each with its breakdown over it. Narrower than
- * its columns, the table scrolls sideways inside its frame. A run the list could not judge is a row of its own (`UnjudgedRow`).
+ * its columns, the table scrolls sideways inside its frame. A run the list could not judge is a row of its own (`UnjudgedRow`). A judged
+ * row's actions open by right-click, a long press or the keyboard's menu key (`RunActions`).
  */
 export function FlightTable({
   runs,
@@ -64,31 +77,33 @@ export function FlightTable({
   return (
     <CutFrame size={24}>
       <div data-table-box className={cn(FRAMED_BOX, FRAMED_END)}>
-        <Table aria-label="Runs in flight" density="dense" className={cn('min-w-[880px] table-fixed', FRAMED_TABLE)}>
-          <TableHeader>
-            <Column id="run" isRowHeader className={HEAD}>
-              Run
-            </Column>
-            <Column id="now" className={cn(HEAD, 'w-[360px]')}>
-              Now
-            </Column>
-            <Column id="clock" align="end" className={cn(HEAD, 'w-[144px]')}>
-              Clock
-            </Column>
-            <Column id="cost" align="end" className={cn(HEAD, 'w-[96px]')}>
-              Cost
-            </Column>
-          </TableHeader>
-          <TableBody>
-            {runs.map((run) =>
-              judged(run) ? (
-                <Run key={run.id} run={run} size="md" layout="row" asOf={asOf} among={among} wrap={previewBar(run, asOf)} />
-              ) : (
-                <UnjudgedRow key={run.id} run={run} />
-              ),
-            )}
-          </TableBody>
-        </Table>
+        <RunActions runOf={(target) => rowRunOf(runs, target)} className="contents">
+          <Table aria-label="Runs in flight" density="dense" className={cn('min-w-[880px] table-fixed', FRAMED_TABLE)}>
+            <TableHeader>
+              <Column id="run" isRowHeader className={HEAD}>
+                Run
+              </Column>
+              <Column id="now" className={cn(HEAD, 'w-[360px]')}>
+                Now
+              </Column>
+              <Column id="clock" align="end" className={cn(HEAD, 'w-[144px]')}>
+                Clock
+              </Column>
+              <Column id="cost" align="end" className={cn(HEAD, 'w-[96px]')}>
+                Cost
+              </Column>
+            </TableHeader>
+            <TableBody>
+              {runs.map((run) =>
+                judged(run) ? (
+                  <Run key={run.id} run={run} size="md" layout="row" asOf={asOf} among={among} wrap={previewBar(run, asOf)} />
+                ) : (
+                  <UnjudgedRow key={run.id} run={run} />
+                ),
+              )}
+            </TableBody>
+          </Table>
+        </RunActions>
       </div>
     </CutFrame>
   );

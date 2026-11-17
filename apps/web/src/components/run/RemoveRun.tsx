@@ -5,21 +5,26 @@ import { Button } from '@/components/ui/button';
 import { removeRun } from '../../lib/api/runs.ts';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
+import { ACTION_LABEL } from '@/lib/runActions';
 
 /**
  * Remove, on a try's page, asked twice: the first press asks, the second removes the run as the CLI's `rm` does — its record and the
  * folders it worked in — and goes back to Runs, whose list is read again while the run's own record is dropped. The api removes only a try,
  * and refuses one still in flight in the package's words, which are shown here.
+ *
+ * Asked where the run is listed (`onClose` given), the menu's press was the first: it asks at once, Keep it closes the surface it is asked
+ * in, and once removed it closes it and stays where it is, the list read again.
  */
-export function RemoveRun({ id }: { id: string }) {
-  const [asking, setAsking] = useState(false);
+export function RemoveRun({ id, onClose }: { id: string; onClose?: () => void }) {
+  const [asking, setAsking] = useState(onClose !== undefined);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const namespaceNow = useRunNamespace(id);
   const remove = useMutation({
     mutationFn: () => namespaceNow().then((ns) => removeRun(ns, id)),
     onSuccess: async () => {
-      await navigate({ to: '/runs' });
+      if (onClose) onClose();
+      else await navigate({ to: '/runs' });
       queryClient.removeQueries({ queryKey: ['runs', id], exact: true });
       await runsMoved(queryClient);
     },
@@ -37,7 +42,8 @@ export function RemoveRun({ id }: { id: string }) {
             size="sm"
             onPress={() => {
               remove.reset();
-              setAsking(false);
+              if (onClose) onClose();
+              else setAsking(false);
             }}
             isDisabled={remove.isPending}
           >
@@ -46,7 +52,7 @@ export function RemoveRun({ id }: { id: string }) {
         </>
       ) : (
         <Button variant="outline" size="sm" onPress={() => setAsking(true)}>
-          Remove…
+          {ACTION_LABEL.remove}
         </Button>
       )}
       {remove.isError && (

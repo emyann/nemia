@@ -1,0 +1,5 @@
+apps/web/src/components/setup/FixRun.stories.tsx#Running
+apps/web/src/components/setup/FixRun.stories.tsx#Phone
+apps/web/src/components/setup/FixRun.stories.tsx#Pending
+apps/web/src/components/setup/FixRun.stories.tsx#Done
+apps/web/src/components/setup/FixRun.stories.tsx#Failed

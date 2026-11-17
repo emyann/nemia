@@ -1,0 +1,6 @@
+apps/web/src/components/factory/TemplateCard.tsx#@/components/ui/badge:Badge
+apps/web/src/components/factory/TemplateCard.tsx#@/components/ui/card:Card
+apps/web/src/components/factory/TemplateCard.tsx#@/components/ui/card:CardContent
+apps/web/src/components/factory/TemplateCard.tsx#@/components/ui/card:CardDescription
+apps/web/src/components/factory/TemplateCard.tsx#@/components/ui/card:CardHeader
+apps/web/src/components/factory/TemplateCard.tsx#@/components/ui/card:CardTitle

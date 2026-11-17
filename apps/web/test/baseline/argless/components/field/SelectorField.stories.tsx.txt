@@ -1,0 +1,3 @@
+apps/web/src/components/field/SelectorField.stories.tsx#Empty
+apps/web/src/components/field/SelectorField.stories.tsx#Selected
+apps/web/src/components/field/SelectorField.stories.tsx#Refused

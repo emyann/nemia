@@ -1,0 +1,8 @@
+apps/web/src/components/factory/FactoryCanvas.tsx#@/components/ui/button:Button
+apps/web/src/components/factory/FactoryCanvas.tsx#@/components/ui/button:LinkButton
+apps/web/src/components/factory/FactoryCanvas.tsx#@/components/ui/card:Card
+apps/web/src/components/factory/FactoryCanvas.tsx#@/components/ui/card:CardContent
+apps/web/src/components/factory/FactoryCanvas.tsx#@/components/ui/card:CardDescription
+apps/web/src/components/factory/FactoryCanvas.tsx#@/components/ui/card:CardHeader
+apps/web/src/components/factory/FactoryCanvas.tsx#@/components/ui/card:CardTitle
+apps/web/src/components/factory/FactoryCanvas.tsx#@/components/ui/switch:Switch

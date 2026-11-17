@@ -1,0 +1,7 @@
+apps/web/src/components/factory/ServerSignIn.stories.tsx#Offered
+apps/web/src/components/factory/ServerSignIn.stories.tsx#Waiting
+apps/web/src/components/factory/ServerSignIn.stories.tsx#Pasted
+apps/web/src/components/factory/ServerSignIn.stories.tsx#PasteRefused
+apps/web/src/components/factory/ServerSignIn.stories.tsx#Expired
+apps/web/src/components/factory/ServerSignIn.stories.tsx#Connected
+apps/web/src/components/factory/ServerSignIn.stories.tsx#Refused

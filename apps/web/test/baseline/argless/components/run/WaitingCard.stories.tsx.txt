@@ -1,0 +1,2 @@
+apps/web/src/components/run/WaitingCard.stories.tsx#Narrow
+apps/web/src/components/run/WaitingCard.stories.tsx#Wide

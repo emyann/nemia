@@ -1,0 +1,2 @@
+apps/web/src/components/conversation/ConversationBand.stories.tsx#QuietNote
+apps/web/src/components/conversation/ConversationBand.stories.tsx#Failure

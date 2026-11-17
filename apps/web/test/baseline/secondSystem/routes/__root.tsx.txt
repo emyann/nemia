@@ -1,0 +1,2 @@
+apps/web/src/routes/__root.tsx#@/components/ui/sidebar:SidebarProvider
+apps/web/src/routes/__root.tsx#@/components/ui/sidebar:sidebarOpenOf

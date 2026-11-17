@@ -1,0 +1,1 @@
+apps/web/src/components/factory/FactoryBlock.tsx#@/components/ui/badge:Badge

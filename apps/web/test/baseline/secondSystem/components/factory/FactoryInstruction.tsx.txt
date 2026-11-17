@@ -1,0 +1,5 @@
+apps/web/src/components/factory/FactoryInstruction.tsx#react-aria-components:TextField
+apps/web/src/components/factory/FactoryInstruction.tsx#@/components/ui/button:Button
+apps/web/src/components/factory/FactoryInstruction.tsx#@/components/ui/input:Input
+apps/web/src/components/factory/FactoryInstruction.tsx#@/components/ui/label:Label
+apps/web/src/components/factory/FactoryInstruction.tsx#@/components/ui/textarea:Textarea

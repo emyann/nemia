@@ -5,6 +5,7 @@ import { liftHold } from '../../lib/api/runs.ts';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
+import { ACTION_LABEL } from '@/lib/runActions';
 
 /** What a lift does, said before the second press: the package's `unhold`, as the CLI's `hold <run> --off` runs it. */
 const LIFTS = 'It goes on at the next tick, and what its steps asked while it was held is asked again.';
@@ -30,10 +31,13 @@ function useLift(id: string, namespace: string | undefined, onLifted: () => void
 /**
  * Lift, where the run's page says it is held, asked twice: the first press asks, the second lifts the hold as the CLI's `hold --off` does.
  * A refusal — a run nobody holds — is shown in the package's words.
+ *
+ * Asked where the run is listed (`onClose` given), the menu's press was the first: it asks at once, and Keep it, or the lift, closes the
+ * surface it is asked in.
  */
-export function LiftHold({ id }: { id: string }) {
-  const [asking, setAsking] = useState(false);
-  const lift = useLift(id, undefined);
+export function LiftHold({ id, onClose }: { id: string; onClose?: () => void }) {
+  const [asking, setAsking] = useState(onClose !== undefined);
+  const lift = useLift(id, undefined, onClose);
   return (
     <span data-lift className="flex flex-wrap items-center gap-2 pt-1 text-body-small">
       {asking ? (
@@ -47,7 +51,8 @@ export function LiftHold({ id }: { id: string }) {
             size="xsmall"
             onPress={() => {
               lift.reset();
-              setAsking(false);
+              if (onClose) onClose();
+              else setAsking(false);
             }}
             isDisabled={lift.isPending}
           >
@@ -56,7 +61,7 @@ export function LiftHold({ id }: { id: string }) {
         </>
       ) : (
         <Button variant="outlined" size="xsmall" onPress={() => setAsking(true)}>
-          Lift…
+          {ACTION_LABEL.lift}
         </Button>
       )}
       {lift.isError && (

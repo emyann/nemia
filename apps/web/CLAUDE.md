@@ -113,7 +113,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `stories.json`'s `matched` and `matches`.
 - What a person does to a part — a press, the keyboard, the focus, where a link leads, what a press opens — is its story's play
   function (`play`, its helpers `.storybook/play.ts`), run by `npm run stories`. What needs the browser's own input or reads pixels
-  stays a browser test under `test/e2e/` (`cuts.test.ts`, `bars.test.ts`, `motion.test.ts`, `secondary.test.ts`), each story opened
+  stays a browser test under `test/e2e/` (`cuts.test.ts`, `bars.test.ts`, `motion.test.ts`, `secondary.test.ts`, `menu-key.test.ts`), each story opened
   alone in Storybook's static build at `iframe.html?id=<id>` (`openStory`, `e2e/stories/built.ts`), which `--look` builds once and names
   in `LOOK_STORYBOOK`, and a test run alone builds itself: the pixels (`e2e/pixels.ts`), Enter on a link, which the browser turns into a
   click and a play function's keys never do (`e2e/keys.ts`), CSS's `:hover`, reduced motion and the dark theme. `node

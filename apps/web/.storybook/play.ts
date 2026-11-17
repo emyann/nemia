@@ -88,3 +88,16 @@ const describing = (trigger: Element): Promise<HTMLElement> =>
     if (tip?.getAttribute('role') !== 'tooltip') throw new Error(`no tooltip describes ${trigger.outerHTML.slice(0, 80)}`);
     return tip;
   });
+
+/**
+ * The keyboard's menu key on `element`, as a person presses it: Shift+F10 sent, then the `contextmenu` the browser makes of it, at no
+ * pointer (`button` -1, as Chromium sends it), since a script's keys have no default action. That Chromium makes it of its own keys is read
+ * by the look's browser tests (`test/e2e/menu-key.test.ts`).
+ * @param user The user the play function is handed.
+ * @param element What has the focus when the key is pressed.
+ */
+export async function menuKey(user: { keyboard: (keys: string) => Promise<unknown> }, element: HTMLElement): Promise<void> {
+  element.focus();
+  await user.keyboard('{Shift>}{F10}{/Shift}');
+  element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: -1 }));
+}

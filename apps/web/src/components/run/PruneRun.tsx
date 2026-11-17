@@ -12,6 +12,7 @@ import { runsMoved } from '@/lib/runWrites';
 import { Reading, ReadingLines } from '@/components/look';
 import { Button, Popover, PopoverTrigger, Radio, RadioGroup, Skeleton, Title } from '@/components/ui/ds';
 import { CHOICE } from '@/lib/classes';
+import { runActionsOf } from '@/lib/runActions';
 
 /**
  * Prune, on a finished repository run's page: the button opens a popover with a choice of what to give back — its worktrees; its files
@@ -24,22 +25,26 @@ export function PruneRun({ run }: { run: RunDetail }) {
   return (
     <PopoverTrigger>
       <Button variant="outlined" size="xsmall" data-prune-open>
-        {run.onDisk.worktrees ? 'Prune…' : 'Prune its files…'}
+        {pruneLabel(run)}
       </Button>
       <Popover aria-label={`Prune ${run.id}`} placement="bottom end" offset={6} className="w-96 space-y-3">
-        {({ close }) => <PruneRead run={run} onClose={close} />}
+        {({ close }) => <PruneQuestion run={run} onClose={close} />}
       </Popover>
     </PopoverTrigger>
   );
 }
 
+/** What of a run its prune's question reads: whether it may be decided, the stamp of its decision, and what it left on disk. */
+type PruneAsked = Parameters<typeof decisionStamp>[0] & Parameters<typeof pruneOffer>[0];
+
 /**
- * Whether anybody decided the run, read off the api's decision (`awaitingOf`) — the package's own reading, which the CLI's `prune` refuses
- * without `--unmerged` — before anything is offered. The same query as the Decide section's, under the same key, so a page that shows the
- * decision reads nothing more; a run called off has nothing to decide, and is not asked. A decision read for an earlier state of the run
- * (`keepPreviousData`) is not taken for this one's.
+ * The prune's question, wherever it is asked: whether anybody decided the run, read off the api's decision (`awaitingOf`) — the package's
+ * own reading, which the CLI's `prune` refuses without `--unmerged` — before anything is offered, then the choice and the two presses. The
+ * same query as the Decide section's, under the same key, so a page that shows the decision reads nothing more; a run called off has
+ * nothing to decide, and is not asked. A decision read for an earlier state of the run (`keepPreviousData`) is not taken for this one's.
+ * `onClose` closes the surface it is asked in, once pruned or closed.
  */
-function PruneRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
+export function PruneQuestion({ run, onClose }: { run: PruneAsked; onClose: () => void }) {
   const decidable = decidableRun(run);
   const { data, error, isPlaceholderData } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable });
   if (decidable && error) {
@@ -157,3 +162,6 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
     </div>
   );
 }
+
+/** What the prune's press says of `run`, as the list of its actions says it (`runActionsOf`). */
+const pruneLabel = (run: RunDetail): string => runActionsOf(run).find((action) => action.key === 'prune')?.label ?? '';

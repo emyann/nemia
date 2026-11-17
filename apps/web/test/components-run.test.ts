@@ -639,11 +639,26 @@ test("AsksOfYou lists each ask as one line linked to its step's part on the page
 });
 
 test("the run's menu holds its actions behind one button, each its own question: Remove for a try, Lift while held, else Hold, and Prune", async () => {
-  const { RunMenu, runActionsOf } = await import('../src/components/run/RunMenu.tsx');
+  const { RunMenu, RunQuestion } = await import('../src/components/run/RunMenu.tsx');
+  const { runActionsOf } = await import('../src/lib/runActions.ts');
   const run = atGate();
   const kept = { onDisk: { worktrees: false, files: false } };
-  assert.deepEqual(runActionsOf({ ...run, ...kept, try: null, status: 'running', moving: true }), ['hold']);
-  assert.deepEqual(runActionsOf({ ...run, ...kept, try: { agent: 'coder' }, holding: HELD }), ['remove', 'lift']);
+  const keys = (r: Parameters<typeof runActionsOf>[0]) => runActionsOf(r).map((action) => action.key);
+  assert.deepEqual(keys({ ...run, ...kept, try: null, status: 'running', moving: true }), ['hold']);
+  assert.deepEqual(keys({ ...run, ...kept, try: { agent: 'coder' }, holding: HELD }), ['remove', 'lift']);
+  const over = { ...run, status: 'failed' as const, moving: false, place: 'git' as const };
+  assert.deepEqual(
+    runActionsOf({ ...over, holding: HELD, onDisk: { worktrees: false, files: true } }).map((action) => action.label),
+    ['Lift…', 'Prune its files…'],
+    'a prune with its worktrees gone says what it takes',
+  );
+  assert.deepEqual(
+    runActionsOf({ ...over, holding: HELD, onDisk: { worktrees: true, files: true } }).map((action) => action.label),
+    ['Lift…', 'Prune…'],
+  );
+  const asked = withClient(createElement(RunQuestion, { run: { ...run, holding: HELD }, action: 'lift', onClose: () => {} }));
+  assert.match(asked, /data-lift/);
+  assert.doesNotMatch(asked, />Lift…</, "asked from a listed run's menu, whose press was the first, it asks at once");
   const html = withClient(createElement(RunMenu, { run: { ...run, ...kept, try: null, status: 'running', moving: true } }));
   assert.equal([...html.matchAll(/<button /g)].length, 1, 'one button');
   assert.match(html, /data-run-menu="hold"/);

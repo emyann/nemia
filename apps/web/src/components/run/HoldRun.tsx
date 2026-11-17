@@ -11,6 +11,7 @@ import { Refusal } from '../gate/Ask';
 import { ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
 import { Reading } from '@/components/look';
+import { ACTION_LABEL } from '@/lib/runActions';
 import { Body, Button, Checkbox, CheckboxGroup, Popover, PopoverTrigger, Skeleton, TextField, Title } from '@/components/ui/ds';
 
 /**
@@ -25,20 +26,21 @@ export function HoldRun({ run }: { run: RunDetail }) {
   return (
     <PopoverTrigger>
       <Button variant="outlined" size="xsmall" data-hold-open>
-        Hold…
+        {ACTION_LABEL.hold}
       </Button>
       <Popover aria-label={`Hold ${run.id}`} placement="bottom end" offset={6} className="w-96 space-y-3">
-        {({ close }) => <HoldRead run={run} onClose={close} />}
+        {({ close }) => <HoldQuestion run={run} onClose={close} />}
       </Popover>
     </PopoverTrigger>
   );
 }
 
 /**
- * The runs a hold may wait on (`holdCandidates`), read before the form is drawn: those not finished, newest created first, then the
- * finished, newest finished first, a page at a time with Show older for the next (`usePickerRuns`).
+ * The hold's question, wherever it is asked: the runs a hold may wait on (`holdCandidates`), read before the form is drawn — those not
+ * finished, newest created first, then the finished, newest finished first, a page at a time with Show older for the next
+ * (`usePickerRuns`) — and the form. `onClose` closes the surface it is asked in, once held or cancelled.
  */
-function HoldRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
+export function HoldQuestion({ run, onClose }: { run: Pick<RunView, 'id' | 'repo'>; onClose: () => void }) {
   const { open, finished, more, older, reading, error } = usePickerRuns();
   if (error) {
     return (

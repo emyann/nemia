@@ -27,9 +27,6 @@ export type Destination =
 /** The part of the kit `part` is. */
 const kit = (part: KitPart, how?: string): Destination => (how === undefined ? { kind: 'kit', part } : { kind: 'kit', part, how });
 
-/** The part of the look `part` becomes. */
-const look = (part: string): Destination => ({ kind: 'look', part });
-
 /** The inline alert the kit lacks, asked of the design system's factory. */
 const ALERT: Destination = { kind: 'ask', what: 'inline alert: a tinted surface with a title and a description', run: null };
 
@@ -64,8 +61,6 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/components/ui/field:FieldLabel': kit('TextField', 'its label'),
   '@/components/ui/input:Input': kit('TextField'),
   '@/components/ui/label:Label': kit('TextField', 'its label'),
-  '@/components/ui/marker:Marker': look('Marker'),
-  '@/components/ui/marker:MarkerContent': look('Marker'),
   '@/components/ui/select:Select': kit('Select'),
   '@/components/ui/select:SelectContent': kit('Select'),
   '@/components/ui/select:SelectItem': kit('SelectItem'),
@@ -86,17 +81,7 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/components/ui/tabs:TabsList': kit('TabList'),
   '@/components/ui/tabs:TabsTrigger': kit('Tab'),
   '@/components/ui/textarea:Textarea': kit('TextField', 'multiline'),
-  '@/components/ui/trace:Trace': look('Trace'),
-  '@/components/ui/trace:TraceCollapsible': look('TraceCollapsible'),
-  '@/components/ui/trace:TraceCollapsibleContent': look('TraceCollapsibleContent'),
-  '@/components/ui/trace:TraceCollapsibleTrigger': look('TraceCollapsibleTrigger'),
-  '@/components/ui/trace:TraceDescription': look('TraceDescription'),
-  '@/components/ui/trace:TraceIcon': look('TraceIcon'),
-  '@/components/ui/trace:TraceLine': look('TraceLine'),
-  '@/components/ui/trace:TraceStatus': look('TraceStatus'),
-  '@/components/ui/trace:TraceTitle': look('TraceTitle'),
   'react-aria-components:Button': kit('Button'),
-  'react-aria-components:Checkbox': kit('Checkbox'),
   'react-aria-components:CheckboxGroup': kit('CheckboxGroup'),
   'react-aria-components:Dialog': kit('Dialog'),
   'react-aria-components:DialogTrigger': kit('PopoverTrigger'),

@@ -38,6 +38,9 @@ const ASK: HerAsk = {
 /** What the person chooses, question by question. */
 const CHOSE = ['Cut it on read', 'Hand them', 'Prove it in this slice'];
 
+/** What the person types in the first question's own-words field, before choosing among its options after all. */
+const OWN_WORDS = 'Cut it where the sentence ends';
+
 export default {
   /**
    * Her several questions, answered one tab at a time: the canvas's board 7b. A tab for each question and one more for Submit, the
@@ -75,6 +78,12 @@ export default {
       await expectCount(ask.getByText('Not answered yet'), 3, 'each question’s line says it is not answered yet');
       await settled(page);
       await photograph(page, path.join(OUT, `chat-asks-many-recap-${await themeOf(page)}.png`), { fullPage: true });
+
+      await ask.locator('[data-chat-qtab]').first().click();
+      await ask.locator('[data-chat-own] input').fill(OWN_WORDS);
+      await expectVisible(ask.locator('[data-chat-option="own"][data-selected]'), 'words typed in the field choose the own-words row');
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-asks-many-own-${await themeOf(page)}.png`), { fullPage: true });
 
       for (const [i, label] of CHOSE.entries()) {
         await ask.locator('[data-chat-qtab]').nth(i).click();

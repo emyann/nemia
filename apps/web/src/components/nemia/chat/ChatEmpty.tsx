@@ -4,7 +4,7 @@
  * her outbox as if it had been typed and Entered (the owner's answer at design's gate). The shell it scrolls in is the family's
  * (`conversation/TalkEmpty`), which writes the mark a page of hers selects it by.
  */
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { container } from '@/lib/meaning';
 import { levelWord } from '@/lib/nemia';
 import type { NemiaLevel } from '@/lib/api/nemia';
@@ -56,7 +56,7 @@ export function ChatEmpty({
         <span className="text-label-small text-on-surface-variant uppercase">Start with</span>
         <div className="flex flex-wrap gap-2">
           {CHAT_STARTERS.map((words) => (
-            <Button key={words} variant="outline" size="sm" data-chat-chip isDisabled={presence.notSent} onPress={() => onSend(words)}>
+            <Button key={words} variant="outlined" size="xsmall" data-chat-chip isDisabled={presence.notSent} onPress={() => onSend(words)}>
               {words}
             </Button>
           ))}

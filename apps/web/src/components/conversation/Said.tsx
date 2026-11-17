@@ -1,7 +1,7 @@
 /**
  * One thing said in a conversation of the board, drawn by who said it: the agent's words in a cut bubble, with the pages they name as
  * the look's filled buttons under it; the person's own in a ringed bubble at the right; another agent's in a ringed bubble at the left,
- * under its own name, apart from both (`Peer`); and a quiet line through the board's `Marker`
+ * under its own name, apart from both (`Peer`); and a quiet line through the look's `Marker`
  * for what frames a conversation rather than being said in it (`Note`). Who said it and when stands over each bubble (`Who`), which a
  * conversation's own parts take for a bubble of their own.
  *
@@ -11,8 +11,7 @@
  * Every data mark is written under the prefix `marks` names (`mark`), so each conversation keeps the names its own pages read.
  */
 import type { ReactNode } from 'react';
-import { Marker, MarkerContent } from '@/components/ui/marker';
-import { CutButton, cutShape } from '@/components/look';
+import { CutButton, cutShape, Marker } from '@/components/look';
 import { mark, type ConversationItem } from '@/lib/conversation';
 import { routeOfHref } from '@/lib/routeHref';
 import { timeOfDay } from '@/lib/timeOfDay';
@@ -37,8 +36,8 @@ export function Who({ who, at, children }: { who: string; at: string; children?:
 /** A quiet line in a conversation: what frames it rather than being said in it. `what` says which, under the caller's prefix. */
 export function Note({ what, marks, children }: { what: string; marks: string; children: ReactNode }) {
   return (
-    <Marker {...mark(marks, 'marker', what)} variant="separator" className="text-body-small">
-      <MarkerContent>{children}</MarkerContent>
+    <Marker {...mark(marks, 'marker', what)} className="text-body-small">
+      {children}
     </Marker>
   );
 }

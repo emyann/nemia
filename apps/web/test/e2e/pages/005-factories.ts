@@ -32,10 +32,10 @@ export default {
    * The Factories at `/`: every factory a block on a canvas, and a file that does not read a block that says why; the default factory is
    * none, in the canvas or the switcher, once a factory is filed, though it holds runs. On a floor the pane's switcher lists every factory,
    * each with its runs in flight, or that its file does not read, then a new factory to come. A block double-clicked opens its factory's
-   * floor, at `/factories/<name>`, with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — its name in the
-   * switcher, Factories lit, and a start in the pane. A name no factory has says so, answered with no 4xx, and leads back. The default
-   * factory's floor still answers its address, the switcher listing it after the others, its start asking which factory; Factories in the
-   * rail leads back.
+   * floor, at `/factories/<name>`, with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown, its card opened saying
+   * it works in folders and naming no repository — its name in the switcher, Factories lit, and a start in the pane. A name no factory
+   * has says so, answered with no 4xx, and leads back. The default factory's floor still answers its address, the switcher listing it
+   * after the others, its start asking which factory; Factories in the rail leads back.
    */
   name: 'factories',
   route: '/',
@@ -103,14 +103,23 @@ export default {
       1,
       `the floor holds one card, finished runs shown: ${FOLDER.id}, the one run in it`,
     );
-    const inFolders = cardOf(page, FOLDER.id).getByText('folders', { exact: true });
-    await expectVisible(inFolders, `a folder run's card says folders, and names no repository (${FOLDER.id})`);
+    const folderCard = cardOf(page, FOLDER.id);
+    await folderCard.getByRole('button', { name: 'Show steps' }).click();
+    const inFolders = folderCard.locator('article[data-size="xl"] [data-works-in="folders"]');
+    await expectVisible(inFolders, `a folder run's opened card says it works in folders, and names no repository (${FOLDER.id})`);
+    await expectTexts(
+      inFolders,
+      ['folders'],
+      `the folder run's card says folders where a repository run names its repository (${FOLDER.id})`,
+    );
     const where = await inFolders.getAttribute('title');
     if (!new RegExp(String.raw`^Its steps work in folders under .+[\\/]runs[\\/]${FOLDER.id}[\\/]work$`).test(where ?? '')) {
       throw new Refused(
-        `the card says where its steps work on hover, not in a row of its own, ending in runs/${FOLDER.id}/work — it says ${JSON.stringify(where)}`,
+        `the opened card says where its steps work on hover, ending in runs/${FOLDER.id}/work — it says ${JSON.stringify(where)}`,
       );
     }
+    await folderCard.getByRole('button', { name: 'Hide steps' }).click();
+    await expectCount(folderCard.locator('article[data-size="xl"]'), 0, `the folder run's card closes again (${FOLDER.id})`);
     await expectVisible(startOf(page), `and the pane offers a start in ${FACTORIES.hiring.name}`);
     await settled(page);
     await photograph(page, path.join(OUT, `factories-floor-${await themeOf(page)}.png`));

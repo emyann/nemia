@@ -177,6 +177,30 @@ export const Failure: StoryObj = {
   ),
 };
 
+/** A frame given a ground of its own (`ground`), the floor's, in place of the card's, as a run's tone mixes one. */
+export const Grounded: StoryObj<typeof CutFrame> = {
+  args: { hue: 'alive', ground: 'bg-background' },
+  render: (args) => (
+    <div data-ground="other" style={ON_OTHER}>
+      <CutFrame {...args}>
+        <div style={EMPTY} />
+      </CutFrame>
+    </div>
+  ),
+};
+
+/** A frame that waits on a person told to cast no glow (`glow={false}`): its edge stays yours, its shape casts nothing. */
+export const YoursUnlit: StoryObj<typeof CutFrame> = {
+  args: { hue: 'yours', glow: false },
+  render: (args) => (
+    <div data-ground="plain" style={ON_PLAIN}>
+      <CutFrame {...args}>
+        <div style={EMPTY} />
+      </CutFrame>
+    </div>
+  ),
+};
+
 /** A frame given a height, filled: what it holds is laid out down the whole of it, and a long child scrolls inside it. */
 export const Filled: StoryObj = {
   parameters: { a11y: { test: 'todo' } },

@@ -7,14 +7,12 @@
  * back. A row is narrow, so the graph holds at most `GRAPH_SLOTS` columns: the ones around where the run is now, the columns before and
  * after them folded into a point that counts them. A column holds at most `RAIL_LANES` points, the last of them counting the steps it
  * leaves out.
- *
- * Opened, the floor's card grows to the right and holds every step as a tile (`tilesOf`), on the same layering with nothing folded.
  */
 import type { RunGraph } from './api/graph.ts';
 import type { Frozen } from './frozen.ts';
 import type { RunView } from './api/judged.ts';
-import { edgesOf, loopPath, movingInto, type EdgeState, type EdgeStep } from './canvas.ts';
-import { layers, stepsOf, type Point } from './layout.ts';
+import { edgesOf, movingInto, type EdgeState, type EdgeStep } from './canvas.ts';
+import { layers, stepsOf } from './layout.ts';
 import { waitsAtGate, settledState, stepState, type StepState } from './status.ts';
 import { stepMark } from './stepMark.ts';
 
@@ -23,7 +21,7 @@ import { stepMark } from './stepMark.ts';
  * `more`, the steps of a column past the lanes it shows. `live`: a step of it is at work or waits on a person — where the run is.
  * `done`: every step of it is settled (`settledState`: done, or passed by its route). `state` is a step's own, and null for the other two.
  */
-export type Pill = {
+type Pill = {
   id: string;
   kind: 'step' | 'fold' | 'more';
   names: string[];
@@ -37,32 +35,10 @@ export type Pill = {
   height: number;
 };
 
-/**
- * An arrow between two boxes, as `edgeStroke` and `edgeLine` draw it: `path` the line, `head` the arrowhead at its end, `loop`
- * a `loop` edge back. Between a fold, or a `more`, and anything, its state is running if any edge it stands for is, done if all
- * are, and to come otherwise. `round`: on a loop edge past its first round, the round it is on (`loopLabel`) and where its words
- * go, under the middle of the curve; null otherwise.
- */
-type Arrow = {
-  id: string;
-  from: string;
-  to: string;
-  loop: boolean;
-  state: EdgeState;
-  path: string;
-  head: string;
-  round: { text: string; x: number; y: number } | null;
-};
-
-/** A flow laid out: its boxes and arrows, the room they take, and why it has no arrows when the steps' `after` go round in a cycle. */
-export type Flow = { pills: Pill[]; arrows: Arrow[]; width: number; height: number; error: string | null };
-
 /** The most columns the graph shows, fold points counted: six columns of 32 pixels or more across its 188, a gate's tick between two. */
 export const GRAPH_SLOTS = 6;
 /** The most points a column of the graph shows, the one counting the rest included. */
 const RAIL_LANES = 3;
-/** The open card's tiles (`w-44`), the arrow's room between columns and between lanes, and the room over and under for arcs. */
-export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under: 22 };
 
 /**
  * A run's steps as its flow reads them, off the list's record of it: each one's name, its state, its note and whether its round is due.
@@ -129,26 +105,6 @@ export function windowOf(n: number, live: number, slots = GRAPH_SLOTS): { start:
 }
 
 type Box = Omit<Pill, 'x' | 'y' | 'width' | 'height'>;
-type Sizes = { width: number; height: number; gap: number; lane: number; over: number; under: number };
-
-/**
- * The tiles an open card holds: every step, on the layering, nothing folded.
- * @param names The run's steps by name, in the run's order.
- * @param graph The run's graph of steps, whose edges lay them out; a run listed without one has each step a column.
- * @param steps Each step's state as the flow reads it (`flowSteps`).
- * @param cancelled Whether somebody called the run off: no step is live then.
- */
-export function tilesOf(names: readonly string[], graph: Frozen<RunGraph>, steps: readonly EdgeStep[], cancelled: boolean): Flow {
-  const { columns, error } = columnsOf(names, graph);
-  const boxOf = boxer(stateReader(steps), cancelled);
-  return arrange(
-    columns.map((column) => column.map((name) => boxOf('step', [name]))),
-    TILE,
-    graph,
-    steps,
-    error,
-  );
-}
 
 /**
  * A point of a run's graph drawn small (`graphOf`): a box (`Pill`'s kind, names, label, state, live and done) at its centre, `x`, `y`;
@@ -158,7 +114,8 @@ export type GraphPoint = Box & { x: number; y: number; r: number; route: boolean
 
 /**
  * A line of the graph between two points: `path` drawn straight between them, or under the row at right angles for a `loop`, with its
- * arrowhead `head`; `state` as `Arrow`'s; `untaken` a route its condition did not take; `taken` a loop the run has gone round.
+ * arrowhead `head`; `state` as an edge's (`EdgeState`); `untaken` a route its condition did not take; `taken` a loop the run has gone
+ * round.
  */
 export type GraphLine = {
   id: string;
@@ -203,6 +160,7 @@ const r1 = (n: number): number => Math.round(n * 10) / 10;
  * @param gates The steps a person approves before they run.
  * @param cancelled Whether somebody called the run off: no step is live then.
  * @param width How wide the graph is drawn, in pixels.
+ * @param fold How many columns it shows before it folds the rest (`GRAPH_SLOTS`); a graph that names its steps folds none.
  */
 export function graphOf(
   names: readonly string[],
@@ -211,10 +169,11 @@ export function graphOf(
   gates: readonly string[],
   cancelled: boolean,
   width = 188,
+  fold = GRAPH_SLOTS,
 ): StepGraphLayout {
   const { columns, error } = columnsOf(names, graph);
   const stateAt = stateReader(steps);
-  const { start, end } = windowOf(columns.length, liveColumn(columns, stateAt, cancelled));
+  const { start, end } = windowOf(columns.length, liveColumn(columns, stateAt, cancelled), Math.max(fold, 1));
   const boxOf = boxer(stateAt, cancelled);
   const slots: Box[][] = [];
   if (start > 0) slots.push([boxOf('fold', columns.slice(0, start).flat())]);
@@ -355,87 +314,6 @@ function joinedOf(slots: readonly Box[][], graph: Frozen<RunGraph>, steps: reado
   return joined;
 }
 
-/**
- * The boxes put down, column by column, each column centred on the tallest; and the arrows between them, off the run's edges
- * (`edgesOf`), each edge drawn once between the boxes that stand for its ends, and none inside a box. A `loop` edge only between
- * two steps' own boxes: back into a fold it would say nothing a person could follow. Room over the row only when an arrow arcs
- * over it, and under it only when a loop does.
- */
-function arrange(slots: readonly Box[][], size: Sizes, graph: Frozen<RunGraph>, steps: readonly EdgeStep[], error: string | null): Flow {
-  const joined = joinedOf(slots, graph, steps, error);
-  const over = [...joined.values()].some((a) => a.skip) ? size.over : 0;
-  const under = [...joined.values()].some((a) => a.loop) ? size.under : 0;
-  const lanes = Math.max(1, ...slots.map((slot) => slot.length));
-  const band = lanes * size.height + (lanes - 1) * size.lane;
-  const pills = slots.flatMap((slot, s) => {
-    const top = over + (band - (slot.length * size.height + (slot.length - 1) * size.lane)) / 2;
-    return slot.map((box, lane): Pill => ({
-      ...box,
-      x: s * (size.width + size.gap),
-      y: top + lane * (size.height + size.lane),
-      width: size.width,
-      height: size.height,
-    }));
-  });
-  const at = new Map(pills.map((pill) => [pill.id, pill]));
-  const arrows = [...joined].map(([id, { from, to, loop, states, skip, label }]): Arrow => {
-    const [a, b] = [at.get(from.id)!, at.get(to.id)!];
-    const bottom = over + band + under - 3;
-    const curve = loop ? loopCurve(a, b, bottom) : skip ? overCurve(a, b, 2) : sideCurve(a, b);
-    const round = loop && label ? { text: label, x: (a.x + a.width / 2 + b.x + b.width / 2) / 2, y: bottom } : null;
-    return { id, from: from.id, to: to.id, loop, state: stateOf(states), path: curve.path, head: headAt(curve.end, curve.toward), round };
-  });
-  return {
-    pills,
-    arrows,
-    width: slots.length ? slots.length * size.width + (slots.length - 1) * size.gap : 0,
-    height: over + band + under,
-    error,
-  };
-}
-
 /** Running if any edge an arrow stands for is, done if every one is, and to come otherwise. */
 const stateOf = (states: readonly EdgeState[]): EdgeState =>
   states.includes('running') ? 'running' : states.every((s) => s === 'done') ? 'done' : 'to-come';
-
-type Curve = { path: string; end: Point; toward: Point };
-
-/** From a box's right side to the next column's left, level where they are level. */
-function sideCurve(a: Pill, b: Pill): Curve {
-  const [x1, y1, x2, y2] = [a.x + a.width, a.y + a.height / 2, b.x, b.y + b.height / 2];
-  const mid = (x1 + x2) / 2;
-  return { path: `M ${x1},${y1} C ${mid},${y1} ${mid},${y2} ${x2},${y2}`, end: { x: x2, y: y2 }, toward: { x: mid, y: y2 } };
-}
-
-/**
- * Over the row, from the top of one box to the top of one a column or more on, its middle at `peak`: a cubic's point at t = ½ is ⅛ of
- * each end and ⅜ of each control point, as in `loopPath`.
- */
-function overCurve(a: Pill, b: Pill, peak: number): Curve {
-  const [x1, y1, x2, y2] = [a.x + a.width * 0.75, a.y, b.x + b.width * 0.25, b.y];
-  const control = (peak - (y1 + y2) / 8) / 0.75;
-  return { path: `M ${x1},${y1} C ${x1},${control} ${x2},${control} ${x2},${y2}`, end: { x: x2, y: y2 }, toward: { x: x2, y: control } };
-}
-
-/**
- * Under the row, from under the looping step to under the one it runs again (`loopPath`), its middle at `bottom`. The head comes from
- * the last control point, which `loopPath` puts straight under the target, so it points up into it.
- */
-function loopCurve(a: Pill, b: Pill, bottom: number): Curve {
-  const [source, target] = [
-    { x: a.x + a.width / 2, y: a.y + a.height },
-    { x: b.x + b.width / 2, y: b.y + b.height },
-  ];
-  const { path } = loopPath(source, target, bottom - Math.max(source.y, target.y));
-  return { path, end: target, toward: { x: target.x, y: (bottom - (source.y + target.y) / 8) / 0.75 } };
-}
-
-/** An arrowhead with its tip at `end`, pointing away from `toward`: the direction the line comes in. */
-function headAt(end: Point, toward: Point): string {
-  const [dx, dy] = [end.x - toward.x, end.y - toward.y];
-  const length = Math.hypot(dx, dy) || 1;
-  const [ux, uy] = [dx / length, dy / length];
-  const [bx, by] = [end.x - ux * 5, end.y - uy * 5];
-  const r = (n: number) => Math.round(n * 10) / 10;
-  return `M ${r(end.x)},${r(end.y)} L ${r(bx - uy * 3)},${r(by + ux * 3)} L ${r(bx + uy * 3)},${r(by - ux * 3)} Z`;
-}

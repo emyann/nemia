@@ -41,7 +41,10 @@ applies: ["apps/web/**"]
    with a cut corner, `CutButton` for the filled cut button that is a link to a route and `CutPress` for the one that is pressed,
    `CutCue` for a cue in a small cut frame beside a face or in a header, `CutField` for a box that holds a field, whose edge lights round its cut when the focus is in it, and `cutShape`, `cutRing` and `cutPoints` for a new part that takes the cut; `Plate` for a section's heading and `PageName` for
    a page's name; `Sticker` for a tile that carries a number and `StatTile` for one over its breakdown; `BreakdownRows` for a breakdown's rows and
-   `BreakdownPreview` for one hung off a focusable trigger of your own; `StepGraph` for a run's steps as its workflow's graph; `Reading`
+   `BreakdownPreview` for one hung off a focusable trigger of your own; `StepGraph` for a run's steps as its workflow's graph;
+   `Run` for a run at any of its five sizes, from its mark in a sentence to the floor's opened panel (`RunMeta`, `RunClock` and
+   `RunCost` for its parts a table draws alone, `QuietLabels` for a run's labels said quietly, `RunMark` for
+   another run named in a run's words); `Reading`
    for what a page or a part draws while its first read is out, the kit's `SkeletonGroup` named by the line it replaces around the kit's
    `Skeleton`s in the shape of what is coming, held back a moment so a fast read draws nothing (`reading.css`), and `ReadingLines` for its
    lines of text;

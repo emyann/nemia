@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Tag, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Button, Tag } from '@/components/ui/ds';
 import { CutField, CutTag, TextLink } from '@/components/look';
 import { CLOSED_LABEL_KEYS, type Labels as LabelMap } from '@/lib/api/labels';
 
@@ -22,42 +22,12 @@ function LabelTag({ name, value }: { name: string; value: string }) {
 
 /** A row's own labels as tags — `factory` and `workflow` left to the row's own columns — none drawn for none. */
 export function LabelTags({ labels }: { labels: Readonly<LabelMap> }) {
-  const entries = ownOf(labels);
+  const entries = entriesOf(labels).filter(([key]) => !CLOSED_LABEL_KEYS.includes(key));
   if (entries.length === 0) return null;
   return (
     <span data-labels className="inline-flex flex-wrap items-center gap-1.5">
       {entries.map(([key, value]) => (
         <LabelTag key={key} name={key} value={value} />
-      ))}
-    </span>
-  );
-}
-
-/** The labels of `map` a person put on it, in key order: every one but the store's own `factory` and `workflow`. */
-const ownOf = (map: Readonly<LabelMap>): Array<[string, string]> => entriesOf(map).filter(([key]) => !CLOSED_LABEL_KEYS.includes(key));
-
-/**
- * A run's own labels, quiet: each its value alone in the meta line's ink, its whole `key=value` in the kit's tooltip and said aloud, a
- * link to its label page; every key drawn alike, the store's `factory` and `workflow` left to the line that says them. None for none.
- */
-export function QuietLabels({ labels }: { labels: Readonly<LabelMap> }) {
-  const entries = ownOf(labels);
-  if (entries.length === 0) return null;
-  return (
-    <span data-quiet-labels className="inline-flex min-w-0 items-center gap-2.5">
-      {entries.map(([key, value]) => (
-        <TooltipTrigger key={key} delay={300}>
-          <TextLink
-            to="/labels/$key/$value"
-            params={{ key, value }}
-            data-label={`${key}=${value}`}
-            aria-label={`${key}=${value}`}
-            className="text-body-small font-medium whitespace-nowrap text-on-surface-variant hover:text-on-surface"
-          >
-            {value}
-          </TextLink>
-          <Tooltip>{`${key}=${value}`}</Tooltip>
-        </TooltipTrigger>
       ))}
     </span>
   );

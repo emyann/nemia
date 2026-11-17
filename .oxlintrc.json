@@ -487,7 +487,7 @@
     {
       "files": ["apps/web/src/components/factory/FactoryCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 246, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 237, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -518,9 +518,8 @@
     {
       "files": ["apps/web/src/components/run/RunNode.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 93, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 30 }],
-        "sonarjs/cognitive-complexity": ["error", 21]
+        "complexity": ["error", { "max": 24 }],
+        "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {
@@ -548,12 +547,6 @@
       "rules": {
         "max-lines-per-function": ["error", { "max": 84, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 25 }]
-      }
-    },
-    {
-      "files": ["apps/web/src/components/step/StepRail.tsx"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 86, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

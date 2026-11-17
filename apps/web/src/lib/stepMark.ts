@@ -1,10 +1,11 @@
 /**
  * How a step is drawn on a run's graph (`StepGraph`): its mark, from its state and whether it waits on something now (`stepMark`,
- * proved by `contracts/step-mark.contract.ts`), and that rule of waiting (`waitsNow`). Pure.
+ * proved by `contracts/step-mark.contract.ts`), that rule of waiting (`waitsNow`), and the mark of the step a run is on (`nowMark`). Pure.
  */
 import type { WaitOn } from 'objects';
 import type { StepMark, StepMarkOf } from '../../contracts/step-mark.contract.ts';
 import type { StepState } from './status.ts';
+import { nowOf, railStates } from './runWords.ts';
 
 export type { StepMark } from '../../contracts/step-mark.contract.ts';
 
@@ -56,4 +57,18 @@ export function waitsNow(drawn: ReadonlyArray<{ state: StepState; on: WaitOn | n
   const { state, on } = drawn[at];
   if (state !== 'waiting') return NOT_STARTED.has(state);
   return on !== null || (held && drawn.findIndex((step) => NOT_STARTED.has(step.state)) === at);
+}
+
+/**
+ * The mark of the step a run is on (`nowOf`), as its graph draws that step (`stepMark`, `waitsNow`), so a run named by its mark and its
+ * graph's node never disagree; `done` for a run whose every step is done.
+ * @param run The run: its steps with their codes, spec and try, its calling off, its hold and its waits.
+ */
+export function nowMark(run: Parameters<typeof nowOf>[0]): StepMark {
+  const now = nowOf(run);
+  if (!now) return 'done';
+  const held = run.holding != null;
+  const drawn = railStates(run.steps, Boolean(run.cancelledAt), held);
+  const at = drawn.findIndex((step) => step.name === now.step);
+  return stepMark(drawn[at].state, waitsNow(drawn, at, held));
 }

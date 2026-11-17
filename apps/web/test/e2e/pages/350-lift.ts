@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, openRunMenu, partOf, photograph, themeOf } from '../board.ts';
-import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard } from '../canvas.ts';
+import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard, wordsSaying } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -40,7 +40,7 @@ export default {
 
     try {
       holdIt();
-      await expectVisible(card.locator('[data-holding]', { hasText: new RegExp(`^${literal(word)}$`) }), `the card says ${word}`);
+      await expectVisible(wordsSaying(card, word), `the card says ${word}`);
       const button = card.locator(`[data-lift="${id}"]`);
       await expectVisible(button, 'and offers Lift… beside its held chip');
       await expectCount(page.locator('[data-lift]'), 1, 'on the held card alone');
@@ -56,7 +56,7 @@ export default {
       await dialog.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(dialog, 0, 'the second press lifts, and the popover closes');
       lifted('the card');
-      await expectCount(card.locator('[data-holding]'), 0, 'the card says no hold');
+      await expectCount(wordsSaying(card, word), 0, 'the card says no hold');
       await expectCount(edge, 0, 'and no hold edge comes into it');
       await expectCount(page.locator('[data-lift]'), 0, 'and offers no lift');
       await expectVisible(card.locator('[data-answer="Approve"]'), `and offers ${gated}'s gate again`);

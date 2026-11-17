@@ -36,8 +36,7 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { RunGone } = await import('../src/components/run/RunGone.tsx');
 const { KindsBehind } = await import('../src/components/run/KindsBehind.tsx');
-const { RunClockCell } = await import('../src/components/run/RunClockCell.tsx');
-const { RunCostCell } = await import('../src/components/run/RunCostCell.tsx');
+const { RunClock: RunClockCell, RunCost: RunCostCell } = await import('../src/components/look/RunFigures.tsx');
 const { BreakdownRows } = await import('../src/components/look/Breakdown.tsx');
 const { clockBreakdown } = await import('../src/lib/breakdown.ts');
 const { instantWhole } = await import('../src/lib/instant.ts');
@@ -363,13 +362,14 @@ test("a try's run is tagged try and names the agent it tried, linked to its page
 });
 
 /** A run's card on the floor, inside the router its title links with, as the floor draws it: shown in the bar or not (`inspected`). */
-async function cardMarkup(run: RunDetail, inspected: boolean, reads: string[] = []): Promise<string> {
+async function cardMarkup(run: RunDetail, inspected: boolean, reads: string[] = [], open = false): Promise<string> {
   const { RunNode } = await import('../src/components/run/RunNode.tsx');
   const data = {
     run,
+    among: [],
     reads,
     finished: false,
-    open: false,
+    open,
     detail: null,
     trouble: null,
     inspected,
@@ -381,13 +381,13 @@ async function cardMarkup(run: RunDetail, inspected: boolean, reads: string[] = 
   return routedWith(createElement(ReactFlowProvider, null, createElement(RunNode, { ...props, positionAbsoluteY: 0 } as never)));
 }
 
-test('the card the bar shows is ringed and marked as inspected, and a card it does not show is not', async () => {
+test('the card the bar shows is banded in the cut and marked as inspected, and a card it does not show is not', async () => {
   const shown = await cardMarkup(atGate(), true);
   assert.match(shown, /data-inspected="true"/);
-  assert.match(shown, /ring-2 ring-ring/);
+  assert.match(shown, /data-ringed="focus"/);
   const other = await cardMarkup(atGate(), false);
   assert.doesNotMatch(other, /data-inspected/);
-  assert.doesNotMatch(other, /ring-2 ring-ring/);
+  assert.doesNotMatch(other, /data-ringed="focus"/);
 });
 
 test('a card that reads runs as context says how many in a chip, each run on hover by its id and title — and a card that reads none has none', async () => {
@@ -402,11 +402,12 @@ test('a card that reads runs as context says how many in a chip, each run on hov
   assert.doesNotMatch(await cardMarkup(atGate(), false), /data-context/);
 });
 
-test("a ghost's card writes the api's word for what it waits on, then an arrow to each run it waits on, the word naming each run once", async () => {
+test("a ghost's card says it waits on the first run it waits on, by its mark, and opened names every run it waits on, each a link", async () => {
   const base = atGate({}, { waitingOnYou: [], waitingOnYouWords: [] });
   const ghost: RunDetail = {
     ...base,
     toDecide: null,
+    steps: base.steps.map((step) => ({ ...step, phase: 'pending', reason: 'Waiting', on: 'run' as const })),
     waiting: {
       runs: [
         { run: 'a-1x2y', missing: false, cancelledAt: null, gone: [] },
@@ -419,15 +420,19 @@ test("a ghost's card writes the api's word for what it waits on, then an arrow t
   };
   const html = await cardMarkup(ghost, false);
   assert.match(html, /data-ghost-run="true"/, 'the card is a ghost');
-  const line = /<p[^>]*data-waiting="on-runs"[^>]*>([\s\S]*?)<\/p>/.exec(html)![1];
-  assert.equal(line.replace(/<[^>]+>/g, ''), 'after a-1x2y and b-3z land', "the line reads the api's word as it is, each run named once");
+  const words = /<span[^>]*data-now-words="true"[^>]*>([\s\S]*?)<\/span><\/span>(?=<\/span>)/.exec(html)?.[0] ?? '';
+  assert.match(words, /title="[^"]*\nit starts once both land"/, "its words whole, then the api's advice, on hover");
   assert.deepEqual(
-    [...line.matchAll(/<a [^>]*>/g)].map((m) => [/href="\/runs\/([^"]+)"/.exec(m[0])?.[1], /aria-label="([^"]+)"/.exec(m[0])?.[1]]),
-    [
-      ['a-1x2y', 'Open a-1x2y'],
-      ['b-3z', 'Open b-3z'],
-    ],
-    'each run it waits on is a link to its page',
+    [...words.matchAll(/data-run-mark="([^"]+)"/g)].map((m) => m[1]),
+    ['a-1x2y'],
+    'the run it waits on is its mark',
+  );
+  const opened = await cardMarkup(ghost, false, [], true);
+  const waitsOn = /data-runs="Waits on"[\s\S]*?(?=data-runs="Waited on by")/.exec(opened)?.[0] ?? '';
+  assert.deepEqual(
+    [...waitsOn.matchAll(/href="\/runs\/([^"]+)"/g)].map((m) => m[1]),
+    ['a-1x2y', 'b-3z'],
+    'opened, each run it waits on is a link to its page',
   );
 });
 

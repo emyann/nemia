@@ -168,14 +168,15 @@ export default {
       await expectCount(card.locator('[data-tile]'), LONG_NAMES.steps.length, 'the card opens into a tile per step');
       for (const name of LONG_NAMES.steps) {
         await expectCount(
-          card.locator(`[data-tile="${name}"][aria-label="Inspect step ${name}"]`).getByTitle(name, { exact: true }),
+          card.locator(`[data-tile="${name}"][aria-label="Inspect step ${name}"]`),
           1,
-          `${name}'s tile is named whole for a screen reader, and on hover`,
+          `${name}'s tile is named whole for a screen reader`,
         );
+        await expectCount(card.locator(`[data-named="${name}"]`).getByTitle(name, { exact: true }), 1, `and under it, whole on hover`);
       }
       await expectVisible(
-        card.locator(`[data-tile="${ending}"] [data-need="approve"]`, { hasText: `approve ${ending} to run it` }),
-        "the ending's tile says approving runs it",
+        card.locator(`[data-gate-line="${ending}"][title^="approve to run ${ending}"]`),
+        'the opened card says approving the ending runs it',
       );
       await expectClearOfEachOther(page);
       await page.getByRole('button', { name: 'Reset layout' }).click();

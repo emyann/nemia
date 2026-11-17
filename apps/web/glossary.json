@@ -233,6 +233,11 @@
     {
       "term": "Factory path",
       "meaning": "the address of a factory's place, `/factories/<name>/<place>`, a run's, a step's and a card's page included: the factory is a segment of the path, never a key of the search. Every old address that named it as `?factory=` is sent to its path, its other keys kept (`factoryRedirect`, `apps/web/src/lib/factoryAddress.ts`, in the root's `beforeLoad`), and a run's or a card's page to where its namespace says (`objectHome`)."
+    },
+    {
+      "term": "Run size",
+      "meaning": "how much of a run one drawing says: `xs` its mark in a sentence, `sm` a line, `md` a runs table's row or the floor's card, `lg` the waiting card, `xl` the opened floor card, its panel. Each size says all the one under it does and more (`says`, `apps/web/src/lib/runSays.ts`, proved by `apps/web/contracts/run-says.contract.ts`), and one part draws them all, `Run` (`apps/web/src/components/look/Run.tsx`).",
+      "type": "RunSize"
     }
   ]
 }

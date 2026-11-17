@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, openRunMenu, photograph, runMenuActions, themeOf, isRunAction } from '../board.ts';
-import { cardOf } from '../canvas.ts';
+import { cardOf, wordsSaying } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -71,12 +71,7 @@ export default {
 
       await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
       await idle(page);
-      await expectVisible(
-        cardOf(page, id)
-          .locator('[data-holding="on-runs"]')
-          .filter({ hasText: new RegExp(`^${literal(word)}$`) }),
-        `GATED's card on the Factory says ${word}`,
-      );
+      await expectVisible(wordsSaying(cardOf(page, id), word), `GATED's card on the Factory says ${word}`);
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
 

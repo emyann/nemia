@@ -167,6 +167,27 @@ export const LONG: GraphRunFixture = graphRun(
   ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map((name, i) => ({ name, ...(i < 5 ? VERIFIED : i === 5 ? WORKING : TO_COME) })),
 );
 
+/** A run whose workflow forks: design, then implement and tokens side by side, each its own lane, joining at review, then land. */
+export const FORKED: GraphRunFixture = {
+  ...graphRun([
+    { name: 'design', ...VERIFIED },
+    { name: 'implement', ...WORKING },
+    { name: 'tokens', ...WORKING },
+    { name: 'review', ...TO_COME },
+    { name: 'land', ...TO_COME },
+  ]),
+  graph: {
+    roots: ['design'],
+    edges: [
+      { from: 'design', to: 'implement', kind: 'after' },
+      { from: 'design', to: 'tokens', kind: 'after' },
+      { from: 'implement', to: 'review', kind: 'after' },
+      { from: 'tokens', to: 'review', kind: 'after' },
+      { from: 'review', to: 'land', kind: 'after' },
+    ],
+  },
+};
+
 /** A run listed without its graph, by an api older than the board. */
 export const UNGRAPHED_RUN: GraphRunFixture = { ...graphRun(AT_WORK), graph: undefined as unknown as RunView['graph'] };
 

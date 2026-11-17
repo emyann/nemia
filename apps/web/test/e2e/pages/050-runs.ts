@@ -231,10 +231,12 @@ async function cardSays(page: Page, run: WaitingRun): Promise<void> {
   await expectTexts(card.locator(`a[data-cut-button]${open}`), [OPENS], "one quiet button, which opens the run's page");
   await expectCount(card.locator('[data-cut-button]'), 1, 'and only one');
   await expectCount(card.locator('button[data-step-bar]'), run.steps.length, "each node of its graph a button that opens its step's card");
+  const clocks = await card.locator('button[data-clock-words]').count();
+  if (clocks > 1) throw new Refused(`the card of ${run.id} draws its clock once — it draws ${clocks}`);
   await expectCount(
     card.locator('button:not([data-step-bar])'),
-    1 + (run.cost && run.tokens ? 1 : 0),
-    'and no control more than the copy of its id and the preview of its cost: nothing is decided from the list',
+    1 + (run.cost && run.tokens ? 1 : 0) + clocks,
+    'and no control more than the copy of its id and the previews of its clock and its cost: nothing is decided from the list',
   );
 }
 
@@ -1043,6 +1045,7 @@ const flightLines = (page: Page) =>
  * each id; and the seed holds ids of more than one length, or the rule would hold for nothing.
  */
 async function flightAligned(page: Page): Promise<void> {
+  await expectVisible(section(page, 'in-flight').locator('tr[data-run]:has([data-factory])').first(), 'the rows in flight, read again');
   const lines = await flightLines(page);
   if (new Set(lines.map((line) => line.id.length)).size < 2)
     throw new Refused(`the runs in flight hold ids of more than one length — ${lines.map((line) => line.id).join(', ')}`);

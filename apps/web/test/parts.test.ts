@@ -435,3 +435,140 @@ test("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and gro
     assert.doesNotMatch(plain, /repeating-linear-gradient/);
   });
 });
+
+/** A row of the runs table in the kit's table, its four columns, as `FlightTable` draws it. */
+async function inTable(row: ReactElement): Promise<ReactElement> {
+  const { Column, Table, TableBody, TableHeader } = await import('../src/components/ui/ds/index.ts');
+  const columns = ['Run', 'Now', 'Clock', 'Cost'].map((name, i) =>
+    createElement(Column, { key: name, id: name, isRowHeader: i === 0 } as never, name),
+  );
+  return createElement(
+    Table,
+    { 'aria-label': 'Runs in flight' } as never,
+    createElement(TableHeader, null, ...columns),
+    createElement(TableBody, null, row),
+  );
+}
+
+test('Run: each size draws what its ladder says and no more, in its tone, and only a card at lg or xl that waits on you glows', async (t) => {
+  const { Run } = await import('../src/components/look/Run.tsx');
+  const { says, smallestSize } = await import('../src/lib/runSays.ts');
+  const { nowOf } = await import('../src/lib/runWords.ts');
+  const { runViewOf } = await import('../src/lib/api/judged.ts');
+  const { TARGET_RUNS, READS } = await import('../.storybook/fixtures/runs.ts');
+  const asOf = new Date('2026-11-15T18:00:00.000Z');
+  const among = Object.values(TARGET_RUNS).map((one) => ({ ...runViewOf(one), clock: null }));
+  const run = among.find((one) => one.id.endsWith('1sw7'))!;
+  const said = (html: string): string[] =>
+    [...new Set([...html.matchAll(/data-run-says="([^"]+)"/g)].flatMap((m) => m[1].split(' ')))].sort();
+  const none = new Set(['words']);
+  const sizes = [
+    ['xs', 'card'],
+    ['sm', 'card'],
+    ['md', 'row'],
+    ['md', 'card'],
+    ['lg', 'card'],
+    ['xl', 'card'],
+  ] as const;
+  for (const [size, layout] of sizes)
+    await t.test(`${size} ${layout}`, async () => {
+      const element = createElement(Run, { run, size, layout, asOf, among, read: READS['1sw7'] });
+      const html = await drawn(size === 'md' && layout === 'row' ? await inTable(element) : element);
+      assert.deepEqual(said(html), [...says(size, layout)].filter((thing) => !none.has(thing)).sort());
+      if (layout === 'row') {
+        assert.match(html, new RegExp(`<tr[^>]*data-run="${run.id}"`), 'the row is the table row, marked by its run');
+        assert.match(html, /data-factory="/, 'and says its factory');
+      }
+    });
+  await t.test('each thing a card says is drawn first at its smallest size, and at every size above it', async () => {
+    const ladder = ['xs', 'sm', 'md', 'lg', 'xl'] as const;
+    const drawings = await Promise.all(
+      ladder.map(async (size) => said(await drawn(createElement(Run, { run, size, layout: 'card', asOf, among, read: READS['1sw7'] })))),
+    );
+    for (const thing of [...says('xl', 'card')].filter((one) => !none.has(one))) {
+      const first = ladder.indexOf(smallestSize(thing, 'card'));
+      assert.deepEqual(
+        ladder.filter((_, at) => drawings[at].includes(thing)),
+        ladder.slice(first),
+        thing,
+      );
+    }
+  });
+  await t.test("xs: a run's mark is the mark its own graph draws on the step it is on, in every staged state, finished too", async () => {
+    for (const one of among) {
+      const xs = await drawn(createElement(Run, { run: one, size: 'xs', layout: 'card', asOf, among }));
+      const mark = /data-mark="([^"]+)"/.exec(xs)?.[1];
+      const step = nowOf(one)?.step ?? one.steps.at(-1)!.name;
+      const graph = await drawn(createElement(StepGraph, { run: one }));
+      const node = new RegExp(`data-step="${step}" data-state="[^"]+" data-mark="([^"]+)"`).exec(graph)?.[1];
+      assert.ok(node, `${one.id}: its graph draws ${step}`);
+      assert.equal(mark, node, `${one.id}: on ${step}`);
+    }
+  });
+  await t.test('its words where it has some: 649a waits on a run, by its mark', async () => {
+    const waits = among.find((one) => one.id.endsWith('649a'))!;
+    const html = await drawn(createElement(Run, { run: waits, size: 'md', layout: 'card', asOf, among }));
+    assert.ok(said(html).includes('words'));
+    assert.match(html, /data-run-mark="api-a-factorys-pages-stop-paying-lgll"/);
+  });
+  await t.test('its tone is its chip’s, rest when finished; a yours card glows at lg and xl, never at md', async () => {
+    for (const one of among) {
+      const html = await drawn(createElement(Run, { run: one, size: 'md', layout: 'card', asOf, among }));
+      assert.match(tagWith(html, 'data-size="md"'), new RegExp(`data-tone="${nowOf(one)?.tone ?? 'rest'}"`), one.id);
+    }
+    const yours = among.find((one) => one.id.endsWith('72wy'))!;
+    for (const size of ['md', 'lg', 'xl'] as const) {
+      const html = await drawn(createElement(Run, { run: yours, size, layout: 'card', asOf, among }));
+      const glows = /filter:drop-shadow/.test(tagWith(html, 'data-cut-shape'));
+      assert.equal(glows, size !== 'md', size);
+    }
+  });
+});
+
+test('CutFrame given a ground and no glow, and StepGraph naming its steps', async (t) => {
+  await t.test('a ground replaces the card’s on its ground layer, and glow={false} leaves a yours frame unlit', async () => {
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const html = await drawn(createElement(CutFrame, { hue: 'yours', ground: 'bg-background', glow: false, children: 'x' }));
+    assert.match(tagWith(html, 'data-cut-ground'), /class="absolute inset-0 bg-background"/);
+    assert.doesNotMatch(tagWith(html, 'data-cut-shape'), /filter/);
+  });
+  await t.test('named: each step under its node, its agent and what is said of it; without, none', async () => {
+    const run = graphRun(STEPS);
+    const named = new Map(STEPS.map((step) => [step.name, { agent: `${step.name}-agent`, said: '4m · $1.00' }]));
+    const html = await drawn(createElement(StepGraph, { run, named, width: 600 }));
+    assert.deepEqual(
+      [...html.matchAll(/data-named="([^"]+)"/g)].map((m) => m[1]),
+      STEPS.map((step) => step.name),
+    );
+    assert.match(html, /design-agent/);
+    assert.doesNotMatch(html, /data-fold/, 'no column folds');
+    assert.doesNotMatch(await drawn(createElement(StepGraph, { run })), /data-named/);
+  });
+  await t.test('named, forked: two steps in one column, each a lane, are named in boxes of their own', async () => {
+    const [design, implement, review, land] = STEPS;
+    const tokens = { ...implement, name: 'tokens' };
+    const steps = [design, implement, tokens, review, land];
+    const run = {
+      ...graphRun(steps),
+      graph: {
+        roots: ['design'],
+        edges: [
+          { from: 'design', to: 'implement', kind: 'after' as const },
+          { from: 'design', to: 'tokens', kind: 'after' as const },
+          { from: 'implement', to: 'review', kind: 'after' as const },
+          { from: 'tokens', to: 'review', kind: 'after' as const },
+          { from: 'review', to: 'land', kind: 'after' as const },
+        ],
+      },
+    };
+    const named = new Map(steps.map((step) => [step.name, { agent: `${step.name}-agent`, said: '' }]));
+    const html = await drawn(createElement(StepGraph, { run, named, width: 600 }));
+    const boxes = [...html.matchAll(/data-named="([^"]+)"[^>]*style="left:([\d.-]+)(?:px)?;top:([\d.-]+)(?:px)?"/g)].map((m) => ({
+      name: m[1],
+      at: `${m[2]},${m[3]}`,
+    }));
+    assert.deepEqual(boxes.map((box) => box.name).sort(), steps.map((step) => step.name).sort(), 'each step is named once');
+    assert.equal(new Set(boxes.map((box) => box.at)).size, boxes.length, `no two names share a box: ${JSON.stringify(boxes)}`);
+    assert.match(html, /data-named="land"(?:(?!data-named).)*>–<\/span>/s, 'a step with nothing read yet says – for its time and cost');
+  });
+});

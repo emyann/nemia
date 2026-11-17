@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, openFold, partOf, photograph, themeOf } from '../board.ts';
-import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard } from '../canvas.ts';
+import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard, wordsSaying } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { DIAMOND, GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -40,8 +40,8 @@ export default {
       fs.writeFileSync(hold, JSON.stringify({ at: new Date().toISOString(), until: [until] }, null, 2), { flag: 'wx' });
       fed(id, 'held');
 
-      const said = card.locator('[data-holding="on-runs"]');
-      await expectVisible(said.filter({ hasText: new RegExp(`^${literal(word)}$`) }), `the card says ${word}`);
+      const said = wordsSaying(card, word);
+      await expectVisible(said, `the card says ${word}`);
       const title = await said.getAttribute('title');
       if (title !== `${word}\n${advice}`)
         throw new Refused(`the card's hold says itself whole and how to lift it on hover — it says ${JSON.stringify(title)}`);
@@ -96,7 +96,7 @@ export default {
     await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     await expectVisible(card.locator('[data-answer="Approve"]'), `and on the Factory, ${id}'s card offers its gate again`);
-    await expectCount(card.locator('[data-holding]'), 0, 'and says no hold');
+    await expectCount(wordsSaying(card, word), 0, 'and says no hold');
     await expectCount(edge, 0, 'and no hold edge comes into it');
     await heldWithWords(page);
     await heldNotStarted(page);
@@ -126,8 +126,8 @@ async function heldWithWords(page: Page): Promise<void> {
     await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     const card = cardOf(page, id);
-    const said = card.locator('[data-holding="on-runs"]');
-    await expectVisible(said.filter({ hasText: whole }), `the card says ${word}`);
+    const said = wordsSaying(card, word);
+    await expectVisible(said, `the card says ${word}`);
     const title = await said.getAttribute('title');
     if (!title?.startsWith(`${word}\n`))
       throw new Refused(`the card's hold says its why whole on hover — it says ${JSON.stringify(title)}`);
@@ -140,7 +140,10 @@ async function heldWithWords(page: Page): Promise<void> {
       page.locator(`[data-runs-page] [data-run="${id}"] [data-run-steps][aria-label*=" held"]`),
       `on Runs, which says less, ${id} is drawn with its steps held on its rail`,
     );
-    await expectCount(page.locator('[data-runs-page] [data-holding]'), 0, 'and the hold in its own words is on its page');
+    await expectVisible(
+      page.locator(`[data-runs-page] [data-run="${id}"] [data-now-words]`, { hasText: /^held\b/i }),
+      'and its row says the hold in its few words, as the card does: a row says what a card at md does',
+    );
     await settled(page);
     await photograph(page, path.join(OUT, `hold-said-runs-${theme}.png`), { fullPage: true });
 

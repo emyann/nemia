@@ -12,6 +12,44 @@ import { stateWordsOf } from '@/lib/words';
 import { Focusable, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 
+/** What the graph says under a step's node, with `named`: its agent, and a line of its own, its time and cost. */
+export type StepNamed = { agent: string | null; said: string };
+
+/** How much taller a graph is that names its steps: three lines under the row. */
+const NAMED_HEIGHT = 44;
+
+/** The ink of a step's name under its node: the step's own hue where it is at work, waits on you or failed, else quiet. */
+const NAME_INK: Partial<Record<StepMark, string>> = { alive: 'text-alive', yours: 'text-yours', failure: 'text-failure' };
+
+/**
+ * Which row under the graph names each step: a column's steps, a fork's lanes, one under another in the order their nodes stand, so no
+ * two names share a box; and how many rows the widest column takes.
+ */
+function namedRows(points: readonly { id: string; kind: string; x: number; y: number }[]): { of: Map<string, number>; count: number } {
+  const of = new Map<string, number>();
+  const columns = new Map<number, { id: string; y: number }[]>();
+  for (const point of points) if (point.kind === 'step') columns.set(point.x, [...(columns.get(point.x) ?? []), point]);
+  for (const column of columns.values()) [...column].sort((a, b) => a.y - b.y).forEach((point, row) => of.set(point.id, row));
+  return { of, count: Math.max(1, ...[...columns.values()].map((column) => column.length)) };
+}
+
+/** A step named under its node, centred on `x` below `y`: its name in small caps, its agent, and what `named` says of it. */
+function Named({ name, named, mark, x, y }: { name: string; named?: StepNamed; mark?: StepMark; x: number; y: number }) {
+  return (
+    <span
+      data-named={name}
+      className="absolute flex w-22 flex-col items-center text-center leading-tight"
+      style={{ left: x - 44, top: y + 2 }}
+    >
+      <span title={name} className={cn('truncate text-label-small uppercase', (mark && NAME_INK[mark]) ?? 'text-on-surface')}>
+        {name}
+      </span>
+      <span className="truncate text-body-small text-on-surface">{named?.agent ?? '—'}</span>
+      <span className="truncate font-mono text-body-small text-on-surface-variant">{named?.said || '–'}</span>
+    </span>
+  );
+}
+
 /** A step of the run as the graph reads it: its name, its codes, its note and whether its next round is due. */
 type GraphStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'note' | 'roundDue'>;
 
@@ -76,6 +114,17 @@ function Mark({ point, mark, tall }: { point: GraphPoint; mark: StepMark; tall: 
   );
 }
 
+/**
+ * A step's mark alone, 12 pixels square: the diamond its node is drawn by (`markPaint`), for a run named by the step it is on.
+ */
+export function MarkDiamond({ mark }: { mark: StepMark }) {
+  return (
+    <svg data-mark={mark} width="12" height="12" viewBox="-6 -6 12 12" aria-hidden="true" className="shrink-0 overflow-visible">
+      <path d={diamond(4.2)} strokeWidth={1.3} strokeLinejoin="miter" style={markPaint(mark)} />
+    </svg>
+  );
+}
+
 /** A line of the graph: solid where the run has gone, dashed ahead, faint off the route taken; a loop violet once gone round. */
 function Line({ line }: { line: GraphLine }) {
   const stroke = line.loop
@@ -126,17 +175,21 @@ function Told({ said, children }: { said: string; children: ReactNode }) {
  * where that step waits on you. Past what its width holds the columns away from where the run is fold into a count. Read aloud as one
  * group, each step and its word (`railSaid`). With `wrap`, each node is put inside what it gives (a button that opens the step);
  * without, each says its name and word in the kit's tooltip. A run listed without its graph says what to do (`UNGRAPHED`). `width` is
- * 188 pixels by default; `className` is the box's, `nodrag` on the floor.
+ * 188 pixels by default; `className` is the box's, `nodrag` on the floor. With `named`, each step is named under its node in small caps,
+ * its agent and what `named` says of it (its time and cost) under that, a fork's lanes one row each in their order (`namedRows`), and the
+ * box is that much taller.
  */
 export function StepGraph({
   run,
   wrap,
   width = 188,
+  named,
   className,
 }: {
   run: GraphRun;
   wrap?: (node: ReactNode, step: WrappedStep) => ReactNode;
   width?: number;
+  named?: ReadonlyMap<string, StepNamed>;
   className?: string;
 }) {
   const cancelled = run.cancelledAt !== null;
@@ -149,10 +202,12 @@ export function StepGraph({
     run.gates,
     cancelled,
     width,
+    named ? Infinity : undefined,
   );
   const at = new Map(drawn.map((step, i) => [step.name, { step, mark: stepMark(step.state, waitsNow(drawn, i, held)) }]));
   const lanes = new Map<number, number>();
   for (const point of layout.points) lanes.set(point.x, (lanes.get(point.x) ?? 0) + 1);
+  const rows = namedRows(layout.points);
   return (
     <div className={cn('flex min-w-0 flex-col gap-1', className)}>
       <div
@@ -160,33 +215,25 @@ export function StepGraph({
         aria-label={railSaid(run.steps, cancelled, held)}
         data-run-steps
         className="relative shrink-0"
-        style={{ width: layout.width, height: layout.height }}
+        style={{ width: layout.width, height: layout.height + (named ? NAMED_HEIGHT * rows.count : 0) }}
       >
-        <svg
-          width={layout.width}
-          height={layout.height}
-          aria-hidden="true"
-          className="pointer-events-none absolute top-0 left-0 overflow-visible"
-        >
-          {layout.lines.map((line) => (
-            <Line key={line.id} line={line} />
-          ))}
-          {layout.gates.map((gate) => (
-            <line
-              key={gate.step}
-              data-gate={gate.step}
-              x1={gate.x}
-              x2={gate.x}
-              y1={gate.y - 5.5}
-              y2={gate.y + 5.5}
-              strokeWidth={1.8}
-              stroke={at.get(gate.step)?.mark === 'yours' ? paint.yours : GONE}
-            />
-          ))}
-        </svg>
+        <Lines layout={layout} at={at} />
         {layout.points.map((point) => (
           <Node key={point.id} point={point} at={at} tall={(lanes.get(point.x) ?? 1) > 1 ? 13 : 24} held={held} wrap={wrap} />
         ))}
+        {named &&
+          layout.points.map((point) =>
+            point.kind === 'step' ? (
+              <Named
+                key={point.id}
+                name={point.names[0]}
+                named={named.get(point.names[0])}
+                mark={at.get(point.names[0])?.mark}
+                x={Math.min(Math.max(point.x, 44), layout.width - 44)}
+                y={layout.height + NAMED_HEIGHT * (rows.of.get(point.id) ?? 0)}
+              />
+            ) : null,
+          )}
       </div>
       {layout.error && (
         <p data-graph-error title={layout.error} className="m-0 line-clamp-2 text-body-small text-failure">
@@ -194,6 +241,34 @@ export function StepGraph({
         </p>
       )}
     </div>
+  );
+}
+
+/** The graph's lines under its nodes, and each gate's tick before its step, yellow where that step waits on you. */
+function Lines({ layout, at }: { layout: ReturnType<typeof graphOf>; at: ReadonlyMap<string, { mark: StepMark }> }) {
+  return (
+    <svg
+      width={layout.width}
+      height={layout.height}
+      aria-hidden="true"
+      className="pointer-events-none absolute top-0 left-0 overflow-visible"
+    >
+      {layout.lines.map((line) => (
+        <Line key={line.id} line={line} />
+      ))}
+      {layout.gates.map((gate) => (
+        <line
+          key={gate.step}
+          data-gate={gate.step}
+          x1={gate.x}
+          x2={gate.x}
+          y1={gate.y - 5.5}
+          y2={gate.y + 5.5}
+          strokeWidth={1.8}
+          stroke={at.get(gate.step)?.mark === 'yours' ? paint.yours : GONE}
+        />
+      ))}
+    </svg>
   );
 }
 

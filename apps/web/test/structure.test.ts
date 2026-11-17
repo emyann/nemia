@@ -420,7 +420,10 @@ test('REFUSED: a read of every run on a page, or in a part a page draws; a JSDoc
   assert.deepEqual(brokenFiles(wholeListBreaks(texts, stale)), ['src/routes/stats.tsx']);
 });
 
-/** Why the waiting card's source is refused, if it is: its figure must be the present wait, never the run's waits summed. */
+/**
+ * Why the source of the part that draws the waiting card is refused, if it is: its figure must be the present wait, never the run's waits
+ * summed.
+ */
 const waitedBreaks = (text: string): string[] => {
   const code = withoutComments(text);
   return [
@@ -432,12 +435,12 @@ const waitedBreaks = (text: string): string[] => {
 };
 
 test('REFUSED: a waiting card whose figure reads the sum of the run’s waits on a person', () => {
-  const card = sourceTexts().get('src/components/run/WaitingCard.tsx')!;
+  const card = sourceTexts().get('src/components/look/Run.tsx')!;
   assert.deepEqual(waitedBreaks(card), []);
   const summed = card.replace(/\{\s*waited\s*\}/, "{durationWords(run.clock.personMs, 'minute')}");
   assert.notEqual(summed, card, 'the figure is planted over');
   assert.equal(waitedBreaks(summed).length, 2);
-  assert.equal(waitedBreaks(card.replace(/presentWait\(run, asOf\)/, 'null')).length, 1);
+  assert.equal(waitedBreaks(card.replace(/presentWait\([^)]*\)/, 'null')).length, 1);
 });
 
 test(`only ${STREAMS.join(' and ')} open an EventSource`, () => {

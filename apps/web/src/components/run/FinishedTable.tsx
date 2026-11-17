@@ -8,10 +8,7 @@ import { agoWords } from '@/lib/runWords';
 import { ENDED } from '@/lib/words';
 import { instantWhole } from '@/lib/instant';
 import { cn, focusRing } from '@/components/ui/ds/utils';
-import { RunClockCell } from './RunClockCell';
-import { RunCostCell } from './RunCostCell';
-import { RunMeta } from './RunMeta';
-import { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, Pager, TextLink } from '../look';
+import { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, Pager, RunClock, RunCost, RunMeta, TextLink } from '../look';
 
 /** A column's heading, in the look's small caps. */
 const HEAD = 'text-label-small uppercase';
@@ -69,10 +66,10 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
         <Ago at={run.finishedAt} asOf={asOf} />
       </Cell>
       <Cell data-clock>
-        <RunClockCell run={run} asOf={asOf} finished />
+        <RunClock run={run} asOf={asOf} finished />
       </Cell>
       <Cell data-cost className={cn(FACT, ink.money)}>
-        <RunCostCell run={run} />
+        <RunCost run={run} />
       </Cell>
       <Cell>
         <TooltipTrigger delay={300}>
@@ -99,8 +96,8 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
  * One page of the finished runs, newest finished first, as the kit's dense table in the look's cut frame, quiet: each run's title as a
  * link over its meta line, its id's end with a copy control, its factory and the workflow it ran, linked to the workflow's page as
  * `WorkflowLink` links it (`workflowTarget`), and its own labels; how long ago it finished, the whole instant in the kit's tooltip; its
- * time at work with a preview over it breaking that clock down (`RunClockCell`); its cost with a preview of its tokens by kind
- * (`RunCostCell`); and how it ended, its sentence in the kit's tooltip, the last row with no line under it; then the pager, under a line
+ * time at work with a preview over it breaking that clock down (`RunClock`); its cost with a preview of its tokens by kind
+ * (`RunCost`); and how it ended, its sentence in the kit's tooltip, the last row with no line under it; then the pager, under a line
  * of its own, which stands on the address' trail (`trail`). A page that holds no row draws no table and no line, and the pager says why.
  * Narrower than its columns, the table scrolls sideways inside its frame.
  */

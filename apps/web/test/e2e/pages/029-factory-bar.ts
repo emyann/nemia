@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, stepBar, themeOf } from '../board.ts';
-import { cardOf, dragBy, zoomOf } from '../canvas.ts';
+import { cardOf, dragBy, placeOf, zoomOf } from '../canvas.ts';
 import { expectCount, expectInside, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ENDING, FAKE, QUEUE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -25,7 +25,7 @@ const floorOf = (page: Page) => page.locator('.react-flow').first();
 const runBar = (page: Page) => page.locator(`aside[data-bar="run:${RUN}"]`);
 
 /** RUN's card, pressed on its body: its time, which is no link and no button. */
-const bodyOf = (page: Page) => cardOf(page, RUN).locator('time').first();
+const bodyOf = (page: Page) => cardOf(page, RUN).locator('[data-run-says="id"]').first();
 
 /** What the address's search holds for `bar`, or null. */
 const barInUrl = (page: Page) => new URL(page.url()).searchParams.get('bar');
@@ -133,7 +133,7 @@ async function contents(page: Page): Promise<void> {
   await expectNoBar(page, 'Escape closes it');
 
   const { id, ending } = ENDING;
-  await cardOf(page, id).locator('time').first().click();
+  await cardOf(page, id).locator('[data-run-says="id"]').first().click();
   const decide = page.locator(`aside[data-bar="run:${id}"]`);
   await expectVisible(decide, `a click on ${id}'s card shows that run in the bar`);
   await decide.locator(`section[aria-label="Asks of you"] button[data-ask-link="${ending}"]`).click();
@@ -216,12 +216,23 @@ async function others(page: Page): Promise<void> {
   await visit(page, FLOOR);
 }
 
-/** A card dragged to the floor's right edge, which the sheet narrows past it, is brought back into the floor once inspected. */
+/**
+ * A card dragged to the floor's right edge, which the sheet narrows past it, is brought back into the floor once inspected: from a fresh
+ * layout, along the lowest row, whose right end no card holds, so the card dropped there lies on no other.
+ */
 async function edge(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Reset layout' }).click();
+  await settled(page);
   await fit(page);
   const [floor, card, zoom] = [await floorOf(page).boundingBox(), await cardOf(page, RUN).boundingBox(), await zoomOf(page)];
   if (!floor || !card) throw new Refused(`the floor and ${RUN}'s card are drawn`);
-  await dragBy(page, bodyOf(page), { x: (floor.x + floor.width - card.x - card.width - 8) / zoom, y: 0 }, `the card of ${RUN}`);
+  const places = await Promise.all((await page.locator('.react-flow__node').all()).map(placeOf));
+  const at = await placeOf(cardOf(page, RUN));
+  const lowest = Math.max(...places.map((place) => place.y));
+  const right = Math.max(...places.map((place) => place.x));
+  if (places.some((place) => place.y === lowest && place.x === right))
+    throw new Refused(`the lowest row of the floor is full, so ${RUN} has no free place at its right edge to be dragged to`);
+  await dragBy(page, bodyOf(page), { x: (floor.x + floor.width - card.x - card.width - 8) / zoom, y: lowest - at.y }, `the card of ${RUN}`);
   await settled(page);
   await expectNoBar(page, 'a drag shows nothing in the bar');
   await bodyOf(page).click();
@@ -240,7 +251,8 @@ export default {
    * run's title and id, the gates its banners name and its steps as buttons that show each step, and its brief. A tile, the card unfolded
    * by its chevron, shows its step and is pressed, the open card whole beside the bar. Open and a double click open the run's page. The
    * start of a run is not closed by the floor, keeps the lane, and leaves the floor's hint clear of its buttons; a ghost opens its card's
-   * page. A card dragged to the edge the sheet takes is brought left of it. The page lays the floor out again at its end.
+   * page. A card dragged to the edge the sheet takes, along the lowest row where nothing stands, is brought left of it. The page lays the
+   * floor out again at its end.
    */
   name: 'factory-bar',
   route: FLOOR,

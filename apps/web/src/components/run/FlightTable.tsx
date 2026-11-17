@@ -2,15 +2,10 @@ import { Cell, Column, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigg
 import type { ListedRun } from '@/lib/api/runs';
 import { judged, type UnjudgedRun } from '@/lib/api/judged';
 import { namespaceOf } from '@/lib/factories';
-import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
-import { waitedOnBy } from '@/lib/nowChip';
 import { cn } from '@/components/ui/ds/utils';
-import { RunClockCell } from './RunClockCell';
-import { RunCostCell } from './RunCostCell';
-import { RunMeta } from './RunMeta';
-import { RunNow } from './RunNow';
-import { CopyId, CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, TextLink } from '../look';
+import { previewBar } from '../step/StepPreview';
+import { CopyId, CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, Run, TextLink } from '../look';
 
 /** A column's heading, in the look's small caps. */
 const HEAD = 'text-label-small uppercase';
@@ -52,12 +47,10 @@ function UnjudgedRow({ run }: { run: UnjudgedRun }) {
 }
 
 /**
- * The runs in flight, as the kit's dense table in the look's cut frame, quiet: each run's title as a link
- * over its meta line (`RunMeta`: its id's end with a copy control, its factory and workflow, its own labels); what it does now in marks
- * (`RunNow`: one chip in the colour of its state, its agent, its round, its words, how many of `among` wait on it and its budget), its
- * steps' rail under them, each bar a button that opens its step's card; its time at work at `asOf`, a preview over it breaking that
- * clock down (`RunClockCell`); and its cost, a preview over it breaking its tokens down by kind (`RunCostCell`). Narrower than its
- * columns, the table scrolls sideways inside its frame. A run the list could not judge is a row of its own (`UnjudgedRow`).
+ * The runs in flight, as the kit's dense table in the look's cut frame, quiet: each judged run the run part at md as a row (`Run`,
+ * `layout="row"`) — its title over its meta line, what it does now in marks over its steps' graph, each node a button that opens its
+ * step's card, how many of `among` wait on it, its time at work at `asOf` and its cost, each with its breakdown over it. Narrower than
+ * its columns, the table scrolls sideways inside its frame. A run the list could not judge is a row of its own (`UnjudgedRow`).
  */
 export function FlightTable({
   runs,
@@ -89,28 +82,7 @@ export function FlightTable({
           <TableBody>
             {runs.map((run) =>
               judged(run) ? (
-                <Row key={run.id} id={run.id} data-run={run.id} className={FRAMED_ROW}>
-                  <Cell className="py-3">
-                    <span className="flex min-w-0 flex-col gap-1">
-                      <TooltipTrigger delay={300}>
-                        <TextLink to="/runs/$runId" params={{ runId: run.id }} className={TITLE}>
-                          {titleOf(run)}
-                        </TextLink>
-                        <Tooltip>{titleOf(run)}</Tooltip>
-                      </TooltipTrigger>
-                      <RunMeta run={run} />
-                    </span>
-                  </Cell>
-                  <Cell className="py-3">
-                    <RunNow run={run} asOf={asOf} waitedBy={waitedOnBy(among, run.id)} />
-                  </Cell>
-                  <Cell data-clock>
-                    <RunClockCell run={run} asOf={asOf} finished={false} />
-                  </Cell>
-                  <Cell data-cost className={`font-mono text-body-small whitespace-nowrap ${ink.money}`}>
-                    <RunCostCell run={run} />
-                  </Cell>
-                </Row>
+                <Run key={run.id} run={run} size="md" layout="row" asOf={asOf} among={among} wrap={previewBar(run, asOf)} />
               ) : (
                 <UnjudgedRow key={run.id} run={run} />
               ),

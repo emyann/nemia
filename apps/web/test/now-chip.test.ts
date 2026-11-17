@@ -1,13 +1,13 @@
 /**
  * Where a runs-page row's step stands, as its chip reads it (`nowStandsOf`, src/lib/nowChip.ts), and how many runs of the page wait on
- * a run (`waitedOnBy`). The chip's colour by where it stands is the contract's (`contracts/now-chip.contract.ts`), proved there: no row
+ * a run (`waitersOf`). The chip's colour by where it stands is the contract's (`contracts/now-chip.contract.ts`), proved there: no row
  * here restates a tone.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { WaitOn } from 'objects';
 import type { NowStands } from '../contracts/now-chip.contract.ts';
-import { nowStandsOf, waitedOnBy } from '../src/lib/nowChip.ts';
+import { nowStandsOf, waitersOf } from '../src/lib/nowChip.ts';
 import type { StepState } from '../src/lib/status.ts';
 import { summary } from './run-fixtures.ts';
 
@@ -83,20 +83,20 @@ const row = (id: string, on: string[] = [], until: Array<[string, boolean]> = []
           },
   });
 
-test('waitedOnBy: the runs of the page that wait on a run, on its checkout, or are held until it lands', async (t) => {
+test('waitersOf: the runs of the page that wait on a run, on its checkout, or are held until it lands', async (t) => {
   await t.test('a wait and an unlanded hold each count once', () => {
     const rows = [row('a'), row('b', ['a']), row('c', [], [['a', false]]), row('d', ['x'])];
-    assert.equal(waitedOnBy(rows, 'a'), 2);
-    assert.equal(waitedOnBy(rows, 'x'), 1);
-    assert.equal(waitedOnBy(rows, 'b'), 0);
+    assert.equal(waitersOf(rows, 'a').length, 2);
+    assert.equal(waitersOf(rows, 'x').length, 1);
+    assert.equal(waitersOf(rows, 'b').length, 0);
   });
   await t.test('a hold on a run that landed, a missing run and the run itself are not counted', () => {
-    assert.equal(waitedOnBy([row('c', [], [['a', true]])], 'a'), 0);
-    assert.equal(waitedOnBy([row('b', ['a'], [], true)], 'a'), 0);
-    assert.equal(waitedOnBy([row('a', ['a'], [['a', false]])], 'a'), 0);
+    assert.equal(waitersOf([row('c', [], [['a', true]])], 'a').length, 0);
+    assert.equal(waitersOf([row('b', ['a'], [], true)], 'a').length, 0);
+    assert.equal(waitersOf([row('a', ['a'], [['a', false]])], 'a').length, 0);
   });
   await t.test('a run that both waits on and is held until the run is one run', () => {
-    assert.equal(waitedOnBy([row('b', ['a'], [['a', false]])], 'a'), 1);
+    assert.equal(waitersOf([row('b', ['a'], [['a', false]])], 'a').length, 1);
   });
   await t.test('a run whose step waits on the checkout counts in the fan of the run whose ending has it, once', () => {
     const onCheckout = (id: string, holder: string, waitsOn: string[] = []) => {
@@ -104,8 +104,8 @@ test('waitedOnBy: the runs of the page that wait on a run, on its checkout, or a
       return { ...r, steps: [{ ...r.steps[0], on: 'base' as const, baseHeldBy: { run: holder, step: 'land' } }] };
     };
     const rows = [row('a'), onCheckout('b', 'a'), onCheckout('c', 'a', ['a']), row('d', ['a'])];
-    assert.equal(waitedOnBy(rows, 'a'), 3);
-    assert.equal(waitedOnBy(rows, 'b'), 0);
-    assert.equal(waitedOnBy([onCheckout('a', 'a')], 'a'), 0, 'never the run itself');
+    assert.equal(waitersOf(rows, 'a').length, 3);
+    assert.equal(waitersOf(rows, 'b').length, 0);
+    assert.equal(waitersOf([onCheckout('a', 'a')], 'a').length, 0, 'never the run itself');
   });
 });

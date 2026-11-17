@@ -6,7 +6,6 @@ import { judged, type AtWork, type RunToDecide, type UnjudgedRun } from './api/j
 import type { RunView } from './api/judged.ts';
 import type { EdgeState } from './canvas.ts';
 import { durationWords } from './duration.ts';
-import type { Flow } from './flow.ts';
 import { instantWhole } from './instant.ts';
 import { layers, type Point } from './layout.ts';
 import { ENDED } from './words.ts';
@@ -402,7 +401,7 @@ export const CELL_WIDTH = 384;
 /**
  * A cell holds a card at rest and the gap under it, as its width holds a card and the gap beside it. A card's steps do not make it
  * taller: they are its graph (`StepGraph`), a node a step, never more than `RAIL_LANES` lanes whatever the run, and an open card takes as
- * many cells down as its tiles need (`openSpan`). What makes a card at rest tall is what it asks of a person — a line per ask and per step
+ * many cells down as its panel needs (`openSpan`). What makes a card at rest tall is what it asks of a person — a line per ask and per step
  * blocked (`needsOf`, two lines each), a gate's line and its buttons. Of the cards the e2e seeds, the tallest is the gate's in
  * `factory-gate-long-names`, 262; then a card with its cost and an ask, 228; most stand about 190. At 320 the tallest keeps about 60 under
  * it, more than the gap beside every card (`CELL_WIDTH` less `CARD_WIDTH`, 32), and most keep about 130. Every card pays for the room:
@@ -421,25 +420,37 @@ export const CARD_WIDTH = 352;
 /** The gap a card leaves beside it in its cell, and the one an open card keeps under it. */
 const GAP = CELL_WIDTH - CARD_WIDTH;
 /**
- * What an open card draws around its tiles (`StepTiles`): across, the section's left border and its padding each side; down, the
- * card's own padding over and under it and the section's heading line.
+ * The room an open card's panel takes (`Run` at xl): as wide as its graph names its steps, each a column of `STEP_ROOM` pixels with the
+ * panel's padding around them, never under `width`; and as tall as the tallest panel staged, its gate's lines and chips under it.
  */
-export const TILES_FRAME = { across: 1 + 2 * 12, down: 2 * 12 + 16 + 4 };
+export const RUN_PANEL = { width: 480, height: 680 };
+
+/** How wide the panel's graph draws each step it names, and the panel's padding and edge either side of it. */
+const STEP_ROOM = 104;
+const PANEL_FRAME = 2 * 28 + 2;
 
 /** The cells a run takes, from its card's cell: across, and down. A closed card takes its one. */
 export type Span = { columns: number; rows: number };
 export const ONE_CELL: Span = { columns: 1, rows: 1 };
 
 /**
- * The cells an open run takes: its card's, and as many more to the right as its tiles reach and as many rows down, with a gap's
- * room past them. From the tiles' size alone (`tilesOf`), which reads the steps' names and the graph and not their words, so a
- * refetch that moves a status moves no card. Never less than the card's own cell.
- * @param tiles The open card's tiles, by their width and height in pixels.
+ * How wide an open run's panel is drawn: `RUN_PANEL`'s width, or room for each step under its graph and the panel's frame where that is
+ * wider. From the count of its steps alone, so the card and the cells it claims (`openSpan`) agree.
+ * @param steps How many steps the run has.
  */
-export function openSpan(tiles: Pick<Flow, 'width' | 'height'>): Span {
+export const panelWidth = (steps: number): number => Math.max(RUN_PANEL.width, steps * STEP_ROOM + PANEL_FRAME);
+
+/**
+ * The cells an open run takes: its panel's (`RUN_PANEL`, `panelWidth`), as many to the right as its width reaches and as many rows down as
+ * its height, with a gap's room past them. From the count of its steps alone, never their words, so a refetch that moves a status moves no
+ * card. Never less than the card's own cell.
+ * @param steps How many steps the run has.
+ */
+export function openSpan(steps: number): Span {
+  const width = panelWidth(steps);
   return {
-    columns: Math.max(1, Math.ceil((CARD_WIDTH + TILES_FRAME.across + tiles.width + GAP) / CELL_WIDTH)),
-    rows: Math.max(1, Math.ceil((TILES_FRAME.down + tiles.height + GAP) / CELL_HEIGHT)),
+    columns: Math.max(1, Math.ceil((width + GAP) / CELL_WIDTH)),
+    rows: Math.max(1, Math.ceil((RUN_PANEL.height + GAP) / CELL_HEIGHT)),
   };
 }
 
@@ -454,7 +465,7 @@ export const toggleOpen = (open: readonly string[], id: string): string[] =>
 /**
  * The open cards opening on the floor on this pass — `placeRuns`' `unfolding` — and what to remember for the next. A card opens
  * when it is drawn open and was not on the last pass: opened by a click, or brought back onto the floor open, finished runs shown
- * again or a run in flight waiting on it. A card drawn open on the last pass is not opening, however its tiles grew — a step added
+ * again or a run in flight waiting on it. A card drawn open on the last pass is not opening, however its panel grew — a step added
  * to a run moves no card. `drawn` is what the last pass remembered, and `spans` the cards drawn open now. The floor starts with the
  * cards left open on the last visit remembered, so they are not taken for cards opening over the ones a person left around them.
  * @param drawn The ids of the cards drawn open on the last pass.

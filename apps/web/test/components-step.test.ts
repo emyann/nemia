@@ -65,8 +65,6 @@ const factsOf = (run: RunDetail): StepGraphFacts => ({
     message,
   })),
 });
-const { StepTiles } = await import('../src/components/step/StepRail.tsx');
-const { flowSteps, tilesOf } = await import('../src/lib/flow.ts');
 const { StateEdge } = await import('../src/components/step/StateEdge.tsx');
 const { CanvasLegend } = await import('../src/components/step/CanvasLegend.tsx');
 const { edgeStroke, LOOP_SOURCE, LOOP_TARGET, TRAVEL_SECONDS } = await import('../src/lib/canvas.ts');
@@ -543,53 +541,45 @@ function summaryRun(): RunView {
   } as unknown as RunView;
 }
 
-const tilesMarkup = (run: RunView, selected: string | null = null, reduce = false): string =>
-  withMotion(reduce, () =>
-    renderToStaticMarkup(
-      createElement(StepTiles, {
-        run,
-        detail: null,
-        selected,
-        onStep: () => {},
-        flow: tilesOf(
-          run.steps.map((s) => s.name),
-          run.graph,
-          flowSteps(run),
-          false,
-        ),
-      }),
-    ),
+/**
+ * The run's panel, the floor's card opened (`Run` at xl), each node of its graph a button that shows its step, `selected` the one shown.
+ */
+const panelMarkup = async (run: RunView, selected: string | null = null): Promise<string> => {
+  const { Run } = await import('../src/components/look/Run.tsx');
+  return routedWith(
+    createElement(Run, {
+      run: Object.assign({ labels: {}, factory: null, workflowDir: '/code/app/flows/build', gates: ['theme'] }, run),
+      size: 'xl',
+      asOf: new Date('2026-10-12T11:00:00.000Z'),
+      read: null,
+      pick: { selected, onStep: () => {} },
+    }),
   );
+};
 
-test("an opened card's tiles each name the step, its chip and what it waits on a person for, and press to inspect it", () => {
-  const html = tilesMarkup(summaryRun(), 'review');
-  assert.match(html, /<section aria-label="The run&#x27;s steps"/);
+test("an opened card's panel names each step under its node, each node a button that shows its step, the one shown pressed", async () => {
+  const html = await panelMarkup(summaryRun(), 'review');
   const tiles = [...html.matchAll(/data-tile="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(tiles, [
-    ['implement', 'verified'],
-    ['tokens', 'unverified'],
-    ['review', 'working'],
-    ['theme', 'awaiting-approval'],
-    ['respond', 'waiting'],
-  ]);
+  assert.deepEqual(tiles.map(([name]) => name).sort(), ['implement', 'respond', 'review', 'theme', 'tokens']);
+  assert.deepEqual(Object.fromEntries(tiles), {
+    implement: 'verified',
+    tokens: 'unverified',
+    review: 'working',
+    theme: 'awaiting-approval',
+    respond: 'waiting',
+  });
   assert.match(html, /aria-label="Inspect step theme"/);
-  assert.match(
-    html,
-    /<span data-need="approve" title="[^"]*" class="[^"]*">approve theme to run it<\/span>/,
-    `the gate that ends the run says what approving it does, in the node's words: ${html}`,
-  );
   assert.deepEqual(
     [...html.matchAll(/aria-pressed="true"[^>]*data-tile="([^"]+)"|data-tile="([^"]+)"[^>]*aria-pressed="true"/g)].map((m) => m[1] ?? m[2]),
     ['review'],
     'the step being inspected is pressed, and only it',
   );
-  assert.equal(
-    [...html.matchAll(/<span class="truncate">…<\/span>/g)].length,
-    5,
-    "before the run's detail is read, a tile's attempt line waits for it",
+  assert.deepEqual(
+    [...html.matchAll(/data-named="([^"]+)"/g)].map((m) => m[1]).sort(),
+    ['implement', 'respond', 'review', 'theme', 'tokens'],
+    'each step named under its node',
   );
-  assert.equal(travelling(html).length, 1);
-  assert.equal(travelling(tilesMarkup(summaryRun(), null, true)).length, 0);
+  assert.match(html, /data-fact="gates"[\s\S]*?theme waits on you/, 'the gate that waits on you is said among the facts');
 });
 
 test("a loop's edge back moves as a running edge does while its round is due, along its curve and keeping its round", () => {

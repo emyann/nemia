@@ -62,6 +62,15 @@ type Shape = {
   status: Partial<Run['status']> & Pick<Run['status'], 'status' | 'phase' | 'reason' | 'moving'>;
 };
 
+/** The graph build's workflow freezes on a run of `names`: a chain in their order, review looping back to implement for three rounds. */
+const chainOf = (names: readonly string[]): Run['status']['graph'] => ({
+  roots: names.slice(0, 1),
+  edges: [
+    ...names.slice(1).map((to, i) => ({ from: names[i], to, kind: 'after' as const })),
+    ...(names.includes('review') && names.includes('implement') ? [{ from: 'review', to: 'implement', kind: 'loop' as const, rounds: 3 }] : []),
+  ],
+});
+
 /** A run of the `factory` factory as a list asked by state answers it. */
 const run = ({ name, brief, createdAt, steps, status }: Shape): Run => ({
   apiVersion: 'nemia/v1',
@@ -91,7 +100,7 @@ const run = ({ name, brief, createdAt, steps, status }: Shape): Run => ({
     waiting: null,
     holding: null,
     toDecide: null,
-    graph: { roots: ['design'], edges: [] },
+    graph: chainOf(steps.map((step) => step.name)),
     timeline: {
       rounds: [],
       run: {
@@ -189,19 +198,7 @@ const STEPS_OF = { quick: ['implement', 'review', 'land'], build: ['design', 'im
 
 /** Each workflow's graph, as the api answers it: a chain in its order, review looping back to implement for three rounds. */
 const GRAPH_OF = Object.fromEntries(
-  (Object.keys(STEPS_OF) as Array<keyof typeof STEPS_OF>).map((workflow) => {
-    const names = STEPS_OF[workflow];
-    return [
-      workflow,
-      {
-        roots: [names[0]],
-        edges: [
-          ...names.slice(1).map((to, i) => ({ from: names[i], to, kind: 'after' as const })),
-          { from: 'review', to: 'implement', kind: 'loop' as const, rounds: 3 },
-        ],
-      },
-    ];
-  }),
+  (Object.keys(STEPS_OF) as Array<keyof typeof STEPS_OF>).map((workflow) => [workflow, chainOf(STEPS_OF[workflow])]),
 ) as Record<keyof typeof STEPS_OF, Run['status']['graph']>;
 
 /** Each workflow's gates: build's design and land; quick's none. */
@@ -508,7 +505,64 @@ export const TARGET_RUNS = {
   k2rq: FOR_A_SLOT,
   c7un: HELD,
   f41l: FAILED_RUN,
+  x57v: LANDED[4],
 } as const;
+
+/** A step as the run read alone answers it, for the panel: its attempts, filing, cost and its session's last line. */
+type StepRead = Pick<RunStepStatus, 'name' | 'attempts' | 'taskId' | 'spent' | 'budget' | 'lastLine'>;
+
+/**
+ * A step read alone: its one attempt from `from` minutes before `AS_OF` to `to` (null while it runs; `from` null for a step not filed
+ * yet), what it spent, and its last line.
+ */
+const readStep = (name: string, from: number | null, to: number | null, usd: number | null, lastLine: string | null = null): StepRead => ({
+  name,
+  attempts:
+    from === null
+      ? { count: 0, latest: null }
+      : {
+          count: 1,
+          latest: {
+            startedAt: before(from),
+            ended: to === null ? null : 'succeeded',
+            endedAt: to === null ? null : before(to),
+            reason: null,
+            release: null,
+            harness: null,
+          },
+        },
+  taskId: from === null ? null : `${name}-task`,
+  spent: usd === null ? null : spent(usd),
+  budget: null,
+  lastLine,
+});
+
+/** Each panel's run read alone, as staged on the targets: each step's time and cost, and the last line of the step it is on. */
+export const READS: Record<'1sw7' | '72wy' | 'vqvd', { steps: StepRead[] }> = {
+  '1sw7': {
+    steps: [
+      readStep('design', 100, 78, 1.72),
+      readStep('implement', 40, null, 2.4, 'npx tsrs --noEmit -p apps/cli'),
+      readStep('review', null, null, null),
+      readStep('land', null, null, null),
+    ],
+  },
+  '72wy': {
+    steps: [
+      readStep('design', 5, 0, 2.16, 'signed off: 4 questions for you'),
+      readStep('implement', null, null, null),
+      readStep('review', null, null, null),
+      readStep('land', null, null, null),
+    ],
+  },
+  vqvd: {
+    steps: [
+      readStep('implement', 70, 46, 2.31),
+      readStep('review', 40, 28, 1.4),
+      readStep('land', 20, 10, 1.87, 'check: landing.ts receipt — exit 1'),
+    ],
+  },
+};
 
 /** The floor's runs: 1sw7 at work, a run waiting on lgll, one for a run slot, one held, and vqvd waiting on you, its land failed. */
 export const onTheFloor: RunList = listOf([VQVD, AT_WORK, ON_A_RUN, FOR_A_SLOT, HELD], { waiting: 1, inFlight: 4, finished: 0 });

@@ -4,7 +4,7 @@
  */
 import type { Locator, Page } from 'playwright';
 import { CELL_HEIGHT } from '../../src/lib/factory.ts';
-import { expectCount, expectVisible, Refused, settled } from './checks.ts';
+import { expectCount, expectVisible, literal, Refused, settled } from './checks.ts';
 import { FAKE } from './seed.ts';
 import { photograph } from './board.ts';
 import { photographing } from './world.ts';
@@ -42,6 +42,15 @@ export function onTheFloor(page: Page): {
     tile: (name) => card.locator(`[data-tile="${name}"]`),
   };
 }
+
+/**
+ * A card's few words of its wait or hold that say on hover what `nemia ls` says of it, `word`, whole: the line itself names each run by its
+ * mark.
+ * @param card The run's card.
+ * @param word What `nemia ls` prints for the run's wait or hold.
+ */
+export const wordsSaying = (card: Locator, word: string): Locator =>
+  card.locator('[data-now-words]').and(card.page().getByTitle(new RegExp(`^${literal(word)}(?:\\n|$)`)));
 
 /** A run's card on the Factory. */
 export const cardOf = (page: Page, id: string): Locator => page.locator(`.react-flow__node[data-id="${id}"]`);

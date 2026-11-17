@@ -58,7 +58,6 @@ import {
   widenLayout,
   type Span,
 } from '@/lib/factory';
-import { flowSteps, tilesOf } from '@/lib/flow';
 import { paint } from '@/lib/meaning';
 import { anyInView, boxesOf, revealView, sized, sizeOf, type Box, type Size, type Transform } from '@/lib/frame';
 import { queuedIn, type FactoryPlace } from '@/lib/factories';
@@ -328,17 +327,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
   const spanEntries = useContent(
     [...opened].reverse().map((id): [string, Span] => {
       const run = shownJudged.find((one) => one.id === id)!;
-      return [
-        id,
-        openSpan(
-          tilesOf(
-            run.steps.map((step) => step.name),
-            run.graph,
-            flowSteps(run),
-            run.cancelledAt !== null,
-          ),
-        ),
-      ];
+      return [id, openSpan(run.steps.length)];
     }),
   );
   const spans = useMemo(() => new Map(spanEntries), [spanEntries]);
@@ -416,6 +405,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
           ariaLabel: `Inspect run: ${judged(run) ? titleOf(run) : run.id}`,
           data: {
             run,
+            among: judgedRuns,
             finished: !flying.has(run.id),
             reads: judged(run) ? readsLines(run, judgedRuns) : [],
             open: isOpen,

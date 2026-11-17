@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { Run } from 'objects';
-import { expect, screen, within } from 'storybook/test';
+import { expect, screen, waitFor, within } from 'storybook/test';
 import { runLinesQuery, runObjectQuery, stepToldQuery, stepTriesQuery } from '@/lib/api/run';
 import { stepFileQuery } from '@/lib/api/steps';
 import type { StepArtifact } from '@/lib/api/tries';
@@ -71,9 +71,9 @@ export const Markdown: Story = {
   play: async () => {
     const sheet = await screen.findByRole('dialog', { name: 'notes.md' });
     await expect(sheet).toHaveAttribute('data-slot', 'side-sheet');
-    await expect(within(sheet).getByText(`${STEP.name} · 812 B · file 1 of 2`, { exact: false })).toBeVisible();
+    await waitFor(() => expect(within(sheet).getByText(`${STEP.name} · 812 B · file 1 of 2`, { exact: false })).toBeVisible());
     await expect(sheet.querySelector('[data-viewer="markdown"]')).not.toBeNull();
-    await expect(within(sheet).getByRole('button', { name: 'Close' })).toBeVisible();
+    await waitFor(() => expect(within(sheet).getByRole('button', { name: 'Close' })).toBeVisible());
   },
 };
 

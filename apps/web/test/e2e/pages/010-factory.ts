@@ -25,6 +25,7 @@ import {
   said,
   samePlace,
   showFinished,
+  wordsSaying,
 } from '../canvas.ts';
 import {
   expectApart,
@@ -36,6 +37,7 @@ import {
   expectTexts,
   expectUncut,
   expectVisible,
+  literal,
   Refused,
   settled,
 } from '../checks.ts';
@@ -68,18 +70,14 @@ import { OUT, store } from '../world.ts';
 async function tookOnTheCard(page: Page): Promise<void> {
   const costly = cardOf(page, COSTLY.id);
   await expectVisible(
-    costly.locator('[data-cost]', { hasText: `· ${COSTLY.cost}` }),
-    `the card of a run whose sessions were priced says what it cost beside its clock (${COSTLY.cost})`,
+    costly.locator('[data-cost-words]', { hasText: new RegExp(`^${literal(COSTLY.cost)}$`) }),
+    `the card of a run whose sessions were priced says what it cost under its clock (${COSTLY.cost}), its tokens by kind in its preview`,
   );
   await expectVisible(
-    costly.locator(`[data-tokens][title="${COSTLY.tokens.split}"]`, { hasText: `· ${COSTLY.tokens.said}` }),
-    `and the tokens its sessions used (${COSTLY.tokens.said}), their split on hover`,
+    costly.locator('[data-run-says="clock"]', { hasText: /^waited .+$/ }),
+    'and how long it has waited on you this time, in place of its time at work: it waits on you',
   );
-  await expectVisible(
-    costly.locator('time', { hasText: new RegExp(`^${COSTLY.took}$`) }),
-    `and its time at work, its sessions and checks side by side counted once (${COSTLY.took}): it waits on you`,
-  );
-  await expectUncut(costly.locator('time, [data-cost], [data-tokens]'), 'the clock, the cost and the tokens are read whole');
+  await expectUncut(costly.locator('[data-run-says="clock"], [data-cost-words]'), 'the clock and the cost are read whole');
   await expectUncut(costly.locator('[data-now-word]'), 'the step it is on is read whole on its chip, over the graph that names none');
   await photographCard(page, costly, path.join(OUT, `factory-card-took-${await themeOf(page)}.png`));
 }
@@ -215,7 +213,10 @@ export default {
       beside,
       `a failed run whose session still runs is in flight: its card is on the Factory by default (${NEIGHBOUR.id})`,
     );
-    await expectVisible(beside.getByText(/ at work$/), 'its card counts its time at work, as a card in flight does');
+    await expectVisible(
+      beside.locator('[data-clock-words]', { hasText: /^(?:under 1m|(?:\d+h )?\d{1,2}m)$/ }),
+      'its card counts its time at work, as a card in flight does',
+    );
     await settled(page);
     await expectClearOfPanels(page, 'on first load');
 
@@ -243,8 +244,8 @@ export default {
     await expectCount(page.locator('.react-flow__edge-path[data-state="done"]'), 0, 'and no edge between cards is drawn solid');
     await expectLeftOf(cardOf(page, running.id), cardOf(page, bottom.id), `${running.id} is left of ${bottom.id}, which waits on it`);
     await expectVisible(
-      cardOf(page, bottom.id).locator('[data-waiting="on-runs"]', { hasText: DIAMOND.words.bottom }),
-      `the bottom's card says ${DIAMOND.words.bottom}, in wf ls's words: the side that landed is waited on no more`,
+      wordsSaying(cardOf(page, bottom.id), DIAMOND.words.bottom),
+      `the bottom's card says ${DIAMOND.words.bottom} on hover, in wf ls's words: the side that landed is waited on no more`,
     );
     await expectCount(
       cardOf(page, bottom.id).getByText('waiting on you', { exact: true }),
@@ -260,18 +261,16 @@ export default {
       cardOf(page, bottom.id),
       'and the graph stays inside the card',
     );
-    await expectCount(cardOf(page, running.id).locator('[data-waiting]'), 0, `${running.id} waits on no run`);
+    await expectCount(cardOf(page, running.id).locator('[data-now-words]'), 0, `${running.id} waits on no run`);
     await expectVisible(
-      cardOf(page, bottom.id).locator(
-        `[data-ghost-run] [data-waiting="on-runs"] a[data-waits-on="${running.id}"][href="/runs/${running.id}"]`,
-      ),
+      cardOf(page, bottom.id).locator(`[data-ghost-run] [data-now-words] a[data-run-mark="${running.id}"][href="/runs/${running.id}"]`),
       `the bottom's card is a ghost until it starts, and names ${running.id}, which it waits on, as a link to that run`,
     );
     for (const run of [running, orphan])
       await expectCount(cardOf(page, run.id).locator('[data-ghost-run]'), 0, `${run.id}'s card is no ghost: it started, or waits on you`);
     await expectVisible(
-      cardOf(page, running.id).locator(`time[title*="${DIAMOND.words.running}"]`, { hasText: /^\d+m \d{2}s at work$/ }),
-      `${running.id}'s card counts its time at work from its first filing, and says on hover that it ${DIAMOND.words.running}`,
+      cardOf(page, running.id).locator('[data-clock-words]', { hasText: /^(?:under 1m|(?:\d+h )?\d{1,2}m)$/ }),
+      `${running.id}'s card counts its time at work from its first filing, to the minute, as the runs table's row does`,
     );
     const object = (await (await page.request.get(new URL(`/api/runs/${running.id}`, page.url()).href)).json()) as {
       metadata: { creationTimestamp: string };
@@ -284,14 +283,14 @@ export default {
       );
     }
     await expectCount(
-      cardOf(page, running.id).locator(`time[datetime="${times.startedAt}"]`),
+      cardOf(page, running.id).locator(`[data-clock-words][data-clock-from="${times.startedAt}"]`),
       1,
       `${running.id}'s card counts from ${times.startedAt}, when it started, not ${times.createdAt}`,
     );
     for (const run of [bottom, orphan]) {
       await expectVisible(
-        cardOf(page, run.id).locator('time[title*="Nothing of it is filed yet"]', { hasText: /^waiting for / }),
-        `${run.id}'s card says it is waiting, and for how long, not a time at work`,
+        cardOf(page, run.id).locator('[data-run-says="clock"]', { hasText: /^(?:not started|waited .+)$/ }),
+        `${run.id}'s card says it has not started, or how long it has waited on you, never a time at work`,
       );
     }
     await expectCount(
@@ -306,7 +305,7 @@ export default {
       page.locator(`.react-flow__node[data-id]${ids.map((id) => `:not([data-id="${id}"])`).join('')}`);
     await expectMovedAlone(
       cardOf(page, running.id),
-      () => dragBy(page, cardOf(page, running.id).locator('time'), { x: 60, y: 30 }, `the card of ${running.id}`),
+      () => dragBy(page, cardOf(page, running.id).locator('[data-run-where]'), { x: 60, y: 30 }, `the card of ${running.id}`),
       `${running.id} dragged moves alone — ${bottom.id}, which waits on it, stays, and so does every other card`,
       everyOther(running.id),
     );
@@ -390,7 +389,10 @@ export default {
     await showFinished(page);
     await expectVisible(unmerged, `with the finished shown too, its card once (${UNMERGED.id})`);
     for (const run of [top, landed]) {
-      await expectVisible(cardOf(page, run.id).getByText(/^took .+$/), `${run.id}, landed, is drawn finished, and says what it took`);
+      await expectVisible(
+        cardOf(page, run.id).locator('article[data-tone="rest"] [data-clock-words]'),
+        `${run.id}, landed, is drawn finished, at rest, with its clock`,
+      );
     }
     await expectDiamond(page, 'with the finished shown');
     await expectCount(
@@ -418,7 +420,7 @@ export default {
       `a run started in the factory ${FOLDER.factory} is on its floor, not the default factory's, finished runs shown (${FOLDER.id})`,
     );
     await expectVisible(
-      cardOf(page, orphan.id).locator('[data-waiting="on-you"]', { hasText: DIAMOND.words.orphan }),
+      wordsSaying(cardOf(page, orphan.id), DIAMOND.words.orphan),
       `${orphan.id}'s card says ${DIAMOND.words.orphan}, as a wait on a person`,
     );
     await expectVisible(cardOf(page, orphan.id).getByText('waiting on you', { exact: true }), `${orphan.id} waits on you`);
@@ -437,15 +439,11 @@ export default {
     );
     await expectVisible(card, `the fake run's card, once finished runs are shown (${FAKE.id})`);
     await expectVisible(
-      card.locator('time[title^="At work "][title*="still going"]', { hasText: / at work$/ }),
-      'the card reads waiting on you: its time at work, not what it took, since a person is to answer — and nothing of it ticks',
+      card.locator('[data-run-says="clock"]', { hasText: /^(?:waited .+|under 1m|(?:\d+h )?\d{1,2}m)$/ }),
+      'the card reads waiting on you: how long it has waited, or its time at work, never what it took, since a person is to answer',
     );
     await tookOnTheCard(page);
-    await expectCount(card.locator('[data-cost]'), 0, "the fake run's card says no cost, not $0: none of its sessions was priced");
-    await expectVisible(
-      card.locator('[data-tokens]', { hasText: /^· ≥\S+ tokens$/ }),
-      "the fake run's card marks its tokens the least they were: its codex session measured them, and its claude ones did not",
-    );
+    await expectCount(card.locator('[data-cost-words]'), 0, "the fake run's card says no cost, not $0: none of its sessions was priced");
     const gated = cardOf(page, GATED.id);
     await expectVisible(
       gated.locator(`[data-gate-line="${GATED.gated}"]`, { hasText: `approve what ${GATED.gated} handed on, or send it back` }),
@@ -519,22 +517,24 @@ export default {
       `${FAKE.blocked} is drawn as a human gate on the Factory`,
     );
     await expectVisible(
-      tile(FAKE.blocked).locator(`[data-need="asks"][title="asks: ${SESSION.closeout.needs}"]`),
-      `${FAKE.blocked}'s tile says what it asks, whole on hover`,
+      card.locator(`[data-step="${FAKE.blocked}"][data-mark="yours"] [data-tile="${FAKE.blocked}"]`),
+      `${FAKE.blocked}'s node waits on you, what it asks said on the card's line (${SESSION.closeout.needs})`,
+    );
+    await expectCount(
+      card.locator(`[data-step="${FAKE.refused}"][data-mark="failure"] [data-tile="${FAKE.refused}"][data-state="failed-check"]`),
+      1,
+      `${FAKE.refused}, whose check refused, is drawn failed`,
+    );
+    await expectCount(
+      tile(FAKE.unverified).and(page.locator('[data-state="unverified"]')),
+      1,
+      `${FAKE.unverified}, signed off with no check, is done on its own word, its node marked unverified`,
     );
     await expectVisible(
-      tile(FAKE.refused).locator('[data-state="failed-check"]', { hasText: 'failed its check' }),
-      `${FAKE.refused}, whose check refused, has a red chip`,
+      card.locator('[data-named="respond"]', { hasText: /–$/ }),
+      'respond, never filed, is named under the graph with nothing it took or spent, once the run is read',
     );
-    await expectVisible(
-      tile(FAKE.unverified).locator('[data-state="unverified"]', { hasText: 'done' }),
-      `${FAKE.unverified}, signed off with no check, is done on its own word, its chip marked unverified`,
-    );
-    await expectVisible(
-      tile('respond').getByText('not filed yet', { exact: true }),
-      'respond, never filed, says so on its tile once the run is read',
-    );
-    const opened = card.locator(`section[aria-label="The run's steps"]`);
+    const opened = card.locator('article[data-size="xl"]');
     await expectCount(opened.locator('[data-arrow]'), FAKE.edges, "an arrow between the tiles for each `after` between the run's steps");
     await expectCount(
       page.locator('.react-flow__edge'),
@@ -542,9 +542,9 @@ export default {
       'and on the floor only the two live waits between cards: none from a card into a step',
     );
     await expectCount(
-      opened.locator('animateMotion'),
+      opened.locator('[data-arrow][data-state="running"]'),
       0,
-      `no dot travels the fake run's arrows: nothing moves into ${FAKE.blocked}, a human gate, nor into ${FAKE.refused}, whose check refused`,
+      `no line of the fake run runs: nothing moves into ${FAKE.blocked}, a human gate, nor into ${FAKE.refused}, whose check refused`,
     );
     await expectVisible(card.getByRole('button', { name: 'Hide steps' }), "the open card's chevron hides the steps");
     await expectApart(beside, card, 'the card beside it moves out from under the open card');
@@ -571,8 +571,8 @@ export default {
     const size = page.viewportSize();
     await page.setViewportSize({ width: 1600, height: 1100 });
     await settled(page);
-    await expectUncovered(card.locator('time'), "the open card's grip stands clear of the floor's panels, to be dragged by");
-    const [from, onto, grip] = [await card.boundingBox(), await beside.boundingBox(), await card.locator('time').boundingBox()];
+    await expectUncovered(card.locator('[data-run-where]'), "the open card's grip stands clear of the floor's panels, to be dragged by");
+    const [from, onto, grip] = [await card.boundingBox(), await beside.boundingBox(), await card.locator('[data-run-where]').boundingBox()];
     if (!from || !onto || !grip) throw new Refused('the cards to drag and drop onto — one of them is not on the page');
     await expectMovedAlone(
       card,
@@ -623,6 +623,10 @@ export default {
     await expectVisible(inspector, "review's bar opens on a press on review");
     await expectCount(tiles, FAKE.steps.length, 'a press on a tile does not close its card');
     await expectCount(card.locator('[data-tile][aria-pressed="true"]'), 1, 'and one tile reads pressed');
+    await expectVisible(
+      card.locator('[data-fact="tokens"]', { hasText: /≥\S+/ }),
+      "the fake run's panel marks its tokens the least they were: its codex session measured them, and its claude ones did not",
+    );
     await expectCount(tile('review').and(page.locator('[aria-pressed="true"]')), 1, "review's, the step inspected");
     await expectCount(
       page.locator('aside[aria-label="Queued cards"]'),
@@ -655,21 +659,16 @@ export default {
     await expectCount(ghosts, LANE.length, "and the queue's lane is back beside the floor");
 
     await beside.getByRole('button', { name: 'Show steps' }).click();
-    const besideOpen = beside.locator(`section[aria-label="The run's steps"]`);
+    const besideOpen = beside.locator('article[data-size="xl"]');
     const moving = besideOpen.locator(`[data-arrow="step:${NEIGHBOUR.running.replace('->', '->step:')}"]`);
     await expectCount(
       moving.and(page.locator('[data-state="running"]')),
       1,
       `the arrow ${NEIGHBOUR.running} between the tiles runs: draft's session is at work`,
     );
-    await expectCount(moving.locator('animateMotion'), 1, `a dot travels ${NEIGHBOUR.running} between the tiles`);
-    await expectCount(besideOpen.locator('animateMotion'), 1, 'and no other arrow between its tiles moves');
-    await expectCount(page.locator('.react-flow__edge animateMotion'), 0, 'nor any edge between cards');
-    await expectCount(
-      page.locator('[data-arrow] animateMotion'),
-      await page.locator(`section[aria-label="The run's steps"] [data-arrow][data-state="running"]`).count(),
-      "on the whole floor, a dot travels each running arrow between an open card's tiles and no other: a graph at rest says it by its pulse",
-    );
+    await expectCount(besideOpen.locator('[data-arrow][data-state="running"]'), 1, 'and no other line of its graph runs');
+    await expectCount(besideOpen.locator('[data-step-pulse]'), 1, 'and its step at work pulses, the one mark of the graph that moves');
+    await expectCount(page.locator('.react-flow__edge animateMotion'), 0, 'nor any edge between cards moves');
     await expectCount(
       page.locator('.react-flow__panel[aria-label="Legend"] animateMotion'),
       1,
@@ -690,15 +689,17 @@ export default {
       `${LOOPING.id}'s rail draws the arrow back from ${LOOPING.exhausted} into ${LOOPING.target}`,
     );
     await expectCount(looping.locator('[data-round]'), 0, "and says no round on the card at rest: the node's card does");
+    await page.getByRole('button', { name: 'Reset layout' }).click();
+    await settled(page);
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
     await looping.getByRole('button', { name: 'Show steps' }).click();
-    const loopOpen = looping.locator(`section[aria-label="The run's steps"]`);
+    const loopOpen = looping.locator('article[data-size="xl"]');
     await expectCount(loopOpen.locator('[data-tile]'), LOOPING.steps.length, `${LOOPING.id} opens on its steps`);
-    await expectTexts(
-      loopOpen.locator(`${back} [data-round]`),
-      [LOOPING.round],
-      `the arrow back between its tiles says the loop is on ${LOOPING.round}, as the run's page labels its edge`,
+    await expectCount(loopOpen.locator(back), 1, `the panel's graph draws the arrow back from ${LOOPING.exhausted} into ${LOOPING.target}`);
+    await expectVisible(
+      loopOpen.locator('[data-pips="3/3"]').and(loopOpen.getByLabel(LOOPING.round, { exact: true })),
+      `and its chip's pips say the loop is on ${LOOPING.round}: the panel's graph draws no round on its arrow back`,
     );
     await settled(page);
     await photographCard(page, looping, path.join(OUT, `factory-loop-open-${await themeOf(page)}.png`));

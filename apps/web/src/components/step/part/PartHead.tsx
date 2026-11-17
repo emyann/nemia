@@ -8,7 +8,7 @@ import { Avatar, Body, Label, Meter, Tag } from '@/components/ui/ds';
 import { ink } from '@/lib/meaning';
 import type { CardNote, CardSpend, CardTime, PartHead as Head, PartSize } from '@/lib/stepPart';
 import { cn } from '@/lib/utils';
-import { CutTag, TextLink } from '../../look';
+import { CutTag, Reading, ReadingLines, TextLink } from '../../look';
 
 /** The ink of the time box's figure, by its kind's meaning. */
 const TIME_INK: Record<CardTime['ink'], string> = {
@@ -184,9 +184,11 @@ export function PartHead({ head, size, action: asked }: { head: Head; size: Part
       <Name head={head} />
       {head.time !== 'none' && <Time time={head.time} />}
       {head.facts === 'none' ? (
-        <Body data-step-reading size="small" colorRole="on-surface-variant">
-          Reading the step…
-        </Body>
+        <div data-step-reading>
+          <Reading label="Reading the step…">
+            <ReadingLines widths={['w-3/4', 'w-1/2']} className="gap-1 text-body-small" />
+          </Reading>
+        </div>
       ) : (
         <Facts facts={facts} />
       )}

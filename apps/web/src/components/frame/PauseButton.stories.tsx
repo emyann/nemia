@@ -1,8 +1,9 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { pauseQuery, type Paused } from '@/lib/api/pause';
-import { PauseButton } from './PauseButton';
+import { NowForm, PauseButton } from './PauseButton';
+import { saysReading, Unread } from '../../../.storybook/unread';
 import { PAUSED, RUNNING } from '../../../.storybook/fixtures/frame';
 import { seeded } from '../../../.storybook/fixtures/proposals';
 
@@ -24,7 +25,8 @@ const drawn = ({ read }: Args) => (
 /**
  * The pause of all factories in the machine bar, a story a state: every factory running, its popover open on what may be done, Pause…
  * asking why, and every factory paused with a session parked. The button is the kit's text `Button`, the popover the kit's `Popover`
- * opened by its `PopoverTrigger`, its heading the kit's `Title`, the why the kit's `TextField`.
+ * opened by its `PopoverTrigger`, its heading the kit's `Title`, the why the kit's `TextField`. While a read is out, its lines are the
+ * kit's skeletons: Stop now… while what runs is read, and the popover opened before the pause is read.
  */
 const meta: Meta<Args> = {
   title: 'Frame/PauseButton',
@@ -77,5 +79,30 @@ export const PausedWithAParkedStep: Story = {
     const open = within(await popover());
     await expect(open.getByRole('heading', { name: 'Paused' })).toBeVisible();
     await expect(open.getByRole('button', { name: 'Resume' })).toBeVisible();
+  },
+};
+
+/** Stop now… while what runs is read: the shape of what it says it stops. */
+export const ReadingWhatRuns: Story = {
+  render: () => (
+    <Unread>
+      <div style={{ width: 360 }}>
+        <NowForm standing={false} onPut={fn()} onClose={fn()} isPending={false} />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading what runs.'),
+};
+
+/** The pause's popover opened before the pause is read: its sentence the shape of its lines. */
+export const ReadingThePause: Story = {
+  render: () => (
+    <Unread>
+      <PauseButton />
+    </Unread>
+  ),
+  play: async (context) => {
+    await userEvent.click(within(context.canvasElement).getByRole('button', { name: 'The pause of all factories, not read' }));
+    await saysReading('Reading whether all factories are paused.')(context);
   },
 };

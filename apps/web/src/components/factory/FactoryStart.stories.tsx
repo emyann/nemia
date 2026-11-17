@@ -6,6 +6,7 @@ import { factoryWorkflowsQuery } from '@/lib/api/workflows';
 import { StartBar } from './FactoryStart';
 import { FACTORY, seeded } from '../../../.storybook/fixtures/proposals';
 import { listing, offering, unfilled } from '../../../.storybook/fixtures/factories';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** The bar on a start in `factory`, the factories `factories` read, and `build` and `quick` on the first's one repository. */
 const drawn = (factory: string | null, factories: readonly Factory[]) => (
@@ -55,4 +56,31 @@ export const NoFactoryYet: Story = {
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector(`[data-start-factory="${FACTORY}"] button`)).not.toBeNull();
   },
+};
+
+/** In a factory, the factories still read. */
+export const ReadingTheFactories: Story = {
+  render: ({ factory }) => (
+    <Unread>
+      <div style={{ width: 420 }}>
+        <StartBar factory={factory} />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading the factories…'),
+};
+
+/** In none yet, the factories it may start in still read. */
+export const AskingTheFactory: Story = { ...ReadingTheFactories, args: { factory: null } };
+
+/** The factory read, on its one repository, the workflows it offers there still read: the shape of their list. */
+export const ReadingTheWorkflows: Story = {
+  render: ({ factory, factories }) => (
+    <QueryClientProvider client={seeded([[factoriesQuery.queryKey, factories]])}>
+      <div style={{ width: 420 }}>
+        <StartBar factory={factory} />
+      </div>
+    </QueryClientProvider>
+  ),
+  play: saysReading('Reading the workflows…'),
 };

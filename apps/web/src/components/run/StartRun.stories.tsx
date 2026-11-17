@@ -5,6 +5,7 @@ import { FILE_LIMIT, type FileObject, type RunStart } from 'objects';
 import type { WorkflowListing } from '@/lib/api/workflows';
 import { StartRun } from './StartRun';
 import { noRuns } from '../../../.storybook/fixtures/runs';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** A file named `name` of `size` bytes, as a browser hands one; its size set, so a story lists a large one without holding it. */
 const fileOf = (name: string, size: number, type = 'image/png'): File => {
@@ -133,4 +134,20 @@ export const UploadsAgain: Story = {
     await expect(SENT.uploads).toBe(2);
     await expect(SENT.starts).toEqual([[idOf(1)], [idOf(2)]]);
   },
+};
+
+/** A workflow that works in a repository, so the form draws the runs it may wait on. */
+const BUILD: WorkflowListing = { ...NOTE, name: 'build', from: 'repo', dir: '/code/app/flow', folderTeam: false };
+
+/** The runs it may wait on still read: the shape of their list. */
+export const ReadingTheRuns: Story = {
+  args: { workflow: BUILD, repo: '/code/app' },
+  render: (args) => (
+    <Unread>
+      <div style={{ width: 640 }}>
+        <StartRun {...args} />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading the runs…'),
 };

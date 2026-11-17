@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useNow } from '@/lib/useNow';
 import type { Actor as ActorRead } from 'objects';
 import { Actor } from '../actor/Actor';
+import { Reading, ReadingLines } from '@/components/look';
 
 /** The popover's heading: the pause's state. */
 const HEADINGS: Record<PauseState, string> = {
@@ -79,7 +80,7 @@ function Lines({ lines, data, className }: { lines: readonly string[]; data: str
  * whose session or check it stops, or that it stops nothing, and what an interrupted step costs, in the api's words. It asks why only
  * where no pause stands (`standing`): one that stands is kept as it was. `onPut` sends the why; `onClose` puts nothing.
  */
-function NowForm({
+export function NowForm({
   standing,
   onPut,
   onClose,
@@ -100,10 +101,16 @@ function NowForm({
         onPut(standing ? '' : why.trim());
       }}
     >
-      {!read.data ? (
+      {read.error && !read.data ? (
         <p data-pause-now-reading className="text-body-small text-muted-foreground">
-          {read.error ? `What runs could not be read: ${read.error.message}` : 'Reading what runs.'}
+          What runs could not be read: {read.error.message}
         </p>
+      ) : !read.data ? (
+        <div data-pause-now-reading>
+          <Reading label="Reading what runs.">
+            <ReadingLines widths={['w-full', 'w-1/2']} className="text-body-small" />
+          </Reading>
+        </div>
       ) : (
         <>
           <p className="text-body-small text-muted-foreground">
@@ -130,12 +137,15 @@ function NowForm({
  */
 function PauseFacts({
   words,
+  unread,
   actor,
   onAsk,
   onResume,
   isPending,
 }: {
   words: PauseWords;
+  /** Whether the pause is still out on its first read, its sentence then drawn as the kit's skeletons under a status that says it. */
+  unread: boolean;
   /** Who put the pause, where its file says. */
   actor: ActorRead | undefined;
   onAsk: (asking: Asking) => void;
@@ -144,9 +154,15 @@ function PauseFacts({
 }) {
   return (
     <>
-      <p data-pause-line className="text-body-small text-muted-foreground">
-        {words.line}
-      </p>
+      {unread ? (
+        <Reading label={words.line}>
+          <ReadingLines widths={['w-full', 'w-2/3']} className="text-body-small" />
+        </Reading>
+      ) : (
+        <p data-pause-line className="text-body-small text-muted-foreground">
+          {words.line}
+        </p>
+      )}
       {words.state !== 'running' && <Actor actor={actor} />}
       <Lines lines={words.finishing} data="data-pause-finishing" />
       <Lines lines={words.parked} data="data-pause-parked" />
@@ -256,6 +272,7 @@ export function PauseButton() {
         {asking === null && (
           <PauseFacts
             words={words}
+            unread={words.state === 'reading' && !read.error}
             actor={read.data?.pause?.actor}
             onAsk={setAsking}
             onResume={() => act.mutate(null)}

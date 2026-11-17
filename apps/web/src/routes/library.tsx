@@ -3,12 +3,13 @@ import { createFileRoute } from '@tanstack/react-router';
 import { Badge } from '@/components/ui/badge';
 import { TextLink } from '@/components/look';
 import { HarnessImport } from '@/components/library/HarnessImport';
+import { LibraryReading } from '@/components/library/LibraryReading';
 import { LIBRARY_KINDS, libraryQuery, type LibraryItem, type LibraryKind } from '../lib/api/storeLibrary.ts';
 
 export const Route = createFileRoute('/library')({
   loader: ({ context }) => context.queryClient.ensureQueryData(libraryQuery()),
   component: LibraryPage,
-  pendingComponent: () => <p className="text-body-medium text-muted-foreground">Reading the store's library…</p>,
+  pendingComponent: LibraryReading,
   errorComponent: ({ error }) => (
     <p className="text-body-medium text-failure">
       Could not read the library: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?

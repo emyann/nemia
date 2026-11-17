@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Select, SelectItem } from '@/components/ui/ds';
+import { Select, SelectItem, Skeleton } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '../../lib/api/factories.ts';
 import { factoryWorkflowsQuery, type Place, type Started } from '../../lib/api/workflows.ts';
 import { storeQuery } from '../../lib/api/store.ts';
@@ -14,6 +14,7 @@ import { startRepo } from '../../lib/factories';
 import { cardPlace, factoriesOffered, startPlace, type CardPlace } from '../../lib/inbox';
 import { StartRun } from '../run/StartRun';
 import { WorkflowsUnread } from '../workflow/WorkflowOptions';
+import { Reading, ReadingLines } from '@/components/look';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
@@ -34,7 +35,10 @@ export function FactoryCardStart({ entry, onStarted, onRefused }: { entry: Inbox
       {factories.error ? (
         <p className="text-body-small text-failure">Could not read the factories to start it in: {factories.error.message}</p>
       ) : !place ? (
-        <p className="text-body-small text-muted-foreground">Reading the factory…</p>
+        <Reading label="Reading the factory…" className="flex flex-col gap-1.5">
+          <Skeleton className="w-20 text-label-medium" />
+          <Skeleton shape="rectangle" className="h-9 max-w-xs rounded-none" />
+        </Reading>
       ) : (
         <Placed entry={entry} place={place} onStarted={onStarted} onRefused={onRefused} />
       )}
@@ -59,7 +63,10 @@ export function UnassignedStart({ entry, onStarted, onRefused }: { entry: InboxE
       {factories.error ? (
         <p className="text-body-small text-failure">Could not read the factories to start it in: {factories.error.message}</p>
       ) : !factories.data || !store ? (
-        <p className="text-body-small text-muted-foreground">Reading the factories…</p>
+        <Reading label="Reading the factories…" className="flex flex-col gap-1.5">
+          <Skeleton className="w-20 text-label-medium" />
+          <Skeleton shape="rectangle" className="h-9 max-w-xs rounded-none" />
+        </Reading>
       ) : offered.length === 0 ? (
         <p data-no-factory className="text-body-small text-yours">
           A card starts in a factory, and the store has none yet: file one with {code(store.fileFactory)}.
@@ -184,7 +191,13 @@ function OnRepo({ entry, workflow, place, onStarted, onRefused }: { entry: Inbox
       </p>
     );
   }
-  if (!workflows.data) return <p className="text-body-small text-muted-foreground">Reading the workflow…</p>;
+  if (!workflows.data)
+    return (
+      <Reading label="Reading the workflow…" className="flex flex-col gap-2">
+        <ReadingLines widths={['w-2/3']} className="text-body-small" />
+        <Skeleton shape="rectangle" className="h-10 w-28 rounded-none" />
+      </Reading>
+    );
   if (unread) return <WorkflowsUnread workflows={listed} />;
   return read?.unfilled ? (
     <p data-unfilled className="text-body-small whitespace-pre-wrap break-words text-yours">

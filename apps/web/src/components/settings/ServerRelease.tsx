@@ -13,7 +13,7 @@ import type {
   UpgradesRead,
   VersionAnswer,
 } from 'objects';
-import { CutFrame, CutPress, type FrameHue } from '@/components/look';
+import { CutFrame, CutPress, Reading, ReadingLines, type FrameHue } from '@/components/look';
 import { FollowedFix } from '@/components/setup/FollowedFix';
 import { ReadinessList } from '@/components/setup/ReadinessList';
 import { Instant } from '@/components/time/Instant';
@@ -26,6 +26,7 @@ import { versionWords } from '@/lib/footer';
 import { container, ringed } from '@/lib/meaning';
 import { atWork, offersReadOf, releaseWord, upgradeOffers, type UpgradeOffers } from '@/lib/upgrade';
 import { useUpgradeFollow } from '@/lib/useUpgradeFollow';
+import { Skeleton } from '@/components/ui/ds';
 
 /** Which of the two presses a confirm or a start is of: Upgrade to the newer release, or Back to the previous one. */
 type Which = 'upgrade' | 'back';
@@ -425,9 +426,14 @@ function ReleaseUnread({ error }: { error: unknown }) {
       <h2 id="server-release" className="text-title-medium">
         Server release
       </h2>
-      <p className="text-body-medium break-words text-muted-foreground">
-        {error == null ? 'Reading the server’s release…' : `The server's release could not be read: ${messageOf(error)}`}
-      </p>
+      {error == null ? (
+        <Reading label="Reading the server’s release…" className="flex flex-col gap-2">
+          <ReadingLines widths={['w-64', 'w-1/2']} className="text-body-medium" />
+          <Skeleton shape="rectangle" className="h-10 w-36 rounded-none" />
+        </Reading>
+      ) : (
+        <p className="text-body-medium break-words text-muted-foreground">The server's release could not be read: {messageOf(error)}</p>
+      )}
     </section>
   );
 }

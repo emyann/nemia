@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { Pairing } from 'objects';
-import { PairingApprovals } from './PairingApprovals';
+import { PairingApprovals, PairingsReading } from './PairingApprovals';
+import { saysReading } from '../../../.storybook/unread';
 
 /** The clients that wait to pair, as Setup lists them: one, several, none, and an approval refused. */
 const meta: Meta = { title: 'Store/PairingApprovals' };
@@ -68,4 +69,15 @@ export const Refused: StoryObj = {
       />
     </div>
   ),
+};
+
+/** The pairings while they are read: the shape of their framed list, beside the lists drawn above. */
+export const Reading: StoryObj = {
+  args: {},
+  render: () => (
+    <div style={WIDE}>
+      <PairingsReading />
+    </div>
+  ),
+  play: saysReading('Reading the pairings…'),
 };

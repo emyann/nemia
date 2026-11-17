@@ -6,7 +6,7 @@
  */
 import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button, PlusIcon, Radio, RadioGroup, Select, SelectItem } from '@/components/ui/ds';
+import { Button, PlusIcon, Radio, RadioGroup, Select, SelectItem, Skeleton } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { factoryWorkflowsQuery, type Place, type WorkflowListing } from '@/lib/api/workflows';
 import { floorPlace, startRepo, whyNotStarted } from '@/lib/factories';
@@ -14,6 +14,7 @@ import { workflowKey } from '@/lib/inbox';
 import { useBar } from '@/lib/useBar';
 import { BarPanel } from '../frame/BarPanel';
 import { StartRun } from '../run/StartRun';
+import { Reading, ReadingLines } from '@/components/look';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 const path = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
@@ -70,7 +71,7 @@ function StartIn({ name }: { name: string }) {
       {factories.error ? (
         <p className="text-body-medium text-failure">Could not read the factories: {factories.error.message}</p>
       ) : !factories.data ? (
-        <p className="text-body-small text-muted-foreground">Reading the factories…</p>
+        <StartReading label="Reading the factories…" />
       ) : place === null ? (
         <p data-unplaced className="text-body-medium text-yours">
           {factory ? 'The default factory starts no run from here: start one from the Workflows page.' : `No factory is named ${name}.`}
@@ -86,6 +87,20 @@ function StartIn({ name }: { name: string }) {
   );
 }
 
+/** The start's form while what it starts from is read: its fields, each a label over its box, named by `label`, the line it replaces. */
+function StartReading({ label }: { label: string }) {
+  return (
+    <Reading label={label} className="flex flex-col gap-4">
+      {[0, 1].map((at) => (
+        <div key={at} className="flex flex-col gap-1.5">
+          <Skeleton className="w-24 text-label-medium" />
+          <Skeleton shape="rectangle" className="h-9 rounded-none" />
+        </div>
+      ))}
+    </Reading>
+  );
+}
+
 /** The bar on the start of a run in no factory yet: which factory, read once the factories are. */
 function AskFactory() {
   const factories = useQuery(factoriesQuery);
@@ -94,7 +109,7 @@ function AskFactory() {
       {factories.error ? (
         <p className="text-body-medium text-failure">Could not read the factories: {factories.error.message}</p>
       ) : !factories.data ? (
-        <p className="text-body-small text-muted-foreground">Reading the factories…</p>
+        <StartReading label="Reading the factories…" />
       ) : (
         <FactoryChoice factories={factories.data} />
       )}
@@ -247,7 +262,9 @@ function Workflows({ place, only }: { place: Place; only?: string }) {
             Could not list the workflows of the factory {code(place.factory)}: {workflows.error.message}
           </p>
         ) : !workflows.data ? (
-          <p className="text-body-small text-muted-foreground">Reading the workflows…</p>
+          <Reading label="Reading the workflows…">
+            <ReadingLines widths={['w-40', 'w-48', 'w-36']} className="gap-1.5 text-body-medium" />
+          </Reading>
         ) : !workflows.data.length ? (
           <p className="text-body-small text-muted-foreground">
             No workflow the factory attaches is on {path(place.repo)}: attach one there{attach ? <> with {code(attach)}</> : null}.

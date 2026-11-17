@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addable, addToFactory, type AddableItem, libraryAddsQuery, libraryQuery, removeFromFactory } from '../../lib/api/storeLibrary.ts';
+import { Reading, ReadingLines } from '@/components/look';
 
 /** What a person asks of a factory's adds: an item of the library added, or an add taken off. */
 type Change = { kind: 'add'; item: AddableItem } | { kind: 'remove'; name: string };
@@ -51,10 +52,12 @@ export function LibraryAdds({ name }: { name: string }) {
       </div>
       {adds.data ? (
         <AddList adds={adds.data} pending={change.isPending} onRemove={(added) => change.mutate({ kind: 'remove', name: added })} />
+      ) : adds.error instanceof Error ? (
+        <p className="text-body-medium text-muted-foreground">Could not read the adds: {adds.error.message}</p>
       ) : (
-        <p className="text-body-medium text-muted-foreground">
-          {adds.error instanceof Error ? `Could not read the adds: ${adds.error.message}` : 'Reading the adds…'}
-        </p>
+        <Reading label="Reading the adds…">
+          <ReadingLines widths={['w-48', 'w-40', 'w-56']} className="gap-2 text-body-medium" />
+        </Reading>
       )}
       {offered.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">

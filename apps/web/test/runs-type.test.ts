@@ -28,6 +28,7 @@ const FILES = [
   'components/run/RunsPage.tsx',
   'components/look/Breakdown.tsx',
   'components/look/Plate.tsx',
+  'components/look/Reading.tsx',
   'components/look/Sticker.tsx',
   'components/look/StepGraph.tsx',
   'components/look/Pager.tsx',

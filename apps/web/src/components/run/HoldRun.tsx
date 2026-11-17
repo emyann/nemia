@@ -17,6 +17,8 @@ import { Refusal } from '../gate/Ask';
 import { ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
 import { POPOVER } from '../../lib/classes';
+import { Reading } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /**
  * Hold, on a run's page: the button opens a popover where a person ticks the runs to wait on, or none, and may say why, and the hold is
@@ -61,9 +63,16 @@ function HoldRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
   }
   if (reading)
     return (
-      <p data-hold-reading className="text-body-small text-muted-foreground">
-        Reading the runs to wait on…
-      </p>
+      <div data-hold-reading>
+        <Reading label="Reading the runs to wait on…" className="divide-y divide-outline-variant rounded border border-outline">
+          {[0, 1, 2].map((at) => (
+            <div key={at} className="flex items-center gap-2 px-2 py-1 text-body-medium">
+              <Skeleton shape="rectangle" className="size-4 rounded-none" />
+              <Skeleton className="flex-1" />
+            </div>
+          ))}
+        </Reading>
+      </div>
     );
   return <HoldForm id={run.id} runs={holdCandidates(run, [...open, ...finished])} older={more ? older : null} onClose={onClose} />;
 }

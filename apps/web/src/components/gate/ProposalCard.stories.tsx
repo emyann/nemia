@@ -5,6 +5,7 @@ import type { Proposal } from 'objects';
 import { proposalQuery } from '@/lib/api/proposals';
 import { ProposalCard } from './ProposalCard';
 import { FACTORY, proposal, seeded } from '../../../.storybook/fixtures/proposals';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** The card of `p`, read from a query client that holds it as its own read. */
 const drawn = (p: Proposal) => (
@@ -68,4 +69,16 @@ export const Declined: Story = {
     await expect(canvasElement.querySelector('[data-proposal-phase="declined"]')).not.toBeNull();
     await expect(canvasElement.querySelector('[data-proposal-approve], [data-proposal-decline]')).toBeNull();
   },
+};
+
+/** The card while its proposal is read: the shape of its title, tags, changes and buttons, beside the phases drawn above. */
+export const Reading: Story = {
+  render: () => (
+    <Unread>
+      <div style={{ width: 560 }}>
+        <ProposalCard factory={FACTORY} name="nemia-ab12c" />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading the proposal…'),
 };

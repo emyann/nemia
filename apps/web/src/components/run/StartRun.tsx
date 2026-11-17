@@ -10,6 +10,8 @@ import { afterFor } from '../../lib/inbox';
 import { usePickerRuns } from '../../lib/pickerRuns.ts';
 import { ContextPicker, ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
+import { Reading } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 import { pastLimit, StartInputs } from './StartInputs';
 
 /**
@@ -252,7 +254,14 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
       ) : runs.error ? (
         <p className="text-body-small text-failure">Could not list the runs to wait on: {runs.error.message}</p>
       ) : !onRepo ? (
-        <p className="text-body-small text-muted-foreground">Reading the runs…</p>
+        <Reading label="Reading the runs…" className="divide-y divide-outline-variant rounded border border-outline">
+          {[0, 1, 2].map((at) => (
+            <div key={at} className="flex items-center gap-2 px-2 py-1 text-body-medium">
+              <Skeleton shape="rectangle" className="size-4 rounded-none" />
+              <Skeleton className="flex-1" />
+            </div>
+          ))}
+        </Reading>
       ) : !onRepo.length ? (
         <p className="text-body-small text-muted-foreground">No run on this repository to wait on.</p>
       ) : (

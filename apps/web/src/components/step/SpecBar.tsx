@@ -10,6 +10,8 @@ import { fromMatches, workflowsInQuery, type WorkflowListing } from '@/lib/api/w
 import { fromWord, listPlace, type ListPlace } from '@/lib/factories';
 import { BarPanel } from '../frame/BarPanel';
 import { runsOn, specLines } from './StepNode';
+import { Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /**
  * The bar for the step `step` of the workflow `workflow` read from `from`, titled by the step's name, saying whose workflow it is under the
@@ -67,7 +69,12 @@ function Nowhere({ where }: { where: ListPlace }) {
 function Unread({ workflow, error, read }: { workflow: string; error: Error | null; read: boolean }) {
   if (error) return <p className="text-body-medium text-failure">Could not read the workflows: {error.message}</p>;
   if (read) return <p className="text-body-medium text-yours">No workflow is named {workflow}.</p>;
-  return <p className="text-body-small text-muted-foreground">Reading the workflows…</p>;
+  return (
+    <Reading label="Reading the workflows…" className="flex flex-col gap-4">
+      <Skeleton className="w-40 text-title-medium" />
+      <ReadingLines widths={['w-full', 'w-5/6', 'w-3/4', 'w-1/2']} className="text-body-medium" />
+    </Reading>
+  );
 }
 
 /**

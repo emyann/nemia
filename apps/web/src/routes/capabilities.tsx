@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { CapabilitiesPage } from '../components/settings/CapabilitiesPage';
+import { CapabilitiesPage, CapabilitiesReading } from '../components/settings/CapabilitiesPage';
 import { capabilitiesQuery } from '../lib/api/capabilities.ts';
 import { pagePlaceOf } from '../lib/factories';
 
@@ -9,9 +9,7 @@ export const Route = createFileRoute('/capabilities')({
   loaderDeps: ({ search }) => ({ repo: search.repo }),
   loader: ({ context, deps }) => context.queryClient.ensureQueryData(capabilitiesQuery({ ...deps })),
   component: Page,
-  pendingComponent: () => (
-    <p className="text-body-medium text-muted-foreground">Reading the repository, and asking each MCP server it enables for its tools…</p>
-  ),
+  pendingComponent: CapabilitiesReading,
   errorComponent: ({ error }) => (
     <p className="text-body-medium text-failure">
       Could not load the capabilities: {error instanceof Error ? error.message : String(error)}. Is the api running (

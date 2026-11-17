@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { KeyRound } from 'lucide-react';
 import type { Pairing } from 'objects';
-import { CutField, CutFrame, CutPress } from '@/components/look';
+import { CutField, CutFrame, CutPress, Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 import { Button } from '@/components/ui/button';
 import { Instant } from '@/components/time/Instant';
 
@@ -106,5 +107,23 @@ export function PairingApprovals({ pairings, ...approves }: { pairings: readonly
         </CutFrame>
       )}
     </div>
+  );
+}
+
+/** The pairings while they are read: a framed list of two, each a client's name and when it lapses, and its Approve. */
+export function PairingsReading() {
+  return (
+    <Reading label="Reading the pairings…">
+      <CutFrame size={12}>
+        <div className="flex flex-col divide-y divide-outline-variant px-4">
+          {[0, 1].map((at) => (
+            <div key={at} className="flex flex-col gap-2 py-3">
+              <ReadingLines widths={['w-56']} className="text-body-medium" />
+              <Skeleton shape="rectangle" className="h-9 w-28 rounded-shape-full" />
+            </div>
+          ))}
+        </div>
+      </CutFrame>
+    </Reading>
   );
 }

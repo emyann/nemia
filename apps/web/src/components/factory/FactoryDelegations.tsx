@@ -14,6 +14,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { delegableAgentsQuery, delegationsKey, delegationsQuery, putDelegation, removeDelegation } from '@/lib/api/proposals';
 import { DELEGABLE } from '@/lib/proposals';
+import { Reading, ReadingLines } from '@/components/look';
 
 /** One grant as the form holds it: resources and verbs picked, and the names typed, comma-separated. */
 type Draft = { resources: readonly string[]; names: string; verbs: readonly ChangeVerb[] };
@@ -80,10 +81,12 @@ export function FactoryDelegations({ name }: { name: string }) {
             None: every proposal of this factory waits on you.
           </p>
         )
+      ) : error instanceof Error ? (
+        <p className="text-body-medium text-muted-foreground">Could not read the delegations: {error.message}</p>
       ) : (
-        <p className="text-body-medium text-muted-foreground">
-          {error instanceof Error ? `Could not read the delegations: ${error.message}` : 'Reading the delegations…'}
-        </p>
+        <Reading label="Reading the delegations…">
+          <ReadingLines widths={['w-3/4', 'w-2/3']} className="gap-2 text-body-medium" />
+        </Reading>
       )}
       {remove.error && (
         <Alert variant="destructive" data-delegation-refused>

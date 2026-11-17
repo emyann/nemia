@@ -13,6 +13,8 @@ import { DOT, RADIO } from '../agent/AgentForm';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
 import { POPOVER } from '../../lib/classes';
+import { Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /**
  * Prune, on a finished repository run's page: the button opens a popover with a choice of what to give back — its worktrees; its files
@@ -59,9 +61,12 @@ function PruneRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
   }
   if (decidable && (!data || isPlaceholderData)) {
     return (
-      <p data-prune-reading className="text-body-small text-muted-foreground">
-        Reading whether it was merged…
-      </p>
+      <div data-prune-reading>
+        <Reading label="Reading whether it was merged…" className="flex flex-col gap-3">
+          <ReadingLines widths={['w-full', 'w-2/3']} className="text-body-small" />
+          <Skeleton shape="rectangle" className="h-9 w-24 rounded-none" />
+        </Reading>
+      </div>
     );
   }
   const offer = pruneOffer(run, decidable && data ? awaitingOf(data) : null);

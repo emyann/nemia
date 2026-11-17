@@ -9,6 +9,8 @@ import { bellHash, bellRows, type BellRow } from '@/lib/bell';
 import { RouteLink } from '../agent/AgentParts';
 import { FactoryTag } from '../factory/FactoryTag';
 import { BarPanel } from '../frame/BarPanel';
+import { Reading } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /** One run waiting on you: its title, its factory and what it waits for, a link to its run's page at its gate, or at its top for none. */
 function WaitingRow({ row }: { row: BellRow }) {
@@ -61,8 +63,14 @@ export function WaitingBar() {
             Nothing waits on you.
           </p>
         )
+      ) : runs.error ? (
+        <p className="text-body-medium">The runs could not be read: {runs.error.message}</p>
       ) : (
-        <p className="text-body-medium">{runs.error ? `The runs could not be read: ${runs.error.message}` : 'Reading the runs…'}</p>
+        <Reading label="Reading the runs…" className="flex flex-col gap-2">
+          {[0, 1, 2].map((at) => (
+            <Skeleton key={at} shape="rectangle" className="h-14 rounded-none" />
+          ))}
+        </Reading>
       )}
     </BarPanel>
   );

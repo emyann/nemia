@@ -5,6 +5,7 @@ import { skillsQuery } from '@/lib/api/skills';
 import { SkillPicker } from './SkillPicker';
 import { scribe, skillPlaces } from '../../../.storybook/fixtures/agents';
 import { seeded } from '../../../.storybook/fixtures/proposals';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** The skills an agent of yours gives, and the side sheet of every skill it can be given, opened by Add a skill. */
 const meta: Meta<typeof SkillPicker> = {
@@ -42,5 +43,21 @@ export const SheetOpen: Story = {
     await waitFor(() => expect(within(sheet).getByRole('button', { name: 'Copy grill-me to my library and add' })).toBeVisible());
     await userEvent.click(within(sheet).getByRole('button', { name: 'Add ask-first' }));
     await expect(args.onSkills).toHaveBeenCalledWith('write-a-note, ask-first');
+  },
+};
+
+/** Opened while the skills it may add are read: the shape of their places. */
+export const ReadingTheSkills: Story = {
+  args: { skills: '', given: [] },
+  render: (args) => (
+    <Unread>
+      <div style={{ width: 560 }}>
+        <SkillPicker {...args} />
+      </div>
+    </Unread>
+  ),
+  play: async (context) => {
+    await userEvent.click(within(context.canvasElement).getByRole('button', { name: 'Add a skill' }));
+    await saysReading('Reading the skills…')(context);
   },
 };

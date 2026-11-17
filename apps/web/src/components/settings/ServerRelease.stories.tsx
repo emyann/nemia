@@ -2,7 +2,8 @@ import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { LatestRelease, Readiness, Upgrade } from 'objects';
 import { ReadinessList } from '../setup/ReadinessList';
-import { ServerReleaseView, type ServerReleaseShown, UpgradeOutcome, UpgradeRun } from './ServerRelease';
+import { ServerRelease, ServerReleaseView, type ServerReleaseShown, UpgradeOutcome, UpgradeRun } from './ServerRelease';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /**
  * Settings' Server release section in each of its states: no newer release, a newer one with its notes, upgrading, restarting,
@@ -220,4 +221,17 @@ export const UpgradesUnread: StoryObj = {
       <ServerReleaseView shown={{ ...BARE, latest: NEWER, unread: 'GET /api/upgrades answered 404' }} onStart={none} />
     </div>
   ),
+};
+
+/** The section while the server's release is read: the shape of its lines and its press, beside its states drawn above. */
+export const Reading: StoryObj = {
+  args: {},
+  render: () => (
+    <Unread>
+      <div style={WIDE}>
+        <ServerRelease />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading the server’s release…'),
 };

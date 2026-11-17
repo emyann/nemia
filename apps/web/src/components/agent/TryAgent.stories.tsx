@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
-import { TryAgent } from './TryAgent';
+import { TryAgent, TryRun } from './TryAgent';
+import { saysReading, Unread } from '../../../.storybook/unread';
 import { critic, scribe } from '../../../.storybook/fixtures/agents';
 
 /** Try it, under an agent's form: a brief and Try it for an agent of yours, or why it cannot be tried. */
@@ -21,3 +22,15 @@ export const NoBrief: Story = {
 
 /** The repository's: why it cannot be tried, and the line that copies it to yours. */
 export const Untried: Story = { args: { agent: critic } };
+
+/** A try started, its run still read: the shape of its box. */
+export const ReadingTheTry: Story = {
+  render: () => (
+    <Unread>
+      <div style={{ width: 480 }}>
+        <TryRun id="r-try" />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading the try…'),
+};

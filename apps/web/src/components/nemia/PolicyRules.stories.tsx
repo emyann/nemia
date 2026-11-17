@@ -5,6 +5,7 @@ import { policyQuery, type PolicyList } from '@/lib/api/policy';
 import { PolicyRules } from './PolicyRules';
 import { policyList, RETRY_RULE } from '../../../.storybook/fixtures/agents';
 import { seeded } from '../../../.storybook/fixtures/proposals';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /**
  * Her rules for Auto, seeded: what is in force, the default marked, and what she proposed.
@@ -50,4 +51,16 @@ export const Confirmed: Story = {
     rules: [{ ...RETRY_RULE, from: 'proposed' }],
     proposed: policyList.proposed && { ...policyList.proposed, rules: [{ ...RETRY_RULE, confirmed: true }] },
   }),
+};
+
+/** Her rules still read: the shape of the rules in force. */
+export const ReadingHerRules: Story = {
+  render: (args) => (
+    <Unread>
+      <div style={{ width: 640 }}>
+        <PolicyRules {...args} />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading her rules…'),
 };

@@ -30,6 +30,8 @@ import { PolicyRules } from './PolicyRules';
 import { CopyButton } from '../command/CopyButton';
 import { BridgeWords } from '../step/Facts';
 import { TrustLine } from './NemiaTrust';
+import { Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /**
  * Nemia, the store's own agent, on the Settings page: the store's level and where it is picked, each factory's level with its default and a
@@ -77,10 +79,17 @@ export function NemiaSettings() {
           <ReachPart reach={data.reach} bridge={data.bridge} />
           <SpendPart nemia={data} />
         </>
+      ) : error instanceof Error ? (
+        <p className="text-body-medium text-muted-foreground">Could not read where she is: {error.message}</p>
       ) : (
-        <p className="text-body-medium text-muted-foreground">
-          {error instanceof Error ? `Could not read where she is: ${error.message}` : 'Reading where she is…'}
-        </p>
+        <Reading label="Reading where she is…" className="flex flex-col gap-4">
+          {[0, 1, 2].map((at) => (
+            <div key={at} className="flex flex-col gap-2 border-t pt-4">
+              <Skeleton className="w-36 text-title-small" />
+              <ReadingLines widths={['w-full', 'w-2/3']} className="text-body-small" />
+            </div>
+          ))}
+        </Reading>
       )}
       <MemoryPart />
     </section>
@@ -401,10 +410,12 @@ function MemoryPart() {
             She keeps no facts yet.
           </p>
         )
+      ) : error instanceof Error ? (
+        <p className="text-body-medium text-muted-foreground">Could not read her memory: {error.message}</p>
       ) : (
-        <p className="text-body-medium text-muted-foreground">
-          {error instanceof Error ? `Could not read her memory: ${error.message}` : 'Reading her memory…'}
-        </p>
+        <Reading label="Reading her memory…">
+          <ReadingLines widths={['w-40', 'w-32', 'w-48']} className="font-mono text-body-small" />
+        </Reading>
       )}
       <p data-nemia-prune className="text-body-small text-muted-foreground">
         {PRUNE_WORDS}
@@ -436,9 +447,11 @@ function FactText({ name }: { name: string }) {
         {data.fact.text}
       </pre>
     );
+  if (error instanceof Error)
+    return <p className="mt-1 text-body-small text-muted-foreground">Could not read this fact: {error.message}</p>;
   return (
-    <p className="mt-1 text-body-small text-muted-foreground">
-      {error instanceof Error ? `Could not read this fact: ${error.message}` : 'Reading the fact…'}
-    </p>
+    <Reading label="Reading the fact…" className="mt-1 rounded-md border px-3 py-2">
+      <ReadingLines widths={['w-full', 'w-3/4']} className="font-mono text-body-small" />
+    </Reading>
   );
 }

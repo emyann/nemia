@@ -23,12 +23,12 @@ type Story = StoryObj<typeof Chips>;
 /** Both kinds of file, a long path among them wrapping in its tag. */
 export const AgentFacingAndCheckAffecting: Story = {
   args: {
-    agentFacing: ['CLAUDE.md', 'packages/templates/sdlc/agents/grace.md'],
+    agentFacing: ['README.md', 'prompts/implementer.md'],
     checkAffecting: ['package.json', 'packages/agent-orchestrator/test/a-test-whose-path-runs-longer-than-its-row-has-room-for.test.ts'],
   },
   play: async ({ canvasElement }) => {
     const marks = within(canvasElement);
-    const note = marks.getByText('CLAUDE.md').closest('[data-slot="tag"]');
+    const note = marks.getByText('README.md').closest('[data-slot="tag"]');
     await expect(note).toHaveAttribute('data-chip', 'agent-facing');
     await expect(note).toHaveAttribute('title', 'the next agent reads this');
     const weighed = marks.getByText('package.json').closest('[data-slot="tag"]');

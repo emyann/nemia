@@ -13,6 +13,7 @@ import {
   answeredSection,
   approvedSection,
   fromSection,
+  gatesAfterSection,
   headingOf,
   loopSection,
   retriedInRound,
@@ -346,7 +347,7 @@ function endingLook(
 
 /**
  * What a step is handed under what was asked for: what each run it waited on or was handed concluded (`parents`), then what a person
- * approved, answered and accepted before it and what recent runs of its workflow cost (`decided`), each section left out where it says
+ * approved, answered and accepted before it, the gates after it, and what recent runs of its workflow cost (`decided`), each section left out where it says
  * nothing.
  */
 function handedOf(
@@ -364,6 +365,7 @@ function handedOf(
       approvedSection(step, run, steps),
       answeredSection(step, run, steps, answers),
       acceptedSection(step, run, steps, closeoutOf),
+      gatesAfterSection(step, run, steps),
       costs ? costsSection(costs) : '',
     ].filter(Boolean),
   };
@@ -453,6 +455,7 @@ export function remoteBrief(
     approvedSection(step, run, steps),
     answeredSection(step, run, steps, answers),
     acceptedSection(step, run, steps, closeoutOf),
+    gatesAfterSection(step, run, steps),
   ].filter(Boolean);
   const given = (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf));
   return [

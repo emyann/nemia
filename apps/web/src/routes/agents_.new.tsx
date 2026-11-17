@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { AgentForm } from '../components/agent/AgentForm';
-import { AgentRefused, BackToAgents, RouteLink } from '../components/agent/AgentParts';
+import { AgentRefused, DefinitionTrail, RouteLink } from '../components/agent/AgentParts';
 import { AgentRefusal, createAgent, type AgentDraft } from '../lib/api/agents.ts';
 import { hireAgent } from '../lib/api/factories.ts';
 import { keyFormQuery } from '../lib/api/builder.ts';
@@ -53,7 +53,7 @@ function NewAgentPage() {
 
   return (
     <article className="space-y-6">
-      <BackToAgents />
+      <DefinitionTrail kind="agent" name="New agent" place={{}} />
       <header className="space-y-1">
         <h1 className="text-title-medium">New agent</h1>
         <p className="text-body-medium text-muted-foreground">

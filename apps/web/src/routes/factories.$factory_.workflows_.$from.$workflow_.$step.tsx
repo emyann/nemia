@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { BackToWorkflow, WorkflowStepPage } from '../components/workflow/WorkflowStepPage';
+import { WorkflowStepPage } from '../components/workflow/WorkflowStepPage';
+import { WorkflowTrail } from '../components/workflow/WorkflowPage';
 import { stepQuery } from '../lib/api/workflows.ts';
 import { pagePlaceOf } from '../lib/factories';
 
@@ -23,12 +24,12 @@ function Page() {
   return <WorkflowStepPage from={from} workflow={workflow} step={step} place={{ ...Route.useSearch(), factory }} />;
 }
 
-/** That the step could not be loaded, and why, under the way back to its workflow. */
+/** That the step could not be loaded, and why, under where its page is. */
 function Failed({ error }: { error: unknown }) {
-  const { factory, from, workflow } = Route.useParams();
+  const { factory, from, workflow, step } = Route.useParams();
   return (
     <div className="space-y-3">
-      <BackToWorkflow from={from} workflow={workflow} place={{ ...Route.useSearch(), factory }} />
+      <WorkflowTrail from={from} workflow={workflow} step={step} place={{ ...Route.useSearch(), factory }} />
       <p className="text-body-medium text-failure">Could not load this step: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   );

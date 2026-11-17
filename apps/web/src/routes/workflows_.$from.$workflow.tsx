@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { BackToWorkflows, loadWorkflow, WorkflowPage, workflowSearch } from '../components/workflow/WorkflowPage';
+import { WorkflowTrail, loadWorkflow, WorkflowPage, workflowSearch } from '../components/workflow/WorkflowPage';
 
 /**
  * The page of a workflow, at /workflows/$from/$workflow: `workflows_` draws it on its own, not inside the Workflows page, which
@@ -11,14 +11,7 @@ export const Route = createFileRoute('/workflows_/$from/$workflow')({
   loaderDeps: ({ search }) => ({ repo: search.repo }),
   loader: ({ context, deps, params }) => loadWorkflow(context.queryClient, { ...deps }, params.from),
   component: Page,
-  errorComponent: ({ error }) => (
-    <div className="space-y-3">
-      <BackToWorkflows />
-      <p className="text-body-medium text-failure">
-        Could not load this workflow: {error instanceof Error ? error.message : String(error)}
-      </p>
-    </div>
-  ),
+  errorComponent: Failed,
 });
 
 /** The workflow's page, read off its address. */
@@ -26,4 +19,18 @@ function Page() {
   const { from, workflow } = Route.useParams();
   const { build, repo } = Route.useSearch();
   return <WorkflowPage from={from} name={workflow} address={{ ...(repo && { repo }) }} building={build ?? false} />;
+}
+
+/** That the workflow could not be loaded, and why, under where its page is. */
+function Failed({ error }: { error: unknown }) {
+  const { from, workflow } = Route.useParams();
+  const { repo } = Route.useSearch();
+  return (
+    <div className="space-y-3">
+      <WorkflowTrail from={from} workflow={workflow} place={{ ...(repo && { repo }) }} />
+      <p className="text-body-medium text-failure">
+        Could not load this workflow: {error instanceof Error ? error.message : String(error)}
+      </p>
+    </div>
+  );
 }

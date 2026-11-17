@@ -17,6 +17,7 @@ import { listPlace, pagePlaceOf, whyNotStarted, workflowFactories } from '@/lib/
 import { workflowLink, workflowsLink } from '@/lib/factoryAddress';
 import { loadWorkflowsIn } from '@/lib/placed';
 import { Button } from '@/components/ui/ds';
+import { factoryLevel, Trail } from '../nav/Trail';
 import type { QueryClient } from '@tanstack/react-query';
 
 /**
@@ -46,7 +47,7 @@ export const loadWorkflow = (client: QueryClient, place: PagePlace, from: string
 /**
  * One workflow, read in the address's place (`listPlace`): with no factory, the folder the list read with none names (`Everywhere`); in a
  * named factory, the folder the api lists in it, its own where it shadows the repository's (`InFactory`); and where the factory lists
- * nowhere, why, with the way back (`Unplaced`).
+ * nowhere, why (`Unplaced`), under where its page is (`WorkflowTrail`).
  */
 export function WorkflowPage({ from, name, address, building }: Asked) {
   const { data: factories } = useQuery(factoriesQuery);
@@ -65,7 +66,7 @@ export function WorkflowPage({ from, name, address, building }: Asked) {
     );
   return (
     <div className="space-y-3">
-      <BackToWorkflows place={address} />
+      <WorkflowTrail from={from} workflow={name} place={address} />
       <Unplaced
         where={where}
         back={
@@ -130,7 +131,7 @@ function InFactory({ from, name, address, place, building, factory }: Asked & { 
   const { data: listed } = useSuspenseQuery(workflowsInQuery(place));
   const { data: plain } = useQuery({ ...workflowsQuery, enabled: from === 'user' });
   const workflow = listed.find((w) => fromMatches(w.from, from) && w.name === name);
-  if (!workflow) return <NotOffered name={name} place={place} address={address} attach={factory?.commands.attach} />;
+  if (!workflow) return <NotOffered from={from} name={name} place={place} address={address} attach={factory?.commands.attach} />;
   const why = whyNotStarted(workflow);
   return (
     <Workflow
@@ -188,7 +189,7 @@ function Workflow({
 
   return (
     <article aria-label={`Workflow ${workflow.name}`} className="space-y-6">
-      <BackToWorkflows place={address} />
+      <WorkflowTrail from={workflow.from} workflow={workflow.name} place={address} />
       <WorkflowHeader
         workflow={workflow}
         tags={tags}
@@ -281,12 +282,24 @@ function WorkflowHeader({
 
 /**
  * A workflow the factory of `place` does not list on its repository: said so, with the line that attaches one, `attach`, as the api
- * answers it on the factory, and the way back to the factory's workflows.
+ * answers it on the factory, under where its page is (`WorkflowTrail`).
  */
-function NotOffered({ name, place, address, attach }: { name: string; place: Place; address: PagePlace; attach: string | undefined }) {
+function NotOffered({
+  from,
+  name,
+  place,
+  address,
+  attach,
+}: {
+  from: string;
+  name: string;
+  place: Place;
+  address: PagePlace;
+  attach: string | undefined;
+}) {
   return (
     <div className="space-y-3">
-      <BackToWorkflows place={address} />
+      <WorkflowTrail from={from} workflow={name} place={address} />
       <p data-not-offered={place.factory} className="text-body-medium text-muted-foreground">
         {place.factory} does not offer {name} on <span className="font-mono text-body-small break-all">{place.repo}</span>, so nothing of it
         is read here and it hires no agent into its steps: attach the workflow to {place.factory} first
@@ -329,11 +342,11 @@ function Refused({ error }: { error: string }) {
   );
 }
 
-/** A workflow the api does not list, here or no longer: said so, with the way back. */
+/** A workflow the api does not list, here or no longer: said so, under where its page is (`WorkflowTrail`). */
 function NotListed({ from, name }: { from: string; name: string }) {
   return (
     <div className="space-y-3">
-      <BackToWorkflows />
+      <WorkflowTrail from={from} workflow={name} place={{}} />
       <p data-not-listed className="text-body-medium text-muted-foreground">
         No workflow <span className="font-mono">{name}</span> is listed {from === 'user' ? 'among yours' : "in this repository's"}: it may
         have been removed or renamed.
@@ -343,12 +356,23 @@ function NotListed({ from, name }: { from: string; name: string }) {
 }
 
 /**
- * Back to the Workflows page, in `place`, the place this page is read in.
+ * Where a workflow's page, or one of its steps', is, in the place it is read in: its factory where it names one, the Workflows list, the
+ * workflow, and the step.
+ *
+ * @param from where the workflow is read from
+ * @param workflow the workflow's name
+ * @param place the factory and the repository the page is read in
+ * @param step the step whose page this is, none on the workflow's own
  */
-export function BackToWorkflows({ place = {} }: { place?: PagePlace }) {
+export function WorkflowTrail({ from, workflow, place, step }: { from: string; workflow: string; place: PagePlace; step?: string }) {
   return (
-    <Link {...workflowsLink(place)} className="text-body-medium text-muted-foreground hover:text-foreground">
-      ← Workflows
-    </Link>
+    <Trail
+      levels={[
+        ...factoryLevel(place.factory),
+        { name: 'Workflows', to: workflowsLink(place) },
+        step === undefined ? { name: workflow } : { name: workflow, to: workflowLink(place, from, workflow) },
+        ...(step === undefined ? [] : [{ name: step }]),
+      ]}
+    />
   );
 }

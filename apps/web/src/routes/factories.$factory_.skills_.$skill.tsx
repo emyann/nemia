@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { BackToAgents } from '../components/agent/AgentParts';
+import { DefinitionTrail } from '../components/agent/AgentParts';
 import { SkillPage } from '../components/agent/SkillPage';
 import { skillQuery } from '../lib/api/skills.ts';
 import { definitionSearch } from '../lib/factoryAddress';
@@ -14,12 +14,7 @@ export const Route = createFileRoute('/factories/$factory_/skills_/$skill')({
   loader: ({ context, deps: { from, repo }, params }) =>
     context.queryClient.ensureQueryData(skillQuery(from, params.skill, { factory: params.factory, ...(repo && { repo }) })),
   component: Page,
-  errorComponent: ({ error }) => (
-    <div className="space-y-3">
-      <BackToAgents />
-      <p className="text-body-medium text-failure">Could not load this skill: {error instanceof Error ? error.message : String(error)}</p>
-    </div>
-  ),
+  errorComponent: Failed,
 });
 
 /** The skill's page, read off its address. */
@@ -27,4 +22,16 @@ function Page() {
   const { factory, skill } = Route.useParams();
   const { from, repo } = Route.useSearch();
   return <SkillPage from={from ?? 'factory'} name={skill} place={{ factory, ...(repo && { repo }) }} />;
+}
+
+/** That the skill could not be loaded, and why, under where its page is. */
+function Failed({ error }: { error: unknown }) {
+  const { factory, skill } = Route.useParams();
+  const { repo } = Route.useSearch();
+  return (
+    <div className="space-y-3">
+      <DefinitionTrail kind="skill" name={skill} place={{ factory, ...(repo && { repo }) }} />
+      <p className="text-body-medium text-failure">Could not load this skill: {error instanceof Error ? error.message : String(error)}</p>
+    </div>
+  );
 }

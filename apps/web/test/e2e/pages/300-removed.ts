@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, photograph, themeOf, trailLevel } from '../board.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, watch } from '../checks.ts';
 import { LANDED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -58,7 +58,7 @@ export default {
           3_000,
         );
         await expectCount(other.locator('article, header[aria-label="The step"]'), 0, `and ${where} draws nothing of what it last read`);
-        await expectVisible(other.getByRole('link', { name: '← Runs' }), `and ${where} links to the runs the store has`);
+        await expectVisible(trailLevel(other, 'Runs'), `and ${where} links to the runs the store has`);
       }
       await settled(run.other);
       await photograph(run.other, path.join(OUT, `removed-run-${await themeOf(run.other)}.png`), { fullPage: true });

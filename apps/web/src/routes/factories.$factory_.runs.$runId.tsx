@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { BackToRuns, RunPage } from '../components/run/RunPage';
+import { RunTrail, RunPage } from '../components/run/RunPage';
 import { loadRun } from '../lib/runView';
 import { barValue } from '../lib/bar';
 import { objectHome } from '../lib/factoryAddress';
@@ -23,15 +23,21 @@ export const Route = createFileRoute('/factories/$factory_/runs/$runId')({
     return loaded;
   },
   component: Page,
-  errorComponent: ({ error }) => (
-    <div className="space-y-3">
-      <BackToRuns />
-      <p className="text-body-medium text-failure">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
-    </div>
-  ),
+  errorComponent: Failed,
 });
 
 /** The run's page, read off its address. */
 function Page() {
   return <RunPage runId={Route.useParams().runId} gone={Route.useLoaderData().gone} />;
+}
+
+/** That the run could not be loaded, and why, under where its page is. */
+function Failed({ error }: { error: unknown }) {
+  const { runId } = Route.useParams();
+  return (
+    <div className="space-y-3">
+      <RunTrail runId={runId} />
+      <p className="text-body-medium text-failure">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
+    </div>
+  );
 }

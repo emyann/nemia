@@ -143,7 +143,7 @@ export default {
       await popover.getByRole('button', { name: 'Pause…' }).click();
       await expectVisible(popover.getByText('Pause all factories', { exact: true }), 'Pause… asks why first');
       if (fs.existsSync(file)) throw new Refused(`nothing is put while it asks why — ${file} is there`);
-      await popover.locator('[data-pause-why]').fill(WHY);
+      await popover.locator('[data-pause-why] input').fill(WHY);
       await settled(page);
       await photograph(page, path.join(OUT, `pause-why-${theme}.png`));
       await popover.getByRole('button', { name: 'Pause', exact: true }).click();

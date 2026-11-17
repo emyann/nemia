@@ -66,11 +66,6 @@ export const OUTSIDE: Outside[] = [
   { file: 'src/components/markdown/Markdown.tsx', size: 'text-[1.08em]', why: PROSE },
   { file: 'src/components/markdown/Markdown.tsx', size: 'text-[0.95em]', why: PROSE },
   { file: 'src/components/markdown/Markdown.tsx', size: 'text-[0.9em]', why: PROSE },
-  {
-    file: 'src/components/frame/FrameTabs.tsx',
-    size: 'text-[length:inherit]',
-    why: 'it gives the size back to where the content stands, and names none',
-  },
 ];
 
 /** The files of `root`'s `src` the rule reads: every `.ts`, `.tsx` and `.css` outside the kit, as its path from `root`. */

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { askPairing, claimPairing } from '@/lib/api/pairing';
 import { signIn } from '@/lib/api/session';
 import { clientNameOf } from '@/lib/setup';
@@ -102,8 +102,7 @@ export function PairBrowser() {
         </p>
       )}
       <div>
-        <Button variant="outline" data-pair-press isDisabled={ask.isPending} onPress={again}>
-          <Link2 aria-hidden />
+        <Button variant="outlined" icon={Link2} data-pair-press isDisabled={ask.isPending} onPress={again}>
           {ask.isPending ? 'Asking…' : 'Pair this browser'}
         </Button>
       </div>

@@ -209,10 +209,7 @@ test("the scroll bar in the board's source: the rule in its styles, and the fram
       'the thumb in outline while it scrolls',
     ]);
   });
-  await t.test("the frame marks what scrolls once, in its root, and the sidebar's list hides no scroll bar", () => {
+  await t.test('the frame marks what scrolls once, in its root', () => {
     assert.match(sliceOf('routes/__root.tsx', 'function Root()', 'return ('), /\n\s*useScrollMark\(\);/, 'Root calls the hook');
-    const list = sliceOf('components/ui/sidebar.tsx', 'function SidebarContent(', 'function SidebarGroup(');
-    assert.match(list, /overflow-auto/, 'the list scrolls');
-    assert.doesNotMatch(list, /no-scrollbar/, 'and wears nothing that hides its bar');
   });
 });

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { KeyRound } from 'lucide-react';
 import { BOARD_LINK_WORDS, commandLine } from 'objects';
-import { CutField, CutFrame, CutPress, ScanLines } from '@/components/look';
+import { CutFrame, CutPress, ScanLines } from '@/components/look';
+import { TextField } from '@/components/ui/ds';
 import type { TokenAsk, TokenAsked } from '@/lib/api/read';
 import { signIn } from '@/lib/api/session';
 import { LinkRefusal } from './LinkRefusal';
@@ -22,14 +23,14 @@ const BOARD_LINK = commandLine(BOARD_LINK_WORDS, {});
 const reload = () => window.location.reload();
 
 /**
- * The page the board shows in place of every other once the api asks this browser for a token (`useTokenAsked`) — which every store
- * does, loopback included, of a browser that sends none: why it asks, the way in (`BOARD_LINK_WORDS`, typed on the store's machine,
- * whose link signs the browser in), the api's own words, which say where a token of the person's is minted, a field the person pastes
- * one into, and a press that sends it to the api, which keeps it as this browser's cookie (`signIn`); then the page loads again, and
- * the board is read with it. A token the api refuses is said, in its words, and the page stays. Where the cookie's token is the one
- * refused, the api's refusal cleared the cookie already, so the browser sends none until one is pasted. Under the form, the other way
- * in: this browser paired by a code the person approves (`PairBrowser`), no token pasted; over it, a first-visit link this page was
- * opened on and the api refused (`LinkRefusal`).
+ * The page the board shows in place of every other once the api asks this browser for a token (`useTokenAsked`) — which every store does,
+ * loopback included, of a browser that sends none: why it asks, the way in (`BOARD_LINK_WORDS`, typed on the store's machine, whose link
+ * signs the browser in), the api's own words, which say where a token of the person's is minted, the kit's field the person pastes one
+ * into, and a press that sends it to the api, which keeps it as this browser's cookie (`signIn`); then the page loads again, and the board
+ * is read with it. A token the api refuses is said, in its words, and the page stays. Where the cookie's token is the one refused, the
+ * api's refusal cleared the cookie already, so the browser sends none until one is pasted. Under the form, the other way in: this browser
+ * paired by a code the person approves (`PairBrowser`), no token pasted; over it, a first-visit link this page was opened on and the api
+ * refused (`LinkRefusal`).
  */
 export function TokenPage({ asked }: { asked: TokenAsked }) {
   const ask = asked.reason;
@@ -67,23 +68,21 @@ export function TokenPage({ asked }: { asked: TokenAsked }) {
           <p className="text-body-medium text-muted-foreground">
             This browser keeps the token you paste for thirty days, until you forget it in Settings.
           </p>
-          <CutField>
-            <input
-              data-token-field
-              type="password"
-              aria-label="Token"
-              name="token"
-              autoComplete="off"
-              placeholder="Token"
-              value={token}
-              disabled={pending}
-              onChange={(event) => {
-                setToken(event.target.value);
-                send.reset();
-              }}
-              className="w-full bg-transparent px-3.5 py-2.5 font-mono text-body-medium text-on-surface outline-none placeholder:text-on-surface-variant"
-            />
-          </CutField>
+          <TextField
+            data-token-field
+            type="password"
+            label="Token"
+            name="token"
+            autoComplete="off"
+            value={token}
+            isDisabled={pending}
+            onChange={(typed) => {
+              setToken(typed);
+              send.reset();
+            }}
+            className="[--md3-field-notch:var(--card)]"
+            inputClassName="font-mono"
+          />
           {send.isError && (
             <p role="alert" data-token-refused className="text-body-small break-words text-failure">
               Not kept. The api refused it: {send.error.message}

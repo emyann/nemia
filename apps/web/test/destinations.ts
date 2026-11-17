@@ -30,9 +30,6 @@ const kit = (part: KitPart, how?: string): Destination => (how === undefined ? {
 /** The inline alert the kit lacks, asked of the design system's factory. */
 const ALERT: Destination = { kind: 'ask', what: 'inline alert: a tinted surface with a title and a description', run: null };
 
-/** The sidebar's state, which the frame keeps itself. */
-const FRAME_FOLD: Destination = { kind: 'frame', part: 'frameFold, keeping the sidebar_state cookie' };
-
 /** Every key the board takes from a second system or draws by hand, and where it moves. */
 export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/components/ui/alert:Alert': ALERT,
@@ -72,13 +69,6 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/components/ui/sheet:SheetHeader': kit('SideSheet'),
   '@/components/ui/sheet:SheetTitle': kit('SideSheet'),
   '@/components/ui/sheet:SheetTrigger': kit('SideSheet'),
-  '@/components/ui/sidebar:SidebarProvider': FRAME_FOLD,
-  '@/components/ui/sidebar:sidebarOpenOf': FRAME_FOLD,
-  '@/components/ui/sidebar:useSidebar': FRAME_FOLD,
-  '@/components/ui/tabs:Tabs': kit('Tabs'),
-  '@/components/ui/tabs:TabsContent': kit('TabPanel'),
-  '@/components/ui/tabs:TabsList': kit('TabList'),
-  '@/components/ui/tabs:TabsTrigger': kit('Tab'),
   '@/components/ui/textarea:Textarea': kit('TextField', 'multiline'),
   'react-aria-components:Button': kit('Button'),
   'react-aria-components:CheckboxGroup': kit('CheckboxGroup'),
@@ -87,7 +77,6 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   'react-aria-components:Form': { kind: 'plain', why: 'a form element of the page, with the kit fields inside it' },
   'react-aria-components:Heading': kit('Title'),
   'react-aria-components:Label': kit('TextField', 'its label'),
-  'react-aria-components:Link': kit('Link'),
   'react-aria-components:Popover': kit('Popover'),
   'react-aria-components:PopoverContext': kit('PreviewTrigger'),
   'react-aria-components:Radio': kit('Radio'),

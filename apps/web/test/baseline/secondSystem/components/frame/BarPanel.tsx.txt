@@ -1,2 +1,0 @@
-apps/web/src/components/frame/BarPanel.tsx#@/components/ui/button:Button
-apps/web/src/components/frame/BarPanel.tsx#@/components/ui/button:LinkButton

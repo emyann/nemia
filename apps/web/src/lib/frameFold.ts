@@ -31,3 +31,27 @@ export const frameFold: FrameFoldOf = (at: FrameAt): FrameFold => {
   }
   return { rail: 'docked', pane: paneWide(at, wanted), sheet: wanted ? 'docked' : 'none', shows };
 };
+
+/** The cookie that keeps the person's fold of the factory pane, read when the frame first draws, as the sidebar's provider kept it. */
+const PANE_COOKIE = 'sidebar_state';
+
+/** How long the fold is kept, in seconds: a week. */
+const PANE_COOKIE_AGE = 60 * 60 * 24 * 7;
+
+/**
+ * Whether the person keeps the factory pane open, as `paneCookie` last kept its fold: folded only where a `sidebar_state=false` pair is
+ * kept, open for none.
+ * @param cookie The page's `document.cookie`.
+ */
+export function paneOpenOf(cookie: string): boolean {
+  return !cookie.split(';').some((pair) => pair.trim() === `${PANE_COOKIE}=false`);
+}
+
+/**
+ * The cookie that keeps the person's fold, for a week, across the whole board: written only when they fold or unfold the pane, never
+ * for the pane the sheet covers.
+ * @param open Whether they keep the pane open.
+ */
+export function paneCookie(open: boolean): string {
+  return `${PANE_COOKIE}=${open}; path=/; max-age=${PANE_COOKIE_AGE}`;
+}

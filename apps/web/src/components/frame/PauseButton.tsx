@@ -1,16 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CircleStop, Pause, Play } from 'lucide-react';
-import { Dialog, DialogTrigger, Form, Heading, Popover, TextField } from 'react-aria-components';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button, Popover, PopoverTrigger, TextField, Title } from '@/components/ui/ds';
 import { pauseNowQuery, pauseQuery, putPause, resumePause } from '@/lib/api/pause';
 import { interruptSentence, PAUSE_PARKS, type PauseState, type PauseWords, pauseWords } from '@/lib/pause';
 import { cn } from '@/lib/utils';
 import { useNow } from '@/lib/useNow';
 import type { Actor as ActorRead } from 'objects';
-import { POPOVER } from '../../lib/classes';
 import { Actor } from '../actor/Actor';
 import { Reading, ReadingLines } from '@/components/look';
 
@@ -28,10 +24,7 @@ type Asking = 'pause' | 'now' | null;
 /** The why of a pause, asked before it is put: optional, sent as given. */
 function WhyField({ why, setWhy }: { why: string; setWhy: (why: string) => void }) {
   return (
-    <TextField value={why} onChange={setWhy} maxLength={200} className="flex flex-col gap-1">
-      <Label className="text-body-small">Why (optional)</Label>
-      <Input data-pause-why placeholder="merging by hand on main" />
-    </TextField>
+    <TextField data-pause-why label="Why (optional)" placeholder="merging by hand on main" value={why} onChange={setWhy} maxLength={200} />
   );
 }
 
@@ -39,10 +32,10 @@ function WhyField({ why, setWhy }: { why: string; setWhy: (why: string) => void 
 function FormActions({ label, onClose, isPending }: { label: string; onClose: () => void; isPending: boolean }) {
   return (
     <div className="flex justify-end gap-2">
-      <Button type="button" variant="outline" size="sm" onPress={onClose} isDisabled={isPending}>
+      <Button type="button" variant="outlined" size="xsmall" onPress={onClose} isDisabled={isPending}>
         Cancel
       </Button>
-      <Button type="submit" size="sm" isDisabled={isPending}>
+      <Button type="submit" size="xsmall" isDisabled={isPending}>
         {label}
       </Button>
     </div>
@@ -56,7 +49,7 @@ function FormActions({ label, onClose, isPending }: { label: string; onClose: ()
 function WhyForm({ onPut, onClose, isPending }: { onPut: (why: string) => void; onClose: () => void; isPending: boolean }) {
   const [why, setWhy] = useState('');
   return (
-    <Form
+    <form
       className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault();
@@ -66,7 +59,7 @@ function WhyForm({ onPut, onClose, isPending }: { onPut: (why: string) => void; 
       <p className="text-body-small text-muted-foreground">Until they resume, in every factory: {PAUSE_PARKS}.</p>
       <WhyField why={why} setWhy={setWhy} />
       <FormActions label="Pause" onClose={onClose} isPending={isPending} />
-    </Form>
+    </form>
   );
 }
 
@@ -101,7 +94,7 @@ export function NowForm({
   const [why, setWhy] = useState('');
   const read = useQuery(pauseNowQuery);
   return (
-    <Form
+    <form
       className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault();
@@ -133,7 +126,7 @@ export function NowForm({
       )}
       {!standing && <WhyField why={why} setWhy={setWhy} />}
       <FormActions label="Stop now" onClose={onClose} isPending={isPending || !read.data} />
-    </Form>
+    </form>
   );
 }
 
@@ -178,30 +171,53 @@ function PauseFacts({
       <ul data-pause-actions className="flex flex-col gap-1">
         {words.state === 'running' && (
           <li>
-            <Button variant="outline" size="sm" className="w-full justify-start" onPress={() => onAsk('pause')}>
-              <Pause data-icon="inline-start" />
+            <Button variant="outlined" size="xsmall" icon={Pause} className="w-full justify-start" onPress={() => onAsk('pause')}>
               Pause…
             </Button>
           </li>
         )}
         {(words.state === 'running' || words.state === 'pausing') && (
           <li>
-            <Button variant="outline" size="sm" className="w-full justify-start" onPress={() => onAsk('now')}>
-              <CircleStop data-icon="inline-start" />
+            <Button variant="outlined" size="xsmall" icon={CircleStop} className="w-full justify-start" onPress={() => onAsk('now')}>
               Stop now…
             </Button>
           </li>
         )}
         {(words.state === 'pausing' || words.state === 'paused') && (
           <li>
-            <Button variant="outline" size="sm" className="w-full justify-start" onPress={onResume} isDisabled={isPending}>
-              <Play data-icon="inline-start" />
+            <Button variant="outlined" size="xsmall" icon={Play} className="w-full justify-start" onPress={onResume} isDisabled={isPending}>
               Resume
             </Button>
           </li>
         )}
       </ul>
     </>
+  );
+}
+
+/**
+ * What opens the pause's popover: the kit's text button, a play icon once all factories are paused and a pause icon else, and the
+ * pause's word beside it where it has one, its whole sentence on hover.
+ * @param words The pause in words (`pauseWords`).
+ * @param finishing How many tasks still finish under the pause, which the button carries for the e2e.
+ */
+function PauseTrigger({ words, finishing }: { words: PauseWords; finishing: number }) {
+  return (
+    <Button
+      variant="text"
+      size="xsmall"
+      icon={words.state === 'paused' ? Play : Pause}
+      aria-label={words.label}
+      data-pause={words.state}
+      data-finishing={finishing}
+      className="min-w-0 text-on-surface-variant"
+    >
+      {words.text && (
+        <span title={words.line} className="truncate">
+          {words.text}
+        </span>
+      )}
+    </Button>
   );
 }
 
@@ -234,7 +250,7 @@ export function PauseButton() {
   const words = pauseWords(read.data, read.error, now);
   const refused = act.error ?? read.error;
   return (
-    <DialogTrigger
+    <PopoverTrigger
       isOpen={open}
       onOpenChange={(opening) => {
         setOpen(opening);
@@ -243,54 +259,44 @@ export function PauseButton() {
         act.reset();
       }}
     >
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label={words.label}
-        data-pause={words.state}
-        data-finishing={read.data?.finishing.length ?? 0}
-        className="min-w-0 font-normal text-muted-foreground"
+      <PauseTrigger words={words} finishing={read.data?.finishing.length ?? 0} />
+      <Popover
+        aria-label="The pause of all factories"
+        data-pause-popover
+        placement="bottom end"
+        offset={6}
+        className="flex w-72 flex-col gap-2"
       >
-        {words.state === 'paused' ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
-        {words.text && (
-          <span title={words.line} className="truncate">
-            {words.text}
-          </span>
+        <Title size="small" component="h2">
+          {asking === 'pause' ? 'Pause all factories' : asking === 'now' ? 'Stop all factories now' : HEADINGS[words.state]}
+        </Title>
+        {asking === 'pause' && (
+          <WhyForm onPut={(why) => act.mutate({ why, now: false })} onClose={() => setAsking(null)} isPending={act.isPending} />
         )}
-      </Button>
-      <Popover placement="bottom end" offset={6} className={POPOVER}>
-        <Dialog aria-label="The pause of all factories" data-pause-popover className="flex flex-col gap-2 outline-none">
-          <Heading slot="title" className="font-medium">
-            {asking === 'pause' ? 'Pause all factories' : asking === 'now' ? 'Stop all factories now' : HEADINGS[words.state]}
-          </Heading>
-          {asking === 'pause' && (
-            <WhyForm onPut={(why) => act.mutate({ why, now: false })} onClose={() => setAsking(null)} isPending={act.isPending} />
-          )}
-          {asking === 'now' && (
-            <NowForm
-              standing={words.state !== 'running'}
-              onPut={(why) => act.mutate({ why, now: true })}
-              onClose={() => setAsking(null)}
-              isPending={act.isPending}
-            />
-          )}
-          {asking === null && (
-            <PauseFacts
-              words={words}
-              unread={words.state === 'reading' && !read.error}
-              actor={read.data?.pause?.actor}
-              onAsk={setAsking}
-              onResume={() => act.mutate(null)}
-              isPending={act.isPending}
-            />
-          )}
-          {refused && (
-            <p role="alert" data-pause-refused className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">
-              {refused.message}
-            </p>
-          )}
-        </Dialog>
+        {asking === 'now' && (
+          <NowForm
+            standing={words.state !== 'running'}
+            onPut={(why) => act.mutate({ why, now: true })}
+            onClose={() => setAsking(null)}
+            isPending={act.isPending}
+          />
+        )}
+        {asking === null && (
+          <PauseFacts
+            words={words}
+            unread={words.state === 'reading' && !read.error}
+            actor={read.data?.pause?.actor}
+            onAsk={setAsking}
+            onResume={() => act.mutate(null)}
+            isPending={act.isPending}
+          />
+        )}
+        {refused && (
+          <p role="alert" data-pause-refused className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">
+            {refused.message}
+          </p>
+        )}
       </Popover>
-    </DialogTrigger>
+    </PopoverTrigger>
   );
 }

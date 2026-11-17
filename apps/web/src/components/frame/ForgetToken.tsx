@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { signOut } from '@/lib/api/session';
 
 /** Reloads the page, where every read is made again with no token, and a Nemia that asks for one shows the token page. */
@@ -20,7 +20,7 @@ export function ForgetToken() {
         it to leave this browser sending none: the token itself stays the store's until it is retired, on the Tokens tab or at its machine.
       </p>
       <div>
-        <Button variant="outline" data-forget-token-press isDisabled={forget.isPending} onPress={() => forget.mutate()}>
+        <Button variant="outlined" data-forget-token-press isDisabled={forget.isPending} onPress={() => forget.mutate()}>
           Forget this browser's token
         </Button>
       </div>

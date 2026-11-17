@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link as AriaLink } from 'react-aria-components';
-import { ListItem } from '@/components/ui/ds';
+import { Link, ListItem } from '@/components/ui/ds';
 import { factoriesQuery } from '@/lib/api/factories';
 import { inboxQuery } from '@/lib/api/inbox';
 import { waitingProposalsQuery } from '@/lib/api/proposals';
@@ -31,7 +30,7 @@ function usePlaceLines(path: string, factory: string): Partial<Record<PanePlace,
 }
 
 /**
- * The places of `factory`'s pane, each a link to its page under the factory's path (`placeHref`), which the root's `RouterProvider`
+ * The places of `factory`'s pane, each the kit's link to its page under the factory's path (`placeHref`), which the root's `RouterProvider`
  * navigates, the one the page sits at (`lit`)
  * selected, on `secondary-container`, and said current to a screen reader; a place pressed calls `onPicked`, which closes a drawer.
  */
@@ -40,13 +39,15 @@ function PanePlaces({ path, factory, lit, onPicked }: { path: string; factory: s
   return (
     <nav aria-label={`${factory}'s places`} className="flex flex-col gap-0.5">
       {PANE_PLACES.map((place) => (
-        <AriaLink
+        <Link
           key={place.id}
           href={placeHref(place.id, factory)}
           data-pane-place={place.id}
           onPress={onPicked}
           aria-current={place.id === lit ? 'page' : undefined}
-          className="block rounded-shape-full outline-none data-focus-visible:ring-2 data-focus-visible:ring-ring/50"
+          color="inherit"
+          underline="hover"
+          className="block rounded-shape-full data-focus-visible:no-underline data-hovered:no-underline"
         >
           <ListItem
             headline={<span className="text-body-large">{place.label}</span>}
@@ -56,7 +57,7 @@ function PanePlaces({ path, factory, lit, onPicked }: { path: string; factory: s
               place.id === lit ? 'bg-secondary-container text-on-secondary-container' : 'hover:bg-surface-container-high',
             )}
           />
-        </AriaLink>
+        </Link>
       ))}
     </nav>
   );

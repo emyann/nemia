@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react';
-import { Button, Popover, PopoverTrigger, Radio, RadioGroup, TextField, Title } from '@/components/ui/ds';
+import { useRef, useState } from 'react';
+import { Button, Popover, Radio, RadioGroup, SplitButton, TextField, Title } from '@/components/ui/ds';
 import { barValue } from '../../lib/bar';
 import { backName, endingWarning, gateCardLine, readLink, takenLine, type GateAsk } from '../../lib/gate';
 import { RouteLink } from '../agent/AgentParts';
@@ -13,16 +13,20 @@ import type { RunAt } from '@/lib/runNamespace';
  */
 export type Taken = { said: string; stamp: string; next?: string };
 
+/** Which of the gate's forms is open over the card, from its menu: the approval with words, or the send-back. */
+type Asked = 'approve' | 'send';
+
 /**
  * A gate on the Factory's card: what approving does and where a send-back goes, in one row whatever the names (`gateCardLine`), since a
  * card taller than its cell reaches over the card beneath it (`CELL_HEIGHT`) — cut short where the names are long and whole on hover and in
- * the inspector; a link to what is being approved, a page away, since a card has no room for a plan; and the answer beside it — Approve
- * and Send back, each a popover over the card, through the same api as the run page's gate (`useApprove`, `useAsk`). The popover is the
- * second press: nothing is sent by the button on the card. At an ending the approval's button says what it runs (`Run ship now`), and a
- * send-back needs words, as the CLI's `retry --message` does. A refusal shows in the popover in the api's words, the words kept in the box.
+ * the inspector; a link to what is being approved, a page away, since a card has no room for a plan; and the answer beside it — the kit's
+ * `SplitButton`, through the same api as the run page's gate (`useApprove`, `useAsk`). Its main press approves, with no words, as `nemia
+ * approve` does; its menu holds Approve with words… and Send back…, each opening its form in a popover over the card. At an ending the
+ * form's approval says what it runs (`Run ship now`), and a send-back needs words, as the CLI's `retry --message` does. A refusal shows in
+ * the popover in the api's words, the words kept in the box: one of the main press opens the approval's form to say it.
  *
- * Clicks inside are the card's own: they neither toggle the card's steps nor drag it (`nodrag`), and the popovers, which React draws
- * outside the card, bubble through it as React does, so the stop is on the wrapper.
+ * Clicks inside are the card's own: they neither toggle the card's steps nor drag it (`nodrag`), and the menu and the popovers, which React
+ * draws outside the card, bubble through it as React does, so the stop is on the wrapper.
  */
 export function CardGate({
   run,
@@ -43,6 +47,18 @@ export function CardGate({
   const sendBack = useAsk(run.id, gate.step, () => undefined, run.namespace);
   const line = gateCardLine(gate);
   const read = readLink(gate);
+  const anchor = useRef<HTMLDivElement>(null);
+  const [asked, setAsked] = useState<Asked | null>(null);
+  const close = () => setAsked(null);
+  const backTo = gate.ends ? backName(gate.back) : gate.step;
+  const approve = (words: string) =>
+    approval.mutate(words.trim() ? { message: words } : {}, {
+      onSuccess: () => {
+        close();
+        onTaken({ said: takenLine({ approved: true }, gate), stamp });
+      },
+      onError: () => setAsked('approve'),
+    });
 
   return (
     <div
@@ -60,49 +76,62 @@ export function CardGate({
         {line}
       </p>
       <div className="flex items-center gap-1.5">
-        <Answer label="Approve" name={`Approve ${gate.step}`} primary>
-          {(close) => (
+        <div ref={anchor} data-gate-answer={gate.step}>
+          <SplitButton
+            size="xsmall"
+            onPress={() => approve('')}
+            isDisabled={approval.isPending || sendBack.isPending}
+            menuLabel={`Other answers to ${gate.step}`}
+            items={[
+              { id: 'approve', label: 'Approve with words…', onAction: () => setAsked('approve') },
+              ...(gate.back.length > 0 ? [{ id: 'send', label: 'Send back…', onAction: () => setAsked('send') }] : []),
+            ]}
+          >
+            {approval.isPending ? 'Approving…' : 'Approve'}
+          </SplitButton>
+        </div>
+        <Popover
+          triggerRef={anchor}
+          isOpen={asked !== null}
+          onOpenChange={(open) => {
+            if (!open) close();
+          }}
+          aria-label={asked === 'send' ? `Send ${backTo} back` : `Approve ${gate.step}`}
+          placement="bottom start"
+          offset={6}
+          className="w-80"
+        >
+          {asked === 'approve' && (
             <ApproveForm
               gate={gate}
               pending={approval.isPending}
               error={approval.isError ? approval.error : null}
               onCancel={close}
-              onApprove={(words) =>
-                approval.mutate(words.trim() ? { message: words } : {}, {
-                  onSuccess: () => {
-                    close();
-                    onTaken({ said: takenLine({ approved: true }, gate), stamp });
+              onApprove={approve}
+            />
+          )}
+          {asked === 'send' && (
+            <SendBackForm
+              gate={gate}
+              to={to}
+              onTo={setTo}
+              pending={sendBack.isPending}
+              error={sendBack.isError ? sendBack.error : null}
+              onCancel={close}
+              onSend={(message) =>
+                sendBack.mutate(
+                  { mode: 'continue', message, step: to },
+                  {
+                    onSuccess: (sent) => {
+                      close();
+                      onTaken({ said: takenLine({ asked: sent, to }, gate), stamp });
+                    },
                   },
-                })
+                )
               }
             />
           )}
-        </Answer>
-        {gate.back.length > 0 && (
-          <Answer label="Send back" name={`Send ${gate.ends ? backName(gate.back) : gate.step} back`}>
-            {(close) => (
-              <SendBackForm
-                gate={gate}
-                to={to}
-                onTo={setTo}
-                pending={sendBack.isPending}
-                error={sendBack.isError ? sendBack.error : null}
-                onCancel={close}
-                onSend={(message) =>
-                  sendBack.mutate(
-                    { mode: 'continue', message, step: to },
-                    {
-                      onSuccess: (asked) => {
-                        close();
-                        onTaken({ said: takenLine({ asked, to }, gate), stamp });
-                      },
-                    },
-                  )
-                }
-              />
-            )}
-          </Answer>
-        )}
+        </Popover>
         <RouteLink
           to="/runs/$runId"
           params={{ runId: run.id }}
@@ -114,30 +143,6 @@ export function CardGate({
         </RouteLink>
       </div>
     </div>
-  );
-}
-
-/** A button on the card that opens its popover, where the answer is given: its dialog is named for what it does (`Approve ship`). */
-function Answer({
-  label,
-  name,
-  primary = false,
-  children,
-}: {
-  label: string;
-  name: string;
-  primary?: boolean;
-  children: (close: () => void) => ReactNode;
-}) {
-  return (
-    <PopoverTrigger>
-      <Button data-answer={label} variant={primary ? 'filled' : 'outlined'} size="xsmall">
-        {primary ? label : `${label}…`}
-      </Button>
-      <Popover aria-label={name} placement="bottom start" offset={6} className="w-80">
-        {({ close }) => <>{children(close)}</>}
-      </Popover>
-    </PopoverTrigger>
   );
 }
 

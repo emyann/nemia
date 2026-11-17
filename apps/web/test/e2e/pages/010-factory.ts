@@ -353,7 +353,10 @@ export default {
       `its card says what approving its ending does and where a send-back goes, the folder's words on hover`,
     );
     await expectVisible(ending.getByRole('button', { name: 'Approve', exact: true }), 'and answers it on the card: Approve');
-    await expectVisible(ending.getByRole('button', { name: 'Send back…', exact: true }), 'and Send back…');
+    await expectVisible(
+      ending.getByRole('button', { name: `Other answers to ${ENDING.ending}`, exact: true }),
+      'and the menu of its other answers, Approve with words… and Send back…',
+    );
     await expectVisible(ending.getByText('to decide', { exact: true }), 'and is marked to decide');
     await expectVisible(
       ending.locator(

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, openFold, partOf, photograph, themeOf } from '../board.ts';
-import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard, wordsSaying } from '../canvas.ts';
+import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard, wordsSaying, gateApprove } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { DIAMOND, GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -32,7 +32,7 @@ export default {
     await settled(page);
     const card = cardOf(page, id);
     const edge = holdEdgeOf(page, until, id);
-    await expectVisible(card.locator('[data-answer="Approve"]'), `before the hold, ${id}'s card offers ${gated}'s gate`);
+    await expectVisible(gateApprove(card), `before the hold, ${id}'s card offers ${gated}'s gate`);
     await expectCount(edge, 0, 'and no hold edge comes into it');
 
     try {
@@ -45,7 +45,7 @@ export default {
       const title = await said.getAttribute('title');
       if (title !== `${word}\n${advice}`)
         throw new Refused(`the card's hold says itself whole and how to lift it on hover — it says ${JSON.stringify(title)}`);
-      await expectCount(card.locator('[data-answer="Approve"]'), 0, 'and offers no Approve: the package refuses it on a held run');
+      await expectCount(gateApprove(card), 0, 'and offers no Approve: the package refuses it on a held run');
       await expectCount(card.locator(`[data-gate-line="${gated}"]`), 0, 'nor says what approving would do');
       await expectCount(card.getByText('waiting on you', { exact: true }), 0, 'and does not say it waits on you');
       await expectVisible(card.getByText('held', { exact: true }), 'its badge says held');
@@ -95,7 +95,7 @@ export default {
     await expectVisible(partOf(page, gated).getByRole('button', { name: 'Approve', exact: true }), `and offers ${gated}'s Approve again`);
     await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);
-    await expectVisible(card.locator('[data-answer="Approve"]'), `and on the Factory, ${id}'s card offers its gate again`);
+    await expectVisible(gateApprove(card), `and on the Factory, ${id}'s card offers its gate again`);
     await expectCount(wordsSaying(card, word), 0, 'and says no hold');
     await expectCount(edge, 0, 'and no hold edge comes into it');
     await heldWithWords(page);

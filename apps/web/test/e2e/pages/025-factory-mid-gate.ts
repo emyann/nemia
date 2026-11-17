@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Response } from 'playwright';
 import { fed, photograph, themeOf, stepBar, isRunAction } from '../board.ts';
-import { cardOf, expectClearOfEachOther, expectClearOfPanels } from '../canvas.ts';
+import { cardOf, expectClearOfEachOther, expectClearOfPanels, gateApprove } from '../canvas.ts';
 import { expectCount, expectOnScreen, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -14,7 +14,7 @@ export default {
    * result, and it waits on a person all the same — so its card stays, says what it asks, and takes the answer. The card links to what is
    * being approved, in its answer row, which grows it no taller: pressed, the run's page opens on plan's inspector, its part whole, with
    * the plan's approach in what it gave, and the page goes back to the floor. The card is approved where it is, a press a person can make
-   * clear of the legend, then the popover's. The approval is written, then taken back, so every page after reads the store as seeded.
+   * clear of the legend: its gate's Approve, which approves with no words. The approval is written, then taken back, so every page after reads the store as seeded.
    */
   name: 'factory-mid-gate',
   route: '/factories/default',
@@ -64,19 +64,10 @@ export default {
     await photograph(page, path.join(OUT, `factory-mid-gate-read-${await themeOf(page)}.png`));
     await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);
-    await expectVisible(card.locator('[data-answer="Approve"]'), 'back on the floor, the card at its gate again');
+    await expectVisible(gateApprove(card), 'back on the floor, the card at its gate again');
 
     try {
-      await card.locator('[data-answer="Approve"]').click();
-      const approval = page.getByRole('dialog', { name: `Approve ${gated}` });
-      await expectVisible(
-        approval.getByText(`What waits on ${gated} is filed next, handed what it handed on.`),
-        'the popover says what approving files',
-      );
-      const [response] = await Promise.all([
-        page.waitForResponse(approved, { timeout: WAIT_MS }),
-        approval.getByRole('button', { name: 'Approve', exact: true }).click(),
-      ]);
+      const [response] = await Promise.all([page.waitForResponse(approved, { timeout: WAIT_MS }), gateApprove(card).click()]);
       if (response.status() !== 202)
         throw new Refused(`the api takes the approval — it answered ${response.status()}: ${await response.text()}`);
       const file = path.join(asks, `approve-${gated}-1`);
@@ -94,9 +85,6 @@ export default {
       fs.rmSync(asks, { recursive: true, force: true });
       fed(id, gated, 'awaiting approval');
     }
-    await expectVisible(
-      card.locator('[data-answer="Approve"]'),
-      'with the approval taken back, the card offers the gate again, and the page ends as it began',
-    );
+    await expectVisible(gateApprove(card), 'with the approval taken back, the card offers the gate again, and the page ends as it began');
   },
 } satisfies PageSpec;

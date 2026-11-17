@@ -1,0 +1,12 @@
+apps/web/src/components/look/CutFrame.stories.tsx#Yours
+apps/web/src/components/look/CutFrame.stories.tsx#Alive
+apps/web/src/components/look/CutFrame.stories.tsx#Quiet
+apps/web/src/components/look/CutFrame.stories.tsx#SmallCut
+apps/web/src/components/look/CutFrame.stories.tsx#OnThePage
+apps/web/src/components/look/CutFrame.stories.tsx#OnAnotherGround
+apps/web/src/components/look/CutFrame.stories.tsx#LinkInTheCutCorner
+apps/web/src/components/look/CutFrame.stories.tsx#TableOfOneRow
+apps/web/src/components/look/CutFrame.stories.tsx#TableOfSeveralRows
+apps/web/src/components/look/CutFrame.stories.tsx#TableNarrowerThanItsColumns
+apps/web/src/components/look/CutFrame.stories.tsx#Failure
+apps/web/src/components/look/CutFrame.stories.tsx#Filled

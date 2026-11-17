@@ -1,0 +1,4 @@
+apps/web/src/components/step/Enough.tsx#<textarea>
+apps/web/src/components/step/Enough.tsx#<button>
+apps/web/src/components/step/Enough.tsx#@/lib/classes:BUTTON
+apps/web/src/components/step/Enough.tsx#@/lib/classes:TEXTAREA

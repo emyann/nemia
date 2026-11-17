@@ -1,0 +1,3 @@
+apps/web/src/components/factory/FactoryTrust.tsx#@/components/ui/alert:Alert
+apps/web/src/components/factory/FactoryTrust.tsx#@/components/ui/alert:AlertDescription
+apps/web/src/components/factory/FactoryTrust.tsx#@/components/ui/alert:AlertTitle

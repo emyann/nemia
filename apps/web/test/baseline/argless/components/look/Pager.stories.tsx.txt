@@ -1,0 +1,2 @@
+apps/web/src/components/look/Pager.stories.tsx#OnTheFirstPage
+apps/web/src/components/look/Pager.stories.tsx#OnTheLastPage

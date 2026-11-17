@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { http, HttpResponse } from 'msw';
 import type { Run as RunObject } from 'objects';
 import { Column, Table, TableBody, TableHeader } from '@/components/ui/ds';
 import { runViewOf, type RunView } from '@/lib/api/judged';
@@ -27,8 +28,20 @@ const AT_WORK = listed(TARGET_RUNS['1sw7']);
 /** A run a person holds, whose hold may be lifted. */
 const HELD = listed(TARGET_RUNS.c7un);
 
+/** The run that offers every action: a try, called off, still held, with its files on disk and its worktrees gone. */
+const OVER: ListedRun = {
+  ...listed(TARGET_RUNS.x57v),
+  holding: HELD.holding,
+  try: { agent: 'coder' },
+  status: 'cancelled',
+  cancelledAt: '2026-11-15T17:40:00.000Z',
+  place: 'git',
+  moving: false,
+  onDisk: { worktrees: false, files: true },
+};
+
 /** Every run the stories draw. */
-const RUNS = [AT_WORK, HELD];
+const RUNS = [AT_WORK, HELD, OVER];
 
 const BOARD: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 24, padding: 32, minHeight: 520 };
 
@@ -91,7 +104,7 @@ async function entriesOf(): Promise<string[]> {
 const meta: Meta<typeof Rows> = {
   title: 'Run/RunActions',
   component: Rows,
-  args: { runs: RUNS },
+  args: { runs: [AT_WORK, HELD] },
 };
 export default meta;
 
@@ -150,5 +163,59 @@ export const OnACard: StoryObj<typeof meta> = {
     await expect(await entriesOf(), 'a finger resting on the card opens its menu').toEqual(['Hold…']);
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(within(document.body).queryByRole('menu')).toBeNull());
+  },
+};
+
+/** Where the story's router stands, as the ground says it. */
+const standing = (canvasElement: HTMLElement) => canvasElement.closest('[data-story-ground]')?.getAttribute('data-at') ?? '';
+
+/**
+ * A row that offers every action, in the list's order. Prune its files… asks the prune's own question, and Close closes it. Remove…
+ * asks its second press, and Keep it closes it; pressed through, the try is removed and the popover closes, and the list stays where it
+ * is rather than going to Runs, as the run's own page does.
+ */
+export const EveryAction: StoryObj<typeof meta> = {
+  args: { runs: [OVER] },
+  parameters: {
+    msw: [
+      http.get('/api/runs/:name', () => HttpResponse.json(TARGET_RUNS.x57v)),
+      http.delete('/api/namespaces/:namespace/runs/:name', ({ params }) =>
+        HttpResponse.json({ id: String(params.name), removed: true, engine: null }),
+      ),
+    ],
+  },
+  render: (args) => (
+    <div style={BOARD}>
+      <Rows {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const row = canvasElement.querySelector(`[role="row"][data-run="${OVER.id}"]`) as HTMLElement;
+    const body = within(document.body);
+    const press = async (entry: string) => {
+      await menuKey(userEvent, row);
+      await expect(await entriesOf(), 'every action, in the order of the run page').toEqual(['Remove…', 'Lift…', 'Prune its files…']);
+      await userEvent.click(body.getByRole('menuitem', { name: entry }));
+    };
+    await userEvent.tab();
+
+    await press('Prune its files…');
+    const prune = await waitFor(() => body.getByRole('dialog', { name: `Prune ${OVER.id}` }));
+    await expect(within(prune).getByRole('radiogroup', { name: 'What to give back' })).toBeVisible();
+    await userEvent.click(within(prune).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+
+    await press('Remove…');
+    const asked = await waitFor(() => body.getByRole('dialog', { name: `Remove ${OVER.id}` }));
+    await expect(within(asked).getByText('Remove this try, its record and its folders?', { exact: false })).toBeVisible();
+    await userEvent.click(within(asked).getByRole('button', { name: 'Keep it' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+
+    const before = standing(canvasElement);
+    await press('Remove…');
+    const removing = await waitFor(() => body.getByRole('dialog', { name: `Remove ${OVER.id}` }));
+    await userEvent.click(within(removing).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    await expect(standing(canvasElement), 'removed from a list, the story stays where it was').toBe(before);
   },
 };

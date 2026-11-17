@@ -88,3 +88,42 @@ export const labelFootnotes =
     };
     walk(tree);
   };
+
+/** A node of the drawn tree as its headings are found in it: an element's tag and properties. */
+type HeadingNode = { type: string; tagName?: string; properties?: Record<string, unknown>; children?: HeadingNode[] };
+
+/** The depth a heading element was written at, from its tag: 0 for any other node. */
+const depthOf = (node: HeadingNode): number =>
+  node.type === 'element' && /^h[1-6]$/.test(node.tagName ?? '') ? Number(node.tagName!.slice(1)) : 0;
+
+/**
+ * Each heading of a text placed on the page: drawn `level` down it from the text's `#`, or from its shallowest heading where `top`, deeper
+ * ones following and none past h6, and given the class of the size it was written at. The footnotes' own heading, which the pipeline
+ * writes and a person never sees, is placed with the rest and sets no depth. A rehype plugin's transform.
+ * @param level The heading the text's `#`, or with `top` its shallowest heading, is drawn as.
+ * @param top Whether the shallowest heading the text writes, rather than its `#`, stands at `level`.
+ * @param sized The class a heading written at a depth is drawn with.
+ */
+export const placeHeadings =
+  (level: number, top: boolean, sized: (depth: number) => string) =>
+  (tree: HeadingNode): void => {
+    const headings: HeadingNode[] = [];
+    const walk = (node: HeadingNode) => {
+      if (depthOf(node)) headings.push(node);
+      for (const child of node.children ?? []) walk(child);
+    };
+    walk(tree);
+    const written = headings
+      .filter((node) => !(typeof node.properties?.id === 'string' && node.properties.id.endsWith(FOOTNOTE_LABEL)))
+      .map(depthOf);
+    const from = top && written.length ? Math.min(...written) : 1;
+    for (const node of headings) {
+      const depth = depthOf(node);
+      const own = node.properties?.className;
+      node.tagName = `h${Math.min(Math.max(level + depth - from, 1), 6)}`;
+      node.properties = {
+        ...node.properties,
+        className: [...(Array.isArray(own) ? own : own ? [own] : []), ...sized(depth).split(' ').filter(Boolean)],
+      };
+    }
+  };

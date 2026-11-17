@@ -5,6 +5,7 @@ import type { WorkflowStepPage as StepRead } from 'objects';
 import { storeQuery } from '@/lib/api/store';
 import { stepQuery } from '@/lib/api/workflows';
 import { WorkflowStepPage } from './WorkflowStepPage';
+import { skippedHeadings } from '../../../.storybook/play';
 import { yourStore } from '../../../.storybook/fixtures/agents';
 import { FACTORY, seeded } from '../../../.storybook/fixtures/proposals';
 
@@ -24,11 +25,11 @@ const REVIEW: StepRead = {
   factory: FACTORY,
   layers: {
     agent: 'You review a change.',
-    instructions: null,
-    custom: null,
+    instructions: '## Your role\n\nYou read a change.\n\n### What you refuse\n\nA weakened test.',
+    custom: '### Mine\n\nBe terse.',
     factory: null,
     agentSkills: [],
-    policy: 'Read the change against its plan.',
+    policy: '### true — on GitHub\n\nRead the change against its plan.\n\n#### Either way\n\nSay why.',
     addedSkills: [],
     fence: [],
     folderFiles: false,
@@ -50,11 +51,9 @@ const PLACE = { factory: FACTORY };
  * run of it will be told, and its file. Its reads are seeded under the keys the page asks them by (`stepQuery`, and `storeQuery` for
  * your workflows' folder), so it asks the network nothing.
  *
- * Two of axe's rules are off. `label-content-name-mismatch`, for the hire's picker (`StepHire`): the ds kit's `Select` draws its
+ * One of axe's rules is off, `label-content-name-mismatch`, for the hire's picker (`StepHire`): the ds kit's `Select` draws its
  * value before its floating label inside its trigger, while React Aria names the trigger label first, so a populated kit select fails it
- * wherever it is drawn, which is the kit's to mend, upstream. And `heading-order`: what a run will be told (`Told`) heads each layer
- * `h4`, as the run's bar nests it, and this page draws it under its `h1` with nothing between, a debt of the page's own this story found.
- * Every other rule holds the page.
+ * wherever it is drawn, which is the kit's to mend, upstream. Every other rule holds the page.
  */
 const meta: Meta<typeof WorkflowStepPage> = {
   title: 'Pages/WorkflowStepPage',
@@ -63,10 +62,7 @@ const meta: Meta<typeof WorkflowStepPage> = {
   parameters: {
     a11y: {
       config: {
-        rules: [
-          { id: 'label-content-name-mismatch', enabled: false },
-          { id: 'heading-order', enabled: false },
-        ],
+        rules: [{ id: 'label-content-name-mismatch', enabled: false }],
       },
     },
   },
@@ -102,5 +98,19 @@ export const InAFactory: Story = {
         `/factories/${FACTORY}/workflows/repo/build`,
       ),
     );
+  },
+};
+
+/**
+ * What a run of the step will be told, its agent's words opened: each layer an h2 straight under the page's h1, the words of each an h3
+ * whatever depth they write their headings at, so axe's `heading-order` holds the page.
+ */
+export const ToldInOrder: Story = {
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByText('Read them'));
+    const fold = canvasElement.querySelector('[data-will-be-told]')!;
+    await expect(fold.querySelector('[data-layer="policy"] h2')?.textContent, 'each layer an h2').toBe("5. The step's policy");
+    await expect(fold.querySelector('[data-layer="instructions"] [data-markdown] h3')?.textContent, 'its `##` one under').toBe('Your role');
+    await expect(skippedHeadings(canvasElement), 'no level skipped').toEqual([]);
   },
 };

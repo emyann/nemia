@@ -233,3 +233,29 @@ export const measured = (step: StepView): StepView => ({
   spent: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
   budget: { usd: 5, said: '$5', of: '$1.25 of $5', over: false },
 });
+
+/**
+ * `step` told in layers whose words write their headings at every depth a step's file does — a `##`, a `###` straight under the layer,
+ * a `#` — and its task in parts, a run it waited on among them: what `Told` draws on its detail, opened.
+ */
+export const toldInLayers = (step: StepView): StepView => ({
+  ...step,
+  told: null,
+  layers: {
+    agent: 'designer',
+    instructions: '## Your role\n\nYou design the change.\n\n### What you refuse\n\nA spec with no test.',
+    custom: '### Mine\n\nBe terse.',
+    factory: '# The rules\n\n## Git\n\nNever push.',
+    agentSkills: [],
+    policy: '### true — on GitHub\n\nOpen the pull request.\n\n#### Either way\n\nMerge the base.',
+    addedSkills: [],
+    fence: [],
+    folderFiles: true,
+    task: null,
+    via: 'prompt',
+  },
+  taskParts: [
+    { kind: 'text', text: '## What was asked for\n\nA flag.' },
+    { kind: 'from', run: 'r-0', asked: 'Build the cache.', body: '### Its work\n\nIt built the cache.', how: 'waited' },
+  ],
+});

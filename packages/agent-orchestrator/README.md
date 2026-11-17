@@ -1207,6 +1207,9 @@ it is between two engineers. A later step is told:
   concluded, under `## From run <id>` (below)
 - after a gate a person approved: the approval and the words given with it, under `## Approved`
   ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve))
+- before a gate: each step after it at which the run waits on a person's approval, its workflow's `gate: true` and the run's own
+  `--gate` or card's `gate:` alike, under `## Gates after you` (`gatesAfterSection`), since its note was written before anyone
+  chose the run's gates
 - after a step a person sent back with an answer (`wf retry --message`): each answer, its step, try and time,
   fenced as data, under `## Answered`, in the order given; the answered step itself reads its own as `## Your answer`
 
@@ -4635,7 +4638,7 @@ holding a concurrency slot forever.
 | `src/decide/decide.ts` | what is left for a person to do about a run (`decision`), and the cost lines `wf decide` prints (`costLine`, `runCostLines`, `runCostWords`) — pure |
 | `src/list/list.ts` | what `wf ls` shows of a run and its steps (`listing`), and the words it and the board say of a wait (`waitingWords`, `harnessWaitLine`, `deniedWords`, `onYouWords`) — pure |
 | `src/brief/brief.ts` | what a step is told — pure: its brief (`composeBrief`), or on a remote agent its remote brief (`remoteBrief`), with what the runs it waited on concluded (`ParentCloseout`) |
-| `src/brief/brief-sections.ts` | the sections of a brief — pure: `## From <step>`, `## From run <id>`, `## Approved`, `## Try <n>` and `## Round <n> of <N>` (`fromSection`, `approvedSection`, `retrySection`, `roundSection`, `loopSection`), and the lines `wf decide` prints of a gate and an accepted loop (`gateLines`, `acceptedLines`) |
+| `src/brief/brief-sections.ts` | the sections of a brief — pure: `## From <step>`, `## From run <id>`, `## Approved`, `## Gates after you`, `## Try <n>` and `## Round <n> of <N>` (`fromSection`, `approvedSection`, `gatesAfterSection`, `retrySection`, `roundSection`, `loopSection`), and the lines `wf decide` prints of a gate and an accepted loop (`gateLines`, `acceptedLines`) |
 | `src/brief/handed.ts` | what a run is handed of another — pure: its `## From run <id>` section, labelled waited on, or read as context landed or not landed, not judged (`handedSection`, `contextSection`), and a task split into its parts (`handedParts`) |
 | `src/brief/handed.verb.ts` | what a run's roots are handed of other runs, read off their records and the engine (`parentCloseouts`, `handedOf`) |
 | `src/record/record.ts` | a run's record, as data — pure: its shape (`Run`, `RepositoryRun`, `FolderRun`, `placeOf`), the facts a person files beside it (`Hold`, `Approval`, `Acceptance`, `Pruned`), a step's status words and its own record (`StepStatus`, `StepRecord`, `refusedCheck`), the task ids a run files (`stepTaskId`, `checkTaskId`, `stepTasks`, `runTasks`), the try a step is on (`tryOf`), why a run is left unjudged (`unjudgedWords`), and the small words the run's judgement shares (`andList`, `fenced`, `oneLine`); `record.store.ts` reads and writes it |

@@ -7,7 +7,8 @@
  * in the checkout by default, where the local check judges each round and the merged tree; a `github` that is no boolean is refused at
  * apply. Each step that writes its own `output:` has its schema beside it in the tree, the template's own bytes; the team is six
  * agents, Ada none of them. Applied with no `--set`, each parameter takes its default. Build's design, read with its agent as a run
- * reads it, declares the budgets of the later steps by their shape.
+ * reads it, declares the budgets of the later steps by their shape. Quick's review note says both cases of its land, gated or not, and
+ * the brief the orchestrator composes for it names the gate under the heading the note reads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +18,7 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { FACTORY_APPLY, loadWorkflows } from 'agent-orchestrator';
 import { parseAgent, parseFolder, parseWorkflow, splitFrontmatter } from 'agent-orchestrator/workflow';
-import { assess } from 'agent-orchestrator/run';
+import { assess, composeBrief } from 'agent-orchestrator/run';
 import { PERSONS_EXIT } from '../sdlc/carried/exec.ts';
 import { scratch } from 'test-kit/scratch';
 import { copyOf, filesUnder, handled, nemia, rendered, SDLC, storeEnv } from './template.ts';
@@ -606,4 +607,50 @@ test("build's and quick's review weigh a moved base alike, by the reads that say
   assert.equal(baseParagraph('quick'), build, "quick's paragraph on the base is build's");
   for (const read of ['git diff -U0', 'git merge-tree --write-tree', 'mergeable'])
     assert.ok(build.includes(read), `the paragraph names ${read}`);
+});
+
+/** The heading under which a step's brief names the gates after it (`gatesAfterSection`), as quick's review note names it. */
+const GATES_AFTER = '## Gates after you';
+
+/** Quick's review brief, composed by the orchestrator as a run composes it, on a run started with the gates `gates`. */
+const quickReviewBrief = (gates: string[]): string => {
+  const steps = [
+    { name: 'implement', after: [], body: 'build it' },
+    { name: 'review', after: ['implement'], body: 'judge it' },
+    { name: 'land', after: ['review'], body: 'land it' },
+  ];
+  const run: Parameters<typeof composeBrief>[1] = {
+    id: 'r-1',
+    repo: '/repo',
+    workspace: '/wt',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'a card',
+    workflowDir: '/wf',
+    createdAt: '2026-01-01T00:00:00Z',
+    steps: { implement: { taskId: 't-implement' }, review: { taskId: 't-review' }, land: { taskId: null } },
+    gates,
+  };
+  return composeBrief(steps[1] as (typeof steps)[number], run, steps);
+};
+
+test("quick's review note says both cases of its land, and the run tells review which by the heading the note names", async (t) => {
+  for (const name of ['set', 'plain'])
+    await t.test(`rendered ${name === 'set' ? 'on GitHub' : 'in the checkout'}`, () => {
+      const note = stepIn(treeOf(name), 'quick', 'review').body;
+      assert.ok(note.includes(`With no \`${GATES_AFTER}\`, your pass lands the change`), 'the case with no gate: the pass lands');
+      assert.ok(note.includes('With `land` named there, a person approves the land after your pass'), 'the case with land gated');
+      assert.ok(note.includes('no reason to sign off `blocked`'), 'a card that waits on the person at its land is met by the gate');
+      assert.ok(!/^\*\*Your pass lands the change\.\*\*/m.test(note), 'no paragraph says the pass lands, whatever the gates');
+    });
+  await t.test('a run started with `--gate land` tells review so under that heading, naming land', () => {
+    const gated = quickReviewBrief(['land']);
+    const section = gated.slice(gated.indexOf(GATES_AFTER));
+    assert.ok(gated.includes(GATES_AFTER), 'the heading is in the gated brief');
+    assert.ok(section.split('\n\n')[1]?.includes('`land`'), 'and names land');
+  });
+  await t.test('a run with no gate tells review nothing of one', () => {
+    assert.equal(quickReviewBrief([]).includes(GATES_AFTER), false);
+  });
 });

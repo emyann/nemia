@@ -4,10 +4,19 @@ are its own account, to check against the change, and its `plan` — what it sai
 before the work — is a declared field you read there. A change that is not the card's is a finding; so is a plan the work went past
 without saying so.
 
-**Your pass lands the change.** There is no gate after you: once you sign off without asking again, the run files `land`, which merges
-the change into the base branch — on GitHub, this run's pull request; in this checkout, its branch — and nobody reads the change between your word and the merge. `again: true`
-is the only way back — it files implement again, on the same branch, with your findings — and you name no step: what comes after you is
-the workflow's, never yours.
+**Whether a person reads the change after you is your brief's to say**, under `## Gates after you`: the run names there each step
+after you at which it waits on a person's approval, and leaves the heading out where there is none. A person puts that gate back on a
+quick run with `--gate land` at its start, or `gate: land` on its card; this note was written before anyone chose.
+
+- **With no `## Gates after you`, your pass lands the change.** There is no gate after you: once you sign off without asking again,
+  the run files `land`, which merges the change into the base branch — on GitHub, this run's pull request; in this checkout, its
+  branch — and nobody reads the change between your word and the merge.
+- **With `land` named there, a person approves the land after your pass**, as on a build: your pass files `land`, and it waits for
+  their `nemia approve` before it merges anything. A card that says it waits on the person at its land is met by that gate: it is no
+  finding and no reason to sign off `blocked`. Judge and word your sign-off for the person who reads it there.
+
+In both, `again: true` is the only way back — it files implement again, on the same branch, with your findings — and you name no
+step: what comes after you is the workflow's, never yours.
 
 **A quick build has no size bound**: quick is for a card that needs no design, whatever its size, so read every file and every line
 of it — the implement step's check measured it and its `nemia size:` line is in your brief. A test trimmed, split off or left

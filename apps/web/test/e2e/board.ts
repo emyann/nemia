@@ -558,7 +558,7 @@ export const partOf = (scope: Page | Locator, step: string): Locator =>
 /** The first fold `name` in `scope`, opened if it is closed (a fold draws what it holds only once open), and returned. */
 export async function openFold(scope: Locator, name: string): Promise<Locator> {
   const fold = scope.locator(`[data-fold="${name}"]`).first();
-  const trigger = fold.locator(':scope > [data-slot="collapsible-trigger"]');
+  const trigger = fold.locator(':scope > [data-slot="disclosure-trigger"]');
   if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
   await expectVisible(trigger.and(scope.page().locator('[aria-expanded="true"]')), `the fold ${name} opens`);
   return fold;

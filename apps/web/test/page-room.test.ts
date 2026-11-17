@@ -53,7 +53,7 @@ const KEPT: readonly Kept[] = [
   { file: 'src/components/frame/MachineBar.tsx', token: 'max-md:hidden', why: FOOT },
   {
     file: 'src/components/step/DebugPanel.tsx',
-    token: 'data-[side=right]:sm:max-w-none',
+    token: 'sm:w-screen',
     why: "A sheet portaled over the window, out of the page column: its width is the window's.",
   },
   {

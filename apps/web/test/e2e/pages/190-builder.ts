@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { filesIn, photograph, sidebar, themeOf } from '../board.ts';
+import { filesIn, heldIn, photograph, pickIn, sidebar, themeOf } from '../board.ts';
 import { drawEdge } from '../canvas.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
@@ -29,7 +29,7 @@ const PASTED = JSON.stringify({
 async function pasteSchema(builder: Locator, step: string, text: string): Promise<void> {
   const keys = builder.locator(`[data-step-form="${step}"]`);
   await expectVisible(keys, `${step}'s form, to paste a schema in`);
-  await keys.locator('[data-field="output"] select').selectOption({ label: 'Paste a schema…' });
+  await pickIn(builder.page(), keys.locator('[data-field="output"] [data-slot="select"]'), 'Paste a schema…');
   const box = keys.getByRole('textbox', { name: 'The JSON Schema' });
   await expectVisible(box, `${step}'s output offers a box for the schema`);
   await box.fill(text);
@@ -194,13 +194,13 @@ export default {
       );
       const buildKeys = builder.locator('[data-step-form="build"]');
       await drawEdge(refused, builder, 'build', 'plan', true);
-      if ((await buildKeys.locator('[data-field="loop"] select').inputValue()) !== 'plan')
+      if ((await heldIn(buildKeys.locator('[data-field="loop"] [data-slot="select"]'))) !== 'plan')
         throw new Refused("the loop drawn from build's loop dot sets build's loop: plan in its form");
       if ((await buildKeys.locator('[data-field="rounds"] input').inputValue()) !== '3') throw new Refused('and its rounds, the default 3');
       await builder.getByRole('button', { name: "Remove build's loop back to plan" }).click();
       await expectCount(builder.locator('.react-flow__edge'), 1, "the loop's button takes it away");
       if (
-        (await buildKeys.locator('[data-field="loop"] select').inputValue()) !== '' ||
+        (await heldIn(buildKeys.locator('[data-field="loop"] [data-slot="select"]'))) !== 'not set' ||
         (await buildKeys.locator('[data-field="rounds"] input').inputValue()) !== ''
       ) {
         throw new Refused("and build's loop and rounds with it");
@@ -234,7 +234,7 @@ export default {
       const keys = builder.locator('[data-step-form="plan"]');
       await expectVisible(keys, "plan's form, open as the builder opens");
       await expectVisible(
-        keys.locator('[data-field="sandbox"] select'),
+        keys.locator('[data-field="sandbox"] [data-slot="select"]'),
         "plan's form offers its sandbox: plan runs on codex, whose fence is Codex's sandbox",
       );
       await expectCount(keys.locator('[data-field="permissionMode"]'), 0, 'and no permission mode, which codex has not');
@@ -320,31 +320,30 @@ export default {
         'and says whose instructions it is told after',
       );
       await expectLayers(keys, agent);
-      const picker = keys.locator('[data-field="agent"] select');
-      const offered = await picker.locator('option').allTextContents();
-      if (
-        (await picker.inputValue()) !== agent ||
-        JSON.stringify(offered) !== JSON.stringify(['no agent', agent, other, AGENTS.seeded.name])
-      ) {
+      const picker = keys.locator('[data-field="agent"] [data-slot="select"]');
+      await picker.locator('[data-slot="select-trigger"]').click();
+      const offered = await crewed.locator('[data-slot="select-popover"] [role="option"]').allTextContents();
+      await crewed.keyboard.press('Escape');
+      await expectCount(crewed.locator('[data-slot="select-popover"]'), 0, "the agent's picker closes on Escape");
+      if ((await heldIn(picker)) !== agent || JSON.stringify(offered) !== JSON.stringify(['no agent', agent, other, AGENTS.seeded.name])) {
         throw new Refused(
-          `the picker names ${agent}, and offers no agent and each agent of yours — it offers ${JSON.stringify(offered)} on ${JSON.stringify(await picker.inputValue())}`,
+          `the picker names ${agent}, and offers no agent and each agent of yours — it offers ${JSON.stringify(offered)} on ${JSON.stringify(await heldIn(picker))}`,
         );
       }
       const model = keys.locator('[data-field="model"] input');
-      const effort = keys.locator('[data-field="effort"] select');
-      const unsetEffort = effort.locator('option[value=""]');
+      const effort = keys.locator('[data-field="effort"] [data-slot="select"]');
       if ((await model.inputValue()) !== '' || (await model.getAttribute('placeholder')) !== `opus — ${agent}'s`)
         throw new Refused(
           `the model ${agent} gives it is shown as ${agent}'s, and the field is empty — it holds ${JSON.stringify(await model.inputValue())} under ${JSON.stringify(await model.getAttribute('placeholder'))}`,
         );
-      if ((await effort.inputValue()) !== '' || (await unsetEffort.textContent()) !== `high — ${agent}'s`)
-        throw new Refused(`and the effort — it reads ${JSON.stringify(await unsetEffort.textContent())}`);
+      if ((await heldIn(effort)) !== `high — ${agent}'s`)
+        throw new Refused(`and the effort — it reads ${JSON.stringify(await heldIn(effort))}`);
       if ((await keys.locator('[data-field="check"] input').inputValue()) !== 'npm test')
         throw new Refused('the check it sets itself is in its field');
       await settled(crewed);
       await photograph(crewed, path.join(OUT, `builder-agent-${await themeOf(crewed)}.png`), { fullPage: true });
 
-      await picker.selectOption(other);
+      await pickIn(crewed, picker, other);
       await expectTexts(
         keys.locator('[data-agent-note]'),
         [`Told after ${other}'s instructions, and any custom instructions you wrote for it; where they conflict, these words win.`],
@@ -360,12 +359,12 @@ export default {
         throw new Refused(
           `moved to ${other}, the model is ${other}'s — it reads ${JSON.stringify(await model.getAttribute('placeholder'))}`,
         );
-      if ((await unsetEffort.textContent()) !== `not set — nor by ${other}`)
-        throw new Refused(`and ${agent}'s effort is not shown as ${other}'s — it reads ${JSON.stringify(await unsetEffort.textContent())}`);
+      if ((await heldIn(effort)) !== `not set — nor by ${other}`)
+        throw new Refused(`and ${agent}'s effort is not shown as ${other}'s — it reads ${JSON.stringify(await heldIn(effort))}`);
       if ((await note.inputValue()) !== 'Mind the cache.' || (await keys.locator('[data-field="check"] input').inputValue()) !== 'npm test')
         throw new Refused('and what the step sets itself stays');
 
-      await picker.selectOption('');
+      await pickIn(crewed, picker, 'no agent');
       await expectCount(keys.locator('[data-agent-note]'), 0, 'with no agent, nothing is told before its body');
       await expectCount(keys.locator('[data-layer]'), 0, 'and it has no layers');
       await expectVisible(keys.getByRole('textbox', { name: 'What it is told' }), 'and its body is all it is told');
@@ -426,8 +425,11 @@ export default {
       await builder.locator('.react-flow__node[data-id="implement"]').click();
       const keys = builder.locator('[data-step-form="implement"]');
       await expectVisible(keys, "implement's form, once its block is clicked");
-      await expectVisible(keys.locator('[data-field="after"] input[type="checkbox"]:checked'), 'whose after has plan, as the edge drew it');
-      await keys.locator('[data-field="effort"] select').selectOption('high');
+      await expectVisible(
+        keys.locator('[data-field="after"] [data-slot="checkbox"][data-selected]'),
+        'whose after has plan, as the edge drew it',
+      );
+      await pickIn(page, keys.locator('[data-field="effort"] [data-slot="select"]'), 'high');
       await keys.locator('[data-field="check"] input').fill('npm test');
       await expectVisible(
         builder.locator('.react-flow__node[data-id="implement"] dd', { hasText: /^npm test$/ }),
@@ -446,7 +448,7 @@ export default {
         builder.locator('[data-saved]', { hasText: 'wrote implement.md, implement.schema.json; left plan.md as it was' }),
         'and the card says what was written, the pasted schema with it',
       );
-      if ((await keys.locator('[data-field="output"] select').inputValue()) !== 'implement.schema.json')
+      if ((await heldIn(keys.locator('[data-field="output"] [data-slot="select"]'))) !== 'implement.schema.json')
         throw new Refused("once saved, implement's output names the schema beside it, as the folder lists it");
 
       const answered = await page.request.get(new URL(`/api/namespaces/default/workflows/${name}?origin=user`, page.url()).href);

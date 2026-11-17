@@ -14,7 +14,7 @@ import { Who } from '@/components/conversation/Said';
 import { mark } from '@/lib/conversation';
 import { container } from '@/lib/meaning';
 import { closeoutOf, type ToolCall } from '@/lib/transcript';
-import { focusRing } from '@/components/ui/ds/utils';
+import { Button } from '@/components/ui/ds';
 import type { SessionOwn as Own } from '@/lib/sessionItems';
 import { cn } from '@/lib/utils';
 
@@ -86,7 +86,7 @@ function Told({ told, marks }: { told: Extract<Own, { what: 'told' }>; marks: st
  * The part's Said slot of the step `step`, in what holds both the part and the talk (`data-step-scope`), scrolled to its top: that scroll
  * alone is moved, as `scrollIntoView` would move the window too and carry the page's header out of view.
  */
-function toSaid(from: HTMLElement, step: string): void {
+function toSaid(from: Element, step: string): void {
   const scope = from.closest<HTMLElement>(`[data-step-scope]`);
   const said = (scope ?? document).querySelector(`[data-part-said="${CSS.escape(step)}"]`);
   if (!said) return;
@@ -119,14 +119,9 @@ function Closeout({ call, step, marks }: { call: ToolCall; step: string; marks: 
           </span>
         )}
         {closeout && (
-          <button
-            type="button"
-            {...mark(marks, 'to-said')}
-            onClick={(event) => toSaid(event.currentTarget, step)}
-            className={cn('text-body-small underline underline-offset-2', focusRing())}
-          >
+          <Button variant="text" size="xsmall" {...mark(marks, 'to-said')} onPress={(event) => toSaid(event.target, step)}>
             Read what it said, above
-          </button>
+          </Button>
         )}
       </p>
       {!closeout && <CodeBlock code={JSON.stringify(call.input ?? null, null, 2)} language="json" />}

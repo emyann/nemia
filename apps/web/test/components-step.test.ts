@@ -761,7 +761,7 @@ test('a StructuredOutput call is drawn as the closeout, named, with its outcome,
   assert.match(html, /aria-label="Closeout"/);
   assert.match(html, />Closeout</);
   assert.match(html, /data-session-outcome="blocked"/);
-  assert.match(html, /<button type="button" data-session-to-said="true"[^>]*>Read what it said, above<\/button>/);
+  assert.match(html, /<button[^>]*data-session-to-said="true"[^>]*>(?:(?!<\/button>)[\s\S])*>Read what it said, above</);
   assert.doesNotMatch(html, /WORD\.txt is not writable|A writable WORD\.txt/, 'what it said is drawn once, in the part');
   assert.doesNotMatch(html, /data-session-step=/, 'never a line of work');
 });
@@ -2589,7 +2589,7 @@ test('REFUSED: the Debug panel is closed by default, and reads and draws nothing
     ),
   );
   assert.match(html, /<section aria-label="Debug"/);
-  assert.match(html, /aria-expanded="false"[^>]*>▸ Debug<\/button>/);
+  assert.match(html, /aria-expanded="false"[^>]*>(?:(?!<\/button>)[\s\S])*>Debug</);
   assert.doesNotMatch(
     html,
     /data-path|data-machine|The path|Full width/,
@@ -2913,7 +2913,7 @@ test("on a step's page, a skill named with its folder is drawn as written, the r
   );
   assert.doesNotMatch(folder, /<a\b/, 'no link: it has no page');
   assert.doesNotMatch(html, /href="\/agents\/skills\/[^"]*(:|%3A)/i, 'and no address of a page that would be refused');
-  assert.match(html, /data-skill="gamma"[^>]*>gamma</, 'one found nowhere: its name alone');
+  assert.match(html, /data-skill="gamma"[^>]*><span[^>]*>gamma</, 'one found nowhere: its name alone');
   assert.doesNotMatch(chip('gamma'), /data-skill-found-in/);
 });
 
@@ -2936,8 +2936,8 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
     "a repository's agent's page, in the factory the step is read in: the default reads no repository",
   );
   assert.match(home('policy'), /href="\/factories\/hiring\/workflows\/user\/w\?build=true"/, 'one of yours: its builder, in the place');
-  assert.match(html, /data-skill="alpha"[^>]*><a[^>]*href="\/agents\/skills\/user\/alpha"/, 'a skill found: linked to its page');
-  assert.match(html, /data-skill="gamma"[^>]*>gamma</, 'a skill found nowhere: its name alone');
+  assert.match(html, /data-skill="alpha"[^>]*><span[^>]*><a[^>]*href="\/agents\/skills\/user\/alpha"/, 'a skill found: linked to its page');
+  assert.match(html, /data-skill="gamma"[^>]*><span[^>]*>gamma</, 'a skill found nowhere: its name alone');
   assert.match(html, /data-layer="task"[^>]*>Then the task: the brief a run is started with\./);
   assert.doesNotMatch(html, /Not composed|What it was told|What it would be told now/);
   assert.match(home('factory'), /written on[^]*href="\/factories\/hiring\/settings"[^>]*>hiring&#x27;s Settings</, "the rules' home");
@@ -2982,7 +2982,7 @@ test("a step's agent: the one the factory picked hires, marked hired; else its f
   const { StepAgent } = await import('../src/components/step/StepParts.tsx');
   const hired = await routedWith(createElement(StepAgent, { page: await hiredPage() }));
   assert.match(hired, /href="\/agents\/user\/writer"/);
-  assert.match(hired, /data-hired="hiring"[^>]*>hired by hiring</);
+  assert.match(hired, /data-hired="hiring"[^>]*><span[^>]*>hired by hiring</);
   assert.doesNotMatch(hired, /data-hired-in/);
 
   const plain = await routedWith(
@@ -3037,13 +3037,13 @@ const PICKABLE = {
 test('hiring into a step: the agent hired with Fire; else the picker of the agents beside it, with Hire and, on yours, New agent', async () => {
   const hired = await hireOn({});
   assert.match(hired, /hiring hires[^]*href="\/agents\/user\/writer"[^]*into this step\./);
-  assert.match(hired, /data-fire="writer"[^>]*>Fire</);
+  assert.match(hired, /data-fire="writer"[^>]*>(?:(?!<\/button>)[\s\S])*>Fire</);
   assert.doesNotMatch(hired, /data-hire-picker|data-new-agent|data-hire-refused/, 'a step hired into is fired before another is hired');
 
   const open = await hireOn({ hired: null, hiring: PICKABLE });
   assert.match(open, /data-hire-picker/);
   assert.match(open, />Hire into this step in hiring</);
-  assert.match(open, /data-hire="true"[^>]*disabled=""[^>]*>Hire</, 'Hire waits for an agent picked');
+  assert.match(open, /data-hire="true"[^>]*disabled=""[^>]*>(?:(?!<\/button>)[\s\S])*>Hire</, 'Hire waits for an agent picked');
   assert.match(open, /<option value="ada">ada<\/option><option value="scribe">scribe<\/option>/);
   assert.doesNotMatch(open, /data-fire/);
   assert.match(

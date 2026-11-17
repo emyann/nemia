@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { cardsPath, photograph, themeOf } from '../board.ts';
+import { cardsPath, photograph, heldIn, pickIn, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { CARDS, FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -74,14 +74,14 @@ async function startUnassigned(page: Page, name: string, theme: string): Promise
     await open(other, new URL('/inbox', page.url()).href);
     const item = cardIn(other, name);
     await item.getByRole('button', { name: 'Start' }).click();
-    const pick = item.getByRole('combobox', { name: 'Factory' });
+    const pick = item.locator('[data-pick-factory]');
     await expectVisible(pick, 'the Start of a card that names no factory asks for the factory first');
-    if ((await pick.inputValue()) !== '') throw new Refused(`no factory is picked for it — the list held ${await pick.inputValue()}`);
+    if ((await heldIn(pick)) !== '') throw new Refused(`no factory is picked for it — the list held ${await heldIn(pick)}`);
     const form = item.locator(`form[aria-label="Start ${name}"]`);
     await expectCount(form, 0, 'and draws no start form before one is picked');
-    await expectCount(item.getByRole('combobox', { name: 'Workflow' }), 0, 'nor a Workflow list');
-    await pick.selectOption(factory);
-    await item.getByRole('combobox', { name: 'Workflow' }).selectOption({ label: WORKFLOWS.good.name });
+    await expectCount(item.locator('[data-pick-workflow]'), 0, 'nor a Workflow list');
+    await pickIn(other, pick, factory);
+    await pickIn(other, item.locator('[data-pick-workflow]'), WORKFLOWS.good.name);
     await expectVisible(form.getByRole('button', { name: 'Start' }), `with ${factory} and ${WORKFLOWS.good.name} picked, the start form`);
     await settled(other);
     await photograph(other, path.join(OUT, `inbox-file-unassigned-${theme}.png`), { fullPage: true });
@@ -146,7 +146,7 @@ async function unreadSaid(page: Page, theme: string): Promise<void> {
 
   const card = cardIn(page, CARDS.rich.name);
   await card.getByRole('button', { name: 'Start' }).click();
-  await card.getByRole('combobox', { name: 'Factory' }).selectOption(factory);
+  await pickIn(page, card.locator('[data-pick-factory]'), factory);
   const unread = card.locator(`[data-workflows-unread] [data-unread="${workflow}"]`);
   await expectVisible(unread, `the start of a card of no factory, in ${factory}, says ${workflow} is left out`);
   const why = ((await unread.textContent()) ?? '').trim();

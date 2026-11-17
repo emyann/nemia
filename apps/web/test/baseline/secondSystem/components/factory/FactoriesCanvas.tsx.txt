@@ -1,6 +1,0 @@
-apps/web/src/components/factory/FactoriesCanvas.tsx#@/components/ui/button:Button
-apps/web/src/components/factory/FactoriesCanvas.tsx#@/components/ui/card:Card
-apps/web/src/components/factory/FactoriesCanvas.tsx#@/components/ui/card:CardContent
-apps/web/src/components/factory/FactoriesCanvas.tsx#@/components/ui/card:CardDescription
-apps/web/src/components/factory/FactoriesCanvas.tsx#@/components/ui/card:CardHeader
-apps/web/src/components/factory/FactoriesCanvas.tsx#@/components/ui/card:CardTitle

@@ -2,8 +2,7 @@ import { useEffect, useEffectEvent, useMemo, useRef, type RefObject } from 'reac
 import { Background, BackgroundVariant, Controls, ReactFlow, ReactFlowProvider, useReactFlow, useStoreApi } from '@xyflow/react';
 import { useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button, Card, CardContent, Title } from '@/components/ui/ds';
 import { levelQuery, putLevel } from '@/lib/api/nemia';
 import { storeQuery } from '@/lib/api/store';
 import type { Bar } from '@/lib/bar';
@@ -142,20 +141,27 @@ function NoFactory() {
   const { data: store } = useQuery(storeQuery);
   return (
     <div className="flex min-h-96 flex-1 items-center justify-center p-6">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>No factory yet</CardTitle>
-          <CardDescription>
-            Make one from the command line
-            {store ? (
-              <>
-                {' '}
-                with <code>{store.fileFactory}</code>
-              </>
-            ) : null}
-            . A run started in none is the default factory&apos;s, which shows here while it holds one and no factory is made.
-          </CardDescription>
-        </CardHeader>
+      <Card variant="outlined" className="w-full max-w-sm" classNames={{ content: 'gap-4' }}>
+        <CardContent
+          headline={
+            <Title size="medium" component="h2">
+              No factory yet
+            </Title>
+          }
+          supportingText={
+            <>
+              Make one from the command line
+              {store ? (
+                <>
+                  {' '}
+                  with <code>{store.fileFactory}</code>
+                </>
+              ) : null}
+              . A run started in none is the default factory&apos;s, which shows here while it holds one and no factory is made.
+            </>
+          }
+          classNames={{ header: 'mb-0' }}
+        />
         <TurnOn line={store?.turnOnNemia ?? null} />
       </Card>
     </div>
@@ -181,19 +187,19 @@ function TurnOn({ line }: { line: string | null }) {
   if (anyAbove(nemia)) {
     const { kind, words } = sessionOf(nemia);
     return (
-      <CardContent data-nemia-on data-state={kind} className="flex flex-col gap-2 border-t pt-4">
+      <div data-nemia-on data-state={kind} className="flex flex-col gap-2 border-t border-outline-variant pt-4">
         <p className="text-body-medium">Nemia is on. {words}</p>
         <TrustLine untrusted={nemia.untrusted} />
-      </CardContent>
+      </div>
     );
   }
   return (
-    <CardContent data-nemia-off className="flex flex-col gap-2 border-t pt-4">
+    <div data-nemia-off className="flex flex-col gap-2 border-t border-outline-variant pt-4">
       <p className="text-body-medium text-muted-foreground">
         Or let Nemia, the store&apos;s own agent, keep a session that asks you what waits on you.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" data-nemia-turn-on isDisabled={turnOn.isPending} onPress={() => turnOn.mutate()}>
+        <Button size="xsmall" data-nemia-turn-on isDisabled={turnOn.isPending} onPress={() => turnOn.mutate()}>
           Turn Nemia on
         </Button>
         {line !== null && (
@@ -207,6 +213,6 @@ function TurnOn({ line }: { line: string | null }) {
           {turnOn.error.message}
         </p>
       )}
-    </CardContent>
+    </div>
   );
 }

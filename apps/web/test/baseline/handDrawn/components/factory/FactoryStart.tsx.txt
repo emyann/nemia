@@ -1,2 +1,0 @@
-apps/web/src/components/factory/FactoryStart.tsx#<select>
-apps/web/src/components/factory/FactoryStart.tsx#<input type="radio">

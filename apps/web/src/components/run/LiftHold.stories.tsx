@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
+import { DEFAULT_NAMESPACE } from 'objects';
 import { CardLift, LiftHold } from './LiftHold';
 
 /** Lift, where a run is held: on its page, asked twice in a line; on the Factory's card, in a popover over the card. */
@@ -29,7 +30,7 @@ export const Asking: StoryObj<typeof meta> = {
 export const OnTheCard: StoryObj<typeof meta> = {
   render: (args) => (
     <div style={{ width: 400, minHeight: 240, display: 'flex', justifyContent: 'flex-end' }}>
-      <CardLift id={args.id} namespace="default" />
+      <CardLift id={args.id} namespace={DEFAULT_NAMESPACE} />
     </div>
   ),
   play: async ({ canvasElement, args }) => {

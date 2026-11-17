@@ -13,6 +13,7 @@ import { MODES, Refusal, useAsk } from './Ask';
 import { Markdown } from '../markdown/Markdown';
 import type { Frozen } from '../../lib/frozen';
 import { Button, Checkbox, Radio, RadioGroup, TextField } from '@/components/ui/ds';
+import { Pending } from '@/components/look';
 
 /** What a person has said so far of each question, by its title: the labels chosen, and words of their own. */
 export type Draft = Readonly<Record<string, { chose: readonly string[]; own: string }>>;
@@ -298,7 +299,7 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <span title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined} className="inline-flex">
-            <Button type="submit" isDisabled={ask.isPending || left.length > 0}>
+            <Button icon={ask.isPending ? Pending : undefined} type="submit" isDisabled={ask.isPending || left.length > 0}>
               {ask.isPending ? 'Asking…' : OFFERS.answer.button}
             </Button>
           </span>

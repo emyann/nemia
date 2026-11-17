@@ -27,6 +27,7 @@ function Option({ choice, starts }: { choice: Choice; starts: Starts }) {
         </div>
         {shown !== undefined && key !== undefined && shown.fix.startable && (
           <CutPress
+            pending={pending}
             data-harness-activate
             isDisabled={pending}
             onPress={() => starts.onStart(startOf(install, shown.fix, shown.i, {}), key)}

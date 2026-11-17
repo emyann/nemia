@@ -61,7 +61,7 @@ function ConfirmRetire({
         keeps. It cannot be taken back: mint another on the store's machine.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <CutPress data-token-confirm-press isDisabled={pending} onPress={onConfirm}>
+        <CutPress pending={pending} data-token-confirm-press isDisabled={pending} onPress={onConfirm}>
           {pending ? 'Retiring…' : `Retire ${name}`}
         </CutPress>
         <Button variant="text" size="xsmall" isDisabled={pending} onPress={onCancel}>

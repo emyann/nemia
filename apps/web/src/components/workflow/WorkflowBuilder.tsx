@@ -32,7 +32,7 @@ import { SpecNode, type SpecFlowNode } from '../step/StepNode';
 import { ringed } from '../../lib/meaning';
 import { FLOOR_BOX } from '../../lib/classes';
 import { cn } from '../../lib/utils';
-import { Reading } from '@/components/look';
+import { Pending, Reading } from '@/components/look';
 import { Button, Skeleton, TextField } from '@/components/ui/ds';
 
 /** The builder's node types for React Flow, one object for the module's life. */
@@ -307,7 +307,7 @@ function BuilderToolbar(props: {
       <Button variant="outlined" size="xsmall" onPress={props.onClose}>
         {dirty ? 'Discard and close' : 'Close'}
       </Button>
-      <Button size="xsmall" isDisabled={!dirty || saving || props.empty} onPress={props.onSave}>
+      <Button icon={saving ? Pending : undefined} size="xsmall" isDisabled={!dirty || saving || props.empty} onPress={props.onSave}>
         {saving ? 'Saving…' : 'Save'}
       </Button>
     </div>
@@ -403,7 +403,7 @@ export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRe
       <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{refusal.message}</p>
       {(!nothingWritten || refusal.status === 409) && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button variant="outlined" size="xsmall" isDisabled={rereading} onPress={onReread}>
+          <Button icon={rereading ? Pending : undefined} variant="outlined" size="xsmall" isDisabled={rereading} onPress={onReread}>
             {rereading ? 'Reading…' : 'Read the folder again'}
           </Button>
           <span className="text-body-small text-yours">The changes drawn here are let go; copy what you need first.</span>

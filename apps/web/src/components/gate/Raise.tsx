@@ -12,6 +12,7 @@ import { MODES, Refusal, useAsk, useRound } from './Ask';
 import { answersFrom, Asks, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import type { Frozen } from '../../lib/frozen';
 import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
+import { Pending } from '@/components/look';
 
 /**
  * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes
@@ -91,7 +92,11 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <AmountBox step={offer.step} amount={amount} onAmount={setAmount} disabled={rechecking} />
           <span title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined} className="inline-flex">
-            <Button type="submit" isDisabled={ask.isPending || left.length > 0 || (asks && !offer.questions.length && !message.trim())}>
+            <Button
+              icon={ask.isPending ? Pending : undefined}
+              type="submit"
+              isDisabled={ask.isPending || left.length > 0 || (asks && !offer.questions.length && !message.trim())}
+            >
               {ask.isPending ? 'Asking…' : raiseWord(offer.by, rechecking, asks)}
             </Button>
           </span>

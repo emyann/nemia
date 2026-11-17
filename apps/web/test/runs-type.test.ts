@@ -25,6 +25,7 @@ const FILES = [
   'components/look/Breakdown.tsx',
   'components/look/Plate.tsx',
   'components/look/Reading.tsx',
+  'components/look/Pending.tsx',
   'components/look/Sticker.tsx',
   'components/look/StepGraph.tsx',
   'components/look/Run.tsx',

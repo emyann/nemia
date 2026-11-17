@@ -12,7 +12,7 @@ import { storeQuery } from '../../lib/api/store.ts';
 import { keptBy, startRepo } from '../../lib/factories';
 import { cardFiling, factoriesOffered, factoryPreset } from '../../lib/inbox';
 import { Button, Select, SelectItem, TextField } from '@/components/ui/ds';
-import { Reading, ReadingLines } from '@/components/look';
+import { Pending, Reading, ReadingLines } from '@/components/look';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
@@ -68,7 +68,7 @@ export function FileCard({ shown }: { shown: string | undefined }) {
       />
       {factory && <InFactory factory={factory} picked={picked} onWorkflow={setWorkflow} />}
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" isDisabled={!idea.trim() || file.isPending}>
+        <Button icon={file.isPending ? Pending : undefined} type="submit" isDisabled={!idea.trim() || file.isPending}>
           {file.isPending ? 'Filing…' : 'File'}
         </Button>
         <span className="text-body-small text-muted-foreground">Parked, not started: nothing runs until you start it.</span>

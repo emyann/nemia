@@ -10,7 +10,7 @@ import {
   type FactoryInstruction as Instruction,
 } from '../../lib/api/factories.ts';
 import { Markdown } from '../markdown/Markdown';
-import { Reading } from '@/components/look';
+import { Pending, Reading } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
 
 /** What a person asks of a factory's instruction: its words saved or cleared in the store, or the place it is read from changed. */
@@ -165,7 +165,7 @@ function StoreForm({ data, pending, onChange }: { data: Instruction; pending: bo
         inputClassName="min-h-40"
       />
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" isDisabled={pending || !draft.trim() || unchanged}>
+        <Button icon={pending ? Pending : undefined} type="submit" isDisabled={pending || !draft.trim() || unchanged}>
           {pending ? 'Writing…' : 'Save'}
         </Button>
         {data.stored &&

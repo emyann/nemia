@@ -1,11 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
-import { expect, fireEvent } from 'storybook/test';
+import { expect, fireEvent, within } from 'storybook/test';
 import { atRest, tabStops, tabTo } from '../../../.storybook/play';
 import { CutButton, CutPress } from './CutButton';
 import { ON_CARD } from './stories.fixtures';
 
-/** The look's filled button with two cut corners: a link to a route, quiet, a button that is pressed, and a press that is disabled. */
+/**
+ * The look's filled button with two cut corners: a link to a route, quiet, a button that is pressed, a press that is disabled, and a
+ * press still out.
+ */
 const meta: Meta = { title: 'Look/CutButton' };
 export default meta;
 
@@ -79,5 +82,20 @@ export const DisabledPress: StoryObj = {
     await expect(pressesIn(canvasElement), 'a click presses nothing').toBe('0');
     await expect(button?.disabled).toBe(true);
     await expect(button?.querySelectorAll('[data-cut-ring]').length, 'it draws no ring').toBe(0);
+  },
+};
+
+/** A press still out: disabled while it waits, the kit's small ProgressIndicator before its words, which stay its name. */
+export const PendingPress: StoryObj<typeof CutPress> = {
+  args: { isDisabled: true, pending: true, children: 'Approving…' },
+  render: (args) => (
+    <div style={ON_CARD}>
+      <CutPress {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const button = within(canvasElement).getByRole('button', { name: 'Approving…' });
+    await expect(button.querySelector('[data-pending]'), 'it draws the indicator').not.toBeNull();
+    await expect(within(canvasElement).queryByRole('progressbar'), 'the indicator is hidden from a screen reader').toBeNull();
   },
 };

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/ds';
 import { askPairing, claimPairing } from '@/lib/api/pairing';
 import { signIn } from '@/lib/api/session';
 import { clientNameOf } from '@/lib/setup';
+import { Pending } from '@/components/look';
 
 /** How often a pairing's claim is asked again while it waits on the person, in milliseconds. */
 const CLAIM_EVERY_MS = 2_000;
@@ -102,7 +103,7 @@ export function PairBrowser() {
         </p>
       )}
       <div>
-        <Button variant="outlined" icon={Link2} data-pair-press isDisabled={ask.isPending} onPress={again}>
+        <Button variant="outlined" icon={ask.isPending ? Pending : Link2} data-pair-press isDisabled={ask.isPending} onPress={again}>
           {ask.isPending ? 'Asking…' : 'Pair this browser'}
         </Button>
       </div>

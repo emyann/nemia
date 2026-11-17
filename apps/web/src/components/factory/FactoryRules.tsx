@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import { clearRules, factoryRulesQuery, writeRules, type FactoryRules as Rules } from '../../lib/api/factories.ts';
-import { Reading } from '@/components/look';
+import { Pending, Reading } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
 
 /** What a person asks of a factory's rules: their words saved, or the rules removed. */
@@ -114,6 +114,7 @@ function RulesForm({ data, pending, onChange }: { data: Rules; pending: boolean;
         </Field>
         <Field orientation="horizontal" className="flex-wrap">
           <Button type="submit" isDisabled={pending || !draft.trim() || unchanged}>
+            {pending && <Pending size={16} />}
             {pending ? 'Writing…' : 'Save'}
           </Button>
           {kept &&

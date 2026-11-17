@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { clearCostLine, factoriesQuery, setCostLine, type Factory } from '@/lib/api/factories';
 import { budgetWord } from '@/lib/money';
 import { CommandText } from './FactorySchedules';
+import { Pending } from '@/components/look';
 
 /** What a person asks of one workflow's line: set to an amount, or taken off. */
 type Change = { kind: 'save'; usd: number } | { kind: 'clear' };
@@ -156,6 +157,7 @@ function CostLineForm({
         />
       </label>
       <Button type="submit" isDisabled={pending || !savable}>
+        {pending && <Pending size={16} />}
         {pending ? 'Writing…' : 'Save'}
       </Button>
       {usd !== null && (

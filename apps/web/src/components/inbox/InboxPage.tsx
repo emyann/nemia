@@ -27,6 +27,7 @@ import {
   type CardRefusal,
 } from '@/lib/inbox';
 import { Button } from '@/components/ui/ds';
+import { Pending } from '@/components/look';
 
 /** What the Inbox reads of its address: the factory its path names (none for every factory's), its label selector and its cards' kind. */
 type InboxAt = { factory?: string; l?: string; cards?: 'ended' };
@@ -294,11 +295,7 @@ function CardItem({
             </Button>
           )}
           <QueueButtons entry={entry} pending={queue.isPending} onQueue={(off) => queue.mutate(off)} />
-          {entry.file.endsWith('.md') && (
-            <Button variant="outlined" isDisabled={remove.isPending} onPress={() => remove.mutate()}>
-              {remove.isPending ? 'Removing…' : 'Remove'}
-            </Button>
-          )}
+          {entry.file.endsWith('.md') && <RemovePress pending={remove.isPending} onPress={() => remove.mutate()} />}
         </div>
       </div>
 
@@ -345,5 +342,14 @@ function StartCard({
     <UnassignedStart entry={entry} onStarted={onStarted} onRefused={onRefused} />
   ) : (
     <FactoryCardStart entry={entry} onStarted={onStarted} onRefused={onRefused} />
+  );
+}
+
+/** A card's Remove: `Removing…` while its press is out, the kit's small ProgressIndicator drawn in it, and disabled then. */
+function RemovePress({ pending, onPress }: { pending: boolean; onPress: () => void }) {
+  return (
+    <Button icon={pending ? Pending : undefined} variant="outlined" isDisabled={pending} onPress={onPress}>
+      {pending ? 'Removing…' : 'Remove'}
+    </Button>
   );
 }

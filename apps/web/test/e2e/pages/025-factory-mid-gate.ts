@@ -14,7 +14,8 @@ export default {
    * result, and it waits on a person all the same — so its card stays, says what it asks, and takes the answer. The card links to what is
    * being approved, in its answer row, which grows it no taller: pressed, the run's page opens on plan's inspector, its part whole, with
    * the plan's approach in what it gave, and the page goes back to the floor. The card is approved where it is, a press a person can make
-   * clear of the legend: its gate's Approve, which approves with no words. The approval is written, then taken back, so every page after reads the store as seeded.
+   * clear of the legend: its gate's Approve, which approves with no words. The approval is written, then taken back, so every page after
+   * reads the store as seeded.
    */
   name: 'factory-mid-gate',
   route: '/factories/default',

@@ -42,7 +42,7 @@ export const OnTheCard: Story = {
   play: async ({ canvasElement }) => {
     const split = canvasElement.querySelector('[data-gate-answer="land"] [data-slot="split-button"]');
     await expect(split).toHaveAttribute('data-variant', 'filled');
-    await expect(within(canvasElement).getByRole('button', { name: 'Approve', exact: true })).toBeEnabled();
+    await expect(within(canvasElement).getByRole('button', { name: 'Approve' })).toBeEnabled();
     await expect(within(canvasElement).getByRole('button', { name: 'Other answers to land' })).toHaveAttribute('aria-haspopup');
   },
 };
@@ -83,7 +83,7 @@ export const Approved: Story = {
     ],
   },
   play: async ({ args, canvasElement, userEvent }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Approve', exact: true }));
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Approve' }));
     await waitFor(() => expect(args.onTaken).toHaveBeenCalledOnce());
     await expect(screen.queryByRole('dialog')).toBeNull();
     atRest();
@@ -96,14 +96,17 @@ export const ApprovalRefused: Story = {
     msw: [http.post(APPROVE, () => HttpResponse.json({ error: 'land is not waiting at its gate' }, { status: 409 }))],
   },
   play: async ({ canvasElement, userEvent }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Approve', exact: true }));
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Approve' }));
     const approval = await screen.findByRole('dialog', { name: 'Approve land' });
     await expect(await within(approval).findByText('land is not waiting at its gate')).toBeVisible();
     atRest();
   },
 };
 
-/** Approve with words… chosen: the kit's popover, named for what it does, the words in the kit's text field and the press that runs the ending. */
+/**
+ * Approve with words… chosen: the kit's popover, named for what it does, the words in the kit's text field and the press that runs the
+ * ending.
+ */
 export const Approving: Story = {
   play: async ({ canvasElement, userEvent }) => {
     const menu = await menuOf(canvasElement, userEvent);

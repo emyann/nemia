@@ -15,8 +15,8 @@ export default {
    * send-back goes, and answers it; the ending's inspector says it in full, first, with the facts to decide on, FAKE's run in flight on
    * main its branch collides with among them; the step not filed says so rather than a table of dashes. In a page of its own whose one
    * refusal is the point, an approval with words made elsewhere first is refused; then the gate is approved on the card with words…,
-   * confirmed, and sent back… with words, each from its split button's menu. The page takes each file back and lays the floor out again, each card still clear of the one beneath it, so each page after it
-   * reads the store and the floor as seeded.
+   * confirmed, and sent back… with words, each from its split button's menu. The page takes each file back and lays the floor out
+   * again, each card still clear of the one beneath it, so each page after it reads the store and the floor as seeded.
    */
   name: 'factory-gate',
   route: '/factories/default',

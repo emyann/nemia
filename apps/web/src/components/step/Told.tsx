@@ -42,6 +42,16 @@ export const FOLDER_FILES = "3. The folder's files";
 export const FACTORY_RULES = "4. The factory's rules";
 export const STEP_POLICY = "5. The step's policy";
 
+/**
+ * The level each layer's heading takes: one under the heading the fold sits beneath on its page. An h4 by default, under a run's part,
+ * whose own headings are h3s; an h2 on a step's own page, straight under its h1. A level is not a size: every layer's title is drawn
+ * the same whatever its level.
+ */
+type LayerLevel = 2 | 3 | 4;
+
+/** The level a layer's own words and blocks take, one under its heading's. */
+const UNDER = { 2: 3, 3: 4, 4: 5 } as const;
+
 /** What the fold says of the numbers it heads its layers with. */
 const PRECEDENCE_NOTE = 'Where two of them say different things, the higher number wins, and the task is above them all.';
 
@@ -79,7 +89,7 @@ export function toldBefore(agent: string, layers: Pick<Frozen<StepLayers>, 'cust
 /**
  * The fold: `told`, the brief whole, drawn only where `layers` is null; `parts`, the task in its parts, where the api split it; `filed`
  * says whether it was told or would be told now. Nothing where there is neither. Given `homes`, `layers` are what a run of the step will
- * be told, read now: drawn open, each beside its home.
+ * be told, read now: drawn open, each beside its home. `level` is the level each layer's heading takes (`LayerLevel`).
  */
 export function Told({
   told,
@@ -87,21 +97,23 @@ export function Told({
   parts = null,
   filed,
   homes,
+  level = 4,
 }: {
   told: string | null;
   layers: Frozen<StepLayers> | null;
   parts?: Frozen<TaskPart[]> | null;
   filed: boolean;
   homes?: LayerHomes;
+  level?: LayerLevel;
 }) {
   if (!told && !layers) return null;
-  if (layers && homes) return <WillBeTold layers={layers} homes={homes} />;
+  if (layers && homes) return <WillBeTold layers={layers} homes={homes} level={level} />;
   return (
     <details className="text-body-medium" data-told>
       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
         {filed ? 'What it was told' : 'What it would be told now'}
       </summary>
-      {layers ? <Layers layers={layers} parts={parts} /> : <Words text={told ?? ''} />}
+      {layers ? <Layers layers={layers} parts={parts} level={level} /> : <Words level={UNDER[level]} text={told ?? ''} />}
     </details>
   );
 }
@@ -110,7 +122,7 @@ export function Told({
  * The layers in the order the session reads them, the factory's rules among them only where the run froze some, and where the agent's
  * words, the person's and the factory's went.
  */
-function Layers({ layers, parts }: { layers: Frozen<StepLayers>; parts: Frozen<TaskPart[]> | null }) {
+function Layers({ layers, parts, level }: { layers: Frozen<StepLayers>; parts: Frozen<TaskPart[]> | null; level: LayerLevel }) {
   return (
     <div className="mt-2 flex flex-col gap-3">
       {layers.agent === null ? (
@@ -122,32 +134,36 @@ function Layers({ layers, parts }: { layers: Frozen<StepLayers>; parts: Frozen<T
             were frozen at the start of the run and given{' '}
             {layers.via === 'prompt' ? "in the session's system prompt" : 'at the head of its brief'}. {PRECEDENCE_NOTE}
           </p>
-          <Layer name="instructions" title={INSTRUCTIONS(layers.agent)}>
-            <Words text={layers.instructions} />
+          <Layer level={level} name="instructions" title={INSTRUCTIONS(layers.agent)}>
+            <Words level={UNDER[level]} text={layers.instructions} />
             <Skills word="Its skills:" skills={layers.agentSkills} />
           </Layer>
-          <Layer name="custom" title={CUSTOM_INSTRUCTIONS}>
-            <Words text={layers.custom} />
+          <Layer level={level} name="custom" title={CUSTOM_INSTRUCTIONS}>
+            <Words level={UNDER[level]} text={layers.custom} />
           </Layer>
         </>
       )}
       {layers.folderFiles && (
-        <Layer name="folder" title={FOLDER_FILES}>
+        <Layer level={level} name="folder" title={FOLDER_FILES}>
           <p className="text-body-small text-muted-foreground">{FOLDER_FILES_SAID}</p>
         </Layer>
       )}
       {layers.factory !== null && (
-        <Layer name="factory" title={FACTORY_RULES}>
-          <Words text={layers.factory} />
+        <Layer level={level} name="factory" title={FACTORY_RULES}>
+          <Words level={UNDER[level]} text={layers.factory} />
         </Layer>
       )}
-      <Layer name="policy" title={STEP_POLICY}>
-        <Words text={layers.policy || null} />
+      <Layer level={level} name="policy" title={STEP_POLICY}>
+        <Words level={UNDER[level]} text={layers.policy || null} />
         <Skills word="Adds the skills:" skills={layers.addedSkills} />
         <Fence agent={layers.agent} fence={layers.fence} />
       </Layer>
-      <Layer name="task" title="The task">
-        {parts?.length ? <TaskParts parts={parts} /> : <Words text={layers.task} none="Not composed: the run could not say it" />}
+      <Layer level={level} name="task" title="The task">
+        {parts?.length ? (
+          <TaskParts parts={parts} level={level} />
+        ) : (
+          <Words level={UNDER[level]} text={layers.task} none="Not composed: the run could not say it" />
+        )}
       </Layer>
     </div>
   );
@@ -158,7 +174,7 @@ function Layers({ layers, parts }: { layers: Frozen<StepLayers>; parts: Frozen<T
  * each beside where it lives, the agent's instructions folded, the factory's rules where the page is read in a factory or some are told,
  * and the task left to the brief a run is started with.
  */
-function WillBeTold({ layers, homes }: { layers: Frozen<StepLayers>; homes: LayerHomes }) {
+function WillBeTold({ layers, homes, level }: { layers: Frozen<StepLayers>; homes: LayerHomes; level: LayerLevel }) {
   return (
     <details open className="text-body-medium" data-told data-will-be-told>
       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">What it will be told</summary>
@@ -173,30 +189,30 @@ function WillBeTold({ layers, homes }: { layers: Frozen<StepLayers>; homes: Laye
           <p className="text-body-small text-muted-foreground">{noAgent(true)}</p>
         ) : (
           <>
-            <Layer name="instructions" title={INSTRUCTIONS(layers.agent)} home={homes.instructions}>
+            <Layer level={level} name="instructions" title={INSTRUCTIONS(layers.agent)} home={homes.instructions}>
               <details data-instructions-fold>
                 <summary className="cursor-pointer text-body-small text-muted-foreground hover:text-foreground">Read them</summary>
-                <Words text={layers.instructions} none="Its file gives no instructions" />
+                <Words level={UNDER[level]} text={layers.instructions} none="Its file gives no instructions" />
               </details>
               <Skills word="Its skills:" skills={layers.agentSkills} link={homes.skill} />
             </Layer>
-            <Layer name="custom" title={CUSTOM_INSTRUCTIONS} home={homes.custom}>
-              <Words text={layers.custom} none="None written" />
+            <Layer level={level} name="custom" title={CUSTOM_INSTRUCTIONS} home={homes.custom}>
+              <Words level={UNDER[level]} text={layers.custom} none="None written" />
             </Layer>
           </>
         )}
         {layers.folderFiles && (
-          <Layer name="folder" title={FOLDER_FILES}>
+          <Layer level={level} name="folder" title={FOLDER_FILES}>
             <p className="text-body-small text-muted-foreground">{FOLDER_FILES_SAID}</p>
           </Layer>
         )}
         {(layers.factory !== null || homes.factory) && (
-          <Layer name="factory" title={FACTORY_RULES} home={homes.factory ?? undefined}>
-            <Words text={layers.factory} none={NO_RULES_TOLD} />
+          <Layer level={level} name="factory" title={FACTORY_RULES} home={homes.factory ?? undefined}>
+            <Words level={UNDER[level]} text={layers.factory} none={NO_RULES_TOLD} />
           </Layer>
         )}
-        <Layer name="policy" title={STEP_POLICY} home={homes.words}>
-          <Words text={layers.policy || null} none="No words of its own" />
+        <Layer level={level} name="policy" title={STEP_POLICY} home={homes.words}>
+          <Words level={UNDER[level]} text={layers.policy || null} none="No words of its own" />
           <Skills word="Adds the skills:" skills={layers.addedSkills} link={homes.skill} />
           <Fence agent={layers.agent} fence={layers.fence} />
         </Layer>
@@ -246,22 +262,23 @@ const HANDED = { read: 'Read as context', waited: 'Waited on, landed' } as const
 /**
  * A task in its parts: its own text as `Words`, and each run it was handed a block headed by how it was handed and the first line that
  * run was asked, linked to the run's page, over the section's body. A run the record names as neither waited on nor read is a plain
- * block, its section as it was written.
+ * block, its section as it was written. Each block's heading stands one under the layer's (`level`).
  */
-function TaskParts({ parts }: { parts: Frozen<TaskPart[]> }) {
+function TaskParts({ parts, level }: { parts: Frozen<TaskPart[]>; level: LayerLevel }) {
+  const Heading = `h${UNDER[level]}` as const;
   return (
     <div className="flex flex-col gap-2">
       {parts.map((part, i) => {
-        if (part.kind === 'text') return <Words key={i} text={part.text} />;
-        if (!part.how) return <Words key={i} text={`## From run ${part.run}\n\n${part.body}`} />;
+        if (part.kind === 'text') return <Words level={UNDER[level]} key={i} text={part.text} />;
+        if (!part.how) return <Words level={UNDER[level]} key={i} text={`## From run ${part.run}\n\n${part.body}`} />;
         return (
           <section key={i} data-from-run={part.run} data-how={part.how} className="flex flex-col gap-1 rounded border p-2">
-            <h5 title={part.run} className="min-w-0 text-label-medium text-muted-foreground">
+            <Heading title={part.run} className="min-w-0 text-label-medium text-muted-foreground">
               <RouteLink to="/runs/$runId" params={{ runId: part.run }} underline="hover" className="block truncate">
                 {HANDED[part.how]} · {part.asked || part.run} ↗
               </RouteLink>
-            </h5>
-            <Words text={part.body} />
+            </Heading>
+            <Words level={UNDER[level]} text={part.body} />
           </section>
         );
       })}
@@ -269,15 +286,28 @@ function TaskParts({ parts }: { parts: Frozen<TaskPart[]> }) {
   );
 }
 
-/** One layer, under its title, and where it lives beside the title where `home` is given. */
-export function Layer({ name, title, home, children }: { name: string; title: string; home?: ReactNode; children: ReactNode }) {
+/** One layer, under its title, a heading at `level` (an h4 unless given), and where it lives beside the title where `home` is given. */
+export function Layer({
+  name,
+  title,
+  home,
+  level = 4,
+  children,
+}: {
+  name: string;
+  title: string;
+  home?: ReactNode;
+  level?: LayerLevel;
+  children: ReactNode;
+}) {
+  const Heading = `h${level}` as const;
   return (
     <section data-layer={name} className="flex flex-col gap-1">
       {home === undefined ? (
-        <h4 className="text-label-medium text-muted-foreground">{title}</h4>
+        <Heading className="text-label-medium text-muted-foreground">{title}</Heading>
       ) : (
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <h4 className="text-label-medium text-muted-foreground">{title}</h4>
+          <Heading className="text-label-medium text-muted-foreground">{title}</Heading>
           <span data-home={name} className="min-w-0 text-body-small break-all text-muted-foreground">
             {home}
           </span>
@@ -289,13 +319,21 @@ export function Layer({ name, title, home, children }: { name: string; title: st
 }
 
 /**
- * A layer's words, drawn as the markdown they are written in, at the fold's size on a quiet ground of their own, a `#` under the
- * layer's title; or `none` where the run froze none.
+ * A layer's words, drawn as the markdown they are written in, at the fold's size on a quiet ground of their own, a `#` at `level` (an
+ * h5 unless given), one under the layer's title; or `none` where the run froze none.
  */
-export function Words({ text, none = 'None frozen on this run' }: { text: string | null; none?: string }) {
+export function Words({
+  text,
+  none = 'None frozen on this run',
+  level = 5,
+}: {
+  text: string | null;
+  none?: string;
+  level?: (typeof UNDER)[LayerLevel];
+}) {
   if (text === null) return <p className="text-body-small text-muted-foreground italic">{none}</p>;
   return (
-    <Markdown level={5} className="rounded bg-muted/60 p-3">
+    <Markdown level={level} className="rounded bg-muted/60 p-3">
       {text}
     </Markdown>
   );

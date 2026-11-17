@@ -166,9 +166,12 @@ export function StepWritten({ page }: { page: WorkflowStepPage }) {
   );
 }
 
-/** What a run of the step will be told, read now: the layers, each beside where it lives (`homesOf`). */
+/**
+ * What a run of the step will be told, read now: the layers, each beside where it lives (`homesOf`), each headed an h2, straight under
+ * the page's h1.
+ */
 export function StepTold({ page, place }: { page: WorkflowStepPage; place: PagePlace }) {
-  return <Told told={null} layers={page.layers} filed={false} homes={homesOf(page, place)} />;
+  return <Told told={null} layers={page.layers} filed={false} homes={homesOf(page, place)} level={2} />;
 }
 
 /**

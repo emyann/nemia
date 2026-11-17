@@ -19,6 +19,7 @@ import { runsMoved } from '@/lib/runWrites';
 import { POPOVER } from '../../lib/classes';
 import { Reading } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
+import { ACTION_LABEL } from '@/lib/runActions';
 
 /**
  * Hold, on a run's page: the button opens a popover where a person ticks the runs to wait on, or none, and may say why, and the hold is
@@ -32,11 +33,11 @@ export function HoldRun({ run }: { run: RunDetail }) {
   return (
     <DialogTrigger>
       <Button variant="outline" size="sm" data-hold-open>
-        Hold…
+        {ACTION_LABEL.hold}
       </Button>
       <Popover placement="bottom end" offset={6} className={cn(POPOVER, 'w-96')}>
         <Dialog aria-label={`Hold ${run.id}`} className="space-y-3 outline-none">
-          {({ close }) => <HoldRead run={run} onClose={close} />}
+          {({ close }) => <HoldQuestion run={run} onClose={close} />}
         </Dialog>
       </Popover>
     </DialogTrigger>
@@ -44,10 +45,13 @@ export function HoldRun({ run }: { run: RunDetail }) {
 }
 
 /**
- * The runs a hold may wait on (`holdCandidates`), read before the form is drawn: those not finished, newest created first, then the
- * finished, newest finished first, a page at a time with Show older for the next (`usePickerRuns`).
+ * The hold's question, wherever it is asked: the runs a hold may wait on (`holdCandidates`), read before the form is drawn — those not
+ * finished, newest created first, then the finished, newest finished first, a page at a time with Show older for the next
+ * (`usePickerRuns`) — and the form.
+ * @param props the props: the run to hold (its id and its repository), and what closes the surface the question is asked in, once held
+ *   or cancelled
  */
-function HoldRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
+export function HoldQuestion({ run, onClose }: { run: Pick<RunView, 'id' | 'repo'>; onClose: () => void }) {
   const { open, finished, more, older, reading, error } = usePickerRuns();
   if (error) {
     return (

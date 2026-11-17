@@ -6,16 +6,16 @@ import { StepHire } from './StepHire';
 import { seeded } from '../../../.storybook/fixtures/proposals';
 
 /** The factory the stories hire in. */
-const FACTORY = 'nemia';
+const FACTORY = 'acme';
 
 /** Where the stories read the step: in the factory, by its path. */
 const PLACE = { factory: FACTORY };
 
-/** The step `review` of your workflow `build`, read in the factory, with `extra` over it: no agent hired, none to pick. */
+/** The step `review` of your workflow `release`, read in the factory, with `extra` over it: no agent hired, none to pick. */
 const page = (extra: Partial<WorkflowStepPage> = {}): WorkflowStepPage => ({
-  workflow: 'build',
+  workflow: 'release',
   from: 'user',
-  dir: '/store/workflows/build',
+  dir: '/store/workflows/release',
   step: 'review',
   body: 'Review the change.',
   source: '---\nworkspace: main\n---\nReview the change.\n',
@@ -47,8 +47,8 @@ const page = (extra: Partial<WorkflowStepPage> = {}): WorkflowStepPage => ({
 const PICKABLE: WorkflowStepPage['hiring'] = {
   refused: null,
   agents: [
-    { name: 'agora', description: 'Reads a change and asks for another round or passes it.' },
-    { name: 'scribe', description: null },
+    { name: 'reviewer', description: 'Reads a change and asks for another round or passes it.' },
+    { name: 'shipper', description: null },
   ],
 };
 
@@ -72,7 +72,7 @@ const drawn = (read: WorkflowStepPage, where: 'page' | 'row' = 'page') => (
 const meta: Meta<typeof StepHire> = {
   title: 'Run/StepHire',
   component: StepHire,
-  args: { from: 'user', workflow: 'build', step: 'review', place: PLACE, where: 'page' },
+  args: { from: 'user', workflow: 'release', step: 'review', place: PLACE, where: 'page' },
   parameters: { a11y: { config: { rules: [{ id: 'label-content-name-mismatch', enabled: false }] } } },
 };
 export default meta;
@@ -97,16 +97,16 @@ export const PickerOpen: Story = {
     const trigger = canvasElement.querySelector<HTMLElement>('[data-hire-picker] [data-slot="select-trigger"]');
     await userEvent.click(trigger!);
     const options = await waitFor(() => within(canvasElement.ownerDocument.body).getAllByRole('option'));
-    await expect(options.map((option) => option.dataset.hireAgent)).toEqual(['agora', 'scribe']);
+    await expect(options.map((option) => option.dataset.hireAgent)).toEqual(['reviewer', 'shipper']);
   },
 };
 
 /** An agent hired: who, linked, and Fire. */
 export const Hired: Story = {
   args: { where: 'page' },
-  render: (args) => drawn(page({ hired: 'agora', hiring: PICKABLE }), args.where),
+  render: (args) => drawn(page({ hired: 'reviewer', hiring: PICKABLE }), args.where),
   play: async ({ canvasElement }) => {
-    await expect(canvasElement.querySelector('[data-fire="agora"]')).not.toBeNull();
+    await expect(canvasElement.querySelector('[data-fire="reviewer"]')).not.toBeNull();
     await expect(canvasElement.querySelector('[data-hire-picker]')).toBeNull();
   },
 };
@@ -126,7 +126,7 @@ export const Refused: Story = {
   args: { where: 'page' },
   render: (args) =>
     drawn(
-      page({ hiring: { refused: "The step's own file names its agent, `agent: scribe`, which fills it in every factory.", agents: [] } }),
+      page({ hiring: { refused: "The step's own file names its agent, `agent: shipper`, which fills it in every factory.", agents: [] } }),
       args.where,
     ),
   play: async ({ canvasElement }) => {

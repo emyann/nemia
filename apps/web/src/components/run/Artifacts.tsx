@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { Link } from '@tanstack/react-router';
+import { Link, useRouter } from '@tanstack/react-router';
 import { FileText } from 'lucide-react';
 import type { StepArtifact, StepValue } from '../../lib/api/tries.ts';
 import { fileKey } from '../../lib/stepPart';
 import { viewOpened } from '../../lib/viewAddress';
 import { cn, focusRing } from '../ui/ds/utils';
+import { Chip as KitChip } from '../ui/ds';
 import { when } from '../step/Facts';
 
 /**
@@ -25,12 +26,6 @@ export const bytesWord = (bytes: number): string =>
 type Served = Extract<StepArtifact, { url: string }>;
 
 const served = (artifact: StepArtifact): artifact is Served => 'url' in artifact;
-
-/** A chip's frame: a hairline box in the mono face, the kit's ring under the keyboard. */
-const CHIP = cn(
-  'inline-flex max-w-full items-center gap-1.5 border border-outline-variant px-2 py-1 font-mono text-body-small text-on-surface no-underline hover:bg-surface-container-high',
-  focusRing(),
-);
 
 /**
  * What opens a served file: with the step it is of, its viewer's sheet by the address (`?view=<step>/<path>`, a push, so Back closes
@@ -128,13 +123,58 @@ function Chip({ artifact, step, size }: { artifact: StepArtifact; step: string |
       </span>
     );
   }
+  return step === null ? (
+    <Opened artifact={artifact} href={artifact.url} size={size} />
+  ) : (
+    <Viewed artifact={artifact} step={step} size={size} />
+  );
+}
+
+/** The glyph of a file that is no picture, at the size the kit's chip hands its icon. */
+function FileGlyph({ size, className }: { size?: number; className?: string }) {
+  return <FileText aria-hidden="true" size={size} className={className} />;
+}
+
+/** A served file whose step is named: the chip links to its viewer's sheet by the address, `?view=<step>/<path>`. */
+function Viewed({ artifact, step, size }: { artifact: Served; step: string; size: boolean }) {
+  const router = useRouter();
+  const href = router.buildLocation({
+    to: '.',
+    search: (prev: Record<string, unknown>) => viewOpened(prev, { step, path: fileKey(artifact) }),
+  }).href;
+  return <Opened artifact={artifact} href={href} size={size} view={fileKey(artifact)} />;
+}
+
+/**
+ * A served file as the kit's assist chip, a link: to its viewer's sheet where `view` names its path there (a push that keeps the page's
+ * scroll, so Back closes it), else to `href`, the file itself, in a new tab. Its name, then its size where `size` asks or it is no text,
+ * cut to the room the list gives it, whole in the title of what holds it.
+ */
+function Opened({ artifact, href, size, view }: { artifact: Served; href: string; size: boolean; view?: string }) {
   return (
-    <span data-artifact={artifact.kind}>
-      <Opens artifact={artifact} step={step} className={CHIP}>
-        <FileText aria-hidden="true" className="size-3.5 shrink-0 text-on-surface-variant" />
-        <span className="truncate">{artifact.name}</span>
-        {(size || artifact.kind === 'other') && <span className="shrink-0 text-on-surface-variant">· {bytesWord(artifact.size)}</span>}
-      </Opens>
+    <span
+      data-artifact={artifact.kind}
+      data-opens-view={view}
+      title={`Open ${artifact.name}`}
+      className="inline-flex max-w-full [&>a]:max-w-full [&>a>div]:min-w-0 [&>a>div>span]:min-w-0"
+    >
+      <KitChip
+        href={href}
+        target={view === undefined ? '_blank' : undefined}
+        rel={view === undefined ? 'noreferrer' : undefined}
+        routerOptions={view === undefined ? undefined : { resetScroll: false }}
+        icon={FileGlyph}
+      >
+        <span className="block truncate font-mono">
+          {artifact.name}
+          {(size || artifact.kind === 'other') && (
+            <>
+              {' '}
+              <span className="text-on-surface-variant">· {bytesWord(artifact.size)}</span>
+            </>
+          )}
+        </span>
+      </KitChip>
     </span>
   );
 }

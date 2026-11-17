@@ -114,6 +114,7 @@ export default {
         `${file} is a check-affecting chip`,
       );
     }
+    await photograph(decide.locator(`[data-touched="${FAKE.branch}"]`), path.join(OUT, `run-decide-files-${await themeOf(page)}.png`));
     await expectVisible(
       decide.locator('[data-lesson="written"]', { hasText: FAKE.lesson }),
       `the lesson chip says what the run wrote (${FAKE.lesson})`,
@@ -285,7 +286,7 @@ export default {
     const thumb = gave.locator('a[data-opens-view]', { has: page.locator('img'), hasText: FAKE.artifacts.image });
     await expectCount(thumb, 1, `${FAKE.artifacts.image} is inside a link that opens it in the viewer's sheet`);
     await expectVisible(
-      gave.locator('a[data-opens-view]', { hasText: FAKE.artifacts.text }),
+      gave.locator('[data-opens-view] a[data-slot="chip"]', { hasText: FAKE.artifacts.text }),
       `the text file it named is a link to its viewer (${FAKE.artifacts.text})`,
     );
     await expectVisible(

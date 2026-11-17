@@ -51,7 +51,7 @@ type StepCloseout = import('../src/lib/api/tries.ts').StepCloseout;
 const { RecommendButton } = await import('../src/components/gate/Questions.tsx');
 type Question = import('../src/lib/api/tries.ts').Question;
 const Answering = await import('../src/components/gate/Decide.tsx');
-const { container, hairline, ringed } = await import('../src/lib/meaning.ts');
+const { container, ringed } = await import('../src/lib/meaning.ts');
 const { decisionStamp } = await import('../src/lib/decide.ts');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
 const Gates = await import('../src/components/gate/Gate.tsx');
@@ -100,16 +100,15 @@ test("each group's bar is its share of the most lines a group changed: the large
   assert.match(html, /data-group="\(root\)"[\s\S]*?>−0<\/span><span[^>]*> · 1 binary<\/span>/);
 });
 
-test('the agent-facing chips are a hairline at rest and the check-affecting ones ringed in yours, each titled with why — and neither is drawn when there are none', () => {
+test("the agent-facing files are the kit's outlined Tag in its hairline and the check-affecting ones outlined in yours, each titled with why — and neither is drawn when there are none", () => {
   const both = renderToStaticMarkup(
     createElement(Chips, { agentFacing: ['CLAUDE.md'], checkAffecting: ['package.json', 'packages/x/test/add.test.ts'] }),
   );
-  const chips = [...both.matchAll(/<span data-chip="([^"]+)" title="([^"]+)" class="([^"]+)">([^<]+)<\/span>/g)].map((m) => ({
-    kind: m[1],
-    title: m[2],
-    cls: m[3],
-    file: m[4],
-  }));
+  const chips = [
+    ...both.matchAll(
+      /<span data-slot="tag" data-variant="([^"]+)"[^>]*data-chip="([^"]+)" title="([^"]+)" class="([^"]+)">[\s\S]*?<span class="[^"]*font-mono[^"]*">([^<]+)<\/span>/g,
+    ),
+  ].map((m) => ({ variant: m[1], kind: m[2], title: m[3], cls: m[4], file: m[5] }));
   assert.deepEqual(
     chips.map(({ kind, title, file }) => [kind, title, file]),
     [
@@ -117,10 +116,16 @@ test('the agent-facing chips are a hairline at rest and the check-affecting ones
       ['check-affecting', 'could make its check pass', 'package.json'],
       ['check-affecting', 'could make its check pass', 'packages/x/test/add.test.ts'],
     ],
+    both,
   );
-  assert.ok(holds(chips[0].cls, hairline), 'a note: at rest');
+  assert.ok(
+    chips.every((chip) => chip.variant === 'outlined'),
+    "each is the kit's outlined Tag",
+  );
+  assert.ok(holds(chips[0].cls, 'border-outline-variant text-on-surface-variant'), 'a note: the hairline, at rest');
   for (const chip of chips.slice(1)) {
-    assert.ok(holds(chip.cls, ringed.yours), 'what a person weighs: yours, drawn light');
+    assert.ok(holds(chip.cls, 'border-yours text-yours'), 'what a person weighs: yours, drawn light');
+    assert.doesNotMatch(chip.cls, /\bborder-outline-variant\b|\btext-on-surface-variant\b/, "yours takes the hairline's place");
     assert.doesNotMatch(chip.cls, /\bbg-/, 'an outline, not a fill');
   }
 

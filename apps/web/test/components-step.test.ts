@@ -1365,7 +1365,7 @@ test('a try whose statement could not be read says so in its Said, why, and show
   );
 });
 
-test("a closeout's picture is a thumbnail captioned by its name, which names its link, its own alt empty; every other file it serves a chip, with its size where it is no text; a bare path the path; each opening in a new tab where no step is named", () => {
+test("a closeout's picture is a thumbnail captioned by its name, which names its link, its own alt empty; every other file it serves the kit's assist chip, with its size where it is no text; a bare path the path; each opening in a new tab where no step is named", () => {
   const url = (name: string) => `/api/runs/r-1/steps/shoot/artifacts/${name}`;
   const dir = '/wf/runs/r-1/artifacts/shoot';
   const html = renderToStaticMarkup(
@@ -1383,9 +1383,11 @@ test("a closeout's picture is a thumbnail captioned by its name, which names its
   assert.ok(image.includes(`<a href="${url('shot.png')}" target="_blank" rel="noreferrer"`), image);
   assert.match(image, /<a [^>]*><img src="\/api\/runs\/r-1\/steps\/shoot\/artifacts\/shot\.png" alt=""/);
   assert.match(image, />shot\.png<\/span><\/a>/, 'the caption inside the link names it');
-  assert.ok(text.includes(`<a href="${url('notes.txt')}" target="_blank" rel="noreferrer"`), text);
+  assert.match(text, /<a data-slot="chip" data-variant="assist"[^>]*>/, "the kit's assist chip, a link");
+  assert.ok(text.includes(`href="${url('notes.txt')}" target="_blank" rel="noreferrer"`), text);
+  assert.doesNotMatch(text, /data-opens-view/, 'no step named: the file itself, in a new tab');
   assert.doesNotMatch(text, / · /, 'a text file: no size');
-  assert.match(other, />trace\.zip<\/span><span[^>]*>· 2\.3 MB<\/span>/);
+  assert.match(other, /<a data-slot="chip"[\s\S]*>trace\.zip <span[^>]*>· 2\.3 MB<\/span>/);
   assert.match(bare, /data-artifact="path"[^>]*>RESPONSE\.md<\/span>/);
   assert.doesNotMatch(bare, /<a /);
   assert.equal(html.match(/<img /g)?.length, 1, 'only the picture is drawn');

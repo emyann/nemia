@@ -21,6 +21,7 @@ import { mswLoader } from 'msw-storybook-addon/csf3';
 import { STORY_FINISHED, type StoryFinishedPayload } from 'storybook/internal/core-events';
 import { addons } from 'storybook/preview-api';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
+import { ariaNavigate } from '@/components/nav/ariaNavigate';
 import '../src/styles.css';
 import { ScanLines } from '../src/components/look';
 import { useScrollMark } from '../src/lib/useScrollMark';
@@ -65,7 +66,7 @@ function Stage() {
   const drawn = useContext(Drawing);
   if (!drawn) return null;
   return (
-    <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
+    <AriaRouterProvider navigate={ariaNavigate(router)}>
       {drawn.marked && <ScrollMark />}
       <ScanLines>
         <div data-story-ground data-at={at} data-moves={moves} style={GROUND}>

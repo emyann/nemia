@@ -22,9 +22,9 @@ import { Facts, HEADING, pathRow, readRows, TrialMerges } from '../step/Facts';
 import { AskedRow, Asks, QuestionsForm } from './Questions';
 import { EnoughRow } from '../step/Enough';
 import { RaiseRow } from './Raise';
-import { container, dashed, hairline, ringed } from '../../lib/meaning';
+import { container, dashed, ringed } from '../../lib/meaning';
 import { OFFERS } from '../../lib/words';
-import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
+import { Button, Radio, RadioGroup, Tag, TextField } from '@/components/ui/ds';
 import { Pending } from '@/components/look';
 
 /**
@@ -402,31 +402,34 @@ const AGENT_FACING = 'the next agent reads this';
 const CHECK_AFFECTING = 'could make its check pass';
 
 /**
- * The files an agent reads as instructions (amber), and those that decide what a check means (red outline). Nothing for a list that is
- * empty.
+ * The files an agent reads as instructions, each the kit's outlined `Tag` in its hairline, and those that decide what a check means, its
+ * outline and ink in yours: what a person weighs, drawn light. Each is titled with why. Nothing for a list that is empty.
  */
 export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly string[]; checkAffecting: readonly string[] }) {
   if (!agentFacing.length && !checkAffecting.length) return null;
   const row = (label: string, files: readonly string[], kind: string, title: string, className: string) =>
     files.length > 0 && (
-      <p className="flex flex-wrap items-center gap-1.5">
-        <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
-        {files.map((file) => (
-          <span
-            key={file}
-            data-chip={kind}
-            title={title}
-            className={cn('break-all rounded px-1.5 py-0.5 font-mono text-body-small', className)}
-          >
-            {file}
-          </span>
-        ))}
+      <p className="flex items-start gap-1.5">
+        <span className="w-28 shrink-0 py-0.5 text-muted-foreground">{label}</span>
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {files.map((file) => (
+            <Tag
+              key={file}
+              variant="outlined"
+              data-chip={kind}
+              title={title}
+              className={cn('h-auto min-h-6 min-w-0 max-w-full shrink whitespace-normal py-0.5', className)}
+            >
+              <span className="break-all font-mono">{file}</span>
+            </Tag>
+          ))}
+        </span>
       </p>
     );
   return (
     <div className="space-y-1.5 text-body-small">
-      {row('agent-facing', agentFacing, 'agent-facing', AGENT_FACING, hairline)}
-      {row('check-affecting', checkAffecting, 'check-affecting', CHECK_AFFECTING, ringed.yours)}
+      {row('agent-facing', agentFacing, 'agent-facing', AGENT_FACING, '')}
+      {row('check-affecting', checkAffecting, 'check-affecting', CHECK_AFFECTING, 'border-yours text-yours')}
     </div>
   );
 }

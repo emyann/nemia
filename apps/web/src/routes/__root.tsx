@@ -12,6 +12,7 @@ import { FramePaneProvider, HerSheetProvider, useFrameFold } from '@/components/
 import { FactoryPane } from '@/components/frame/FactoryPane';
 import { MachineBar } from '@/components/frame/MachineBar';
 import { seatOf } from '@/components/nav/nav';
+import { ariaNavigate } from '@/components/nav/ariaNavigate';
 import { factoryRedirect } from '@/lib/factoryAddress';
 import { LinkRefusal } from '@/components/frame/LinkRefusal';
 import { NewerRelease } from '@/components/frame/NewerRelease';
@@ -81,7 +82,7 @@ function Root() {
   const linesHeight = useFrameSize(lines, true).height;
 
   return (
-    <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
+    <AriaRouterProvider navigate={ariaNavigate(router)}>
       <NemiaChatProvider>
         <HerSheetProvider>
           <FramePaneProvider shortcut={seatOf(path)?.level === 'factory'}>

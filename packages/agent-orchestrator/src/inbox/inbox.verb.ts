@@ -12,7 +12,6 @@ import { Cause, Effect, Exit } from 'effect';
 import { WorkflowError } from '../step/step.ts';
 import { workflowDirAt, workflowFolder, workflowsIn } from '../folder/folder.store.ts';
 import type { WorkflowDir } from '../folder/folder.model.ts';
-import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import {
   cardWorkflowName,
   cardWorkflowRefusal,
@@ -42,11 +41,10 @@ import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { CardName } from './inbox.model.ts';
 import { filedNames, inboxCards, readableFactories } from './inbox.store.ts';
-import { startRun, type StartedRun } from '../start/start.verb.ts';
+import { startRun, startedSteps, type StartedRun } from '../start/start.verb.ts';
 import { cardRuns, type SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
 import { contextRefusal } from '../start/index.ts';
-import { placesOf } from '../folder/lookup.store.ts';
 import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { defaultStartRefusal, unattachedRefusal, wiredRepo, type Factory } from '../factory/factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
@@ -228,7 +226,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
       `${card.file}: the brief given in place of the card's body is empty. Give what the run is asked to do, or leave it out, and the run is asked what the card says.`,
     );
   }
-  const gates = yield* cardGates(card, opts.gates ?? [], workflowDir, repo);
+  const gates = yield* cardGates(card, opts.gates ?? [], workflowDir, repo, filed);
   const ids = new Set(yield* runs.runs.ids());
   const context = cardContext(card, opts, (id) => ids.has(id));
 
@@ -271,12 +269,17 @@ const takeQueueOff = (name: CardName, file: string): Effect.Effect<string | unde
 
 /**
  * The steps a card's run is gated at: its `gate:` first, then `flags`, a step both name once — refused as the card's line when no step,
- * its workflow's steps read through the Workflow door the program is given.
+ * its workflow's steps read as the start reads them (`startedSteps`): in `filed`, with the agents it hires into them.
  */
-const cardGates = Effect.fn('cardGates')(function* (card: InboxCard, flags: readonly string[], workflowDir: WorkflowDir, repo: string) {
-  const home = yield* StoreRoot;
+const cardGates = Effect.fn('cardGates')(function* (
+  card: InboxCard,
+  flags: readonly string[],
+  workflowDir: WorkflowDir,
+  repo: string,
+  filed: Factory | undefined,
+) {
   if (card.gate !== undefined) {
-    const steps = yield* (yield* WorkflowDoor).workflows.read(workflowDir, placesOf(home, repo));
+    const steps = yield* startedSteps(workflowDir, repo, filed);
     const refusedGate = gateRefusal([card.gate], steps, (step) => `${card.file}: \`gate: ${step}\``);
     if (refusedGate) return yield* Effect.fail(new WorkflowError(`${refusedGate} Correct the line, or delete it.`));
   }

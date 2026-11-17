@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { StepPart } from '@/components/step/part/StepPart';
 import { SessionRetryingBand, SessionStoppedBand, SessionUnreadableBand } from '@/components/step/session/SessionBand';
@@ -17,7 +16,7 @@ import { waitsAtGate, stepState } from '@/lib/status';
 import { foldTranscript, heardIn, sessionToRead, withSaid, type Turn } from '@/lib/transcript';
 import { useStepTranscript, type Following } from '@/lib/useStepTranscript';
 
-import { BackToRuns } from '../run/RunPage';
+import { RunTrail } from '../run/RunPage';
 
 type Step = StepView;
 
@@ -30,7 +29,7 @@ export function StepPage({ runId, name, gone }: { runId: string; name: string; g
   if (gone) {
     return (
       <div className="space-y-3 p-4">
-        <BackToRuns />
+        <RunTrail runId={runId} step={name} />
         <RunGone id={runId} />
       </div>
     );
@@ -49,7 +48,7 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
   if (readGone(error)) {
     return (
       <div className="space-y-3 p-4">
-        <BackToRuns />
+        <RunTrail runId={runId} name={titleOf(run)} step={name} />
         <RunGone run={run} />
       </div>
     );
@@ -58,7 +57,7 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
   if (!step) {
     return (
       <div className="space-y-3 p-4">
-        <BackToRun run={run} />
+        <RunTrail runId={run.id} name={titleOf(run)} step={name} />
         <p className="text-body-medium text-failure">
           Run {run.id} has no step '{name}'. Its page lists the steps it has.
         </p>
@@ -69,7 +68,7 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
 }
 
 /**
- * The session of `step` in `run`: its header — the way back to its run, its name and whether it is followed live — then its part whole
+ * The session of `step` in `run`: its header — where it is (`RunTrail`), its name and whether it is followed live — then its part whole
  * (`StepPart` at L, its Debug in its detail), and under it the bands over its talk, its talk, and the composer under it — which is drawn
  * only while there is a session to say anything to, the stopped band standing in its place where there is not (`sayable`). The part and the
  * talk scroll together under the header, the talk held to 60% of the window so it keeps its own latest and its way back to it, the composer
@@ -101,7 +100,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
   return (
     <div className="flex h-[calc(100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot))] min-h-96 flex-col">
       <header aria-label="The step" className="shrink-0 space-y-1 border-b px-4 py-3">
-        <BackToRun run={run} />
+        <RunTrail runId={run.id} name={titleOf(run)} step={step.name} />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="font-semibold">{step.name}</h1>
           {following.live && (
@@ -161,17 +160,5 @@ export function SessionBody({ step, following, turns }: { step: Step; following:
         following.live ? 'Nothing said yet. The page follows the session as it goes.' : 'Its session said nothing the engine can read.'
       }
     />
-  );
-}
-
-function BackToRun({ run }: { run: RunDetail }) {
-  return (
-    <Link
-      to="/runs/$runId"
-      params={{ runId: run.id }}
-      className="block truncate text-body-medium text-muted-foreground hover:text-foreground"
-    >
-      ← {titleOf(run)}
-    </Link>
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { Button, Switch } from '@/components/ui/ds';
-import { BackToAgents, AgentLink, SkillRefused, SkillSourceBadge } from './AgentParts';
+import { DefinitionTrail, AgentLink, SkillRefused, SkillSourceBadge } from './AgentParts';
 import { SkillForm } from './SkillForm';
 import { saveSkill, SkillRefusal, skillQuery, switchPreload, type SkillDetail, type SkillDraft, type SkillSaved } from '@/lib/api/skills';
 import { costWords, drawnSkill, preloadWords, reachWords } from '@/lib/skills';
@@ -54,7 +54,7 @@ export function SkillPage({ from, name, place }: { from: string; name: string; p
 
   return (
     <article className="space-y-6">
-      <BackToAgents />
+      <DefinitionTrail kind="skill" name={name} place={place} />
 
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

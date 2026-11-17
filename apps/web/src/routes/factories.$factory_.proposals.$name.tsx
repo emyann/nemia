@@ -1,7 +1,6 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, linkOptions } from '@tanstack/react-router';
 import { ProposalCard } from '@/components/gate/ProposalCard';
-import { routeLink } from '@/components/nav/routeLink';
-import { Button } from '@/components/ui/ds';
+import { factoryLevel, Trail } from '@/components/nav/Trail';
 import { proposalQuery } from '@/lib/api/proposals';
 
 /**
@@ -14,20 +13,19 @@ export const Route = createFileRoute('/factories/$factory_/proposals/$name')({
   component: ProposalPage,
 });
 
-/** A button to a route, as the router draws its links (`routeLink`). */
-const RouterLinkButton = routeLink(Button);
-
-/** The proposal, as its own part draws it (`ProposalCard`), with the way back to its factory's proposals. */
+/** The proposal, as its own part draws it (`ProposalCard`), under where it is: its factory, its proposals, and itself. */
 function ProposalPage() {
   const { factory, name } = Route.useParams();
   return (
     <article data-proposal-page={name} className="mx-auto flex max-w-3xl flex-col gap-6">
       <header className="flex flex-col gap-3">
-        <div>
-          <RouterLinkButton to="/factories/$factory/proposals" params={{ factory }} variant="text" size="xsmall">
-            ← Back to the proposals
-          </RouterLinkButton>
-        </div>
+        <Trail
+          levels={[
+            ...factoryLevel(factory),
+            { name: 'Proposals', to: linkOptions({ to: '/factories/$factory/proposals', params: { factory } }) },
+            { name },
+          ]}
+        />
         <div className="flex flex-col gap-1">
           <h1 className="text-title-large">A proposal of {factory}</h1>
           <p className="text-body-medium text-muted-foreground">

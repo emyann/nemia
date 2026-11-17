@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, themeOf, trailLevel } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -249,7 +249,7 @@ export default {
       }
       await idle(page);
 
-      await page.getByRole('link', { name: '← Agents' }).click();
+      await trailLevel(page, 'Skills').click();
       await page.waitForURL((url) => url.pathname === '/agents', { timeout: WAIT_MS });
       const mine = page.locator('section[data-skill-place="user"]');
       await expectVisible(

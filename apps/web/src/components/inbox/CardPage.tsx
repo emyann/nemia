@@ -1,5 +1,4 @@
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
 import { AsWritten, KeyTable } from '../field/FilePage';
 import { Instant } from '../time/Instant';
 import { StartedAs } from './InboxParts';
@@ -12,6 +11,7 @@ import { startedCard } from '@/lib/inbox';
 
 import { seatFactory } from '../nav/nav';
 import { useSeat } from '../nav/useSeat';
+import { factoryLevel, inboxLevel, Trail } from '../nav/Trail';
 
 /**
  * One inbox card, to read: its body rendered, then each key a card may set with its value and what it means — or, with Source, its file as
@@ -24,7 +24,7 @@ export function CardPage({ name }: { name: string }) {
 
   return (
     <article className="space-y-6">
-      <BackToInbox />
+      <CardTrail name={card.name} />
 
       <header className="space-y-1">
         <h1 className="font-mono text-body-medium text-muted-foreground">{card.name}</h1>
@@ -72,17 +72,10 @@ export function CardPage({ name }: { name: string }) {
   );
 }
 
-/** The way back to the Inbox: the factory's, on a page under its path, else every factory's. */
-export function BackToInbox() {
+/**
+ * Where a card's page is: its factory where the page sits under one, the Inbox, and the card, by its `name`.
+ */
+export function CardTrail({ name }: { name: string }) {
   const factory = seatFactory(useSeat());
-  const className = 'text-body-medium text-muted-foreground hover:text-foreground';
-  return factory === undefined ? (
-    <Link to="/inbox" className={className}>
-      ← Inbox
-    </Link>
-  ) : (
-    <Link to="/factories/$factory/inbox" params={{ factory }} className={className}>
-      ← Inbox
-    </Link>
-  );
+  return <Trail levels={[...factoryLevel(factory), inboxLevel(factory), { name }]} />;
 }

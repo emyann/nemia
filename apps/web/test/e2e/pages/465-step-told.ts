@@ -218,9 +218,9 @@ export default {
       await expectVisible(page.locator(`[data-hired="${factory}"]`), 'back on the step, in the run’s factory');
       await expectHref(
         page,
-        'article > a',
+        `article nav[aria-label="Where you are"] a:text-is("${good.name}")`,
         `/factories/${factory}/workflows/repo/${good.name}?repo=${encodeURIComponent(checkout)}`,
-        'whose way back to its workflow keeps the place',
+        "whose trail's level of its workflow keeps the place",
       );
       await untold(page, placed, factory);
       await goto(page, '/workflows');

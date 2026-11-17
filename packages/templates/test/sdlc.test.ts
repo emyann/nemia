@@ -656,6 +656,10 @@ test("quick's review note says both cases of its land, and the run tells review 
       assert.ok(note.includes('With `land` named there, a person approves the land after your pass'), 'the case with land gated');
       assert.ok(note.includes('no reason to sign off `blocked`'), 'a card that waits on the person at its land is met by the gate');
       assert.ok(!/^\*\*Your pass lands the change\.\*\*/m.test(note), 'no paragraph says the pass lands, whatever the gates');
+      const pages = note.slice(note.indexOf('**A claim on a page you cannot read'));
+      assert.ok(pages.includes(`With no \`${GATES_AFTER}\`, it stops the landing`), 'a page claim blocks where no gate follows');
+      assert.ok(pages.includes('With `land` named there, it goes at the top of your sign-off'), 'and goes to the person at land');
+      assert.ok(!/^\*\*A claim on a page you cannot read stops the landing\.\*\*/m.test(note), 'never stops it whatever the gates');
     });
   await t.test('a run started with `--gate land` tells review so under that heading, naming land', () => {
     const gated = quickReviewBrief(['land']);

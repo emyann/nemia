@@ -82,11 +82,15 @@ green pull request makes the landing refuse rather than land. In this checkout, 
 way, it costs a retry and never a broken base. Once implement has merged the base, the diff your brief
 names shows the base's landings with the change: read the change alone with `git diff main-worktree/HEAD...HEAD`.
 
-**A claim on a page you cannot read stops the landing.** No design ran, so no step handed you a passage of any page outside the
-repository. Where the change rests on such a page — a claim of the card or of the implement step's `plan` — and your fence refuses it,
-nobody reads the change after you to check it: sign off `blocked`, with `needs` naming each claim and its page, and a person answers
-with `nemia retry <run> review --message "<what the page says>"`. A claim you could check, against the repository or a page your fence
-allows, is checked and is no reason to stop.
+**A claim on a page you cannot read waits for a person.** No design ran, so no step handed you a passage of any page outside the
+repository. Where the change rests on such a page — a claim of the card or of the implement step's `plan` — and your fence refuses it:
+
+- **With no `## Gates after you`, it stops the landing.** Nobody reads the change after you to check it: sign off `blocked`, with
+  `needs` naming each claim and its page, and a person answers with `nemia retry <run> review --message "<what the page says>"`.
+- **With `land` named there, it goes at the top of your sign-off**, each claim and its page, where the person who approves the land
+  reads it before anything merges: it is no reason to sign off `blocked`.
+
+A claim you could check, against the repository or a page your fence allows, is checked and is no reason to stop.
 
 **A change to this factory's definitions that the work needs** — an allow or a deny on a step, a line of a step's overlay — you
 propose, never name in your closeout for someone to write by hand: `nemia propose -f <file> -n <factory> --at run-end`, `<factory>`

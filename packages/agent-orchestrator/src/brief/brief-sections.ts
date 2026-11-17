@@ -80,6 +80,7 @@ export const TASK_HEADINGS = {
   'Before you sign off': 'run',
   'The run checks and lands your merge': 'run',
   'When you are finished': 'run',
+  'Gates after you': 'run',
   'What runs of this workflow cost': 'run',
   'The routes you choose between': 'run',
   'Merge <base>': 'run',

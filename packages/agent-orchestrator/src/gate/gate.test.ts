@@ -70,23 +70,24 @@ test('gatesOf, hasGate', async (t) => {
   });
 });
 
+/** `implement → review → land`, as quick is: land gated by the run alone. */
+const QUICK: StepSpec[] = [step('implement'), step('review', ['implement']), step('land', ['review'])];
+
 test("gatesAfterSection: a step is told the gates after it, the run's own and its workflow's", async (t) => {
-  /** `implement → review → land`, as quick is: land gated by the run alone. */
-  const QUICK: StepSpec[] = [step('implement'), step('review', ['implement']), step('land', ['review'])];
   const named = (section: string): string[] => [...section.matchAll(/`([a-z]+)`/g)].map((m) => m[1] ?? '').filter((n) => n !== 'nemia');
   await t.test('a run started with `--gate land` tells each step before land of it', () => {
     for (const s of QUICK.slice(0, 2)) assert.deepEqual(named(gatesAfterSection(s, { gates: ['land'] }, QUICK)), ['land'], s.name);
   });
   await t.test('a run gated nowhere after the step tells it nothing', () => {
-    assert.equal(gatesAfterSection(QUICK[1] as StepSpec, {}, QUICK), '');
-    assert.equal(gatesAfterSection(QUICK[1] as StepSpec, { gates: [] }, QUICK), '');
+    assert.equal(gatesAfterSection(QUICK[1], {}, QUICK), '');
+    assert.equal(gatesAfterSection(QUICK[1], { gates: [] }, QUICK), '');
   });
   await t.test('nor of a gate at the step itself, or before it', () => {
-    assert.equal(gatesAfterSection(QUICK[1] as StepSpec, { gates: ['implement', 'review'] }, QUICK), '');
+    assert.equal(gatesAfterSection(QUICK[1], { gates: ['implement', 'review'] }, QUICK), '');
   });
   await t.test("the workflow's own `gate: true` after the step, in the order the steps run", () => {
     const gated: StepSpec[] = [step('plan'), { ...step('implement', ['plan']), gate: true }, step('review', ['implement'])];
-    assert.deepEqual(named(gatesAfterSection(gated[0] as StepSpec, { gates: ['review'] }, gated)), ['implement', 'review']);
+    assert.deepEqual(named(gatesAfterSection(gated[0], { gates: ['review'] }, gated)), ['implement', 'review']);
   });
 });
 

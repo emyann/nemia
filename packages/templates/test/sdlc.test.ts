@@ -645,7 +645,7 @@ const quickReviewBrief = (gates: string[]): string => {
     steps: { implement: { taskId: 't-implement' }, review: { taskId: 't-review' }, land: { taskId: null } },
     gates,
   };
-  return composeBrief(steps[1] as (typeof steps)[number], run, steps);
+  return composeBrief(steps[1], run, steps);
 };
 
 test("quick's review note says both cases of its land, and the run tells review which by the heading the note names", async (t) => {

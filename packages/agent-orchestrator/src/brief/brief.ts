@@ -347,8 +347,8 @@ function endingLook(
 
 /**
  * What a step is handed under what was asked for: what each run it waited on or was handed concluded (`parents`), then what a person
- * approved, answered and accepted before it, the gates after it, and what recent runs of its workflow cost (`decided`), each section left out where it says
- * nothing.
+ * approved, answered and accepted before it, the gates after it, and what recent runs of its workflow cost (`decided`), each section
+ * left out where it says nothing.
  */
 function handedOf(
   step: StepSpec,

@@ -2,7 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { http, HttpResponse } from 'msw';
-import { API_VERSION, type Card } from 'objects';
+import { API_VERSION, DEFAULT_NAMESPACE, type Card } from 'objects';
 import { SnackbarRegion } from '@/components/ui/ds';
 import { factoriesQuery } from '../../lib/api/factories.ts';
 import { FileCard } from './FileCard';
@@ -40,7 +40,12 @@ export const ReadingTheFactories: StoryObj<typeof meta> = {
 const FILED: Card = {
   apiVersion: API_VERSION,
   kind: 'Card',
-  metadata: { name: 'write-the-release-notes', namespace: 'default', creationTimestamp: new Date(0).toISOString(), resourceVersion: '1' },
+  metadata: {
+    name: 'write-the-release-notes',
+    namespace: DEFAULT_NAMESPACE,
+    creationTimestamp: new Date(0).toISOString(),
+    resourceVersion: '1',
+  },
   spec: { body: 'Write the release notes' },
   status: { state: 'filed', runs: [], inPlay: true, title: 'Write the release notes', file: 'write-the-release-notes.md' },
 };

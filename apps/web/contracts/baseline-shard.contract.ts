@@ -28,11 +28,11 @@ const shardOfSpec = spec<(list: BaselineList, entry: string) => string>({
   ensures: {
     filedUnderItsList: {
       description: "An entry is filed in its own list's folder, never another list's",
-      condition: ({ input: [list], output }) => output.startsWith(`${FOLDER}${list}/`),
+      condition: ({ input: [list], output }) => output.startsWith(FOLDER + list + '/'),
     },
     filedByItsSourceFile: {
       description: "An entry is filed at its source file's path under src, as text, whatever the list keys in that file",
-      condition: ({ input: [list, entry], output }) => output === `${FOLDER}${list}/${sourceOf(entry).slice(SRC.length)}.txt`,
+      condition: ({ input: [list, entry], output }) => output === FOLDER + list + '/' + sourceOf(entry).slice(SRC.length) + '.txt',
     },
   },
 });
@@ -50,7 +50,7 @@ export type FiledApart = { readonly astray: readonly Astray[]; readonly empty: r
 /** The file `entry` belongs in on `list`, or none where it names no source file under src. */
 const homeOf = (list: BaselineList, entry: string): string | undefined =>
   sourceOf(entry).startsWith(SRC) && sourceOf(entry).length > SRC.length
-    ? `${FOLDER}${list}/${sourceOf(entry).slice(SRC.length)}.txt`
+    ? FOLDER + list + '/' + sourceOf(entry).slice(SRC.length) + '.txt'
     : undefined;
 
 /** Whether `files` names no file twice. */

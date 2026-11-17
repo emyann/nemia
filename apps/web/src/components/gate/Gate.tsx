@@ -234,10 +234,7 @@ function ApproveForm({
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span title={approveWaits(left, budgeting.unread)} className="inline-flex">
-          <Button
-            type="submit"
-            isDisabled={busy || left.length > 0 || budgeting.unread.length > 0}
-          >
+          <Button type="submit" isDisabled={busy || left.length > 0 || budgeting.unread.length > 0}>
             {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
           </Button>
         </span>
@@ -313,11 +310,7 @@ function SendBackForm({
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span title={notAnswered(waits)} className="inline-flex">
-          <Button
-            type="submit"
-            variant="tonal"
-            isDisabled={busy || waits.length > 0 || !(body.message?.trim() || body.answers)}
-          >
+          <Button type="submit" variant="tonal" isDisabled={busy || waits.length > 0 || !(body.message?.trim() || body.answers)}>
             {sendBack.isPending ? 'Sending back…' : 'Send back'}
           </Button>
         </span>

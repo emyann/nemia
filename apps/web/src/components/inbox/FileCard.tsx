@@ -128,8 +128,9 @@ function FactoryField({
       <Select
         label="Factory"
         data-factory-field
-        selectedKey={picked === '' ? NONE : picked}
-        onSelectionChange={(key) => onPick(key === NONE || key === null ? '' : String(key))}
+        placeholder="No factory: chosen at start"
+        value={picked === '' ? null : picked}
+        onChange={(key) => onPick(key === NONE || key === null ? '' : String(key))}
         className="@md/page:max-w-xs"
       >
         <SelectItem id={NONE} label="No factory: chosen at start" />
@@ -174,9 +175,10 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
         <Select
           label="Workflow"
           data-workflow-field
-          selectedKey={picked === null || picked === '' ? NONE : picked}
+          placeholder="None: chosen at start"
+          value={picked === null || picked === '' ? null : picked}
           isDisabled={offered.length === 0}
-          onSelectionChange={(key) => onWorkflow(key === NONE || key === null ? '' : String(key))}
+          onChange={(key) => onWorkflow(key === NONE || key === null ? '' : String(key))}
         >
           <SelectItem id={NONE} label="None: chosen at start" />
           {offered.map((name) => (

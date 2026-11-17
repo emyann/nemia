@@ -91,10 +91,7 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <AmountBox step={offer.step} amount={amount} onAmount={setAmount} disabled={rechecking} />
           <span title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined} className="inline-flex">
-            <Button
-              type="submit"
-              isDisabled={ask.isPending || left.length > 0 || (asks && !offer.questions.length && !message.trim())}
-            >
+            <Button type="submit" isDisabled={ask.isPending || left.length > 0 || (asks && !offer.questions.length && !message.trim())}>
               {ask.isPending ? 'Asking…' : raiseWord(offer.by, rechecking, asks)}
             </Button>
           </span>
@@ -240,7 +237,9 @@ function RaiseWords({
       {choosing && <QuestionFields questions={questions} draft={draft} onDraft={onDraft} />}
       {choosing && <RecommendButton questions={questions} draft={draft} onDraft={onDraft} />}
       <TextField
-        aria-label={choosing ? `A note to ${step} beside the answers` : asks ? `Your answer to ${step}` : `What to tell ${step}, if anything`}
+        aria-label={
+          choosing ? `A note to ${step} beside the answers` : asks ? `Your answer to ${step}` : `What to tell ${step}, if anything`
+        }
         multiline
         value={message}
         onChange={onMessage}

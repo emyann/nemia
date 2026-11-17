@@ -67,7 +67,10 @@ export function AsWritten({ file, source, children }: { file: string; source: st
     <section aria-label="The file" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-outline-variant pb-2">
         <p className="min-w-0 font-mono text-body-small break-all text-muted-foreground">{file}</p>
-        <span title={shown ? 'Show it rendered, with its keys' : 'Show the file as written, frontmatter included'} className="inline-flex shrink-0">
+        <span
+          title={shown ? 'Show it rendered, with its keys' : 'Show the file as written, frontmatter included'}
+          className="inline-flex shrink-0"
+        >
           <Button variant="outlined" size="xsmall" isToggle isSelected={shown} onChange={setShown}>
             Source
           </Button>

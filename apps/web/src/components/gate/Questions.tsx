@@ -296,10 +296,7 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <span title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined} className="inline-flex">
-            <Button
-              type="submit"
-              isDisabled={ask.isPending || left.length > 0}
-            >
+            <Button type="submit" isDisabled={ask.isPending || left.length > 0}>
               {ask.isPending ? 'Asking…' : OFFERS.answer.button}
             </Button>
           </span>

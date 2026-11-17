@@ -45,7 +45,6 @@ const FIT = { padding: 0.2, maxZoom: 1 };
 /** Room under the lowest row for an edge drawn beneath it — a loop's, or one of steps that wait on each other — and its button. */
 const UNDER_ROOM = 100;
 
-
 /**
  * A folder of yours, built on the board: its steps as blocks with handles, drawn left to right by `after`. Drag from a block's right-hand
  * dot to another's left-hand dot and that one waits on it; from the violet dot underneath, and the block runs the other again (`loop:`,

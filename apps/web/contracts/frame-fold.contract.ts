@@ -1,11 +1,11 @@
 /**
  * How the frame stands around its one side sheet and its factory pane (`frameFold`, src/lib/frameFold.ts), from what holds now: how wide
  * the window is, whether the page sits in a factory's pane (`seatOf`, src/components/nav/nav.ts), whether the person keeps that pane open
- * (the `sidebar_state` cookie's fold, as the sidebar provider holds it), whether the address's `?bar=` names a thing, whether they opened
- * her sheet, and whether the page is her chat's own (`/chat`). The rail is the store's and never folds: it is the collapsed rail at the
- * window's left, or on a narrow screen the modal drawer. One sheet at a time: what the bar names takes the sheet, and naming one closes
- * her chat (`HerSheetProvider`). At 1600 and wider the sheet is the third pane, beside the factory pane; narrower it opens over the
- * factory pane, which comes back the moment it closes. Level-triggered: the pane covered by the sheet is never written as the person's
+ * (the `sidebar_state` cookie's fold, as the frame's `FramePaneProvider` holds it), whether the address's `?bar=` names a thing, whether
+ * they opened her sheet, and whether the page is her chat's own (`/chat`). The rail is the store's and never folds: it is the collapsed
+ * rail at the window's left, or on a narrow screen the modal drawer. One sheet at a time: what the bar names takes the sheet, and naming
+ * one closes her chat (`HerSheetProvider`). At 1600 and wider the sheet is the third pane, beside the factory pane; narrower it opens over
+ * the factory pane, which comes back the moment it closes. Level-triggered: the pane covered by the sheet is never written as the person's
  * fold.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
@@ -18,7 +18,7 @@ export type FrameAt = {
   readonly width: FrameWidth;
   /** The page sits in one factory's pane (`seatOf` answers the factory level), so the frame draws that pane. */
   readonly hasPane: boolean;
-  /** The factory pane as the person last left it (`useSidebar().open`): open, or folded by them with the menu button or Ctrl+B. */
+  /** The factory pane as the person last left it (`useFramePane().open`): open, or folded by them with the menu button or Ctrl+B. */
   readonly paneOpen: boolean;
   /** The address's `?bar=` names a thing to show (`useBar().open`), on any page, hers included. */
   readonly barOpen: boolean;

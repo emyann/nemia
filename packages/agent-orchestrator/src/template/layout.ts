@@ -104,6 +104,11 @@ export type Step = {
   gate?: boolean;
   budget?: Value<number>;
   check?: Value<string>;
+  /**
+   * The memory the step's check asks of the machine, a Kubernetes quantity (`256Mi`), as its line writes it: often a parameter's value,
+   * whose empty value writes no line, so the check asks the daemon's default.
+   */
+  checkMemory?: string;
   loop?: string;
   rounds?: number;
   /** A condition's routes, how it answers them, and those on which the run ends; a node's routes; a workflow node's workflow. */
@@ -310,6 +315,7 @@ const STEP: Shape = {
     gate: 'boolean',
     budget: 'count',
     check: 'words',
+    checkMemory: 'string',
     loop: 'string',
     rounds: 'number',
     routes: 'strings',

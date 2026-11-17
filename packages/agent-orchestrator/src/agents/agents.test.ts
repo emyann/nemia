@@ -260,6 +260,7 @@ const WIRING = [
   'check',
   'retries',
   'checkFailurePolicy',
+  'checkMemory',
   'gate',
   'loop',
   'rounds',

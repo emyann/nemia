@@ -125,6 +125,39 @@ test("what a render writes into a factory's tree, read back as today's folder re
     assert.equal(loaded.find((step) => step.name === 'review')?.memory, '4Gi');
     assert.deepEqual(stepsOf(loaded), stepsOf(loadWorkflows(path.join(repo, 'workflows', 'dev'))));
   });
+  await t.test(
+    "a step's `checkMemory:` is placed by the export, rendered back as its line and loads as it did; a parameter left empty writes no line",
+    () => {
+      const repo = scratch('wf-render-repo-');
+      fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+      const ship = path.join(repo, 'workflows', 'dev', 'ship.md');
+      fs.writeFileSync(ship, fs.readFileSync(ship, 'utf8').replace(/^check: /m, 'checkMemory: 256Mi\ncheck: '));
+      const dir = path.join(scratch('wf-render-out-'), 'team');
+      exportTemplate({ dir, from: repo });
+      const { tree, out } = rendered(dir);
+      assert.deepEqual(out.refusals, []);
+      assert.match(fs.readFileSync(path.join(tree, 'workflows/dev/ship.md'), 'utf8'), /^checkMemory: 256Mi$/m);
+      const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };
+      const loaded = loadWorkflows(path.join(tree, 'workflows', 'dev'), {}, fills);
+      assert.equal(loaded.find((step) => step.name === 'ship')?.checkMemory, '256Mi');
+      assert.deepEqual(stepsOf(loaded), stepsOf(loadWorkflows(path.join(repo, 'workflows', 'dev'))));
+
+      edit(dir, 'nemia.yaml', (spec) => {
+        spec.parameters = { asks: { type: 'string', description: 'what the check asks', default: '' } };
+      });
+      edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+        const step = spec.steps.find((one: { name: string }) => one.name === 'ship');
+        step.checkMemory = '${{ parameters.asks }}';
+      });
+      const blank = rendered(dir);
+      assert.deepEqual(blank.out.refusals, []);
+      assert.doesNotMatch(fs.readFileSync(path.join(blank.tree, 'workflows/dev/ship.md'), 'utf8'), /^checkMemory:/m);
+      const unset = loadWorkflows(path.join(blank.tree, 'workflows', 'dev'), {}, fills);
+      assert.equal(unset.find((step) => step.name === 'ship')?.checkMemory, undefined);
+      const set = rendered(dir, ['asks=64Mi']);
+      assert.match(fs.readFileSync(path.join(set.tree, 'workflows/dev/ship.md'), 'utf8'), /^checkMemory: 64Mi$/m);
+    },
+  );
   await t.test("a manifest's revisions policy is rendered into the tree's wiring, and a manifest that says none renders none", () => {
     const { dir } = exported();
     assert.equal(Object.hasOwn(rendered(dir).out.wiring, 'revisions'), false, 'a manifest that says nothing leaves the factory pinned');

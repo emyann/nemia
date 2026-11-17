@@ -210,6 +210,21 @@ test('each key a step has: read as written, and refused blank, twice or with a w
       refuses(`memory: ${bad}, which the runtime does not read`, 'implement', `memory: ${bad}`, `implement: \`memory: ${bad}\``),
     ),
 
+    ...['256Mi', '64Mi', '1G'].map((q) =>
+      reads(`checkMemory: ${q} beside a check, as written`, 'land', `check: npm test\ncheckMemory: ${q}`, { checkMemory: q }),
+    ),
+    reads("checkMemory: none, the daemon's default", 'land', 'check: npm test', { checkMemory: undefined }),
+    ...['lots', '0', '1.5Gi', '100m'].map((bad) =>
+      refuses(
+        `checkMemory: ${bad}, which the runtime does not read`,
+        'land',
+        `check: npm test\ncheckMemory: ${bad}`,
+        `\`checkMemory: ${bad}\``,
+        '`checkMemory: 256Mi`',
+      ),
+    ),
+    refuses('checkMemory: with no check to ask it for', 'land', 'checkMemory: 256Mi', '`check: <command>`'),
+
     ...(
       [
         ['5', 5],
@@ -917,6 +932,7 @@ const EVERY: Record<
   memory: '4Gi',
   budget: '2.50',
   check: `'npm test && node -e "console.log(1 ? 2 : 3)"'`,
+  checkMemory: '256Mi',
   retries: '0',
   gate: 'true',
   output: 'review.schema.json',
@@ -983,6 +999,7 @@ test('`renderStep`: the parser run backwards, in one canonical form, and refusin
             'memory: 4Gi',
             'budget: 2.5',
             `check: 'npm test && node -e "console.log(1 ? 2 : 3)"'`,
+            'checkMemory: 256Mi',
             'retries: 0',
             'gate: true',
             'output: review.schema.json',

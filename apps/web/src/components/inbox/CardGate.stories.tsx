@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, screen, within } from 'storybook/test';
+import { http, HttpResponse } from 'msw';
+import { expect, fn, screen, waitFor, within } from 'storybook/test';
 import { atRest } from '../../../.storybook/play';
 import { CardGate } from './CardGate';
 
@@ -9,7 +10,22 @@ const RUN = { id: 'ship-it-k2rq', namespace: 'nemia' };
 /** The ending `land`, which a send-back returns to `implement` or `review`. */
 const ENDING = { step: 'land', ends: true, back: ['implement', 'review'], onto: 'main' };
 
-/** The gate on the Factory's card, one story a state: on the card, Approve opened, and Send back opened on an ending that waits on two. */
+/** A gate in the run's middle, `plan`, which a send-back asks again. */
+const MID = { step: 'plan', ends: false, back: ['plan'], onto: null };
+
+/** The approval's address, as the api serves it. */
+const APPROVE = '/api/namespaces/:namespace/runs/:name/steps/:step/approve';
+
+/** The menu of the gate's other answers, opened from the split button's trailing half. */
+const menuOf = async (canvasElement: HTMLElement, userEvent: { click: (element: Element) => Promise<void> }) => {
+  await userEvent.click(within(canvasElement).getByRole('button', { name: 'Other answers to land' }));
+  return screen.findByRole('menu');
+};
+
+/**
+ * The gate on the Factory's card, one story a state: on the card, its menu, Approve pressed at an ending and asking its second press,
+ * Approve pressed mid-run and taken or refused, Approve with words… opened, and Send back… opened on an ending that waits on two.
+ */
 const meta: Meta<typeof CardGate> = {
   title: 'Factory/CardGate',
   component: CardGate,
@@ -24,18 +40,95 @@ export default meta;
 
 type Story = StoryObj<typeof CardGate>;
 
-/** On the card: what approving does, the kit's Approve and Send back…, and the link to what is being approved. */
+/** On the card: what approving does, the kit's split button — Approve, and the menu of the other answers — and the link to what is read. */
 export const OnTheCard: Story = {
   play: async ({ canvasElement }) => {
-    await expect(canvasElement.querySelector('[data-answer="Approve"]')).toHaveAttribute('data-slot', 'button');
-    await expect(canvasElement.querySelector('[data-answer="Send back"]')).toHaveAttribute('data-variant', 'outlined');
+    const split = canvasElement.querySelector('[data-gate-answer="land"] [data-slot="split-button"]');
+    await expect(split).toHaveAttribute('data-variant', 'filled');
+    await expect(within(canvasElement).getByRole('button', { name: 'Approve' })).toBeEnabled();
+    await expect(within(canvasElement).getByRole('button', { name: 'Other answers to land' })).toHaveAttribute('aria-haspopup');
   },
 };
 
-/** Approve pressed: the kit's popover, named for what it does, the words in the kit's text field and the press that runs the ending. */
+/** The trailing half pressed: the menu holds Approve with words… and Send back…, in that order. */
+export const Answers: Story = {
+  play: async ({ canvasElement, userEvent }) => {
+    const menu = await menuOf(canvasElement, userEvent);
+    const items = within(menu).getAllByRole('menuitem');
+    await expect(items.map((item) => item.textContent)).toEqual(['Approve with words…', 'Send back…']);
+  },
+};
+
+/** A gate no send-back reaches: its menu holds Approve with words… alone. */
+export const ApprovalAlone: Story = {
+  args: { gate: { step: 'land', ends: true, back: [], onto: 'main' } },
+  play: async ({ canvasElement, userEvent }) => {
+    const menu = await menuOf(canvasElement, userEvent);
+    await expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Approve with words…']);
+  },
+};
+
+/** Approve pressed at an ending: the first of two presses, it opens the approval's form, which says what running it does. */
+export const ConfirmingAnEnding: Story = {
+  args: { onTaken: fn() },
+  play: async ({ args, canvasElement, userEvent }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Approve' }));
+    const approval = await screen.findByRole('dialog', { name: 'Approve land' });
+    const asks = within(approval);
+    await waitFor(() => expect(asks.getByText(/cannot be taken back/)).toBeVisible());
+    await expect(asks.getByRole('button', { name: 'Run land now' })).toBeEnabled();
+    await expect(args.onTaken).not.toHaveBeenCalled();
+    atRest();
+  },
+};
+
+/** Approve pressed at a gate mid-run: the approval is sent at once, with no words, and the card is told it was taken. */
+export const Approved: Story = {
+  args: { gate: MID, title: 'plan waits on your approval', stamp: 'plan|1', onTaken: fn() },
+  parameters: {
+    msw: [
+      http.post(APPROVE, ({ params }) =>
+        HttpResponse.json(
+          { step: String(params.step), try: 1, at: '2026-11-17T10:00:00Z', message: null, file: 'approve-plan-1' },
+          { status: 202 },
+        ),
+      ),
+    ],
+  },
+  play: async ({ args, canvasElement, userEvent }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(args.onTaken).toHaveBeenCalledOnce());
+    await expect(screen.queryByRole('dialog')).toBeNull();
+    atRest();
+  },
+};
+
+/** Approve pressed at a gate mid-run and refused: the approval's form opens over the card to say the refusal in the api's words. */
+export const ApprovalRefused: Story = {
+  args: { gate: MID, title: 'plan waits on your approval', stamp: 'plan|1' },
+  parameters: {
+    msw: [http.post(APPROVE, () => HttpResponse.json({ error: 'plan is not waiting at its gate' }, { status: 409 }))],
+  },
+  play: async ({ canvasElement, userEvent }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Approve' }));
+    const approval = await screen.findByRole('dialog', { name: 'Approve plan' });
+    await waitFor(() => expect(within(approval).getByText('plan is not waiting at its gate')).toBeVisible());
+    atRest();
+  },
+};
+
+/**
+ * Approve with words… chosen: the kit's popover, named for what it does, the words in the kit's text field and the press that runs the
+ * ending.
+ */
 export const Approving: Story = {
   play: async ({ canvasElement, userEvent }) => {
-    await userEvent.click(canvasElement.querySelector<HTMLElement>('[data-answer="Approve"]')!);
+    const menu = await menuOf(canvasElement, userEvent);
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Approve with words…' }));
     const approval = await screen.findByRole('dialog', { name: 'Approve land' });
     const asks = within(approval);
     await expect(asks.getByRole('textbox', { name: 'Words to approve land with, if any' })).toBeVisible();
@@ -45,10 +138,11 @@ export const Approving: Story = {
   },
 };
 
-/** Send back pressed on an ending that waits on two: the words it needs, the kit's radios for where it goes, Send back held until words. */
+/** Send back… chosen on an ending that waits on two: the words it needs, the kit's radios for where it goes, Send back held until words. */
 export const SendingBack: Story = {
   play: async ({ canvasElement, userEvent }) => {
-    await userEvent.click(canvasElement.querySelector<HTMLElement>('[data-answer="Send back"]')!);
+    const menu = await menuOf(canvasElement, userEvent);
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Send back…' }));
     const sending = await screen.findByRole('dialog', { name: 'Send the work back' });
     const asks = within(sending);
     await expect(asks.getByRole('radio', { name: 'implement' })).toBeChecked();

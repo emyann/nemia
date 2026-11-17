@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { askRunAction, fed, partOf, photograph, themeOf } from '../board.ts';
-import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard, wordsSaying } from '../canvas.ts';
+import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard, wordsSaying, gateApprove } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -35,7 +35,7 @@ export default {
     await settled(page);
     const card = cardOf(page, id);
     const edge = holdEdgeOf(page, until, id);
-    await expectVisible(card.locator('[data-answer="Approve"]'), `before the hold, ${id}'s card offers ${gated}'s gate`);
+    await expectVisible(gateApprove(card), `before the hold, ${id}'s card offers ${gated}'s gate`);
     await expectCount(page.locator('[data-lift]'), 0, 'and no card offers a lift: nothing on the floor is held');
 
     try {
@@ -59,7 +59,7 @@ export default {
       await expectCount(wordsSaying(card, word), 0, 'the card says no hold');
       await expectCount(edge, 0, 'and no hold edge comes into it');
       await expectCount(page.locator('[data-lift]'), 0, 'and offers no lift');
-      await expectVisible(card.locator('[data-answer="Approve"]'), `and offers ${gated}'s gate again`);
+      await expectVisible(gateApprove(card), `and offers ${gated}'s gate again`);
 
       holdIt();
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });

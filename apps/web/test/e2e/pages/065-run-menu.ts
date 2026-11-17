@@ -47,11 +47,15 @@ export default {
       await page.locator('button[data-run-menu]').focus();
       await page.keyboard.press('Enter');
       const menu = await openRunMenu(page);
-      await expectTexts(menu.getByRole('menuitem'), ['Remove…', 'Prune…'], "Enter opens the menu on the run's actions, in their order");
+      await expectTexts(
+        menu.getByRole('menuitem'),
+        ['Remove…', 'Prune its files…'],
+        "Enter opens the menu on the run's actions, in their order",
+      );
       await expectVisible(menu.getByRole('menuitem', { name: 'Remove…' }).and(page.locator(':focus')), 'its first item focused');
       await settled(page);
       await photograph(page, path.join(OUT, `run-menu-open-${await themeOf(page)}.png`));
-      await menu.getByRole('menuitem', { name: 'Prune…', exact: true }).click();
+      await menu.getByRole('menuitem', { name: 'Prune its files…', exact: true }).click();
       const prune = page.getByRole('dialog', { name: `Prune ${id}` });
       await expectVisible(prune, 'Prune opens its own dialog once the menu closes');
       await page.keyboard.press('Escape');

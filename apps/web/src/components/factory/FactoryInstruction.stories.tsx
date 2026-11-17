@@ -5,6 +5,7 @@ import { factoryInstructionQuery } from '@/lib/api/factories';
 import { FactoryInstruction } from './FactoryInstruction';
 import { FACTORY, seeded } from '../../../.storybook/fixtures/proposals';
 import { instruction } from '../../../.storybook/fixtures/factories';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** The instruction of the factory, read as `store` says it is kept. */
 const drawn = (name: string, store: boolean) => (
@@ -38,4 +39,16 @@ export const InAFile: Story = {
     await expect(canvasElement.querySelector('[data-instruction-kept="folder"]')).not.toBeNull();
     await expect(canvasElement.querySelector('[data-instruction-place] input')).not.toBeNull();
   },
+};
+
+/** The instruction still read: the shape of its words. */
+export const Reading: Story = {
+  render: (args) => (
+    <Unread>
+      <div style={{ width: 640 }}>
+        <FactoryInstruction {...args} />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading the instruction…'),
 };

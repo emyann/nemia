@@ -2,7 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { http, HttpResponse } from 'msw';
 import type { Concluded } from 'objects';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
-import { ContextPicker } from './ContextPicker';
+import { ConcludedPreview, ContextPicker } from './ContextPicker';
+import { saysReading, Unread } from '../../../.storybook/unread';
 import { nothingWaits, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
 
 /** The run in flight a story picks: lgll, being checked. */
@@ -59,3 +60,27 @@ export const OnePicked: Story = {
 
 /** Held while the form writes: every box disabled. */
 export const Disabled: Story = { args: { selected: [LGLL], disabled: true } };
+
+/** The runs still read: the shape of the list's rows. */
+export const ReadingTheRuns: Story = {
+  render: (args) => (
+    <Unread>
+      <div style={{ width: 560 }}>
+        <ContextPicker {...args} />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading the runs…'),
+};
+
+/** A run picked, what it concluded still read: the shape of its section. */
+export const ReadingWhatItConcluded: Story = {
+  render: () => (
+    <Unread>
+      <div style={{ width: 560 }}>
+        <ConcludedPreview run="r-1" />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading what it concluded…'),
+};

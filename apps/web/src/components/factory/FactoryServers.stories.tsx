@@ -1,8 +1,9 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { FactoryServer, BuiltinServer } from '@/lib/api/factories';
-import { ServerForm, ServerRow, ServerState } from './FactoryServers';
+import { FactoryServers, ServerForm, ServerRow, ServerState } from './FactoryServers';
 import { SignInView } from './ServerSignIn';
+import { saysReading, Unread } from '../../../.storybook/unread';
 
 /**
  * A factory's MCP servers: every state a chip carries, a row in each of them, and the form that records a remote one. The colour of a
@@ -89,4 +90,17 @@ export const Writing: StoryObj = {
       <ServerForm builtin={BUILTIN} pending onRecord={() => {}} />
     </div>
   ),
+};
+
+/** A factory's servers while they are read: the shape of their framed rows, beside the rows drawn above. */
+export const Reading: StoryObj = {
+  args: {},
+  render: () => (
+    <Unread>
+      <div style={BOX}>
+        <FactoryServers name="nemia" />
+      </div>
+    </Unread>
+  ),
+  play: saysReading('Reading the servers…'),
 };

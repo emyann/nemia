@@ -14,6 +14,7 @@ import { atWork, atWorkWords, feedWords, versionWords } from '@/lib/footer';
 import { DaemonLine } from './DaemonLine';
 import { BarPanel } from './BarPanel';
 import { QuotaLine } from './QuotaLine';
+import { Reading, ReadingLines } from '@/components/look';
 
 /** One gauge: its name over what it says. */
 function Gauge({ name, children }: { name: string; children: ReactNode }) {
@@ -53,25 +54,31 @@ export function GaugesBar({ feed }: { feed: FeedStatus }) {
           </p>
         </Gauge>
         <Gauge name="At work">
-          <p data-at-work-sentence className="text-body-medium">
-            {runs.data
-              ? atWorkWords(atWork(runs.data)).title
-              : runs.error
-                ? `The runs could not be read: ${runs.error.message}`
-                : 'Reading the runs…'}
-          </p>
+          {runs.data || runs.error ? (
+            <p data-at-work-sentence className="text-body-medium">
+              {runs.data ? atWorkWords(atWork(runs.data)).title : `The runs could not be read: ${runs.error?.message}`}
+            </p>
+          ) : (
+            <Reading label="Reading the runs…">
+              <ReadingLines widths={['w-3/4']} className="text-body-medium" />
+            </Reading>
+          )}
         </Gauge>
         <Gauge name="Quota">
           <QuotaLine quota={quota.data} error={quota.error} />
         </Gauge>
         <Gauge name="Version">
-          <p data-version-sentence className="text-body-medium">
-            {version.data
-              ? `${versionWords(version.data).title}, as the api serving this board answers it.`
-              : version.error
-                ? `The version could not be read: ${version.error.message}`
-                : 'Reading the version…'}
-          </p>
+          {version.data || version.error ? (
+            <p data-version-sentence className="text-body-medium">
+              {version.data
+                ? `${versionWords(version.data).title}, as the api serving this board answers it.`
+                : `The version could not be read: ${version.error?.message}`}
+            </p>
+          ) : (
+            <Reading label="Reading the version…">
+              <ReadingLines widths={['w-2/3']} className="text-body-medium" />
+            </Reading>
+          )}
         </Gauge>
       </div>
     </BarPanel>

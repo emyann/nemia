@@ -20,6 +20,8 @@ import { Link } from '@tanstack/react-router';
 import { repoName } from '@/lib/factory';
 import { container, hairline } from '@/lib/meaning';
 import { libraryCount, libraryQuery } from '@/lib/api/storeLibrary';
+import { Reading, ReadingLines } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /**
  * How many items the store's library holds, besides what this repository offers, and a link to the Library, where a factory's adds are
@@ -36,6 +38,33 @@ function LibraryCount() {
       </Link>
       .
     </p>
+  );
+}
+
+/** The rows each section of the page is drawn with while it is read: skills, agents, MCP servers. */
+const SECTIONS_READ = [3, 2, 2];
+
+/**
+ * The page while the repository is read and each MCP server it enables is asked for its tools: its opening line, then its sections, each
+ * a heading and a list of rows. Shown at once: the router holds a pending page back a second already.
+ */
+export function CapabilitiesReading() {
+  return (
+    <Reading label="Reading the repository, and asking each MCP server it enables for its tools…" at="now" className="space-y-8">
+      <ReadingLines widths={['w-full', 'w-1/2']} className="text-body-medium" />
+      {SECTIONS_READ.map((rows, at) => (
+        <div key={at} className="space-y-3">
+          <Skeleton className="w-28 text-title-small" />
+          <div className="divide-y divide-outline-variant rounded-lg border border-outline-variant">
+            {Array.from({ length: rows }, (_, row) => (
+              <div key={row} className="px-3 py-2">
+                <ReadingLines widths={['w-40', 'w-3/4']} className="text-body-medium" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </Reading>
   );
 }
 

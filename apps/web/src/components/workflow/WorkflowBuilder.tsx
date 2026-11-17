@@ -32,6 +32,8 @@ import { SpecNode, type SpecFlowNode } from '../step/StepNode';
 import { ringed } from '../../lib/meaning';
 import { FLOOR_BOX } from '../../lib/classes';
 import { cn } from '../../lib/utils';
+import { Reading } from '@/components/look';
+import { Skeleton } from '@/components/ui/ds';
 
 /** The builder's node types for React Flow, one object for the module's life. */
 const nodeTypes = { spec: SpecNode };
@@ -256,7 +258,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
           {form.error ? (
             <p className="text-body-small text-failure">Could not read the keys a step may set: {form.error.message}</p>
           ) : !form.data ? (
-            <p className="text-body-small text-muted-foreground">Reading the keys a step may set…</p>
+            <KeysReading />
           ) : step ? (
             <StepForm
               key={`${step.name}:${version}`}
@@ -361,6 +363,20 @@ async function savedOf(base: WorkflowListing, draft: { steps: DraftStep[]; readm
     readme,
   });
   return { workflow, ...filesSaved(draft.steps, readme, base) };
+}
+
+/** The step's form while the keys a step may set are read: its fields, each a label over its box. */
+function KeysReading() {
+  return (
+    <Reading label="Reading the keys a step may set…" className="flex flex-col gap-3">
+      {[0, 1, 2].map((at) => (
+        <div key={at} className="flex flex-col gap-1">
+          <Skeleton className="w-20 text-label-medium" />
+          <Skeleton shape="rectangle" className="h-9 rounded-none" />
+        </div>
+      ))}
+    </Reading>
+  );
 }
 
 /**

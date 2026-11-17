@@ -89,8 +89,9 @@ async function badgeColour(page: Page): Promise<void> {
 }
 
 /**
- * The default factory's pane counts the seed's runs waiting on you on its Runs badge. On a factory's list, another factory picked keeps the place under its path, every place of the pane leading under it and its lines its
- * own; on a run's page a factory picked opens its runs; Factories in the rail leads to the store's floor.
+ * The default factory's pane counts the seed's runs waiting on you on its Runs badge. On a factory's list, another factory picked keeps
+ * the place under its path, every place of the pane leading under it and its lines its own; on a run's page a factory picked opens its
+ * runs; Factories in the rail leads to the store's floor.
  */
 async function picks(page: Page): Promise<void> {
   await waitingIs(page, 'on the store');

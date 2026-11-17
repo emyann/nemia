@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { cardsPath, photograph, themeOf } from '../board.ts';
+import { cardsPath, photograph, heldIn, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -99,11 +99,11 @@ export default {
       const { problems } = watch(other);
       await other.goto(page.url(), { waitUntil: 'load' });
       let item = await openStart(other);
-      const pick = item.getByRole('combobox', { name: 'Workflow' });
+      const pick = item.locator('[data-pick-workflow]');
       await expectVisible(pick, `Start opens ${CARD}'s start form`);
-      if ((await pick.inputValue()) !== WORKFLOWS.good.name)
+      if ((await heldIn(pick)) !== WORKFLOWS.good.name)
         throw new Refused(
-          `the start is preset to the workflow the card names, among those ${factory} offers — it was ${JSON.stringify(await pick.inputValue())}`,
+          `the start is preset to the workflow the card names, among those ${factory} offers — it was ${JSON.stringify(await heldIn(pick))}`,
         );
       await expectTexts(item.locator('[data-factory-repo]'), [checkout], `and says the repository ${factory} gives it, its only one`);
       await expectCount(item.getByRole('combobox', { name: 'Repository' }), 0, 'as text, never a list');

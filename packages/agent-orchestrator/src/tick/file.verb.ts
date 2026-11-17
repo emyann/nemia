@@ -28,6 +28,7 @@ import {
   budgetUsdFor,
   holdsOpenOn,
   landsOnCheck,
+  LANDING_MOMENTUM,
   MOMENTUM,
   sentBack,
   stepMomentum,
@@ -82,10 +83,17 @@ type Spec = Parameters<Engine['file']>[0];
 /**
  * What a step's session is limited by, a container's `resources`: its `memory:` as `limits.memory`, or nothing, where the engine's
  * default stands (`WF_MEMORY_LIMIT`). On a session alone, inside `localFields`, since the runtime refuses a limit on a remote agent; a
- * check is filed without it, and takes the engine's default.
+ * check is filed without it, asking its step's `checkMemory:` instead (`checkRequestOf`).
  */
 const limitsOf = (step: StepSpec): Pick<Spec, 'resources'> =>
   step.memory === undefined ? {} : { resources: { limits: { memory: step.memory } } };
+
+/**
+ * What a step's check asks of the machine, a container's `resources`: its `checkMemory:` as `requests.memory` alone, or nothing, where
+ * the engine's default request stands (`WF_MEMORY_REQUEST`). The runtime gives a request alone the engine's default limit beside it.
+ */
+const checkRequestOf = (step: StepSpec): Pick<Spec, 'resources'> =>
+  step.checkMemory === undefined ? {} : { resources: { requests: { memory: step.checkMemory } } };
 
 /**
  * The pass's closer of the tasks held open that wait for a word: `closeWaiting` closes one, and answers with the engine's refusal as a
@@ -530,10 +538,11 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
       e.file({
         id: taskId,
         harness: 'check',
-        priority: MOMENTUM,
+        priority: lands ? LANDING_MOMENTUM : MOMENTUM,
         brief: command,
         cwd: workspace,
         deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
+        ...checkRequestOf(step),
         config: { command: checkArgv(command, first), env, niceness: CHECK_NICENESS },
       }),
     );

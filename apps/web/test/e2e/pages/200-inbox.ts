@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { cardsPath, expectInstant, photograph, PLACES_SAID, sidebar, themeOf, railPlace, litOf } from '../board.ts';
+import { cardsPath, expectInstant, heldIn, photograph, pickIn, PLACES_SAID, sidebar, themeOf, railPlace, litOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import {
   CARDS,
@@ -39,10 +39,10 @@ const FACTORY = FACTORIES.hiring.name;
 async function startIn(p: Page, name: string): Promise<Locator> {
   const item = cardIn(p, name);
   await item.getByRole('button', { name: 'Start' }).click();
-  const pick = item.getByRole('combobox', { name: 'Factory' });
+  const pick = item.locator('[data-pick-factory]');
   await expectVisible(pick, `Start asks ${name}, which names no factory, for the factory it runs in`);
   await expectCount(item.locator(`form[aria-label="Start ${name}"]`), 0, 'and draws no start form before one is picked');
-  await pick.selectOption(FACTORY);
+  await pickIn(p, pick, FACTORY);
   return item;
 }
 
@@ -361,9 +361,9 @@ async function visit(page: Page): Promise<void> {
     }
 
     const plannedItem = await startIn(page, planned.name);
-    const workflowPick = plannedItem.getByRole('combobox', { name: 'Workflow' });
+    const workflowPick = plannedItem.locator('[data-pick-workflow]');
     await expectVisible(workflowPick, `Start opens ${planned.name}'s start form`);
-    const presetLabel = await workflowPick.locator('option:checked').textContent();
+    const presetLabel = await heldIn(workflowPick);
     if (presetLabel !== planned.workflow)
       throw new Refused(`the workflow is preset from the card (${planned.workflow}) — it was ${JSON.stringify(presetLabel)}`);
     const startForm = plannedItem.locator(`form[aria-label="Start ${planned.name}"]`);
@@ -657,12 +657,12 @@ async function visit(page: Page): Promise<void> {
       await refused.goto(page.url(), { waitUntil: 'load' });
       await idle(refused);
       const item = await startIn(refused, bare.name);
-      const pick = item.getByRole('combobox', { name: 'Workflow' });
+      const pick = item.locator('[data-pick-workflow]');
       await expectVisible(pick, `Start opens ${bare.name}'s start form`);
-      if ((await pick.inputValue()) !== '')
-        throw new Refused(`a card that names no workflow is preset to none — it was ${JSON.stringify(await pick.inputValue())}`);
+      if ((await heldIn(pick)) !== '')
+        throw new Refused(`a card that names no workflow is preset to none — it was ${JSON.stringify(await heldIn(pick))}`);
       await expectCount(item.locator(`form[aria-label="Start ${bare.name}"]`), 0, 'and has no Start until one is picked');
-      await pick.selectOption({ label: WORKFLOWS.good.name });
+      await pickIn(refused, pick, WORKFLOWS.good.name);
       const form = item.locator(`form[aria-label="Start ${bare.name}"]`);
       const bareBrief = form.getByRole('textbox', { name: 'Brief' });
       await expectVisible(bareBrief, 'a workflow picked, the brief and Start');

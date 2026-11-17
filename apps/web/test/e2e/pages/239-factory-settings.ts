@@ -143,7 +143,7 @@ async function expectKept(section: Locator, kept: 'store' | 'folder', file: stri
  * `NEMIA.md`, no file there yet.
  */
 async function followSettings(page: Page, section: Locator, checkout: string): Promise<void> {
-  await page.locator('[data-factory-settings-link]').click();
+  await page.locator('[data-floor-options]').getByRole('link', { name: 'Settings', exact: true }).click();
   await page.waitForURL((url) => url.pathname === `/factories/${FACTORY}/settings`, { timeout: WAIT_MS });
   await idle(page);
   await expectVisible(page.getByRole('heading', { level: 1, name: FACTORY }), "the page is headed with the factory's name");

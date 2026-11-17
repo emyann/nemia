@@ -69,7 +69,6 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/components/ui/sheet:SheetHeader': kit('SideSheet'),
   '@/components/ui/sheet:SheetTitle': kit('SideSheet'),
   '@/components/ui/sheet:SheetTrigger': kit('SideSheet'),
-  '@/components/ui/switch:Switch': kit('Switch'),
   '@/components/ui/textarea:Textarea': kit('TextField', 'multiline'),
   'react-aria-components:Button': kit('Button'),
   'react-aria-components:CheckboxGroup': kit('CheckboxGroup'),

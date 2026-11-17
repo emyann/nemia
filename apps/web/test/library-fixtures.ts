@@ -132,6 +132,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
   memory: null,
   budget: 5,
   check: 'npm test',
+  checkMemory: null,
   retries: 1,
   checkFailurePolicy: null,
   gate: true,

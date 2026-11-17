@@ -161,6 +161,27 @@ export function memoryOf(step: string, memory: string | undefined): string | und
 }
 
 /**
+ * `checkMemory:` as written, refused where the runtime reads no request off it (`memoryQuantityRefusal`, in its words), and refused on a
+ * step with no `check:` to ask it for: a Kubernetes quantity, `256Mi`, which the step's check is filed under as its
+ * `resources.requests.memory`.
+ * @param step The step's name, which a refusal starts with.
+ * @param checkMemory The `checkMemory:` line's value, undefined where the step has none.
+ * @param check The step's `check:` line, undefined where it has none.
+ */
+export function checkMemoryOf(step: string, checkMemory: string | undefined, check: string | undefined): string | undefined {
+  if (checkMemory === undefined) return undefined;
+  if (check === undefined)
+    return refuse(
+      `${step}: \`checkMemory:\` is the memory the step's \`check:\` asks of the machine, and this step has none. Add \`check: <command>\`, or delete the line.`,
+    );
+  const why = memoryQuantityRefusal(checkMemory);
+  if (why === undefined) return checkMemory;
+  return refuse(
+    `${step}: \`checkMemory: ${checkMemory}\` is not a memory request: ${why} \`checkMemory\` is the memory the step's check asks of the machine, a container's request, as a Kubernetes quantity — for example \`checkMemory: 256Mi\`.`,
+  );
+}
+
+/**
  * `context:` as tokens, refused unless a number of them (`tokensOf`). The windows a harness takes, and whether it has the knob, are the
  * runtime's to say at `nemia start` (`configRefused` in start.verb.ts).
  * @param step The step's name, which a refusal starts with.

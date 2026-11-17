@@ -38,6 +38,7 @@ const TREES = await rendered([
       'implementCheck=echo own',
       'landingRefresh=node x.ts cut',
       'landingDerives=a.json',
+      'landingCheckMemory=256Mi',
     ],
   },
   { name: 'plain', template: COPY },
@@ -150,6 +151,18 @@ test("build's and quick's implement try again on their own twice when their chec
       assert.equal(stepIn(treeOf(name), workflow, 'implement').front.retries, 2, `${name}: ${workflow}/implement`);
       assert.equal(stepIn(treeOf(name), workflow, 'land').front.retries, undefined, `${name}: ${workflow}/land waits on a person`);
     }
+});
+
+test("build's and quick's land check asks the memory the factory sets, and the daemon's default where it sets none", () => {
+  for (const workflow of ['build', 'quick']) {
+    assert.equal(loaded('set', workflow).find((step) => step.name === 'land')?.checkMemory, '256Mi', `set: ${workflow}/land`);
+    assert.equal(loaded('plain', workflow).find((step) => step.name === 'land')?.checkMemory, undefined, `plain: ${workflow}/land`);
+    assert.equal(
+      Object.hasOwn(stepIn(treeOf('plain'), workflow, 'land').front, 'checkMemory'),
+      false,
+      `plain: ${workflow}/land writes no line`,
+    );
+  }
 });
 
 /** The steps of `workflow` in the factory `name`'s tree, loaded as a start of it in the factory loads them: with the factory's hires. */

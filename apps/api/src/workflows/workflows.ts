@@ -439,14 +439,20 @@ export const specOf = (step: StepSpec): WorkflowStepSpec => ({
   denials: step.denials ?? null,
   remote: step.remote ?? null,
   ...boundsOf(step),
-  check: step.check ?? null,
-  retries: step.retries ?? null,
-  checkFailurePolicy: step.checkFailurePolicy ? checkFailurePolicyLine(step.checkFailurePolicy) : null,
+  ...checkingOf(step),
   gate: step.gate ?? null,
   output: step.output?.file ?? null,
   loop: step.loop ?? null,
   rounds: step.rounds ?? null,
   ...routingOf(step),
+});
+
+/** A step's check and what it asks, its tries and which of its exits a person answers, each null where the step does not say it. */
+const checkingOf = (step: StepSpec) => ({
+  check: step.check ?? null,
+  checkMemory: step.checkMemory ?? null,
+  retries: step.retries ?? null,
+  checkFailurePolicy: step.checkFailurePolicy ? checkFailurePolicyLine(step.checkFailurePolicy) : null,
 });
 
 /** A condition's keys and a node's, each null where the step does not say it. */

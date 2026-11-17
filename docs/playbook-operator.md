@@ -308,7 +308,8 @@ Environment=WF_CGROUP_PARENT=sessions.slice
 ```
 
 `WF_MEMORY_LIMIT` is a Kubernetes quantity (`6Gi`, `512Mi`, `4G`): every session and check the daemon files without a `memory:` of its
-step's runs under it. A step's `memory: 8Gi` raises or lowers it for that step's sessions alone; its check keeps the default. The runtime
+step's runs under it. A step's `memory: 8Gi` raises or lowers it for that step's sessions alone; its check keeps the default limit, and asks the step's
+`checkMemory: 256Mi` as its request where it names one (below). The runtime
 runs each limited task in a transient scope of systemd's user manager (`systemd-run --user --scope`, `MemoryMax=` the limit,
 `MemorySwapMax=0`, `OOMPolicy=continue`), so a process past it is killed by the kernel in that scope alone, and the attempt records the
 kill, the limit and the peak. A step whose session or check was killed there says so in its note (the feed, `nemia ls`, the run page),
@@ -340,7 +341,10 @@ The daemon admits a session only while the memory it asks fits the machine above
 each asks is `WF_MEMORY_REQUEST` (a Kubernetes quantity, `2560Mi`), else its limit; the floor is `WF_MEMORY_RESERVED`, else an eighth of
 the machine, 1 GiB at least. A step that does not fit waits, and `nemia ls` says so in its note: `waits for memory: needs 6Gi, 2.5Gi
 free`. A server already installed keeps the settings its person wrote: nothing rewrites its unit. With a limit and no request, each
-session asks its whole limit, so a machine sized for its sessions' limits may admit fewer than `WF_MAX_CONCURRENT`. To size it:
+session asks its whole limit, so a machine sized for its sessions' limits may admit fewer than `WF_MAX_CONCURRENT`. A step's check asks
+its step's `checkMemory:` where it names one: sdlc's land steps name the factory's `landingCheckMemory` parameter, empty by default, so a
+factory that lands on GitHub, whose landing's check only waits on CI, sets it at its upgrade, `nemia factory upgrade <factory> --to
+<version> --set landingCheckMemory=256Mi`, and its landing's check is admitted while sessions wait. To size it:
 
 1. **Read whether it fits**: `nemia doctor`. Its `memory-fit` piece says how many sessions fit, and what to set.
 2. **Size it**, either by `nemia service install --size auto`, which writes `WF_MAX_CONCURRENT`, `WF_MEMORY_LIMIT` and

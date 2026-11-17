@@ -5,6 +5,7 @@ import type { WorkflowStepPage as StepRead } from 'objects';
 import { storeQuery } from '@/lib/api/store';
 import { stepQuery } from '@/lib/api/workflows';
 import { WorkflowStepPage } from './WorkflowStepPage';
+import { skippedHeadings } from '../../../.storybook/play';
 import { yourStore } from '../../../.storybook/fixtures/agents';
 import { FACTORY, seeded } from '../../../.storybook/fixtures/proposals';
 
@@ -24,11 +25,11 @@ const REVIEW: StepRead = {
   factory: FACTORY,
   layers: {
     agent: 'You review a change.',
-    instructions: null,
-    custom: null,
+    instructions: '## Your role\n\nYou read a change.\n\n### What you refuse\n\nA weakened test.',
+    custom: '### Mine\n\nBe terse.',
     factory: null,
     agentSkills: [],
-    policy: 'Read the change against its plan.',
+    policy: '### true — on GitHub\n\nRead the change against its plan.\n\n#### Either way\n\nSay why.',
     addedSkills: [],
     fence: [],
     folderFiles: false,
@@ -97,5 +98,19 @@ export const InAFactory: Story = {
         `/factories/${FACTORY}/workflows/repo/build`,
       ),
     );
+  },
+};
+
+/**
+ * What a run of the step will be told, its agent's words opened: each layer an h2 straight under the page's h1, the words of each an h3
+ * whatever depth they write their headings at, so axe's `heading-order` holds the page.
+ */
+export const ToldInOrder: Story = {
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByText('Read them'));
+    const fold = canvasElement.querySelector('[data-will-be-told]')!;
+    await expect(fold.querySelector('[data-layer="policy"] h2')?.textContent, 'each layer an h2').toBe("5. The step's policy");
+    await expect(fold.querySelector('[data-layer="instructions"] [data-markdown] h3')?.textContent, 'its `##` one under').toBe('Your role');
+    await expect(skippedHeadings(canvasElement), 'no level skipped').toEqual([]);
   },
 };

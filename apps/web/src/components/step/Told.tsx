@@ -52,6 +52,9 @@ type LayerLevel = 2 | 3 | 4;
 /** The level a layer's own words and blocks take, one under its heading's. */
 const UNDER = { 2: 3, 3: 4, 4: 5 } as const;
 
+/** The level a block's own words take, under a layer's block: two under the layer's heading. */
+const DEEPER = { 2: 4, 3: 5, 4: 6 } as const;
+
 /** What the fold says of the numbers it heads its layers with. */
 const PRECEDENCE_NOTE = 'Where two of them say different things, the higher number wins, and the task is above them all.';
 
@@ -113,7 +116,7 @@ export function Told({
       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
         {filed ? 'What it was told' : 'What it would be told now'}
       </summary>
-      {layers ? <Layers layers={layers} parts={parts} level={level} /> : <Words level={UNDER[level]} text={told ?? ''} />}
+      {layers ? <Layers layers={layers} parts={parts} level={level} /> : <Words level={level} text={told ?? ''} />}
     </details>
   );
 }
@@ -278,7 +281,7 @@ function TaskParts({ parts, level }: { parts: Frozen<TaskPart[]>; level: LayerLe
                 {HANDED[part.how]} · {part.asked || part.run} ↗
               </RouteLink>
             </Heading>
-            <Words level={UNDER[level]} text={part.body} />
+            <Words level={DEEPER[level]} text={part.body} />
           </section>
         );
       })}
@@ -319,8 +322,9 @@ export function Layer({
 }
 
 /**
- * A layer's words, drawn as the markdown they are written in, at the fold's size on a quiet ground of their own, a `#` at `level` (an
- * h5 unless given), one under the layer's title; or `none` where the run froze none.
+ * A layer's words, drawn as the markdown they are written in, at the fold's size on a quiet ground of their own, the shallowest heading
+ * they write at `level` (an h5 unless given), one under the heading they sit beneath, whatever depth they write it at; or `none` where
+ * the run froze none.
  */
 export function Words({
   text,
@@ -329,11 +333,11 @@ export function Words({
 }: {
   text: string | null;
   none?: string;
-  level?: (typeof UNDER)[LayerLevel];
+  level?: LayerLevel | (typeof DEEPER)[LayerLevel];
 }) {
   if (text === null) return <p className="text-body-small text-muted-foreground italic">{none}</p>;
   return (
-    <Markdown level={level} className="rounded bg-muted/60 p-3">
+    <Markdown level={level} top className="rounded bg-muted/60 p-3">
       {text}
     </Markdown>
   );

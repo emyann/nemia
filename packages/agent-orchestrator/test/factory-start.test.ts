@@ -883,6 +883,30 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
   });
 
   await s.test(
+    "a card's `gate:` starts its run as `--gate` does, its workflow read with the factory's hires: a hired step's `skills:` holds",
+    async () => {
+      const skilled = path.join(repo, 'workflows', 'skilled');
+      fs.mkdirSync(skilled);
+      fs.writeFileSync(path.join(skilled, 'implement.md'), '---\nplace: git\nskills: review-a-change\n---\nBuild what was asked.\n');
+      fs.writeFileSync(path.join(skilled, 'review.md'), '---\nafter: implement\nplace: git\n---\nReview it.\n');
+      addFactoryAt(ROOT, { name: 'acme', repos: [repo] });
+      attachWorkflowAt(ROOT, { factory: 'acme', workflow: 'skilled' });
+      hireAgentAt(ROOT, { factory: 'acme', agent: 'implementer', step: 'skilled/implement' });
+      hireAgentAt(ROOT, { factory: 'acme', agent: 'reviewer', step: 'skilled/review' });
+      aCard('gated-by-card', '---\nworkflow: skilled\nfactory: acme\ngate: review\n---\nBuild it.\n');
+      aCard('gated-by-flag', '---\nworkflow: skilled\nfactory: acme\n---\nBuild it.\n');
+      const byCard = runRecord(ROOT, startedId(await startTypedFrom(ROOT, ['start', 'gated-by-card', '--no-worktree'])));
+      const byFlag = runRecord(
+        ROOT,
+        startedId(await startTypedFrom(ROOT, ['start', 'gated-by-flag', '--gate', 'review', '--no-worktree'])),
+      );
+      const filed = (run: typeof byCard) => [run.factory, run.workflowDir, run.gates];
+      assert.deepEqual(filed(byCard), ['acme', skilled, ['review']]);
+      assert.deepEqual(filed(byFlag), filed(byCard), 'the flag files the same run');
+    },
+  );
+
+  await s.test(
     '`nemia start <name>` of a card starts it as its path does; a name no card has is a brief, a file of that name over it',
     async () => {
       const before = await runPlaced(startRun({ brief: 'read first', repo, workflowDir: build, isolate: false, factory: 'pipao' }));

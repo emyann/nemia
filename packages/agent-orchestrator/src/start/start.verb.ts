@@ -104,6 +104,18 @@ const stepsIn = Effect.fnUntraced(function* (workflowDir: string, places: Places
 });
 
 /**
+ * A workflow folder's steps as a start in `factory` on `repo` reads them (`stepsIn`), its agents and skills looked up where the start
+ * looks (`startPlaces`): what a card's own `gate:` is judged against, so a card's gate and `--gate` read the same workflow.
+ * @param workflowDir The workflow's folder.
+ * @param repo The repository the run is started on.
+ * @param factory The factory the run is started in, or undefined for the default.
+ */
+export const startedSteps = Effect.fn('startedSteps')(function* (workflowDir: string, repo: string, factory: Factory | undefined) {
+  const home = yield* StoreRoot;
+  return yield* stepsIn(workflowDir, startPlaces(home, { repo, ...(factory ? { factory: factory.name } : {}) }), factory);
+});
+
+/**
  * A workflow folder's steps, refused as `start` refuses them before a run is written, with the fix. What `startPlan` asks of every card
  * before the first run is started. Refused:
  * - a folder that is not a workflow (the Workflow door's `read`), and, in a factory, a workflow it has not attached, or a step its hires
@@ -751,7 +763,8 @@ export const wiredRepoFor = (home: string, name: string, workflow: string): stri
  * render's `Error` included (`tried`).
  */
 /** Where a start on `opts.repo` looks for its agents and skills, its factory's library adds among them (`addedOf`). */
-const startPlaces = (home: string, opts: StartOptions) => placesOf(home, opts.repo, addedOf(home, opts.factory ?? DEFAULT_NAMESPACE));
+const startPlaces = (home: string, opts: Pick<StartOptions, 'repo' | 'factory'>) =>
+  placesOf(home, opts.repo, addedOf(home, opts.factory ?? DEFAULT_NAMESPACE));
 
 export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const home = yield* StoreRoot;

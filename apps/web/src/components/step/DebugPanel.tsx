@@ -12,6 +12,11 @@ import { Button, Disclosure, DisclosurePanel, DisclosureTrigger, Pressable, Side
 
 type Step = StepView;
 
+/**
+ * The panel at its own height, unclipped: the kit's panel clips to the height it measured as it opened, and the path is read after.
+ */
+const UNCLIPPED = 'h-auto overflow-visible';
+
 /** The machine the panel draws a task's path on, by its name and what a person calls it: the runtime's lifecycle. */
 const LIFECYCLE = { name: 'lifecycle', title: "A task's lifecycle" };
 
@@ -35,7 +40,9 @@ export function DebugPanel({ run, step, shown }: { run: RunDetail; step: Step; s
         <DisclosureTrigger className="min-h-0 py-1.5">
           <span className="text-body-small font-body-small text-muted-foreground">Debug</span>
         </DisclosureTrigger>
-        <DisclosurePanel isUnstyled>{isExpanded && <PathOf run={run} step={step} shown={shown} />}</DisclosurePanel>
+        <DisclosurePanel isUnstyled className={UNCLIPPED}>
+          {isExpanded && <PathOf run={run} step={step} shown={shown} />}
+        </DisclosurePanel>
       </Disclosure>
     </section>
   );

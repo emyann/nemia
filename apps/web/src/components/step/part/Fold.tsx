@@ -5,6 +5,12 @@
 import { useState, type ReactNode } from 'react';
 import { Disclosure, DisclosurePanel, DisclosureTrigger } from '@/components/ui/ds';
 
+/**
+ * The panel at its own height, unclipped: the kit's panel clips to the height it measured as it opened, and what a fold draws once
+ * open, and reads after, is taller than that.
+ */
+const UNCLIPPED = 'h-auto overflow-visible';
+
 /** A fold titled `title`, closed unless `open`, marked `data-fold` with `name` for whoever reads it. */
 export function Fold({ name, title, open = false, children }: { name: string; title: ReactNode; open?: boolean; children: ReactNode }) {
   const [isExpanded, setExpanded] = useState(open);
@@ -13,7 +19,9 @@ export function Fold({ name, title, open = false, children }: { name: string; ti
       <DisclosureTrigger className="min-h-0 px-0 py-1">
         <span className="text-label-medium font-label-medium text-on-surface-variant uppercase">{title}</span>
       </DisclosureTrigger>
-      <DisclosurePanel isUnstyled>{isExpanded && <div className="space-y-3 pt-2 pb-1">{children}</div>}</DisclosurePanel>
+      <DisclosurePanel isUnstyled className={UNCLIPPED}>
+        {isExpanded && <div className="space-y-3 pt-2 pb-1">{children}</div>}
+      </DisclosurePanel>
     </Disclosure>
   );
 }

@@ -98,7 +98,7 @@ export const ApprovalRefused: Story = {
   play: async ({ canvasElement, userEvent }) => {
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Approve' }));
     const approval = await screen.findByRole('dialog', { name: 'Approve land' });
-    await expect(await within(approval).findByText('land is not waiting at its gate')).toBeVisible();
+    await waitFor(() => expect(within(approval).getByText('land is not waiting at its gate')).toBeVisible());
     atRest();
   },
 };

@@ -43,15 +43,19 @@ type RadioTileProps = Omit<ComponentProps<typeof Radio>, 'children'> & {
   description?: ReactNode;
 };
 
-/** One tile of the group: the kit's radio, its `title` and `description` beside it, the whole tile pressed. */
+/**
+ * One tile of the group: the kit's radio, its `title` and `description` beside it, the whole tile pressed. A disabled tile fades its
+ * outline to Material's disabled 12% and its title to the supporting ink, so it reads apart from those that can be picked, its words
+ * still read.
+ */
 export function RadioTile({ title, description, className = '', ...props }: RadioTileProps) {
   return (
     <Radio
       {...props}
-      className={`rounded-shape-medium border-outline-variant data-selected:border-primary data-selected:bg-primary/8 min-w-40 flex-1 items-center gap-4 border py-1 ps-4 pe-4 transition-colors ${className}`}
+      className={`rounded-shape-medium border-outline-variant data-disabled:border-on-surface/12 data-selected:border-primary data-selected:bg-primary/8 min-w-40 flex-1 items-center gap-4 border py-1 ps-4 pe-4 transition-colors ${className}`}
     >
       <span className="flex min-w-0 flex-col py-1">
-        <Title size="small" component="span" className="text-on-surface">
+        <Title size="small" component="span" className="text-on-surface group-data-disabled/rd:text-on-surface-variant">
           {title}
         </Title>
         {description && (

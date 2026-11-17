@@ -23,12 +23,22 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** None chosen yet: the group is one tab stop, and the arrow keys move the choice from tile to tile, past the one disabled. */
+/**
+ * None chosen yet: the group is one tab stop, and the arrow keys move the choice from tile to tile, past the one disabled, whose outline
+ * and title are faded apart from the others'.
+ */
 export const NoneChosen: Story = {
   play: async ({ canvasElement, userEvent }) => {
     const radios = [...canvasElement.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
     await expect(radios.map((r) => r.checked)).toEqual([false, false, false]);
     await expect(radios[2]).toBeDisabled();
+    const tiles = [...canvasElement.querySelectorAll<HTMLElement>('[data-slot="radio"]')];
+    const [open, closed] = [tiles[0], tiles[2]].map((tile) => ({
+      outline: getComputedStyle(tile).borderTopColor,
+      title: getComputedStyle(tile.querySelector('[data-slot="radio-target"] + span > span')!).color,
+    }));
+    await expect(closed.outline).not.toBe(open.outline);
+    await expect(closed.title).not.toBe(open.title);
     await userEvent.tab();
     await expect(radios[0]).toHaveFocus();
     await userEvent.keyboard('{ArrowDown}');

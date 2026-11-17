@@ -152,6 +152,8 @@ export default {
       );
       let form = await pickWorkflow(bar, workflow);
       await expectVisible(form.getByText(`in the factory ${factory}`, { exact: false }), `which says the run runs in ${factory}`);
+      await settled(other);
+      await photograph(other, path.join(OUT, `factory-start-picked-${theme}.png`));
       await keptOnEscape(other, bar, form);
       bar = await openStart(other);
       form = await pickWorkflow(bar, workflow);

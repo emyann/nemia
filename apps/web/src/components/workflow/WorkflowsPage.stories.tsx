@@ -62,8 +62,18 @@ export const Filtered: Story = {
   },
 };
 
-/** A filter that keeps nothing: the page says so, and Clear the filter brings every card back and clears the address's. */
+/** A filter that keeps nothing: the page says so, under the filter, and draws no card. */
 export const NothingMatches: Story = {
+  args: { query: 'zzz' },
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement);
+    await waitFor(() => expect(page.getByRole('button', { name: 'Clear the filter' })).toBeVisible());
+    await expect(page.queryByRole('region', { name: /^Workflow / })).toBeNull();
+  },
+};
+
+/** Cleared from nothing matches: Clear the filter brings every card back and clears the address's. */
+export const Cleared: Story = {
   args: { query: 'zzz' },
   play: async ({ canvasElement, args, userEvent }) => {
     const page = within(canvasElement);

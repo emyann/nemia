@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, railPlace, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { Page } from 'playwright';
@@ -24,9 +24,10 @@ async function open(page: Page, route: string): Promise<void> {
 export default {
   /**
    * The whole lists filter by the kit's search bar, kept in the address. On the Library, typing keeps what matches by name or
-   * description, in any case, writes it to the address as `?q=`, and a reload keeps it; the Agents page, opened with a filter, lists the
-   * agent it keeps; the Workflows page, opened with one that keeps nothing, says so, and Clear the filter brings the list back and takes
-   * `?q=` off the address.
+   * description, in any case, writes it to the address as `?q=`, and a reload keeps it, while the rail's Library, an address with no
+   * filter, empties the field and brings every item back; the Agents page, opened with a filter, lists the agent it keeps, and typing on
+   * its Skills, opened at `#skills`, keeps that place in the address; the Workflows page, opened with one that keeps nothing, says so,
+   * and Clear the filter brings the list back and takes `?q=` off the address.
    */
   name: 'list-filter',
   route: '/library',
@@ -49,9 +50,22 @@ export default {
     if ((await field.inputValue()) !== 'NOTES')
       throw new Refused(`the field holds the address's filter: it holds ${await field.inputValue()}`);
 
+    await railPlace(page, 'Library').click();
+    await addressHolds(page, undefined, "the rail's Library opens it with no filter");
+    await expectVisible(
+      page.locator(`[data-library-item="Skill.${made.skill.id}"]`),
+      'the field takes the address it did not send: every item is back',
+    );
+    if ((await field.inputValue()) !== '') throw new Refused(`the field is emptied with the address: it holds ${await field.inputValue()}`);
+
     await open(page, `/agents?q=${seeded.name.slice(0, 4)}`);
     await expectVisible(page.locator(`[data-agent="${seeded.name}"]`), `the Agents page, filtered, lists ${seeded.name}`);
     await photograph(page.locator('article').first(), path.join(OUT, `list-filter-agents-${theme}.png`));
+
+    await open(page, '/agents#skills');
+    await page.getByRole('searchbox', { name: 'Filter agents and skills' }).pressSequentially(made.skill.id.slice(0, 5));
+    await addressHolds(page, made.skill.id.slice(0, 5), 'what is typed on the Skills is kept in the address');
+    if (new URL(page.url()).hash !== '#skills') throw new Refused(`typing keeps the #skills the page was opened at: ${page.url()}`);
 
     await open(page, '/workflows?q=zzz');
     const nothing = page.locator('[data-nothing-matches]');

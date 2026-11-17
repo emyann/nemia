@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, waitFor, within } from 'storybook/test';
 import { agentsQuery } from '@/lib/api/agents';
 import { skillsQuery } from '@/lib/api/skills';
 import { storeQuery } from '@/lib/api/store';
@@ -62,8 +62,19 @@ export const Filtered: Story = {
   },
 };
 
-/** A filter that keeps nothing: the page says so, and Clear the filter brings both lists back and clears the address's. */
+/** A filter that keeps nothing: the page says so, under the filter, and draws neither list. */
 export const NothingMatches: Story = {
+  args: { query: 'zzz' },
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement);
+    await waitFor(() => expect(page.getByRole('button', { name: 'Clear the filter' })).toBeVisible());
+    await expect(page.queryByRole('region', { name: 'Yours' })).toBeNull();
+    await expect(page.queryByRole('region', { name: 'Skills' })).toBeNull();
+  },
+};
+
+/** Cleared from nothing matches: Clear the filter brings both lists back and clears the address's. */
+export const Cleared: Story = {
   args: { query: 'zzz' },
   play: async ({ canvasElement, args, userEvent }) => {
     const page = within(canvasElement);

@@ -28,7 +28,9 @@ function Page() {
     <WorkflowsPage
       place={place}
       query={q ?? ''}
-      onQuery={(query) => void navigate({ search: (prev) => ({ ...prev, q: query || undefined }), replace: true, resetScroll: false })}
+      onQuery={(query) =>
+        void navigate({ search: (prev) => ({ ...prev, q: query || undefined }), hash: true, replace: true, resetScroll: false })
+      }
     />
   );
 }

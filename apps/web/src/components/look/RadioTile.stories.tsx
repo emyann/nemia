@@ -45,7 +45,7 @@ export const Chosen: Story = {
   play: async ({ canvasElement, userEvent }) => {
     const tiles = [...canvasElement.querySelectorAll<HTMLElement>('[data-slot="radio"]')];
     await expect(tiles[0]).toHaveAttribute('data-selected', 'true');
-    await userEvent.click(tiles[1]!);
+    await userEvent.click(tiles[1]);
     await expect(tiles[1]).toHaveAttribute('data-selected', 'true');
     await expect(tiles[0]).not.toHaveAttribute('data-selected');
   },

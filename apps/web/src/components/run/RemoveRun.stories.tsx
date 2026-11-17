@@ -46,7 +46,7 @@ export const Removed: StoryObj<typeof meta> = {
     </div>
   ),
   play: async ({ canvasElement, args }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Remove' }));
+    await userEvent.click(await within(canvasElement).findByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(args.onClose).toHaveBeenCalled());
     const said = await snackbarShown(canvasElement.ownerDocument.body);
     await expect(said).toHaveTextContent(args.id);

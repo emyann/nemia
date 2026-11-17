@@ -50,7 +50,17 @@ const FILED: Card = {
   status: { state: 'filed', runs: [], inPlay: true, title: 'Write the release notes', file: 'write-the-release-notes.md' },
 };
 
-/** Filed with no factory: the snackbar the frame hosts names the card, and its Open goes to the card's page. */
+/** The idea typed and File pressed in the story drawn in `canvasElement`: the snackbar that names the card filed. */
+async function filedIn(canvasElement: HTMLElement): Promise<HTMLElement> {
+  const box = within(canvasElement);
+  await userEvent.type(await box.findByRole('textbox', { name: 'An idea' }), 'Write the release notes');
+  await userEvent.click(box.getByRole('button', { name: 'File' }));
+  const said = await snackbarShown(canvasElement.ownerDocument.body);
+  await expect(said).toHaveTextContent(FILED.metadata.name);
+  return said;
+}
+
+/** Filed with no factory: the snackbar the frame hosts names the card, and offers Open, which stays until it is pressed or closed. */
 export const Filed: StoryObj<typeof meta> = {
   args: { shown: undefined },
   parameters: { msw: [http.post('/api/namespaces/:namespace/cards', () => HttpResponse.json(FILED, { status: 201 }))] },
@@ -63,11 +73,16 @@ export const Filed: StoryObj<typeof meta> = {
     </QueryClientProvider>
   ),
   play: async ({ canvasElement }) => {
-    const box = within(canvasElement);
-    await userEvent.type(box.getByRole('textbox', { name: 'An idea' }), 'Write the release notes');
-    await userEvent.click(box.getByRole('button', { name: 'File' }));
-    const said = await snackbarShown(canvasElement.ownerDocument.body);
-    await expect(said).toHaveTextContent(FILED.metadata.name);
+    const said = await filedIn(canvasElement);
+    await expect(within(said).getByRole('button', { name: 'Open' })).toBeEnabled();
+  },
+};
+
+/** Filed, then its snackbar's Open pressed: the router goes to the card's page. */
+export const FiledOpened: StoryObj<typeof meta> = {
+  ...Filed,
+  play: async ({ canvasElement }) => {
+    const said = await filedIn(canvasElement);
     await userEvent.click(within(said).getByRole('button', { name: 'Open' }));
     const ground = canvasElement.querySelector('[data-story-ground]');
     await waitFor(() => expect(ground?.getAttribute('data-at')).toBe(`/inbox/${FILED.metadata.name}`));

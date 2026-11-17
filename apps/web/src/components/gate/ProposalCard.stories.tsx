@@ -104,7 +104,7 @@ export const DeclinePressed: Story = {
     </>
   ),
   play: async ({ canvasElement, args }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Decline' }));
+    await userEvent.click(await within(canvasElement).findByRole('button', { name: 'Decline' }));
     await expect(await snackbarShown(canvasElement.ownerDocument.body)).toHaveTextContent(args.name);
     await expect(canvasElement.querySelector('[data-proposal-phase="declined"]')).not.toBeNull();
   },

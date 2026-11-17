@@ -76,7 +76,7 @@ export const Pruned: StoryObj<typeof meta> = {
   play: async ({ canvasElement, args }) => {
     const form = within(canvasElement);
     await userEvent.click(await form.findByRole('button', { name: 'Prune…' }));
-    await userEvent.click(form.getByRole('button', { name: 'Prune' }));
+    await userEvent.click(await form.findByRole('button', { name: 'Prune' }));
     await waitFor(() => expect(args.onClose).toHaveBeenCalled());
     await expect(await snackbarShown(canvasElement.ownerDocument.body)).toHaveTextContent(args.run.id);
   },

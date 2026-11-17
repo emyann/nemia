@@ -43,10 +43,10 @@ export const Choices: StoryObj<typeof meta> = {
   ),
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByRole('button', { name: /^Prune/ }));
-    const form = within(canvasElement.ownerDocument.body);
+    const form = within(await within(canvasElement.ownerDocument.body).findByRole('dialog', { name: `Prune ${CALLED_OFF.id}` }));
     const choices = await form.findAllByRole('radio');
     await expect(choices[0]).toBeChecked();
     await userEvent.click(form.getByRole('button', { name: 'Prune…' }));
-    await expect(canvasElement.ownerDocument.body.querySelector('[data-prune-question]')).not.toBeNull();
+    await expect(form.getByRole('button', { name: 'Prune' })).toBeEnabled();
   },
 };

@@ -10,6 +10,7 @@ export { CutCue } from './CutCue';
 export { CutField } from './CutField';
 export { CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, type FrameHue } from './CutFrame';
 export { CutTag } from './CutTag';
+export { Marker } from './Marker';
 export { Pager } from './Pager';
 export { PageName, Plate, type PlateHue } from './Plate';
 export { Run, type RunProps } from './Run';
@@ -23,3 +24,14 @@ export { ScanLines } from './ScanLines';
 export { StatTile } from './StatTile';
 export { Sticker } from './Sticker';
 export { TEXT_LINK, TextLink } from './TextLink';
+export {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+  type TraceStatus,
+} from './Trace';

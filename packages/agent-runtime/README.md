@@ -1055,7 +1055,9 @@ other party's. An engine given `defaultLimits: { memory: '6Gi' }` and `defaultRe
 task filed with no `resources` of its own as each of its attempts starts, as a LimitRange's `default` and `defaultRequest` land on a
 Pod only when it is created: nothing is written onto the `filed` entry, a queued task is admitted by the defaults the engine holds when
 it judges it (`runsUnder`, `src/core/admission.ts`), and each attempt's `starting` entry records what it ran under, which its cgroup
-holds until it ends. So a resize of the defaults reaches every task not yet started, and a later turn or restart of one already
+holds until it ends. A task that names a memory request and no limit keeps its request and takes the default limit beside it, as a
+LimitRange's `default` lands on a container that names a request alone; where the engine holds no default limit it runs under its request
+alone. So a resize of the defaults reaches every task not yet started, and a later turn or restart of one already
 running; an attempt already started keeps its own. A journal an older runtime wrote, with the defaults of its day on `filed`, runs at
 that size. A remote agent's task is never given the defaults, so a default makes no remote task unfileable. `Engine.layer` refuses a `defaultLimits.memory` or a
 `defaultRequests.memory` it cannot read, a default request above the default limit, and a `cgroupParent` that is not a slice's unit

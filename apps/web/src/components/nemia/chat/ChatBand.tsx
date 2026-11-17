@@ -5,11 +5,11 @@
  */
 import { CircleXIcon, PauseIcon, RefreshCwIcon } from 'lucide-react';
 import { ConversationBand } from '@/components/conversation/ConversationBand';
-import { LinkButton } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { clockWord } from '@/lib/quota';
 import { routeLink } from '../../nav/routeLink';
 
-const RouterLinkButton = routeLink(LinkButton);
+const RouterLinkButton = routeLink(Button);
 
 /**
  * Why her session stopped, and what to do: Start her session leads to her settings, where a level above Manual files her one, and Why
@@ -22,10 +22,10 @@ export function ChatStoppedBand({ words }: { words: string }) {
         {`${words} Your factories still tick; gates still come to you. What you write waits for her.`}
       </ConversationBand>
       <div className="flex flex-wrap gap-2">
-        <RouterLinkButton to="/settings" variant="secondary" size="sm" data-chat-start>
+        <RouterLinkButton to="/settings" variant="tonal" size="xsmall">
           Start her session
         </RouterLinkButton>
-        <RouterLinkButton to="/settings" variant="link" size="sm">
+        <RouterLinkButton to="/settings" variant="text" size="xsmall">
           Why it stopped
         </RouterLinkButton>
       </div>

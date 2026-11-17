@@ -210,6 +210,7 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   memory: null,
   budget: null,
   check: null,
+  checkMemory: null,
   retries: null,
   checkFailurePolicy: null,
   gate: null,

@@ -12,18 +12,13 @@
  */
 import { useState } from 'react';
 import { CheckIcon } from 'lucide-react';
-import { Radio, RadioGroup } from 'react-aria-components';
-import { Button } from '@/components/ui/button';
+import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 import type { AskPick, AskQuestion } from '@/lib/api/chat';
 import { askAnswered, askLeft, type ChatAsk as Ask } from '@/lib/chatFollowing';
-import { AskChose, AskHead, AskOption } from './ChatAsk';
+import { AskChose, AskHead, AskOption, OPTION } from './ChatAsk';
 
 /** What the group's value is for the own-words row, and the prefix each option's label carries, so neither can be the other. */
 const [OWN, LABEL] = ['own', 'o:'];
-
-/** One option row, the canvas's `opt`, chosen and not. */
-const OPTION = 'grid grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 gap-y-1 px-3 py-2.5 outline-none cursor-pointer';
-const [OPTION_ON, OPTION_OFF] = ['bg-secondary-container text-on-secondary-container', 'ring-1 ring-outline-variant ring-inset'];
 
 /** The person's answer to each question of the ask, by the question's place in it; absent where they have not answered it yet. */
 type Picks = Record<number, AskPick>;
@@ -44,21 +39,18 @@ function Tabs({ ask, picks, tab, onGo }: { ask: Ask; picks: Picks; tab: number; 
       {[...ask.questions.map((q) => q.header), 'Submit'].map((head, i) => {
         const done = i < last && askAnswered(picks[i]);
         return (
-          <button
+          <Button
             key={head}
-            type="button"
+            size="xsmall"
+            variant={i === tab ? 'tonal' : 'outlined'}
+            icon={done ? CheckIcon : undefined}
             data-chat-qtab={i === tab ? 'on' : done ? 'done' : 'off'}
             aria-current={i === tab ? 'step' : 'false'}
-            onClick={() => onGo(i)}
-            className={`inline-flex h-7.5 items-center gap-1.5 px-2.5 text-label-small uppercase outline-none ${
-              i === tab
-                ? 'bg-secondary-container text-on-secondary-container'
-                : 'text-on-surface-variant ring-1 ring-outline-variant ring-inset'
-            }`}
+            onPress={() => onGo(i)}
+            classNames={{ label: 'uppercase' }}
           >
-            {done && <CheckIcon aria-hidden="true" className="size-3.5" />}
             {head}
-          </button>
+          </Button>
         );
       })}
     </nav>
@@ -81,44 +73,23 @@ function Question({ question, pick, onPick }: { question: AskQuestion; pick: Ask
               : { question: question.question, labels: [value.slice(LABEL.length)] },
           )
         }
-        className="flex flex-col gap-2"
+        className="gap-2"
       >
         {question.options.map((option, n) => (
-          <Radio
-            key={option.label}
-            value={`${LABEL}${option.label}`}
-            data-chat-option={option.label}
-            className={({ isSelected }) => `${OPTION} ${isSelected ? OPTION_ON : OPTION_OFF}`}
-          >
-            {({ isSelected }) => (
-              <AskOption n={n + 1} label={option.label} why={option.description} recommended={option.recommended}>
-                <span
-                  aria-hidden="true"
-                  className={`mt-1 size-4 rounded-full border-2 ${isSelected ? 'border-alive bg-alive' : 'border-outline'}`}
-                />
-              </AskOption>
-            )}
+          <Radio key={option.label} value={`${LABEL}${option.label}`} data-chat-option={option.label} className={OPTION}>
+            <AskOption n={n + 1} label={option.label} why={option.description} recommended={option.recommended} />
           </Radio>
         ))}
-        <Radio value={OWN} data-chat-option="own" className={({ isSelected }) => `${OPTION} ${isSelected ? OPTION_ON : OPTION_OFF}`}>
-          {({ isSelected }) => (
-            <AskOption n={question.options.length + 1} label="Your own words" recommended={false}>
-              <span
-                aria-hidden="true"
-                className={`mt-1 size-4 rounded-full border-2 ${isSelected ? 'border-alive bg-alive' : 'border-outline'}`}
-              />
-            </AskOption>
-          )}
+        <Radio value={OWN} data-chat-option="own" className={OPTION}>
+          <AskOption n={question.options.length + 1} label="Your own words" recommended={false} />
         </Radio>
       </RadioGroup>
-      <input
-        type="text"
-        aria-label="Your own answer"
+      <TextField
+        label="Your own answer"
         data-chat-own
         placeholder="Type something"
         value={own ?? ''}
-        onChange={(event) => onPick({ question: question.question, words: event.target.value })}
-        className="h-8 min-w-0 bg-surface-container-high px-2.5 text-body-medium text-on-surface outline-none ring-1 ring-outline-variant ring-inset placeholder:text-on-surface-variant"
+        onChange={(words) => onPick({ question: question.question, words })}
       />
     </fieldset>
   );
@@ -143,10 +114,10 @@ function Recap({ ask, picks, onBack, onSubmit }: { ask: Ask; picks: Picks; onBac
         })}
       </dl>
       <div className="flex flex-wrap items-center gap-2">
-        <Button data-chat-submit size="sm" isDisabled={open > 0} onPress={onSubmit}>
+        <Button data-chat-submit size="xsmall" isDisabled={open > 0} onPress={onSubmit}>
           Submit answers
         </Button>
-        <Button size="sm" variant="outline" onPress={onBack}>
+        <Button size="xsmall" variant="outlined" onPress={onBack}>
           Back
         </Button>
         <span data-chat-left className="ml-auto text-body-small text-on-surface-variant">
@@ -193,11 +164,11 @@ export function ChatAskMany({ ask, onAnswer }: { ask: Ask; onAnswer: (id: string
               <Question question={question} pick={picks[tab]} onPick={(pick) => setPicks((held) => ({ ...held, [tab]: pick }))} />
               <div className="flex flex-wrap items-center gap-2">
                 {tab > 0 && (
-                  <Button size="sm" variant="outline" onPress={() => setTab(tab - 1)}>
+                  <Button size="xsmall" variant="outlined" onPress={() => setTab(tab - 1)}>
                     Back
                   </Button>
                 )}
-                <Button size="sm" variant="secondary" onPress={() => setTab(Math.min(tab + 1, last))}>
+                <Button size="xsmall" variant="tonal" onPress={() => setTab(Math.min(tab + 1, last))}>
                   Next
                 </Button>
                 <span data-chat-of className="ml-auto font-mono text-body-small text-on-surface-variant">{`${tab + 1} OF ${last}`}</span>

@@ -461,6 +461,7 @@ const frozenStepFields = {
   memory: Schema.optionalKey(Schema.String),
   budget: Schema.optionalKey(Schema.Finite),
   check: Schema.optionalKey(Schema.String),
+  checkMemory: Schema.optionalKey(Schema.String),
   retries: Schema.optionalKey(Schema.Finite),
   checkFailurePolicy: Schema.optionalKey(
     Schema.StructWithRest(

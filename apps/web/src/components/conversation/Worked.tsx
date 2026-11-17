@@ -30,7 +30,7 @@ import {
   TraceIcon,
   TraceLine,
   TraceTitle,
-} from '@/components/ui/trace';
+} from '@/components/look';
 import { ink } from '@/lib/meaning';
 import { mark, traceStatusOf, turnWords, type ConversationItem, type ConversationLine } from '@/lib/conversation';
 import { cn } from '@/lib/utils';

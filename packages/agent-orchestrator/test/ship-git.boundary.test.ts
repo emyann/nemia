@@ -468,6 +468,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
 
   assert.deepEqual(signed.checked, ['ship']);
   const check = tasks.get(checkId)!.spec;
+  assert.equal(check.priority, 2, "a landing's check is filed above the sessions in flight, since it holds the checkout while it waits");
   assert.deepEqual(
     [check.harness, check.cwd, check.deadlineSeconds],
     ['check', repo, 2700],

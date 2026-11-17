@@ -45,7 +45,9 @@ applies: ["apps/web/**"]
    `Run` for a run at any of its five sizes, from its mark in a sentence to the floor's opened panel (`RunMeta`, `RunClock` and
    `RunCost` for its parts a table draws alone, `QuietLabels` for a run's labels said quietly, `RunMark` for
    another run named in a run's words);
-   `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`. Each is shown in its stories beside it
+   `ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`; `Trace` for
+   what an agent did, a line a step (`TraceLine`, with `TraceIcon`, `TraceTitle` and `TraceDescription`; `TraceCollapsible`, its
+   `TraceCollapsibleTrigger` and `TraceCollapsibleContent`, for a step that opens), and `Marker` for a quiet line across a conversation. Each is shown in its stories beside it
    (`<Part>.stories.tsx`): `npm run storybook`, from `apps/web`, serves them to a person on port 6007, and a step looks at them
    through `storybook dev` on a port of its own (item 10). A new part of the look gets its stories in the same change, and its name
    here.

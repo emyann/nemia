@@ -137,6 +137,7 @@ const STEP_WORDS = [
   'workspace',
   'budget',
   'check',
+  'checkMemory',
   'loop',
   'rounds',
   'routes',
@@ -160,6 +161,12 @@ function routeEvalOf(route: unknown): RouteEval | undefined {
   return undefined;
 }
 
+/**
+ * Whether `key` is a step's `checkMemory:` that renders blank, as an empty parameter writes it: no line, so the check asks the daemon's
+ * default request. A blank line in a person's step file is still refused by the parser.
+ */
+const blankAsked = (key: string, value: unknown): boolean => key === 'checkMemory' && lineOf(value).trim() === '';
+
 /** A template's `checkFailurePolicy:` as the parser reads it, refused as a step's line would be; nothing for none. */
 const policyOf = (step: string, policy: unknown): { checkFailurePolicy?: CheckFailurePolicy } =>
   policy === undefined ? {} : { checkFailurePolicy: checkFailurePolicyOf(step, JSON.stringify(policy)) };
@@ -179,7 +186,7 @@ function stepFile(
   const name = String(step.name);
   const where = `${WORKFLOWS}/${workflow}/workflow.yaml, step ${name}`;
   const keys: Record<string, string> = {};
-  for (const key of STEP_WORDS) if (step[key] !== undefined) keys[key] = lineOf(step[key]);
+  for (const key of STEP_WORDS) if (step[key] !== undefined && !blankAsked(key, step[key])) keys[key] = lineOf(step[key]);
   if (step.gate === true) keys.gate = 'true';
   Object.assign(keys, baseSpelled(keys));
   const output = isMap(step.output) ? step.output.path : undefined;

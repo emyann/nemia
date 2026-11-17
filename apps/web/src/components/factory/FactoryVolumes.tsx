@@ -5,10 +5,7 @@
  */
 import { Fragment } from 'react';
 import { TriangleAlert } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
-import { Separator } from '@/components/ui/separator';
+import { Card, CardContent, Divider, EmptyState, Tag, Title } from '@/components/ui/ds';
 import type { Factory, FactoryVolume } from '@/lib/api/factories';
 import { ink } from '@/lib/meaning';
 import { cn } from '@/lib/utils';
@@ -20,9 +17,9 @@ function VolumeRow({ volume: v }: { volume: FactoryVolume }) {
     <div data-factory-volume={v.path} className="flex flex-col gap-2">
       <div className="flex min-w-0 items-center gap-2">
         <span className="min-w-0 font-mono text-body-medium [overflow-wrap:anywhere]">{v.path}</span>
-        <Badge variant={v.readOnly ? 'secondary' : 'outline'} className="font-mono" data-volume-mark={v.readOnly ? 'ro' : 'rw'}>
+        <Tag variant={v.readOnly ? 'tonal' : 'outlined'} className="font-mono" data-volume-mark={v.readOnly ? 'ro' : 'rw'}>
           {v.readOnly ? ':ro' : ':rw'}
-        </Badge>
+        </Tag>
       </div>
       {!v.readOnly && (
         <p data-volume-caveat className="flex items-start gap-2 text-body-medium text-muted-foreground">
@@ -38,34 +35,34 @@ function VolumeRow({ volume: v }: { volume: FactoryVolume }) {
 /** The volumes of `factory`, marked `data-factory-volumes` with its name, in the api's order (`VolumeRow`). */
 export function FactoryVolumes({ factory }: { factory: Pick<Factory, 'name' | 'volumes' | 'commands'> }) {
   return (
-    <Card data-factory-volumes={factory.name}>
-      <CardHeader>
-        <CardTitle>Volumes</CardTitle>
-        <CardDescription>
-          Folders of this machine every local step of a run here reaches, beside its repositories, read-only (:ro) or writable (:rw). A
-          volume is mounted and taken back on the command line.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {factory.volumes.length === 0 ? (
-          <Empty data-no-volumes className="border">
-            <EmptyHeader>
-              <EmptyTitle>No volume</EmptyTitle>
-              <EmptyDescription>This factory's runs reach only its repositories. To mount a folder for them, type:</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent className="max-w-full">
-              <CommandText text={factory.commands.volume} />
-            </EmptyContent>
-          </Empty>
-        ) : (
-          factory.volumes.map((v, i) => (
-            <Fragment key={v.path}>
-              {i > 0 && <Separator />}
-              <VolumeRow volume={v} />
-            </Fragment>
-          ))
-        )}
-      </CardContent>
+    <Card variant="outlined" data-factory-volumes={factory.name} classNames={{ content: 'gap-4' }}>
+      <CardContent
+        headline={
+          <Title size="medium" component="h3">
+            Volumes
+          </Title>
+        }
+        supportingText="Folders of this machine every local step of a run here reaches, beside its repositories, read-only (:ro) or writable (:rw). A volume is mounted and taken back on the command line."
+        classNames={{ header: 'mb-0' }}
+      />
+      {factory.volumes.length === 0 ? (
+        <div data-no-volumes>
+          <EmptyState
+            size="sm"
+            title="No volume"
+            description="This factory's runs reach only its repositories. To mount a folder for them, type:"
+            action={<CommandText text={factory.commands.volume} />}
+            className="max-w-full"
+          />
+        </div>
+      ) : (
+        factory.volumes.map((v, i) => (
+          <Fragment key={v.path}>
+            {i > 0 && <Divider />}
+            <VolumeRow volume={v} />
+          </Fragment>
+        ))
+      )}
     </Card>
   );
 }

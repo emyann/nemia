@@ -126,7 +126,7 @@ const rowsOf = (html: string): Array<[string, string]> =>
   [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '')]);
 const { raiseBody } = await import('../src/components/gate/Raise.tsx');
 const { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } =
-  await import('../src/components/ui/trace.tsx');
+  await import('../src/components/look/Trace.tsx');
 
 const exhaustedNote = 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round';
 
@@ -914,6 +914,7 @@ const unset: WorkflowStepSpec = {
   memory: null,
   budget: null,
   check: null,
+  checkMemory: null,
   retries: null,
   checkFailurePolicy: null,
   gate: null,

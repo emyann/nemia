@@ -50,7 +50,7 @@ export const Picks: StoryObj<typeof meta> = {
       if (!found.length) throw new Error('no run to wait on is offered');
       return found;
     });
-    await userEvent.click(boxes[0]!);
+    await userEvent.click(boxes[0]);
     await expect(boxes[0]).toBeChecked();
     await expect(form.getByRole('textbox', { name: 'Why (optional)' })).toBeInTheDocument();
     await expect(form.getByRole('button', { name: 'Hold' })).toBeEnabled();

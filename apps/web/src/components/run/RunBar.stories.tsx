@@ -24,6 +24,6 @@ export const AtItsGate: StoryObj<typeof meta> = {
   play: async ({ canvasElement }) => {
     const bar = within(canvasElement);
     await expect(bar.getByRole('region', { name: 'Steps' })).toBeInTheDocument();
-    await expect(canvasElement.querySelector(`button[data-step="${AT_GATE.steps[0]!.name}"]`)).not.toBeNull();
+    await expect(canvasElement.querySelector(`button[data-step="${AT_GATE.steps[0].name}"]`)).not.toBeNull();
   },
 };

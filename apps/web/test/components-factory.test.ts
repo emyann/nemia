@@ -437,7 +437,7 @@ test("a factory's delegations list each agent's grants in words with a Remove, b
   };
   const html = await routedWith(createElement(FactoryDelegations, { name: 'acme' }), [
     [['delegations', 'acme'], [delegation]],
-    [['delegable-agents', 'acme'], ['planner']],
+    [['delegable-agents', 'acme'], [{ name: 'planner', role: 'plans the work' }]],
   ]);
   assert.match(html, /data-delegation="planner"[^]*data-delegation-grant[^>]*>update hires, any name<[^]*data-delegation-remove/);
   assert.match(html, /data-delegation-form[^]*data-delegation-resource="hires"[^]*data-delegation-verb="update"/);

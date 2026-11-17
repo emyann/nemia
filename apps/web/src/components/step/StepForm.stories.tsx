@@ -12,7 +12,7 @@ const FORM: KeyForm = {
     { key: 'budget', meaning: 'The most its tries may cost, in dollars.', kind: 'dollars', choices: null, byHarness: null },
     { key: 'retries', meaning: 'How many times it is tried again after a refusal.', kind: 'count', choices: null, byHarness: null },
   ],
-  defaultHarness: 'claude',
+  defaultHarness: 'local',
   roleKeys: [],
   policyKeys: [],
   agents: {},

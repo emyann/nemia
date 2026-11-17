@@ -9,7 +9,7 @@ export type AmountKind = 'dollars' | 'count';
 /**
  * The format of each kind of amount, as the field's `formatOptions`: dollars to the cent, as the board writes money (`dollars`), `$16.00`
  * and `$2.50` — not `budgetWord`'s `$16`, since React Aria's parser of a format that strips the cents of a whole amount
- * (`trailingZeroDisplay`) refuses a decimal point typed; a count whole, with no separator, as a key of a step is written.
+ * (Intl's trailing zero display) refuses a decimal point typed; a count whole, with no separator, as a key of a step is written.
  */
 export const AMOUNT_FORMATS: Readonly<Record<AmountKind, Intl.NumberFormatOptions>> = {
   dollars: { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 },

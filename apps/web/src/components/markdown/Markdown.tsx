@@ -1,7 +1,7 @@
 import { memo, useId, type ComponentProps, type ReactNode } from 'react';
 import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { fencedCode, labelFootnotes, languageOf } from '../../lib/markdown';
+import { fencedCode, labelFootnotes, languageOf, placeHeadings } from '../../lib/markdown';
 import { cn } from '../../lib/utils';
 import { Checkbox } from '@/components/ui/ds';
 import { CodeBlock } from '../ai-elements/code-block';
@@ -20,17 +20,22 @@ const HEADING = {
 
 const TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
 
-/** The heading a text's `#` stands at on the page: an h3 by default, deeper where a panel's own heading is deeper. */
-type Level = 3 | 4 | 5;
+/**
+ * The heading a text's `#` stands at on the page, or its shallowest heading with `top`: an h3 by default, deeper under a deeper
+ * heading.
+ */
+type Level = 2 | 3 | 4 | 5 | 6;
 
-const heading = (written: (typeof TAGS)[number], Tag: (typeof TAGS)[number]) =>
+/** A heading's size, by the depth the text wrote it at (`placeHeadings` gives it as the heading's class). */
+const sizeOf = (depth: number): string => HEADING[TAGS[depth - 1] ?? 'h6'];
+
+const heading = (Tag: (typeof TAGS)[number]) =>
   function Heading({ node: _node, className, ...props }: ComponentProps<'h1'> & ExtraProps) {
-    return <Tag className={cn('mt-4 mb-1.5 font-semibold leading-snug', HEADING[written], className)} {...props} />;
+    return <Tag className={cn('mt-4 mb-1.5 font-semibold leading-snug', className)} {...props} />;
   };
 
-/** Each heading of a text drawn `level` down the page from its `#`, deeper ones following, and none past h6. */
-const headingsAt = (level: Level): Components =>
-  Object.fromEntries(TAGS.map((written, i) => [written, heading(written, TAGS[Math.min(level - 1 + i, TAGS.length - 1)])]));
+/** Each heading as the tag `placeHeadings` named it. */
+const HEADINGS: Components = Object.fromEntries(TAGS.map((tag) => [tag, heading(tag)]));
 
 const LINK = 'font-medium text-foreground underline underline-offset-2 break-words hover:text-muted-foreground';
 
@@ -116,12 +121,8 @@ const COMPONENTS: Components = {
   ),
 };
 
-/** The components a text is drawn with, by the level its `#` stands at. */
-const COMPONENTS_AT: Record<Level, Components> = {
-  3: { ...COMPONENTS, ...headingsAt(3) },
-  4: { ...COMPONENTS, ...headingsAt(4) },
-  5: { ...COMPONENTS, ...headingsAt(5) },
-};
+/** The components a text is drawn with. */
+const DRAWN: Components = { ...COMPONENTS, ...HEADINGS };
 
 type MarkdownProps = {
   /** The text, as an agent, a folder or a card wrote it. */
@@ -129,6 +130,11 @@ type MarkdownProps = {
   className?: string;
   /** The heading a text's `#` is drawn as: 3 by default, under the page's own; deeper in a panel whose own heading is an h4. */
   level?: Level;
+  /**
+   * Whether the text's shallowest heading, rather than its `#`, is drawn at `level`: for a text drawn under a heading of the page's, which
+   * a `##` or a `###` it opens with would otherwise skip levels under.
+   */
+  top?: boolean;
   /** Marks a text by what it is on its page (`data-body`, a closeout's body), on the element that holds it. */
   'data-body'?: boolean;
 };
@@ -138,11 +144,12 @@ type MarkdownProps = {
  *
  * Raw HTML in the text is shown as the text it is, never as HTML: react-markdown turns it into text as it comes, and nothing here adds
  * a plugin that would parse it. A link's address passes react-markdown's own check, which empties a protocol that could run script.
- * Headings stand under the page's: a `#` is an h3, or `level`, and each deeper one follows it, sized by its level in the text. A soft
+ * Headings stand under the page's: a `#` is an h3, or `level`, and each deeper one follows it, sized by its level in the text; with
+ * `top`, the text's shallowest heading is drawn at `level`, whatever it is written as (`placeHeadings`). A soft
  * line break joins its lines into one paragraph: nothing here keeps a source's breaks. A text's footnote ids have a prefix of its own, so
  * two closeouts with a `[^1]` on one page each link to their own.
  */
-function MarkdownText({ children, className, level = 3, 'data-body': body }: MarkdownProps): ReactNode {
+function MarkdownText({ children, className, level = 3, top = false, 'data-body': body }: MarkdownProps): ReactNode {
   const prefix = `md${useId().replace(/[^\w-]/g, '')}-`;
   return (
     <div
@@ -153,8 +160,8 @@ function MarkdownText({ children, className, level = 3, 'data-body': body }: Mar
       <ReactMarkdown
         remarkPlugins={PLUGINS}
         remarkRehypeOptions={{ clobberPrefix: prefix }}
-        rehypePlugins={[() => labelFootnotes(prefix)]}
-        components={COMPONENTS_AT[level]}
+        rehypePlugins={[() => placeHeadings(level, top, sizeOf), () => labelFootnotes(prefix)]}
+        components={DRAWN}
       >
         {children}
       </ReactMarkdown>
@@ -169,6 +176,7 @@ export const Markdown = memo(
     before.children === after.children &&
     before.className === after.className &&
     before.level === after.level &&
+    before.top === after.top &&
     before['data-body'] === after['data-body'],
 );
 Markdown.displayName = 'Markdown';

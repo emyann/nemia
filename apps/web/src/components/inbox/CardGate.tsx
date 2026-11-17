@@ -21,7 +21,7 @@ type Asked = 'approve' | 'send';
  * card taller than its cell reaches over the card beneath it (`CELL_HEIGHT`) — cut short where the names are long and whole on hover and in
  * the inspector; a link to what is being approved, a page away, since a card has no room for a plan; and the answer beside it — the kit's
  * `SplitButton`, through the same api as the run page's gate (`useApprove`, `useAsk`). Its main press approves a gate mid-run at once, with
- * no words, as the CLI's `approve` does; at an ending, which cannot be taken back, it is the first of two presses, as on the run's own gate:
+ * no words, as the CLI's `approve` does; at an ending, which cannot be taken back, it is the first of two presses, as on the run's gate:
  * it opens the approval's form, which says what running it does (`endingWarning`) over `Run ship now`. Its menu holds Approve with words…
  * and Send back…, each opening its form in a popover over the card; a send-back needs words, as the CLI's `retry --message` does. A
  * refusal shows in the popover in the api's words, the words kept in the box: one of the main press opens the approval's form to say it.

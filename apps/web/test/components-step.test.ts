@@ -1387,7 +1387,7 @@ test("a closeout's picture is a thumbnail captioned by its name, which names its
   assert.ok(text.includes(`href="${url('notes.txt')}" target="_blank" rel="noreferrer"`), text);
   assert.doesNotMatch(text, /data-opens-view/, 'no step named: the file itself, in a new tab');
   assert.doesNotMatch(text, / · /, 'a text file: no size');
-  assert.match(other, /<a data-slot="chip"[\s\S]*>trace\.zip<span[^>]*> · 2\.3 MB<\/span>/);
+  assert.match(other, /<a data-slot="chip"[\s\S]*>trace\.zip <span[^>]*>· 2\.3 MB<\/span>/);
   assert.match(bare, /data-artifact="path"[^>]*>RESPONSE\.md<\/span>/);
   assert.doesNotMatch(bare, /<a /);
   assert.equal(html.match(/<img /g)?.length, 1, 'only the picture is drawn');

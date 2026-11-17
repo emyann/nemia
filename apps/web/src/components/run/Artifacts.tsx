@@ -167,7 +167,12 @@ function Opened({ artifact, href, size, view }: { artifact: Served; href: string
       >
         <span className="block truncate font-mono">
           {artifact.name}
-          {(size || artifact.kind === 'other') && <span className="text-on-surface-variant"> · {bytesWord(artifact.size)}</span>}
+          {(size || artifact.kind === 'other') && (
+            <>
+              {' '}
+              <span className="text-on-surface-variant">· {bytesWord(artifact.size)}</span>
+            </>
+          )}
         </span>
       </KitChip>
     </span>

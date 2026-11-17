@@ -479,12 +479,6 @@
       }
     },
     {
-      "files": ["apps/web/src/components/inbox/CardGate.tsx"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 90, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["apps/web/src/components/factory/FactoryCanvas.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 231, "skipBlankLines": true, "skipComments": true }]

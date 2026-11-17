@@ -126,7 +126,7 @@ export const Unlisted: Story = {
 /** A write the api refuses: its words under the form, the name kept in the field to mend. */
 export const Refused: Story = {
   parameters: {
-    msw: [http.put(PUT, () => HttpResponse.json({ error: 'no agent of nemia is named nobody' }, { status: 422 }))],
+    msw: [http.put(PUT, () => HttpResponse.json({ error: 'this factory serves no agent named nobody' }, { status: 422 }))],
   },
   play: async ({ canvasElement }) => {
     await sent(canvasElement, 'nobody');

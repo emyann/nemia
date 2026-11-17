@@ -8,7 +8,7 @@ import { FrameHeader } from '@/components/frame/FrameHeader';
 import { FrameRail } from '@/components/frame/FrameRail';
 import { FrameTabs } from '@/components/frame/FrameTabs';
 import { FrameSheet } from '@/components/frame/FrameSheet';
-import { HerSheetProvider, useFrameFold } from '@/components/frame/HerSheet';
+import { FramePaneProvider, HerSheetProvider, useFrameFold } from '@/components/frame/HerSheet';
 import { FactoryPane } from '@/components/frame/FactoryPane';
 import { MachineBar } from '@/components/frame/MachineBar';
 import { seatOf } from '@/components/nav/nav';
@@ -17,7 +17,6 @@ import { LinkRefusal } from '@/components/frame/LinkRefusal';
 import { NewerRelease } from '@/components/frame/NewerRelease';
 import { SetupBanner } from '@/components/frame/SetupBanner';
 import { ViewerSheet } from '@/components/view/ViewerSheet';
-import { SidebarProvider, sidebarOpenOf } from '@/components/ui/sidebar';
 import { barSearch } from '@/lib/bar';
 import { trySearch } from '@/lib/tryAddress';
 import { viewSearch } from '@/lib/viewAddress';
@@ -47,8 +46,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
  * The frame of every page, the layout of a list-detail frame in its regions: the store's rail at the left (`FrameRail`), across every
  * factory, collapsed and never folding, a modal drawer on a narrow screen; on a factory's page (`seatOf`) the factory pane beside it
  * (`FrameFactoryPane`), folded where the person folds it (the menu button, Ctrl+B on a factory's page alone, which has the pane, this
- * browser's `sidebar_state` cookie, `sidebarOpenOf`) and covered by the docked sheet under 1600 (`frameFold`); then the page's column: its
- * head (`FrameHeader`), as tall as `--frame-top`, naming the page, then the frame's lines:
+ * browser's `sidebar_state` cookie, `paneOpenOf`, held by `FramePaneProvider`) and covered by the docked sheet under 1600
+ * (`frameFold`); then the page's column: its head (`FrameHeader`), as tall as `--frame-top`, naming the page, then the frame's lines:
  * the line saying a newer release is out where one is (`NewerRelease`), the line saying a run
  * waits on a piece the server misses, linking to Setup (`SetupBanner`), and a first-visit link refused on a board that asks no token
  * (`LinkRefusal`). The lines are measured as they come and go into `--frame-lines`, which a page that fills the window takes off its
@@ -83,40 +82,38 @@ function Root() {
     <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
       <NemiaChatProvider>
         <HerSheetProvider>
-          <SidebarProvider
-            defaultOpen={sidebarOpenOf(document.cookie)}
-            keyboardShortcut={seatOf(path)?.level === 'factory'}
-            className="flex-col"
-          >
-            <div data-frame-row className="flex min-h-[calc(100svh-var(--frame-foot))] w-full">
-              <FrameRail path={path} search={search} />
-              <FrameFactoryPane path={path} search={search} />
-              <div className="flex min-w-0 flex-1 flex-col" style={{ '--frame-lines': `${linesHeight}px` } as CSSProperties}>
-                <FrameHeader path={path} />
-                <main data-frame-page className="@container/page relative flex min-w-0 flex-1 flex-col bg-background">
-                  <div ref={lines} data-frame-lines>
-                    <NewerRelease />
-                    <SetupBanner path={path} />
-                    <div className="px-4 py-2 empty:hidden">
-                      <LinkRefusal />
-                    </div>
-                  </div>
-                  <FrameTabs path={path}>
-                    {fullBleed ? (
-                      <Outlet />
-                    ) : (
-                      <div className="mx-auto w-full max-w-4xl px-4 py-6">
-                        <Outlet />
+          <FramePaneProvider shortcut={seatOf(path)?.level === 'factory'}>
+            <div className="flex min-h-svh w-full flex-col">
+              <div data-frame-row className="flex min-h-[calc(100svh-var(--frame-foot))] w-full">
+                <FrameRail path={path} search={search} />
+                <FrameFactoryPane path={path} search={search} />
+                <div className="flex min-w-0 flex-1 flex-col" style={{ '--frame-lines': `${linesHeight}px` } as CSSProperties}>
+                  <FrameHeader path={path} />
+                  <main data-frame-page className="@container/page relative flex min-w-0 flex-1 flex-col bg-background">
+                    <div ref={lines} data-frame-lines>
+                      <NewerRelease />
+                      <SetupBanner path={path} />
+                      <div className="px-4 py-2 empty:hidden">
+                        <LinkRefusal />
                       </div>
-                    )}
-                  </FrameTabs>
-                </main>
+                    </div>
+                    <FrameTabs path={path}>
+                      {fullBleed ? (
+                        <Outlet />
+                      ) : (
+                        <div className="mx-auto w-full max-w-4xl px-4 py-6">
+                          <Outlet />
+                        </div>
+                      )}
+                    </FrameTabs>
+                  </main>
+                </div>
+                <FrameSheet path={path} feed={feed} />
               </div>
-              <FrameSheet path={path} feed={feed} />
+              <MachineBar path={path} feed={feed} />
+              <ViewerSheet />
             </div>
-            <MachineBar path={path} feed={feed} />
-            <ViewerSheet />
-          </SidebarProvider>
+          </FramePaneProvider>
         </HerSheetProvider>
       </NemiaChatProvider>
       <ReactQueryDevtools buttonPosition="bottom-left" />

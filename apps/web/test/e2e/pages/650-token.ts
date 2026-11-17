@@ -13,7 +13,7 @@ const NAME = 'board-e2e';
 
 /** The token field's press, sending what the field holds, and the answer of `POST /api/session` it is sent as. */
 async function sent(other: Page, token: string): Promise<number> {
-  await other.locator('input[data-token-field]').fill(token);
+  await other.locator('[data-token-field] input').fill(token);
   const [answered] = await Promise.all([
     other.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/session', { timeout: WAIT_MS }),
     other.getByRole('button', { name: 'Use this token' }).click(),
@@ -64,7 +64,7 @@ export default {
         other.locator('[data-token-way] code').getByText('nemia board link', { exact: true }),
         "the page names the way in typed on the store's machine, nemia board link",
       );
-      if ((await other.locator('input[data-token-field]').getAttribute('type')) !== 'password')
+      if ((await other.locator('[data-token-field] input').getAttribute('type')) !== 'password')
         throw new Refused('the field hides what is pasted into it (type=password)');
       await settled(other);
       await photograph(other, path.join(OUT, `token-asked-${await themeOf(other)}.png`));

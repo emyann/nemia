@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Pressable } from '@/components/ui/ds';
 import { daemonQuery } from '@/lib/api/daemon';
 import { pauseQuery } from '@/lib/api/pause';
 import { quotaQuery } from '@/lib/api/quota';
@@ -40,10 +41,11 @@ export function presenceWord(presence: Presence): string {
 }
 
 /**
- * The machine bar, at the window's foot across the whole frame, one line as tall as `--frame-foot` on `surface-container`: the machine
- * in short, a button that opens and closes its gauges in the side sheet (`GaugesBar`, `?bar=gauges`) — the daemon's dot and whether the
- * store ticks or is paused, the runs and sessions at work, the feed (`feed`), Nemia's session at the page at `path`, the quota (in money
- * while it nears its limit) and the version the api runs — then Pause every factory (`PauseButton`).
+ * The machine bar, at the window's foot across the whole frame, one line as tall as `--frame-foot` on `surface-container`: the machine in
+ * short, the kit's `Pressable`, the line pressed whole, that opens and closes its gauges in the side sheet (`GaugesBar`, `?bar=gauges`),
+ * the daemon's state said on hover — the daemon's dot and whether the store ticks or is paused, the runs and sessions at work, the feed
+ * (`feed`), Nemia's session at the page at `path`, the quota (in money while it nears its limit) and the version the api runs — then Pause
+ * every factory (`PauseButton`).
  */
 export function MachineBar({ path, feed }: { path: string; feed: FeedStatus }) {
   const now = new Date(useNow(30_000));
@@ -69,8 +71,7 @@ export function MachineBar({ path, feed }: { path: string; feed: FeedStatus }) {
       data-machine-bar
       className="sticky bottom-0 z-40 flex h-(--frame-foot) w-full shrink-0 items-center gap-2 bg-surface-container px-3 font-mono text-body-small text-on-surface-variant"
     >
-      <button
-        type="button"
+      <Pressable
         data-gauges-button
         data-feed={feed}
         data-daemon-dot={dot.kind}
@@ -79,22 +80,23 @@ export function MachineBar({ path, feed }: { path: string; feed: FeedStatus }) {
         data-marked={short.marked ? '' : undefined}
         aria-expanded={open?.kind === 'gauges'}
         aria-label={`This machine: daemon ${parts.join(', ')}, quota ${short.text}${short.marked ? ', near its limit' : ''}`}
-        title={dot.title}
-        onClick={() => toggle(GAUGES)}
-        className="flex h-full min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-shape-small px-2 text-left outline-none hover:bg-surface-container-high focus-visible:ring-2 focus-visible:ring-ring/50"
+        onPress={() => toggle(GAUGES)}
+        className="flex h-full min-w-0 flex-1 overflow-hidden"
       >
-        <span aria-hidden className={`size-2 shrink-0 rounded-full ${DOT[dot.tone]}`} />
-        <span className="min-w-0 truncate">{parts.join(' · ')}</span>
-        <span aria-hidden>·</span>
-        <span data-quota-line data-quota-mark={short.marked ? '' : undefined} className={cn('shrink-0', short.marked && ink.money)}>
-          {short.text}
-        </span>
-        {version.data && (
-          <span data-version-line className="ml-auto shrink-0 max-md:hidden">
-            {versionWords(version.data).text}
+        <span title={dot.title} className="flex h-full min-w-0 flex-1 items-center gap-2 px-2">
+          <span aria-hidden className={`size-2 shrink-0 rounded-full ${DOT[dot.tone]}`} />
+          <span className="min-w-0 truncate">{parts.join(' · ')}</span>
+          <span aria-hidden>·</span>
+          <span data-quota-line data-quota-mark={short.marked ? '' : undefined} className={cn('shrink-0', short.marked && ink.money)}>
+            {short.text}
           </span>
-        )}
-      </button>
+          {version.data && (
+            <span data-version-line className="ml-auto shrink-0 max-md:hidden">
+              {versionWords(version.data).text}
+            </span>
+          )}
+        </span>
+      </Pressable>
       <PauseButton />
     </footer>
   );

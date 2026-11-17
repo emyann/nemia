@@ -142,7 +142,7 @@ export default {
       await expectTexts(popover.locator('[data-pause-interrupt] li'), read.interrupts.map(interruptSentence), 'the confirm names each');
       await expectTexts(popover.locator('[data-pause-cost]'), [COST], 'and says what an interrupted step costs');
       if (fs.existsSync(path.join(store!, 'cordon'))) throw new Refused('nothing is put while the confirm asks');
-      await popover.locator('[data-pause-why]').fill(NOW_WHY);
+      await popover.locator('[data-pause-why] input').fill(NOW_WHY);
       await settled(page);
       await photograph(page, path.join(OUT, `stop-now-confirm-${theme}.png`));
       await popover.getByRole('button', { name: 'Stop now', exact: true }).click();
@@ -187,7 +187,7 @@ export default {
       await expectVisible(button.and(page.locator('[data-pause="running"]')), 'put back, all factories run again');
       await button.click();
       await popover.getByRole('button', { name: 'Pause…' }).click();
-      await popover.locator('[data-pause-why]').fill(PLAIN_WHY);
+      await popover.locator('[data-pause-why] input').fill(PLAIN_WHY);
       await popover.getByRole('button', { name: 'Pause', exact: true }).click();
       await expectCount(popover, 0, 'the plain pause put');
       const plain = pauseFile();

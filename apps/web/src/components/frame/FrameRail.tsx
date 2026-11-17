@@ -1,11 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { PanelLeft } from 'lucide-react';
 import { Avatar, IconButton, NavigationDrawer, type NavigationItem, NavigationRail } from '@/components/ui/ds';
-import { useSidebar } from '@/components/ui/sidebar';
 import { openRunsQuery } from '@/lib/api/runs';
 import { NemiaRailFace } from '../nemia/NemiaRailFace';
 import { useNemiaPresence } from '../nemia/useNemiaPresence';
-import { useFrameFold, useHerSheet, useOwnsChat } from './HerSheet';
+import { useFrameFold, useFramePane, useHerSheet, useOwnsChat } from './HerSheet';
 import { FactoryPane } from './FactoryPane';
 import { litOf, RAIL_GROUPS, type RailGroup, railHref, seatOf } from '../nav/nav';
 
@@ -36,13 +35,11 @@ function useRailGroups(): { group: RailGroup; items: NavigationItem[] }[] {
  * sheet covers under 1600 is said closed, and a press there folds it as the person keeps it, which the sheet closing then shows.
  */
 export function MenuButton() {
-  const { isMobile, openMobile, open, toggleSidebar } = useSidebar();
+  const { narrow, drawerOpen, open, toggle } = useFramePane();
   const fold = useFrameFold();
-  const shown = isMobile ? openMobile : fold.pane === 'docked';
-  const name = isMobile ? (shown ? 'Close the menu' : 'Open the menu') : open ? 'Fold the factory pane' : 'Unfold the factory pane';
-  return (
-    <IconButton data-menu-button variant="standard" icon={PanelLeft} aria-label={name} aria-expanded={shown} onPress={toggleSidebar} />
-  );
+  const shown = narrow ? drawerOpen : fold.pane === 'docked';
+  const name = narrow ? (shown ? 'Close the menu' : 'Open the menu') : open ? 'Fold the factory pane' : 'Unfold the factory pane';
+  return <IconButton data-menu-button variant="standard" icon={PanelLeft} aria-label={name} aria-expanded={shown} onPress={toggle} />;
 }
 
 /**
@@ -78,17 +75,17 @@ function AccountToCome() {
  * factory pane (`FactoryPane`) on a factory's page over the same groups, and which a pick closes.
  */
 export function FrameRail({ path, search }: { path: string; search: Record<string, unknown> }) {
-  const { isMobile, openMobile, setOpenMobile } = useSidebar();
+  const { narrow, drawerOpen, setDrawerOpen } = useFramePane();
   const seat = seatOf(path);
   const groups = useRailGroups();
   const selected = litOf(seat) ?? null;
-  if (isMobile)
+  if (narrow)
     return (
       <NavigationDrawer
         variant="modal"
         aria-label="Places"
-        isOpen={openMobile}
-        onClose={() => setOpenMobile(false)}
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         header={
           seat?.level === 'factory' ? (
             <FactoryPane
@@ -97,7 +94,7 @@ export function FrameRail({ path, search }: { path: string; search: Record<strin
               factory={seat.factory}
               lit={seat.place}
               inDrawer
-              onPicked={() => setOpenMobile(false)}
+              onPicked={() => setDrawerOpen(false)}
             />
           ) : undefined
         }

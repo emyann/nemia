@@ -8,12 +8,12 @@
 import { usePagePlace } from '@/components/nav/useSeat';
 import { useEffect, useId, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { XIcon } from 'lucide-react';
-import { Button, LinkButton } from '@/components/ui/button';
+import { Button, IconButton } from '@/components/ui/ds';
 import { barOpens, barValue, escapeDoes, focusGoesBack, type FocusPlace } from '@/lib/bar';
 import { useBar } from '@/lib/useBar';
 import { routeLink } from '../nav/routeLink';
 
-const RouterLinkButton = routeLink(LinkButton);
+const RouterLinkButton = routeLink(Button);
 
 /** The text of `target` when it is a field a person types in, else null. */
 function fieldTextOf(target: EventTarget | null): string | null {
@@ -126,13 +126,11 @@ export function BarPanel({
         </div>
         {actions}
         {page && (
-          <RouterLinkButton {...page} variant="outline" size="sm" className="-mt-0.5 shrink-0">
+          <RouterLinkButton {...page} variant="outlined" size="xsmall" className="shrink-0">
             Open
           </RouterLinkButton>
         )}
-        <Button variant="ghost" size="icon-sm" aria-label="Close" onPress={close} className="-mt-1 -mr-1 shrink-0">
-          <XIcon />
-        </Button>
+        <IconButton variant="standard" size="xsmall" icon={XIcon} aria-label="Close" onPress={close} className="shrink-0" />
       </div>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">{children}</div>
     </aside>

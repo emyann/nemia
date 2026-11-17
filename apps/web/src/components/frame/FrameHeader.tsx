@@ -1,6 +1,6 @@
 import { PageName } from '@/components/look';
-import { useSidebar } from '@/components/ui/sidebar';
 import { HerFace, MenuButton } from './FrameRail';
+import { useFramePane } from './HerSheet';
 import { pageNameOf } from '../nav/nav';
 
 /**
@@ -10,12 +10,12 @@ import { pageNameOf } from '../nav/nav';
  * window's foot (`MachineBar`), the factory switcher in the factory pane (`FactoryPane`).
  */
 export function FrameHeader({ path }: { path: string }) {
-  const { isMobile } = useSidebar();
+  const { narrow } = useFramePane();
   const name = pageNameOf(path);
   return (
     <header data-frame-header className="sticky top-0 z-20 flex h-(--frame-top) shrink-0 items-center gap-3 bg-background px-6 max-md:px-3">
-      {isMobile && <MenuButton />}
-      {isMobile && <HerFace path={path} />}
+      {narrow && <MenuButton />}
+      {narrow && <HerFace path={path} />}
       {name && <PageName>{name}</PageName>}
     </header>
   );

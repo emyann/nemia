@@ -25,16 +25,21 @@ async function frameTabsAt(path: string): Promise<string> {
   return routedWith(createElement(FrameTabs, { path, children: createElement('p', { 'data-page': '' }, 'the page') }));
 }
 
-/** The strip's tabs, in their order: each one's tag, `href`, name and whether it is selected. */
+/**
+ * The strip's tabs, in their order: each one's tag, `href`, name (the text it holds, whatever it is drawn in) and whether it is
+ * selected.
+ */
 const tabsIn = (html: string) =>
-  [...(/<div[^>]*role="tablist"[^>]*>([\s\S]*?)<\/div>/.exec(html)?.[1] ?? '').matchAll(/<(\w+)\b([^>]*role="tab"[^>]*)>([^<]*)</g)].map(
-    ([, tag, attrs, name]) => ({
-      tag,
-      href: /href="([^"]*)"/.exec(attrs ?? '')?.[1],
-      name,
-      selected: /aria-selected="true"/.test(attrs ?? ''),
-    }),
-  );
+  [
+    ...(/role="tablist"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/.exec(html)?.[1] ?? '').matchAll(
+      /<(a|div)\b([^>]*role="tab"[^>]*)>([\s\S]*?)<\/\1>/g,
+    ),
+  ].map(([, tag, attrs, inner]) => ({
+    tag,
+    href: /href="([^"]*)"/.exec(attrs ?? '')?.[1],
+    name: (inner ?? '').replace(/<[^>]*>/g, ''),
+    selected: /aria-selected="true"/.test(attrs ?? ''),
+  }));
 
 test("a tab's page is drawn under the strip of Settings' tabs, each a link to its own address, its own alone selected", async () => {
   const html = await frameTabsAt('/capabilities');
@@ -65,12 +70,21 @@ test('a page with one view draws no strip: its page bare', async () => {
   }
 });
 
-test('REFUSED: the sidebar is drawn folded only where the cookie keeps sidebar_state=false, whole', async () => {
-  const { sidebarOpenOf } = await import('../src/components/ui/sidebar.tsx');
-  assert.equal(sidebarOpenOf('a=1; sidebar_state=false'), false);
-  assert.equal(sidebarOpenOf('sidebar_state=false'), false);
+test('REFUSED: the factory pane is drawn folded only where the cookie keeps sidebar_state=false, whole', async () => {
+  const { paneOpenOf } = await import('../src/lib/frameFold.ts');
+  assert.equal(paneOpenOf('a=1; sidebar_state=false'), false);
+  assert.equal(paneOpenOf('sidebar_state=false'), false);
   for (const open of ['', 'sidebar_state=true', 'sidebar_statex=false', 'xsidebar_state=false', 'a=sidebar_state=false'])
-    assert.equal(sidebarOpenOf(open), true, open);
+    assert.equal(paneOpenOf(open), true, open);
+});
+
+test("the person's fold is kept as the cookie the pane is read from, for a week across the board", async () => {
+  const { paneCookie, paneOpenOf } = await import('../src/lib/frameFold.ts');
+  for (const open of [true, false]) {
+    const [pair, ...attributes] = paneCookie(open).split('; ');
+    assert.equal(paneOpenOf(pair ?? ''), open);
+    assert.deepEqual(attributes, ['path=/', `max-age=${60 * 60 * 24 * 7}`]);
+  }
 });
 
 /** A piece of the readiness read, of `cost`, in `state`. */

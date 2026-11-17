@@ -24,7 +24,7 @@ function ProposalPage() {
     <article data-proposal-page={name} className="mx-auto flex max-w-3xl flex-col gap-6">
       <header className="flex flex-col gap-3">
         <div>
-          <RouterLinkButton to="/factories/$factory/proposals" params={{ factory }} variant="text" size="xsmall" data-back-to-proposals>
+          <RouterLinkButton to="/factories/$factory/proposals" params={{ factory }} variant="text" size="xsmall">
             ← Back to the proposals
           </RouterLinkButton>
         </div>

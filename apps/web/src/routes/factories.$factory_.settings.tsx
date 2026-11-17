@@ -71,7 +71,7 @@ function SettingsPage() {
     <article data-factory-settings={name} className="mx-auto flex max-w-3xl flex-col gap-8">
       <header className="flex flex-col gap-3">
         <div>
-          <RouterLinkButton to="/factories/$factory" params={{ factory: name }} variant="text" size="xsmall" data-back-to-floor>
+          <RouterLinkButton to="/factories/$factory" params={{ factory: name }} variant="text" size="xsmall">
             ← Back to the floor
           </RouterLinkButton>
         </div>

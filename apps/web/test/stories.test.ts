@@ -181,7 +181,7 @@ test('REFUSED: a baseline that grows, and one that keeps an entry since mended',
   assert.deepEqual(against(['a'], ['a', 'b']).stale, ['b']);
 });
 
-test('REFUSED: a baseline entry filed in another source file\'s file, an empty file, and a file of no list', () => {
+test("REFUSED: a baseline entry filed in another source file's file, an empty file, and a file of no list", () => {
   const root = scratch('web-baseline-');
   const home = `${FOLDER}storyless/components/run/Bar.tsx.txt`;
   const other = `${FOLDER}storyless/components/run/Foo.tsx.txt`;
@@ -190,7 +190,8 @@ test('REFUSED: a baseline entry filed in another source file\'s file, an empty f
     [home]: 'apps/web/src/components/run/Bar.tsx\n',
     [other]: 'apps/web/src/components/run/Foo.tsx\napps/web/src/components/run/Bar.tsx\n',
     [`${FOLDER}storyless/components/run/Baz.tsx.txt`]: '',
-    [keyed]: 'apps/web/src/components/run/Bar.tsx#@/components/ui/badge:Badge\napps/web/src/components/run/Foo.tsx#react-aria-components:Dialog\n',
+    [keyed]:
+      'apps/web/src/components/run/Bar.tsx#@/components/ui/badge:Badge\napps/web/src/components/run/Foo.tsx#react-aria-components:Dialog\n',
     [`${FOLDER}storyless/components/run/Qux.tsx.ts`]: 'apps/web/src/components/run/Qux.tsx\n',
     [`${FOLDER}nowhere/components/run/Qux.tsx.txt`]: 'apps/web/src/components/run/Qux.tsx\n',
     [`${FOLDER}README.md`]: 'x\n',
@@ -204,7 +205,7 @@ test('REFUSED: a baseline entry filed in another source file\'s file, an empty f
     astray: [{ file: keyed, entry: 'apps/web/src/components/run/Foo.tsx#react-aria-components:Dialog' }],
     empty: [],
   });
-  assert.deepEqual(misfiled('argless', read.lists.storyless).astray.length, 3, 'a file of one list read as another\'s is astray whole');
+  assert.deepEqual(misfiled('argless', read.lists.storyless).astray.length, 3, "a file of one list read as another's is astray whole");
   assert.deepEqual(
     [...read.strays].sort(),
     [`${FOLDER}README.md`, `${FOLDER}nowhere/components/run/Qux.tsx.txt`, `${FOLDER}storyless/components/run/Qux.tsx.ts`].sort(),

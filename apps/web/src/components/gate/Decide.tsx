@@ -409,19 +409,21 @@ export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly s
   if (!agentFacing.length && !checkAffecting.length) return null;
   const row = (label: string, files: readonly string[], kind: string, title: string, className: string) =>
     files.length > 0 && (
-      <p className="flex flex-wrap items-center gap-1.5">
-        <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
-        {files.map((file) => (
-          <Tag
-            key={file}
-            variant="outlined"
-            data-chip={kind}
-            title={title}
-            className={cn('h-auto min-h-6 max-w-full whitespace-normal py-0.5', className)}
-          >
-            <span className="break-all font-mono">{file}</span>
-          </Tag>
-        ))}
+      <p className="flex items-start gap-1.5">
+        <span className="w-28 shrink-0 py-0.5 text-muted-foreground">{label}</span>
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {files.map((file) => (
+            <Tag
+              key={file}
+              variant="outlined"
+              data-chip={kind}
+              title={title}
+              className={cn('h-auto min-h-6 min-w-0 max-w-full shrink whitespace-normal py-0.5', className)}
+            >
+              <span className="break-all font-mono">{file}</span>
+            </Tag>
+          ))}
+        </span>
       </p>
     );
   return (

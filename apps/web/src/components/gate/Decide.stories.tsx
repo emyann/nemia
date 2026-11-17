@@ -35,6 +35,9 @@ export const AgentFacingAndCheckAffecting: Story = {
     await expect(weighed).toHaveAttribute('data-chip', 'check-affecting');
     await expect(weighed).toHaveAttribute('title', 'could make its check pass');
     const long = marks.getByText(/a-test-whose-path/).closest('[data-slot="tag"]');
+    await expect(long?.getBoundingClientRect().left, "a long path stays in the files' column, beside its label, never under it").toBe(
+      weighed?.getBoundingClientRect().left,
+    );
     await expect(long?.getBoundingClientRect().right, 'a long path wraps inside the row').toBeLessThanOrEqual(
       canvasElement.querySelector('div')!.getBoundingClientRect().right,
     );

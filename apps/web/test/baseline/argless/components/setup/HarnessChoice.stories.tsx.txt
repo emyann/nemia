@@ -1,0 +1,4 @@
+apps/web/src/components/setup/HarnessChoice.stories.tsx#NoneActivated
+apps/web/src/components/setup/HarnessChoice.stories.tsx#Installing
+apps/web/src/components/setup/HarnessChoice.stories.tsx#SignedOut
+apps/web/src/components/setup/HarnessChoice.stories.tsx#Skipped

@@ -1,0 +1,2 @@
+apps/web/src/components/look/ScanLines.stories.tsx#Lined
+apps/web/src/components/look/ScanLines.stories.tsx#GlowAlone

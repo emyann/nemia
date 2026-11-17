@@ -1,0 +1,5 @@
+apps/web/src/components/setup/ReadinessList.stories.tsx#Missing
+apps/web/src/components/setup/ReadinessList.stories.tsx#Phone
+apps/web/src/components/setup/ReadinessList.stories.tsx#Refused
+apps/web/src/components/setup/ReadinessList.stories.tsx#DeactivateRefused
+apps/web/src/components/setup/ReadinessList.stories.tsx#Ready

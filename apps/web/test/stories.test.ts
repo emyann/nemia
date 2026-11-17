@@ -1,16 +1,20 @@
 /**
  * The board's stories, held by the rules of `stories.ts`: each is first made to refuse on a fixture that breaks it, then run on the
- * tree against `stories.baseline.ts`, whose lists only shrink. A file that breaks a rule and is not listed is refused, and so is a
- * listed one that no longer breaks it, so the list is cut in the change that mends it. The categories rule has no list.
+ * tree against the baseline, `test/baseline/` (`baseline.ts`), whose lists only shrink. A file that breaks a rule and is not listed is
+ * refused, and so is a listed one that no longer breaks it, so the list is cut in the change that mends it: its line, or its file
+ * where it is the last. The categories rule has no list. The baseline's folder is held to its layout: each entry in its source file's
+ * file, no file empty, and nothing else there.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { files, REPO } from 'test-kit/repo';
+import { scratch } from 'test-kit/scratch';
+import { FOLDER, LISTS, misfiled, readBaseline, shardOf } from './baseline.ts';
+import type { BaselineList } from '../contracts/baseline-shard.contract.ts';
 import { DESTINATIONS, EXEMPT } from './destinations.ts';
 import { a11yTodos, argless, handDrawn, mapGaps, offCategory, secondSystem, seenOnceFound, storyless, storyModuleOf } from './stories.ts';
-import { BASELINE } from './stories.baseline.ts';
 
 /** The board's files that are there, from the workspace root. */
 const board = (): string[] => files().filter((file) => file.startsWith('apps/web/') && fs.existsSync(path.join(REPO, file)));
@@ -30,11 +34,29 @@ const against = (found: readonly string[], listed: readonly string[]) => ({
   stale: listed.filter((one) => !found.includes(one)),
 });
 
-/** Asserts `found` is `listed` exactly, naming what to add a story for and what to cut from the baseline's `list`. */
-const heldTo = (found: readonly string[], listed: readonly string[], list: string): void => {
-  const { added, stale } = against(found, listed);
-  assert.deepEqual(added, [], `mend each of these, never add it to ${list} in test/stories.baseline.ts`);
-  assert.deepEqual(stale, [], `each of these is mended: cut it from ${list} in test/stories.baseline.ts`);
+/** The entries the tree's baseline lists on `list`, every file's lines together. */
+const listed = (list: BaselineList): string[] => readBaseline(REPO).lists[list].flatMap(({ entries }) => entries);
+
+/**
+ * Asserts `found` is the baseline's `list` exactly, naming what to add a story for, and for each mended entry the file it is cut
+ * from: the line, or the whole file where it is the last.
+ */
+const heldTo = (found: readonly string[], list: BaselineList): void => {
+  const { added, stale } = against(found, listed(list));
+  assert.deepEqual(added, [], `mend each of these, never add it to ${FOLDER}${list}/`);
+  assert.deepEqual(
+    stale.map((entry) => `${shardOf(list, entry)}: ${entry}`),
+    [],
+    'each of these is mended: cut its line from the file named, and delete the file where it is the last line (git rm <file>)',
+  );
+};
+
+/** Writes each of `planted` under `root`, by its path from the workspace root, with its text. */
+const plant = (root: string, planted: Readonly<Record<string, string>>): void => {
+  for (const [file, text] of Object.entries(planted)) {
+    fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    fs.writeFileSync(path.join(root, file), text);
+  }
 };
 
 const STORY = (body: string) => `import type { Meta, StoryObj } from '@storybook/react-vite';\n${body}`;
@@ -159,6 +181,60 @@ test('REFUSED: a baseline that grows, and one that keeps an entry since mended',
   assert.deepEqual(against(['a'], ['a', 'b']).stale, ['b']);
 });
 
+test("REFUSED: a baseline entry filed in another source file's file, an empty file, and a file of no list", () => {
+  const root = scratch('web-baseline-');
+  const home = `${FOLDER}storyless/components/run/Bar.tsx.txt`;
+  const other = `${FOLDER}storyless/components/run/Foo.tsx.txt`;
+  const keyed = `${FOLDER}secondSystem/components/run/Bar.tsx.txt`;
+  plant(root, {
+    [home]: 'apps/web/src/components/run/Bar.tsx\n',
+    [other]: 'apps/web/src/components/run/Foo.tsx\napps/web/src/components/run/Bar.tsx\n',
+    [`${FOLDER}storyless/components/run/Baz.tsx.txt`]: '',
+    [keyed]:
+      'apps/web/src/components/run/Bar.tsx#@/components/ui/badge:Badge\napps/web/src/components/run/Foo.tsx#react-aria-components:Dialog\n',
+    [`${FOLDER}storyless/components/run/Qux.tsx.ts`]: 'apps/web/src/components/run/Qux.tsx\n',
+    [`${FOLDER}nowhere/components/run/Qux.tsx.txt`]: 'apps/web/src/components/run/Qux.tsx\n',
+    [`${FOLDER}README.md`]: 'x\n',
+  });
+  const read = readBaseline(root);
+  assert.deepEqual(misfiled('storyless', read.lists.storyless), {
+    astray: [{ file: other, entry: 'apps/web/src/components/run/Bar.tsx' }],
+    empty: [`${FOLDER}storyless/components/run/Baz.tsx.txt`],
+  });
+  assert.deepEqual(misfiled('secondSystem', read.lists.secondSystem), {
+    astray: [{ file: keyed, entry: 'apps/web/src/components/run/Foo.tsx#react-aria-components:Dialog' }],
+    empty: [],
+  });
+  assert.deepEqual(misfiled('argless', read.lists.storyless).astray.length, 3, "a file of one list read as another's is astray whole");
+  assert.deepEqual(
+    [...read.strays].sort(),
+    [`${FOLDER}README.md`, `${FOLDER}nowhere/components/run/Qux.tsx.txt`, `${FOLDER}storyless/components/run/Qux.tsx.ts`].sort(),
+  );
+  assert.deepEqual(read.lists.storyless.find(({ file }) => file === other)?.entries, [
+    'apps/web/src/components/run/Foo.tsx',
+    'apps/web/src/components/run/Bar.tsx',
+  ]);
+});
+
+test("the baseline's folder: each entry in its source file's file, no file empty, nothing else there, and no one-file baseline left", () => {
+  const { lists, strays } = readBaseline(REPO);
+  for (const list of LISTS) {
+    const { astray, empty } = misfiled(list, lists[list]);
+    assert.deepEqual(
+      astray.map(({ file, entry }) => `${file}: ${entry} belongs in ${shardOf(list, entry)}`),
+      [],
+      'move each of these lines to the file named',
+    );
+    assert.deepEqual([...empty], [], 'delete each of these files: a mended file is deleted, never left empty (git rm <file>)');
+  }
+  assert.deepEqual([...strays], [], `only ${FOLDER}<list>/<path under apps/web/src>.txt belongs here: move or delete each of these`);
+  assert.equal(
+    fs.existsSync(path.join(REPO, 'apps/web/test/stories.baseline.ts')),
+    false,
+    'the baseline moved to test/baseline/: git rm apps/web/test/stories.baseline.ts, run node --test test/stories.test.ts from apps/web, and cut from test/baseline/ what it names',
+  );
+});
+
 test("the board's stories: every story titled in a category, and each other rule held to its baseline", () => {
   const all = board();
   const modules = storyModules(all);
@@ -168,10 +244,9 @@ test("the board's stories: every story titled in a category, and each other rule
     [],
     'title each story under Look/, Frame/, Store/, Factory/, Run/ or Pages/, by where its part sits',
   );
-  heldTo(storyless(all), BASELINE.storyless, 'storyless');
+  heldTo(storyless(all), 'storyless');
   heldTo(
     modules.flatMap(({ file, module }) => argless(file, module)),
-    BASELINE.argless,
     'argless',
   );
   const sources = all.filter((file) => /\.tsx?$/.test(file)).map((file) => ({ file, source: textOf(file) }));
@@ -181,12 +256,10 @@ test("the board's stories: every story titled in a category, and each other rule
   const drawn = sources.flatMap(({ file, source }) => handDrawn(file, source).map((key) => ({ file, key })));
   heldTo(
     imported.filter(({ key }) => !EXEMPT.includes(key)).map(({ file, key }) => `${file}#${key}`),
-    BASELINE.secondSystem,
     'secondSystem',
   );
   heldTo(
     drawn.map(({ file, key }) => `${file}#${key}`),
-    BASELINE.handDrawn,
     'handDrawn',
   );
   const { unmapped, unused } = mapGaps([...new Set([...imported, ...drawn].map(({ key }) => key))], Object.keys(DESTINATIONS));
@@ -199,7 +272,6 @@ test("the board's stories: every story titled in a category, and each other rule
   );
   heldTo(
     modules.flatMap(({ file, module }) => a11yTodos(file, module)),
-    BASELINE.a11yTodo,
     'a11yTodo',
   );
 });

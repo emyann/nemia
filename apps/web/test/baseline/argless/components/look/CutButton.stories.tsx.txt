@@ -1,0 +1,3 @@
+apps/web/src/components/look/CutButton.stories.tsx#Link
+apps/web/src/components/look/CutButton.stories.tsx#Press
+apps/web/src/components/look/CutButton.stories.tsx#DisabledPress

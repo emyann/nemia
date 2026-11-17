@@ -1,0 +1,1 @@
+apps/web/src/components/look/CutFrame.stories.tsx#Filled

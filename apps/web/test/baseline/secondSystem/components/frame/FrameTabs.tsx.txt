@@ -1,0 +1,4 @@
+apps/web/src/components/frame/FrameTabs.tsx#@/components/ui/tabs:Tabs
+apps/web/src/components/frame/FrameTabs.tsx#@/components/ui/tabs:TabsContent
+apps/web/src/components/frame/FrameTabs.tsx#@/components/ui/tabs:TabsList
+apps/web/src/components/frame/FrameTabs.tsx#@/components/ui/tabs:TabsTrigger

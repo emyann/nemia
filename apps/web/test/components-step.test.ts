@@ -2097,7 +2097,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   );
   const buttons = (name: string) => kitButtons(rows.get(name)!.html);
   const radios = (name: string) => kitRadios(rows.get(name)!.html);
-  const input = (name: string) => /<input [^>]*inputMode="decimal"[^>]*>/.exec(rows.get(name)!.html)?.[0] ?? '';
+  const input = (name: string) => /<input [^>]*aria-label="The cap to raise [^>]*>/.exec(rows.get(name)!.html)?.[0] ?? '';
   const box = (name: string) => /\bvalue="([^"]*)"/.exec(input(name))?.[1];
   const boxClosed = (name: string) => /\bdisabled=""/.test(input(name));
   const said = (name: string) => kitBoxes(rows.get(name)!.html)[0] ?? null;
@@ -2107,7 +2107,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     tokens.includes('over budget $4.25 of $3') && tokens.join(' ').includes(': the button below raises it.') && tokens.includes('$4.25'),
     tokens.join(' | '),
   );
-  assert.equal(box('tokens'), '5', 'the amount box starts above what it cost, whatever order a server render writes its attributes in');
+  assert.equal(box('tokens'), '$5.00', 'the amount box starts above what it cost, whatever order a server render writes its attributes in');
   assert.deepEqual(buttons('tokens'), [['submit', false, 'Raise the budget and try again']]);
   assert.deepEqual(
     radios('tokens'),
@@ -2134,7 +2134,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     'the question as markdown, in a box that scrolls',
   );
   assert.ok(palette.join(' ').includes(': the button below raises it.'), palette.join(' | '));
-  assert.equal(box('palette'), '2');
+  assert.equal(box('palette'), '$2.00');
   assert.deepEqual(said('palette'), ['Your answer to palette', false], 'and the answer with the raise');
   assert.deepEqual(
     buttons('palette'),
@@ -2162,7 +2162,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
 
   const review = textsOf(rows.get('review')!.html);
   assert.ok(review.join(' ').includes(", with its loop's next round: the button below raises it."), review.join(' | '));
-  assert.equal(box('review'), '3');
+  assert.equal(box('review'), '$3.00', 'in dollars, as the board writes money');
   assert.deepEqual(buttons('review'), [['submit', false, 'Raise the budget and go round again']]);
   assert.deepEqual(radios('review'), [], 'a round has no mode');
   assert.equal(said('review'), null, 'and nothing to tell: a round carries no message');

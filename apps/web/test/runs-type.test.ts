@@ -56,6 +56,7 @@ const FILES = [
   'components/gate/GateBudgets.tsx',
   'components/gate/Questions.tsx',
   'components/gate/Raise.tsx',
+  'components/field/AmountField.tsx',
   'components/markdown/Markdown.tsx',
   'components/nav/Trail.tsx',
   'components/run/Artifacts.tsx',

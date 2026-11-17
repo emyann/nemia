@@ -109,7 +109,7 @@ async function setCostLine(page: Page, factoryFile: string): Promise<void> {
   await expectCount(section.locator('[data-cost-line]'), 1, 'a row for each workflow the factory offers');
   await expectVisible(row.locator('[data-cost-line-said="none"]'), `${workflow} has no cost line yet, and its row says so`);
   await expectCount(row.getByRole('button', { name: 'Clear', exact: true }), 0, 'with no line set, there is nothing to clear');
-  await row.getByRole('spinbutton', { name: `The cost line of ${workflow}, in dollars` }).fill(String(usd));
+  await row.getByRole('textbox', { name: `The cost line of ${workflow}, in dollars` }).fill(String(usd));
   await wrote(page, row, 'Save', 'PUT', 'costLine');
   const kept = costLinesIn(factoryFile);
   if (JSON.stringify(kept) !== JSON.stringify({ [workflow]: usd }))

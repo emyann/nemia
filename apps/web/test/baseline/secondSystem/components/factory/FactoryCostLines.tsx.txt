@@ -12,5 +12,4 @@ apps/web/src/components/factory/FactoryCostLines.tsx#@/components/ui/empty:Empty
 apps/web/src/components/factory/FactoryCostLines.tsx#@/components/ui/empty:EmptyDescription
 apps/web/src/components/factory/FactoryCostLines.tsx#@/components/ui/empty:EmptyHeader
 apps/web/src/components/factory/FactoryCostLines.tsx#@/components/ui/empty:EmptyTitle
-apps/web/src/components/factory/FactoryCostLines.tsx#@/components/ui/input:Input
 apps/web/src/components/factory/FactoryCostLines.tsx#@/components/ui/separator:Separator

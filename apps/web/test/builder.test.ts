@@ -21,7 +21,6 @@ import {
   listOf,
   listUnsetWords,
   nameRefusal,
-  numberOf,
   orderOf,
   placesOf,
   removeStep,
@@ -211,7 +210,7 @@ test('draftOf, connect, disconnect, addStep, removeStep, setKey, setSchema: a wo
   });
 });
 
-test('orderOf, listUnsetWords, listOf, numberOf, listedWith, readmeSent: the steps placed, the list fields, and what a save sends', async (t) => {
+test('orderOf, listUnsetWords, listOf, listedWith, readmeSent: the steps placed, the list fields, and what a save sends', async (t) => {
   await t.test('the steps are placed left to right by after; steps that wait on each other, which the package refuses, in a row', () => {
     const { at, cycle } = placesOf(draftOf(folder));
     assert.equal(cycle, false);
@@ -253,14 +252,10 @@ test('orderOf, listUnsetWords, listOf, numberOf, listedWith, readmeSent: the ste
       assert.deepEqual(specOf(addStep(draftOf(named), 'ship', 'Ship it.'), 'ship').mcp, [], 'a new step names none');
     },
   );
-  await t.test('what is typed into a list or a number field, as the listing has it', () => {
+  await t.test('what is typed into a list or a tokens field, as the listing has it', () => {
     assert.deepEqual(listOf('Read, Grep,  Bash(npm test) ,'), ['Read', 'Grep', 'Bash(npm test)']);
     assert.deepEqual(listOf('  '), []);
     assert.deepEqual(listOf('review, apps/site:lay-out'), ['review', 'apps/site:lay-out'], 'a skill named with its folder is kept whole');
-    assert.equal(numberOf(''), null);
-    assert.equal(numberOf(' 900 '), 900);
-    assert.equal(numberOf('2.50'), 2.5);
-    assert.equal(numberOf('-1'), -1, 'the package refuses it on save, in its words');
     for (const [typed, tokens] of [
       ['200k', 200_000],
       [' 150000 ', 150_000],

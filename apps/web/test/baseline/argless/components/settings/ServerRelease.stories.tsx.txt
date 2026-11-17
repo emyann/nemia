@@ -1,0 +1,11 @@
+apps/web/src/components/settings/ServerRelease.stories.tsx#NoNewerRelease
+apps/web/src/components/settings/ServerRelease.stories.tsx#NewerWithNotes
+apps/web/src/components/settings/ServerRelease.stories.tsx#Phone
+apps/web/src/components/settings/ServerRelease.stories.tsx#Upgrading
+apps/web/src/components/settings/ServerRelease.stories.tsx#WaitingForASlot
+apps/web/src/components/settings/ServerRelease.stories.tsx#Restarting
+apps/web/src/components/settings/ServerRelease.stories.tsx#SucceededWithPieces
+apps/web/src/components/settings/ServerRelease.stories.tsx#Failed
+apps/web/src/components/settings/ServerRelease.stories.tsx#BackRefused
+apps/web/src/components/settings/ServerRelease.stories.tsx#StartRefused
+apps/web/src/components/settings/ServerRelease.stories.tsx#UpgradesUnread

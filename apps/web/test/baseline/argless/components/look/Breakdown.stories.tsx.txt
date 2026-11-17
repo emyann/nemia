@@ -1,0 +1,4 @@
+apps/web/src/components/look/Breakdown.stories.tsx#OverAButton
+apps/web/src/components/look/Breakdown.stories.tsx#WithoutTheRest
+apps/web/src/components/look/Breakdown.stories.tsx#ALongHead
+apps/web/src/components/look/Breakdown.stories.tsx#RowsAlone

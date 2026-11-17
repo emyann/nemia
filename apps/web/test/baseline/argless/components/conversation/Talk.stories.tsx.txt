@@ -1,0 +1,5 @@
+apps/web/src/components/conversation/Talk.stories.tsx#EveryKind
+apps/web/src/components/conversation/Talk.stories.tsx#WhatIsNew
+apps/web/src/components/conversation/Talk.stories.tsx#Compact
+apps/web/src/components/conversation/Talk.stories.tsx#BeingWritten
+apps/web/src/components/conversation/Talk.stories.tsx#Empty

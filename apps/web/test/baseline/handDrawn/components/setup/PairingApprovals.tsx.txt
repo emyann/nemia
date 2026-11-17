@@ -1,0 +1,1 @@
+apps/web/src/components/setup/PairingApprovals.tsx#<input>

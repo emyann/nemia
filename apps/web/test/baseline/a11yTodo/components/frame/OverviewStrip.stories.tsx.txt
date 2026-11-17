@@ -1,0 +1,5 @@
+apps/web/src/components/frame/OverviewStrip.stories.tsx#BusyDay
+apps/web/src/components/frame/OverviewStrip.stories.tsx#QuietDay
+apps/web/src/components/frame/OverviewStrip.stories.tsx#QuotaPastTheMark
+apps/web/src/components/frame/OverviewStrip.stories.tsx#DaemonStalled
+apps/web/src/components/frame/OverviewStrip.stories.tsx#Narrow

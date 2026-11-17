@@ -1,0 +1,9 @@
+apps/web/src/components/nemia/NemiaFace.stories.tsx#Idle
+apps/web/src/components/nemia/NemiaFace.stories.tsx#Thinking
+apps/web/src/components/nemia/NemiaFace.stories.tsx#Surprised
+apps/web/src/components/nemia/NemiaFace.stories.tsx#Happy
+apps/web/src/components/nemia/NemiaFace.stories.tsx#Sleepy
+apps/web/src/components/nemia/NemiaFace.stories.tsx#Unsure
+apps/web/src/components/nemia/NemiaFace.stories.tsx#SeveralAtOnce
+apps/web/src/components/nemia/NemiaFace.stories.tsx#InTheHeader
+apps/web/src/components/nemia/NemiaFace.stories.tsx#Docked

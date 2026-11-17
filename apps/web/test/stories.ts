@@ -1,9 +1,10 @@
 /**
  * The rules the board's stories are held to, as pure functions over file lists and sources, which `stories.test.ts` runs on fixtures
- * and on the tree against `stories.baseline.ts`: a component or page body with no story beside it (`storyless`), a story given no args
- * (`argless`), a title outside the board's categories (`offCategory`), an import of a second component system (`secondSystem`), a
- * control drawn by hand (`handDrawn`), a story whose axe only warns (`a11yTodos`), a play that reads a part visible the moment it is
- * found (`seenOnceFound`), and where the map of destinations (`destinations.ts`) falls short of what the board takes (`mapGaps`).
+ * and on the tree against the baseline, `test/baseline/`: a component or page body with no story beside it (`storyless`), a story
+ * given no args (`argless`), a title outside the board's categories (`offCategory`), an import of a second component system
+ * (`secondSystem`), a control drawn by hand (`handDrawn`), a story whose axe only warns (`a11yTodos`), a play that reads a part visible
+ * the moment it is found (`seenOnceFound`), and where the map of destinations (`destinations.ts`) falls short of what the board takes
+ * (`mapGaps`).
  * Paths are from the workspace root.
  */
 import path from 'node:path';

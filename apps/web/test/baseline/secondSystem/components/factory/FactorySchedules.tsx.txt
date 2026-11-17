@@ -1,0 +1,16 @@
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/alert:Alert
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/alert:AlertDescription
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/alert:AlertTitle
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/badge:Badge
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/button:LinkButton
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/card:Card
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/card:CardContent
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/card:CardDescription
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/card:CardHeader
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/card:CardTitle
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/empty:Empty
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/empty:EmptyContent
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/empty:EmptyDescription
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/empty:EmptyHeader
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/empty:EmptyTitle
+apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/separator:Separator

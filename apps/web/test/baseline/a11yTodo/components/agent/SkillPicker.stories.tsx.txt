@@ -1,0 +1,1 @@
+apps/web/src/components/agent/SkillPicker.stories.tsx#SheetOpen

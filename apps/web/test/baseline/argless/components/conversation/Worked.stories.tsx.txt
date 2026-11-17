@@ -1,0 +1,7 @@
+apps/web/src/components/conversation/Worked.stories.tsx#AtWork
+apps/web/src/components/conversation/Worked.stories.tsx#Folded
+apps/web/src/components/conversation/Worked.stories.tsx#Opened
+apps/web/src/components/conversation/Worked.stories.tsx#Openable
+apps/web/src/components/conversation/Worked.stories.tsx#OpenedLine
+apps/web/src/components/conversation/Worked.stories.tsx#Failed
+apps/web/src/components/conversation/Worked.stories.tsx#Long

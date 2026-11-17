@@ -83,8 +83,9 @@ export const ReadingTheFactories: Story = {
 };
 
 /**
- * The store and its factory read, the workflow the card names still read: the shape of what it says and its Start. Its axe check waits
- * as the stories above do: the kit's select above it is named by its value and its label (`label-content-name-mismatch`), an ask of the kit.
+ * The store and its factory read, the workflow the card names still read: the shape of what it says and its Start. Its axe check
+ * waits as the stories above do: the kit's select above it is named by its value and its label (`label-content-name-mismatch`), an
+ * ask of the kit.
  */
 export const ReadingTheWorkflow: Story = {
   parameters: { a11y: { test: 'todo' } },

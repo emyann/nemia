@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery, type QueryClie
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/ds';
 import { AgentForm } from './AgentForm';
-import { BackToAgents, AgentFace, AgentRefused, FromBadge, personOf, UsedBy } from './AgentParts';
+import { DefinitionTrail, AgentFace, AgentRefused, FromBadge, personOf, UsedBy } from './AgentParts';
 import { CustomInstructions } from '../step/CustomInstructions';
 import { AsWritten } from '../field/FilePage';
 import { TryAgent, TryYours } from './TryAgent';
@@ -113,7 +113,7 @@ export function AgentPage({ from, name, place }: { from: string; name: string; p
 
   return (
     <article className="space-y-6">
-      <BackToAgents />
+      <DefinitionTrail kind="agent" name={name} place={place} />
 
       <AgentHeader agent={agent} mine={mine} />
 

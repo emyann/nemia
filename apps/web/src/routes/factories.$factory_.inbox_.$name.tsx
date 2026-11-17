@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { BackToInbox, CardPage } from '../components/inbox/CardPage';
+import { CardTrail, CardPage } from '../components/inbox/CardPage';
 import { cardQuery } from '../lib/api/inbox.ts';
 import { namespaceOf } from '../lib/api/namespace.ts';
 import { objectHome } from '../lib/factoryAddress';
@@ -17,15 +17,20 @@ export const Route = createFileRoute('/factories/$factory_/inbox_/$name')({
     return card;
   },
   component: Page,
-  errorComponent: ({ error }) => (
-    <div className="space-y-3">
-      <BackToInbox />
-      <p className="text-body-medium text-failure">Could not load this card: {error instanceof Error ? error.message : String(error)}</p>
-    </div>
-  ),
+  errorComponent: Failed,
 });
 
 /** The card's page, read off its address. */
 function Page() {
   return <CardPage name={Route.useParams().name} />;
+}
+
+/** That the card could not be loaded, and why, under where its page is. */
+function Failed({ error }: { error: unknown }) {
+  return (
+    <div className="space-y-3">
+      <CardTrail name={Route.useParams().name} />
+      <p className="text-body-medium text-failure">Could not load this card: {error instanceof Error ? error.message : String(error)}</p>
+    </div>
+  );
 }

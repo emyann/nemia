@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Request } from 'playwright';
-import { herChat, openChat, photograph, placeLitOf, placeOf, themeOf } from '../board.ts';
+import { herChat, openChat, photograph, placeLitOf, placeOf, themeOf, trailLevel } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { WAITING_SELECTOR } from '../../../src/lib/api/proposals.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
@@ -220,9 +220,9 @@ async function listedOnPage(page: Page, name: string): Promise<void> {
   await proposalsLit(page, "on a proposal's page");
   await settled(page);
   await photograph(page, path.join(OUT, `proposal-page-${await themeOf(page)}.png`));
-  await page.getByRole('link', { name: '← Back to the proposals' }).click();
+  await trailLevel(page, 'Proposals').click();
   await page.waitForURL((url) => url.pathname === `/factories/${FACTORY}/proposals`, { timeout: WAIT_MS });
-  await expectVisible(row, 'its way back leads to the proposals page');
+  await expectVisible(row, "its trail's Proposals leads to the proposals page");
 }
 
 /** On the settings, the form writes a delegation of the seeded agent over hires' updates; it is listed, then removed. */

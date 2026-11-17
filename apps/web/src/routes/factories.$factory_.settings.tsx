@@ -10,8 +10,7 @@ import { FactorySchedules } from '@/components/factory/FactorySchedules';
 import { FactoryServers } from '@/components/factory/FactoryServers';
 import { FactoryVolumes } from '@/components/factory/FactoryVolumes';
 import { LibraryAdds } from '@/components/library/LibraryAdds';
-import { routeLink } from '@/components/nav/routeLink';
-import { Button } from '@/components/ui/ds';
+import { factoryLevel, Trail } from '@/components/nav/Trail';
 import { delegationsQuery } from '@/lib/api/proposals';
 import { factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServersQuery } from '@/lib/api/factories';
 
@@ -51,9 +50,6 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
  */
 const OPENED = { enter: 0, stay: Infinity } as const;
 
-/** A button to a route, as the router draws its links (`routeLink`). */
-const RouterLinkButton = routeLink(Button);
-
 /**
  * What a person sets of one factory: first, the template it is made from, where it has one, read-only (`TemplateCard`); then a place of it
  * that is not trusted, with the line that trusts it (`FactoryTrust`); the folders its runs reach beside its repositories, each with the
@@ -61,7 +57,7 @@ const RouterLinkButton = routeLink(Button);
  * (`FactoryCostLines`); its rules, what every agent hired into it is told (`FactoryRules`); the agents it lets approve its proposals
  * (`FactoryDelegations`); its instruction, what Nemia is to know about it (`FactoryInstruction`); then its schedules, shown as the
  * factories' read answers them (`FactorySchedules`). The default factory, and a name no factory has, have no settings to keep, and say so:
- * neither the rules nor the instruction is read for them.
+ * neither the rules nor the instruction is read for them. Its head says where it is: the factory, leading to its floor, then Settings.
  */
 function SettingsPage() {
   const { factory: name } = Route.useParams();
@@ -70,11 +66,7 @@ function SettingsPage() {
   return (
     <article data-factory-settings={name} className="mx-auto flex max-w-3xl flex-col gap-8">
       <header className="flex flex-col gap-3">
-        <div>
-          <RouterLinkButton to="/factories/$factory" params={{ factory: name }} variant="text" size="xsmall">
-            ← Back to the floor
-          </RouterLinkButton>
-        </div>
+        <Trail levels={[...factoryLevel(name), { name: 'Settings' }]} />
         <div className="flex flex-col gap-1">
           <h1 className="text-title-large">{name}</h1>
           <p className="text-body-medium text-muted-foreground">This factory's settings.</p>

@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { BackToAgents } from '../components/agent/AgentParts';
+import { DefinitionTrail } from '../components/agent/AgentParts';
 import { AgentPage, loadAgent } from '../components/agent/AgentPage';
 import { definitionSearch } from '../lib/factoryAddress';
 
@@ -13,12 +13,7 @@ export const Route = createFileRoute('/factories/$factory_/agents_/$agent')({
   loader: ({ context, deps: { from, repo }, params }) =>
     loadAgent(context.queryClient, from, params.agent, { factory: params.factory, ...(repo && { repo }) }),
   component: Page,
-  errorComponent: ({ error }) => (
-    <div className="space-y-3">
-      <BackToAgents />
-      <p className="text-body-medium text-failure">Could not load this agent: {error instanceof Error ? error.message : String(error)}</p>
-    </div>
-  ),
+  errorComponent: Failed,
 });
 
 /** The agent's page, read off its address. */
@@ -26,4 +21,16 @@ function Page() {
   const { factory, agent } = Route.useParams();
   const { from, repo } = Route.useSearch();
   return <AgentPage from={from ?? 'factory'} name={agent} place={{ factory, ...(repo && { repo }) }} />;
+}
+
+/** That the agent could not be loaded, and why, under where its page is. */
+function Failed({ error }: { error: unknown }) {
+  const { factory, agent } = Route.useParams();
+  const { repo } = Route.useSearch();
+  return (
+    <div className="space-y-3">
+      <DefinitionTrail kind="agent" name={agent} place={{ factory, ...(repo && { repo }) }} />
+      <p className="text-body-medium text-failure">Could not load this agent: {error instanceof Error ? error.message : String(error)}</p>
+    </div>
+  );
 }

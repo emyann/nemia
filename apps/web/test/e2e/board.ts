@@ -78,6 +78,14 @@ export const placeLitOf = (page: Page): Locator => paneOf(page).locator('a[data-
 /** The frame's strip of Settings' tabs, under the page's head and above the page. */
 export const frameTabsOf = (page: Page): Locator => page.getByRole('tablist', { name: 'Settings', exact: true });
 
+/**
+ * A level of a deep page's trail, by its name: a link up to that level's page, or the page itself, the last.
+ * @param page The page whose head draws the trail.
+ * @param name The level's name.
+ */
+export const trailLevel = (page: Page, name: string): Locator =>
+  page.getByRole('navigation', { name: 'Where you are' }).getByRole('link', { name, exact: true });
+
 /** The page's head, one line over the page's column. */
 export const topBarOf = (page: Page): Locator => page.locator('header[data-frame-header]');
 

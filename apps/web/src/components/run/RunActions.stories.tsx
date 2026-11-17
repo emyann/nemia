@@ -167,7 +167,7 @@ export const OnACard: StoryObj<typeof meta> = {
 };
 
 /** Where the story's router stands, as the ground says it. */
-const standing = (canvasElement: HTMLElement) => canvasElement.closest('[data-story-ground]')?.getAttribute('data-at') ?? '';
+const standing = (canvasElement: HTMLElement) => canvasElement.querySelector('[data-story-ground]')?.getAttribute('data-at');
 
 /**
  * A row that offers every action, in the list's order. Prune its files… asks the prune's own question, and Close closes it. Remove…
@@ -211,11 +211,12 @@ export const EveryAction: StoryObj<typeof meta> = {
     await userEvent.click(within(asked).getByRole('button', { name: 'Keep it' }));
     await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
 
-    const before = standing(canvasElement);
+    const listed = standing(canvasElement);
+    await expect(listed, 'the list stands where the story put it').toBe('/');
     await press('Remove…');
     const removing = await waitFor(() => body.getByRole('dialog', { name: `Remove ${OVER.id}` }));
     await userEvent.click(within(removing).getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
-    await expect(standing(canvasElement), 'removed from a list, the story stays where it was').toBe(before);
+    await expect(standing(canvasElement), 'removed from a list, the story stays on the list').toBe(listed);
   },
 };

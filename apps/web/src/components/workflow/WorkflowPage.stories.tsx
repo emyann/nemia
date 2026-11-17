@@ -8,7 +8,7 @@ import { seeded } from '../../../.storybook/fixtures/proposals';
 import { WorkflowPage } from './WorkflowPage';
 
 /** A workflow of the person's own, with no step yet. */
-const TRIAGE: WorkflowListing = { ...listing('triage'), from: 'user', dir: '/home/you/.agent-workflows/workflows/triage' };
+const TRIAGE: WorkflowListing = { ...listing('triage'), from: 'user', dir: '/work/nemia/mine/triage' };
 
 /** A workflow's page, one story a state: one of the person's own, which the kit's Build opens in its builder, and one not listed. */
 const meta: Meta<typeof WorkflowPage> = {

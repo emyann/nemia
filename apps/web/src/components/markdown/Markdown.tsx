@@ -96,7 +96,7 @@ const COMPONENTS: Components = {
       isSelected={Boolean(checked)}
       isDisabled
       aria-label={checked ? 'Done' : 'Not done'}
-      className={cn('mr-1.5 inline-flex align-middle', className)}
+      className={cn('mr-1.5 inline-flex min-h-0 align-middle', className)}
     />
   ),
   blockquote: ({ node: _node, className, ...props }) => (

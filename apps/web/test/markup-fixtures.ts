@@ -623,3 +623,42 @@ export async function withProposal(
   client.setQueryData(['proposal', 'acme', 'nemia-ab12c'], proposal);
   return renderToStaticMarkup(createElement(QueryClientProvider, { client }, element));
 }
+
+/**
+ * Each of the ds kit's Buttons in `html`, in order: its type, whether it is disabled, and its words.
+ * @param html The markup the buttons are rendered in.
+ */
+export const kitButtons = (html: string): [string, boolean, string][] =>
+  [...html.matchAll(/<button data-slot="button"([^>]*)>([\s\S]*?)<\/button>/g)].map((m) => [
+    /\btype="(\w+)"/.exec(m[1])?.[1] ?? '',
+    /\bdisabled=""/.test(m[1]),
+    /data-slot="button-label"[^>]*>([^<]*)</.exec(m[2])?.[1] ?? '',
+  ]);
+
+/**
+ * Each choice of the ds kit's radios and checkboxes in `html`, in order: its value, its kind, and whether it is chosen; those of the
+ * group whose name `name` matches alone, where it is given.
+ * @param html The markup the choices are rendered in.
+ * @param name What the name of the group read must match.
+ */
+export const kitChoices = (html: string, name?: RegExp): [string, 'radio' | 'checkbox', boolean][] =>
+  [...html.matchAll(/<input [^>]*type="(radio|checkbox)"[^>]*>/g)]
+    .filter((m) => name === undefined || name.test(/\bname="([^"]*)"/.exec(m[0])?.[1] ?? ''))
+    .map((m) => [/\bvalue="([^"]*)"/.exec(m[0])?.[1] ?? '', m[1] as 'radio' | 'checkbox', /\bchecked=""/.test(m[0])]);
+
+/**
+ * Each of the ds kit's radios in `html`, in order: its value and whether it is chosen.
+ * @param html The markup the radios are rendered in.
+ * @param name What the name of the group read must match, where only one group is read.
+ */
+export const kitRadios = (html: string, name?: RegExp): [string, boolean][] =>
+  kitChoices(html, name)
+    .filter(([, kind]) => kind === 'radio')
+    .map(([value, , checked]) => [value, checked]);
+
+/**
+ * Each box to write in of the ds kit's text fields in `html`, in order: the name it is read by, and whether it is closed.
+ * @param html The markup the boxes are rendered in.
+ */
+export const kitBoxes = (html: string): [string, boolean][] =>
+  [...html.matchAll(/<textarea aria-label="([^"]*)"([^>]*)>/g)].map((m) => [unescaped(m[1]), /\bdisabled=""/.test(m[2])]);

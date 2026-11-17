@@ -62,8 +62,15 @@ test('markdown is drawn as GFM: headings two levels down, lists, a table, a task
     'a table, in a box that scrolls sideways',
   );
   assert.match(html, /<td[^>]*>a\.ts<\/td><td[^>]*>12<\/td>/);
-  assert.match(html, /<input type="checkbox" disabled=""[^>]*checked=""\/> done/, 'a task done, its box not to be ticked from the board');
-  assert.match(html, /<input type="checkbox" disabled=""[^>]*\/> to do/);
+  assert.match(
+    html,
+    /<label data-slot="checkbox"[^>]*data-selected="true" data-disabled="true">.*?<input aria-label="Done"[^>]* disabled="" type="checkbox"[^>]* checked=""\/>.*?<\/label> done/,
+    "a task done, the kit's box, not to be ticked from the board",
+  );
+  assert.match(
+    html,
+    /<label data-slot="checkbox"[^>]*data-rac="" data-disabled="true">.*?<input aria-label="Not done"[^>]* disabled="" type="checkbox"[^>]*\/>.*?<\/label> to do/,
+  );
   assert.match(html, /<del>gone<\/del>/);
   assert.match(html, /<a href="http:\/\/www\.example\.com" target="_blank"/);
   assert.match(html, /<section data-footnotes="true"/);

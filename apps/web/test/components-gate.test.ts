@@ -32,6 +32,10 @@ import {
   where,
   withClient,
   withProposal,
+  kitBoxes,
+  kitButtons,
+  kitChoices,
+  kitRadios,
 } from './markup-fixtures.ts';
 
 const { createElement } = await import('react');
@@ -287,14 +291,8 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
     ],
   );
   const said = (name: string) => textsOf(/<(p|div) data-said="true"[^>]*>([\s\S]*?)<\/\1>/.exec(rows.get(name)!.html)![2]).join(' ');
-  const buttons = (name: string) =>
-    [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [
-      m[1],
-      Boolean(m[2]),
-      m[3],
-    ]);
-  const radios = (name: string) =>
-    [...rows.get(name)!.html.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
+  const buttons = (name: string) => kitButtons(rows.get(name)!.html);
+  const radios = (name: string) => kitRadios(rows.get(name)!.html);
   const boxes = (name: string) => [...rows.get(name)!.html.matchAll(/<textarea /g)].length;
   const closed = (name: string) => /<textarea [^>]*\bdisabled=""/.test(rows.get(name)!.html);
 
@@ -309,7 +307,7 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
     ],
     'a nudge unless a new session is chosen (a server render writes `checked` before `value`)',
   );
-  assert.match(rows.get('implement')!.html, /<label for="[^"]+" class="sr-only">Your answer to implement<\/label>/);
+  assert.deepEqual(kitBoxes(rows.get('implement')!.html), [['Your answer to implement', false]], 'the box named for what it holds');
 
   assert.equal(said('theme'), `theme ${OFFERS['try-again'].said.refused}`, 'any need but a question is a sentence: a refused check');
   assert.equal(boxes('theme'), 1, 'a refused check: something to tell it if you like');
@@ -369,12 +367,8 @@ test('a step `denials: fail` stopped is offered Try again with a new session fir
   assert.equal(said('notes'), `notes ${OFFERS.denied.said('denied: Write(/tmp/w/notes.md)')}`, 'the calls the api named');
   assert.equal(said('bare'), `bare ${OFFERS.denied.said(null)}`, 'and none where it named none');
   assert.notEqual(OFFERS.denied.said('x'), OFFERS.denied.said(null), 'the calls are in the sentence');
-  const radios = [...rows.get('notes')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [
-    m[2],
-    Boolean(m[1]),
-  ]);
   assert.deepEqual(
-    radios,
+    kitRadios(rows.get('notes')!),
     [
       ['fresh', true],
       ['continue', false],
@@ -382,7 +376,7 @@ test('a step `denials: fail` stopped is offered Try again with a new session fir
     'a new session first, and no recheck: no check of it ran',
   );
   assert.match(rows.get('notes')!, /<form aria-label="Try notes again"/);
-  assert.match(rows.get('notes')!, /<button type="submit"[^>]*>Try again<\/button>/);
+  assert.deepEqual(kitButtons(rows.get('notes')!), [['submit', false, 'Try again']]);
 });
 
 test('a step asking questions as data is answered by choosing: radios where it takes one, checkboxes where several, the recommended marked, nothing chosen, and a button that waits for every answer', () => {
@@ -401,11 +395,8 @@ test('a step asking questions as data is answered by choosing: radios where it t
     [...design.matchAll(/<fieldset data-question="([^"]+)"/g)].map((m) => unescaped(m[1])),
     [cut.title, where.title],
   );
-  const choices = [
-    ...design.matchAll(/<input type="(radio|checkbox)" class="[^"]*" name="[^"]*-choice"( checked="")? value="([^"]+)"/g),
-  ].map((m) => [m[3], m[1], Boolean(m[2])]);
   assert.deepEqual(
-    choices,
+    kitChoices([...design.matchAll(/<fieldset data-question[\s\S]*?<\/fieldset>/g)].map((m) => m[0]).join('')),
     [
       ['a', 'radio', false],
       ['b', 'radio', false],
@@ -420,14 +411,17 @@ test('a step asking questions as data is answered by choosing: radios where it t
     /<strong class="font-medium">a<\/strong> <span[^>]*>— The shape and the board first\.<\/span><span data-recommended="true"[^>]*>recommended<\/span>/,
   );
   assert.match(design, /<strong>big<\/strong>/, 'a body is its markdown');
-  const buttons = (row: string) =>
-    [...row.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
+  const buttons = kitButtons;
   assert.deepEqual(buttons(design), [
     ['submit', true, 'Answer and continue'],
     ['button', false, 'Choose the recommended answers'],
   ]);
-  assert.match(design, /<button type="submit" disabled="" title="Not answered: How is the card cut\? · Where do the answers go\?"/);
-  assert.equal([...design.matchAll(/<textarea [^>]*data-own="true"/g)].length, 2, "a line for each question's own words");
+  assert.match(
+    design,
+    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-slot="button"[^>]*disabled=""/,
+    'Approve says on hover what is not answered',
+  );
+  assert.equal([...design.matchAll(/<div data-slot="text-field"[^>]*data-own="true"/g)].length, 2, "a line for each question's own words");
   assert.deepEqual(
     buttons(rows.get('spec')!),
     [['submit', true, 'Answer and continue']],
@@ -543,12 +537,11 @@ test("Continue asks the tick for another try of a session the harness blocked: a
   const html = withClient(createElement(Answering.Continue, { runId: 'r-1', step: 'review', line: 'nemia retry r-1 review' }));
   assert.match(html, /^<div data-continue="true"[^>]*><form aria-label="Continue review"/);
   assert.deepEqual(
-    [...html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2])]),
+    kitButtons(html).map(([type, disabled]) => [type, disabled]),
     [['submit', false]],
     'one button, enabled with nothing written: the box is optional',
   );
-  assert.match(html, /<label for="[^"]+" class="sr-only">/);
-  assert.match(html, /<textarea /);
+  assert.equal(kitBoxes(html).length, 1, 'one box, named');
   assert.ok(textsOf(html).includes('nemia retry r-1 review'), `the step's retry line, as the api answers it\n${html}`);
   assert.doesNotMatch(html, /data-copy|ae stop/, 'no commands to copy');
 });
@@ -602,8 +595,7 @@ test('the gate: Approve with a box for the words, which may stay empty, and Send
   );
   const forms = new Map([...html.matchAll(/<form aria-label="([^"]+)"[^>]*>([\s\S]*?)<\/form>/g)].map((m) => [m[1], m[2]]));
   assert.deepEqual([...forms.keys()], ['Approve plan', 'Send plan back']);
-  const buttons = (form: string) =>
-    [...forms.get(form)!.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
+  const buttons = (form: string) => kitButtons(forms.get(form)!);
   assert.deepEqual(buttons('Approve plan'), [['submit', false, 'Approve']], 'Approve is enabled with no words: an approval needs none');
   assert.deepEqual(
     buttons('Send plan back'),
@@ -612,14 +604,11 @@ test('the gate: Approve with a box for the words, which may stay empty, and Send
   );
   assert.match(
     forms.get('Approve plan')!,
-    /<label for="[^"]+" class="sr-only">Words to approve plan with, if any<\/label><textarea [^>]*placeholder="Your words \(optional\): every step after the gate is handed them, under “Approved”\."/,
+    /<textarea aria-label="Words to approve plan with, if any"[^>]*placeholder="Your words \(optional\): every step after the gate is handed them, under “Approved”\."/,
   );
   assert.ok(textsOf(forms.get('Approve plan')!).includes('nemia approve r-1 plan'), 'the line the api answers beside the button');
-  assert.match(forms.get('Send plan back')!, /<label for="[^"]+" class="sr-only">What to change, sent back to plan<\/label>/);
-  const radios = [...forms.get('Send plan back')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [
-    m[2],
-    Boolean(m[1]),
-  ]);
+  assert.deepEqual(kitBoxes(forms.get('Send plan back')!), [['What to change, sent back to plan', false]]);
+  const radios = kitRadios(forms.get('Send plan back')!);
   assert.deepEqual(
     radios,
     [
@@ -773,7 +762,7 @@ test('the gate of an ending step says approving is what files it, and its send-b
   assert.match(texts, /the next tick files it(?! what)/);
   const forms = [...html.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(forms, ['Approve ship', 'Send implement back'], 'the send-back names the step it goes to');
-  assert.match(html, /What to change, sent back to implement<\/label>/);
+  assert.match(html, /<textarea aria-label="What to change, sent back to implement"/);
   const wide = withClient(
     createElement(Gates.Gate, {
       runId: 'r-1',
@@ -788,7 +777,7 @@ test('the gate of an ending step says approving is what files it, and its send-b
     ['Approve ship', 'Send the work back'],
     'several work steps: one send-back form',
   );
-  const to = [...wide.matchAll(/<input type="radio" name="[^"]*-to"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
+  const to = kitRadios(wide, /-to$/);
   assert.deepEqual(
     to,
     [
@@ -1042,20 +1031,28 @@ test('a gate whose step asks questions draws them before its answer, with the re
   assert.doesNotMatch(html, /data-questions=/, 'the questions are drawn once, as fields, not read-only beside');
   assert.match(html, /<fieldset data-question="How is the card cut\?"/);
   assert.match(html, /<fieldset data-question="Where do the answers go\?"/);
-  assert.match(html, /<button type="button" data-recommend-all[^>]*>Choose the recommended answers<\/button>/);
   assert.match(
     html,
-    /<button type="submit" disabled="" title="Not answered: How is the card cut\? · Where do the answers go\?"[^>]*>Approve<\/button>/,
+    /<button data-slot="button"[^>]*data-recommend-all="true"[^>]*>(?:(?!<\/button>)[\s\S])*>Choose the recommended answers</,
+  );
+  assert.match(
+    html,
+    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-slot="button"[^>]*type="submit"[^>]*disabled=""(?:(?!<\/button>)[\s\S])*>Approve</,
   );
   assert.match(
     html,
     /placeholder="A note beside the answers \(optional\): every step after the gate is handed it with the answers, under “Approved”\."/,
   );
-  assert.match(html, /<button type="submit" disabled=""[^>]*>Send back<\/button>/, 'nothing to send back yet: no words, no answers');
+  assert.ok(
+    kitButtons(html).some(([type, disabled, words]) => type === 'submit' && disabled && words === 'Send back'),
+    'nothing to send back yet: no words, no answers',
+  );
   const plain = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
   assert.doesNotMatch(plain, /data-gate-questions|Not answered|data-recommend-all/);
-  assert.match(plain, /<button type="submit"[^>]*>Approve<\/button>/);
-  assert.doesNotMatch(plain, /<button type="submit" disabled=""[^>]*>Approve<\/button>/);
+  assert.ok(
+    kitButtons(plain).some(([type, disabled, words]) => type === 'submit' && !disabled && words === 'Approve'),
+    'Approve, enabled',
+  );
 });
 
 test("the inspector's gate of a step that asks questions draws them too, its Approve waiting until each is answered — and a step that asks none, no fields", async () => {
@@ -1066,17 +1063,22 @@ test("the inspector's gate of a step that asks questions draws them too, its App
   assert.match(asked, /<section [^>]*aria-label="What review asks"/, html);
   assert.match(asked, /<fieldset data-question="How is the card cut\?"/);
   assert.match(asked, /<fieldset data-question="Where do the answers go\?"/);
-  assert.match(asked, /<button type="button" data-recommend-all[^>]*>Choose the recommended answers<\/button>/);
   assert.match(
     asked,
-    /<button type="submit" disabled="" title="Not answered: How is the card cut\? · Where do the answers go\?"[^>]*>Approve<\/button>/,
+    /<button data-slot="button"[^>]*data-recommend-all="true"[^>]*>(?:(?!<\/button>)[\s\S])*>Choose the recommended answers</,
+  );
+  assert.match(
+    asked,
+    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-slot="button"[^>]*type="submit"[^>]*disabled=""(?:(?!<\/button>)[\s\S])*>Approve</,
   );
   const plain = atGate({ closeout: planCloseout });
   const none = await routedWith(createElement(Asked, { run: plain, step: plain.steps[0] }));
   assert.match(none, /aria-label="What review asks of you"/);
   assert.doesNotMatch(none, /data-question=|Not answered|data-recommend-all/);
-  assert.match(none, /<button type="submit"[^>]*>Approve<\/button>/);
-  assert.doesNotMatch(none, /<button type="submit" disabled=""[^>]*>Approve<\/button>/);
+  assert.ok(
+    kitButtons(none).some(([type, disabled, words]) => type === 'submit' && !disabled && words === 'Approve'),
+    'Approve, enabled',
+  );
 });
 
 test('a raise of a step that signed off blocked asking questions as data draws them to answer by choosing, with the recommended answers and a note beside them, its button waiting for each', () => {
@@ -1098,12 +1100,18 @@ test('a raise of a step that signed off blocked asking questions as data draws t
   ]);
   assert.match(html, /<fieldset data-question="How is the card cut\?"/);
   assert.match(html, /<fieldset data-question="Where do the answers go\?"/);
-  assert.match(html, /data-recommend-all[^>]*>Choose the recommended answers</);
-  assert.match(html, /class="sr-only">A note to palette beside the answers<\/label>/);
+  assert.ok(
+    kitButtons(html).some(([, , words]) => words === 'Choose the recommended answers'),
+    'the recommended answers offered',
+  );
+  assert.ok(
+    kitBoxes(html).some(([name]) => name === 'A note to palette beside the answers'),
+    'a note beside the answers',
+  );
   assert.doesNotMatch(html, /Your answer to palette/);
   assert.match(
     html,
-    /<button type="submit" disabled="" title="Not answered: How is the card cut\? · Where do the answers go\?"[^>]*>Raise the budget and answer<\/button>/,
+    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-slot="button"[^>]*type="submit"[^>]*disabled=""(?:(?!<\/button>)[\s\S])*>Raise the budget and answer</,
   );
 });
 

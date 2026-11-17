@@ -7,7 +7,7 @@ import { NewWorkflow } from './NewWorkflow';
 const meta: Meta<typeof NewWorkflow> = {
   title: 'Factory/NewWorkflow',
   component: NewWorkflow,
-  args: { folder: '/home/you/.agent-workflows/workflows', onCreated: () => undefined },
+  args: { folder: '/work/nemia/mine', onCreated: () => undefined },
   render: (args) => (
     <div style={{ width: 640 }}>
       <NewWorkflow {...args} />
@@ -25,7 +25,7 @@ export const Offered: Story = {
   },
 };
 
-/** Opened: the kit's text fields, the two places as the kit's radios with neither chosen, and Make it held until a name, a step and a place. */
+/** Opened: the kit's text fields, the two places as the kit's radios with neither chosen, Make it held until all are given. */
 export const Opened: Story = {
   play: async ({ canvasElement, userEvent }) => {
     const part = within(canvasElement);

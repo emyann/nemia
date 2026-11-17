@@ -121,7 +121,6 @@ export function Gate({
           acts={acts}
           onto={onto}
           approveLine={approveLine}
-          field={field}
           approval={approval}
           busy={busy}
           budgeting={budgeting}
@@ -189,7 +188,6 @@ function ApproveForm({
   acts,
   onto,
   approveLine,
-  field,
   approval,
   busy,
   budgeting,
@@ -201,7 +199,6 @@ function ApproveForm({
   acts: boolean;
   onto: string | null;
   approveLine: string;
-  field: string;
   approval: ReturnType<typeof useApprove>;
   busy: boolean;
   /** The budgets the person changed, and those whose field holds no amount (`budgetsGiven`). */

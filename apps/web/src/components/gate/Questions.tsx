@@ -8,7 +8,6 @@ import { useId, useState } from 'react';
 import type { Question } from '../../lib/api/tries.ts';
 import type { QuestionAnswer, RetryMode } from '../../lib/api/asks.ts';
 import { askedSaid, type Answer } from '../../lib/asks';
-import { cn } from '../../lib/utils';
 import { OFFERS } from '../../lib/words';
 import { MODES, Refusal, useAsk } from './Ask';
 import { Markdown } from '../markdown/Markdown';
@@ -135,6 +134,7 @@ function QuestionField({ q, n, draft, onDraft }: { q: Frozen<Question>; n: numbe
             <Checkbox
               key={o.label}
               data-option={o.label}
+              value={o.label}
               isSelected={chose.includes(o.label)}
               onChange={(checked) => onDraft(chosenDraft(draft, q, o.label, checked))}
             >

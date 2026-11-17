@@ -21,6 +21,18 @@ const NAMED_HEIGHT = 44;
 /** The ink of a step's name under its node: the step's own hue where it is at work, waits on you or failed, else quiet. */
 const NAME_INK: Partial<Record<StepMark, string>> = { alive: 'text-alive', yours: 'text-yours', failure: 'text-failure' };
 
+/**
+ * Which row under the graph names each step: a column's steps, a fork's lanes, one under another in the order their nodes stand, so no
+ * two names share a box; and how many rows the widest column takes.
+ */
+function namedRows(points: readonly { id: string; kind: string; x: number; y: number }[]): { of: Map<string, number>; count: number } {
+  const of = new Map<string, number>();
+  const columns = new Map<number, { id: string; y: number }[]>();
+  for (const point of points) if (point.kind === 'step') columns.set(point.x, [...(columns.get(point.x) ?? []), point]);
+  for (const column of columns.values()) [...column].sort((a, b) => a.y - b.y).forEach((point, row) => of.set(point.id, row));
+  return { of, count: Math.max(1, ...[...columns.values()].map((column) => column.length)) };
+}
+
 /** A step named under its node, centred on `x` below `y`: its name in small caps, its agent, and what `named` says of it. */
 function Named({ name, named, mark, x, y }: { name: string; named?: StepNamed; mark?: StepMark; x: number; y: number }) {
   return (
@@ -164,7 +176,8 @@ function Told({ said, children }: { said: string; children: ReactNode }) {
  * group, each step and its word (`railSaid`). With `wrap`, each node is put inside what it gives (a button that opens the step);
  * without, each says its name and word in the kit's tooltip. A run listed without its graph says what to do (`UNGRAPHED`). `width` is
  * 188 pixels by default; `className` is the box's, `nodrag` on the floor. With `named`, each step is named under its node in small caps,
- * its agent and what `named` says of it (its time and cost) under that, and the box is that much taller.
+ * its agent and what `named` says of it (its time and cost) under that, a fork's lanes one row each in their order (`namedRows`), and the
+ * box is that much taller.
  */
 export function StepGraph({
   run,
@@ -194,6 +207,7 @@ export function StepGraph({
   const at = new Map(drawn.map((step, i) => [step.name, { step, mark: stepMark(step.state, waitsNow(drawn, i, held)) }]));
   const lanes = new Map<number, number>();
   for (const point of layout.points) lanes.set(point.x, (lanes.get(point.x) ?? 0) + 1);
+  const rows = namedRows(layout.points);
   return (
     <div className={cn('flex min-w-0 flex-col gap-1', className)}>
       <div
@@ -201,7 +215,7 @@ export function StepGraph({
         aria-label={railSaid(run.steps, cancelled, held)}
         data-run-steps
         className="relative shrink-0"
-        style={{ width: layout.width, height: layout.height + (named ? NAMED_HEIGHT : 0) }}
+        style={{ width: layout.width, height: layout.height + (named ? NAMED_HEIGHT * rows.count : 0) }}
       >
         <Lines layout={layout} at={at} />
         {layout.points.map((point) => (
@@ -216,7 +230,7 @@ export function StepGraph({
                 named={named.get(point.names[0])}
                 mark={at.get(point.names[0])?.mark}
                 x={Math.min(Math.max(point.x, 44), layout.width - 44)}
-                y={layout.height}
+                y={layout.height + NAMED_HEIGHT * (rows.of.get(point.id) ?? 0)}
               />
             ) : null,
           )}

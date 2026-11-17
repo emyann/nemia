@@ -533,4 +533,30 @@ test('CutFrame given a ground and no glow, and StepGraph naming its steps', asyn
     assert.doesNotMatch(html, /data-fold/, 'no column folds');
     assert.doesNotMatch(await drawn(createElement(StepGraph, { run })), /data-named/);
   });
+  await t.test('named, forked: two steps in one column, each a lane, are named in boxes of their own', async () => {
+    const [design, implement, review, land] = STEPS;
+    const tokens = { ...implement, name: 'tokens' };
+    const steps = [design, implement, tokens, review, land];
+    const run = {
+      ...graphRun(steps),
+      graph: {
+        roots: ['design'],
+        edges: [
+          { from: 'design', to: 'implement', kind: 'after' as const },
+          { from: 'design', to: 'tokens', kind: 'after' as const },
+          { from: 'implement', to: 'review', kind: 'after' as const },
+          { from: 'tokens', to: 'review', kind: 'after' as const },
+          { from: 'review', to: 'land', kind: 'after' as const },
+        ],
+      },
+    };
+    const named = new Map(steps.map((step) => [step.name, { agent: `${step.name}-agent`, said: '' }]));
+    const html = await drawn(createElement(StepGraph, { run, named, width: 600 }));
+    const boxes = [...html.matchAll(/data-named="([^"]+)"[^>]*style="left:([\d.-]+)(?:px)?;top:([\d.-]+)(?:px)?"/g)].map((m) => ({
+      name: m[1],
+      at: `${m[2]},${m[3]}`,
+    }));
+    assert.deepEqual(boxes.map((box) => box.name).sort(), steps.map((step) => step.name).sort(), 'each step is named once');
+    assert.equal(new Set(boxes.map((box) => box.at)).size, boxes.length, `no two names share a box: ${JSON.stringify(boxes)}`);
+  });
 });

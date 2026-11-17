@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, ListItem } from '@/components/ui/ds';
+import type { ReactNode } from 'react';
+import { Badge, Link, ListItem } from '@/components/ui/ds';
 import { factoriesQuery } from '@/lib/api/factories';
 import { inboxQuery } from '@/lib/api/inbox';
 import { waitingProposalsQuery } from '@/lib/api/proposals';
@@ -9,13 +10,37 @@ import { FactoryPicker } from '../factory/FactoryPicker';
 import { PaneStart } from '../factory/FactoryStart';
 import { frameRunsQuery, PANE_PLACES, type PanePlace, placeHref } from '../nav/nav';
 
+/** What a place of the pane draws: its line under its name, and the count of its badge where it has one. */
+type PlaceLine = { line: ReactNode; count?: number };
+
+/**
+ * A place's line that leads with a count: the count drawn by the kit's `Badge` at the line's end, in yours (what waits on the person),
+ * and said before `words` to a screen reader alone, the badge being hidden from it; a count of 0 draws no badge and says `none` instead.
+ */
+const counted = (count: number, words: string, none: string): PlaceLine =>
+  count > 0
+    ? {
+        line: (
+          <>
+            <span className="sr-only">{count} </span>
+            {words}
+          </>
+        ),
+        count,
+      }
+    : { line: none };
+
+/** The badge of a place's count, in yours; none where its line carries no count. */
+const countOf = (line: PlaceLine | undefined) =>
+  line?.count === undefined ? undefined : <Badge value={line.count} color="primary" data-pane-count />;
+
 /**
  * What a place of the pane says under its name: Runs how many wait on the person, off the frame's one count of the runs (`frameRunsQuery`),
- * the Inbox how many cards are not started, and Proposals how many proposals wait on the person, asked of the api by phase
- * (`waitingProposalsQuery`) and never as the whole list, read for a factory a person made alone, the default factory having none; none
- * for any other place, or before they are read.
+ * and the Inbox how many cards are not started, each count on its badge (`counted`); Proposals how many proposals wait on the person, asked
+ * of the api by phase (`waitingProposalsQuery`) and never as the whole list, read for a factory a person made alone, the default factory
+ * having none; none for any other place, or before they are read.
  */
-function usePlaceLines(path: string, factory: string): Partial<Record<PanePlace, string>> {
+function usePlaceLines(path: string, factory: string): Partial<Record<PanePlace, PlaceLine>> {
   const runs = useQuery(frameRunsQuery(path)).data;
   const inbox = useQuery(inboxQuery).data;
   const place = useQuery(factoriesQuery).data?.find((f) => f.name === factory);
@@ -23,9 +48,9 @@ function usePlaceLines(path: string, factory: string): Partial<Record<PanePlace,
   const cards = inbox ? notStarted(inbox, factory).length : undefined;
   const waiting = place?.default ? 0 : proposals?.length;
   return {
-    ...(runs && { runs: runs.counts.waiting > 0 ? `${runs.counts.waiting} waiting on you` : 'nothing waits on you' }),
-    ...(cards !== undefined && { inbox: cards > 0 ? `${cards} not started` : 'every card started' }),
-    ...(waiting !== undefined && { proposals: waiting > 0 ? `${waiting} wait on you` : 'none waiting' }),
+    ...(runs && { runs: counted(runs.counts.waiting, 'waiting on you', 'nothing waits on you') }),
+    ...(cards !== undefined && { inbox: counted(cards, 'not started', 'every card started') }),
+    ...(waiting !== undefined && { proposals: { line: waiting > 0 ? `${waiting} wait on you` : 'none waiting' } }),
   };
 }
 
@@ -51,7 +76,8 @@ function PanePlaces({ path, factory, lit, onPicked }: { path: string; factory: s
         >
           <ListItem
             headline={<span className="text-body-large">{place.label}</span>}
-            supportingText={lines[place.id]}
+            supportingText={lines[place.id]?.line}
+            trailingElement={countOf(lines[place.id])}
             className={cn(
               'min-h-12 rounded-shape-full py-1.5',
               place.id === lit ? 'bg-secondary-container text-on-secondary-container' : 'hover:bg-surface-container-high',

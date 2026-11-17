@@ -46,7 +46,7 @@ async function waitingIs(page: Page, where: string): Promise<void> {
   await expectTexts(badgeOf(page), open.counts.waiting ? [String(open.counts.waiting)] : [], `${where}: Waiting counts what waits on you`);
 }
 
-/** The pane's lines are `factory`'s own: Runs what waits on you there, the Inbox its cards not yet started. */
+/** The pane's lines are `factory`'s own: Runs what waits on you there, the Inbox its cards not yet started, each count on its badge. */
 async function linesAre(page: Page, factory: string): Promise<void> {
   const open = await openAnswered(page, factory);
   const cards = notStarted(entriesOf(await answer<CardList>(page, `/api/cards?limit=${LIST_PAGE.most}`)), factory).length;
@@ -57,6 +57,16 @@ async function linesAre(page: Page, factory: string): Promise<void> {
   await expectVisible(
     placeOf(page, 'Inbox').getByText(cards ? `${cards} not started` : 'every card started'),
     `${factory}'s Inbox says its cards not yet started`,
+  );
+  await expectTexts(
+    placeOf(page, 'Runs').locator('[data-slot="badge"]'),
+    open.counts.waiting ? [String(open.counts.waiting)] : [],
+    `${factory}'s Runs counts what waits on you on its badge, none drawn for none`,
+  );
+  await expectTexts(
+    placeOf(page, 'Inbox').locator('[data-slot="badge"]'),
+    cards ? [String(cards)] : [],
+    `${factory}'s Inbox counts its cards not yet started on its badge, none drawn for none`,
   );
 }
 

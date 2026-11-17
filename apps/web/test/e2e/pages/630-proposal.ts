@@ -225,11 +225,27 @@ async function listedOnPage(page: Page, name: string): Promise<void> {
   await expectVisible(row, "its trail's Proposals leads to the proposals page");
 }
 
-/** On the settings, the form writes a delegation of the seeded agent over hires' updates; it is listed, then removed. */
+/**
+ * On the settings, the form writes a delegation of the seeded agent, picked from the list its first letters narrow, over hires' updates; it
+ * is listed, then removed.
+ */
 async function delegated(page: Page): Promise<void> {
   await goto(page, `/factories/${FACTORY}/settings`);
   const form = page.locator('[data-delegation-form]');
-  await form.getByRole('combobox', { name: 'Agent' }).fill(AGENTS.seeded.name);
+  const field = form.getByRole('combobox', { name: 'Agent' });
+  await idle(page);
+  await field.evaluate(async (input) => {
+    input.scrollIntoView({ block: 'center', behavior: 'instant' });
+    for (let frame = 0; frame < 2; frame++) await new Promise((next) => requestAnimationFrame(next));
+  });
+  await field.fill(AGENTS.seeded.name.slice(0, 3));
+  const option = page.getByRole('option').filter({ hasText: `· ${AGENTS.seeded.name}` });
+  await expectVisible(option, "typing narrows the agent's list to the factory's agents it names");
+  await settled(page);
+  await photograph(page, path.join(OUT, `proposal-delegation-agent-${await themeOf(page)}.png`));
+  await option.click();
+  const picked = await field.inputValue();
+  if (picked !== AGENTS.seeded.name) throw new Refused(`a pick writes the agent's name in the field, which holds ${picked}`);
   await form.locator('[data-delegation-resource="hires"]').click();
   await form.locator('[data-delegation-verb="update"]').click();
   await form.locator('[data-delegation-save]').click();

@@ -303,6 +303,7 @@ function AgentField({
         if (key !== null) onAgent(String(key));
       }}
       validate={({ inputValue }) => agentRefusal(inputValue, agents) ?? null}
+      className="[--md3-field-notch:var(--background)]"
     >
       {(a) => (
         <ComboBoxItem id={a.name} textValue={a.name} label={personOf(a.name)} supportingText={`${a.role ?? 'No role yet'} · ${a.name}`} />

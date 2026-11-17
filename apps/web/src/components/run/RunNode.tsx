@@ -223,7 +223,7 @@ function Chevron({ run, open, onToggle }: { run: RunView; open: boolean; onToggl
       aria-expanded={open}
       aria-label={open ? 'Hide steps' : 'Show steps'}
       onPress={() => onToggle(run.id)}
-      className="nodrag relative z-10 -mr-1.5 h-6 w-6 shrink-0"
+      className="nodrag relative z-10 -mr-1.5 h-6 w-6 shrink-0 before:h-6 before:w-6"
       classNames={{ icon: `size-4 transition-transform ${open ? 'rotate-180' : ''}` }}
     />
   );

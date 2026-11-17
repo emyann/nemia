@@ -392,7 +392,7 @@ test("a factory's cost lines: a row per workflow it offers, its line or none, an
   );
   const [, build = '', quick = ''] = html.split(/data-cost-line="/);
   assert.match(build, /data-cost-line-said="80"[^>]*>\$80</, "build's line, as its author writes a budget");
-  assert.match(build, /value="80"/, 'its field holds the line');
+  assert.match(build, /value="\$80.00"/, 'its field holds the line, as the board writes money');
   assert.match(build, />Clear</, 'a line set can be cleared');
   assert.match(quick, /data-cost-line-said="none"/, 'quick sets none, and says so');
   assert.doesNotMatch(quick, />Clear</, 'no line: nothing to clear');

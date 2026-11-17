@@ -4,6 +4,7 @@ import type { Locator, Page } from 'playwright';
 import { openFold, partOf, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
 import { expectCount, expectInside, expectUncut, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { COSTLY } from '../seed.ts';
+import { dollars } from '../../../src/lib/money.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -260,7 +261,7 @@ export default {
         throw new Refused(
           `the refusal beside the box is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`,
         );
-      if ((await box.inputValue()) !== String(COSTLY.refused))
+      if ((await box.inputValue()) !== dollars(COSTLY.refused))
         throw new Refused('the amount stays in the box after a refusal, to raise again');
       if (fs.existsSync(asks))
         throw new Refused(`nothing is written on a refusal — ${asks} holds ${fs.readdirSync(asks, { recursive: true }).join(', ')}`);

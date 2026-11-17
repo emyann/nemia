@@ -1,13 +1,15 @@
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { FileText, Folder, FolderOpen } from 'lucide-react';
-import type { Key } from 'react-aria-components';
 import type { StepArtifact } from '../../lib/api/tries.ts';
 import { folderTreeOf, type FolderTreeNode } from '../../lib/folderTree.ts';
 import { viewOpened } from '../../lib/viewAddress';
-import { Tree, TreeItem } from '../ui/ds';
+import { Tree, TreeItem, type TreeProps } from '../ui/ds';
 import { when } from '../step/Facts';
 import { bytesWord } from './Artifacts';
+
+/** A row's key, as the kit's Tree hands it back. */
+type Key = Parameters<NonNullable<TreeProps<object>['onAction']>>[0];
 
 /** What a file row says after its name: its size where the api serves it, when it went where a prune removed it, nothing else. */
 function After({ file }: { file: StepArtifact }) {

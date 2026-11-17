@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { askRunAction, fed, openRunMenu, photograph, runMenuActions, themeOf, isRunAction } from '../board.ts';
+import { askRunAction, fed, openRunMenu, photograph, runMenuActions, snackbarSaying, themeOf, isRunAction } from '../board.ts';
 import { cardOf, wordsSaying } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
@@ -54,6 +54,8 @@ export default {
       if (answered.status() !== 200)
         throw new Refused(`the api puts the hold — it answered ${answered.status()}: ${await answered.text()}`);
       await expectCount(dialog, 0, 'the popover closes once the hold is put');
+      await snackbarSaying(page, id, "and the frame's snackbar names the run held");
+      await photograph(page, path.join(OUT, `hold-put-said-${theme}.png`));
       const written = JSON.parse(fs.readFileSync(hold, 'utf8')) as { until?: string[]; why?: string; by?: string };
       if (JSON.stringify([written.until, written.why, written.by]) !== JSON.stringify([[until], WHY, os.userInfo().username]))
         throw new Refused(`the hold's file says the runs ticked, the why and the api's user — it says ${JSON.stringify(written)}`);

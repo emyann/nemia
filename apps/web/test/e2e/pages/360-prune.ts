@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, openFold, openRunMenu, photograph, runMenuActions, themeOf } from '../board.ts';
+import { fed, openFold, openRunMenu, photograph, runMenuActions, snackbarSaying, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, photographCard } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { UNMERGED } from '../seed.ts';
@@ -88,6 +88,8 @@ export default {
 
       await dialog.getByRole('button', { name: 'Prune', exact: true }).click();
       await expectCount(dialog, 0, 'the second press prunes, and the popover closes');
+      await snackbarSaying(page, id, "and the frame's snackbar names the run pruned");
+      await photograph(page, path.join(OUT, `prune-said-${theme}.png`));
       await expectCount(page.locator('[role="alert"][data-prune-refused]'), 0, 'with no refusal said');
       if (!fs.existsSync(marker)) throw new Refused(`the prune marks ${id} pruned — ${marker} is not there`);
       if (fs.existsSync(lane)) throw new Refused(`the prune removes the worktree — ${lane} is still there`);

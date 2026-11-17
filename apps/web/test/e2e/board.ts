@@ -1185,3 +1185,16 @@ export async function expectStripWhole(page: Page, assertion: string): Promise<v
     `${assertion}: each agent's row shows the agent's name whole`,
   );
 }
+
+/**
+ * The frame's snackbar, refused unless it shows naming `name`: what a write says once its thing left the page (`sayWritten`). A snackbar
+ * stays five seconds, so a page reads it, and pictures it, before anything slow.
+ * @param page The board's page that wrote.
+ * @param name The run's id, the card's or the proposal's name, which the snackbar names.
+ * @param assertion What the page asserts by it.
+ */
+export async function snackbarSaying(page: Page, name: string, assertion: string): Promise<Locator> {
+  const said = page.locator('[data-slot="snackbar-region"] [data-slot="snackbar"]', { hasText: name });
+  await expectVisible(said, assertion);
+  return said;
+}

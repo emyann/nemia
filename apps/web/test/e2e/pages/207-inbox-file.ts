@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { cardsPath, photograph, heldIn, optionsIn, pickIn, themeOf } from '../board.ts';
+import { cardsPath, photograph, heldIn, optionsIn, pickIn, snackbarSaying, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { CARDS, FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -204,6 +204,10 @@ export default {
       const line = cardIn(page, bare.name);
       await expectTexts(line.locator('[data-unassigned]'), ['no factory yet'], 'its line says it has no factory yet');
       await expectCount(line.locator('[data-factory-tag]'), 0, 'and wears no tag, the default one least of all');
+      const said = await snackbarSaying(page, bare.name, "the frame's snackbar names the card filed");
+      await photograph(page, path.join(OUT, `inbox-file-said-${theme}.png`));
+      await said.getByRole('button', { name: 'Open', exact: true }).click();
+      await page.waitForURL((url) => url.pathname === `/inbox/${bare.name}`, { timeout: WAIT_MS });
 
       await open(page, `/inbox?factory=${factory}`);
       if ((await heldIn(list)) !== factory)

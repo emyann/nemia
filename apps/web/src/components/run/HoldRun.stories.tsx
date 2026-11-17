@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { http, HttpResponse } from 'msw';
+import { SnackbarRegion } from '@/components/ui/ds';
 import { HoldQuestion } from './HoldRun';
-import { noRuns, oneWaits } from '../../../.storybook/fixtures/runs';
+import { noRuns, oneWaits, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
+import { snackbarShown } from '../../../.storybook/play';
 import { CODES, runOf, stepOf, tryOf } from '../../../.storybook/fixtures/steps';
 import { saysReading, Unread } from '../../../.storybook/unread';
 
@@ -10,7 +13,7 @@ const AT_WORK = runOf(stepOf(CODES.work, [tryOf(1, CODES.work, false, null)]));
 
 /**
  * A run's Hold…, asked once its menu's press was made: while the runs it may wait on are read, the shape of their list; once read, the
- * runs to tick, and none.
+ * runs to tick, and none; and, held, the frame's snackbar that says so.
  */
 const meta: Meta<typeof HoldQuestion> = {
   title: 'Run/HoldRun',
@@ -65,5 +68,30 @@ export const NoneToWaitOn: StoryObj<typeof meta> = {
   play: async ({ canvasElement }) => {
     await waitFor(() => expect(canvasElement.ownerDocument.body.querySelector('[data-hold-none]')).not.toBeNull());
     await expect(within(canvasElement.ownerDocument.body).queryAllByRole('checkbox')).toHaveLength(0);
+  },
+};
+
+/** Held, waiting on none: the form closes, and the snackbar the frame hosts names the run held. */
+export const Held: StoryObj<typeof meta> = {
+  parameters: {
+    msw: [
+      ...noRuns,
+      http.get('/api/runs/:name', () => HttpResponse.json(TARGET_RUNS.x57v)),
+      http.post('/api/namespaces/:namespace/runs/:name/hold', ({ params }) =>
+        HttpResponse.json({ id: String(params.name), lifted: false, hold: { at: new Date(0).toISOString(), until: [] } }),
+      ),
+    ],
+  },
+  render: (args) => (
+    <>
+      {answered(args)}
+      <SnackbarRegion />
+    </>
+  ),
+  play: async ({ canvasElement, args }) => {
+    const body = canvasElement.ownerDocument.body;
+    await userEvent.click(await within(body).findByRole('button', { name: 'Hold' }));
+    await waitFor(() => expect(args.onClose).toHaveBeenCalled());
+    await expect(await snackbarShown(body)).toHaveTextContent(args.run.id);
   },
 };

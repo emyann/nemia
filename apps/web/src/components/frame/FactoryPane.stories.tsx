@@ -16,6 +16,10 @@ type Reads = { waiting: readonly Proposal[]; cards: number; runs: number };
  * The pane of `factory` at `path`, its reads seeded under the keys the pane asks them by: its Proposals line reads the proposals that
  * wait (`waitingProposalsQuery`), never the whole list.
  */
+/** The badge `place`'s line ends on, if it draws one. */
+const badgeOf = (canvasElement: HTMLElement, place: string) =>
+  canvasElement.querySelector(`[data-pane-place="${place}"] [data-slot="badge"]`);
+
 const drawn = ({ path, search, factory, lit }: Parameters<typeof FactoryPane>[0], reads: Reads) => (
   <QueryClientProvider
     client={seeded([
@@ -47,7 +51,10 @@ export default meta;
 
 type Story = StoryObj<typeof FactoryPane>;
 
-/** Two proposals wait on the person, a card is not started and a run waits: each place says so. */
+/**
+ * Two proposals wait on the person, a card is not started and a run waits: each place says so, the count of Runs and of the Inbox on
+ * the kit's badge, in yours, and said to a screen reader in the line.
+ */
 export const ProposalsWaiting: Story = {
   args: { lit: 'runs' },
   render: (args) =>
@@ -55,12 +62,29 @@ export const ProposalsWaiting: Story = {
   play: async ({ canvasElement }) => {
     const pane = within(canvasElement);
     await waitFor(() => expect(pane.getByText('2 wait on you')).toBeVisible());
-    await waitFor(() => expect(pane.getByText('1 not started')).toBeVisible());
-    await waitFor(() => expect(pane.getByText('1 waiting on you')).toBeVisible());
+    await waitFor(() => expect(pane.getByText('not started')).toBeVisible());
+    await waitFor(() => expect(pane.getByText('waiting on you')).toBeVisible());
+    await expect(badgeOf(canvasElement, 'runs')).toHaveTextContent('1');
+    await expect(badgeOf(canvasElement, 'runs')).toHaveAttribute('data-color', 'primary');
+    await expect(badgeOf(canvasElement, 'inbox')).toHaveTextContent('1');
+    await expect(badgeOf(canvasElement, 'inbox')).toHaveAttribute('data-color', 'primary');
+    await expect(badgeOf(canvasElement, 'proposals')).toBeNull();
+    await expect(pane.getByRole('link', { name: /Runs\s+1 waiting on you/ })).toBeVisible();
+    await expect(pane.getByRole('link', { name: /Inbox\s+1 not started/ })).toBeVisible();
   },
 };
 
-/** Nothing waits: no proposal, every card started, no run waiting. */
+/** Many wait: the badges grow with their counts, and one past the kit's most shows `999+`. */
+export const ManyWaiting: Story = {
+  args: { lit: 'inbox' },
+  render: (args) => drawn(args, { waiting: [], cards: 12, runs: 1200 }),
+  play: async ({ canvasElement }) => {
+    await waitFor(() => expect(badgeOf(canvasElement, 'runs')).toHaveTextContent('999+'));
+    await expect(badgeOf(canvasElement, 'inbox')).toHaveTextContent('12');
+  },
+};
+
+/** Nothing waits: no proposal, every card started, no run waiting; a count of 0 draws no badge, its line saying so in words. */
 export const NoneWaiting: Story = {
   args: { lit: 'proposals' },
   render: (args) => drawn(args, { waiting: [], cards: 0, runs: 0 }),
@@ -69,6 +93,7 @@ export const NoneWaiting: Story = {
     await waitFor(() => expect(pane.getByText('none waiting')).toBeVisible());
     await waitFor(() => expect(pane.getByText('every card started')).toBeVisible());
     await waitFor(() => expect(pane.getByText('nothing waits on you')).toBeVisible());
+    await expect(canvasElement.querySelector('[data-slot="badge"]')).toBeNull();
   },
 };
 

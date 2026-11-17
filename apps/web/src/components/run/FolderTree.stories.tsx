@@ -81,8 +81,18 @@ export const Opened: Story = {
     await expect(preview, "the picture's row previews it").not.toBeNull();
     if (preview === null) return;
     await waitFor(() => expect(preview.naturalWidth, 'the api served the picture, and it drew').toBeGreaterThan(0));
+  },
+};
+
+/** A second press on an opened folder's row folds it again, and what it holds is drawn no more. */
+export const FoldsAgain: Story = {
+  play: async ({ canvasElement }) => {
+    const tree = within(canvasElement);
     await userEvent.click(tree.getByRole('row', { name: 'e2e' }));
-    await expect(tree.queryByText('run-light.png'), 'a second press folds it again').toBeNull();
+    await expect(tree.getByText('folder-dark.png')).toBeVisible();
+    await userEvent.click(tree.getByRole('row', { name: 'e2e' }));
+    await expect(tree.getByRole('row', { name: 'e2e' })).toHaveAttribute('aria-expanded', 'false');
+    await expect(tree.queryByText('folder-dark.png'), 'a second press folds it again').toBeNull();
   },
 };
 

@@ -105,7 +105,6 @@ function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: bo
     <div className="flex flex-wrap items-start gap-2">
       <Select
         label={`Hire into this step in ${page.factory}`}
-        placeholder="Pick an agent"
         value={picked}
         onChange={(key) => setPicked(key == null ? null : String(key))}
         isDisabled={pending}

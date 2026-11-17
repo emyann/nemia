@@ -5,18 +5,18 @@
  * the api's words under its row. The default factory offers every workflow found and keeps no file, so it sets no line, and says so; a
  * factory that offers none gives the line that attaches one.
  */
-import { Fragment, useId, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
-import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { clearCostLine, factoriesQuery, setCostLine, type Factory } from '@/lib/api/factories';
 import { budgetWord } from '@/lib/money';
 import { CommandText } from './FactorySchedules';
 import { Pending } from '@/components/look';
+import { AmountField } from '../field/AmountField';
 
 /** What a person asks of one workflow's line: set to an amount, or taken off. */
 type Change = { kind: 'save'; usd: number } | { kind: 'clear' };
@@ -25,12 +25,6 @@ type Change = { kind: 'save'; usd: number } | { kind: 'clear' };
 const SAID: Record<Change['kind'], { done: string; refused: string }> = {
   save: { done: 'Saved: a run started from now on keeps this line.', refused: 'Not saved' },
   clear: { done: 'Cleared: a run started from now on has no line.', refused: 'Not cleared' },
-};
-
-/** The amount a field holds, or null where it holds no number of dollars above zero. */
-const amountOf = (text: string): number | null => {
-  const usd = Number(text.trim());
-  return text.trim() !== '' && Number.isFinite(usd) && usd > 0 ? usd : null;
 };
 
 /** The cost lines of `factory`, marked `data-cost-lines` with its name: a row per workflow it offers (`CostLineRow`). */
@@ -114,7 +108,10 @@ function CostLineRow({ factory, workflow, usd }: { factory: string; workflow: st
   );
 }
 
-/** The amount field of a line: Save while it holds an amount above zero other than the line, and Clear while a line is set. */
+/**
+ * The amount field of a line, in dollars to the cent: Save while it holds an amount above zero other than the line, as it is typed, and
+ * Clear while a line is set.
+ */
 function CostLineForm({
   workflow,
   usd,
@@ -126,9 +123,8 @@ function CostLineForm({
   pending: boolean;
   onChange: (change: Change) => void;
 }) {
-  const id = useId();
-  const [draft, setDraft] = useState(usd === null ? '' : String(usd));
-  const typed = amountOf(draft);
+  const [draft, setDraft] = useState(usd);
+  const typed = draft !== null && draft > 0 ? draft : null;
   const savable = typed !== null && typed !== usd;
   return (
     <form
@@ -139,23 +135,14 @@ function CostLineForm({
         if (typed !== null && typed !== usd) onChange({ kind: 'save', usd: typed });
       }}
     >
-      <label htmlFor={id} className="flex items-center gap-1">
-        <span className="sr-only">{`The cost line of ${workflow}, in dollars`}</span>
-        <span aria-hidden className="font-mono text-body-medium text-money">
-          $
-        </span>
-        <Input
-          id={id}
-          type="number"
-          step="any"
-          min="0"
-          inputMode="decimal"
-          placeholder="80"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          className="w-28 font-mono"
-        />
-      </label>
+      <AmountField
+        aria-label={`The cost line of ${workflow}, in dollars`}
+        placeholder="$80"
+        value={draft}
+        onAmount={setDraft}
+        className="w-36"
+        inputClassName="font-mono"
+      />
       <Button type="submit" isDisabled={pending || !savable}>
         {pending && <Pending size={16} />}
         {pending ? 'Writing…' : 'Save'}

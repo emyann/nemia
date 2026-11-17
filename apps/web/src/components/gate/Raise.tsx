@@ -13,6 +13,7 @@ import { answersFrom, Asks, QuestionFields, RecommendButton, unanswered, type Dr
 import type { Frozen } from '../../lib/frozen';
 import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 import { Pending } from '@/components/look';
+import { AmountField } from '../field/AmountField';
 
 /**
  * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes
@@ -145,13 +146,11 @@ function AmountBox({
   disabled: boolean;
 }) {
   return (
-    <TextField
+    <AmountField
       aria-label={`The cap to raise ${step} to, in dollars`}
-      prefix="$"
-      inputMode="decimal"
-      value={amount}
+      value={amount.trim() === '' ? null : Number(amount)}
       isDisabled={disabled}
-      onChange={onAmount}
+      onAmount={(next) => onAmount(next === null ? '' : String(next))}
       className="w-36"
       inputClassName="font-mono"
     />

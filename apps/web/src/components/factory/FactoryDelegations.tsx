@@ -12,9 +12,18 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { delegableAgentsQuery, delegationsKey, delegationsQuery, putDelegation, removeDelegation } from '@/lib/api/proposals';
+import { ComboBox, ComboBoxItem } from '@/components/ui/ds';
+import {
+  delegableAgentsQuery,
+  type DelegableAgent,
+  delegationsKey,
+  delegationsQuery,
+  putDelegation,
+  removeDelegation,
+} from '@/lib/api/proposals';
 import { DELEGABLE } from '@/lib/proposals';
 import { Pending, Reading, ReadingLines } from '@/components/look';
+import { personOf } from '../agent/AgentParts';
 
 /** One grant as the form holds it: resources and verbs picked, and the names typed, comma-separated. */
 type Draft = { resources: readonly string[]; names: string; verbs: readonly ChangeVerb[] };
@@ -163,7 +172,7 @@ function DelegationForm({
       }}
     >
       <FieldGroup>
-        <AgentField id={`${id}-agent`} agents={agents ?? []} agent={agent} onAgent={named} />
+        <AgentField agents={agents} agent={agent} onAgent={named} />
         {drafts.map((draft, i) => (
           <GrantFields
             key={i}
@@ -257,36 +266,47 @@ function GrantFields({
   );
 }
 
-/** The agent a delegation names, typed or picked among the factory's agents. */
+/**
+ * Why the agent typed is refused: it names none of the factory's `agents`, once they are read; undefined where it names one, or the field
+ * is blank, or they are still out.
+ */
+export const agentRefusal = (typed: string, agents: readonly DelegableAgent[] | undefined): string | undefined => {
+  const name = typed.trim();
+  if (name === '' || agents === undefined || agents.some((a) => a.name === name)) return undefined;
+  return `This factory serves no agent named ${name}: pick one from the list.`;
+};
+
+/**
+ * The agent a delegation names, in the kit's ComboBox: typing narrows the factory's agents, each named as the agents page names it (its
+ * person, its role and its file's name), and a pick writes its file's name; a name that is no agent of the factory is refused under the
+ * field when the form is sent.
+ */
 function AgentField({
-  id,
   agents,
   agent,
   onAgent,
 }: {
-  id: string;
-  agents: readonly string[];
+  agents: readonly DelegableAgent[] | undefined;
   agent: string;
   onAgent: (agent: string) => void;
 }) {
   return (
-    <Field>
-      <FieldLabel htmlFor={id}>Agent</FieldLabel>
-      <Input
-        id={id}
-        data-delegation-agent
-        list={`${id}s`}
-        value={agent}
-        onChange={(event) => onAgent(event.target.value)}
-        placeholder="An agent of this factory"
-      />
-      <datalist id={`${id}s`}>
-        {agents.map((a) => (
-          <option key={a} value={a}>
-            {a}
-          </option>
-        ))}
-      </datalist>
-    </Field>
+    <ComboBox
+      data-delegation-agent
+      label="Agent"
+      placeholder="An agent of this factory"
+      items={agents ?? []}
+      allowsCustomValue
+      inputValue={agent}
+      onInputChange={onAgent}
+      onChange={(key) => {
+        if (key !== null) onAgent(String(key));
+      }}
+      validate={({ inputValue }) => agentRefusal(inputValue, agents) ?? null}
+    >
+      {(a) => (
+        <ComboBoxItem id={a.name} textValue={a.name} label={personOf(a.name)} supportingText={`${a.role ?? 'No role yet'} · ${a.name}`} />
+      )}
+    </ComboBox>
   );
 }

@@ -229,7 +229,7 @@ async function listedOnPage(page: Page, name: string): Promise<void> {
 async function delegated(page: Page): Promise<void> {
   await goto(page, `/factories/${FACTORY}/settings`);
   const form = page.locator('[data-delegation-form]');
-  await form.locator('[data-delegation-agent]').fill(AGENTS.seeded.name);
+  await form.getByRole('combobox', { name: 'Agent' }).fill(AGENTS.seeded.name);
   await form.locator('[data-delegation-resource="hires"]').click();
   await form.locator('[data-delegation-verb="update"]').click();
   await form.locator('[data-delegation-save]').click();

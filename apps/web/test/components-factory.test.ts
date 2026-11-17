@@ -437,12 +437,30 @@ test("a factory's delegations list each agent's grants in words with a Remove, b
   };
   const html = await routedWith(createElement(FactoryDelegations, { name: 'acme' }), [
     [['delegations', 'acme'], [delegation]],
-    [['delegable-agents', 'acme'], ['planner']],
+    [['delegable-agents', 'acme'], [{ name: 'planner', role: 'plans the work' }]],
   ]);
   assert.match(html, /data-delegation="planner"[^]*data-delegation-grant[^>]*>update hires, any name<[^]*data-delegation-remove/);
   assert.match(html, /data-delegation-form[^]*data-delegation-resource="hires"[^]*data-delegation-verb="update"/);
   const none = await routedWith(createElement(FactoryDelegations, { name: 'acme' }), [[['delegations', 'acme'], []]]);
   assert.match(none, /data-no-delegation/);
+});
+
+test('agentRefusal: a name typed is refused only where the agents are read and none of them is named so', async () => {
+  const { agentRefusal } = await import('../src/components/factory/FactoryDelegations.tsx');
+  const agents = [{ name: 'planner', role: null }];
+  const rows: [string, typeof agents | undefined, boolean][] = [
+    ['planner', agents, false],
+    ['  planner ', agents, false],
+    ['', agents, false],
+    ['   ', agents, false],
+    ['nobody', undefined, false],
+    ['nobody', agents, true],
+    ['Planner', agents, true],
+    ['planner', [], true],
+  ];
+  for (const [typed, served, refused] of rows)
+    assert.equal(agentRefusal(typed, served) !== undefined, refused, `${JSON.stringify(typed)} against ${JSON.stringify(served)}`);
+  assert.match(agentRefusal('nobody', agents) ?? '', /nobody/, 'the refusal names what was typed');
 });
 
 test("switcherLine: the switcher says its factory's repository, its template and version, and whether the store ticks, each where known", async () => {

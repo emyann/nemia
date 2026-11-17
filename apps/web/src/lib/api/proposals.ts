@@ -115,12 +115,21 @@ export const putDelegation = (factory: string, agent: string, spec: DelegationWr
  */
 export const removeDelegation = (factory: string, agent: string): Promise<Delegation> => delegations.delete(factory, agent);
 
+/** An agent a delegation may name: its file's name, and its `role:` line, null where it has none. */
+export type DelegableAgent = { readonly name: string; readonly role: string | null };
+
 /**
- * The names of the agents the factory `factory` serves, which its delegations may name: read on the settings page's visit.
+ * The agents the factory `factory` serves, which its delegations may name, once each by name, in the order of their names, with the role
+ * the first of each name says: read on the settings page's visit.
  * @param factory The factory's name.
  */
 export const delegableAgentsQuery = (factory: string) =>
   queryOptions({
     queryKey: ['delegable-agents', factory],
-    queryFn: async (): Promise<readonly string[]> => [...new Set((await agents.list(factory)).map((a) => a.metadata.name))].sort(),
+    queryFn: async (): Promise<readonly DelegableAgent[]> => {
+      const byName = new Map<string, DelegableAgent>();
+      for (const a of await agents.list(factory))
+        if (!byName.has(a.metadata.name)) byName.set(a.metadata.name, { name: a.metadata.name, role: a.spec.role ?? null });
+      return [...byName.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    },
   });

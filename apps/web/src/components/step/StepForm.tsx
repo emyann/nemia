@@ -265,14 +265,7 @@ function KeyInput({
     case 'count':
     case 'dollars':
       control = (
-        <AmountField
-          label={key}
-          kind={kind}
-          value={value as number | null}
-          placeholder={given ?? 'not set'}
-          supportingText={value === null ? (given ?? 'not set') : undefined}
-          onAmount={(amount) => set(key, amount as never)}
-        />
+        <AmountKey label={key} kind={kind} value={value as number | null} given={given} onAmount={(amount) => set(key, amount as never)} />
       );
       break;
     case 'tokens': {
@@ -366,6 +359,36 @@ function Choose({
         <SelectItem key={option} id={option} label={option} />
       ))}
     </Select>
+  );
+}
+
+/**
+ * A step's amount — its budget in dollars, or a count — in an amount field, each keystroke committed to the draft; while it is unset, what
+ * it stands at (`given`, the agent's, or `not set`) said under it too.
+ */
+function AmountKey({
+  label,
+  kind,
+  value,
+  given,
+  onAmount,
+}: {
+  label: string;
+  kind: 'count' | 'dollars';
+  value: number | null;
+  given: string | null;
+  onAmount: (amount: number | null) => void;
+}) {
+  const unset = given ?? 'not set';
+  return (
+    <AmountField
+      label={label}
+      kind={kind}
+      value={value}
+      placeholder={unset}
+      supportingText={value === null ? unset : undefined}
+      onAmount={onAmount}
+    />
   );
 }
 

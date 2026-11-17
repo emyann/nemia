@@ -18,7 +18,8 @@ export const AMOUNT_FORMATS: Readonly<Record<AmountKind, Intl.NumberFormatOption
 
 /**
  * The amount a field's text holds as typed, read in the field's locale and format: `null` for an empty field, the number for one the
- * format reads, and `undefined` for a text it does not, or one finer than the format keeps — a key the field refuses, which it takes back before it is drawn.
+ * format reads, and `undefined` for a text it does not, or one finer than the format keeps — a key the field refuses, which it takes
+ * back before it is drawn.
  * @param text What the field's input holds.
  * @param kind The kind of amount the field takes, which says its format.
  * @param locale The locale the field formats in; the runtime's own where none is given, as the kit's field takes it.

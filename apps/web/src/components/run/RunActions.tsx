@@ -70,8 +70,9 @@ function useLongPress() {
 
 /**
  * The actions of a run, opened where the run is listed, through the kit's `ContextMenu`: the same list as the run page's menu
- * (`runActionsOf`), and each, pressed, asks the question the page asks in the popover it asks it in (`QuestionPopover`), beside the run's row or card, every
- * write reading the run and the lists again (`runsMoved`). Nothing on screen says it is there: the run's page keeps its menu.
+ * (`runActionsOf`), and each, pressed, asks the question the page asks in the popover it asks it in (`QuestionPopover`), beside the
+ * run's row or card, every write reading the run and the lists again (`runsMoved`). Nothing on screen says it is there: the run's page
+ * keeps its menu.
  *
  * Opened by the pointer's secondary press, a long press on Android and the keyboard's menu key or Shift+F10 on what has the focus inside
  * it, which the kit gives; and a long press on iOS, which it adds (`useLongPress`). A press on what holds no run (`runOf` answers null), or

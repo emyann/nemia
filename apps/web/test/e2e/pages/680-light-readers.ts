@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 import { FINISHED_SELECTOR, OPEN_SELECTOR, UNDECIDED_SELECTOR } from '../../../src/lib/api/runs.ts';
-import { openRunMenu } from '../board.ts';
+import { askRunAction } from '../board.ts';
 import { showFinished } from '../canvas.ts';
 import { expectVisible, idle, Refused } from '../checks.ts';
 import { AGENTS, FACTORIES, GATED, hiringStarts, WORKFLOWS } from '../seed.ts';
@@ -87,8 +87,7 @@ export default {
 
       await reading("a run's Hold popover", [OPEN_SELECTOR, FINISHED_SELECTOR], async () => {
         await visit(page, `/runs/${GATED.id}`);
-        await (await openRunMenu(page)).locator('[data-hold-open]').click();
-        const dialog = page.getByRole('dialog', { name: `Hold ${GATED.id}` });
+        const dialog = await askRunAction(page, 'Hold…', `Hold ${GATED.id}`);
         await expectVisible(dialog.locator('[data-hold-run]').first(), 'the Hold popover offers a run to wait on');
         await page.keyboard.press('Escape');
       });

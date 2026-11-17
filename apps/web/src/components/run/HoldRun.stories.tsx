@@ -8,7 +8,10 @@ import { saysReading, Unread } from '../../../.storybook/unread';
 /** A run at work, which a hold may hold. */
 const AT_WORK = runOf(stepOf(CODES.work, [tryOf(1, CODES.work, false, null)]));
 
-/** A run's Hold…, asked once its menu's press was made: while the runs it may wait on are read, the shape of their list; once read, the runs to tick, and none. */
+/**
+ * A run's Hold…, asked once its menu's press was made: while the runs it may wait on are read, the shape of their list; once read, the
+ * runs to tick, and none.
+ */
 const meta: Meta<typeof HoldQuestion> = {
   title: 'Run/HoldRun',
   component: HoldQuestion,

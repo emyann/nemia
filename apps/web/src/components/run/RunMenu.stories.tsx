@@ -28,7 +28,10 @@ const meta: Meta<typeof RunMenu> = {
 export default meta;
 
 /** The labels of the menu's items, in their order. */
-const itemsOf = (menu: HTMLElement): string[] => within(menu).getAllByRole('menuitem').map((item) => item.textContent?.trim() ?? '');
+const itemsOf = (menu: HTMLElement): string[] =>
+  within(menu)
+    .getAllByRole('menuitem')
+    .map((item) => item.textContent?.trim() ?? '');
 
 /** Opened by a press on a try at work: Remove… and Hold…, in the order the run's actions say (`runActionsOf`). */
 export const Opened: StoryObj<typeof meta> = {

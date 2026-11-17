@@ -7,7 +7,10 @@ import { saysReading, Unread } from '../../../.storybook/unread';
 /** A run that ended, its worktrees still on disk: one a prune is offered on. */
 const ENDED = runOf(stepOf(CODES.done, [tryOf(1, CODES.done, true, null)]));
 
-/** A run's Prune…, asked once its menu's press was made: while whether it was merged is read, the shape of its form; and, for a run called off, the form itself. */
+/**
+ * A run's Prune…, asked once its menu's press was made: while whether it was merged is read, the shape of its form; and, for a run
+ * called off, the form itself.
+ */
 const meta: Meta<typeof PruneQuestion> = {
   title: 'Run/PruneRun',
   component: PruneQuestion,

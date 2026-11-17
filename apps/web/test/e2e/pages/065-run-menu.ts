@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, openRunMenu, photograph, runMenuActions, themeOf } from '../board.ts';
-import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
+import { askRunAction, fed, openRunMenu, photograph, runMenuActions, themeOf } from '../board.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { GATED, SHAPED, writeShaped } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -15,24 +15,22 @@ async function offers(page: Page, want: readonly string[], who: string): Promise
   await expectCount(page.locator('header[data-run-header] button[data-run-menu]'), 1, `${who}'s actions are behind one button`);
   const actions = await runMenuActions(page);
   if (actions.join() !== want.join()) throw new Refused(`${who}'s menu offers ${want.join(', ')} — it offers ${actions.join(', ')}`);
-  for (const mark of ['[data-hold-open]', '[data-prune-open]', '[data-remove-run]', '[data-lift]'])
+  for (const mark of ['[data-remove-run]', '[data-lift]', '[data-hold-reading]', '[data-prune-reading]'])
     await expectCount(page.locator(`header[data-run-header] ${mark}`), 0, `and none of them stands in the header outside it (${mark})`);
 }
 
 export default {
   /**
-   * Whatever a person can do to a whole run is behind one button in its header: GATED, in flight, offers Hold, whose press opens the
-   * hold's own dialog; SHAPED, written as a try of an agent, over and holding files on disk, offers Remove and Prune, Prune opening its
-   * own dialog and Remove asking its own question. Nothing is pressed past the question: each is taken back, with Escape or Keep it, and
-   * SHAPED with it.
+   * Whatever a person can do to a whole run is behind one button in its header, the kit's menu: GATED, in flight, offers Hold, whose
+   * item opens the hold's own dialog; SHAPED, written as a try of an agent, over and holding files on disk, offers Remove and Prune, its
+   * menu opened by Enter on its first item, Prune opening its own dialog and Remove asking its own question. Nothing is pressed past
+   * the question: each is taken back, with Escape or Keep it, and SHAPED with it.
    */
   name: 'run-menu',
   route: `/runs/${GATED.id}`,
   expect: async (page) => {
     await offers(page, ['hold'], GATED.id);
-    await (await openRunMenu(page)).locator('[data-hold-open]').click();
-    const hold = page.getByRole('dialog', { name: `Hold ${GATED.id}` });
-    await expectVisible(hold, 'Hold opens its own dialog');
+    const hold = await askRunAction(page, 'Hold…', `Hold ${GATED.id}`);
     await settled(page);
     await photograph(page, path.join(OUT, `run-menu-hold-${await themeOf(page)}.png`));
     await page.keyboard.press('Escape');
@@ -46,20 +44,23 @@ export default {
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
       await offers(page, ['remove', 'prune'], id);
+      await page.locator('button[data-run-menu]').focus();
+      await page.keyboard.press('Enter');
       const menu = await openRunMenu(page);
+      await expectTexts(menu.getByRole('menuitem'), ['Remove…', 'Prune…'], "Enter opens the menu on the run's actions, in their order");
+      await expectVisible(menu.getByRole('menuitem', { name: 'Remove…' }).and(page.locator(':focus')), 'its first item focused');
       await settled(page);
       await photograph(page, path.join(OUT, `run-menu-open-${await themeOf(page)}.png`));
-      await menu.locator('[data-prune-open]').click();
+      await menu.getByRole('menuitem', { name: 'Prune…', exact: true }).click();
       const prune = page.getByRole('dialog', { name: `Prune ${id}` });
-      await expectVisible(prune, 'Prune opens its own dialog');
+      await expectVisible(prune, 'Prune opens its own dialog once the menu closes');
       await page.keyboard.press('Escape');
       await expectCount(prune, 0, 'and Escape closes it, nothing pruned');
 
-      const again = await openRunMenu(page);
-      await again.getByRole('button', { name: 'Remove…' }).click();
-      await expectVisible(again.locator('[data-remove-run]').getByRole('button', { name: 'Remove', exact: true }), 'Remove asks first');
-      await again.getByRole('button', { name: 'Keep it' }).click();
-      await expectVisible(again.getByRole('button', { name: 'Remove…' }), 'and Keep it takes the question back, nothing removed');
+      const remove = await askRunAction(page, 'Remove…', `Remove ${id}`);
+      await expectVisible(remove.locator('[data-remove-run]').getByRole('button', { name: 'Remove', exact: true }), 'Remove asks first');
+      await remove.getByRole('button', { name: 'Keep it' }).click();
+      await expectCount(remove, 0, 'and Keep it takes the question back, nothing removed');
     } finally {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);

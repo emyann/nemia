@@ -39,6 +39,7 @@ import { modeWord, retriesDue, type CheckKillOf, type Retry, type RetryAsk, type
 import { refusalSection, type CheckRefusal, type LandingSaid, type Verdict } from '../check/index.ts';
 import { saidBy, type Said } from '../say/say.ts';
 import { loopSpan, upstreamOf } from '../workflow/index.ts';
+import { downstreamOf } from '../workspace/workspace.ts';
 import { heldLater, roundsDue } from '../round/round.ts';
 import { neverApproved } from '../forget/prune/prune.ts';
 import { answersOr } from '../question/index.ts';
@@ -79,6 +80,7 @@ export const TASK_HEADINGS = {
   'Before you sign off': 'run',
   'The run checks and lands your merge': 'run',
   'When you are finished': 'run',
+  'Gates after you': 'run',
   'What runs of this workflow cost': 'run',
   'The routes you choose between': 'run',
   'Merge <base>': 'run',
@@ -622,6 +624,28 @@ export function fromSection(
     `is in its folder's \`${HANDED_CLOSEOUT}\`: its summary and body are its own account, to check against the change.`,
     '',
     ...dataBlock(declaredOutput(producer, said, fields).given),
+  ].join('\n');
+}
+
+/**
+ * `## Gates after you`: the steps after this one, directly or through another (`downstreamOf`), at which the run waits on a person's
+ * approval (`hasGate`): those its workflow gates and those it was started with (`nemia start --gate`, a card's `gate:`), in the order the
+ * steps run. Nothing for a step no gate comes after, so a run with no gate composes no such section. A step reads here, and nowhere else,
+ * whether a person reads its work before what it hands on goes further: its note cannot say it, written before the run was started.
+ * @param step The step told.
+ * @param run The run, the gates it was started with among it.
+ * @param steps The run's steps.
+ */
+export function gatesAfterSection(step: StepSpec, run: Pick<Run, 'gates'>, steps: readonly StepSpec[]): string {
+  const after = downstreamOf(steps, step.name);
+  const gated = steps.filter((s) => after.has(s.name) && hasGate(s, run)).map((s) => `\`${s.name}\``);
+  if (!gated.length) return '';
+  return [
+    '',
+    headingOf('Gates after you'),
+    '',
+    `This run waits on a person's approval (\`nemia approve\`) at ${andList(gated)}, after you: a person reads the work there before it`,
+    'goes further.',
   ].join('\n');
 }
 

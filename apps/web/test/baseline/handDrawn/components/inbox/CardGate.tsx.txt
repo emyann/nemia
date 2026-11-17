@@ -1,8 +1,0 @@
-apps/web/src/components/inbox/CardGate.tsx#<textarea>
-apps/web/src/components/inbox/CardGate.tsx#<button>
-apps/web/src/components/inbox/CardGate.tsx#<input type="radio">
-apps/web/src/components/inbox/CardGate.tsx#@/lib/classes:BUTTON
-apps/web/src/components/inbox/CardGate.tsx#@/lib/classes:BUTTON_SECONDARY
-apps/web/src/components/inbox/CardGate.tsx#@/lib/classes:BUTTON_SMALL
-apps/web/src/components/inbox/CardGate.tsx#@/lib/classes:TEXTAREA
-apps/web/src/components/inbox/CardGate.tsx#@/lib/classes:POPOVER

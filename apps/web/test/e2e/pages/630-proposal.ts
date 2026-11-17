@@ -220,7 +220,7 @@ async function listedOnPage(page: Page, name: string): Promise<void> {
   await proposalsLit(page, "on a proposal's page");
   await settled(page);
   await photograph(page, path.join(OUT, `proposal-page-${await themeOf(page)}.png`));
-  await page.locator('[data-back-to-proposals]').click();
+  await page.getByRole('link', { name: '← Back to the proposals' }).click();
   await page.waitForURL((url) => url.pathname === `/factories/${FACTORY}/proposals`, { timeout: WAIT_MS });
   await expectVisible(row, 'its way back leads to the proposals page');
 }

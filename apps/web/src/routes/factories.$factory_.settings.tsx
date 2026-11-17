@@ -11,7 +11,7 @@ import { FactoryServers } from '@/components/factory/FactoryServers';
 import { FactoryVolumes } from '@/components/factory/FactoryVolumes';
 import { LibraryAdds } from '@/components/library/LibraryAdds';
 import { routeLink } from '@/components/nav/routeLink';
-import { LinkButton } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { delegationsQuery } from '@/lib/api/proposals';
 import { factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServersQuery } from '@/lib/api/factories';
 
@@ -52,7 +52,7 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
 const OPENED = { enter: 0, stay: Infinity } as const;
 
 /** A button to a route, as the router draws its links (`routeLink`). */
-const RouterLinkButton = routeLink(LinkButton);
+const RouterLinkButton = routeLink(Button);
 
 /**
  * What a person sets of one factory: first, the template it is made from, where it has one, read-only (`TemplateCard`); then a place of it
@@ -71,7 +71,7 @@ function SettingsPage() {
     <article data-factory-settings={name} className="mx-auto flex max-w-3xl flex-col gap-8">
       <header className="flex flex-col gap-3">
         <div>
-          <RouterLinkButton to="/factories/$factory" params={{ factory: name }} variant="ghost" size="sm" data-back-to-floor>
+          <RouterLinkButton to="/factories/$factory" params={{ factory: name }} variant="text" size="xsmall">
             ← Back to the floor
           </RouterLinkButton>
         </div>

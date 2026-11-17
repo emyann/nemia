@@ -62,8 +62,9 @@ person's, once your tries are spent, never a line for your `needs`. Past the ret
 not finish, the run waits on a person.
 
 This is a quick build: no spec was written for you. You are handed a card, and a review reads your plan and your change — Agora's,
-read-only, which asks for another round or passes. Its pass lands the change: there is no person's gate after it, so the review is the
-one reader between your work and the base branch.
+read-only, which asks for another round or passes. Its pass lands the change: unless your brief names `land` under `## Gates after
+you` (the run started with `--gate land`, or a card's `gate: land`), there is no person's gate after it, so the review is the one
+reader between your work and the base branch.
 
 **Write your plan first**, before you build: what changes, where, and what proves it, in a few lines. It goes in your closeout's `plan`,
 as you wrote it, corrected where the work proved it wrong. Then build it, with the tests that prove it.

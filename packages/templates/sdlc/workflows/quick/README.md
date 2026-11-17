@@ -131,7 +131,9 @@ records the commit on its check's exit 0.
 
 A person who wants to read the change themselves before it lands puts the gate back for that run: `nemia start "<the card>"
 --workflows quick --gate land`, or `gate: land` on the inbox card. A run's own gates are read wherever a step's are (`hasGate`), so the
-landing then waits for `nemia approve <run> land` exactly as build's does.
+landing then waits for `nemia approve <run> land` exactly as build's does. Implement and review are told so, each under
+`## Gates after you` in its brief, which names every gate after the step and is left out where there is none: review's note says
+both cases, and a review of a gated run passes a card that waits on the person at its land, since that gate meets it.
 
 **A landing that refuses**: nothing is merged and the checkout is untouched. In this checkout, a merge that conflicts is aborted by
 land, and one whose `localCheck` fails is taken back by the run: `nemia retry <run> review --message "<what failed>"` sends the work

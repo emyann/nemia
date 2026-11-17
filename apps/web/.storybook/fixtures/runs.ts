@@ -5,7 +5,7 @@
  * told apart by their `fieldSelector`) — with none, refusing, or with the runs of the person's three target pictures.
  */
 import { http, HttpResponse } from 'msw';
-import type { Run, RunList, RunSpecStep, RunStepStatus } from 'objects';
+import type { Run, RunLines, RunList, RunSpecStep, RunStepStatus } from 'objects';
 
 /** The instant every list is measured to, so a story draws the same words whatever day it is drawn on. */
 const AS_OF = '2026-11-15T18:00:00.000Z';
@@ -581,3 +581,15 @@ export const everyState = answering(
   [ASKS, VQVD, AT_WORK, OVER_ITS_CAP, LGLL, ON_A_RUN, ON_THE_CHECKOUT[1], FOR_A_SLOT, HELD],
   { waiting: 2, inFlight: 7, finished: FINISHED_COUNT },
 );
+
+/**
+ * The lines of the run `name` as the api builds them, its steps given none: what a part that reads a run's detail is seeded with.
+ * @param name The run's name.
+ */
+export const linesOf = (name: string): RunLines => ({
+  decide: `nemia decide ${name}`,
+  refresh: `nemia refresh ${name}`,
+  fromNote: null,
+  steps: {},
+  workflowPage: null,
+});

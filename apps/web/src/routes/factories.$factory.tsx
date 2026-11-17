@@ -1,9 +1,8 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { FactoryCanvas } from '@/components/factory/FactoryCanvas';
-import { LinkButton } from '@/components/ui/button';
 import { routeLink } from '@/components/nav/routeLink';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button, Card, CardContent, Title } from '@/components/ui/ds';
 import { factoriesQuery } from '@/lib/api/factories';
 import { inboxQuery } from '@/lib/api/inbox';
 import { openRunsQuery } from '@/lib/api/runs';
@@ -48,32 +47,39 @@ function FactoryPage() {
 }
 
 /** A button to a route, as the router draws its links (`routeLink`). */
-const RouterLinkButton = routeLink(LinkButton);
+const RouterLinkButton = routeLink(Button);
 
 /** A name no factory has: say so, how to make it (`fileFactory`, as the api answers it), and lead back to the Factories. */
 function NoSuchFactory({ name }: { name: string }) {
   const { data: store } = useQuery(storeQuery);
   return (
     <div className="flex h-[calc(100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot))] items-center justify-center p-6">
-      <Card className="w-full max-w-sm" data-no-factory={name}>
-        <CardHeader>
-          <CardTitle>No factory named {name}</CardTitle>
-          <CardDescription>
-            The factories are listed on the Factories page. Make one named {name} from the command line
-            {store ? (
-              <>
-                {' '}
-                with <code>{store.fileFactory}</code>
-              </>
-            ) : null}
-            .
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RouterLinkButton to="/" variant="outline" size="sm">
-            Go to Factories
-          </RouterLinkButton>
-        </CardContent>
+      <Card variant="outlined" className="w-full max-w-sm" classNames={{ content: 'gap-4' }} data-no-factory={name}>
+        <CardContent
+          headline={
+            <Title size="medium" component="h2">
+              No factory named {name}
+            </Title>
+          }
+          supportingText={
+            <>
+              The factories are listed on the Factories page. Make one named {name} from the command line
+              {store ? (
+                <>
+                  {' '}
+                  with <code>{store.fileFactory}</code>
+                </>
+              ) : null}
+              .
+            </>
+          }
+          actions={
+            <RouterLinkButton to="/" variant="outlined" size="xsmall">
+              Go to Factories
+            </RouterLinkButton>
+          }
+          classNames={{ header: 'mb-0', actions: 'mt-0 justify-start' }}
+        />
       </Card>
     </div>
   );

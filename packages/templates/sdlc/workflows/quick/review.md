@@ -4,10 +4,19 @@ are its own account, to check against the change, and its `plan` — what it sai
 before the work — is a declared field you read there. A change that is not the card's is a finding; so is a plan the work went past
 without saying so.
 
-**Your pass lands the change.** There is no gate after you: once you sign off without asking again, the run files `land`, which merges
-the change into the base branch — on GitHub, this run's pull request; in this checkout, its branch — and nobody reads the change between your word and the merge. `again: true`
-is the only way back — it files implement again, on the same branch, with your findings — and you name no step: what comes after you is
-the workflow's, never yours.
+**Whether a person reads the change after you is your brief's to say**, under `## Gates after you`: the run names there each step
+after you at which it waits on a person's approval, and leaves the heading out where there is none. A person puts that gate back on a
+quick run with `--gate land` at its start, or `gate: land` on its card; this note was written before anyone chose.
+
+- **With no `## Gates after you`, your pass lands the change.** There is no gate after you: once you sign off without asking again,
+  the run files `land`, which merges the change into the base branch — on GitHub, this run's pull request; in this checkout, its
+  branch — and nobody reads the change between your word and the merge.
+- **With `land` named there, a person approves the land after your pass**, as on a build: your pass files `land`, and it waits for
+  their `nemia approve` before it merges anything. A card that says it waits on the person at its land is met by that gate: it is no
+  finding and no reason to sign off `blocked`. Judge and word your sign-off for the person who reads it there.
+
+In both, `again: true` is the only way back — it files implement again, on the same branch, with your findings — and you name no
+step: what comes after you is the workflow's, never yours.
 
 **A quick build has no size bound**: quick is for a card that needs no design, whatever its size, so read every file and every line
 of it — the implement step's check measured it and its `nemia size:` line is in your brief. A test trimmed, split off or left
@@ -73,11 +82,15 @@ green pull request makes the landing refuse rather than land. In this checkout, 
 way, it costs a retry and never a broken base. Once implement has merged the base, the diff your brief
 names shows the base's landings with the change: read the change alone with `git diff main-worktree/HEAD...HEAD`.
 
-**A claim on a page you cannot read stops the landing.** No design ran, so no step handed you a passage of any page outside the
-repository. Where the change rests on such a page — a claim of the card or of the implement step's `plan` — and your fence refuses it,
-nobody reads the change after you to check it: sign off `blocked`, with `needs` naming each claim and its page, and a person answers
-with `nemia retry <run> review --message "<what the page says>"`. A claim you could check, against the repository or a page your fence
-allows, is checked and is no reason to stop.
+**A claim on a page you cannot read waits for a person.** No design ran, so no step handed you a passage of any page outside the
+repository. Where the change rests on such a page — a claim of the card or of the implement step's `plan` — and your fence refuses it:
+
+- **With no `## Gates after you`, it stops the landing.** Nobody reads the change after you to check it: sign off `blocked`, with
+  `needs` naming each claim and its page, and a person answers with `nemia retry <run> review --message "<what the page says>"`.
+- **With `land` named there, it goes at the top of your sign-off**, each claim and its page, where the person who approves the land
+  reads it before anything merges: it is no reason to sign off `blocked`.
+
+A claim you could check, against the repository or a page your fence allows, is checked and is no reason to stop.
 
 **A change to this factory's definitions that the work needs** — an allow or a deny on a step, a line of a step's overlay — you
 propose, never name in your closeout for someone to write by hand: `nemia propose -f <file> -n <factory> --at run-end`, `<factory>`

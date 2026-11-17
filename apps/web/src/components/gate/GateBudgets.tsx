@@ -6,7 +6,7 @@
 import type { StepView } from '../../lib/runView';
 import type { Frozen } from '../../lib/frozen';
 import { budgetWord } from '../../lib/money';
-import { TextField } from '@/components/ui/ds';
+import { AmountField } from '../field/AmountField';
 
 /** The budgets a gated step proposed for the steps after it, or the caps its approval set, as the api says each. */
 export type GateBudgets = NonNullable<NonNullable<StepView['gate']>['budgets']>;
@@ -131,12 +131,10 @@ function BudgetRow({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium">{row.step}</span>{' '}
         {onTyped ? (
-          <TextField
+          <AmountField
             aria-label={`The budget of ${row.step}, in dollars`}
-            prefix="$"
-            inputMode="decimal"
-            value={typed ?? String(row.usd)}
-            onChange={(text) => onTyped(row.step, text)}
+            value={typed === undefined ? row.usd : typed.trim() === '' ? null : Number(typed)}
+            onAmount={(amount) => onTyped(row.step, amount === null ? '' : String(amount))}
             className="w-36"
             inputClassName="font-mono text-money"
           />

@@ -6,7 +6,6 @@ import {
   contextText,
   listOf,
   listUnsetWords,
-  numberOf,
   removeStep,
   setBody,
   setKey,
@@ -17,6 +16,7 @@ import {
 } from '../../lib/builder';
 import { Button, Checkbox, Select, SelectItem, TextField } from '@/components/ui/ds';
 import { Markdown } from '../markdown/Markdown';
+import { AmountField } from '../field/AmountField';
 import { AgentLayers, PolicyLayer } from './StepLayers';
 
 /** A change to the whole draft, made in one step so a key and what comes with it land together. */
@@ -265,13 +265,13 @@ function KeyInput({
     case 'count':
     case 'dollars':
       control = (
-        <Typed
+        <AmountField
           label={key}
-          type="number"
-          value={value === null ? '' : String(value)}
-          placeholder={given ?? undefined}
-          canon={(typed) => String(numberOf(typed) ?? '')}
-          commit={(typed) => set(key, numberOf(typed) as never)}
+          kind={kind}
+          value={value as number | null}
+          placeholder={given ?? 'not set'}
+          supportingText={value === null ? (given ?? 'not set') : undefined}
+          onAmount={(amount) => set(key, amount as never)}
         />
       );
       break;
@@ -381,7 +381,6 @@ function Typed({
   commit,
   canon,
   mono = false,
-  type = 'text',
   placeholder,
 }: {
   label: string;
@@ -389,14 +388,12 @@ function Typed({
   commit: (typed: string) => void;
   canon: (typed: string) => string;
   mono?: boolean;
-  type?: 'text' | 'number';
   placeholder?: string;
 }) {
   const [typed, setTyped] = useState(value);
   return (
     <TextField
       label={label}
-      inputMode={type === 'number' ? 'decimal' : undefined}
       value={canon(typed) === value ? typed : value}
       placeholder={placeholder ?? 'not set'}
       supportingText={value === '' ? (placeholder ?? 'not set') : undefined}

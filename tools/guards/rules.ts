@@ -34,7 +34,7 @@ export const RULES: readonly Group[] = [
   },
   { dir: 'packages/agent-runtime', loads: [], files: ['test/contract.test.ts'] },
   { dir: 'apps/api', loads: ['--import', './test/harness.ts'], files: ['test/harness.test.ts'] },
-  { dir: 'apps/web', loads: [], files: ['test/dead-exports.test.ts'] },
+  { dir: 'apps/web', loads: [], files: ['test/dead-exports.test.ts', 'test/structure.test.ts', 'test/runs-type.test.ts'] },
 ];
 
 /** What `group`'s tests said, and whether they passed. */

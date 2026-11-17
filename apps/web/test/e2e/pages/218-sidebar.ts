@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { notStarted } from '../../../src/lib/inbox.ts';
-import { type CardList, LIST_PAGE } from 'objects';
+import { type CardList, DEFAULT_NAMESPACE, LIST_PAGE } from 'objects';
 import { entriesOf } from '../../../src/lib/api/inbox.ts';
 import { openAnswered, pick, pickedIn, photograph, placeOf, railPlace, sectionsOf, sidebar, startOf, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
@@ -89,12 +89,17 @@ async function badgeColour(page: Page): Promise<void> {
 }
 
 /**
- * On a factory's list, another factory picked keeps the place under its path, every place of the pane leading under it and its lines its
+ * The default factory's pane counts the seed's runs waiting on you on its Runs badge. On a factory's list, another factory picked keeps the place under its path, every place of the pane leading under it and its lines its
  * own; on a run's page a factory picked opens its runs; Factories in the rail leads to the store's floor.
  */
 async function picks(page: Page): Promise<void> {
   await waitingIs(page, 'on the store');
   await badgeColour(page);
+  await visit(page, `/factories/${DEFAULT_NAMESPACE}/runs`);
+  await sidebar(page);
+  await linesAre(page, DEFAULT_NAMESPACE);
+  await settled(page);
+  await photograph(page, path.join(OUT, `sidebar-counts-${await themeOf(page)}.png`));
   await visit(page, `/factories/${FACTORY}/runs`);
   await sidebar(page);
   await linesAre(page, FACTORY);

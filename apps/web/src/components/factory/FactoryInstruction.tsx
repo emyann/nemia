@@ -1,10 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { TextField } from 'react-aria-components';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Button, TextField } from '@/components/ui/ds';
 import {
   clearInstruction,
   factoryInstructionQuery,
@@ -155,13 +151,14 @@ function StoreForm({ data, pending, onChange }: { data: Instruction; pending: bo
         if (draft.trim() && !unchanged) onChange({ kind: 'save', words: draft });
       }}
     >
-      <TextField value={draft} onChange={setDraft} className="flex flex-col gap-1.5">
-        <Label className="text-body-small">Words</Label>
-        <Textarea
-          placeholder="What Nemia is to know about this factory: what it is for, how its work goes, what to ask you before she acts."
-          className="min-h-40 leading-relaxed"
-        />
-      </TextField>
+      <TextField
+        label="Words"
+        value={draft}
+        onChange={setDraft}
+        multiline
+        placeholder="What Nemia is to know about this factory: what it is for, how its work goes, what to ask you before she acts."
+        inputClassName="min-h-40"
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" isDisabled={pending || !draft.trim() || unchanged}>
           {pending ? 'Writing…' : 'Save'}
@@ -171,7 +168,8 @@ function StoreForm({ data, pending, onChange }: { data: Instruction; pending: bo
             <span data-instruction-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
               Remove the words the store keeps?
               <Button
-                variant="destructive"
+                color="error"
+                size="xsmall"
                 isDisabled={pending}
                 onPress={() => {
                   setAsking(false);
@@ -180,12 +178,12 @@ function StoreForm({ data, pending, onChange }: { data: Instruction; pending: bo
               >
                 Clear
               </Button>
-              <Button variant="ghost" isDisabled={pending} onPress={() => setAsking(false)}>
+              <Button variant="text" size="xsmall" isDisabled={pending} onPress={() => setAsking(false)}>
                 Keep them
               </Button>
             </span>
           ) : (
-            <Button variant="outline" isDisabled={pending} onPress={() => setAsking(true)}>
+            <Button variant="outlined" isDisabled={pending} onPress={() => setAsking(true)}>
               Clear…
             </Button>
           ))}
@@ -203,33 +201,37 @@ function Place({ data, pending, onChange }: { data: Instruction; pending: boolea
   const asked = path.trim();
   const same = data.store ? asked === '' : asked === (data.path ?? '');
   return (
-    <div data-instruction-place className="flex flex-col gap-3 border-t pt-4">
+    <div data-instruction-place className="flex flex-col gap-3 border-t border-outline-variant pt-4">
       <p className="text-body-medium font-medium">Where it is kept</p>
       <div className="flex flex-wrap gap-2">
         {!data.store && (
-          <Button variant="outline" size="sm" isDisabled={pending} onPress={() => onChange({ kind: 'store' })}>
+          <Button variant="outlined" size="xsmall" isDisabled={pending} onPress={() => onChange({ kind: 'store' })}>
             Keep it in the store instead
           </Button>
         )}
         {(data.store || data.path !== null) && (
-          <Button variant="outline" size="sm" isDisabled={pending} onPress={() => onChange({ kind: 'reset' })}>
+          <Button variant="outlined" size="xsmall" isDisabled={pending} onPress={() => onChange({ kind: 'reset' })}>
             Back to NEMIA.md
           </Button>
         )}
       </div>
       <form
         aria-label="Read it from a file in the folder"
-        className="flex flex-wrap items-end gap-2"
+        className="flex flex-wrap items-center gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           if (!same) onChange(asked ? { kind: 'path', path: asked } : { kind: 'reset' });
         }}
       >
-        <TextField value={path} onChange={setPath} className="flex min-w-60 flex-1 flex-col gap-1.5">
-          <Label className="text-body-small">Or read it from a file in the factory's first folder, by its path from there</Label>
-          <Input placeholder="NEMIA.md" className="font-mono" />
-        </TextField>
-        <Button type="submit" variant="outline" size="sm" isDisabled={pending || same}>
+        <TextField
+          label="Or read it from a file in the factory's first folder, by its path from there"
+          value={path}
+          onChange={setPath}
+          placeholder="NEMIA.md"
+          inputClassName="font-mono"
+          className="min-w-60 flex-1"
+        />
+        <Button type="submit" variant="outlined" isDisabled={pending || same}>
           Read this file
         </Button>
       </form>

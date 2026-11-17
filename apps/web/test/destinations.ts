@@ -75,7 +75,6 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/components/ui/sidebar:SidebarProvider': FRAME_FOLD,
   '@/components/ui/sidebar:sidebarOpenOf': FRAME_FOLD,
   '@/components/ui/sidebar:useSidebar': FRAME_FOLD,
-  '@/components/ui/switch:Switch': kit('Switch'),
   '@/components/ui/tabs:Tabs': kit('Tabs'),
   '@/components/ui/tabs:TabsContent': kit('TabPanel'),
   '@/components/ui/tabs:TabsList': kit('TabList'),

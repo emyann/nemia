@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, startOf, themeOf, isRunStart } from '../board.ts';
+import { photograph, pickIn, startOf, themeOf, isRunStart } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, onSeveralRepos, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -71,7 +71,7 @@ async function severalRepos(page: Page, workflow: string, checkout: string, them
   try {
     let bar = await openStart(page);
     await expectCount(bar.getByRole('option', { name: 'Pick where it runs' }), 0, 'on two repositories, none is offered to pick');
-    await bar.getByLabel('Workflow').selectOption(workflow);
+    await pickIn(page, bar.locator('[data-pick-workflow]'), workflow);
     await expectVisible(
       bar.locator('[data-unwired="unwired"]', { hasText: `nemia factory attach ${factory} ${workflow} --repo <name>` }),
       `${workflow} unwired says the attach that names its repository`,
@@ -84,7 +84,7 @@ async function severalRepos(page: Page, workflow: string, checkout: string, them
     const read = JSON.parse(fs.readFileSync(file, 'utf8')) as object;
     fs.writeFileSync(file, JSON.stringify({ ...read, workflowRepos: { [workflow]: path.basename(checkout) } }, null, 2));
     bar = await openStart(page);
-    await bar.getByLabel('Workflow').selectOption(workflow);
+    await pickIn(page, bar.locator('[data-pick-workflow]'), workflow);
     await expectVisible(bar.locator('[data-repo]', { hasText: `On ${checkout}` }), `wired, ${workflow} says the repository it runs on`);
     await expectVisible(
       bar.locator(`form[aria-label="Start a run of ${workflow}"]`).or(bar.locator(`[data-workflow="repo:${workflow}"]`)),

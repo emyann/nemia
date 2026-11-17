@@ -507,7 +507,13 @@ const DECLARED = {
 test("a checked step, from its check's filing to `retries:` spent and the run waiting on you", async (t) => {
   const s = story(t);
   const b = stage.board();
-  const dir = implementThenReview(['output: implement.schema.json', 'check: npm test && npm run typecheck', 'retries: 1', 'memory: 4Gi']);
+  const dir = implementThenReview([
+    'output: implement.schema.json',
+    'check: npm test && npm run typecheck',
+    'retries: 1',
+    'memory: 4Gi',
+    'checkMemory: 64Mi',
+  ]);
   fs.writeFileSync(path.join(dir, 'implement.schema.json'), JSON.stringify(DECLARED));
   let run: RepositoryRun;
   const id = () => run.id;
@@ -554,7 +560,11 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
         'one attempt, as every task is: the runtime refuses a count or a policy',
       );
       assert.equal(spec.brief, 'npm test && npm run typecheck', 'the brief is the frozen check line, not the one planted since');
-      assert.equal('resources' in spec, false, "the step's `memory:` binds its session alone: its check takes the engine's default");
+      assert.deepEqual(
+        [spec.resources, spec.priority],
+        [{ requests: { memory: '64Mi' } }, 1],
+        "the check asks its step's `checkMemory:` alone, the step's `memory:` binding its session alone, at a step's momentum",
+      );
       assert.deepEqual(spec.config, {
         command: ['sh', '-c', 'npm test && npm run typecheck'],
         env: {
@@ -801,6 +811,7 @@ test('a check that ended stopped spends no retry, and `nemia retry --recheck` ru
     assert.deepEqual([pass.tried, pass.checked, pass.filed], [['implement'], ['implement'], []]);
     assert.deepEqual(b.filings, [`${run.id}-implement`, check1(), check2()], 'a check, and no step');
     assert.equal(b.tasks.get(check2())!.spec.harness, 'check');
+    assert.equal('resources' in b.tasks.get(check2())!.spec, false, 'a step with no `checkMemory:` files its check under the defaults');
     const rechecked = [{ taskId: `${run.id}-implement`, check: { taskId: check1(), tip: filedOn(run) }, cause: 'recheck' }];
     assert.deepEqual(filedAs(runRecord(ROOT, run.id).steps.implement), {
       taskId: `${run.id}-implement`,

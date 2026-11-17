@@ -3,7 +3,7 @@ kind: FactoryTemplate
 metadata:
   name: sdlc
 spec:
-  version: 4.5.0
+  version: 4.6.0
   rules:
     path: RULES.md
   parameters:
@@ -30,6 +30,10 @@ spec:
     landingDerives:
       type: string
       description: "The paths landingRefresh derives, apart by spaces, each a git glob from the repository's root (a * matches no /): the only paths where the landed commit may differ from git's plain merge of the reviewed head and the base, and the only files where the review lets a conflict with the base go, since the landing derives them again. Read only where github is true. It is written inside a double-quoted shell word, so it holds no quote, no $ and no backtick. Empty (the default) names none."
+      default: ""
+    landingCheckMemory:
+      type: string
+      description: "The memory the land step's check asks of the machine, a Kubernetes quantity such as 256Mi, by which the daemon admits it while the check holds the repository's checkout: set it where github is true, where the check only waits on GitHub and needs little. The check keeps the daemon's default limit. Empty (the default) asks the daemon's default request, which a check that runs localCheck on the merged tree needs."
       default: ""
     roundCheck:
       type: string

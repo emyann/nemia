@@ -569,5 +569,6 @@ test('CutFrame given a ground and no glow, and StepGraph naming its steps', asyn
     }));
     assert.deepEqual(boxes.map((box) => box.name).sort(), steps.map((step) => step.name).sort(), 'each step is named once');
     assert.equal(new Set(boxes.map((box) => box.at)).size, boxes.length, `no two names share a box: ${JSON.stringify(boxes)}`);
+    assert.match(html, /data-named="land"(?:(?!data-named).)*>–<\/span>/s, 'a step with nothing read yet says – for its time and cost');
   });
 });

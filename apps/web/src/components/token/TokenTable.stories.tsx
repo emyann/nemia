@@ -8,7 +8,7 @@ import { saysReading } from '../../../.storybook/unread';
 /** The store's standing tokens: the person's laptop, store-wide, and an agent's, bound to a factory and narrowed. */
 const TOKENS: Token[] = [
   { name: 'laptop', holder: 'person', createdAt: '2026-11-02T09:14:00.000Z' },
-  { name: 'grace', holder: 'agent', agent: 'Grace', factory: 'nemia', narrowed: 'read', createdAt: '2026-11-12T16:40:00.000Z' },
+  { name: 'scribe', holder: 'agent', agent: 'Scribe', factory: 'nemia', narrowed: 'read', createdAt: '2026-11-12T16:40:00.000Z' },
 ];
 
 /** The tokens on Settings, one story a state: listed, and a Retire asked before it is sent. */
@@ -41,7 +41,7 @@ export const Asking: Story = {
     await userEvent.click(canvasElement.querySelector<HTMLElement>('[data-token-retire="laptop"]')!);
     await expect(canvasElement.querySelector('[data-token-confirm="laptop"]')).not.toBeNull();
     await expect(table.getByRole('button', { name: 'Cancel' })).toBeVisible();
-    await expect(canvasElement.querySelector('[data-token-retire="grace"]')).toHaveAttribute('data-disabled');
+    await expect(canvasElement.querySelector('[data-token-retire="scribe"]')).toHaveAttribute('data-disabled');
     atRest();
   },
 };

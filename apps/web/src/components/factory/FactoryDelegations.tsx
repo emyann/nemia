@@ -269,6 +269,8 @@ function GrantFields({
 /**
  * Why the agent typed is refused: it names none of the factory's `agents`, once they are read; undefined where it names one, or the field
  * is blank, or they are still out.
+ * @param typed What the agent's field holds.
+ * @param agents The factory's agents, undefined while their read is out.
  */
 export const agentRefusal = (typed: string, agents: readonly DelegableAgent[] | undefined): string | undefined => {
   const name = typed.trim();

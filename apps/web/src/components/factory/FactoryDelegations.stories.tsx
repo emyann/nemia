@@ -9,10 +9,10 @@ import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** The agents the factory serves, as its agents page names them: three with a role, and one whose file says none. */
 const AGENTS: readonly DelegableAgent[] = [
-  { name: 'agora', role: 'code reviewer' },
-  { name: 'argus', role: null },
-  { name: 'grace', role: 'lead software engineer' },
-  { name: 'seldon', role: 'software architect' },
+  { name: 'critic', role: 'code reviewer' },
+  { name: 'keeper', role: null },
+  { name: 'planner', role: 'plans the work' },
+  { name: 'scribe', role: 'writes the notes' },
 ];
 
 /** `children` over a query client that holds the factory's agents and no delegation, asking the network nothing. */
@@ -66,16 +66,16 @@ export const Picked: Story = {
     await userEvent.click(canvasElement.querySelector<HTMLElement>('[data-delegation-agent] [data-slot="combo-box-trigger"]')!);
     const listed = await body.findAllByRole('option');
     await expect(listed.map((o) => o.textContent)).toEqual([
-      'Agoracode reviewer · agora',
-      'ArgusNo role yet · argus',
-      'Gracelead software engineer · grace',
-      'Seldonsoftware architect · seldon',
+      'Criticcode reviewer · critic',
+      'KeeperNo role yet · keeper',
+      'Plannerplans the work · planner',
+      'Scribewrites the notes · scribe',
     ]);
     await userEvent.click(field);
-    await userEvent.type(field, 'se');
-    await waitFor(() => expect(body.getAllByRole('option').map((o) => o.textContent)).toEqual(['Seldonsoftware architect · seldon']));
-    await userEvent.click(body.getByRole('option', { name: /Seldon/ }));
-    await expect(field).toHaveValue('seldon');
+    await userEvent.type(field, 'sc');
+    await waitFor(() => expect(body.getAllByRole('option').map((o) => o.textContent)).toEqual(['Scribewrites the notes · scribe']));
+    await userEvent.click(body.getByRole('option', { name: /Scribe/ }));
+    await expect(field).toHaveValue('scribe');
     await expect(field).not.toHaveAttribute('aria-invalid');
   },
 };

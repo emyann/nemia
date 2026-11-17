@@ -9,6 +9,7 @@ import { usePickerRuns } from '../../lib/pickerRuns.ts';
 import { Refusal } from '../gate/Ask';
 import { ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
+import { sayWritten } from '@/lib/written';
 import { Reading } from '@/components/look';
 import { Body, Button, Checkbox, CheckboxGroup, Skeleton, TextField, Title } from '@/components/ui/ds';
 
@@ -49,7 +50,7 @@ export function HoldQuestion({ run, onClose }: { run: Pick<RunView, 'id' | 'repo
 
 /**
  * The runs to wait on, ticked, the why, and Hold. The run is read again once held, its record and the list each alone (`exact`), as a lift
- * reads them, and the popover closes; a refusal stays in the form until something is changed.
+ * reads them, and the popover closes as the frame's snackbar says it is held; a refusal stays in the form until something is changed.
  */
 function HoldForm({ id, runs, older, onClose }: { id: string; runs: RunView[]; older: (() => void) | null; onClose: () => void }) {
   const [until, setUntil] = useState<string[]>([]);
@@ -60,6 +61,7 @@ function HoldForm({ id, runs, older, onClose }: { id: string; runs: RunView[]; o
     mutationFn: () => namespaceNow().then((ns) => putHold(ns, id, until, why)),
     onSuccess: async () => {
       onClose();
+      sayWritten('held', id);
       await runsMoved(queryClient, id);
     },
   });

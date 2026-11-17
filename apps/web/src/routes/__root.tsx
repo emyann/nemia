@@ -17,6 +17,7 @@ import { LinkRefusal } from '@/components/frame/LinkRefusal';
 import { NewerRelease } from '@/components/frame/NewerRelease';
 import { SetupBanner } from '@/components/frame/SetupBanner';
 import { ViewerSheet } from '@/components/view/ViewerSheet';
+import { SnackbarRegion } from '@/components/ui/ds';
 import { barSearch } from '@/lib/bar';
 import { trySearch } from '@/lib/tryAddress';
 import { viewSearch } from '@/lib/viewAddress';
@@ -65,7 +66,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
  * while its stream is open, and the gauges say which. Her chat is held over the whole frame too (`NemiaChatProvider`), one stream of
  * hers for the visit, which the sheet and the chat page both read, so neither a navigation nor a bar taking the sheet closes it or opens
  * another. Over the page, the viewer's sheet shows the step's file the address's `?view=` names (`ViewerSheet`), its own place, which
- * Back closes. The devtools of a dev build sit over the machine bar's left end. React Aria's `RouterProvider` sends every React Aria
+ * Back closes. Over the machine bar, the frame's one host of the kit's snackbar (`SnackbarRegion`), where a write whose thing leaves the
+ * page says so (`sayWritten`), so a snackbar outlives the page that wrote it. The devtools of a dev build sit over the machine bar's left end. React Aria's `RouterProvider` sends every React Aria
  * link, pressed with Enter or clicked, through the router, so no link loads the whole page again.
  */
 function Root() {
@@ -112,6 +114,7 @@ function Root() {
               </div>
               <MachineBar path={path} feed={feed} />
               <ViewerSheet />
+              <SnackbarRegion className="bottom-[calc(var(--frame-foot)+1rem)]" />
             </div>
           </FramePaneProvider>
         </HerSheetProvider>

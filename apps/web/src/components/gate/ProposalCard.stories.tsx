@@ -1,11 +1,14 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
+import { http, HttpResponse } from 'msw';
+import { SnackbarRegion } from '@/components/ui/ds';
 import type { Proposal } from 'objects';
 import { proposalQuery } from '@/lib/api/proposals';
 import { ProposalCard } from './ProposalCard';
 import { FACTORY, proposal, seeded } from '../../../.storybook/fixtures/proposals';
 import { saysReading, Unread } from '../../../.storybook/unread';
+import { snackbarShown } from '../../../.storybook/play';
 
 /** The card of `p`, read from a query client that holds it as its own read. */
 const drawn = (p: Proposal) => (
@@ -18,7 +21,8 @@ const drawn = (p: Proposal) => (
 
 /**
  * A factory's proposal as its page and her chat draw it, one story a phase: waiting with Approve and Decline, waiting and widening
- * access with its mark, approved with Decline alone, and declined, offering nothing. A judgement reads the factory's proposals again,
+ * access with its mark, approved with Decline alone, and declined, offering nothing; and a decline pressed, which the frame's
+ * snackbar names. A judgement reads the factory's proposals again,
  * those that wait among them.
  */
 const meta: Meta<typeof ProposalCard> = {
@@ -81,4 +85,27 @@ export const Reading: Story = {
     </Unread>
   ),
   play: saysReading('Reading the proposal…'),
+};
+
+/** Waiting, then Decline pressed: the card reads declined, and the snackbar the frame hosts names the proposal declined. */
+export const DeclinePressed: Story = {
+  args: { name: 'nemia-p2d4x' },
+  parameters: {
+    msw: [
+      http.post('/api/namespaces/:namespace/proposals/:name/decline', ({ params }) =>
+        HttpResponse.json(proposal(String(params.name), 'declined')),
+      ),
+    ],
+  },
+  render: (args) => (
+    <>
+      {drawn(proposal(args.name, 'waiting'))}
+      <SnackbarRegion />
+    </>
+  ),
+  play: async ({ canvasElement, args }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Decline' }));
+    await expect(await snackbarShown(canvasElement.ownerDocument.body)).toHaveTextContent(args.name);
+    await expect(canvasElement.querySelector('[data-proposal-phase="declined"]')).not.toBeNull();
+  },
 };

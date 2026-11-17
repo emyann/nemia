@@ -8,6 +8,7 @@ import { awaitingOf, firstChoice, pruneOffer, pruneQuestion, type PruneChoice, t
 import { cn } from '../../lib/utils';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
+import { sayWritten } from '@/lib/written';
 import { Reading, ReadingLines } from '@/components/look';
 import { Button, Radio, RadioGroup, Skeleton, Title } from '@/components/ui/ds';
 import { CHOICE } from '@/lib/classes';
@@ -53,7 +54,7 @@ export function PruneQuestion({ run, onClose }: { run: PruneAsked; onClose: () =
 
 /**
  * The choice and the two presses. The run is read again once pruned, its record and the list each alone (`exact`), as an approval reads
- * them; the popover closes, unless the CLI's `prune` kept something it could not remove, which its lines then say.
+ * them; the popover closes as the frame's snackbar says it is pruned, unless the CLI's `prune` kept something it could not remove, which its lines then say.
  */
 function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onClose: () => void }) {
   const [key, setKey] = useState<PruneChoice['key']>(firstChoice(offer).key);
@@ -64,7 +65,10 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
     mutationFn: () => runNamespace(queryClient, id).then((ns) => pruneRun(ns, id, choice.how)),
     onSuccess: async (done) => {
       setAsking(false);
-      if (done.left === 0) onClose();
+      if (done.left === 0) {
+        onClose();
+        sayWritten('pruned', id);
+      }
       await runsMoved(queryClient, id);
     },
   });

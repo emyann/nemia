@@ -101,3 +101,14 @@ export async function menuKey(user: { keyboard: (keys: string) => Promise<unknow
   await user.keyboard('{Shift>}{F10}{/Shift}');
   element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: -1 }));
 }
+
+/**
+ * The snackbar the kit's region shows once it comes: what a story's write said as its thing left the page.
+ * @param body The document's body, where the region stands.
+ */
+export const snackbarShown = (body: HTMLElement): Promise<HTMLElement> =>
+  waitFor(() => {
+    const shown = body.querySelector<HTMLElement>('[data-slot="snackbar"]');
+    if (!shown) throw new Error('no snackbar is shown');
+    return shown;
+  });

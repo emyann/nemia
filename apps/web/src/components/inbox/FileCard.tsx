@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { factoriesQuery, type Factory } from '../../lib/api/factories.ts';
 import { fileCard } from '../../lib/api/inbox.ts';
 import { storeQuery } from '../../lib/api/store.ts';
@@ -13,12 +13,13 @@ import { keptBy, startRepo } from '../../lib/factories';
 import { cardFiling, factoriesOffered, factoryPreset } from '../../lib/inbox';
 import { Button, Select, SelectItem, TextField } from '@/components/ui/ds';
 import { Reading, ReadingLines } from '@/components/look';
+import { sayWritten } from '@/lib/written';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
 /**
  * The box: the idea, the Factory list (`FactoryField`) and, under a factory, the workflow it runs and the repository the factory gives it
- * (`InFactory`); File; then the api's refusal in full, with the idea kept to send again, or a note for a card filed where the page's
+ * (`InFactory`); File; once filed, the frame's snackbar names the card and offers Open, to its page; then the api's refusal in full, with the idea kept to send again, or a note for a card filed where the page's
  * filter hides it (`Hidden`).
  *
  * `shown` is the factory the address names, which the list starts on when it is offered (`factoryPreset`), until a person picks. Picking
@@ -27,6 +28,7 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
  */
 export function FileCard({ shown }: { shown: string | undefined }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const factories = useQuery(factoriesQuery);
   const offered = factoriesOffered(factories.data ?? []);
   const [idea, setIdea] = useState('');
@@ -42,6 +44,7 @@ export function FileCard({ shown }: { shown: string | undefined }) {
       setIdea('');
       setWorkflow('');
       setFiled({ name, factory: factory?.name ?? null });
+      sayWritten('filed', name, () => void navigate({ to: '/inbox/$name', params: { name } }));
       void queryClient.invalidateQueries({ queryKey: ['inbox'] });
     },
   });

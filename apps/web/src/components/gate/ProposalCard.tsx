@@ -3,7 +3,7 @@
  * copy. Its phase in the person's words (`PROPOSAL_WORDS`), a *Widens access* mark where the machinery says it widens, each object it
  * changes (resource, name, verb, and what it does to access), why, who proposed it and who approved it, the machinery's message as it
  * comes, and Approve and Decline wherever the api takes them (`proposalOffers`). The board sends no session token, so a click is the
- * person's: the answer is set as the proposal's own read, and the factory's list is read again.
+ * person's: the answer is set as the proposal's own read, and the factory's list is read again; a decline, which takes the proposal out of what waits, is said in the frame's snackbar.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AccessChange, ChangeVerb, Proposal, ProposalChange, ProposalPhase } from 'objects';
@@ -16,6 +16,7 @@ import { readGone } from '@/lib/api/gone';
 import { ink } from '@/lib/meaning';
 import { proposalOffers, widensHue, type ProposalOffers } from '@/lib/proposals';
 import { cn } from '@/lib/utils';
+import { sayWritten } from '@/lib/written';
 import { ProposalTags } from './ProposalTags';
 import { Reading, ReadingLines } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
@@ -39,8 +40,9 @@ export function ProposalCard({ factory, name }: { factory: string; name: string 
   const { data: proposal, error } = useQuery(proposalQuery(factory, name));
   const judge = useMutation({
     mutationFn: (asked: Judgement) => (asked === 'approve' ? approveProposal(factory, name) : declineProposal(factory, name)),
-    onSuccess: (now) => {
+    onSuccess: (now, asked) => {
       queryClient.setQueryData(proposalKey(factory, name), now);
+      if (asked === 'decline') sayWritten('declined', name);
       void queryClient.invalidateQueries({ queryKey: proposalsKey(factory) });
     },
   });

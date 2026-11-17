@@ -12,7 +12,7 @@ import { FACTORY, seeded } from '../../../.storybook/fixtures/proposals';
 const REVIEW: StepRead = {
   workflow: 'build',
   from: 'repo',
-  dir: '/src/nemia/workflows/build',
+  dir: '/src/shop/flows/build',
   step: 'review',
   body: 'Read the change against its plan, and pass it or ask for another round.',
   source: '---\nagent: reviewer\n---\nRead the change against its plan, and pass it or ask for another round.\n',

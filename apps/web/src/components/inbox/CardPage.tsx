@@ -73,9 +73,7 @@ export function CardPage({ name }: { name: string }) {
 }
 
 /**
- * Where a card's page is: its factory where the page sits under one, the Inbox, and the card.
- *
- * @param name the card's name
+ * Where a card's page is: its factory where the page sits under one, the Inbox, and the card, by its `name`.
  */
 export function CardTrail({ name }: { name: string }) {
   const factory = seatFactory(useSeat());

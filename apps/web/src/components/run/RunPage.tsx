@@ -84,11 +84,8 @@ function Run({ run }: { run: RunDetail }) {
 }
 
 /**
- * Where a run's page, or one of its steps', is: its factory where the page sits under one, the runs, the run, and the step.
- *
- * @param runId the run's id
- * @param name what the run is called, its id while it is still read or where it is gone
- * @param step the step whose page this is, none on the run's own
+ * Where a run's page, or one of its steps', is: its factory where the page sits under one, the runs, the run `runId` by its `name` (its
+ * id while it is still read, or where it is gone), and the `step` whose page this is, none on the run's own.
  */
 export function RunTrail({ runId, name = runId, step }: { runId: string; name?: string; step?: string }) {
   const factory = seatFactory(useSeat());

@@ -15,9 +15,7 @@ type TrailLevel = { readonly name: string; readonly to?: TrailTo };
 /**
  * Where a deep page is, in its head: the kit's `Breadcrumbs`, a level a link to its page, from the factory down to the page itself, which
  * is the last and no link. Each level's address is built by the router from its route (`buildLocation`), and the root's `RouterProvider`
- * navigates it, for a click and for Enter alike.
- *
- * @param levels the levels, the factory's first and the page's own last
+ * navigates it, for a click and for Enter alike. Its `levels` run from the factory's first to the page's own last.
  */
 export function Trail({ levels }: { levels: readonly TrailLevel[] }) {
   const router = useRouter();

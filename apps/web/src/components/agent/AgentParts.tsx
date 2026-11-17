@@ -405,12 +405,9 @@ export function GivenSkills({
 }
 
 /**
- * Where an agent's page or a skill's is, in the place it is read in: its factory where it names one, the list of its kind there (the
- * factory's Agents or Skills, else the store's Agents, at its skills for a skill), and the page itself.
- *
- * @param kind whether the page is an agent's or a skill's
- * @param name the page's own name: the definition's, or what a new one's page is called
- * @param place the factory and the repository the page is read in
+ * Where an agent's page or a skill's (`kind`) is, in `place`, the factory and the repository it is read in: its factory where it names
+ * one, the list of its kind there (the factory's Agents or Skills, else the store's Agents, at its skills for a skill), and the page
+ * itself, by its `name`: the definition's, or what a new one's page is called.
  */
 export function DefinitionTrail({ kind, name, place }: { kind: 'agent' | 'skill'; name: string; place: PagePlace }) {
   const factory = place.factory;

@@ -356,13 +356,8 @@ function NotListed({ from, name }: { from: string; name: string }) {
 }
 
 /**
- * Where a workflow's page, or one of its steps', is, in the place it is read in: its factory where it names one, the Workflows list, the
- * workflow, and the step.
- *
- * @param from where the workflow is read from
- * @param workflow the workflow's name
- * @param place the factory and the repository the page is read in
- * @param step the step whose page this is, none on the workflow's own
+ * Where a workflow's page, or one of its steps', is, in `place`, the factory and the repository it is read in: its factory where it
+ * names one, the Workflows list, the `workflow` read from `from`, and the `step` whose page this is, none on the workflow's own.
  */
 export function WorkflowTrail({ from, workflow, place, step }: { from: string; workflow: string; place: PagePlace; step?: string }) {
   return (

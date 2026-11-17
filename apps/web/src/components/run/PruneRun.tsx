@@ -9,6 +9,7 @@ import type { RunDetail } from '../../lib/runView';
 import { decidableRun, decisionStamp } from '../../lib/decide';
 import { awaitingOf, firstChoice, prunable, pruneOffer, pruneQuestion, type PruneChoice, type PruneOffer } from '../../lib/prune.ts';
 import { cn } from '../../lib/utils';
+import { focusRing } from '@/components/ui/ds/utils';
 import { DOT, RADIO } from '../agent/AgentForm';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
@@ -118,7 +119,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
             value={c.key}
             isDisabled={c.unavailable !== null}
             data-prune-choice={c.key}
-            className={cn(RADIO, 'data-disabled:opacity-60')}
+            className={({ isFocusVisible }) => cn(RADIO, focusRing(), isFocusVisible && 'outline-solid', 'data-disabled:opacity-60')}
           >
             <span aria-hidden className={DOT} />
             <span className="space-y-0.5">

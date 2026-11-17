@@ -30,7 +30,7 @@ function WhyField({ why, setWhy }: { why: string; setWhy: (why: string) => void 
 
 /**
  * Cancel, which puts nothing (`onClose`), and the form's submit, `label`; both off while the api is asked (`isPending`, the submit drawing
- * the kit's small ProgressIndicator then), and the submit off while `held`.
+ * the kit's small ProgressIndicator then) or while what the form says is still read (`held`).
  */
 function FormActions({
   label,
@@ -45,7 +45,7 @@ function FormActions({
 }) {
   return (
     <div className="flex justify-end gap-2">
-      <Button type="button" variant="outlined" size="xsmall" onPress={onClose} isDisabled={isPending}>
+      <Button type="button" variant="outlined" size="xsmall" onPress={onClose} isDisabled={isPending || held}>
         Cancel
       </Button>
       <Button type="submit" size="xsmall" icon={isPending ? Pending : undefined} isDisabled={isPending || held}>

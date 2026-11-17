@@ -39,7 +39,7 @@ async function openStart(page: Page): Promise<Locator> {
 
 /** Picks `workflow` in the bar, and the start it offers. */
 async function pickWorkflow(bar: Locator, workflow: string): Promise<Locator> {
-  await bar.locator(`[data-workflow="repo:${workflow}"] label`).click();
+  await bar.locator(`[data-workflow="repo:${workflow}"]`).click();
   const form = bar.locator(`form[aria-label="Start a run of ${workflow}"]`);
   await expectVisible(form, `picked, ${workflow} offers its start`);
   return form;

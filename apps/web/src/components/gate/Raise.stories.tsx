@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { delay, http, HttpResponse } from 'msw';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import type { Answer } from '@/lib/asks';
+import { OFFERS } from '@/lib/words';
 import { TARGET_RUNS } from '../../../.storybook/fixtures/runs';
 import { RaiseRow } from './Raise';
 
@@ -66,7 +67,7 @@ export const Over: Story = {
   },
 };
 
-/** A loop's round past its cap: the box, and Raise the budget and go round again. */
+/** A loop's round past its cap: the box, and the button that raises it with the loop's next round. */
 export const Round: Story = {
   args: {
     offer: {
@@ -82,6 +83,6 @@ export const Round: Story = {
   },
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByRole('textbox', { name: 'The cap to raise review to, in dollars' })).toHaveValue('$3.00');
-    await expect(within(canvasElement).getByRole('button', { name: 'Raise the budget and go round again' })).toBeEnabled();
+    await expect(within(canvasElement).getByRole('button', { name: OFFERS.raise.buttons.round })).toBeEnabled();
   },
 };

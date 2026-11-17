@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { DEFAULT_NAMESPACE } from 'objects';
 import { expect, userEvent, within } from 'storybook/test';
 import { factoryView, FACTORY } from '../../../.storybook/fixtures/proposals';
 import { atRest } from '../../../.storybook/play';
@@ -38,7 +39,7 @@ export const Lines: Story = {
 
 /** The default factory: it keeps no file, so it sets no line, and says so. */
 export const DefaultFactory: Story = {
-  args: { factory: factoryView('default', true) },
+  args: { factory: factoryView(DEFAULT_NAMESPACE, true) },
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-no-cost-lines]')).not.toBeNull();
     await expect(within(canvasElement).queryByRole('textbox')).toBeNull();
@@ -49,6 +50,7 @@ export const DefaultFactory: Story = {
 export const NoWorkflow: Story = {
   args: { factory: { ...factoryView(FACTORY), workflows: [] } },
   play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByText(/nemia factory attach nemia/)).toBeVisible();
+    const { attach } = factoryView(FACTORY).commands;
+    await expect(within(canvasElement).getByText(attach)).toBeVisible();
   },
 };

@@ -42,18 +42,18 @@ const REVIEW: StepRead = {
   recentRuns: [],
 };
 
-/** Where the page is read: the stories' factory, on the repository its workflow is from. */
+/** Where the page is read: the stories' factory, on the repository it names. */
 const PLACE = { factory: FACTORY };
 
 /**
  * A workflow's step, read in a factory: its trail in its head (the factory, its workflows, the workflow and the step), its agent, what a
- * run of it will be told, and its file. Its reads are seeded under the keys the page asks them by (`stepQuery`, and `storeQuery` for your workflows' folder), so it asks the
- * network nothing.
+ * run of it will be told, and its file. Its reads are seeded under the keys the page asks them by (`stepQuery`, and `storeQuery` for
+ * your workflows' folder), so it asks the network nothing.
  *
- * Axe's `label-content-name-mismatch` alone is off, for the hire's picker (`StepHire`): the ds kit's `Select` draws its value before its
- * floating label inside its trigger, while React Aria names the trigger label first, so a populated kit select fails it wherever it is
- * drawn. That is the kit's to mend, upstream. `heading-order` is off too: what a run will be told (`Told`) heads each layer `h4`, as
- * the run's bar nests it, and this page draws it under its `h1` with nothing between, a debt of the page's own that this story found.
+ * Two of axe's rules are off. `label-content-name-mismatch`, for the hire's picker (`StepHire`): the ds kit's `Select` draws its
+ * value before its floating label inside its trigger, while React Aria names the trigger label first, so a populated kit select fails it
+ * wherever it is drawn, which is the kit's to mend, upstream. And `heading-order`: what a run will be told (`Told`) heads each layer
+ * `h4`, as the run's bar nests it, and this page draws it under its `h1` with nothing between, a debt of the page's own this story found.
  * Every other rule holds the page.
  */
 const meta: Meta<typeof WorkflowStepPage> = {

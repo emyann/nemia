@@ -1,10 +1,9 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
 import { Skills } from '../agent/AgentParts';
+import { WorkflowTrail } from './WorkflowPage';
 import { StepHire } from '../step/StepHire';
 import { RecentRuns, StepAgent, StepTold, StepWritten } from '../step/StepParts';
 import { stepQuery, type PagePlace } from '@/lib/api/workflows';
-import { workflowLink } from '@/lib/factoryAddress';
 import { fromWord } from '@/lib/factories';
 import { container } from '@/lib/meaning';
 
@@ -19,7 +18,7 @@ export function WorkflowStepPage({ from, workflow, step, place }: { from: string
 
   return (
     <article className="space-y-6">
-      <BackToWorkflow from={from} workflow={workflow} place={place} />
+      <WorkflowTrail from={from} workflow={workflow} step={step} place={place} />
 
       <header className="space-y-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -46,16 +45,5 @@ export function WorkflowStepPage({ from, workflow, step, place }: { from: string
 
       <StepWritten page={page} />
     </article>
-  );
-}
-
-/**
- * Back to the page of the step's workflow, in the place this page is read in.
- */
-export function BackToWorkflow({ from, workflow, place }: { from: string; workflow: string; place: PagePlace }) {
-  return (
-    <Link {...workflowLink(place, from, workflow)} className="font-mono text-body-medium text-muted-foreground hover:text-foreground">
-      ← {workflow}
-    </Link>
   );
 }

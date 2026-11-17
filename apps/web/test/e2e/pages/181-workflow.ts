@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { cancelledAt, nextVisit, photograph, themeOf, isRunStart } from '../board.ts';
+import { cancelledAt, nextVisit, photograph, themeOf, isRunStart, trailLevel } from '../board.ts';
 import { expectCount, expectInside, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { checkoutIn, DIAMOND, DIAMOND_RUNS, FACTORIES, FAKE, REVIEWER, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -231,11 +231,11 @@ export default {
           .click();
         await again.waitForURL(`**${AT}/workflows/repo/${good.name}/review`, { timeout: WAIT_MS });
         await expectVisible(again.locator('h1', { hasText: /^review$/ }), "a step's row opens the step's page");
-        await again.getByRole('link', { name: `← ${good.name}` }).click();
+        await trailLevel(again, good.name).click();
         await again.waitForURL((url) => url.pathname === `${AT}/workflows/repo/${good.name}`, { timeout: WAIT_MS });
         await idle(again);
         const block = again.locator('.react-flow__node[data-id="implement"]');
-        await expectVisible(block, "the step's page leads back to its workflow's, and its graph");
+        await expectVisible(block, "the step's trail leads up to its workflow's page, and its graph");
         await block.dblclick();
         await again.waitForURL(`**${AT}/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
         await expectVisible(

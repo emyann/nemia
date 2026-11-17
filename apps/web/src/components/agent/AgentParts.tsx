@@ -7,7 +7,9 @@ import { type AgentFill, type AgentListing, type AgentUser } from '../../lib/api
 import { type PagePlace } from '../../lib/api/workflows.ts';
 import { costWords, SOURCE_BADGES } from '../../lib/skills';
 import { cn } from '../../lib/utils';
+import { linkOptions } from '@tanstack/react-router';
 import { routeLink } from '../nav/routeLink';
+import { factoryLevel, Trail } from '../nav/Trail';
 import { usePagePlace } from '../nav/useSeat';
 import { definitionLink, workflowLink } from '../../lib/factoryAddress';
 import { container, hairline } from '../../lib/meaning';
@@ -402,11 +404,18 @@ export function GivenSkills({
   );
 }
 
-/** The way back to the Agents page. */
-export function BackToAgents() {
-  return (
-    <RouteLink to="/agents" underline="hover" className="text-body-medium text-muted-foreground hover:text-foreground">
-      ← Agents
-    </RouteLink>
-  );
+/**
+ * Where an agent's page or a skill's (`kind`) is, in `place`, the factory and the repository it is read in: its factory where it names
+ * one, the list of its kind there (the factory's Agents or Skills, else the store's Agents, at its skills for a skill), and the page
+ * itself, by its `name`: the definition's, or what a new one's page is called.
+ */
+export function DefinitionTrail({ kind, name, place }: { kind: 'agent' | 'skill'; name: string; place: PagePlace }) {
+  const factory = place.factory;
+  const list =
+    factory === undefined
+      ? { name: kind === 'agent' ? 'Agents' : 'Skills', to: linkOptions({ to: '/agents', ...(kind === 'skill' && { hash: 'skills' }) }) }
+      : kind === 'agent'
+        ? { name: 'Agents', to: linkOptions({ to: '/factories/$factory/agents', params: { factory } }) }
+        : { name: 'Skills', to: linkOptions({ to: '/factories/$factory/skills', params: { factory } }) };
+  return <Trail levels={[...factoryLevel(factory), list, { name }]} />;
 }

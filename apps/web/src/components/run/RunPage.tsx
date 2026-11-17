@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import { RunGone } from './RunGone';
 import { AsksOfYou } from './AsksOfYou';
 import { RunHeader } from './RunHeader';
@@ -9,6 +8,8 @@ import { Receipts } from './Receipts';
 import { KindsBehind } from './KindsBehind';
 import { readGone } from '@/lib/api/gone';
 import { useRunView, type RunDetail } from '@/lib/runView';
+import { titleOf } from '@/lib/factory';
+import { factoryLevel, runLevel, runsLevel, Trail } from '../nav/Trail';
 import { seatFactory } from '../nav/nav';
 import { useSeat } from '../nav/useSeat';
 
@@ -20,7 +21,7 @@ export function RunPage({ runId, gone }: { runId: string; gone: boolean }) {
   if (gone) {
     return (
       <div className="space-y-3">
-        <BackToRuns />
+        <RunTrail runId={runId} />
         <RunGone id={runId} />
       </div>
     );
@@ -37,7 +38,7 @@ function RunRead({ runId }: { runId: string }) {
   if (readGone(error)) {
     return (
       <div className="space-y-3">
-        <BackToRuns />
+        <RunTrail runId={runId} name={titleOf(run)} />
         <RunGone run={run} />
       </div>
     );
@@ -55,7 +56,7 @@ function RunRead({ runId }: { runId: string }) {
 function Run({ run }: { run: RunDetail }) {
   return (
     <article className="space-y-6">
-      <BackToRuns />
+      <RunTrail runId={run.id} name={titleOf(run)} />
 
       <AsksOfYou run={run} />
 
@@ -82,17 +83,20 @@ function Run({ run }: { run: RunDetail }) {
   );
 }
 
-/** The way back to the runs: the factory's, on a page under its path, else every factory's. */
-export function BackToRuns() {
+/**
+ * Where a run's page, or one of its steps', is: its factory where the page sits under one, the runs, the run `runId` by its `name` (its
+ * id while it is still read, or where it is gone), and the `step` whose page this is, none on the run's own.
+ */
+export function RunTrail({ runId, name = runId, step }: { runId: string; name?: string; step?: string }) {
   const factory = seatFactory(useSeat());
-  const className = 'text-body-medium text-muted-foreground hover:text-foreground';
-  return factory === undefined ? (
-    <Link to="/runs" className={className}>
-      ← Runs
-    </Link>
-  ) : (
-    <Link to="/factories/$factory/runs" params={{ factory }} className={className}>
-      ← Runs
-    </Link>
+  return (
+    <Trail
+      levels={[
+        ...factoryLevel(factory),
+        runsLevel(factory),
+        step === undefined ? { name } : runLevel(factory, runId, name),
+        ...(step === undefined ? [] : [{ name: step }]),
+      ]}
+    />
   );
 }

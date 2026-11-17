@@ -196,6 +196,32 @@ function PauseFacts({
 }
 
 /**
+ * What opens the pause's popover: the kit's text button, a play icon once all factories are paused and a pause icon else, and the
+ * pause's word beside it where it has one, its whole sentence on hover.
+ * @param words The pause in words (`pauseWords`).
+ * @param finishing How many tasks still finish under the pause, which the button carries for the e2e.
+ */
+function PauseTrigger({ words, finishing }: { words: PauseWords; finishing: number }) {
+  return (
+    <Button
+      variant="text"
+      size="xsmall"
+      icon={words.state === 'paused' ? Play : Pause}
+      aria-label={words.label}
+      data-pause={words.state}
+      data-finishing={finishing}
+      className="min-w-0 text-on-surface-variant"
+    >
+      {words.text && (
+        <span title={words.line} className="truncate">
+          {words.text}
+        </span>
+      )}
+    </Button>
+  );
+}
+
+/**
  * The pause of all factories, in the frame's top bar: one button, a pause icon while they run, `Pausing · N` while each working session
  * stops at its current tool call's end, and a play icon with `Paused` once nothing does (`pauseWords`, read again on each poll of
  * `GET /api/pause`).
@@ -233,21 +259,7 @@ export function PauseButton() {
         act.reset();
       }}
     >
-      <Button
-        variant="text"
-        size="xsmall"
-        icon={words.state === 'paused' ? Play : Pause}
-        aria-label={words.label}
-        data-pause={words.state}
-        data-finishing={read.data?.finishing.length ?? 0}
-        className="min-w-0 text-on-surface-variant"
-      >
-        {words.text && (
-          <span title={words.line} className="truncate">
-            {words.text}
-          </span>
-        )}
-      </Button>
+      <PauseTrigger words={words} finishing={read.data?.finishing.length ?? 0} />
       <Popover
         aria-label="The pause of all factories"
         data-pause-popover

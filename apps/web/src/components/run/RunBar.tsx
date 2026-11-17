@@ -6,6 +6,7 @@ import { readGone } from '@/lib/api/gone';
 import { useRunRead, type RunDetail } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { useBar } from '@/lib/useBar';
+import { Pressable } from '@/components/ui/ds';
 import { BarPanel } from '../frame/BarPanel';
 import { Markdown } from '../markdown/Markdown';
 import { AsksOfYou } from './AsksOfYou';
@@ -45,15 +46,14 @@ export function RunBody({ id, run, error }: { id: string; run: RunDetail | undef
         <ul className="space-y-0.5">
           {run.steps.map((step) => (
             <li key={step.name}>
-              <button
-                type="button"
+              <Pressable
                 data-step={step.name}
-                onClick={() => onStep(step.name)}
-                className="flex w-full items-center justify-between gap-3 rounded px-2 py-1 text-left hover:bg-muted"
+                onPress={() => onStep(step.name)}
+                className="flex w-full items-center justify-between gap-3 rounded px-2 py-1"
               >
                 <span className="min-w-0 truncate font-mono text-body-small">{step.name}</span>
                 <StatusChip codes={step} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
-              </button>
+              </Pressable>
             </li>
           ))}
         </ul>

@@ -480,11 +480,6 @@ function SkillToolNote({ form, setKey }: { form: Form; setKey: (key: AgentRoleKe
   );
 }
 
-export const RADIO =
-  'group flex cursor-default items-start gap-2.5 rounded border border-outline-variant px-3 py-2 outline-none data-selected:border-foreground data-focus-visible:ring-2 data-focus-visible:ring-ring/50 data-disabled:cursor-not-allowed';
-export const DOT =
-  'mt-0.5 size-3.5 shrink-0 rounded-full border border-outline group-data-selected:border-4 group-data-selected:border-foreground';
-
 /** A choice of the prompt as its box: the kit's radio and its words, framed, the frame lit while it is chosen. */
 const CHOICE = 'items-start rounded border border-outline-variant px-3 py-2 data-selected:border-primary';
 

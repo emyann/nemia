@@ -2,14 +2,11 @@
  * What a person can do to a whole run, behind one button in its header: Remove (a try), Hold or Lift (a hold standing), and Prune (a run
  * over that holds something on disk), each the existing control with its own question and refusal. None where the run offers none.
  */
-import { Dialog, DialogTrigger, Popover } from 'react-aria-components';
 import { Ellipsis } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, Popover, PopoverTrigger } from '@/components/ui/ds';
 import { holdable } from '@/lib/hold';
 import { prunable } from '@/lib/prune';
 import type { RunDetail } from '@/lib/runView';
-import { cn } from '@/lib/utils';
-import { POPOVER } from '@/lib/classes';
 import { HoldRun } from './HoldRun';
 import { LiftHold } from './LiftHold';
 import { PruneRun } from './PruneRun';
@@ -31,19 +28,22 @@ export function RunMenu({ run }: { run: RunDetail }) {
   const actions = runActionsOf(run);
   if (!actions.length) return null;
   return (
-    <DialogTrigger>
-      <Button variant="outline" size="sm" data-run-menu={actions.join(' ')} aria-label={`Actions on ${run.id}`}>
-        <Ellipsis aria-hidden className="size-4" />
+    <PopoverTrigger>
+      <Button variant="outlined" size="xsmall" icon={Ellipsis} data-run-menu={actions.join(' ')} aria-label={`Actions on ${run.id}`}>
         Actions
       </Button>
-      <Popover placement="bottom end" offset={6} className={cn(POPOVER, 'w-80')}>
-        <Dialog aria-label={`Actions on ${run.id}`} data-run-actions className="flex flex-col items-start gap-3 outline-none">
-          {actions.includes('remove') && <RemoveRun id={run.id} />}
-          {actions.includes('lift') && <LiftHold id={run.id} />}
-          {actions.includes('hold') && <HoldRun run={run} />}
-          {actions.includes('prune') && <PruneRun run={run} />}
-        </Dialog>
+      <Popover
+        aria-label={`Actions on ${run.id}`}
+        data-run-actions
+        placement="bottom end"
+        offset={6}
+        className="flex w-80 flex-col items-start gap-3"
+      >
+        {actions.includes('remove') && <RemoveRun id={run.id} />}
+        {actions.includes('lift') && <LiftHold id={run.id} />}
+        {actions.includes('hold') && <HoldRun run={run} />}
+        {actions.includes('prune') && <PruneRun run={run} />}
       </Popover>
-    </DialogTrigger>
+    </PopoverTrigger>
   );
 }

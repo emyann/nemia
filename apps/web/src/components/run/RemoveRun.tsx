@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/ds';
 import { removeRun } from '../../lib/api/runs.ts';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
@@ -29,12 +29,12 @@ export function RemoveRun({ id }: { id: string }) {
       {asking ? (
         <>
           Remove this try, its record and its folders?
-          <Button variant="destructive" size="sm" onPress={() => remove.mutate()} isDisabled={remove.isPending}>
+          <Button variant="tonal" color="error" size="xsmall" onPress={() => remove.mutate()} isDisabled={remove.isPending}>
             {remove.isPending ? 'Removing…' : 'Remove'}
           </Button>
           <Button
-            variant="ghost"
-            size="sm"
+            variant="text"
+            size="xsmall"
             onPress={() => {
               remove.reset();
               setAsking(false);
@@ -45,7 +45,7 @@ export function RemoveRun({ id }: { id: string }) {
           </Button>
         </>
       ) : (
-        <Button variant="outline" size="sm" onPress={() => setAsking(true)}>
+        <Button variant="outlined" size="xsmall" onPress={() => setAsking(true)}>
           Remove…
         </Button>
       )}

@@ -71,16 +71,7 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/components/ui/sheet:SheetTrigger': kit('SideSheet'),
   '@/components/ui/textarea:Textarea': kit('TextField', 'multiline'),
   'react-aria-components:Button': kit('Button'),
-  'react-aria-components:CheckboxGroup': kit('CheckboxGroup'),
-  'react-aria-components:Dialog': kit('Dialog'),
-  'react-aria-components:DialogTrigger': kit('PopoverTrigger'),
-  'react-aria-components:Form': { kind: 'plain', why: 'a form element of the page, with the kit fields inside it' },
-  'react-aria-components:Heading': kit('Title'),
-  'react-aria-components:Label': kit('TextField', 'its label'),
-  'react-aria-components:Popover': kit('Popover'),
   'react-aria-components:PopoverContext': kit('PreviewTrigger'),
-  'react-aria-components:Radio': kit('Radio'),
-  'react-aria-components:RadioGroup': kit('RadioGroup'),
   'react-aria-components:RouterProvider': {
     kind: 'exempt',
     why: "the kit's Link and Button route href through it, and the kit exports none",
@@ -88,7 +79,6 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   'react-aria-components:Slider': kit('Slider'),
   'react-aria-components:SliderThumb': kit('Slider'),
   'react-aria-components:SliderTrack': kit('Slider'),
-  'react-aria-components:Text': kit('Body'),
   'react-aria-components:TextField': kit('TextField'),
   'react-aria-components:ToggleButton': kit('Segment'),
   'react-aria-components:ToggleButtonGroup': kit('SegmentedButton'),
@@ -101,8 +91,6 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/lib/classes:BUTTON': kit('Button'),
   '@/lib/classes:BUTTON_OUTLINED': kit('Button', 'outlined'),
   '@/lib/classes:BUTTON_SECONDARY': kit('Button', 'tonal'),
-  '@/lib/classes:BUTTON_SMALL': kit('Button', 'small'),
-  '@/lib/classes:POPOVER': kit('Popover'),
   '@/lib/classes:TEXTAREA': kit('TextField', 'multiline'),
 };
 

@@ -662,7 +662,7 @@ test("the run's menu holds its actions behind one button, each its own question:
   const html = withClient(createElement(RunMenu, { run: { ...run, ...kept, try: null, status: 'running', moving: true } }));
   assert.equal([...html.matchAll(/<button /g)].length, 1, 'one button');
   assert.match(html, /data-run-menu="hold"/);
-  assert.doesNotMatch(html, /data-hold-open|data-remove-run|data-prune-open/, 'its actions are drawn once it is opened');
+  assert.doesNotMatch(html, /role="menu"|data-remove-run|data-lift/, 'its actions are drawn once it is opened');
 });
 
 test('the receipts are five folds, closed at first, in their order — and opened, the timeline, the checks, the specs, the tokens and where it ran', async () => {

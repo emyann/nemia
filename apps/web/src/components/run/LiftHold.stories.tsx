@@ -1,13 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { DEFAULT_NAMESPACE } from 'objects';
 import { CardLift, LiftHold } from './LiftHold';
 
-/** Lift, where a run is held: on its page, asked twice in a line; on the Factory's card, in a popover over the card. */
+/** Lift, where a run is held: asked once a menu's Lift… was pressed; on the Factory's card, in a popover over the card. */
 const meta: Meta<typeof LiftHold> = {
   title: 'Run/LiftHold',
   component: LiftHold,
-  args: { id: 'board-hold-the-floor-a1b2' },
+  args: { id: 'board-hold-the-floor-a1b2', onClose: fn() },
   render: (args) => (
     <div style={{ width: 400 }}>
       <LiftHold {...args} />
@@ -16,13 +16,13 @@ const meta: Meta<typeof LiftHold> = {
 };
 export default meta;
 
-/** On the run's page, Lift… pressed: what a lift does, Lift and Keep it. */
+/** Asked, once a menu's Lift… was pressed: what a lift does, Lift and Keep it, which closes the question. */
 export const Asking: StoryObj<typeof meta> = {
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const page = within(canvasElement);
-    await userEvent.click(page.getByRole('button', { name: 'Lift…' }));
     await expect(page.getByRole('button', { name: 'Lift' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Keep it' })).toBeEnabled();
+    await userEvent.click(page.getByRole('button', { name: 'Keep it' }));
+    await expect(args.onClose).toHaveBeenCalled();
   },
 };
 

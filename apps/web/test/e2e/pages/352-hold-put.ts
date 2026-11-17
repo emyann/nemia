@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, openRunMenu, photograph, runMenuActions, themeOf, isRunAction } from '../board.ts';
+import { askRunAction, fed, openRunMenu, photograph, runMenuActions, themeOf, isRunAction } from '../board.ts';
 import { cardOf, wordsSaying } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
@@ -34,8 +34,7 @@ export default {
     if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page puts one — ${hold} is there`);
 
     try {
-      await (await openRunMenu(page)).locator('[data-hold-open]').click();
-      const dialog = page.getByRole('dialog', { name: `Hold ${id}` });
+      const dialog = await askRunAction(page, 'Hold…', `Hold ${id}`);
       await expectVisible(dialog.locator(`[data-hold-run="${until}"]`), `the form offers ${until}, a run of the same repository`);
       await expectCount(dialog.locator(`[data-hold-run="${id}"]`), 0, `and not ${id} itself`);
       const put = dialog.getByRole('button', { name: 'Hold', exact: true });
@@ -62,7 +61,10 @@ export default {
       const actions = await runMenuActions(page);
       if (!actions.includes('lift') || actions.includes('hold'))
         throw new Refused(`the run's menu offers Lift… and no Hold…: a held run is held once — it offers ${actions.join(', ')}`);
-      await expectVisible((await openRunMenu(page)).getByRole('button', { name: 'Lift…', exact: true }), "and Lift… is in the run's menu");
+      await expectVisible(
+        (await openRunMenu(page)).getByRole('menuitem', { name: 'Lift…', exact: true }),
+        "and Lift… is in the run's menu",
+      );
       await page.keyboard.press('Escape');
       await expectCount(page.locator('[role="alert"][data-hold-refused]'), 0, 'with no refusal said');
       await idle(page);
@@ -75,12 +77,14 @@ export default {
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
 
-      const menu = await openRunMenu(page);
-      await menu.getByRole('button', { name: 'Lift…', exact: true }).click();
-      await menu.getByRole('button', { name: 'Lift', exact: true }).click();
+      const lift = await askRunAction(page, 'Lift…', `Lift the hold on ${id}`);
+      await lift.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(section, 0, 'the lift takes it back, and the page says no hold');
       if (fs.existsSync(hold)) throw new Refused(`the lift removed ${hold} — it is still there`);
-      await expectVisible((await openRunMenu(page)).locator('[data-hold-open]'), "and the run's menu offers Hold… again");
+      await expectVisible(
+        (await openRunMenu(page)).getByRole('menuitem', { name: 'Hold…', exact: true }),
+        "and the run's menu offers Hold… again",
+      );
       await page.keyboard.press('Escape');
     } finally {
       await takeBack(page, hold, id, gated);

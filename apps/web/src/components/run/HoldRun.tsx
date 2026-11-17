@@ -3,37 +3,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { putHold } from '../../lib/api/runs.ts';
 import type { RunView } from '../../lib/api/judged.ts';
 import { useRunNamespace } from '@/lib/runNamespace';
-import type { RunDetail } from '../../lib/runView';
 import { titleOf } from '../../lib/factory';
-import { holdable, holdCandidates } from '../../lib/hold.ts';
+import { holdCandidates } from '../../lib/hold.ts';
 import { usePickerRuns } from '../../lib/pickerRuns.ts';
 import { Refusal } from '../gate/Ask';
 import { ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
 import { Reading } from '@/components/look';
-import { ACTION_LABEL } from '@/lib/runActions';
-import { Body, Button, Checkbox, CheckboxGroup, Popover, PopoverTrigger, Skeleton, TextField, Title } from '@/components/ui/ds';
-
-/**
- * Hold, on a run's page: the button opens a popover where a person ticks the runs to wait on, or none, and may say why, and the hold is
- * put as the CLI's `hold <run> --until <run>… --why <words>` puts it; with none ticked, as `hold <run> --why <words>`, held until a person
- * lifts it. The page then says the hold in its Held section, with Lift. A refusal — the
- * package's, of a run it will not hold or one it will not wait on — is shown in the form, and nothing is written. Nothing is offered where
- * the run says it cannot be held (`holdable`).
- */
-export function HoldRun({ run }: { run: RunDetail }) {
-  if (!holdable(run)) return null;
-  return (
-    <PopoverTrigger>
-      <Button variant="outlined" size="xsmall" data-hold-open>
-        {ACTION_LABEL.hold}
-      </Button>
-      <Popover aria-label={`Hold ${run.id}`} placement="bottom end" offset={6} className="w-96 space-y-3">
-        {({ close }) => <HoldQuestion run={run} onClose={close} />}
-      </Popover>
-    </PopoverTrigger>
-  );
-}
+import { Body, Button, Checkbox, CheckboxGroup, Skeleton, TextField, Title } from '@/components/ui/ds';
 
 /**
  * The hold's question, wherever it is asked: the runs a hold may wait on (`holdCandidates`), read before the form is drawn — those not

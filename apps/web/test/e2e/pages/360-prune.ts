@@ -43,12 +43,8 @@ export default {
 
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
-      const open = page.locator('[data-prune-open]');
-      await openRunMenu(page);
-      await expectVisible(
-        open.filter({ hasText: /^Prune…$/ }),
-        `${id}'s page offers Prune… in its header's menu: it is over, and its worktree and files are on disk`,
-      );
+      const open = (await openRunMenu(page)).getByRole('menuitem', { name: 'Prune…', exact: true });
+      await expectVisible(open, `${id}'s page offers Prune… in its header's menu: it is over, and its worktree and files are on disk`);
       await open.click();
       const dialog = page.getByRole('dialog', { name: `Prune ${id}` });
       await expectVisible(dialog, 'the first press opens the choice of what to give back');

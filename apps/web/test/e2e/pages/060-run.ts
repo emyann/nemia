@@ -114,6 +114,7 @@ export default {
         `${file} is a check-affecting chip`,
       );
     }
+    await photograph(decide.locator(`[data-touched="${FAKE.branch}"]`), path.join(OUT, `run-decide-files-${await themeOf(page)}.png`));
     await expectVisible(
       decide.locator('[data-lesson="written"]', { hasText: FAKE.lesson }),
       `the lesson chip says what the run wrote (${FAKE.lesson})`,

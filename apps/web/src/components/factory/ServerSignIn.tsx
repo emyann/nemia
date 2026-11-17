@@ -71,7 +71,7 @@ function PasteBack({ pending, pasting }: { pending: boolean; pasting: Pasting })
         inputClassName="font-mono"
         className="min-w-64 flex-1"
       />
-      <CutPress isDisabled={pending || pasting.pasted.trim() === ''} onPress={pasting.onComplete} className="mt-2">
+      <CutPress pending={pending} isDisabled={pending || pasting.pasted.trim() === ''} onPress={pasting.onComplete} className="mt-2">
         Complete
       </CutPress>
     </div>
@@ -81,7 +81,8 @@ function PasteBack({ pending, pasting }: { pending: boolean; pasting: Pasting })
 /**
  * What a sign-in of a server shows, in each place it stands: the press that starts one, the link to open while one waits with the
  * field to paste the address the browser landed on, why the last one ended with the press to try again, and the press that signs out
- * of a connected server; and the api's own words where it refused. Exported for its stories.
+ * of a connected server; and the api's own words where it refused. One press is drawn at a time, so the one shown is the one `pending`
+ * is of, and it draws the kit's small ProgressIndicator while it is. Exported for its stories.
  */
 export function SignInView({
   name,
@@ -104,7 +105,7 @@ export function SignInView({
     <div data-server-sign-in={shown.at} className="flex flex-col gap-2">
       {shown.at === 'connected' ? (
         <div className="flex flex-wrap items-center gap-3">
-          <CutPress isDisabled={pending} onPress={onSignOut}>
+          <CutPress pending={pending} isDisabled={pending} onPress={onSignOut}>
             Sign out
           </CutPress>
           <span className="text-body-small text-muted-foreground">
@@ -123,7 +124,7 @@ export function SignInView({
         </>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <CutPress isDisabled={pending} onPress={onSignIn}>
+          <CutPress pending={pending} isDisabled={pending} onPress={onSignIn}>
             {shown.at === 'ended' ? 'Sign in again' : 'Sign in'}
           </CutPress>
           <span className="text-body-small text-muted-foreground">

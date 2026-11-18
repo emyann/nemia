@@ -12,15 +12,16 @@ import { clockWord } from './quota.ts';
 /**
  * Her session's state, as the board says it: stopped from outside, filed again on the person's next word; not filed since the keeper
  * could not trust her folder; resting, no session of hers open, which a message in her chat starts; filed and starting, not yet
- * reachable; and up, reached.
+ * reachable; and up, reached. Resting with a factory above Manual, she is not filed yet: the keeper files her at its next beat.
  */
-type SessionKind = 'stopped' | 'untrusted' | 'resting' | 'starting' | 'up';
+type SessionKind = 'stopped' | 'untrusted' | 'resting' | 'not-filed' | 'starting' | 'up';
 
 /** What each state is said as, a sentence each. */
 const SESSION_WORDS: Record<SessionKind, string> = {
   stopped: 'Stopped from outside: your next message or level set starts her again.',
   untrusted: 'Not filed: the keeper could not trust her folder.',
   resting: 'Resting: a message in her chat starts her session.',
+  'not-filed': 'Not filed yet: the keeper files her session at its next beat.',
   starting: 'Filed: her session is starting.',
   up: 'Up: her session runs.',
 };
@@ -40,7 +41,8 @@ function kindOf(nemia: NemiaLevel): SessionKind {
   if (nemia.stopped) return 'stopped';
   if (nemia.reach.length) return 'up';
   if (nemia.untrusted !== null) return 'untrusted';
-  return nemia.rests && !anyAbove(nemia) ? 'resting' : 'starting';
+  if (!nemia.rests) return 'starting';
+  return anyAbove(nemia) ? 'not-filed' : 'resting';
 }
 
 /** Whether she is kept: the store's level, or any factory's in force, above Manual. */

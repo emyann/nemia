@@ -42,7 +42,7 @@ export default {
       if (answered.status() !== 200)
         throw new Refused(`and it is written — the api answered ${answered.status()}: ${await answered.text()}`);
       await idle(page);
-      const on = page.locator('[data-nemia-on][data-state="starting"]');
+      const on = page.locator('[data-nemia-on][data-state="not-filed"]');
       await expectVisible(on, "the card says she is on, her session filed at the keeper's next beat");
       if (await on.locator('[data-nemia-trust]').count()) throw new Refused('nothing is said of her trust: the keeper gives it');
       if (await page.locator('[data-nemia-turn-on]').count()) throw new Refused('once on, Turn Nemia on is offered no more');

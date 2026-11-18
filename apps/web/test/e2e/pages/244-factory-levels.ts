@@ -64,7 +64,7 @@ export default {
       await expectVisible(row.and(page.locator('[data-level="semi-auto"]')), `${factory} reads Semi-auto`);
       await expectVisible(row.locator('[data-factory-raised]'), 'and raised');
       await expectVisible(row.locator('[data-factory-words]', { hasText: 'Raised until' }), 'naming when the raise ends');
-      await expectVisible(section.locator('[data-nemia-session][data-state="starting"]'), 'a factory raised keeps her session');
+      await expectVisible(section.locator('[data-nemia-session][data-state="not-filed"]'), 'a factory raised keeps her session');
       await settled(page);
       await photograph(page, path.join(OUT, `factory-levels-raised-${await themeOf(page)}.png`), { fullPage: true });
       await wrote(page, row.locator('[data-factory-end]'), 'the raise is ended');

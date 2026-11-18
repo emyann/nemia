@@ -62,8 +62,13 @@ test("sessionOf: her session's state, judged from the orchestrator's facts", asy
     'her session reads resting where none is open and a message starts one, at any level; starting while nothing reaches it; up once something does',
     () => {
       assert.equal(sessionOf(nemiaLevel()).kind, 'resting', 'a fresh store: a message wakes her');
-      assert.equal(sessionOf(nemiaLevel({ level: 'semi-auto', task: 'nemia-1' })).kind, 'starting', 'above Manual: the keeper files her');
-      assert.equal(sessionOf(nemiaLevel({ factories: [raised] })).kind, 'starting', 'a factory above Manual keeps her too');
+      assert.equal(
+        sessionOf(nemiaLevel({ level: 'semi-auto', task: 'nemia-1' })).kind,
+        'not-filed',
+        'above Manual: the keeper files her at its next beat',
+      );
+      assert.equal(sessionOf(nemiaLevel({ factories: [raised] })).kind, 'not-filed', 'a factory above Manual keeps her too');
+      assert.match(sessionOf(nemiaLevel({ factories: [raised] })).words, /^Not filed yet/, 'never said filed while nothing is');
       assert.match(sessionOf(nemiaLevel()).words, /^Resting: a message in her chat starts her session/);
       assert.equal(sessionOf({ ...up, reach: [], sessionId: null }).kind, 'starting');
       assert.equal(sessionOf(up).kind, 'up');

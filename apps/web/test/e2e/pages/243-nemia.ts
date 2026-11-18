@@ -77,7 +77,7 @@ export default {
       if (on.level !== 'semi-auto' || on.task !== null)
         throw new Refused(`Semi-auto is written, naming no task: the keeper mints hers as it files her — ${JSON.stringify(on)}`);
       await expectVisible(section.locator('[data-nemia-level="semi-auto"]'), 'her level reads Semi-auto');
-      await expectVisible(section.locator('[data-nemia-session][data-state="starting"]'), 'her session reads starting, not filed yet');
+      await expectVisible(section.locator('[data-nemia-session][data-state="not-filed"]'), 'her session reads not filed yet');
       await expectCount(section.locator('[data-nemia-task]'), 0, 'naming no task before one is filed');
       await expectVisible(
         section.getByText('what waits on you waits for your answer'),

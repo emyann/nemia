@@ -567,7 +567,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
     },
   );
   await s.test(
-    'REFUSED: custom words that do not read are told to no one while she is kept, naming the clear; a stop at manual is never held by them',
+    'REFUSED: custom words that do not read are told to no one while she is kept, naming the clear; at manual her chat and her rest are never held by them',
     async () => {
       const b = stage.board();
       await keptAnew(t);
@@ -586,6 +586,22 @@ test("Kept, she is told what changed: the person's custom words once, never by a
         return true;
       });
       assert.deepEqual(listSubscriptions(ROOT), [], 'her operating ended all the same');
+      const task = herTask();
+      b.settle(task, 'working');
+      appendOutbox(nemiaDir(ROOT), { id: 'unread-o1', at: new Date().toISOString(), text: 'Still with me?' });
+      await assert.rejects(beat(), (err: Error) => {
+        names(err.message, 'nemia agents custom nemia --clear');
+        return true;
+      });
+      assert.equal(b.said.length, told + 1, 'the message said to her all the same, and nothing else');
+      b.settle(task, 'idle');
+      t.mock.timers.tick(1_000);
+      await assert.rejects(beat());
+      const idleSince = readSession(ROOT)?.idleSince;
+      assert.equal(idleSince, new Date().toISOString(), 'her idle marked all the same');
+      t.mock.timers.tick(15 * 60_000);
+      assert.deepEqual(await beat(), ['rest'], 'quiet: she rests, the words unread or not');
+      assert.ok(b.stopped.includes(task));
       fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
     },
   );

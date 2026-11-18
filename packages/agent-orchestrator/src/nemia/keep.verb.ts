@@ -396,13 +396,13 @@ const herSubscription = Effect.fn('herSubscription')(function* () {
 
 /**
  * One beat: the levels, the keeper's record of her session (`readSession`, her tasks by `herTasks`), her current task, her subscription,
- * her folder's trust (`trustedFolder`), her chat's files and the person's custom words read (words that do not read are owed as changed,
- * so their refusal is said by the act that tells her them, and no other act waits on it); whether the conversation is quiet enough
- * for her to rest (`quietOf`, her idle mark against the latest word said or answered to her, at least `restAfterMs` old on the wall
- * clock); whether the person spoke after her task was seen ended with no rest (a chat entry, an answer, or a level set after the mark);
- * her folder trusted by the keeper before she is filed where it is not (`trustHer`, the filing left undone where the trust was refused),
- * the keeper's record of a refusal taken away on a beat that owes no trust; each act owed (`nemiaDue`) done in order. Answers the acts
- * done: those owed, but past a trust refused.
+ * her folder's trust (`trustedFolder`), her chat's files and the person's custom words read (words that do not read are owed as changed, so
+ * their refusal is said by the act that tells her them, as the beat's failure once every other act owed is done: none waits on it); whether
+ * the conversation is quiet enough for her to rest (`quietOf`, her idle mark against the latest word said or answered to her, at least
+ * `restAfterMs` old on the wall clock); whether the person spoke after her task was seen ended with no rest (a chat entry, an answer, or a
+ * level set after the mark); her folder trusted by the keeper before she is filed where it is not (`trustHer`, the filing left undone where
+ * the trust was refused), the keeper's record of a refusal taken away on a beat that owes no trust; each act owed (`nemiaDue`) done in
+ * order. Answers the acts done: those owed, but past a trust refused.
  * @param restAfterMs How long the conversation is quiet before she rests at `manual`, in milliseconds.
  */
 export const keepOnce = Effect.fn('keepOnce')(function* (
@@ -448,11 +448,14 @@ export const keepOnce = Effect.fn('keepOnce')(function* (
   if (!owed.includes('trust')) writeUntrusted(home, undefined);
   const beat: Beat = { home, id: id ?? '', filed: task !== undefined, above, at: new Date(now).toISOString() };
   const done: NemiaAct[] = [];
+  let refused: Effect.Error<ReturnType<typeof act>> | undefined;
   for (const one of owed) {
     if (one === 'trust' && !(yield* trustHer(home))) break;
-    if (one !== 'trust') yield* act(e, beat, one);
-    done.push(one);
+    if (one === 'sayCustom') refused = yield* act(e, beat, one).pipe(Effect.as(undefined), Effect.catch(Effect.succeed));
+    else if (one !== 'trust') yield* act(e, beat, one);
+    if (one !== 'sayCustom' || refused === undefined) done.push(one);
   }
+  if (refused !== undefined) return yield* Effect.fail(refused);
   return done;
 });
 

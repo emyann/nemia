@@ -206,7 +206,7 @@ test('Nemia not filed yet, or her folder untrusted, names no task; filed, it nam
   assert.match(untrusted, /data-state="untrusted"/);
   assert.doesNotMatch(untrusted, /data-nemia-task|>Task/, 'waiting on her trust: nothing filed, no task named');
   const notFiled = await nemiaWith({ level: 'semi-auto', task: 'nemia-1' });
-  assert.match(notFiled, /data-state="starting"/);
+  assert.match(notFiled, /data-state="not-filed"/);
   assert.doesNotMatch(notFiled, /data-nemia-task|>Task/, 'not filed yet: no task named');
   const starting = await nemiaWith({ level: 'semi-auto', task: 'nemia-1', phase: 'pending', rests: false });
   assert.match(starting, /data-state="starting"/);

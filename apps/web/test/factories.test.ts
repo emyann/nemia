@@ -206,7 +206,7 @@ test('startRepo, floorPlace, whyNotStarted, untrustedFor: where a workflow or a 
     "a workflow starts on the repository the factory's wiring names for it, else its only one; never on a card's: the orchestrator's workflowRepo",
     () => {
       const pair = { worksOn: ['/r/app', '/r/docs'] };
-      const rows: Array<[string, Partial<Factory>, string, string | null, 'unwired' | 'unknown' | 'shared' | null]> = [
+      const rows: Array<[string, Partial<Factory>, string, string | null, 'none' | 'unwired' | 'unknown' | 'shared' | null]> = [
         ['wired', { ...pair, workflowRepos: { build: 'docs' } }, 'build', '/r/docs', null],
         [
           'wired with a trailing separator',
@@ -220,7 +220,8 @@ test('startRepo, floorPlace, whyNotStarted, untrustedFor: where a workflow or a 
         ['several, none named', pair, 'build', null, 'unwired'],
         ['several, another workflow wired', { ...pair, workflowRepos: { quick: 'app' } }, 'build', null, 'unwired'],
         ["a prototype's name is no wiring", { ...pair, workflowRepos: {} }, 'constructor', null, 'unwired'],
-        ['none at all', { worksOn: [] }, 'build', null, 'unwired'],
+        ['none at all', { worksOn: [] }, 'build', null, 'none'],
+        ['none at all, the workflow wired', { worksOn: [], workflowRepos: { build: 'app' } }, 'build', null, 'none'],
         ['a name none has', { ...pair, workflowRepos: { build: 'site' } }, 'build', null, 'unknown'],
         ['a name none has, on its only one', { worksOn: ['/r/app'], workflowRepos: { build: 'site' } }, 'build', null, 'unknown'],
         ['a name two share', { worksOn: ['/a/app', '/b/app'], workflowRepos: { build: 'app' } }, 'build', null, 'shared'],
@@ -231,7 +232,9 @@ test('startRepo, floorPlace, whyNotStarted, untrustedFor: where a workflow or a 
         else {
           assert.ok('refused' in on, row);
           assert.equal(on.refused, refused, row);
-          assert.match(on.why, new RegExp(`nemia factory attach pair ${workflow} --repo`), `${row}: names the attach that fixes it`);
+          if (refused === 'none')
+            assert.ok(on.why.includes('nemia factory volume add pair'), `${row}: names the volume add that fixes it: ${on.why}`);
+          else assert.match(on.why, new RegExp(`nemia factory attach pair ${workflow} --repo`), `${row}: names the attach that fixes it`);
           for (const name of new Set((extra.worksOn ?? []).map((r) => r.split('/').filter(Boolean).at(-1)))) {
             assert.ok(on.why.includes(name!), `${row}: offers ${name}`);
           }

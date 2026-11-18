@@ -117,9 +117,9 @@ export type AskClose = { id: string; how: 'cut' | 'again'; at: string; call?: st
 /**
  * Where the task is: `up`, its session live; `answering`, a turn in progress; `waitsOnYou`, what waits on the person (the runs waiting,
  * and the task's own questions, proposals and permissions they have not answered); `unread`, the agent's messages after the person's
- * read mark.
+ * read mark; `wakes`, whether a message to the chat starts its task where none is open.
  */
-export type Presence = { up: boolean; answering: boolean; waitsOnYou: number; unread: number };
+export type Presence = { up: boolean; answering: boolean; waitsOnYou: number; unread: number; wakes: boolean };
 
 /** One event of a session's transcript, as the projection reads it (the runtime's `TranscriptEvent`). */
 export type SourceEvent = {
@@ -149,8 +149,53 @@ export type OutboxEntry = { id: string; at: string; text: string; from?: Speaker
 /** The keeper's mark of an outbox entry delivered: its `id`, and the said that carried it, by its time and attempt. */
 export type DeliveredMark = { id: string; said: string; attempt: number };
 
-/** One turn the person stopped: when, and which attempt was answering. */
-export type SourceStop = { at: string; attempt: number };
+/**
+ * One turn the person stopped: when, which attempt was answering, and of which task, for a chat whose agent was filed as several tasks
+ * (absent on a stop written before a chat spanned tasks, read as of the last task holding that attempt).
+ */
+export type SourceStop = { at: string; attempt: number; task?: string };
+
+/**
+ * One task of a chat whose agent was filed as several, one after another, each continuing the last's session: its id, the number its
+ * attempts are counted on from (`offset`, the attempts of the tasks before it), the attempts it holds, and the words said to it, each
+ * with its own attempt as the runtime journals it.
+ */
+export type TaskSpan = { task: string; offset: number; attempts: readonly number[]; said: readonly SourceSaid[] };
+
+/**
+ * The number the attempts of the task after `span` are counted on from: past its last attempt, or its own where it holds none. Pure.
+ * @param span The task before, or undefined where there is none.
+ */
+export const offsetAfter = (span: TaskSpan | undefined): number =>
+  span === undefined ? 0 : span.attempts.reduce((max, n) => Math.max(max, span.offset + n), span.offset);
+
+/** The last of `spans` that `holds`, or undefined. */
+const lastSpan = (spans: readonly TaskSpan[], holds: (span: TaskSpan) => boolean): TaskSpan | undefined =>
+  [...spans].reverse().find(holds);
+
+/**
+ * The words said across `spans` and the chat's marks that name an attempt, each numbered across the tasks, so one chat draws them all
+ * as one history: a said by its task's offset; a delivered mark by the task that holds its said (by attempt and time), the last task
+ * where none does yet; a stop by the task it names, or, where it names none, the last task holding its attempt. Pure.
+ * @param spans The chat's tasks, oldest first.
+ * @param delivered The keeper's delivered marks, as the chat's file keeps them.
+ * @param stops The turns the person stopped, as the chat's file keeps them.
+ */
+export function spanned(
+  spans: readonly TaskSpan[],
+  delivered: readonly DeliveredMark[],
+  stops: readonly SourceStop[],
+): { said: SourceSaid[]; delivered: DeliveredMark[]; stops: SourceStop[] } {
+  const last = spans.at(-1)?.offset ?? 0;
+  const ofMark = (m: DeliveredMark) => lastSpan(spans, (s) => s.said.some((x) => x.attempt === m.attempt && x.at === m.said));
+  const ofStop = (st: SourceStop) =>
+    st.task === undefined ? lastSpan(spans, (s) => s.attempts.includes(st.attempt)) : spans.find((s) => s.task === st.task);
+  return {
+    said: spans.flatMap((s) => s.said.map((x) => ({ ...x, attempt: x.attempt + s.offset }))),
+    delivered: delivered.map((m) => ({ ...m, attempt: m.attempt + (ofMark(m)?.offset ?? last) })),
+    stops: stops.map((st) => ({ ...st, attempt: st.attempt + (ofStop(st)?.offset ?? last) })),
+  };
+}
 
 /** The last event the person saw (`through`), and when they said so. */
 export type ReadMark = { through: string; at: string };
@@ -307,16 +352,22 @@ const saidEvent = (said: SourceSaid, claims: ReadonlyMap<string, OutboxEntry>): 
     : entryEvent(entry, said.at);
 };
 
-/** One session's events, each said to it placed after the transcript event it followed, or first where it followed none. */
+/**
+ * One session's events, each said to it placed after the transcript event it followed, or first where it followed none. An event timed
+ * before the session began is left out: a session that continues another's holds its parent's conversation, with the parent's times,
+ * which the parent's own session draws.
+ */
 function sessionEvents(session: ChatSession, said: readonly SourceSaid[], claims: ReadonlyMap<string, OutboxEntry>, open: CallState) {
-  const results = new Map(session.events.filter((e) => e.kind === 'tool_result').map((e) => [e.id, e]));
-  const ids = new Set(session.events.map((e) => `${e.kind} ${e.id}`));
+  const began = Date.parse(session.startedAt);
+  const events = session.events.filter((e) => !(Date.parse(e.at) < began));
+  const results = new Map(events.filter((e) => e.kind === 'tool_result').map((e) => [e.id, e]));
+  const ids = new Set(events.map((e) => `${e.kind} ${e.id}`));
   const own = said.filter((s) => s.attempt === session.attempt);
   const placed = (mark: string | null) =>
     own.filter((s) => (s.after ? (ids.has(`${s.after.kind} ${s.after.id}`) ? `${s.after.kind} ${s.after.id}` : null) : '') === mark);
   const out: ChatEvent[] = placed('').map((s) => saidEvent(s, claims));
-  const last = session.events.filter((e) => e.kind === 'tool_use').at(-1);
-  for (const e of session.events) {
+  const last = events.filter((e) => e.kind === 'tool_use').at(-1);
+  for (const e of events) {
     out.push(...eventsOf(session.attempt, e, results, e === last ? open : 'pending'));
     out.push(...placed(`${e.kind} ${e.id}`).map((s) => saidEvent(s, claims)));
   }
@@ -817,17 +868,19 @@ const unreadOf = (events: readonly ChatEvent[], mark: ReadMark | undefined): num
 /**
  * Where the task is, off its phase (none where no task is filed), the runs that wait on the person (`waiting`), its chat and the
  * person's read mark: `waitsOnYou` the runs waiting and the asks of its own the person has not answered (`asksWaiting`), unread the
- * agent's messages the mark leaves unread (`unreadOf`). Pure.
+ * agent's messages the mark leaves unread (`unreadOf`), and `wakes` as its place says. Pure.
  * @param phase The task's phase in the runtime's words, or undefined where no task is filed.
  * @param waiting How many runs wait on the person.
  * @param events The chat's events.
  * @param mark The person's read mark, or undefined where they never set one.
+ * @param wakes Whether a message to the chat starts its task where none is open.
  */
 export function presenceOf(
   phase: EnginePhase | undefined,
   waiting: number,
   events: readonly ChatEvent[],
   mark: ReadMark | undefined,
+  wakes = false,
 ): Presence {
   const up = phase !== undefined && upOf(phase);
   return {
@@ -835,5 +888,6 @@ export function presenceOf(
     answering: up && answeringOf(phase),
     waitsOnYou: waiting + asksWaiting(events),
     unread: unreadOf(events, mark),
+    wakes,
   };
 }

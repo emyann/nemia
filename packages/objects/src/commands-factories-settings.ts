@@ -13,9 +13,6 @@ import { NO_TRUST } from './commands-factories-templated.ts';
 export const FACTORY_SETTINGS_HARNESS = 'claude';
 export const FACTORY_SETTABLE = ['attribution', 'includeGitInstructions', 'language'] as const;
 
-/** What a writable volume is not, said wherever a person reads one. */
-export const NOT_THE_WORKSPACE = "a step's writes there are not the run's workspace: nothing commits, lands or reverts them";
-
 /**
  * Why the command line takes a volume's write by its arguments: the api serves it as the Factory's `addVolume` and `removeVolume`,
  * calling these handlers with a path of the machine it runs on.

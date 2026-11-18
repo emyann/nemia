@@ -31,7 +31,7 @@ write(path.join(LOOSE, 'critic.md'), '---\ndescription: Critiques it.\n---\nCrit
 const seed = (root: string): void => {
   write(path.join(root, 'workflows', 'agents', 'archivist.md'), '---\ndescription: Files it away.\n---\nFile it away.\n');
   write(path.join(root, 'workflows', 'errand', 'go.md'), '---\nplace: git\n---\nGo.\n');
-  write(path.join(root, 'factories', 'elsewhere.json'), JSON.stringify({ repos: [THEIRS] }));
+  write(path.join(root, 'factories', 'elsewhere.json'), JSON.stringify({ volumes: [{ path: THEIRS, readOnly: false }] }));
 };
 
 const store = await servedStore('nemia-definitions-', seed);

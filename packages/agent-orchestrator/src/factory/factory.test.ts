@@ -160,7 +160,7 @@ test('what a refused start names: the factory, the workflow, the steps, the fold
     assert.equal(outsideRefusal(pipao, '/r/a'), undefined);
     assert.equal(outsideRefusal(pipao, '/r/b/'), undefined);
     const why = outsideRefusal(pipao, '/r/c');
-    names(why, '/r/c', 'pipao', '/r/a, /r/b', '--repo /r/a', 'nemia factory volume add pipao /r/c:rw');
+    names(why, '/r/c', '/r/a, /r/b', '--repo /r/a', 'nemia factory volume add pipao /r/c:rw');
     assert.doesNotMatch(why!, /default factory/);
   });
   await t.test(
@@ -282,7 +282,7 @@ test("instructionAt: a factory's instruction in its first folder as filed, at NE
     assert.deepEqual(
       instructionAt(
         {
-          name: 'pipao',
+          name: 'acme',
           volumes: [
             { path: '/b', readOnly: false },
             { path: '/a', readOnly: false },
@@ -297,7 +297,7 @@ test("instructionAt: a factory's instruction in its first folder as filed, at NE
     assert.deepEqual(
       instructionAt(
         {
-          name: 'pipao',
+          name: 'acme',
           volumes: [
             { path: '/b', readOnly: false },
             { path: '/a', readOnly: false },
@@ -318,7 +318,7 @@ test("instructionAt: a factory's instruction in its first folder as filed, at NE
     assert.deepEqual(
       instructionAt(
         {
-          name: 'pipao',
+          name: 'acme',
           volumes: [
             { path: '/b', readOnly: false },
             { path: '/a', readOnly: false },

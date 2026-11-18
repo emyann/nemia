@@ -8,7 +8,7 @@
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
@@ -78,6 +78,7 @@ const changed = (before: Record<string, string>, after: Record<string, string>):
 /** The repository the factory `mill` works on, with a `workflows/` folder an export reads. */
 const MILL = scratch('nemia-remote-mill-');
 fs.mkdirSync(path.join(MILL, 'workflows'), { recursive: true });
+execFileSync('git', ['init', '-q'], { cwd: MILL });
 
 /** `nemia <argv>` on the laptop `env`, its exit code asserted `code`. */
 async function typed(env: NodeJS.ProcessEnv, argv: readonly string[], code = 0): Promise<Said> {
@@ -89,7 +90,7 @@ async function typed(env: NodeJS.ProcessEnv, argv: readonly string[], code = 0):
 /** The factory `mill` filed on the daemon's store over `MILL`, its instruction kept in the store, through the laptop `env`. */
 const millFiled = await (async () => {
   const env = laptop();
-  await typed(env, ['factory', 'add', 'mill', '--repo', MILL]);
+  await typed(env, ['factory', 'add', 'mill', '--volume', `${MILL}:rw`]);
   await typed(env, ['factory', 'instruction', 'mill', '--store']);
   return 'mill';
 })();
@@ -121,7 +122,9 @@ test('REFUSED: what the api answers 404 exits as Missing does, exit 2, and a tok
 
 test("REFUSED: a card of the daemon's inbox that names no workflow, started with none, is refused naming its start by its name", async () => {
   const env = laptop();
-  await typed(env, ['factory', 'add', 'press', '--repo', scratch('nemia-remote-press-')]);
+  const press = scratch('nemia-remote-press-');
+  execFileSync('git', ['init', '-q'], { cwd: press });
+  await typed(env, ['factory', 'add', 'press', '--volume', `${press}:rw`]);
   write(path.join(HERE, 'bare.md'), 'Show the flag\n\nNo workflow named.\n');
   const before = Object.keys(filesOf(path.join(exposed.root, 'inbox')));
   await typed(env, ['inbox', 'add', 'bare.md', '--factory', 'press']);

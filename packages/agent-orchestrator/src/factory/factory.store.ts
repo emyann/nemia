@@ -43,7 +43,7 @@ import {
   volumeEntry,
 } from './factory.ts';
 import { volumeOf, volumeRefusal, withVolume } from './volume/volume.ts';
-import { volumesFromRepos, type FileVolume } from './volume/from-repos.ts';
+import { volumesFromRepos, type FileVolume } from './from-repos/from-repos.ts';
 import { firesOf } from './schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, isDirectory } from '../record/record.store.ts';

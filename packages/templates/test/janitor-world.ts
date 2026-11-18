@@ -78,7 +78,7 @@ export async function world(t: TestContext): Promise<{ env: NodeJS.ProcessEnv; r
   for (const [factory, workflows] of Object.entries(FACTORIES)) {
     const repo = path.join(at, 'repos', factory);
     fs.mkdirSync(repo, { recursive: true });
-    nemia(env, ['factory', 'add', factory, '--repo', repo, '--no-trust']);
+    nemia(env, ['factory', 'add', factory, '--volume', `${repo}:rw`, '--no-trust']);
     for (const workflow of workflows) nemia(env, ['factory', 'attach', factory, workflow]);
   }
   return { env, root: env.WF_ROOT! };

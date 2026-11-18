@@ -27,6 +27,29 @@ export const repoSent = (typed: string, env: NodeJS.ProcessEnv = process.env): s
   GIT_URL.test(typed) ? typed : pathSent(typed, env);
 
 /**
+ * A volume as it is sent: its folder or git URL as `repoSent` sends it and its mark as typed; one with no mark the api reads (`:ro`,
+ * `:rw`) sent as typed, for the api to refuse in its words.
+ * @param spelled The volume as typed: a folder or a git URL, then `:ro` or `:rw`.
+ * @param env The environment whose chosen context says how a folder is sent; this process's by default.
+ */
+export function volumeSent(spelled: string, env: NodeJS.ProcessEnv = process.env): string {
+  const at = spelled.lastIndexOf(':');
+  const mark = at < 0 ? '' : spelled.slice(at + 1);
+  const given = at < 0 ? '' : spelled.slice(0, at);
+  return (mark === 'ro' || mark === 'rw') && given.trim() !== '' ? `${repoSent(given, env)}:${mark}` : spelled;
+}
+
+/**
+ * What a factory works on, as its first line says it: its writable volumes' paths, or that it works on none yet.
+ * @param volumes The factory's volumes, as the api answers them.
+ */
+export const worksOnLine = (volumes: readonly { readonly path: string; readonly readOnly: boolean }[]): string =>
+  volumes
+    .filter((v) => !v.readOnly)
+    .map((v) => v.path)
+    .join(', ') || 'works on no repository yet';
+
+/**
  * What a write's answer says it wrote (`written`); refused, naming the restart, where the daemon answers none, being older than this
  * client.
  * @param answer The api's answer to the write, whose `written` says what it wrote.

@@ -618,7 +618,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   await s.test(
     'with WF_DEFAULT_FACTORY_STARTS=1, a start no factory holds is in the default factory: plain sessions, no factory recorded',
     async () => {
-      fs.writeFileSync(path.join(FACTORIES, 'default.json'), '{"repos": ["/x"], "hires": {"build/implement": "shipper"}}\n');
+      fs.writeFileSync(path.join(FACTORIES, 'default.json'), '{"volumes": [], "hires": {"build/implement": "shipper"}}\n');
       const loose = aRepo();
       for (const factory of [undefined, 'default']) {
         const started = await runPlaced(
@@ -744,7 +744,6 @@ test('a start in a factory refused step by step, each naming its fix, until it s
       () => runPlaced(startRun({ brief: 'build it', repo: other, repoNamed: true, workflowDir: build, isolate: false, factory: 'pipao' })),
       'Invalid',
       other,
-      'pipao',
       `--repo ${repo}`,
       `nemia factory volume add pipao ${other}:rw`,
     );

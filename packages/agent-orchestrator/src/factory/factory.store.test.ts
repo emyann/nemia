@@ -112,9 +112,9 @@ test('REFUSED: two adds of one name, the second while the first is between its w
 
 test('a factory with no volume is filed, working on no repository yet, its instruction kept in the store', async () => {
   fresh();
-  await main(['factory', 'add', 'pipao'], noEngine());
-  assert.deepEqual(fileOf('pipao'), { volumes: [], instruction: { store: true }, generation: 1 });
-  assert.deepEqual(await listedBy(), [['pipao', []]]);
+  await main(['factory', 'add', 'acme'], noEngine());
+  assert.deepEqual(fileOf('acme'), { volumes: [], instruction: { store: true }, generation: 1 });
+  assert.deepEqual(await listedBy(), [['acme', []]]);
 });
 
 test("an earlier release's file is moved once to one list of volumes, its repositories writable, and no key of the old shape kept", async (t) => {

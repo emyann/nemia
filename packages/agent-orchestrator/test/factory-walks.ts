@@ -217,6 +217,16 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: { removed: { refused: 'Conflict' }, read: { kind: 'default', name: 'default' } },
     },
   ],
+  'factories.moveVolumes': [
+    {
+      name: 'a factory filed in one list of volumes is not moved, and nothing is left; an earlier shape is held by factory.store.test.ts',
+      walk: ({ door }) => {
+        filed(door, 'acme');
+        return { moved: done(door.factories.moveVolumes()), volumes: readFiled(door, 'acme').volumes };
+      },
+      says: { moved: { moved: [], left: [] }, volumes: [{ path: '/repo', readOnly: false }] },
+    },
+  ],
   'level.read': [
     { name: 'none where none was written', walk: ({ door }) => done(door.level.read(nameOf('acme'))) ?? 'none', says: 'none' },
     {

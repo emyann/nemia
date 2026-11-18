@@ -60,7 +60,7 @@ test('a person files a factory, wires its parts, sees each in the listing, and r
   const s = story(t);
 
   await s.test('`factory add` with a repository typed relative files it on the folder by its whole path', async () => {
-    const said = await out(['factory', 'add', 'mill', '--repo', 'mill', '--no-trust']);
+    const said = await out(['factory', 'add', 'mill', '--volume', 'mill:rw', '--no-trust']);
     assert.match(said, new RegExp(`^mill  ${repo}$`, 'm'));
     assert.match(said, /^filed: .*mill\.json$/m);
     assert.match(await out(['factory', 'ls']), new RegExp(`^mill +${repo}$`, 'm'));

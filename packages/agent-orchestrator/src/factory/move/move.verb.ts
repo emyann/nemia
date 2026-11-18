@@ -17,7 +17,7 @@ import { StoreRoot } from '../../config/root.store.ts';
 import { FactoryDoor, refuseName, volumesGiven } from '../door/factories.store.ts';
 import { Factory as FactoryModel, FactoryName, isDefaultFactory } from '../factory.model.ts';
 import { workedOn, type Factory } from '../factory.ts';
-import { volumesFromRepos, type FileVolume } from '../volume/from-repos.ts';
+import { volumesFromRepos, type FileVolume } from '../from-repos/from-repos.ts';
 import { CardDoor } from '../../cards/cards.store.ts';
 import { RunDoor } from '../../runs/runs.store.ts';
 import { CardName } from '../../inbox/inbox.model.ts';

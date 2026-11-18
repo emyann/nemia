@@ -270,7 +270,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
     const checkout = scratch('wf-skill-life-known-');
     fs.mkdirSync(path.join(checkout, '.git'));
     const library = path.join(checkout, 'workflows', 'skills');
-    refuses(() => writeSkill(ROOT, library, DRAFT, { version: null }), 'Invalid', library, 'nemia factory add <name> --repo <repo>');
+    refuses(() => writeSkill(ROOT, library, DRAFT, { version: null }), 'Invalid', library, 'nemia factory volume add <factory> <repo>:rw');
     assert.equal(fs.existsSync(path.join(library, DRAFT.name)), false, 'a .git beside it makes no repository known');
     addFactoryAt(ROOT, { name: 'skill-known', volumes: [checkout].map((r) => `${r}:rw`) });
     writeSkill(ROOT, library, DRAFT, { version: null });

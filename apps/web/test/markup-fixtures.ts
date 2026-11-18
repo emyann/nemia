@@ -523,7 +523,7 @@ export const filed = (
   commands: {
     attach: `nemia factory attach ${name} <workflow>`,
     rm: `nemia factory rm ${name}`,
-    add: `nemia factory add ${name} --repo <path>`,
+    add: `nemia factory add ${name} --volume <path|url>:rw`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
     trust: `nemia factory trust ${name}`,
     volume: `nemia factory volume add ${name} <path>:ro|:rw`,
@@ -593,7 +593,7 @@ export const listedFactory = (name: string, repos: string[], error: string | nul
 /** Your store, as the api answers it, with the line that files a factory. */
 export const STORE_ANSWER: [readonly unknown[], unknown] = [
   ['store'],
-  { workflows: '', agents: '', skills: '', fileFactory: 'nemia factory add <name> --repo <path>', turnOnNemia: '' },
+  { workflows: '', agents: '', skills: '', fileFactory: 'nemia factory add <name> --volume <path|url>:rw', turnOnNemia: '' },
 ];
 
 export const LISTED = [listedFactory('default', ['/code/app']), listedFactory('solo', ['/r/a']), listedFactory('pair', ['/r/a', '/r/b'])];

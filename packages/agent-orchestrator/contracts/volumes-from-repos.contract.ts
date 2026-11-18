@@ -1,5 +1,5 @@
 /**
- * A factory's file written by a release before one list, read into one list (agent-orchestrator, src/factory/volume/from-repos.ts,
+ * A factory's file written by a release before one list, read into one list (agent-orchestrator, src/factory/from-repos/from-repos.ts,
  * `volumesFromRepos`): the repositories it worked on (`repos`), each with the git URL it was cloned from where it was given by one
  * (`origins`, by its path), and its extra folders (`volumes`), each read-only or writable. A factory's record then has `volumes` alone: a
  * repository it worked on is a writable volume, in the order it was filed, so its first repository is still its first writable volume
@@ -48,7 +48,7 @@ const volumesFromReposSpec = spec<(file: FormerKeys) => readonly FileVolume[]>({
    * its URL as its origin; that each volume the file held follows, at its path and under its name, read-only in a file written before
    * one list and as it was in one written after: each runs out of the solver's work through the two `map`s the function is and the list
    * they join (tsverify leaves each `bounded`, with no counterexample up to four elements), so they are held whole by
-   * `src/factory/volume/from-repos.test.ts`, a row per law, until the verifier reads them here.
+   * `src/factory/from-repos/from-repos.test.ts`, a row per law, until the verifier reads them here.
    */
   ensures: {
     nothingAdded: {
@@ -58,5 +58,5 @@ const volumesFromReposSpec = spec<(file: FormerKeys) => readonly FileVolume[]>({
   },
 });
 
-/** `volumesFromRepos`'s type, which src/factory/volume/from-repos.ts takes. */
+/** `volumesFromRepos`'s type, which src/factory/from-repos/from-repos.ts takes. */
 export type VolumesFromRepos = Implementation<typeof volumesFromReposSpec>;

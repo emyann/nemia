@@ -224,7 +224,7 @@ test('REFUSED at shipped defaults, with the folder as it was, before a byte is w
   const nowhere = [
     "is not a workflow in the store's workflows/",
     '<repo>/workflows/<name>',
-    'nemia factory add <name> --repo <repo>',
+    'nemia factory volume add <factory> <repo>:rw',
     '{ anywhere: true }',
   ];
   const file = path.join(STORE, 'a-file');

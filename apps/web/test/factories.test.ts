@@ -47,7 +47,7 @@ const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
   commands: {
     attach: `nemia factory attach ${name} <workflow>`,
     rm: `nemia factory rm ${name}`,
-    add: `nemia factory add ${name} --repo <path>`,
+    add: `nemia factory add ${name} --volume <path|url>:rw`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
     trust: `nemia factory trust ${name}`,
     volume: `nemia factory volume add ${name} <path>:ro|:rw`,

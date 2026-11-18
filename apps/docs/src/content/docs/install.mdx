@@ -28,9 +28,9 @@ lays the release down:
   step runs the `nemia` its settings allow. Both name the launcher through `current`, so they follow every upgrade.
 
 On a laptop it then asks nothing. It starts Nemia now, on this machine alone (127.0.0.1), with no service that starts it at login,
-opens the board's welcome page in your browser, and prints a short summary of what it did, ending on the link to that page: a
-first-visit link, which signs that browser in to the board once, within ten minutes. Where no browser could be opened, open the
-printed link yourself; `nemia board link --base http://127.0.0.1:8787/welcome` makes another. `--no-open` opens nothing. To start
+opens the board's welcome page in your browser, and prints a short summary of what it did, ending on the link to that page under
+`http://localhost:8787/welcome`: a first-visit link, which signs that browser in to the board once, within ten minutes. Where no browser could be opened, open the
+printed link yourself; `nemia board link --base http://localhost:8787/welcome` makes another. `--no-open` opens nothing. To start
 Nemia at login later, run `nemia service install`. The summary is plain where the output is no terminal or `NO_COLOR` is set.
 
 On a server, said by `--serve` or by a `--bind <address>`, it asks two things instead, each of which you can also answer by a flag

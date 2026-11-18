@@ -257,30 +257,35 @@ test('a typed address is taken, and the 1 of the offer binds this machine alone,
   assert.equal(alone.asked.at(-1), 'doctor');
 });
 
-test('a laptop is asked nothing: Nemia started on 127.0.0.1, no login service, and the first-visit link to /welcome opened', onHost, () => {
-  const run = server();
-  const ran = run([], ['n', '2']);
-  assert.equal(ran.status, 0, ran.out);
-  assert.deepEqual(ran.asked, ['daemon --json', 'board link --base http://127.0.0.1:8787/welcome'], 'no service, token or doctor');
-  assert.deepEqual(ran.opened, ['http://127.0.0.1:8787/welcome/link/first-visit']);
-  assert.doesNotMatch(ran.out, /Start Nemia at login|Pick a number/, 'no question is put');
-  assert.match(ran.stdout, /http:\/\/127\.0\.0\.1:8787\/welcome/);
-  assert.match(ran.stdout, /v1\.2\.3/);
-  assert.match(ran.stdout, /nemia service install/, 'starting at login is named, not asked');
-  assert.doesNotMatch(ran.stdout, /\x1b/, 'plain where stdout is no terminal');
-});
+test(
+  'a laptop is asked nothing: Nemia started on the loopback, no login service, and the first-visit link to localhost/welcome opened',
+  onHost,
+  () => {
+    const run = server();
+    const ran = run([], ['n', '2']);
+    assert.equal(ran.status, 0, ran.out);
+    assert.deepEqual(ran.asked, ['daemon --json', 'board link --base http://localhost:8787/welcome'], 'no service, token or doctor');
+    assert.deepEqual(ran.opened, ['http://localhost:8787/welcome/link/first-visit']);
+    assert.doesNotMatch(ran.out, /Start Nemia at login|Pick a number/, 'no question is put');
+    assert.match(ran.stdout, /http:\/\/localhost:8787\/welcome/);
+    assert.doesNotMatch(ran.stdout, /127\.0\.0\.1/, 'the loopback is named localhost, on the running line and the link alike');
+    assert.match(ran.stdout, /v1\.2\.3/);
+    assert.match(ran.stdout, /nemia service install/, 'starting at login is named, not asked');
+    assert.doesNotMatch(ran.stdout, /\x1b/, 'plain where stdout is no terminal');
+  },
+);
 
 test('a laptop whose browser does not open, or under --no-open, still installs and prints the first-visit link', onHost, () => {
   const run = server();
   const failed = run([], undefined, { OPEN_EXIT: '1' });
   assert.equal(failed.status, 0, failed.out);
-  assert.deepEqual(failed.opened, ['http://127.0.0.1:8787/welcome/link/first-visit']);
-  assert.match(failed.stdout, /http:\/\/127\.0\.0\.1:8787\/welcome\/link\/first-visit/);
+  assert.deepEqual(failed.opened, ['http://localhost:8787/welcome/link/first-visit']);
+  assert.match(failed.stdout, /http:\/\/localhost:8787\/welcome\/link\/first-visit/);
 
   const unopened = run(['--no-open']);
   assert.equal(unopened.status, 0, unopened.out);
   assert.deepEqual(unopened.opened, []);
-  assert.match(unopened.stdout, /http:\/\/127\.0\.0\.1:8787\/welcome\/link\/first-visit/);
+  assert.match(unopened.stdout, /http:\/\/localhost:8787\/welcome\/link\/first-visit/);
 
   const headless = run([], undefined, { DISPLAY: '' });
   assert.equal(headless.status, 0, headless.out);

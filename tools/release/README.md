@@ -121,7 +121,7 @@ is taken), refuses an archive whose sum differs, unpacks it into
 the old one, and links `~/.local/bin/nemia` and the store's `tools/bin/nemia` to `releases/current/bin/nemia`, the second so a step's
 session, whose PATH starts with the tools folder, runs the `nemia` its settings allow. Then it takes one of three paths. On a laptop (no `--serve`, `--bind` or `--client`) it asks nothing: it starts Nemia now on
 127.0.0.1 (`nemia daemon --json`, the read that starts the store's daemon on demand) with no login service, mints a first-visit link
-under `<url>/welcome` (`nemia board link --base`), opens it (`open` on macOS, `xdg-open` on Linux with a display; `--no-open` opens
+under `http://localhost:<port>/welcome` (the loopback named as a person types it) (`nemia board link --base`), opens it (`open` on macOS, `xdg-open` on Linux with a display; `--no-open` opens
 nothing, and a failure to open fails nothing) and ends on a summary of what it did and that link, coloured only on a terminal or with
 `FORCE_COLOR`, never with `NO_COLOR`. On a server (`--serve`, or a `--bind`) it asks, or with `--yes` reads its flags: starting at login (`nemia service install --size auto`, `--no-service` to skip,
 `loginctl enable-linger` on Linux), and the address to bind (`--bind`, after which `nemia token add` prints the first person token).

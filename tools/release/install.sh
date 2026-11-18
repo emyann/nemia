@@ -10,7 +10,7 @@
 #
 # On a laptop, with neither --serve, --bind nor --client, it asks nothing: it starts Nemia now on this machine alone (nemia daemon
 # --json, the read that starts this store's daemon on demand, bound to 127.0.0.1), with no login service, mints the board's single-use
-# first-visit link under <url>/welcome (nemia board link --base) and opens it in the browser (open on macOS, xdg-open on Linux where a
+# first-visit link under http://localhost:<port>/welcome (nemia board link --base) and opens it in the browser (open on macOS, xdg-open on Linux where a
 # display is set; --no-open opens nothing, and a failure to open fails nothing), then prints a short summary of what it did, ending on
 # the link, and nemia service install named for starting at login. The summary is coloured where stdout is a terminal whose TERM is not
 # dumb, or FORCE_COLOR is set; a set NO_COLOR keeps it plain whatever else (https://no-color.org, https://force-color.org).
@@ -289,7 +289,7 @@ home() {
 # laptop: start Nemia now on this machine alone, open the board's first-visit link to its welcome page, and print the summary. It asks
 # nothing, installs no login service, and nothing it does past the unpacking fails the install.
 laptop() {
-  url=http://127.0.0.1:8787
+  url=http://localhost:8787
   started=0
   link=
   opened=0
@@ -300,6 +300,13 @@ laptop() {
       [ -z "$said" ] || url=${said%/}
     fi
   fi
+  # The loopback is named localhost, as a person types it on their own machine; the board's cookie is kept per host name, so the link
+  # opened and every one nemia board link prints after it name it alike. The api takes it, and a browser that tries ::1 first comes
+  # to 127.0.0.1, where the daemon listens.
+  case $url in
+    http://127.0.0.1:* | http://127.0.0.1) url=http://localhost${url#http://127.0.0.1} ;;
+    'http://[::1]:'* | 'http://[::1]') url=http://localhost${url#'http://[::1]'} ;;
+  esac
   welcome=$url/welcome
   if [ "$started" = 1 ]; then
     if "$nemia" board link --base "$welcome" >"$work/link"; then

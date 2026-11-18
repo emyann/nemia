@@ -132,11 +132,11 @@ test("an archive install's service runs its own node under releases/current too;
   assert.equal(archiveInstall(CHECKOUT), false);
 });
 
-test('an archive is published for linux on x64 and arm64 and for macOS on arm64, and for no other machine', () => {
+test('an archive is published for linux on x64 and arm64 and for macOS on x64 and arm64, and for no other machine', () => {
   assert.equal(platformOf('linux', 'x64'), 'linux-x64');
   assert.equal(platformOf('linux', 'arm64'), 'linux-arm64');
   assert.equal(platformOf('darwin', 'arm64'), 'darwin-arm64');
-  assert.equal(platformOf('darwin', 'x64'), null);
+  assert.equal(platformOf('darwin', 'x64'), 'darwin-x64');
   assert.equal(platformOf('win32', 'x64'), null);
 });
 

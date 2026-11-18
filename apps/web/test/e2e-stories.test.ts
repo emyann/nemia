@@ -3,7 +3,8 @@
  * file. What a change touches is read along the first parent, so what a merged branch changed is not the work's; `--list` prints
  * Storybook's ids and launches nothing; a changed part no story reaches is refused, exit 1, named; what every story is drawn in (the
  * preview, what it imports, the stylesheets those import) reaches every story. A person's targets (`--targets`) are read off their
- * folder's names and paired with their stories, a target naming no story refused. Each case a row.
+ * folder's names and paired with their stories, a target naming no story refused. A picture's key moves with what its story is drawn
+ * from and nothing else; the cache copies what it holds byte for byte, and a pass it holds whole builds no Storybook. Each case a row.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -263,10 +264,10 @@ test('a pass into an empty --out, or one not there yet, clears nothing and passe
 
 /** Each picture's key of the touched `ids` in the planted tree at `root`, by `<id>-<theme>`, as `shoot.ts` keys them. */
 const keyed = (root: string, ids: readonly string[]): Map<string, string> =>
-  keysOf(root, path.join(root, 'package-lock.json'), reachesOf(root, storyFilesOf(root), ids), picturesOf(ids));
+  keysOf(root, path.join(root, 'package-lock.json'), reachesOf(root, STORY_FILES, ids), picturesOf(ids));
 
 /** The planted story files, from the root. */
-const storyFilesOf = (root: string): string[] => [TAG_STORIES, 'apps/web/src/components/run/Card.stories.tsx'];
+const STORY_FILES = [TAG_STORIES, 'apps/web/src/components/run/Card.stories.tsx'];
 
 /** The keys of `after` that differ from `before`'s, by picture. */
 const movedKeys = (before: ReadonlyMap<string, string>, after: ReadonlyMap<string, string>): string[] =>

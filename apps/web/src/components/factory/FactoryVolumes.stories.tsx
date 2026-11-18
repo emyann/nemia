@@ -49,7 +49,7 @@ export const Added: Story = {
         await expect(volume).toBe('/srv/notes:ro');
         return HttpResponse.json({
           file: '/store/factories/mill.json',
-          volume: { name: 'notes', path: '/srv/notes', readOnly: true, origin: null },
+          volume: { name: 'notes', path: '/srv/notes', readOnly: true },
           was: null,
           trusts: [],
         });
@@ -79,7 +79,8 @@ export const Refused: Story = {
     const page = within(canvasElement);
     await userEvent.type(page.getByRole('textbox', { name: 'Path or git URL' }), '/srv/scratch');
     await userEvent.click(page.getByRole('button', { name: 'Add' }));
-    await expect(await page.findByRole('alert')).toHaveTextContent('in no git repository');
+    await waitFor(() => expect(canvasElement.querySelector('[data-volume-refused]')).not.toBeNull());
+    await expect(canvasElement.querySelector('[data-volume-refused]')).toHaveTextContent('in no git repository');
   },
 };
 

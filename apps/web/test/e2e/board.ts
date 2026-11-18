@@ -888,7 +888,8 @@ const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => st
 };
 
 /**
- * Plants Nemia's chat in the store the worker serves: her level file naming her task, her task journalled filed and spawned, her
+ * Plants Nemia's chat in the store the worker serves: her level file naming her task, her task journalled filed and spawned as her
+ * transcript's first line is written (a line timed before her attempt began is her parent session's, never drawn), her
  * session's run file as its holder writes one (`herRun`), her session's transcript, the person's outbox and their read mark. Each file
  * is written as the keeper, the api and the runtime write theirs — a key they leave out absent, never null.
  *
@@ -922,7 +923,6 @@ export function herChat(what: HerChat): () => void {
         /** Her session is long-lived, as the keeper files it: a session between turns reads idle only under this policy (`idleOf`). */
         restartPolicy: 'Always',
       },
-      /** Her attempt starts as her transcript's first line is written: a line timed before it is her parent session's, never drawn. */
       { kind: 'starting', at: at(0), attempt: 1 },
       { kind: 'spawned', at: at(0), attempt: 1 },
       ...(what.told ?? []).map((told, i) => ({ kind: 'said', at: at(2 + i), attempt: 1, text: told.text })),

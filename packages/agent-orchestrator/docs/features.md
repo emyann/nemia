@@ -2469,9 +2469,11 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   that owes her session asks again. A factory's places are another matter: each is given its trust when a person adds it (`nemia
   factory add`, `apply`, `trust`), since a repository's settings are another party's.
 - **The keeper** (`keep`, `src/nemia/keep.verb.ts`), forked by `up` beside the deliverer, beats every 5 s and acts on what her
-  machine owes (`nemiaDue`, `src/nemia/nemia.ts`): at `semi-auto`, her task filed once under `nemia-<since>`, then her subscription put;
-  at `manual`, her task stopped and her subscription dropped. A task stopped or ended from outside is never filed again — the keeper
-  never fights the person — and `nemia level semi-auto` then gives a fresh one. Her task is long-lived (`restartPolicy: 'Always'`,
+  machine owes (`nemiaDue`, `src/nemia/nemia.ts`): while a factory is above `manual`, her task filed, then her subscription put, and
+  she never rests; a message in her chat files her at any level, each task named `nemia-<when filed>` and listed in her record
+  (`nemia/session.json`), a new one resuming the last (`resumeFrom`); at `manual`, her subscription dropped, and after 15 quiet minutes
+  (`NEMIA_REST_AFTER`) her task put to rest. A task stopped or ended from outside is not filed again until the person speaks — the
+  keeper never fights the person — and a message or a level set then gives a fresh one. Her task is long-lived (`restartPolicy: 'Always'`,
   `background: true`, Remote Control on), in `$WF_ROOT/nemia/`, at `permissionMode: auto`, with every factory's folders mounted
   read-only and her memory writable; her instruction is written at filing, the shipped one followed by the person's custom one (a
   change while she is kept is told, *Her custom instruction told*, below). At 5b

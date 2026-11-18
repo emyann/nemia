@@ -3725,8 +3725,10 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   retry that waits on no one — is hers. Each command's class in the table decides (`class` on its entry, `src/admission/class.ts`), and
   a "don't ask again" never widens what waits. Her folder is Nemia's own, so the keeper gives the harness's trust to it before it
   files her, in the same beat, and no person runs a command for it; only a write the harness's file refuses is said, as `untrusted` on
-  `nemia level`, the board and `nemia doctor`, in words that name what to mend. **`nemia level manual`** puts her off: the keeper stops her session and drops her subscription. A
-  session stopped from outside is never filed again; `nemia level semi-auto` starts a fresh one.
+  `nemia level`, the board and `nemia doctor`, in words that name what to mend. **`nemia level manual`** ends her operating: the keeper drops her
+  subscription, and she stays for the conversation, resting after 15 quiet minutes. A message in her chat starts her at any level, a
+  new task resuming her last session. A session stopped from outside is not filed again until the person speaks: a message or a level
+  set starts a fresh one.
 - **`nemia level auto`**, or a factory set or raised to it (`--factory <name> auto`), is Semi-auto with one difference: an answer the
   person's confirmed list allows in the run's current state is given unasked; anything else asks, as at Semi-auto. A rule names the
   answer (`approve`, `retry`), the steps it holds at, a dollar line the run's spend stays under (`under`), and its

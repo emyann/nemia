@@ -147,7 +147,7 @@ export function clientNameOf(userAgent: string): string {
   return browser === undefined ? 'board' : `board-${browser}`;
 }
 
-/** The query key a first-visit link carries its secret in, on any path of the board (`<base>/welcome?link=<secret>`). */
+/** The query key a first-visit link carries its secret in (`<base>/?link=<secret>`). */
 const LINK_KEY = 'link';
 
 /**

@@ -135,9 +135,12 @@ export default {
       await photograph(page, path.join(OUT, `welcome-ready-${await themeOf(page)}.png`));
 
       planted = 'fresh';
-      await page.goto(new URL('/', page.url()).href);
+      await page.goto(new URL('/welcome/', page.url()).href);
       await idle(page);
-      await expectVisible(welcome, 'fresh again, / sends this browser to the welcome');
+      await expectVisible(
+        welcome,
+        "fresh again, the installer's address, /welcome/ (its base, `/welcome`, with `/?link=`), opens the welcome",
+      );
       await welcome.locator('[data-welcome-skip]').click();
       await page.waitForURL((url) => url.pathname === '/');
       await idle(page);

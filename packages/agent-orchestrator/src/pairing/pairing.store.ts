@@ -293,9 +293,9 @@ export function pairingApproved(home: string, code: string, nowMs: number): Pair
 const linkFile = (home: string, digest: string): string => path.join(linksDir(home), `${digest}.json`);
 
 /**
- * A first-visit link minted at `nowMs`: the board's address `base` with the link's secret (`<base>/welcome?link=<secret>`, the welcome,
- * which sends a store already onboarded on to the board), answered this once, and when it lapses. The store keeps the secret's digest
- * alone, as the link's file's name. Refused (`Invalid`): a base that is no http or https address.
+ * A first-visit link minted at `nowMs`: the board's address `base` with the link's secret (`<base>/?link=<secret>`), answered this once,
+ * and when it lapses. The store keeps the secret's digest alone, as the link's file's name. Refused (`Invalid`): a base that is no
+ * http or https address.
  * @param home The store's root.
  * @param base The board's address the link is printed under.
  * @param nowMs The time it is minted at, in ms since the epoch.
@@ -308,7 +308,7 @@ export function linkMinted(home: string, base: string, nowMs: number): LinkMinte
   swept(linksDir(home), nowMs);
   const secret = secretNew();
   filed(linkFile(home, ticketDigest(secret)), { createdAtMs: nowMs, ttlMs: LINK_TTL_MS } satisfies LinkFiled);
-  return { url: `${base.replace(/\/+$/, '')}/welcome?link=${secret}`, expiresAt: iso(nowMs + LINK_TTL_MS) };
+  return { url: `${base.replace(/\/+$/, '')}/?link=${secret}`, expiresAt: iso(nowMs + LINK_TTL_MS) };
 }
 
 /** The name a first-visit link's token takes: `board-` and the day it was claimed, `board-<yyyy-mm-dd>`. */

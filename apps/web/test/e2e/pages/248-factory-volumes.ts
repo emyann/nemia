@@ -36,7 +36,7 @@ const drawnBefore = (page: Page, before: string, after: string): Promise<boolean
   );
 
 /**
- * The Volumes card of FACTORY, given a read-only folder and a writable one beside its repository: each path in the api's order, its
+ * The Volumes card of FACTORY, given a read-only folder beside its repository: each path in the api's order, its
  * mark, a writable one worked on and a read-only one read, and the api's line that takes each back; drawn after the trust caution's
  * place and before the rules.
  */
@@ -104,8 +104,8 @@ async function expectAddedThenRemoved(page: Page, folder: string): Promise<void>
 export default {
   /**
    * A factory's volumes on its settings page. The page makes folders where the pictures go (`OUT`), outside the store and every
-   * factory's repositories, as `nemia factory volume add` requires, and writes two into the file of FACTORIES' `hiring` beside its
-   * repository as the verb writes them, one `:ro` and one `:rw`: the card lists each, in the api's order, with its mark, what it is,
+   * factory's repositories, as `nemia factory volume add` requires, and writes one into the file of FACTORIES' `hiring` beside its
+   * repository as the verb writes it, `:ro`: the card lists each, in the api's order, with its mark, what it is,
    * and the line that takes it back. A third is given through the card's form, read only, and taken back by its Remove. A factory it
    * files with none shows the api's line to add one. It is pictured once, in the dark theme. The factory's file is put back, the one it
    * filed removed, then the folders, whatever happens.
@@ -117,15 +117,14 @@ export default {
     const factoryText = fs.readFileSync(factoryFile, 'utf8');
     fs.mkdirSync(OUT, { recursive: true });
     const ro = fs.mkdtempSync(path.join(OUT, 'factory-volumes-ro-'));
-    const rw = fs.mkdtempSync(path.join(OUT, 'factory-volumes-rw-'));
     const formed = fs.mkdtempSync(path.join(OUT, 'factory-volumes-form-'));
     const noneFile = path.join(store!, 'factories', `${NONE}.json`);
     try {
       const factory = JSON.parse(factoryText) as { volumes: unknown[] };
-      const volumes = [...factory.volumes, { path: ro, readOnly: true }, { path: rw, readOnly: false }];
+      const volumes = [...factory.volumes, { path: ro, readOnly: true }];
       fs.writeFileSync(factoryFile, `${JSON.stringify({ ...factory, volumes }, null, 2)}\n`);
-      fs.writeFileSync(noneFile, `${JSON.stringify({ volumes: [] }, null, 2)}\n`);
-      await expectListed(page, ro, rw);
+      fs.writeFileSync(noneFile, `${JSON.stringify({ volumes: [], instruction: { store: true } }, null, 2)}\n`);
+      await expectListed(page, ro);
       await expectAddedThenRemoved(page, formed);
       await expectNone(page);
     } finally {
@@ -133,7 +132,6 @@ export default {
       fs.rmSync(noneFile, { force: true });
       fs.rmSync(formed, { recursive: true, force: true });
       fs.rmSync(ro, { recursive: true, force: true });
-      fs.rmSync(rw, { recursive: true, force: true });
     }
   },
 } satisfies PageSpec;

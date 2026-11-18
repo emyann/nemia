@@ -34,7 +34,8 @@ import type { Run } from '../record/record.ts';
 import { aRun } from '../../test/run-walks.ts';
 import { names } from '../../test/assessed.ts';
 import { nemiaDir, writeUntrusted } from '../nemia/level.store.ts';
-import { trustFolder } from '../runtime-client.ts';
+import { engineOf, EngineService, trustFolder } from '../runtime-client.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { trustPlaces } from '../trust/trust.verb.ts';
 
 const ROOT = scratch('wf-readiness-');
@@ -154,6 +155,39 @@ test('a harness in place says whether its version is the pin and offers its remo
   assert.equal(untested.ready, false);
   assert.ok(signIn?.fixes.length, 'it offers a fix');
   for (const fix of signIn?.fixes ?? []) assert.deepEqual([fix.kind, fix.startable], ['typed', false]);
+});
+
+test('a harness in place carries its two checks: its version against the pin, with the install again where it differs, and its last turn, unrun', async () => {
+  const PATH = `${toolsBinDir(ROOT)}:/usr/bin:/bin`;
+  fs.writeFileSync(SIGNED_IN, '');
+  const checksOf = async (given: ReadinessFacts, engine = false) => {
+    const program = readinessOf(given).pipe(
+      Effect.provide(PlaceService.layer({ ...testPlace().place, declared: { ...declared, needs: [identity('exit 0')] } })),
+      Effect.provideService(StoreRoot, ROOT),
+    );
+    const got = await Effect.runPromise(engine ? program.pipe(Effect.provide(EngineService.layer(engineOf(testEngine().layer)))) : program);
+    return got.pieces.find((p) => p.name === DEFAULT_HARNESS)?.checks ?? [];
+  };
+  const [atPin] = await checksOf(facts({ PATH }));
+  assert.deepEqual([atPin?.name, atPin?.state, atPin?.found, atPin?.pin], ['version', 'passed', CLAUDE_PIN, CLAUDE_PIN]);
+  const [drifted] = await checksOf(facts({ PATH }, {}, '0.0.1'));
+  assert.deepEqual([drifted?.state, drifted?.found, drifted?.pin], ['failed', '0.0.1', CLAUDE_PIN]);
+  assert.deepEqual(
+    drifted?.fixes.map((f) => [f.startable, f.index]),
+    [[true, 0]],
+    'the install is offered again',
+  );
+  const broken = facts({ PATH });
+  const [unread] = await checksOf({
+    ...broken,
+    run: (command, args) =>
+      command === 'env' && args.at(-1)?.endsWith('--version') ? { code: 1, out: 'error: cannot find module\n' } : broken.run(command, args),
+  });
+  assert.equal(unread?.state, 'failed');
+  assert.ok(unread?.message.includes('cannot find module'), 'it fails in what the program printed');
+  assert.equal((await checksOf(facts({ PATH }))).length, 1, 'with no engine given, no turn is read');
+  const [, turn] = await checksOf(facts({ PATH }), true);
+  assert.deepEqual([turn?.name, turn?.state], ['turn', 'unrun']);
 });
 
 test('the kept token reaches the sign-in check, said as set and loading, never as good; a file others may read is missing, its chmod typed', async () => {

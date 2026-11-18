@@ -20,6 +20,7 @@ const NEMIA: NemiaLevel = {
   reach: [],
   bridge: null,
   stopped: false,
+  rests: false,
   spend: null,
   allows: [],
   factories: [],

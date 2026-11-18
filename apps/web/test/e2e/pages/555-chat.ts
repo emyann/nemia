@@ -52,6 +52,7 @@ async function expectClosed(page: Page): Promise<void> {
     asksWaiting: 0,
     notSent: false,
     down: false,
+    resting: false,
     answering: api.answering,
     unread: api.unread,
   };

@@ -28,12 +28,13 @@ const DOT: Record<DaemonTone, string> = {
 };
 
 /**
- * Nemia's session in a word: down, answering, asking the person, holding an unsent message, or here.
+ * Nemia's session in a word: down, resting, answering, asking the person, holding an unsent message, or here.
  *
  * @param presence her presence, as her face reads it
  */
 export function presenceWord(presence: Presence): string {
   if (presence.down) return 'Nemia down';
+  if (presence.resting) return 'Nemia resting';
   if (presence.answering) return 'Nemia answering';
   if (presence.asksWaiting > 0) return `Nemia asks ${presence.asksWaiting}`;
   if (presence.notSent) return 'Nemia, not sent';

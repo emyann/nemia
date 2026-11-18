@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, settled } from '../checks.ts';
-import { FACTORIES } from '../seed.ts';
+import { FACTORIES, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -73,7 +73,7 @@ export default {
     const writeStatus = (applied: typeof RENDERED) =>
       fs.writeFileSync(path.join(folder, 'status.json'), `${JSON.stringify(statusOf(applied), null, 2)}\n`);
     try {
-      fs.writeFileSync(file, `${JSON.stringify({ repos: [path.join(store!, 'checkout')], template: TEMPLATE }, null, 2)}\n`);
+      fs.writeFileSync(file, `${JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), template: TEMPLATE }, null, 2)}\n`);
       await factoryAt(page, SHAPED);
       await expectCount(page.locator('[data-template], [data-factory-template]'), 0, 'the floor draws no template');
       await pictured(page, 'floor');

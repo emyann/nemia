@@ -103,7 +103,7 @@ export const blockOf = (factory: Factory, runs: readonly FactoryRun[]): FactoryB
   return {
     name: factory.name,
     default: factory.default,
-    repos: factory.repos.map(repoName),
+    repos: factory.worksOn.map(repoName),
     runs: mine.length,
     inFlight: mine.filter((run) => !judged(run) || inFlight(run)).length,
     waitsOnYou: mine.filter((run) => judged(run) && waitsOnYou(run)).length,
@@ -189,7 +189,7 @@ type WorkflowRepoRefusal = 'unwired' | 'unknown' | 'shared';
 export type StartRepo = { repo: string } | { refused: WorkflowRepoRefusal; why: string };
 
 /** A factory as `startRepo` reads it: its name, its repositories, its wiring and the line that attaches a workflow. */
-type Wired = Pick<Factory, 'name' | 'repos' | 'workflowRepos'> & { commands: Pick<Factory['commands'], 'attach'> };
+type Wired = Pick<Factory, 'name' | 'worksOn' | 'workflowRepos'> & { commands: Pick<Factory['commands'], 'attach'> };
 
 /**
  * The repository a run of `workflow` starts on in `factory`, a mirror of the orchestrator's `workflowRepo`
@@ -203,11 +203,11 @@ type Wired = Pick<Factory, 'name' | 'repos' | 'workflowRepos'> & { commands: Pic
  */
 export function startRepo(factory: Wired, workflow: string): StartRepo {
   const wired = Object.hasOwn(factory.workflowRepos, workflow) ? factory.workflowRepos[workflow] : undefined;
-  const named = wired === undefined ? factory.repos : factory.repos.filter((repo) => repoName(repo) === wired);
+  const named = wired === undefined ? factory.worksOn : factory.worksOn.filter((repo) => repoName(repo) === wired);
   const [one, ...more] = named;
   if (one !== undefined && !more.length) return { repo: one };
   const refused: WorkflowRepoRefusal = wired === undefined ? 'unwired' : one === undefined ? 'unknown' : 'shared';
-  const names = [...new Set(factory.repos.map(repoName))].sort().join(', ') || 'none';
+  const names = [...new Set(factory.worksOn.map(repoName))].sort().join(', ') || 'none';
   const attach = `${factory.commands.attach.replace('<workflow>', workflow)} --repo <name>, one of ${names}`;
   const why = {
     unwired: `The factory ${factory.name} works on several repositories and names none for ${workflow}: ${attach}.`,
@@ -218,8 +218,7 @@ export function startRepo(factory: Wired, workflow: string): StartRepo {
 }
 
 /** The repository a floor or an address starts on in `factory`: the one `named`, else its only one, else none until a person picks. */
-const repoOn = (factory: Pick<Factory, 'repos'>, named: string | null): string | null =>
-  named ?? (factory.repos.length === 1 ? (factory.repos[0] ?? null) : null);
+const repoOn = (repos: readonly string[], named: string | null): string | null => named ?? (repos.length === 1 ? (repos[0] ?? null) : null);
 
 /**
  * Where a factory's floor starts a run: the factory, its repositories and the one it starts on — its only one, else null until a person
@@ -230,12 +229,12 @@ const repoOn = (factory: Pick<Factory, 'repos'>, named: string | null): string |
 export const floorPlace = (factory: Factory): { factory: string; repos: string[]; repo: string | null } | { why: string } | null => {
   if (factory.default) return null;
   if (factory.error !== null) return { why: `The factory ${factory.name}'s file does not read: ${factory.error}` };
-  if (!factory.repos.length) {
+  if (!factory.worksOn.length) {
     return {
-      why: `The factory ${factory.name} names no repository to start a run on: give its file one, or file it again with ${factory.commands.rm} and ${factory.commands.add}.`,
+      why: `The factory ${factory.name} works on no volume to start a run on: give it a writable volume with ${factory.commands.volume}.`,
     };
   }
-  return { factory: factory.name, repos: factory.repos, repo: repoOn(factory, null) };
+  return { factory: factory.name, repos: factory.worksOn, repo: repoOn(factory.worksOn, null) };
 };
 
 /**
@@ -277,10 +276,10 @@ export const shownIn = <T extends { factory: string | null }>(items: readonly T[
  * @param factories The factories as the api lists them.
  */
 export const workflowFactories = (workflow: Pick<WorkflowListing, 'name' | 'from'>, factories: readonly Factory[]): string[] => {
-  const here = factories.find((f) => f.default)?.repos[0];
+  const here = factories.find((f) => f.default)?.worksOn[0];
   return factories
     .filter((f) => !f.default && f.error === null && f.workflows !== null && f.workflows.includes(workflow.name))
-    .filter((f) => workflow.from === 'user' || (here !== undefined && f.repos.includes(here)))
+    .filter((f) => workflow.from === 'user' || (here !== undefined && f.worksOn.includes(here)))
     .map((f) => f.name)
     .sort();
 };
@@ -311,7 +310,7 @@ export const listPlace = (address: PagePlace, factories: readonly Factory[]): Li
   const floor = factory ? floorPlace(factory) : null;
   if (!floor) return { kind: 'refused', factory: name, why: `No factory is named ${name}.` };
   if ('why' in floor) return { kind: 'refused', factory: name, why: floor.why };
-  const on = repoOn(floor, repo ?? null);
+  const on = repoOn(floor.repos, repo ?? null);
   return on === null
     ? { kind: 'pick', factory: name, repos: floor.repos }
     : { kind: 'in', place: { factory: name, repo: on }, repos: floor.repos };

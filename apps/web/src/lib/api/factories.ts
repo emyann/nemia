@@ -62,13 +62,15 @@ export type FactorySchedule = {
 export type FactoryUntrusted = { place: string; harness: string; withheld: string; never: string | null };
 
 /**
- * A folder of the person's machine a factory's runs reach beside its repositories: its path, whether it is read-only (`:ro`) or
- * writable (`:rw`), and the line that takes it back.
+ * A volume of a factory: a folder of the person's machine or a repository Nemia cloned (`origin`, its git URL, null where none), by
+ * its path; whether it is read-only (`:ro`), mounted for every local step, or writable (`:rw`), a repository the factory works on; and the
+ * line that takes it back.
  */
-export type FactoryVolume = { path: string; readOnly: boolean; commands: { rm: string } };
+export type FactoryVolume = { path: string; readOnly: boolean; origin: string | null; commands: { rm: string } };
 
 /**
- * The board's view of a factory (`factoryViewOf`): its name, whether it is the default factory, the repositories it works on, the
+ * The board's view of a factory (`factoryViewOf`): its name, whether it is the default factory, `worksOn` the repositories it works on
+ * (its writable volumes' paths, none for a factory given none yet), the
  * workflows it offers — null for the default factory, which offers every workflow found — its hires, `<workflow>/<step>` to an agent's
  * name, and its schedules. `error` says why its file does not read, null for every other. `template` is the template it is made from,
  * null for one that is not; `untrusted` each of its places a harness does not trust now; `volumes` each folder its runs reach;
@@ -78,7 +80,7 @@ export type FactoryVolume = { path: string; readOnly: boolean; commands: { rm: s
 export type Factory = {
   name: string;
   default: boolean;
-  repos: string[];
+  worksOn: string[];
   workflows: string[] | null;
   hires: Record<string, string>;
   error: string | null;
@@ -124,7 +126,7 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands,
   return {
     name: factory.metadata.name,
     default: factory.metadata.name === DEFAULT_NAMESPACE,
-    repos: [...spec.repos],
+    worksOn: spec.volumes.filter((v) => !v.readOnly).map((v) => v.path),
     workflows: spec.workflows ? [...spec.workflows] : null,
     hires: { ...spec.hires },
     error: status.error ?? null,
@@ -144,6 +146,7 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands,
     volumes: spec.volumes.map((v) => ({
       path: v.path,
       readOnly: v.readOnly,
+      origin: v.origin ?? null,
       commands: { rm: (v.name === undefined ? undefined : commands.volumeRm[v.name]) ?? '' },
     })),
   };

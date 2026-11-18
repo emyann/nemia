@@ -34,7 +34,7 @@ export function FactoryBar({ factory: name }: { factory: string }) {
           {block?.default && <Tag>default</Tag>}
         </span>
       }
-      description={block && <span className="break-all">on {repos || 'no repository'}</span>}
+      description={block && <span className="break-all">on {repos || 'no volume to work on'}</span>}
     >
       <div data-factory-bar={name} className="space-y-5">
         {block ? (

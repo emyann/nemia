@@ -515,7 +515,7 @@ export const filed = (
 ): import('../src/lib/api/factories.ts').Factory => ({
   name,
   default: false,
-  repos: ['/code/nemia'],
+  worksOn: ['/code/nemia'],
   workflows: ['build'],
   hires: {},
   error: null,
@@ -526,7 +526,7 @@ export const filed = (
     add: `nemia factory add ${name} --volume <path|url>:rw`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
     trust: `nemia factory trust ${name}`,
-    volume: `nemia factory volume add ${name} <path>:ro|:rw`,
+    volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
   },
   untrusted: [],
   volumes: [],
@@ -576,11 +576,11 @@ export const inboxCard = (extra: Record<string, unknown> = {}) =>
     ...extra,
   }) as never;
 
-/** A factory as the api lists it, on `repos`. */
+/** A factory as the api lists it, working on `repos`. */
 export const listedFactory = (name: string, repos: string[], error: string | null = null) => ({
   name,
   default: name === 'default',
-  repos,
+  worksOn: repos,
   workflows: name === 'default' ? null : ['dev'],
   hires: {},
   error,

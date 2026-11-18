@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
-import { DIAMOND, FACTORIES, WORKFLOWS } from '../seed.ts';
+import { DIAMOND, FACTORIES, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -97,7 +97,7 @@ function written(checkout: string): () => void {
   };
   fs.writeFileSync(record, JSON.stringify(run, null, 2));
   const plain = path.join(store!, 'factories', `${PLAIN}.json`);
-  fs.writeFileSync(plain, JSON.stringify({ repos: [checkout], workflows: [WORKFLOWS.good.name] }, null, 2));
+  fs.writeFileSync(plain, JSON.stringify({ volumes: worked([checkout]), workflows: [WORKFLOWS.good.name] }, null, 2));
   return () => {
     fs.rmSync(plain, { force: true });
     fs.rmSync(record, { force: true });

@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
-import { AGENTS, FACTORIES, WORKFLOWS } from '../seed.ts';
+import { AGENTS, FACTORIES, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -59,9 +59,9 @@ function written(): () => void {
     path.join(workflows, 'skills', TREE_SKILL.name, 'SKILL.md'),
     `---\nname: ${TREE_SKILL.name}\ndescription: ${TREE_SKILL.description}\n---\n# Outline\n`,
   );
-  put(file, `${JSON.stringify({ repos: [path.join(store!, 'elsewhere')], template: TEMPLATE }, null, 2)}\n`);
+  put(file, `${JSON.stringify({ volumes: worked([path.join(store!, 'elsewhere')]), template: TEMPLATE }, null, 2)}\n`);
   const twin = path.join(store!, 'factories', `${TWIN.name}.json`);
-  put(twin, `${JSON.stringify({ repos: TWIN.repos.map((repo) => path.join(store!, repo)) }, null, 2)}\n`);
+  put(twin, `${JSON.stringify({ volumes: worked(TWIN.repos.map((repo) => path.join(store!, repo))) }, null, 2)}\n`);
   return () => {
     fs.rmSync(twin, { force: true });
     fs.rmSync(file, { force: true });

@@ -40,7 +40,7 @@ export function FactoryBlockNode({ data: block }: NodeProps<FactoryFlowNode>) {
       ) : (
         <>
           <span className="truncate text-muted-foreground" title={repos}>
-            on {repos || 'no repository'}
+            on {repos || 'no volume to work on'}
           </span>
           <span className="mt-auto font-medium" data-runs>
             {runsOf(block)}

@@ -56,7 +56,7 @@ export const proposal = (name: string, phase: ProposalPhase, widens = false): Pr
 export const factoryView = (name: string, isDefault = false): Factory => ({
   name,
   default: isDefault,
-  repos: ['/work/nemia'],
+  worksOn: ['/work/nemia'],
   workflows: ['build'],
   hires: {},
   error: null,

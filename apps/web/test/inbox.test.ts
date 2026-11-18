@@ -615,7 +615,7 @@ const FILE_FACTORY = 'nemia factory add <name> --volume <path|url>:rw';
 const factoryOn = (name: string, repos: string[], error: string | null = null): Factory => ({
   name,
   default: name === 'default',
-  repos,
+  worksOn: repos,
   workflows: name === 'default' ? null : ['good'],
   hires: {},
   error,
@@ -626,7 +626,7 @@ const factoryOn = (name: string, repos: string[], error: string | null = null): 
     add: `nemia factory add ${name} --volume <path|url>:rw`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
     trust: `nemia factory trust ${name}`,
-    volume: `nemia factory volume add ${name} <path>:ro|:rw`,
+    volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
   },
   untrusted: [],
   volumes: [],

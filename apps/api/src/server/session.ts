@@ -10,31 +10,24 @@
  *   at a private network's address. A request with no bearer is refused 400 (`BadRequest`), naming how to send one. Answers
  *   `{ cookie: 'set' }`, never the token.
  * - `DELETE /api/session` — the cookie cleared (`Max-Age=0`), `{ cookie: 'cleared' }`.
+ *
+ * The cookie renews itself while it is used: each read (`GET`) the person's cookie alone signed in sets it again for its whole keeping
+ * (`cookieRenewed`, server/renewal.ts, asked by `callerGate`), so its 30 days run from the last visit. Forget (`DELETE /api/session`)
+ * and a token removed (`nemia token rm`, refused `unknown-token`, which clears it) end it.
  */
-import { Duration, Effect } from 'effect';
+import { Effect } from 'effect';
 import { HttpEffect, type HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { Api, BadRequest, TOKEN_COOKIE, type SessionAnswer } from 'objects';
 import { bearerOf } from '../guard.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
-
-/** How long the browser keeps the board's cookie: a person signs in again once a month, or as the token is removed. */
-const KEPT = Duration.days(30);
-
-/** The first value of `header`, a proxy's list (`https, http`) read at its first, in lower case. */
-const firstOf = (header: string | undefined): string => (header ?? '').split(',')[0]?.trim().toLowerCase() ?? '';
+import { httpsBy, KEPT } from './keeping.ts';
 
 /**
  * Whether `request` came over https: its own URL's scheme, or a proxy in front that says so (`X-Forwarded-Proto: https`).
  * @param request The request, its URL and its headers.
  */
-export function overHttps(request: HttpServerRequest.HttpServerRequest): boolean {
-  if (firstOf(request.headers['x-forwarded-proto']) === 'https') return true;
-  try {
-    return new URL(request.originalUrl).protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
+export const overHttps = (request: HttpServerRequest.HttpServerRequest): boolean =>
+  httpsBy(request.headers['x-forwarded-proto'], request.originalUrl);
 
 /** The board's cookie as the browser keeps it, `Secure` where `secure`. */
 const cookieOptions = (secure: boolean) => ({ httpOnly: true, sameSite: 'strict', path: '/', secure }) as const;

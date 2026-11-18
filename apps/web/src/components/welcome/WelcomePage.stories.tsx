@@ -29,7 +29,7 @@ const loaded = async (canvas: HTMLElement): Promise<HTMLElement> => {
   return canvas.querySelector<HTMLElement>('[data-welcome]')!;
 };
 
-/** A fresh store: Claude Code, the one line, Activate, and the skip. */
+/** A fresh store: its one harness, the one line, Activate, and the skip. */
 export const Fresh: Story = {
   parameters: { msw: freshStore },
   play: async ({ canvasElement }) => {

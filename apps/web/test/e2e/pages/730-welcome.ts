@@ -90,7 +90,7 @@ async function drawsTicks(page: Page, states: readonly [Check['state'], Check['s
 export default {
   /**
    * The welcome, over readiness reads it answers in place of the api's: `/` on a fresh store lands on `/welcome`; Activate starts the
-   * install piece's first fix; a turn failed and both passed are drawn as their ticks, Next shown once both passed; and Skip for now
+   * install piece's first fix; a turn failed and both passed are drawn as their ticks, Next shown once both passed; and the skip
    * leaves for `/`, under the Setup banner, which no longer sends that browser to the welcome. The skip is taken back.
    */
   name: 'welcome',

@@ -448,23 +448,26 @@ test('A factory raised for a stretch keeps her, the store at manual; its end pas
     const after = await level({});
     assert.deepEqual(after.factories.find((row) => row.factory === 'pipao')?.raise, null);
   });
-  await s.test('a raise ended early ends her operating at the next beat; a raise to a level the factory has by default is refused', async () => {
-    t.mock.timers.tick(1);
-    const raised = await level({ factory: 'pipao', level: 'semi-auto', for: '2h' });
-    assert.deepEqual(await beat(), ['subscribe'], 'her task still open from the conversation: subscribed again');
-    const ended = await level({ factory: 'pipao', end: true });
-    assert.equal(ended.task, raised.task, 'her task is the same');
-    assert.deepEqual(ended.factories.find((row) => row.factory === 'pipao')?.raise, null);
-    assert.equal(fs.existsSync(factoryLevelFile(ROOT, 'pipao')), false, 'a factory with no level of its own follows the store');
-    assert.deepEqual(await beat(), ['drop']);
-    t.mock.timers.tick(1);
-    await level({ factory: 'pipao', level: 'semi-auto' });
-    assert.deepEqual(await beat(), ['subscribe'], "a factory's own default above manual keeps her");
-    names(await refusal(() => level({ factory: 'pipao', level: 'semi-auto', for: '1h' })), 'pipao is at semi-auto by default');
-    await level({ factory: 'pipao', level: 'manual' });
-    assert.deepEqual(await beat(), ['drop']);
-    await letGo(t);
-  });
+  await s.test(
+    'a raise ended early ends her operating at the next beat; a raise to a level the factory has by default is refused',
+    async () => {
+      t.mock.timers.tick(1);
+      const raised = await level({ factory: 'pipao', level: 'semi-auto', for: '2h' });
+      assert.deepEqual(await beat(), ['subscribe'], 'her task still open from the conversation: subscribed again');
+      const ended = await level({ factory: 'pipao', end: true });
+      assert.equal(ended.task, raised.task, 'her task is the same');
+      assert.deepEqual(ended.factories.find((row) => row.factory === 'pipao')?.raise, null);
+      assert.equal(fs.existsSync(factoryLevelFile(ROOT, 'pipao')), false, 'a factory with no level of its own follows the store');
+      assert.deepEqual(await beat(), ['drop']);
+      t.mock.timers.tick(1);
+      await level({ factory: 'pipao', level: 'semi-auto' });
+      assert.deepEqual(await beat(), ['subscribe'], "a factory's own default above manual keeps her");
+      names(await refusal(() => level({ factory: 'pipao', level: 'semi-auto', for: '1h' })), 'pipao is at semi-auto by default');
+      await level({ factory: 'pipao', level: 'manual' });
+      assert.deepEqual(await beat(), ['drop']);
+      await letGo(t);
+    },
+  );
   await s.test(
     "a factory's raise or default above manual while her folder is not trusted is written, and the keeper trusts it and files her at once",
     async () => {
@@ -802,7 +805,7 @@ test('She answers her chat at any level: a message files her, she rests once the
       assert.notEqual(herTask(), four);
     },
   );
-  await s.test("a store whose level file names her task and whose keeper kept no record adopts it as her first", async () => {
+  await s.test('a store whose level file names her task and whose keeper kept no record adopts it as her first', async () => {
     fs.rmSync(sessionFile(ROOT));
     writeLevel(ROOT, { level: 'manual', since: '2026-10-09T08:00:00.000Z', task: 'nemia-older' });
     assert.deepEqual(herTasks(ROOT), ['nemia-older']);

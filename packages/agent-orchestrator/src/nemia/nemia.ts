@@ -133,8 +133,7 @@ export const nemiaDue: NemiaDue = (keeping, task, subscribed) => {
     const unheard = task !== undefined && k.rested !== true && k.heard !== true;
     return [...dropped, ...(unheard && k.stoppedMarked !== true ? (['markStopped'] as const) : [])];
   }
-  const quiet =
-    k.quiet === true && k.idle === true && k.owed !== true && k.answered !== true && k.asking !== true && k.closing !== true;
+  const quiet = k.quiet === true && k.idle === true && k.owed !== true && k.answered !== true && k.asking !== true && k.closing !== true;
   if (k.rested === true || (!k.above && quiet)) return ['rest', ...dropped];
   const mine = proper(k.task, subscribed);
   if (k.above && !mine) return [...dropped, 'subscribe'];

@@ -405,7 +405,9 @@ const herSubscription = Effect.fn('herSubscription')(function* () {
  * done: those owed, but past a trust refused.
  * @param restAfterMs How long the conversation is quiet before she rests at `manual`, in milliseconds.
  */
-export const keepOnce = Effect.fn('keepOnce')(function* (restAfterMs: number = Duration.toMillis(Duration.fromInputUnsafe(NEMIA_REST_AFTER))) {
+export const keepOnce = Effect.fn('keepOnce')(function* (
+  restAfterMs: number = Duration.toMillis(Duration.fromInputUnsafe(NEMIA_REST_AFTER)),
+) {
   const home = yield* StoreRoot;
   const e = yield* EngineService;
   const now = Date.now();

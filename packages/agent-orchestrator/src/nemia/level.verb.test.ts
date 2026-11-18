@@ -82,7 +82,7 @@ test("`nemia level`'s reach: the attach line, then her web link off her task's v
   });
 });
 
-test('`nemia level` reads her task off the keeper\'s record, says a stop from outside apart from a rest, and a set names no task', async (t) => {
+test("`nemia level` reads her task off the keeper's record, says a stop from outside apart from a rest, and a set names no task", async (t) => {
   writeLevel(ROOT, { level: 'manual', since: '2026-10-06T08:00:00.000Z', task: TASK });
   fs.rmSync(sessionFile(ROOT), { force: true });
   await t.test("an older store's level file names her task: it is hers, with no record of the keeper's", async () => {
@@ -92,7 +92,7 @@ test('`nemia level` reads her task off the keeper\'s record, says a stop from ou
     const open = await levelOver(undefined);
     assert.deepEqual([open.stopped, open.rests], [false, false]);
   });
-  await t.test('ended with no rest of the keeper\'s: stopped, at manual too, and resting, so a message starts her', async () => {
+  await t.test("ended with no rest of the keeper's: stopped, at manual too, and resting, so a message starts her", async () => {
     const ended = await levelOver(undefined, 'stopped');
     assert.deepEqual([ended.stopped, ended.rests], [true, true]);
   });
@@ -109,6 +109,6 @@ test('`nemia level` reads her task off the keeper\'s record, says a stop from ou
     assert.equal(file?.level, 'semi-auto');
     assert.ok(file?.asked !== undefined, 'when the person set it');
     assert.equal(file?.task, undefined, 'no task named: the keeper names her tasks');
-    assert.equal(fs.existsSync(sessionFile(ROOT)), false, 'the keeper\'s record is the keeper\'s');
+    assert.equal(fs.existsSync(sessionFile(ROOT)), false, "the keeper's record is the keeper's");
   });
 });

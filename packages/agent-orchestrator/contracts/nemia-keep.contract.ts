@@ -93,16 +93,10 @@ const operating = (k: Keeping, t: HerTask | undefined): boolean => isOpen(t) && 
 
 /** The conversation is quiet: her session idle long enough since the last word, and nothing of the person's or hers waiting. */
 const quietAll = (k: Keeping): boolean =>
-  k.quiet === true &&
-  k.idle === true &&
-  k.owed !== true &&
-  k.answered !== true &&
-  k.asking !== true &&
-  k.closing !== true;
+  k.quiet === true && k.idle === true && k.owed !== true && k.answered !== true && k.asking !== true && k.closing !== true;
 
 /** Her open task is to be put to rest: one the keeper already marked rested, or a quiet conversation at `manual`. */
-const restDue = (k: Keeping, t: HerTask | undefined): boolean =>
-  isOpen(t) && (k.rested === true || (!k.above && quietAll(k)));
+const restDue = (k: Keeping, t: HerTask | undefined): boolean => isOpen(t) && (k.rested === true || (!k.above && quietAll(k)));
 
 /** Her session is one the keeper speaks to: open, not being put to rest, and, while operating, subscribed as hers. */
 const speaking = (k: Keeping, t: HerTask | undefined, s: HerSubscription | undefined): boolean =>
@@ -136,8 +130,7 @@ const nemiaDueSpec = spec<(keeping: Keeping, task: HerTask | undefined, subscrib
     trustOnlyBeforeAFiling: {
       description: 'Her folder is trusted exactly when a filing is due and her harness does not trust it, and before the filing',
       condition: ({ input: [k], output }) =>
-        has(output, 'trust') === (has(output, 'file') && k.trusted === false) &&
-        (!has(output, 'trust') || before(output, 'trust', 'file')),
+        has(output, 'trust') === (has(output, 'file') && k.trusted === false) && (!has(output, 'trust') || before(output, 'trust', 'file')),
     },
     restExactlyWhenQuietAtManual: {
       description:
@@ -163,13 +156,11 @@ const nemiaDueSpec = spec<(keeping: Keeping, task: HerTask | undefined, subscrib
     },
     chatWordsSaidOnlyToASpeakingLiveSession: {
       description: 'The chat’s words are said to her exactly when some are owed, her session is up, and the keeper speaks to it',
-      condition: ({ input: [k, t, s], output }) =>
-        has(output, 'sayOutbox') === (speaking(k, t, s) && k.owed === true && k.up === true),
+      condition: ({ input: [k, t, s], output }) => has(output, 'sayOutbox') === (speaking(k, t, s) && k.owed === true && k.up === true),
     },
     answersCarriedOnlyToASpeakingLiveSession: {
       description: 'The person’s answers are carried exactly when one is owed, her session is up, and the keeper speaks to it',
-      condition: ({ input: [k, t, s], output }) =>
-        has(output, 'answer') === (speaking(k, t, s) && k.answered === true && k.up === true),
+      condition: ({ input: [k, t, s], output }) => has(output, 'answer') === (speaking(k, t, s) && k.answered === true && k.up === true),
     },
     questionsRecordedOnlyFromASpeakingLiveSession: {
       description:
@@ -188,8 +179,7 @@ const nemiaDueSpec = spec<(keeping: Keeping, task: HerTask | undefined, subscrib
     },
     endWithNoRestMarkedOnce: {
       description: 'A task of hers that ended with no rest is marked so exactly once, while the person has not spoken since',
-      condition: ({ input: [k, t], output }) =>
-        has(output, 'markStopped') === (stoppedUnheard(k, t) && k.stoppedMarked !== true),
+      condition: ({ input: [k, t], output }) => has(output, 'markStopped') === (stoppedUnheard(k, t) && k.stoppedMarked !== true),
     },
     aFilingIsAllABeatDoes: {
       description: 'A beat that files her does nothing else but trust her folder and drop a subscription left over',
@@ -226,8 +216,7 @@ const quietOfSpec = spec<(read: IdleRead) => Quiet>({
   ensures: {
     markedExactlyWhenIdleSeenSinceTheLastWord: {
       description: 'The idle mark stands exactly when there is one and no word was said to her after it',
-      condition: ({ input: [r], output }) =>
-        output.marked === (r.idleSince !== null && (r.lastSaid === null || r.idleSince >= r.lastSaid)),
+      condition: ({ input: [r], output }) => output.marked === (r.idleSince !== null && (r.lastSaid === null || r.idleSince >= r.lastSaid)),
     },
     quietExactlyWhenTheMarkIsOldEnough: {
       description: 'The conversation is quiet exactly when the idle mark stands and is at least the rest’s length old',

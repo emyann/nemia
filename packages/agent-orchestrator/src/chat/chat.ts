@@ -170,8 +170,7 @@ export const offsetAfter = (span: TaskSpan | undefined): number =>
   span === undefined ? 0 : span.attempts.reduce((max, n) => Math.max(max, span.offset + n), span.offset);
 
 /** The last of `spans` that `holds`, or undefined. */
-const lastSpan = (spans: readonly TaskSpan[], holds: (span: TaskSpan) => boolean): TaskSpan | undefined =>
-  [...spans].reverse().find(holds);
+const lastSpan = (spans: readonly TaskSpan[], holds: (span: TaskSpan) => boolean): TaskSpan | undefined => [...spans].reverse().find(holds);
 
 /**
  * The words said across `spans` and the chat's marks that name an attempt, each numbered across the tasks, so one chat draws them all

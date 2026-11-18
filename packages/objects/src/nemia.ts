@@ -74,7 +74,8 @@ export const NemiaLevel = Schema.Struct({
       "Whether her task ended with no rest of the keeper's (stopped from outside, or refused at its start): filed again on the person's next message or level set.",
   }),
   rests: Schema.Boolean.annotate({
-    description: "Whether no task of hers is open, so a message in her chat starts one; false while the keeper's trust of her folder is refused.",
+    description:
+      "Whether no task of hers is open, so a message in her chat starts one; false while the keeper's trust of her folder is refused.",
   }),
   spend: Schema.NullOr(
     Schema.Struct({

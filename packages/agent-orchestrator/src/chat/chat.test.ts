@@ -621,8 +621,16 @@ test('a chat across tasks: one history, a continued session drawn once, each tas
   });
   await t.test('an earlier task’s delivered words are drawn where their said is, not at the end', () => {
     const events = projectChat(acrossTasks());
-    assert.equal(events.findIndex((e) => e.id === 'p:o1'), 0, 'claimed by the first task’s said');
-    assert.equal(events.findIndex((e) => e.id === 'p:o2'), 5, 'claimed by the second task’s said, after her answer');
+    assert.equal(
+      events.findIndex((e) => e.id === 'p:o1'),
+      0,
+      'claimed by the first task’s said',
+    );
+    assert.equal(
+      events.findIndex((e) => e.id === 'p:o2'),
+      5,
+      'claimed by the second task’s said, after her answer',
+    );
   });
   await t.test('the ids drawn are the same when a third task is appended', () => {
     const two = projectChat(acrossTasks(2)).map((e) => e.id);
@@ -632,12 +640,16 @@ test('a chat across tasks: one history, a continued session drawn once, each tas
   await t.test('a stop is numbered by the task it names; one that names none by the last task holding its attempt', () => {
     const first: TaskSpan = { task: 'nemia-1', offset: 0, attempts: [1, 2], said: [] };
     const second: TaskSpan = { task: 'nemia-2', offset: 2, attempts: [1], said: [] };
-    const stops = spanned([first, second], [], [
-      { at: at(1), attempt: 2, task: 'nemia-1' },
-      { at: at(2), attempt: 1, task: 'nemia-2' },
-      { at: at(3), attempt: 2 },
-      { at: at(4), attempt: 1 },
-    ]).stops.map((st) => st.attempt);
+    const stops = spanned(
+      [first, second],
+      [],
+      [
+        { at: at(1), attempt: 2, task: 'nemia-1' },
+        { at: at(2), attempt: 1, task: 'nemia-2' },
+        { at: at(3), attempt: 2 },
+        { at: at(4), attempt: 1 },
+      ],
+    ).stops.map((st) => st.attempt);
     assert.deepEqual(stops, [2, 3, 2, 3]);
   });
 });

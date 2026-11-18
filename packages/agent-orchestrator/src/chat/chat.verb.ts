@@ -518,8 +518,7 @@ export const chatAnswer = Effect.fn('chatAnswer')(function* (place: ChatPlace, g
 export const chatStop = Effect.fn('chatStop')(function* (place: ChatPlace) {
   const e = yield* EngineService;
   const task = place.tasks.at(-1);
-  if (task === undefined)
-    return yield* Effect.fail(new Conflict({ message: 'No session of hers is filed, so there is no turn to stop.' }));
+  if (task === undefined) return yield* Effect.fail(new Conflict({ message: 'No session of hers is filed, so there is no turn to stop.' }));
   const ended = yield* e.interrupt(task).pipe(
     Effect.catchTags({
       InterruptRefused: (refused) => Effect.fail(new Conflict({ message: refused.message })),

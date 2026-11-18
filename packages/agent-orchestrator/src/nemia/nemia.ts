@@ -255,7 +255,6 @@ const STATES: NemiaState[] = ['resting', 'due', 'untrusted', 'filed', 'kept', 't
  * an end from outside holds her stopped until the person speaks.
  */
 const EDGES: NemiaEdge[] = [
-  { from: 'resting', to: 'due', event: 'WORD_OWED', action: 'nothing' },
   { from: 'due', to: 'filed', event: 'ABOVE_MANUAL', action: 'file' },
   { from: 'due', to: 'talking', event: 'AT_MANUAL', action: 'file' },
   { from: 'due', to: 'untrusted', event: 'FOLDER_UNTRUSTED', action: 'nothing' },

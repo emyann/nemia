@@ -2494,31 +2494,31 @@ Her machine, drawn by its code:
 <!-- diagram:nemia:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/nemia/nemia.ts').then((m) => console.log(m.nemiaDiagram()))" -->
 ```mermaid
 stateDiagram-v2
-  [*] --> off
-  due --> filed: NO_TASK / file
+  [*] --> resting
+  due --> filed: ABOVE_MANUAL / file
+  due --> talking: AT_MANUAL / file
   due --> untrusted: FOLDER_UNTRUSTED / nothing
-  untrusted --> filed: TRUST_WRITTEN / trust, file
+  untrusted --> due: TRUST_WRITTEN / trust, file
   untrusted --> untrusted: TRUST_REFUSED / trust
   filed --> kept: NOT_SUBSCRIBED / subscribe
-  filed --> stopped: SETTLED_OUTSIDE / nothing
-  kept --> stopped: SETTLED_OUTSIDE / nothing
   kept --> kept: CUSTOM_CHANGED / sayCustom
   kept --> kept: OUTBOX_OWED / sayOutbox
-  stopped --> stopped: SUBSCRIBED / drop
-  leaving --> off: OPEN_OR_SUBSCRIBED / stop, drop
-  due --> off: RAISE_ENDED / nothing
-  untrusted --> off: RAISE_ENDED / nothing
-  filed --> leaving: RAISE_ENDED / nothing
-  kept --> leaving: RAISE_ENDED / nothing
-  off --> due: level (a factory above manual) [always] (by person)
-  untrusted --> due: level (a factory above manual) [always] (by person)
+  kept --> talking: RAISE_ENDED / drop
+  talking --> talking: CUSTOM_CHANGED / sayCustom
+  talking --> talking: OUTBOX_OWED / sayOutbox
+  talking --> talking: IDLE / markIdle
+  talking --> filed: ABOVE_MANUAL / nothing
+  talking --> leaving: QUIET / rest
+  leaving --> resting: SETTLED / nothing
+  filed --> stopped: SETTLED_OUTSIDE / markStopped
+  kept --> stopped: SETTLED_OUTSIDE / drop, markStopped
+  talking --> stopped: SETTLED_OUTSIDE / markStopped
+  resting --> due: chat (a message) [always] (by person)
+  stopped --> due: chat (a message) [always] (by person)
+  resting --> due: level (a factory above manual) [always] (by person)
   stopped --> due: level (a factory above manual) [always] (by person)
-  leaving --> due: level (a factory above manual) [always] (by person)
-  due --> leaving: level (none above manual) [always] (by person)
-  untrusted --> leaving: level (none above manual) [always] (by person)
-  filed --> leaving: level (none above manual) [always] (by person)
-  kept --> leaving: level (none above manual) [always] (by person)
-  stopped --> leaving: level (none above manual) [always] (by person)
+  filed --> talking: level (none above manual) [always] (by person)
+  kept --> talking: level (none above manual) [always] (by person)
   kept --> kept: agents custom nemia (set or clear) [always] (by person)
 ```
 <!-- diagram:nemia:end -->

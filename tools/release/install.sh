@@ -368,7 +368,8 @@ laptop() {
   elif [ "$started" = 1 ]; then
     printf '  Open Nemia to finish in your browser:\n\n    %s\n' "$welcome"
   else
-    printf '  Start it, then open Nemia to finish in your browser:\n\n    nemia up && nemia board link --base %s\n' "$welcome"
+    printf '  Once it runs (nemia up, in a terminal of its own), make the link that finishes in your browser:\n\n'
+    printf '    nemia board link --base %s\n' "$welcome"
   fi
   printf '\n  Later: nemia doctor says what is in place · nemia --help\n'
   printf '         nemia service install starts Nemia at login\n\n'

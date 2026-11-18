@@ -922,8 +922,9 @@ export function herChat(what: HerChat): () => void {
         /** Her session is long-lived, as the keeper files it: a session between turns reads idle only under this policy (`idleOf`). */
         restartPolicy: 'Always',
       },
-      { kind: 'starting', at: at(1), attempt: 1 },
-      { kind: 'spawned', at: at(1), attempt: 1 },
+      /** Her attempt starts as her transcript's first line is written: a line timed before it is her parent session's, never drawn. */
+      { kind: 'starting', at: at(0), attempt: 1 },
+      { kind: 'spawned', at: at(0), attempt: 1 },
       ...(what.told ?? []).map((told, i) => ({ kind: 'said', at: at(2 + i), attempt: 1, text: told.text })),
     ]),
   );

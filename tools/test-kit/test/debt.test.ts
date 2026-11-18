@@ -2,7 +2,7 @@
  * The door-debt counter, proven on planted sources: a door's store test counts the seam's uses in each file of `src` and holds them to
  * its baseline, which only shrinks, so a counter that counts nothing, or a judge that lets a fallen count stand, would pass there too.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

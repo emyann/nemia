@@ -2,7 +2,7 @@
  * The folder rule's judgement (`docs/architecture.md`, *Folders, in every package*), proven on planted trees: each package's own
  * layout test calls it over its source, so a rule that reads nothing here would pass there too.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { importsIn } from 'test-kit/imports';
 import { cycles, depthBreaks, faceBreaks, namelessBreaks, starExports, testImports, valueGraph } from 'test-kit/layout';

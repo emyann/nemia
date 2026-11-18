@@ -8,7 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsrs --noEmit && tsrs --noEmit -p test",
-    "test": "node --import ./test/ambient.ts --test --test-concurrency=2 --test-timeout=120000 ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD} 'test/*.test.ts' 'src/**/*.test.ts'"
+    "test": "vitest run ${WF_TEST_SHARD:+--shard=$WF_TEST_SHARD}"
   },
   "keywords": [],
   "author": "",

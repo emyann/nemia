@@ -2,7 +2,7 @@
  * The import scanners' reading of comments, proven on planted source: every workspace's layout and boundary tests read code through
  * `withoutComments`, so a comment it left would count as code, and code it blanked would pass every rule unread.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { importsIn, withoutComments } from 'test-kit/imports';
 

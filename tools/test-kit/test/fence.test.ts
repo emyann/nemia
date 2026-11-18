@@ -2,7 +2,7 @@
  * The matcher of Claude Code's rule shapes (`fence.ts`): what each shape of rule reaches, how a command is split into the parts a rule
  * is matched against, what a fence runs of a list of calls, and that a shape it does not model throws rather than passing.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   bash,

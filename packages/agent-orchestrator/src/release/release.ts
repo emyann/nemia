@@ -25,7 +25,7 @@ export const RELEASE_CHECK = 'release:check';
 export type ReleaseFrom = 'build' | 'archive';
 
 /** The platforms a release archive is published for: `process.platform` and `process.arch` of the machines Nemia installs on. */
-export const RELEASE_PLATFORMS = ['linux-x64', 'linux-arm64', 'darwin-arm64'] as const;
+export const RELEASE_PLATFORMS = ['linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64'] as const;
 
 /** A platform a release archive is published for (`RELEASE_PLATFORMS`). */
 export type ReleasePlatform = (typeof RELEASE_PLATFORMS)[number];

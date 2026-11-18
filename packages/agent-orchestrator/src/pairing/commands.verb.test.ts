@@ -54,10 +54,13 @@ test('nemia board link mints a link of the board under its address, or under --b
   assert.ok(![printed, based].some((answer) => answer.includes(claimed.token)), 'no answer holds a token');
 });
 
-test("the board's address: the lease's url where an api ticks, else NEMIA_BIND's address and PORT, a wildcard as the loopback", () => {
+test("the board's address: the lease's url where an api ticks, else NEMIA_BIND's address and PORT, the loopback and a wildcard as localhost", () => {
   assert.equal(boardBase('http://100.64.0.7:8790', {}), 'http://100.64.0.7:8790');
-  assert.equal(boardBase(undefined, {}), 'http://127.0.0.1:8787');
+  assert.equal(boardBase('http://127.0.0.1:8790', {}), 'http://localhost:8790', "the loopback's lease, by the name a browser keeps");
+  assert.equal(boardBase('http://[::1]:8790', {}), 'http://localhost:8790');
+  assert.equal(boardBase(undefined, {}), 'http://localhost:8787');
+  assert.equal(boardBase(undefined, { NEMIA_BIND: '127.0.0.1' }), 'http://localhost:8787');
   assert.equal(boardBase(undefined, { NEMIA_BIND: '100.64.0.7', PORT: '9000' }), 'http://100.64.0.7:9000');
-  assert.equal(boardBase(undefined, { NEMIA_BIND: '0.0.0.0' }), 'http://127.0.0.1:8787');
+  assert.equal(boardBase(undefined, { NEMIA_BIND: '0.0.0.0' }), 'http://localhost:8787');
   assert.equal(boardBase(undefined, { NEMIA_BIND: 'fd7a::1' }), 'http://[fd7a::1]:8787');
 });

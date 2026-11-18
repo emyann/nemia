@@ -7,7 +7,8 @@
  *   (`OWN_FENCE`), the api and the board, file by file (`FENCE_WORDS`), each entry naming the slice that moves its words.
  * - **A harness's words stay in the runtime** (`HARNESS`): the names Claude Code, Codex and Anthropic, and the runtime's own permission
  *   modes and sandboxes, imported from its public entry, but the plain English ones (`PLAIN_HARNESS`). Refused in the orchestrator's `src`
- *   and `bin`, `apps/api/src` and `apps/web/src`.
+ *   and `bin`, `apps/api/src` and `apps/web/src`, but in the files `HARNESS_KEPT` names, each held to its count with why: a file that
+ *   points a client at what only one harness offers (the MCP port's instructions, at the channel that harness starts).
  * - **A workflow's words stay above the runtime** (`WORKFLOW`): a workflow, a step, a gate, a factory, a closeout, the orchestrator,
  *   `nemia` and Nemia. Refused in the runtime's `src` and `bin`.
  * - **The layer above's words for what the runtime has its own for stay above it** (`LAYER_ABOVE`): a session that signs for one that
@@ -341,6 +342,33 @@ const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/index.ts': { count: 2, ...MOVES.reword },
 };
 
+/** A file kept saying a harness's word for good: how many it says, and why that harness is its to name. */
+type Kept = { count: number; why: string };
+
+/**
+ * The files outside the runtime that may say a harness's word, not as a debt but because they point a client at what only that harness
+ * offers, each held to its count. Its words stay in these files: any other file of the layer is refused them as before.
+ */
+const HARNESS_KEPT: Readonly<Record<string, Kept>> = {
+  'apps/api/src/mcp/instructions.ts': {
+    count: 1,
+    why: "the MCP port's instructions point a session at nemia channel, which Claude Code starts over stdio and a remote port cannot be",
+  },
+};
+
+/** What a kept file and its measure disagree on, each a sentence naming the fix: a file gone, a count changed, or no why. */
+function keptBreaks(rule: Rule, counts: Record<string, number>, kept: Readonly<Record<string, Kept>>): string[] {
+  return Object.entries(kept).flatMap(([file, entry]) => {
+    const why = entry.why.trim() ? [] : [`${file} is kept for ${rule.what} with no why: say why that harness is its to name`];
+    const counted = countBreak(file, rule.what, counts[file] ?? 0, entry.count, onDisk);
+    return [...why, ...(counted ? [counted] : [])];
+  });
+}
+
+/** `counts` without the files `kept` names, which `keptBreaks` judges. */
+const unkept = (counts: Record<string, number>, kept: Readonly<Record<string, Kept>>): Record<string, number> =>
+  Object.fromEntries(Object.entries(counts).filter(([file]) => !(file in kept)));
+
 /** Each runtime file that says the layer above's word for an end, the store or an attempt today, its count and what removes them. */
 const LAYER_ABOVE_WORDS: Baseline = {};
 
@@ -592,7 +620,8 @@ type Texts = {
 function breaches(texts: Texts, team: string[], folders: readonly string[] = TEAM_FOLDERS) {
   return [
     ...ratchetBreaks(FENCE_RULE, measured(texts.fence, FENCE), FENCE_WORDS, onDisk),
-    ...ratchetBreaks(HARNESS_RULE, measured(texts.harness, HARNESS), HARNESS_WORDS, onDisk),
+    ...ratchetBreaks(HARNESS_RULE, unkept(measured(texts.harness, HARNESS), HARNESS_KEPT), HARNESS_WORDS, onDisk),
+    ...keptBreaks(HARNESS_RULE, measured(texts.harness, HARNESS), HARNESS_KEPT),
     ...ratchetBreaks(WORKFLOW_RULE, measured(texts.workflow, WORKFLOW), WORKFLOW_WORDS, onDisk),
     ...ratchetBreaks(LAYER_ABOVE_RULE, measuredBy(texts.workflow, kept('layer above', layerAboveIn)), LAYER_ABOVE_WORDS, onDisk),
     ...ratchetBreaks(TEAM_RULE, measured(texts.team, [...team, ...FORMER_TEAM, ...FACTORY_NAMES], PLAIN_NAMES), TEAM_NAMES, onDisk),
@@ -690,6 +719,18 @@ test('REFUSED: a new file in each layer that says a word of another', () => {
   assert.deepEqual(planted('harness', 'apps/web/src/lib/x.ts', '/** Asks Anthropic. */\nexport const x = 1;\n'), [
     `apps/web/src/lib/x.ts holds 1 harness words: ${harness}; never add them here`,
   ]);
+  const kept = 'apps/api/src/mcp/instructions.ts';
+  const keptBroken = (text: string): string[] => planted('harness', kept, text).filter((b) => b.startsWith(`${kept} `));
+  assert.equal(keptBroken(`${texts.harness.get(kept) ?? ''}\n/** Or through Codex. */\n`).length, 1, 'a kept file is held to its count');
+  assert.equal(keptBroken('export const x = 1;\n').length, 1, 'a kept file that no longer says the word is taken off');
+  assert.deepEqual(planted('harness', kept, texts.harness.get(kept) ?? ''), [], 'a kept file at its count is let through');
+  const harnessCounts = measured(texts.harness, HARNESS);
+  assert.equal(
+    keptBreaks(HARNESS_RULE, harnessCounts, { [kept]: { count: harnessCounts[kept] ?? 0, why: ' ' } }).length,
+    1,
+    'a kept file with no why is refused',
+  );
+  assert.deepEqual(keptBreaks(HARNESS_RULE, harnessCounts, HARNESS_KEPT), [], 'every kept file says why, at its count');
   assert.deepEqual(planted('workflow', 'packages/agent-runtime/src/x.ts', '/** A workflow, under nemia. */\nexport const x = 1;\n'), [
     `packages/agent-runtime/src/x.ts holds 2 workflow words: ${WORKFLOW_RULE.fix}; never add them here`,
   ]);

@@ -9,7 +9,8 @@
  * asserts is exit codes and files, never a sentence.
  *
  * The stand-in Node is also the stand-in `nemia` of the steps after the unpacking: given `STUB_LOG`, it logs each verb it is asked,
- * answers `daemon --json` with a daemon on 127.0.0.1 (or exits 1 under `STUB_DAEMON=down`), `service addresses` with one address of each kind, `token add` with a person token (on its `Authorization:` line and
+ * answers `daemon --json` with a daemon on 127.0.0.1 (or exits 1 under `STUB_DAEMON=down`), `service addresses` with one address of
+ * each kind, `token add` with a person token (on its `Authorization:` line and
  * another), `board link` with a link, `doctor` with a missing piece and exit 1, and keeps the token file `config set-context` was
  * handed beside the log. A release carries no harness: an archive `pack` makes from a tree npm put the SDK's platform package in holds
  * none, and the installer asks for no harness's credential. A person's answers are lines of a file named by `NEMIA_INSTALL_TTY`,
@@ -208,6 +209,9 @@ const server = () => {
   };
 };
 
+/** The escape a terminal's colour begins with. */
+const ESC = String.fromCharCode(0x1b);
+
 const onHost = { skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}` };
 
 test(
@@ -271,7 +275,7 @@ test(
     assert.doesNotMatch(ran.stdout, /127\.0\.0\.1/, 'the loopback is named localhost, on the running line and the link alike');
     assert.match(ran.stdout, /v1\.2\.3/);
     assert.match(ran.stdout, /nemia service install/, 'starting at login is named, not asked');
-    assert.doesNotMatch(ran.stdout, /\x1b/, 'plain where stdout is no terminal');
+    assert.equal(ran.stdout.includes(ESC), false, 'plain where stdout is no terminal');
   },
 );
 
@@ -309,10 +313,14 @@ test('a laptop with --no-service, or whose daemon does not start, still installs
 
 test('the summary is plain unless colour is asked: FORCE_COLOR colours it, and NO_COLOR wins over it', onHost, () => {
   const run = server();
-  assert.doesNotMatch(run(['--no-open']).stdout, /\x1b/);
-  assert.match(run(['--no-open'], undefined, { FORCE_COLOR: '1' }).stdout, /\x1b\[/);
-  assert.doesNotMatch(run(['--no-open'], undefined, { FORCE_COLOR: '1', NO_COLOR: '1' }).stdout, /\x1b/);
-  assert.doesNotMatch(run(['--no-open'], undefined, { TERM: 'xterm-256color', NO_COLOR: '' }).stdout, /\x1b/, 'no terminal, no colour');
+  assert.equal(run(['--no-open']).stdout.includes(ESC), false);
+  assert.ok(run(['--no-open'], undefined, { FORCE_COLOR: '1' }).stdout.includes(`${ESC}[`));
+  assert.equal(run(['--no-open'], undefined, { FORCE_COLOR: '1', NO_COLOR: '1' }).stdout.includes(ESC), false);
+  assert.equal(
+    run(['--no-open'], undefined, { TERM: 'xterm-256color', NO_COLOR: '' }).stdout.includes(ESC),
+    false,
+    'no terminal, no colour',
+  );
 });
 
 test('REFUSED: a public or wildcard bind exits 1 with no service installed, unless --public, which is passed on', onHost, () => {

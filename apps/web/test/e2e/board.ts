@@ -842,6 +842,8 @@ export type HerChat = {
   told?: readonly { text: string; delivers?: string }[];
   /** The questions of hers waiting on the person, each drawn in her talk by what its choices carry (`drawnAsk`). */
   asks?: readonly HerAsk[];
+  /** Why the keeper could not trust her folder, written as its record (`untrusted.json`): a message no longer wakes her. */
+  untrusted?: string;
 };
 
 /**
@@ -962,6 +964,8 @@ export function herChat(what: HerChat): () => void {
     );
     if (answered.length > 0) fs.writeFileSync(path.join(chat, 'answers.jsonl'), lines(answered));
   }
+  if (what.untrusted !== undefined)
+    fs.writeFileSync(path.join(nemiaDir, 'untrusted.json'), `${JSON.stringify({ refused: what.untrusted })}\n`);
   if (what.read !== undefined) {
     fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });
     fs.writeFileSync(path.join(nemiaDir, 'chat', 'read.json'), `${JSON.stringify({ through: what.read, at: at(600) })}\n`);

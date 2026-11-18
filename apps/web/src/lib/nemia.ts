@@ -36,11 +36,11 @@ export function sessionOf(nemia: NemiaLevel): { kind: SessionKind; words: string
 }
 
 /** The state alone, in the order `sessionOf` judges it. */
-function kindOf({ reach, stopped, rests, untrusted }: NemiaLevel): SessionKind {
-  if (stopped) return 'stopped';
-  if (reach.length) return 'up';
-  if (untrusted !== null) return 'untrusted';
-  return rests ? 'resting' : 'starting';
+function kindOf(nemia: NemiaLevel): SessionKind {
+  if (nemia.stopped) return 'stopped';
+  if (nemia.reach.length) return 'up';
+  if (nemia.untrusted !== null) return 'untrusted';
+  return nemia.rests && !anyAbove(nemia) ? 'resting' : 'starting';
 }
 
 /** Whether she is kept: the store's level, or any factory's in force, above Manual. */

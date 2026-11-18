@@ -72,11 +72,12 @@ export default {
       await page.reload({ waitUntil: 'load' });
       await idle(page);
       const section = page.locator('[data-nemia-section]');
-      await expectVisible(section.locator('[data-nemia-session][data-state="off"]'), 'her session is off, no level ever set');
+      await expectVisible(section.locator('[data-nemia-session][data-state="resting"]'), 'her session rests, no level ever set');
       const on = await switched(page, section, 'Semi-auto');
-      if (on.level !== 'semi-auto' || on.task === null) throw new Refused(`Semi-auto is written with a task — ${JSON.stringify(on)}`);
+      if (on.level !== 'semi-auto' || on.task !== null)
+        throw new Refused(`Semi-auto is written, naming no task: the keeper mints hers as it files her — ${JSON.stringify(on)}`);
       await expectVisible(section.locator('[data-nemia-level="semi-auto"]'), 'her level reads Semi-auto');
-      await expectVisible(section.locator('[data-nemia-session][data-state="not-filed"]'), 'her session reads not filed yet');
+      await expectVisible(section.locator('[data-nemia-session][data-state="starting"]'), 'her session reads starting, not filed yet');
       await expectCount(section.locator('[data-nemia-task]'), 0, 'naming no task before one is filed');
       await expectVisible(
         section.getByText('what waits on you waits for your answer'),
@@ -97,7 +98,7 @@ export default {
       await photograph(page, path.join(OUT, `nemia-auto-${await themeOf(page)}.png`), { fullPage: true });
       const off = await switched(page, section, 'Manual');
       if (off.level !== 'manual') throw new Refused(`a pick of Manual then writes it — ${JSON.stringify(off)}`);
-      await expectVisible(section.locator('[data-nemia-session][data-state="off"]'), 'and her session reads off');
+      await expectVisible(section.locator('[data-nemia-session][data-state="resting"]'), 'and her session reads resting');
     } finally {
       if (before === null) fs.rmSync(config, { force: true });
       else fs.writeFileSync(config, before);

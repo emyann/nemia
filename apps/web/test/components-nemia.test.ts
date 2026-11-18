@@ -112,7 +112,7 @@ test('at Auto: her level and a factory by default picked at Auto in one control 
   assert.doesNotMatch(html, /data-slot="switch"/, 'no switch beside it');
   assert.match(
     html,
-    /one kept from before asks you every answer until it is filed again — set her level and every factory above Manual to Manual, ending any raise, and once her session reads Off, set them back\./,
+    /one kept from before asks you every answer until it is filed again — set her level and every factory above Manual to Manual, ending any raise, and once her session reads Resting, set them back\./,
   );
 });
 
@@ -201,13 +201,13 @@ test('Nemia stopped from outside: said so, with a way to a fresh session', async
   assert.match(html, /data-nemia-restart[^>]*>(?:<[^>]*>)*Start a fresh session</);
 });
 
-test('Nemia resting, or her folder untrusted, names no task; filed, it names its task and phase', async () => {
+test('Nemia not filed yet, or her folder untrusted, names no task; filed, it names its task and phase', async () => {
   const untrusted = await nemiaWith({ level: 'semi-auto', since: '2026-10-05T12:00:00.000Z', task: 'nemia-1', untrusted: UNTRUSTED });
   assert.match(untrusted, /data-state="untrusted"/);
   assert.doesNotMatch(untrusted, /data-nemia-task|>Task/, 'waiting on her trust: nothing filed, no task named');
   const notFiled = await nemiaWith({ level: 'semi-auto', task: 'nemia-1' });
-  assert.match(notFiled, /data-state="resting"/);
-  assert.doesNotMatch(notFiled, /data-nemia-task|>Task/, 'resting: no task named');
+  assert.match(notFiled, /data-state="starting"/);
+  assert.doesNotMatch(notFiled, /data-nemia-task|>Task/, 'not filed yet: no task named');
   const starting = await nemiaWith({ level: 'semi-auto', task: 'nemia-1', phase: 'pending', rests: false });
   assert.match(starting, /data-state="starting"/);
   assert.match(starting, /data-nemia-task[^>]*>nemia-1</);

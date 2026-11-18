@@ -64,12 +64,12 @@ export default {
       await expectVisible(row.and(page.locator('[data-level="semi-auto"]')), `${factory} reads Semi-auto`);
       await expectVisible(row.locator('[data-factory-raised]'), 'and raised');
       await expectVisible(row.locator('[data-factory-words]', { hasText: 'Raised until' }), 'naming when the raise ends');
-      await expectVisible(section.locator('[data-nemia-session][data-state="not-filed"]'), 'a factory raised keeps her session');
+      await expectVisible(section.locator('[data-nemia-session][data-state="starting"]'), 'a factory raised keeps her session');
       await settled(page);
       await photograph(page, path.join(OUT, `factory-levels-raised-${await themeOf(page)}.png`), { fullPage: true });
       await wrote(page, row.locator('[data-factory-end]'), 'the raise is ended');
       await expectVisible(row.and(page.locator('[data-level="manual"]')), `${factory} reads Manual again`);
-      await expectVisible(section.locator('[data-nemia-session][data-state="off"]'), 'and her session off, no factory above Manual');
+      await expectVisible(section.locator('[data-nemia-session][data-state="resting"]'), 'and her session rests, no factory above Manual');
       await wrote(page, row.locator('[data-factory-default]'), `${factory}'s default is picked at Semi-auto`, 'Semi-auto');
       await expectVisible(row.and(page.locator('[data-level="semi-auto"]')), `${factory} reads Semi-auto by default`);
       if (await row.locator('[data-factory-raise]').count()) throw new Refused('a factory at Semi-auto by default offers no raise to it');

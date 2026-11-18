@@ -64,7 +64,8 @@ applies: ["apps/web/**"]
    build (`openStory`, `test/e2e/stories/built.ts`). `npm run stories`, from `apps/web`, runs every story in Chromium (its render,
    its play function, axe as `error`); one file with `npx vitest run --project=storybook <file>.stories.tsx`. `node
    test/e2e/stories/shoot.ts --base main-worktree/HEAD --out <your files>` pictures each story the change touches, light and dark, and
-   the before, after and diff of each whose pixels moved; it refuses a changed part no story reaches. **Look through `storybook
+   the before, after and diff of each whose pixels moved; it refuses a changed part no story reaches, and copies from its cache each
+   picture whose story's inputs have not changed (`--no-cache` draws them all). **Look through `storybook
    dev`** while you work: from `apps/web`, `npx storybook dev -p <a port of its own> --no-open --ci &`, its pid kept in your step's
    files, never port 6007 (the person's); read a story at `http://localhost:<port>/iframe.html?id=<story id>`, which shows an edit in
    under a second against a static build's 20 s. It holds about 2.5 GB while it runs, counted against your step's memory limit: stop

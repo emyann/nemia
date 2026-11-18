@@ -548,7 +548,7 @@ export class ServerGroup extends HttpApiGroup.make('server').add(
   ),
   HttpApiEndpoint.get('wait', '/api/feed/wait', { query: FeedWaitQuery, success: FeedWait, error: [BadRequest, Invalid] }).annotate(
     OpenApi.Description,
-    'Waits on the feed for lines the label queries take, from a cursor, up to a bound. Answers FeedWait: why it ended, the lines as Events, and the cursor the next wait starts from.',
+    "Waits on the feed for lines the label queries take, from a cursor, up to a bound. Answers FeedWait: why it ended, the lines as Events, and the cursor the next wait starts from. It is the fallback for a client that can only call tools, and it polls: the MCP port's instructions name the two ways that need no polling, a channel and a subscriptions/listen stream of the feed's resources.",
   ),
   HttpApiEndpoint.get('feed', '/api/feed/stream', {
     query: FeedQuery,

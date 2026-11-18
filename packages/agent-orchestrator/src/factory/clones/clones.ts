@@ -1,5 +1,6 @@
 /**
- * What a factory's volume, or an import's `--repo`, names (`cloneTarget`): a directory of this machine, or a repository by its git URL, kept as a clone under
+ * What a factory's volume, or an import's `--repo`, names (`cloneTarget`): a directory of this machine, or a repository by its git URL,
+ * kept as a clone under
  * the store's `clones/` folder (`cloneFolder`), or neither. Pure: the clone itself is the place's (`clone`), and the sweep that keeps it
  * is `clones.verb.ts`'s. `contracts/clone-target.contract.ts` proves what a value is read as and what folder a URL is given.
  */
@@ -94,7 +95,8 @@ const plain = (text: string): boolean =>
   !text.includes(' ') && !text.includes('%') && !text.includes('\\') && !text.includes(':') && !text.includes('@');
 
 /**
- * What `given`, a factory's volume or an import's `--repo`, names. A path, as git reads one, is a directory as before. A URL is kept as a clone in the folder
+ * What `given`, a factory's volume or an import's `--repo`, names. A path, as git reads one, is a directory as before. A URL is kept as a
+ * clone in the folder
  * of its host and path, its user, port, scheme and `.git` dropped, so one repository named two ways is one clone. Refused: a URL that
  * carries a password (the machine holds the credential, never Nemia), a scheme a clone is not made over, and a URL that names no plain
  * host and path.

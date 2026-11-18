@@ -164,7 +164,7 @@ test('a hand-made factory taken over by a template: previewed, written, its card
     assert.equal(template.source, dir);
     assert.deepEqual(template.params, {});
     assert.deepEqual(
-      file.volumes.filter((v: { readOnly: boolean }) => !v.readOnly).map((v: { path: string }) => v.path),
+      (file.volumes as { path: string; readOnly: boolean }[]).filter((v) => !v.readOnly).map((v) => v.path),
       [repo],
     );
     assert.deepEqual(Object.keys(file.schedules as object), ['dev']);

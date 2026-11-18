@@ -84,7 +84,8 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * `harnessSettings`: the settings of a harness every session of its runs' steps on it is given, when it names any (`HarnessSettings`), as
  * the file holds them: judged at a start and at the door's write, not on read. `costLines`: the cost line it sets for each workflow it
  * offers, in dollars, by the workflow's folder name (`nemia factory cost-line set`), when it sets any: frozen on a run of that workflow at
- * its start (`Run.costLine`), said at a gate whose caps pass it, and holding auto back there; it cuts nothing. `workflowRepos`: the repository each workflow it attaches
+ * its start (`Run.costLine`), said at a gate whose caps pass it, and holding auto back there; it cuts nothing. `workflowRepos`: the
+ * repository each workflow it attaches
  * works on, by the workflow's folder name to the repository's folder name (`nemia factory attach <factory> <workflow> --repo <name>`,
  * `workflowRepo`), when it names any; kept, as an attach writes it, in its own file, or in its tree's wiring (`factory.json`) where it is
  * made from a template, so an upgrade keeps it; never in the template, which knows no person's folders. `generation`: the count of
@@ -478,7 +479,8 @@ export type { NamedRepo, WorkflowRepoOf, WorkflowRepoRefusal } from '../../contr
 /**
  * The repository a run of `workflow` works on in a factory of `worked`, each with its folder name: the one named `wired[workflow]`,
  * else the only one; refused where the factory has none (`none`), several and names none (`unwired`), names one none has (`unknown`),
- * or one two share (`shared`). A prototype's name (`constructor`) names no workflow's repository: the wiring is a person's file, read as JSON.
+ * or one two share (`shared`). A prototype's name (`constructor`) names no workflow's repository: the wiring is a person's file, read as
+ * JSON.
  * @param worked The factory's repositories, each with its folder name.
  * @param wired The repository each workflow works on, by its folder name, or undefined where the factory names none.
  * @param workflow The workflow's folder name.

@@ -1,6 +1,7 @@
 /**
  * The factories on disk: `<home>/factories/<name>.json`, one file per factory, holding `{ "volumes": [...], "workflows": [...],
- * "hires": {...} }` — read (`readFactoriesAt`, `readFactoryAt`), filed (`addFactoryAt`, `createFactoryAt`), written back (`rewriteFactoryAt`),
+ * "hires": {...} }` — read (`readFactoriesAt`, `readFactoryAt`), filed (`addFactoryAt`, `createFactoryAt`), written back
+ * (`rewriteFactoryAt`),
  * given workflows (`attachWorkflowAt`), hired into and fired from (`hireAgentAt`, `fireAgentAt`), told where its instruction is kept
  * (`setInstructionAt`), and removed (`removeFactoryAt`); and, once, a file an earlier release wrote moved into one list of volumes
  * (`volumesMovedAt`). Each takes the store's root, `home`, first: the Factory door's files layer
@@ -96,7 +97,8 @@ const VolumeEntrySchema = Schema.StructWithRest(
  * store, when it says; whether its runs follow merged revisions, `follow` or `pinned`, when it says (a templated factory says it in its
  * tree's wiring, and this key is not read); the settings of a harness its
  * runs' sessions are given (`harnessSettings`), kept here for the same reason and judged by the model at the door, not on read; the cost
- * line it sets for each workflow it offers (`costLines`), kept here for the same reason; the repository each workflow works on, by folder name (`workflowRepos`), where it is made from no
+ * line it sets for each workflow it offers (`costLines`), kept here for the same reason; the repository each workflow works on, by folder
+ * name (`workflowRepos`), where it is made from no
  * template (one made from a template keeps it in its tree's wiring, as an attach writes it); and the template it was made from, when it was
  * (`nemia factory apply`): its folder, its version and the parameters given; its `generation`, the count of changes to its spec, absent on
  * a file written before the counter; a volume's `name`. A key a later `nemia` writes is kept.
@@ -348,9 +350,11 @@ export function createFactoryAt(home: string, factory: Factory): string {
 
 /**
  * What the file of `factory` holds, written over `content`, what it held, every key the model does not name kept where it was: its
- * volumes, a key a later `nemia` wrote beside one kept, the list written even where it is empty; its workflows, hires and schedules where the file named the key or the factory names one (made from a template, its
+ * volumes, a key a later `nemia` wrote beside one kept, the list written even where it is empty; its workflows, hires and schedules where
+ * the file named the key or the factory names one (made from a template, its
  * workflows, hires, revisions policy and workflows' repositories are its tree's, and the file's are left as they were); where its
- * instruction is kept and its revisions policy where it says, the key gone where it does not; its harness settings where it names any; and its template, the keys a later `nemia` wrote
+ * instruction is kept and its revisions policy where it says, the key gone where it does not; its harness settings where it names any; and
+ * its template, the keys a later `nemia` wrote
  * beside it kept.
  */
 function fileContentOf(content: FactoryFile | undefined, factory: Factory): FactoryFile {

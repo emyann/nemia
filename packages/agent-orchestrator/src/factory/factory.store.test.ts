@@ -80,7 +80,8 @@ const fileOf = (name: string): Record<string, unknown> => JSON.parse(fs.readFile
 /** The bytes of the factory `name`'s file. */
 const bytesOf = (name: string): Buffer => fs.readFileSync(path.join(FACTORIES, `${name}.json`));
 
-/** An empty folder of factories, and a plain directory to name as a repository: no `.git`, which the store asks for of none (the verb asks the place). */
+/** An empty folder of factories, and a plain directory to name as a repository: no `.git`, which the store asks for of none (the verb asks
+ * the place). */
 const fresh = (): string => {
   fs.rmSync(FACTORIES, { recursive: true, force: true });
   return fs.mkdtempSync(path.join(ROOT, 'repo-'));

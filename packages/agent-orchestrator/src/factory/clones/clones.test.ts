@@ -1,6 +1,7 @@
 /**
  * A factory's repositories named by git URL: what a volume's URL is read as, in the facts that span two values a law cannot state
- * (`cloneTarget`'s table); and the person's story, told as one test — `nemia factory add --volume <url>:rw` cloning before it files, refused
+ * (`cloneTarget`'s table); and the person's story, told as one test — `nemia factory add --volume <url>:rw` cloning before it files,
+ * refused
  * with nothing filed where the URL is no clone's, and the daemon's sweep (`clonesOnce`) making again a clone whose folder went, saying
  * one it cannot make once, and asking nothing of a factory given no URL. On the test place, a store of its own at `ROOT`.
  */

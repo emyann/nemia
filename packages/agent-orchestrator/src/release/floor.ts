@@ -3,7 +3,8 @@
  * its code the oldest release that reads what it writes (`STORE_READABLE_FROM`); the daemon raises the record to it as it takes the
  * store (`floorAfter`) and never lowers it; and `nemia upgrade <older>` is refused where the release asked for is below it
  * (`goingBackRefused`). Moving forward the store is read in place, so only going back is ever refused: the one rewrite, v1.26.0's move
- * of each factory's file into one list of volumes (`volumesMovedAt`), is made by the daemon as it takes the store, before it raises this. Pure: the
+ * of each factory's file into one list of volumes (`volumesMovedAt`), is made by the daemon as it takes the store, before it raises this.
+ * Pure: the
  * record is read and written by `archive.store.ts`, the refusal said by `upgrade.verb.ts`.
  */
 import type { FloorAfter, GoingBackRefused, Version } from '../../contracts/store-floor.contract.ts';

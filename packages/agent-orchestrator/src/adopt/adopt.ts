@@ -57,7 +57,8 @@ export const adoptRefusal: AdoptRefusal = (factory, adoption) => {
 
 /**
  * `factory` taken over by `template`, running from `tree`: its name, volumes (the repositories it works on among them, each with its
- * origin), schedules, instruction, harness settings, cost lines and workflows' repositories kept; its workflows, hires and revisions policy the template's `wiring`. A cost line
+ * origin), schedules, instruction, harness settings, cost lines and workflows' repositories kept; its workflows, hires and revisions policy
+ * the template's `wiring`. A cost line
  * of a workflow the wiring does not offer is refused at the door's write, naming its `nemia factory cost-line rm`.
  * @param factory The factory as it is in the store, whose own fields are kept.
  * @param wiring The render's wiring: its workflows, hires and revisions policy.

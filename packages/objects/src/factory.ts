@@ -1,6 +1,7 @@
 /**
  * The Factory: a factory served as an object, which no namespace holds (it is the namespace its parts are in). Its `spec` is what its
- * file says — its volumes, the writable ones those it works on, the workflows it offers, its hires by `<workflow>/<step>`, its harness settings,
+ * file says — its volumes, the writable ones those it works on, the workflows it offers, its hires by `<workflow>/<step>`, its harness
+ * settings,
  * whether its runs follow merged revisions, the template it was applied from and its own level — and its `status` what the controller
  * last observed of it: the generation it read, its conditions, the template's version its base holds, an upgrade waiting, its places a
  * harness does not trust now, and why its file does not read. Its `metadata.generation` counts the changes to its spec.
@@ -63,7 +64,8 @@ export const HarnessSettings = Schema.Record(Schema.String, Schema.Record(Schema
 export type HarnessSettings = typeof HarnessSettings.Type;
 
 /**
- * What a factory's file says: its volumes, the folders and repositories it reaches, its writable ones those it works on; the workflows it offers, absent on the default factory, which offers every workflow
+ * What a factory's file says: its volumes, the folders and repositories it reaches, its writable ones those it works on; the workflows it
+ * offers, absent on the default factory, which offers every workflow
  * found; its hires, `<workflow>/<step>` to an agent's name; and, where its file names them, its harness settings, its
  * revisions policy, the template it was applied from, its own level (absent where it follows the store's), and its cost line per
  * workflow: the dollars a run of that workflow should stay under, all tries and rounds included (absent where it sets none); and the

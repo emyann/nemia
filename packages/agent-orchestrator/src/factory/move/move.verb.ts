@@ -109,7 +109,8 @@ const oneList = (raw: object): object => {
 };
 
 /**
- * The factory the export's `file` says, under the name `name`, read into one list where an earlier release wrote it (`oneList`): refused `Invalid`, naming the export to take again, where it reads as
+ * The factory the export's `file` says, under the name `name`, read into one list where an earlier release wrote it (`oneList`): refused
+ * `Invalid`, naming the export to take again, where it reads as
  * none. A templated factory's workflows are its tree's, which travels in its folder, so its schedules and cost lines are judged once it is
  * filed, not here.
  */
@@ -155,7 +156,7 @@ function reposDecided(home: string, source: Factory, typedRepos: Readonly<Record
       if (read?.origin !== undefined) out.origins[read.path] = read.origin;
     } catch (err) {
       if (!isRefusal(err)) throw err;
-      out.refused.push(`--repo ${repo}=${given.repo}: ${err.message}`);
+      out.refused.push(`--repo ${repo.path}=${given.repo}: ${err.message}`);
     }
   }
 }
@@ -231,6 +232,12 @@ const cardFiled = Effect.fn('cardFiled')(function* (name: string, text: string) 
   }
 });
 
+/** The refusal of an import under `name`, which this store files a factory under already. */
+const filedHere = (name: string): Conflict =>
+  new Conflict({
+    message: `this store holds a factory ${name} already: remove it here with nemia factory rm ${name}, or keep it and move none over it. Nothing was filed.`,
+  });
+
 /**
  * `POST /api/factories/<name>/import`: the factory the export in `write` carries filed in this store under `name`, its template read at
  * `template` — the source the caller took the export's template at (`withTemplateTaken(write.export.template, 'made', …)`), none for a
@@ -251,12 +258,7 @@ export const factoryImported = Effect.fn('factoryImported')(function* (
   const id = FactoryName.read(name);
   yield* tried(() => refuseName(name, 'add'));
   const there = yield* Effect.result(door.factories.read(id));
-  if (there._tag === 'Success')
-    return yield* Effect.fail(
-      new Conflict({
-        message: `this store holds a factory ${name} already: remove it here with nemia factory rm ${name}, or keep it and move none over it. Nothing was filed.`,
-      }),
-    );
+  if (there._tag === 'Success') return yield* Effect.fail(filedHere(name));
   if (there.failure._tag !== 'Missing') return yield* Effect.fail(there.failure);
   const source = yield* tried(() => factorySent(name, write.export.file));
   if (source.template !== undefined && template === undefined)

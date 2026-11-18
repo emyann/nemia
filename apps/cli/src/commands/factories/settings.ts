@@ -1,6 +1,7 @@
 /**
  * The runners of what a factory gives the runs started in it: a volume mounted and taken off (`nemia factory volume add|rm`, its folder
- * or git URL sent through `repoSent`, the daemon keeping it by its whole path), a harness setting set and taken off (`setting set|rm`) and a
+ * or git URL sent through `repoSent`, the daemon keeping it by its whole path), a harness setting set and taken off (`setting set|rm`) and
+ * a
  * workflow's cost line (`cost-line set|rm`). Each prints, word for word as the old path did, what the answer says it wrote.
  */
 import type { Args } from 'objects';

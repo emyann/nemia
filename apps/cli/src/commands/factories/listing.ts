@@ -42,7 +42,8 @@ function templateLines(o: Factory, width: number): string[] {
   ];
 }
 
-/** A factory's read-only volumes, by path, once each: `volume /home/me/notes :ro`; its writable ones are what its first line says it works on. */
+/** A factory's read-only volumes, by path, once each: `volume /home/me/notes :ro`; its writable ones are what its first line says it works
+ * on. */
 function volumeLines(o: Factory, width: number): string[] {
   const seen = new Map<string, boolean>();
   for (const v of o.spec.volumes) if (v.readOnly && !seen.has(v.path)) seen.set(v.path, v.readOnly);

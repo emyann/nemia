@@ -38,7 +38,8 @@ const specKey = (factory: Factory): string =>
 
 /**
  * Whether `now` changes the spec of `was`: its workflows, hires, volumes (each by its path, its mark and its origin, in order: a name
- * given changes no mount), harness settings, cost lines, workflows' repositories, revisions policy or template. Its schedules, its instruction's
+ * given changes no mount), harness settings, cost lines, workflows' repositories, revisions policy or template. Its schedules, its
+ * instruction's
  * place and its name are no part of it; its level is, and is written beside it (`factories.store.ts`).
  * @param was The factory as its file held it.
  * @param now The factory as it is to be written.

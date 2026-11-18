@@ -61,7 +61,8 @@ export const volumeKey = (volume: Pick<Volume, 'name' | 'path'>): string => volu
 /**
  * What the target decided of a factory before it files it: its tree (`treeDir`, for a templated one), each source repository's folder on
  * the target by its path on the source (`repos`, its writable volumes), the URL of each folder it clones (`origins`), each read-only
- * volume's path by its key (`volumeKey`; one not named keeps its path), whether the instruction's words the export carried are kept in its store
+ * volume's path by its key (`volumeKey`; one not named keeps its path), whether the instruction's words the export carried are kept in its
+ * store
  * (`instructionKept`), and where it keeps the template it was given (`template`).
  */
 export type OnTarget = {
@@ -106,7 +107,8 @@ const volumeOnTargetOf = (volume: Volume, onTarget: OnTarget): Volume => {
 
 /**
  * The factory `source` as the target files it: its writable volumes on its repositories there (`onTarget.repos`, each named once) with
- * the origins of those it cloned, from its own tree, its read-only volumes at their decided paths, each with its name and mark kept, the workflows' repositories and the schedules'
+ * the origins of those it cloned, from its own tree, its read-only volumes at their decided paths, each with its name and mark kept, the
+ * workflows' repositories and the schedules'
  * renamed where a repository's folder name changed, its instruction kept in the store where the export carried its words, its template
  * read where the target kept it, and no generation, which the door counts again. Everything else as read.
  * @param source The factory as the source's file holds it.

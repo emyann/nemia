@@ -4,7 +4,7 @@
  * and its name, read-only. A file already in one list is answered as it is. Pure: the daemon's move at its start (`volumesMovedAt`,
  * `factory.store.ts`) and an import of an earlier release's archive each read the keys and write the answer.
  */
-import type { FileVolume, FormerKeys, VolumesFromRepos } from '../../../contracts/volumes-from-repos.contract.ts';
+import type { FileVolume, VolumesFromRepos } from '../../../contracts/volumes-from-repos.contract.ts';
 
 export type { FileVolume, FormerKeys } from '../../../contracts/volumes-from-repos.contract.ts';
 

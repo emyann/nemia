@@ -20,7 +20,8 @@ type Mode = 'rw' | 'ro';
 type Change = { kind: 'add'; volume: string } | { kind: 'remove'; path: string };
 
 /** The api's words for a write it refused, or none. */
-const refusalOf = (error: unknown): string | null => (error instanceof Error ? error.message : error ? String(error) : null);
+const refusalOf = (error: unknown): string | null =>
+  error === null || error === undefined ? null : error instanceof Error ? error.message : 'the api answered nothing the board reads.';
 
 /** One volume: its path, its mark, what it is, where it was cloned from, and Remove, pending while its own removal is out. */
 function VolumeRow({

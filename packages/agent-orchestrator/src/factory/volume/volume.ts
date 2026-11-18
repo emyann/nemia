@@ -49,7 +49,8 @@ const within = (inner: string, outer: string): boolean => {
  * Why `volume` cannot be a volume of `factory`, or undefined: a path that is no directory (`isDirectory` looks), but a clone, made after
  * this judgement; a writable one inside another writable volume of the factory or holding one, which a run works on in a worktree of its
  * own and mounts read-only (a volume of its own path is replaced, and taken); and a read-only one at or inside the store `storeRoot`,
- * whose runs, cards and worktrees no step reads around its doors, but a clone the store keeps for it. A writable one is a repository a run works on in a worktree, as a
+ * whose runs, cards and worktrees no step reads around its doors, but a clone the store keeps for it. A writable one is a repository a run
+ * works on in a worktree, as a
  * factory's repositories always were, so the store, which keeps the clones, refuses none; a read-only one inside a repository it works
  * on, or holding the store, a person's home say, is taken. Whether a writable one is a git repository is the place's to say, at the
  * verb.

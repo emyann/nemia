@@ -61,7 +61,8 @@ const workflowOf = (step: string): string => step.slice(0, step.indexOf('/'));
  * A factory as its store reads it (`Factory`): its volumes, none or several, its hires by `<workflow>/<step>`, its schedules by workflow.
  * Its invariants are the door's: it names only the harness settings a factory may set (`harnessSettingsRefusal`), names no volume twice,
  * and it hires and schedules only into a workflow it offers, and sets a
- * cost line only for one (`costLines`, dollars above zero) — a hire, a schedule or a line of one it has not attached is refused, and a workflow it still hires into, schedules or sets a line for is not
+ * cost line only for one (`costLines`, dollars above zero) — a hire, a schedule or a line of one it has not attached is refused, and a
+ * workflow it still hires into, schedules or sets a line for is not
  * detached (`wiringRefusal`, `wiring.ts`, whose contract proves those refusals); this struct's own checks refuse a factory the door
  * writes that breaks them. Its `generation`, the count of changes to its spec, is the door's to count (`generationWritten`), never a
  * caller's.

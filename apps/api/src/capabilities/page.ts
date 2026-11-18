@@ -4,7 +4,6 @@
  * store works on, where they all work on one. The default factory reads none, so the api's own repository is never a candidate. Nothing
  * here reads a repository or starts anything.
  */
-import path from 'node:path';
 import { commandLine, FACTORY_ADD, FACTORY_APPLY, workedOn, type FactoryListing } from 'agent-orchestrator';
 import { CLAUDE_RULES } from 'agent-orchestrator/workflow';
 import type { CapabilitiesUnread, CapabilitiesWithSteps } from 'objects';

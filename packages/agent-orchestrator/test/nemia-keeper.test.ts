@@ -710,9 +710,10 @@ test('She answers her chat at any level: a message files her, she rests once the
   const b = stage.board();
   const lastSpec = () => b.specs.at(-1) as unknown as { id: string; brief: string; resumeFrom?: string };
   const say = (id: string, text: string) => appendOutbox(nemiaDir(ROOT), { id, at: new Date().toISOString(), text });
-  trust(true);
+  withPipao();
+  const [factory = ''] = factoryNamesAt(ROOT);
   fs.rmSync(nemiaDir(ROOT), { recursive: true, force: true });
-  fs.rmSync(factoryLevelFile(ROOT, 'pipao'), { force: true });
+  fs.rmSync(factoryLevelFile(ROOT, factory), { force: true });
   let [one, two] = ['', ''];
   await s.test('a fresh store: a message in her chat files her under a new id, at manual, with no subscription', async () => {
     assert.deepEqual(await beat(), [], 'nobody wants her: nothing runs');
@@ -757,7 +758,7 @@ test('She answers her chat at any level: a message files her, she rests once the
     assert.deepEqual(nemiaChatPlace(ROOT).tasks, [one, two], 'her chat spans both');
   });
   await s.test('a factory raised: subscribed, and quiet past fifteen minutes she never rests', async () => {
-    await level({ factory: 'pipao', level: 'semi-auto' });
+    await level({ factory, level: 'semi-auto' });
     b.settle(two, 'working');
     assert.deepEqual(await beat(), ['subscribe']);
     assert.deepEqual(await beat(), ['sayOutbox']);
@@ -768,7 +769,7 @@ test('She answers her chat at any level: a message files her, she rests once the
     assert.deepEqual(await beat(), [], 'operating: never put to rest');
   });
   await s.test('back to manual: her subscription dropped, and she rests once quiet — at once, quiet already', async () => {
-    await level({ factory: 'pipao', level: 'manual' });
+    await level({ factory, level: 'manual' });
     assert.deepEqual(await beat(), ['rest', 'drop']);
     assert.deepEqual(listSubscriptions(ROOT), []);
     assert.ok(b.stopped.includes(two));

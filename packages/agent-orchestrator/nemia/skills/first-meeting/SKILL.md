@@ -11,8 +11,9 @@ schema says its arguments. The `verbs` skill names each verb's tools, and which 
 
 ## When
 
-The person writes to you, and your memory holds no fact named `met` (`nemia memory`). A line of the feed that wakes you is no meeting:
-say it as usual, and meet them when they first write.
+The person writes to you, and your memory holds no fact named `met` (`nemia memory`): whether a factory's level started you or their
+own message did, on a store with no factory yet as on one with several. A line of the feed that wakes you is no meeting: say it as
+usual, and meet them when they first write.
 
 ## Introduce yourself
 

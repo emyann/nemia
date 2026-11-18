@@ -27,8 +27,14 @@ lays the release down:
 - the same link in the store's tools folder, `~/.agent-workflows/tools/bin/nemia`, which every session finds first on its PATH, so a
   step runs the `nemia` its settings allow. Both name the launcher through `current`, so they follow every upgrade.
 
-Then it asks two things, on the server, each of which you can also answer by a flag with `--yes`, for a machine you set up by
-script:
+On a laptop it then asks nothing. It starts Nemia now, on this machine alone (127.0.0.1), with no service that starts it at login,
+opens the board's welcome page in your browser, and prints a short summary of what it did, ending on the link to that page: a
+first-visit link, which signs that browser in to the board once, within ten minutes. Where no browser could be opened, open the
+printed link yourself; `nemia board link --base http://127.0.0.1:8787/welcome` makes another. `--no-open` opens nothing. To start
+Nemia at login later, run `nemia service install`. The summary is plain where the output is no terminal or `NO_COLOR` is set.
+
+On a server, said by `--serve` or by a `--bind <address>`, it asks two things instead, each of which you can also answer by a flag
+with `--yes`, for a machine you set up by script:
 
 - **Starting at login.** Yes runs `nemia service install --size auto`: a systemd user unit on Linux, or a launchd agent on macOS,
   with as many concurrent sessions and as much memory each as the machine's size allows. On Linux it also runs
@@ -37,10 +43,10 @@ script:
   their kind), or typed. Left at its default, the daemon listens on this machine alone.
 
 Other flags: `--version <tag>` installs that release instead of the latest, `--base <url>` downloads from another place laid out
-as GitHub lays out a release, and `--board-base <url>` is the address the first-visit link is printed under (below).
+as GitHub lays out a release, `--no-open` opens no browser on a laptop, and `--board-base <url>` is the address the first-visit link is printed under (below).
 
 The installer prints no token, and installs no harness and asks for no harness's credential: a release carries no Claude Code and no
-Codex. It ends on `nemia doctor` (below): what is in place, and the command that fixes each piece that is not. You activate the
+Codex. A server's install ends on `nemia doctor` (below), and a laptop's summary names it: what is in place, and the command that fixes each piece that is not. You activate the
 harness your factories run on when you need it ([Activate a harness](#activate-a-harness)).
 
 ## Bind it to a private network
@@ -52,7 +58,7 @@ the daemon to an address of a private network you trust, such as your Tailscale 
 curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --bind 100.64.0.1
 ```
 
-or pick that address at the installer's question. A public address, or every interface (`0.0.0.0`), is refused unless you acknowledge
+or pick that address at the question the installer asks with `--serve`. A public address, or every interface (`0.0.0.0`), is refused unless you acknowledge
 it with `--public`, which writes `NEMIA_BIND_PUBLIC=1` into the service: the daemon refuses to start on such an address without it.
 
 A store bound beyond this machine is marked exposed: every caller then needs a person token, the board included, and the server's own

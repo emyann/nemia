@@ -119,10 +119,14 @@ three numbers, digits and dots alone, as `nemia upgrade` reads a published one, 
 is taken), refuses an archive whose sum differs, unpacks it into
 `$WF_ROOT/releases/<tag>` through a hidden folder renamed into place, points `releases/current` at it by a relative link renamed over
 the old one, and links `~/.local/bin/nemia` and the store's `tools/bin/nemia` to `releases/current/bin/nemia`, the second so a step's
-session, whose PATH starts with the tools folder, runs the `nemia` its settings allow. Then it asks, or with `--yes` reads its flags: starting at login (`nemia service install --size auto`, `--no-service` to skip,
+session, whose PATH starts with the tools folder, runs the `nemia` its settings allow. Then it takes one of three paths. On a laptop (no `--serve`, `--bind` or `--client`) it asks nothing: it starts Nemia now on
+127.0.0.1 (`nemia daemon --json`, the read that starts the store's daemon on demand) with no login service, mints a first-visit link
+under `<url>/welcome` (`nemia board link --base`), opens it (`open` on macOS, `xdg-open` on Linux with a display; `--no-open` opens
+nothing, and a failure to open fails nothing) and ends on a summary of what it did and that link, coloured only on a terminal or with
+`FORCE_COLOR`, never with `NO_COLOR`. On a server (`--serve`, or a `--bind`) it asks, or with `--yes` reads its flags: starting at login (`nemia service install --size auto`, `--no-service` to skip,
 `loginctl enable-linger` on Linux), and the address to bind (`--bind`, after which `nemia token add` prints the first person token).
 `--client --server <url> [--context <name>] [--token-file <file>]` makes a client-only install (`nemia config set-context`, then
-`use-context`) and no service. `--base <url>` takes another download base, a `file://` one read from disk. It never prints a token. It ends, on either side, on
+`use-context`) and no service. `--base <url>` takes another download base, a `file://` one read from disk. It never prints a token. The server and client paths end on
 `nemia doctor`, the read of what is in place and what is missing, whose exit fails no install.
 
 **No harness comes with a release.** The archive holds no harness's binary (`npm ci --omit=optional` would have dropped every package's

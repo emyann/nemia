@@ -68,7 +68,8 @@ Install as the Nemia user, over `ssh -t`, because the installer asks its questio
 ssh -t nemia@<address> 'curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --bind <address>'
 ```
 
-It asks two things ([Install](/install/#install) explains each one), and nothing of a harness: you activate one afterwards
+`--bind` makes this the installer's server path (as `--serve` does), so it asks two things ([Install](/install/#install) explains
+each one), where on a laptop it asks none,, and nothing of a harness: you activate one afterwards
 ([Activate a harness](/install/#activate-a-harness)).
 
 - **Start at login.** Answer yes. The installer sizes the service to the machine. The 8 vCPU, 16 GB server read as about 15.2 GiB and

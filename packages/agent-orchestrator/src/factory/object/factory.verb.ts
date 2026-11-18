@@ -37,7 +37,7 @@ import { untrustedPlaces } from '../../trust/untrusted.verb.ts';
 import type { Untrusted } from '../../trust/trust.ts';
 import { Invalid, Missing } from '../../refusal/refusal.ts';
 import type { Level } from '../../level/level.ts';
-import { volumesNamed } from '../volume/volume.ts';
+import { factoryVolumesNamed } from '../volume/volume.ts';
 import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
 
 /** Two texts in the order `<` compares them. */
@@ -166,7 +166,7 @@ export const filedOf = (listing: FactoryListing, home: string): FiledFactory => 
   const spec: FactoryObject['spec'] = {
     workflows: [...listing.workflows],
     hires: { ...listing.hires },
-    volumes: volumesNamed(listing.volumes).map(({ name, path, readOnly, origin }) => ({
+    volumes: factoryVolumesNamed(listing).map(({ name, path, readOnly, origin }) => ({
       name,
       path,
       readOnly,

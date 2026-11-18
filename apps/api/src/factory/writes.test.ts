@@ -21,7 +21,7 @@ type FactoryRemoved = import('objects').FactoryRemoved;
 
 /** A factory's place: a plain folder, since no write here asks the place for anything. */
 const repo = scratch('nemia-api-factory-writes-');
-for (const name of ['mill', 'gone', 'kept']) addFactory({ name, repos: [repo] });
+for (const name of ['mill', 'gone', 'kept']) addFactory({ name, volumes: [repo].map((r) => `${r}:rw`) });
 attachWorkflow({ factory: 'mill', workflow: 'alpha' });
 
 const json = { 'content-type': 'application/json' };

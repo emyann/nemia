@@ -26,7 +26,7 @@ const folder = path.join(repo, 'workflows', 'build');
 write(path.join(folder, 'design.md'), '---\nplace: git\nskills: spec-it\n---\nDesign it.\n');
 write(path.join(repo, 'workflows', 'agents', 'seldon.md'), '---\nharness: claude\n---\nYou design.\n');
 write(path.join(repo, 'workflows', 'skills', 'spec-it', 'SKILL.md'), '---\nname: spec-it\ndescription: Write a spec.\n---\nSpec it.\n');
-addFactory({ name: 'hires', repos: [repo] });
+addFactory({ name: 'hires', volumes: [repo].map((r) => `${r}:rw`) });
 attachWorkflow({ factory: 'hires', workflow: 'build' });
 hireAgent({ factory: 'hires', agent: 'seldon', step: 'build/design' });
 

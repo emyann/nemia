@@ -18,7 +18,7 @@ import { app } from '../app.ts';
 type FactoryInstruction = import('agent-orchestrator').FactoryInstruction;
 
 const folder = scratch('nemia-api-instruction-folder-');
-addFactory({ name: 'mill', repos: [folder] });
+addFactory({ name: 'mill', volumes: [folder].map((r) => `${r}:rw`) });
 
 const RECORD = path.join(root, 'factories', 'mill.json');
 const STORE = path.join(root, 'factories', 'mill');

@@ -5,7 +5,7 @@
  * here reads a repository or starts anything.
  */
 import path from 'node:path';
-import { commandLine, FACTORY_ADD, FACTORY_APPLY, type FactoryListing } from 'agent-orchestrator';
+import { commandLine, FACTORY_ADD, FACTORY_APPLY, workedOn, type FactoryListing } from 'agent-orchestrator';
 import { CLAUDE_RULES } from 'agent-orchestrator/workflow';
 import type { CapabilitiesUnread, CapabilitiesWithSteps } from 'objects';
 import type { Place } from '../factory/place.ts';
@@ -15,8 +15,8 @@ export type PageRead = { repo: string } | { unread: CapabilitiesUnread };
 
 /** The lines that file a factory, which a page with no factory to read names: the add, and the apply from a template. */
 export const FILE_FACTORY: readonly string[] = [
-  commandLine(FACTORY_ADD, {}, { repos: '<path>' }),
-  commandLine(FACTORY_APPLY, {}, { template: '<name>', repos: '<path>' }),
+  commandLine(FACTORY_ADD, {}, { volumes: '<path|url>:rw' }),
+  commandLine(FACTORY_APPLY, {}, { template: '<name>', volumes: '<path|url>:rw' }),
 ];
 
 /** A factory the page may read with none named: its name and its repositories, each as `path.resolve` spells it. */
@@ -46,15 +46,10 @@ const pickRepository = (name: string, repos: readonly string[]): PageRead =>
 export function pageRead(place: Place, listings: readonly FactoryListing[]): PageRead {
   if (place.factory !== undefined) {
     if (place.repo !== undefined) return { repo: place.repo };
-    return pickRepository(
-      place.factory.name,
-      place.factory.repos.map((r) => path.resolve(r)),
-    );
+    return pickRepository(place.factory.name, workedOn(place.factory));
   }
   if (place.repo !== undefined) return { repo: place.repo };
-  const candidates: Candidate[] = listings.flatMap((l) =>
-    'error' in l ? [] : [{ name: l.name, repos: l.repos.map((r) => path.resolve(r)) }],
-  );
+  const candidates: Candidate[] = listings.flatMap((l) => ('error' in l ? [] : [{ name: l.name, repos: workedOn(l) }]));
   const repos = [...new Set(candidates.flatMap((c) => c.repos))];
   const [only, ...more] = repos;
   if (only !== undefined && !more.length) return { repo: only };

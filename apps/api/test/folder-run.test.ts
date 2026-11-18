@@ -359,7 +359,7 @@ const teamInRepo = (): void => {
   fs.cpSync(team, path.join(notARepo, 'workflows', 'notes'), { recursive: true });
   fs.mkdirSync(path.join(notARepo, 'workflows', 'agents'), { recursive: true });
   fs.writeFileSync(path.join(notARepo, 'workflows', 'agents', 'scribe.md'), '---\nharness: claude\n---\nYou write notes.\n');
-  addFactory({ name: 'shore', repos: [notARepo] });
+  addFactory({ name: 'shore', volumes: [notARepo].map((r) => `${r}:rw`) });
   attachWorkflow({ factory: 'shore', workflow: 'notes' });
   hireAgent({ factory: 'shore', agent: 'scribe', step: 'notes/write' });
 };

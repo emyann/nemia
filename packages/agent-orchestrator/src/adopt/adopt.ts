@@ -56,8 +56,8 @@ export const adoptRefusal: AdoptRefusal = (factory, adoption) => {
 };
 
 /**
- * `factory` taken over by `template`, running from `tree`: its name, repositories, schedules, instruction, volumes, harness settings,
- * cost lines, origins and workflows' repositories kept; its workflows, hires and revisions policy the template's `wiring`. A cost line
+ * `factory` taken over by `template`, running from `tree`: its name, volumes (the repositories it works on among them, each with its
+ * origin), schedules, instruction, harness settings, cost lines and workflows' repositories kept; its workflows, hires and revisions policy the template's `wiring`. A cost line
  * of a workflow the wiring does not offer is refused at the door's write, naming its `nemia factory cost-line rm`.
  * @param factory The factory as it is in the store, whose own fields are kept.
  * @param wiring The render's wiring: its workflows, hires and revisions policy.
@@ -66,7 +66,7 @@ export const adoptRefusal: AdoptRefusal = (factory, adoption) => {
  */
 export const adopted: Adopted = (factory, wiring, template, tree) => ({
   name: factory.name,
-  repos: factory.repos,
+  volumes: factory.volumes,
   workflows: wiring.workflows,
   hires: wiring.hires,
   schedules: factory.schedules,
@@ -74,10 +74,8 @@ export const adopted: Adopted = (factory, wiring, template, tree) => ({
   revisions: wiring.revisions,
   template,
   tree,
-  volumes: factory.volumes,
   harnessSettings: factory.harnessSettings,
   costLines: factory.costLines,
-  origins: factory.origins,
   workflowRepos: factory.workflowRepos,
 });
 
@@ -97,7 +95,6 @@ export type HireChange = {
 export type AdoptPlan = {
   readonly factory: string;
   readonly kept: {
-    readonly repos: readonly string[];
     readonly schedules: readonly string[];
     readonly instruction: boolean;
     readonly volumes: readonly string[];
@@ -141,7 +138,6 @@ export function adoptPlan(factory: Factory, adoption: Adoption, runs: readonly s
   return {
     factory: factory.name,
     kept: {
-      repos: factory.repos,
       schedules: sorted(Object.keys(factory.schedules)),
       instruction: factory.instruction !== undefined,
       volumes: factoryVolumes(factory).map((v) => `${v.path}${volumeMark(v)}`),
@@ -187,7 +183,7 @@ export function adoptLines(plan: AdoptPlan, digest: string, adopt: string): stri
   const blocked = stranded.cards.length > 0 || stranded.schedules.length > 0;
   return [
     `${factory}: taken over by the template, in place — nothing is written until nemia factory adopt`,
-    `stays: its name, its repositories (${listed(kept.repos)}), its schedules (${listed(kept.schedules)}), ${kept.instruction ? 'its instruction' : 'no instruction'}, its volumes (${listed(kept.volumes)}), its harness settings (${listed(kept.settings)}), its cards, its runs and its stats`,
+    `stays: its name, its schedules (${listed(kept.schedules)}), ${kept.instruction ? 'its instruction' : 'no instruction'}, its volumes, the repositories it works on among them (${listed(kept.volumes)}), its harness settings (${listed(kept.settings)}), its cards, its runs and its stats`,
     `workflows: + ${listed(workflows.added)}; - ${listed(workflows.dropped)}; kept ${listed(workflows.kept)}`,
     hires.length ? 'hires:' : 'hires: unchanged',
     ...hires.map(hireLine),

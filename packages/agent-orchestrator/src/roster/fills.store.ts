@@ -11,7 +11,7 @@ import path from 'node:path';
 import { AGENTS_FOLDER } from '../step/step.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { stepFiles } from '../folder/folder.ts';
-import { fillsOf, type Factory, type FactoryListing } from '../factory/factory.ts';
+import { fillsOf, type Factory, type FactoryListing, workedOn } from '../factory/factory.ts';
 import { lookupRoots, type Places } from '../skills/read.store.ts';
 import { foldersIn } from '../folder/lookup.store.ts';
 import type { FillPlace, FilledStep } from './roster.ts';
@@ -143,7 +143,7 @@ export function stepSkillsNamed(repo: string | undefined, home: string, factory?
  * names none; none on one whose folders cannot be listed.
  */
 const filesFilledBy = (factory: Factory, home: string): string[] =>
-  (factory.repos.length === 0 && factory.tree !== undefined ? [undefined] : factory.repos).flatMap((repo) => {
+  (workedOn(factory).length === 0 && factory.tree !== undefined ? [undefined] : workedOn(factory)).flatMap((repo) => {
     try {
       return stepsFilled(repo === undefined ? undefined : path.resolve(repo), home, factory).map(({ file }) => file);
     } catch {

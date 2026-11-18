@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { LineCounter, parse, parseAllDocuments, stringify, type Document } from 'yaml';
 import type { Agent, SkillsFound } from '../agents/agents.ts';
-import { outsideRefusal, type Factory } from '../factory/factory.ts';
+import { outsideRefusal, type Factory, workedOn } from '../factory/factory.ts';
 import { workflowDescription, workflowsIn } from '../folder/folder.store.ts';
 import { stepFiles } from '../folder/folder.ts';
 import { placesOf } from '../folder/lookup.store.ts';
@@ -272,8 +272,10 @@ function factorySource(
 ): { source: NonNullable<Source['factory']>; workflows: string[] } {
   const { factory, instruction, rules } = parts;
   const { name } = factory;
-  if (outsideRefusal(factory, from)) {
-    const repos = factory.repos.map((r) => path.resolve(r)).sort();
+  const outside = outsideRefusal(factory, from);
+  if (outside) {
+    const repos = workedOn(factory).sort();
+    if (!repos.length) throw new Invalid({ message: outside.replace('Nothing was started.', 'Nothing was written.') });
     throw new Invalid({
       message: `${from}: the factory ${name} works on ${repos.join(', ')}, and its workflows are read from one of them: --from ${repos[0]}. Nothing was written.`,
     });
@@ -350,7 +352,7 @@ export type WordsRead = { words: string | null; error: string | null; file: stri
  * workflows, hires and revisions policy, where it is kept, its instruction and its rules.
  */
 export type FactoryParts = {
-  factory: Pick<Factory, 'name' | 'repos' | 'workflows' | 'hires' | 'revisions'>;
+  factory: Pick<Factory, 'name' | 'volumes' | 'workflows' | 'hires' | 'revisions'>;
   file: string;
   instruction: WordsRead;
   rules: WordsRead;

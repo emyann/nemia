@@ -554,7 +554,7 @@ export const queueOrder = <L extends Pick<CardListing, 'name' | 'queued' | 'star
     .map(({ l }) => l);
 
 /** A factory as a card's placement reads it: its repositories and the repository its wiring names each workflow. */
-export type WiredFactory = Pick<Factory, 'repos' | 'workflowRepos'>;
+export type WiredFactory = Pick<Factory, 'volumes' | 'workflowRepos'>;
 
 /**
  * The repository a card's factory works on for the card's workflow (`workflowRepo`): the one its wiring names, else its only one. Null

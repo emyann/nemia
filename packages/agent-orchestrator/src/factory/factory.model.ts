@@ -20,14 +20,16 @@ export const FactoryName = brandedId('FactoryName', factoryNameRefusal);
 export type FactoryName = Id<'FactoryName'>;
 
 /**
- * A folder of the person's machine a factory mounts for every local step of its runs (`Volume`): its path, and whether steps only read it,
- * the runtime's `Mount` field and Kubernetes' `volumeMounts.readOnly`, compose's long-form read_only. Marked always. Its `name`, the one it
- * is served and linked under, where its file stores one (`volumesNamed` names one it does not).
+ * A folder or repository of the person's machine a factory reaches (`Volume`): its path, and whether steps only read it, the runtime's
+ * `Mount` field and Kubernetes' `volumeMounts.readOnly`, compose's long-form read_only; a writable one is a repository the factory works
+ * on. Marked always. Its `name`, the one it is served and linked under, where its file stores one (`volumesNamed` names one it does not),
+ * and its `origin`, the git URL it was cloned from, where it was given by one.
  */
 export const Volume = Schema.Struct({
   path: Schema.String,
   readOnly: Schema.Boolean,
   name: Schema.optional(Schema.String),
+  origin: Schema.optional(Schema.String),
 }).annotate({ identifier: 'Volume' });
 export type Volume = typeof Volume.Type;
 
@@ -56,18 +58,17 @@ export type AppliedTemplate = typeof AppliedTemplate.Type;
 const workflowOf = (step: string): string => step.slice(0, step.indexOf('/'));
 
 /**
- * A factory as its store reads it (`Factory`): its hires by `<workflow>/<step>`, its schedules by workflow. Its invariants are the door's:
- * it works on one repository at least (`factoryRepos`), names only the harness settings a factory may set (`harnessSettingsRefusal`),
- * mounts no volume that is one of its repositories or named twice, and it hires and schedules only into a workflow it offers, and sets a
- * cost line only for one (`costLines`, dollars above zero), and names the URL only of a repository it has (`origins`) — a hire, a
- * schedule or a line of one it has not attached is refused, and a workflow it still hires into, schedules or sets a line for is not
+ * A factory as its store reads it (`Factory`): its volumes, none or several, its hires by `<workflow>/<step>`, its schedules by workflow.
+ * Its invariants are the door's: it names only the harness settings a factory may set (`harnessSettingsRefusal`), names no volume twice,
+ * and it hires and schedules only into a workflow it offers, and sets a
+ * cost line only for one (`costLines`, dollars above zero) — a hire, a schedule or a line of one it has not attached is refused, and a workflow it still hires into, schedules or sets a line for is not
  * detached (`wiringRefusal`, `wiring.ts`, whose contract proves those refusals); this struct's own checks refuse a factory the door
  * writes that breaks them. Its `generation`, the count of changes to its spec, is the door's to count (`generationWritten`), never a
  * caller's.
  */
 export const Factory = Schema.Struct({
   name: FactoryName.OnRead,
-  repos: Schema.Array(Schema.String),
+  volumes: Schema.Array(Volume),
   workflows: Schema.Array(WorkflowName.OnRead),
   hires: Schema.Record(Schema.String, AgentName.OnRead),
   schedules: Schema.Record(WorkflowName.OnRead, Schedule),
@@ -75,10 +76,8 @@ export const Factory = Schema.Struct({
   revisions: Schema.optional(Schema.Literals(REVISIONS_POLICIES)),
   template: Schema.optional(AppliedTemplate),
   tree: Schema.optional(Schema.String),
-  volumes: Schema.optional(Schema.Array(Volume)),
   harnessSettings: Schema.optional(HarnessSettings),
   costLines: Schema.optional(Schema.Record(WorkflowName.OnRead, Schema.Finite.check(Schema.isGreaterThan(0)))),
-  origins: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   /**
    * The repository each workflow works on, by its folder name (`workflowRepo`). Checked for its shape alone, on purpose: a key for a
    * workflow it no longer offers (an upgrade of its template dropped it) names nothing anyone starts, and refusing it would leave the
@@ -88,7 +87,6 @@ export const Factory = Schema.Struct({
   generation: Schema.optional(Schema.Number),
 })
   .check(
-    Schema.makeFilter((factory) => factory.repos.length > 0 || 'a factory works on no repository: nemia factory add <name> --repo <path>'),
     Schema.makeFilter((factory) => {
       const offered: ReadonlyArray<string> = factory.workflows;
       const unoffered = [...Object.keys(factory.hires).map(workflowOf), ...Object.keys(factory.schedules)].find(
@@ -105,19 +103,7 @@ export const Factory = Schema.Struct({
       );
     }),
     Schema.makeFilter((factory) => {
-      const repos: ReadonlyArray<string> = factory.repos;
-      const stray = Object.keys(factory.origins ?? {}).find((folder) => !repos.includes(folder));
-      return (
-        stray === undefined ||
-        `it names the URL of ${stray}, which is none of its repositories: take the folder out of origins in its file, or add it again with nemia factory add ${factory.name} --repo <url>`
-      );
-    }),
-    Schema.makeFilter((factory) => {
-      const at = (factory.volumes ?? []).map((v) => v.path);
-      const repos = new Set(factory.repos);
-      const repo = at.find((v) => repos.has(v));
-      if (repo !== undefined)
-        return `its volume ${repo} is one of its repositories, which a run mounts already: nemia factory volume rm ${factory.name} ${repo}`;
+      const at = factory.volumes.map((v) => v.path);
       const twice = at.find((v, i) => at.indexOf(v) !== i);
       return (
         twice === undefined || `it names the volume ${twice} twice: nemia factory volume rm ${factory.name} ${twice}, then add it once`

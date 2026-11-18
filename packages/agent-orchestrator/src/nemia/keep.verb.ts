@@ -117,8 +117,8 @@ const nemiaBrief = (quota: string | undefined): string =>
 
 /** Each factory's folders, read-only: what she reads of the work and never writes. A factory that does not read is left out. */
 const factoryFolders = (home: string): Mount[] => {
-  const repos = listedAtOnce(home).flatMap((f) => ('repos' in f ? f.repos : []));
-  return factoryMounts({ repos }, undefined);
+  const volumes = listedAtOnce(home).flatMap((f) => ('volumes' in f ? f.volumes : []));
+  return factoryMounts({ volumes }, undefined);
 };
 
 /**

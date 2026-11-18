@@ -8,14 +8,16 @@
  * read — then clones, places the folder, files the factory and its cards, and takes back what it wrote, in reverse, on a failure after.
  * The template is the caller's to take under the store before (`withTemplateTaken`, `'made'`), as `nemia factory apply`'s is.
  */
+import path from 'node:path';
 import { Effect } from 'effect';
 import type { FactoryExport, FactoryImported, FactoryImportWrite, MoveCards } from 'objects';
 import { brokenBy, fromThrow as tried } from '../../door/door.store.ts';
 import { Conflict, Invalid, isRefusal } from '../../refusal/refusal.ts';
 import { StoreRoot } from '../../config/root.store.ts';
-import { FactoryDoor, factoryRepos, refuseName } from '../door/factories.store.ts';
+import { FactoryDoor, refuseName, volumesGiven } from '../door/factories.store.ts';
 import { Factory as FactoryModel, FactoryName, isDefaultFactory } from '../factory.model.ts';
-import type { Factory } from '../factory.ts';
+import { workedOn, type Factory } from '../factory.ts';
+import { volumesFromRepos, type FileVolume } from '../volume/from-repos.ts';
 import { CardDoor } from '../../cards/cards.store.ts';
 import { RunDoor } from '../../runs/runs.store.ts';
 import { CardName } from '../../inbox/inbox.model.ts';
@@ -72,8 +74,9 @@ export const factoryExported = Effect.fn('factoryExported')(function* (name: str
  * origin (the clone carries it), or reads no words.
  */
 const instructionCarried = Effect.fn('instructionCarried')(function* (factory: Factory) {
-  const [first] = factory.repos;
-  if (factory.tree !== undefined || first === undefined || factory.origins?.[first] !== undefined) return undefined;
+  const [first] = workedOn(factory);
+  const cloneOf = factory.volumes.find((v) => !v.readOnly && v.origin !== undefined && path.resolve(v.path) === first);
+  if (factory.tree !== undefined || first === undefined || cloneOf !== undefined) return undefined;
   const read = yield* (yield* FactoryDoor).instruction.read(FactoryName.read(factory.name));
   return read.store || read.words === null ? undefined : { path: read.file, words: read.words };
 });
@@ -91,7 +94,22 @@ const cardsOf = Effect.fn('cardsOf')(function* (name: string) {
 });
 
 /**
- * The factory the export's `file` says, under the name `name`: refused `Invalid`, naming the export to take again, where it reads as
+ * The file `raw` an export carries, in one list of volumes: one an earlier release wrote, its repositories under `repos` and their URLs
+ * under `origins`, read as the daemon's move reads it (`volumesFromRepos`), those keys taken out; one in one list as it is.
+ */
+const oneList = (raw: object): object => {
+  if (!('repos' in raw) && !('origins' in raw)) return raw;
+  const { repos, origins, volumes, ...kept } = raw as { repos?: unknown; origins?: unknown; volumes?: unknown };
+  const keys = {
+    ...(Array.isArray(repos) ? { repos: repos.filter((r): r is string => typeof r === 'string') } : {}),
+    ...(typeof origins === 'object' && origins !== null ? { origins: origins as Record<string, string> } : {}),
+    ...(Array.isArray(volumes) ? { volumes: volumes as FileVolume[] } : {}),
+  };
+  return { ...kept, volumes: volumesFromRepos(keys) };
+};
+
+/**
+ * The factory the export's `file` says, under the name `name`, read into one list where an earlier release wrote it (`oneList`): refused `Invalid`, naming the export to take again, where it reads as
  * none. A templated factory's workflows are its tree's, which travels in its folder, so its schedules and cost lines are judged once it is
  * filed, not here.
  */
@@ -105,7 +123,7 @@ function factorySent(name: string, text: string): Factory {
   }
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw))
     throw new Invalid({ message: `the factory sent is no factory's file. ${again}` });
-  const sent: object = { workflows: [], hires: {}, schedules: {}, ...raw, name };
+  const sent: object = { volumes: [], workflows: [], hires: {}, schedules: {}, ...oneList(raw), name };
   const { schedules: _schedules, costLines: _costLines, ...wiringFree } = sent as Factory;
   const broken = brokenBy(FactoryModel, 'template' in sent ? { ...wiringFree, schedules: {} } : sent);
   if (broken !== null) throw new Invalid({ message: `the factory sent: ${broken}. ${again}` });
@@ -121,21 +139,20 @@ type Decided = {
 };
 
 /**
- * Each repository of `source` as the target in the store `home` takes it (`repoOnTarget`, then `factoryRepos`), what was typed for each
- * by its path on the source (`typedRepos`), into `out`.
+ * Each repository of `source`, its writable volumes, as the target in the store `home` takes it (`repoOnTarget`, then `volumesGiven`
+ * as a writable volume), what was typed for each by its path on the source (`typedRepos`), into `out`.
  */
 function reposDecided(home: string, source: Factory, typedRepos: Readonly<Record<string, string>>, out: Decided): void {
-  for (const repo of source.repos) {
-    const given = repoOnTarget(repo, source.origins?.[repo], typedRepos[repo]);
+  for (const repo of source.volumes.filter((v) => !v.readOnly)) {
+    const given = repoOnTarget(repo.path, repo.origin, typedRepos[repo.path]);
     if (given.kind === 'refused') {
       out.refused.push(given.message);
       continue;
     }
     try {
-      const read = factoryRepos(home, source.name, [given.repo]);
-      const [folder] = read.repos;
-      if (folder !== undefined) out.repos[repo] = folder;
-      Object.assign(out.origins, read.origins);
+      const [read] = volumesGiven(home, source.name, [`${given.repo}:rw`], process.cwd());
+      if (read !== undefined) out.repos[repo.path] = read.path;
+      if (read?.origin !== undefined) out.origins[read.path] = read.origin;
     } catch (err) {
       if (!isRefusal(err)) throw err;
       out.refused.push(`--repo ${repo}=${given.repo}: ${err.message}`);
@@ -152,8 +169,9 @@ function decided(home: string, source: Factory, write: FactoryImportWrite): Deci
   const typedRepos = write.repos ?? {};
   reposDecided(home, source, typedRepos, out);
   const typedVolumes = write.volumes ?? {};
-  const onTarget = { name: source.name, repos: Object.values(out.repos) };
-  for (const volume of source.volumes ?? []) {
+  const onTarget = { name: source.name, volumes: Object.values(out.repos).map((at) => ({ path: at, readOnly: false })) };
+  const readOnly = source.volumes.filter((v) => v.readOnly);
+  for (const volume of readOnly) {
     const key = volumeKey(volume);
     const typed = typedVolumes[key];
     const refusal = volumeRefusal(onTarget, { path: typed ?? volume.path, readOnly: volume.readOnly }, home, isDirectory);
@@ -161,9 +179,10 @@ function decided(home: string, source: Factory, write: FactoryImportWrite): Deci
     if (mounted.kind === 'refused') out.refused.push(mounted.message);
     else out.volumes[key] = mounted.path;
   }
-  const keys = new Set((source.volumes ?? []).map(volumeKey));
-  for (const repo of Object.keys(typedRepos).filter((r) => !source.repos.includes(r)))
-    out.refused.push(`--repo ${repo}= names no repository of ${source.name}: give one of ${source.repos.join(', ')}.`);
+  const keys = new Set(readOnly.map(volumeKey));
+  const repos = source.volumes.filter((v) => !v.readOnly).map((v) => v.path);
+  for (const repo of Object.keys(typedRepos).filter((r) => !repos.includes(r)))
+    out.refused.push(`--repo ${repo}= names no repository of ${source.name}: give one of ${repos.join(', ') || 'none, since it works on none'}.`);
   for (const key of Object.keys(typedVolumes).filter((k) => !keys.has(k)))
     out.refused.push(
       `--volume ${key}= names no volume of ${source.name}: give one of ${[...keys].join(', ') || 'none, since it mounts none'}.`,
@@ -289,13 +308,13 @@ export const factoryImported = Effect.fn('factoryImported')(function* (
   return {
     name,
     file: filed.file,
-    repos: [...factory.repos],
+    repos: workedOn(factory),
     cloned: Object.values(decision.origins),
-    volumes: (source.volumes ?? []).map((volume) => ({
+    volumes: source.volumes.filter((v) => v.readOnly).map((volume) => ({
       name: volumeKey(volume),
       path: decision.volumes[volumeKey(volume)] ?? volume.path,
     })),
     cards: filed.cards,
-    untrusted: [...factory.repos],
+    untrusted: workedOn(factory),
   } satisfies FactoryImported;
 });

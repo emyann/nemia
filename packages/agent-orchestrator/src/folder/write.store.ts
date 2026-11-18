@@ -5,6 +5,7 @@
  * agents and skills reads: it imports neither the engine nor a controller. A run that froze its folder at `nemia start` is changed by none
  * of it.
  */
+import { workedOn } from '../factory/factory.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -317,7 +318,7 @@ const listedAt = (home: string) => doorAtOnce(home, (door) => door.factories.lis
  * @param repo A repository the caller names besides, or undefined for none.
  */
 export function knownReposAt(home: string, repo?: string): Set<string> {
-  const known = new Set(listedAt(home).flatMap((f) => ('repos' in f ? f.repos.map((r) => path.resolve(r)) : [])));
+  const known = new Set(listedAt(home).flatMap((f) => ('volumes' in f ? workedOn(f).map((r) => path.resolve(r)) : [])));
   if (repo) known.add(path.resolve(repo));
   return known;
 }

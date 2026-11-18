@@ -36,7 +36,7 @@ export type CloneMemory = { said: Map<string, string> };
 export const freshCloneMemory = (): CloneMemory => ({ said: new Map() });
 
 /**
- * One sweep: each folder a factory names an origin of that is not there now cloned again, the folders it found there asked nothing.
+ * One sweep: each volume of a factory cloned from an origin whose folder is not there now cloned again, the folders it found there asked nothing.
  * A refusal is a warning, said once while its words stand. The folders cloned again.
  */
 export const clonesOnce = Effect.fn('clonesOnce')(function* (memory: CloneMemory) {
@@ -44,7 +44,8 @@ export const clonesOnce = Effect.fn('clonesOnce')(function* (memory: CloneMemory
   const missing = new Set<string>();
   for (const factory of yield* (yield* FactoryDoor).factories.listed()) {
     if ('error' in factory) continue;
-    for (const [into, url] of Object.entries(factory.origins ?? {})) {
+    for (const { path: into, origin: url } of factory.volumes) {
+      if (url === undefined) continue;
       if (fs.existsSync(into) || missing.has(into)) continue;
       missing.add(into);
       const refused = yield* cloneRefusal(url, into);

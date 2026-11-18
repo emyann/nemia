@@ -9,6 +9,7 @@
  * from facts the package already holds; the machine's are read through `ReadinessFacts`, which a test hands its own. A controller: it
  * reads the store, this process's needs' readings (`NeedsMemory`), or the checks run now where it keeps none.
  */
+import { workedOn } from '../factory/factory.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -555,7 +556,7 @@ const workflowHarnesses = Effect.fnUntraced(function* (home: string, f: Factory,
   const loaded = yield* Effect.exit(
     Effect.flatMap(
       tried(() => ({ dir: workflowDirAt(w.dir), fills: factoryFills(home, f, w.workflow).fills })),
-      ({ dir, fills }) => door.read(dir, placesOf(home, f.repos[0] ?? f.tree, addedOf(home, f.name)), fills),
+      ({ dir, fills }) => door.read(dir, placesOf(home, workedOn(f)[0] ?? f.tree, addedOf(home, f.name)), fills),
     ),
   );
   return Exit.isSuccess(loaded) ? runHarnesses(loaded.value) : [];

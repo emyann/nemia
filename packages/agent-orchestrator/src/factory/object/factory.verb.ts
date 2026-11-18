@@ -37,7 +37,7 @@ import { untrustedPlaces } from '../../trust/untrusted.verb.ts';
 import type { Untrusted } from '../../trust/trust.ts';
 import { Invalid, Missing } from '../../refusal/refusal.ts';
 import type { Level } from '../../level/level.ts';
-import { factoryVolumesNamed } from '../volume/volume.ts';
+import { volumesNamed } from '../volume/volume.ts';
 import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
 
 /** Two texts in the order `<` compares them. */
@@ -161,16 +161,19 @@ export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, 
  */
 export const filedOf = (listing: FactoryListing, home: string): FiledFactory => {
   const meta = { name: listing.name, creationTimestamp: bornAt(listing.file) };
-  if ('error' in listing) return { metadata: meta, spec: { repos: [], workflows: [], hires: {}, volumes: [] } };
+  if ('error' in listing) return { metadata: meta, spec: { workflows: [], hires: {}, volumes: [] } };
   const level = ownLevel(home, listing.name);
   const spec: FactoryObject['spec'] = {
-    repos: [...listing.repos],
     workflows: [...listing.workflows],
     hires: { ...listing.hires },
-    volumes: factoryVolumesNamed(listing).map(({ name, path, readOnly }) => ({ name, path, readOnly })),
+    volumes: volumesNamed(listing.volumes).map(({ name, path, readOnly, origin }) => ({
+      name,
+      path,
+      readOnly,
+      ...(origin === undefined ? {} : { origin }),
+    })),
     ...harnessSettingsOf(listing.harnessSettings),
     ...(listing.costLines === undefined || Object.keys(listing.costLines).length === 0 ? {} : { costLines: { ...listing.costLines } }),
-    ...(listing.origins === undefined || Object.keys(listing.origins).length === 0 ? {} : { origins: { ...listing.origins } }),
     ...(listing.workflowRepos === undefined || Object.keys(listing.workflowRepos).length === 0
       ? {}
       : { workflowRepos: { ...listing.workflowRepos } }),
@@ -184,14 +187,14 @@ export const filedOf = (listing: FactoryListing, home: string): FiledFactory => 
 };
 
 /**
- * The default factory's object: on no repository (a repository is a factory's own, filed with `nemia factory add`), offering every
+ * The default factory's object: with no volume (a volume is a factory's own, given with `nemia factory volume add`), offering every
  * workflow (no `workflows`), hiring no one, keeping no file.
  * @param home The store's root, whose time of birth is the default factory's.
  */
 export const defaultFactoryObject = (home: string): FactoryObject =>
   objectOf(
     { name: DEFAULT_NAMESPACE, creationTimestamp: bornAt(home) },
-    { repos: [], hires: {}, volumes: [] },
+    { hires: {}, volumes: [] },
     { conditions: [], untrusted: [] },
   );
 

@@ -2,7 +2,7 @@
  * The Schedule (`src/schedule.ts`): a schedule, named by its workflow, and a page of them as the Api's endpoints answer them, every key
  * kept, one missing every optional key read; and the write body the Api takes as the old route was sent it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, Schedule, ScheduleWrite } from 'objects';

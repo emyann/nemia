@@ -14,7 +14,7 @@
  * Each word is first refused in planted text (`PLANTED`), each allowance is held to its place, and each file is read for a name it must
  * hold, so a file moved or emptied cannot make the guard pass by reading nothing.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

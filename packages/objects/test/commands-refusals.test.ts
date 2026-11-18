@@ -4,7 +4,7 @@
  * line a refusal shows, and, one table (`REFUSALS`), each refusal matched by the command, flag and fix it names, never by its whole
  * sentence. Moved from the orchestrator's `src/command/command.test.ts` with the words.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { type Args, COMMAND_WORDS, CommandRefused, commandLine, parseArgv, RETIRED_COMMANDS, retiredIn, type Spec } from 'objects';
 
@@ -71,12 +71,12 @@ test("say's words are every argument after its step, joined", () => {
   assert.equal(parseArgv(SAY.spec, ['r-1']), undefined);
 });
 
-test("a table command's flag is read wherever it stands among the positionals, before them as after", async (t) => {
+describe("a table command's flag is read wherever it stands among the positionals, before them as after", () => {
   const rows: readonly (readonly [row: string, spec: Spec, after: readonly string[], before: readonly string[]])[] = [
     ['retry --budget', RETRY.spec, ['r-1', '--budget', '5'], ['--budget', '5', 'r-1']],
   ];
   for (const [row, spec, after, before] of rows)
-    await t.test(row, () => {
+    test(row, () => {
       const read = parseArgv(spec, after);
       assert.ok(read, `${after.join(' ')} is read`);
       assert.deepEqual(parseArgv(spec, before), read);
@@ -257,9 +257,9 @@ const REFUSALS: readonly Refused[] = [
   ],
 ];
 
-test('REFUSED: what each command the client holds refuses of its command line, before anything is asked', async (t) => {
+describe('REFUSED: what each command the client holds refuses of its command line, before anything is asked', () => {
   for (const [row, command, argv, said, not = []] of REFUSALS)
-    await t.test(row, () => {
+    test(row, () => {
       const refused = refusedBy(command, argv);
       if (said === null) return assert.equal(refused, null);
       names(refused, ...said);

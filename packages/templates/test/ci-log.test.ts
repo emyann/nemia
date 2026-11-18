@@ -3,7 +3,7 @@
  * says the page that failed as `<tool>: FAILED — <subject>: <why>`, from each worker and again from the runner, gives that page once, with
  * the line saying what it looked like, rather than npm's tail.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { failures } from '../sdlc/carried/ci-log.ts';
 

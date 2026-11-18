@@ -2,7 +2,7 @@
  * The Agent (`src/agent.ts`): an agent and a page of them as the Api's endpoints answer them, every key kept; its origin and a given
  * skill's one of the four words; and the write and try bodies the Api takes, and the card it answers.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, Agent, AgentCard } from 'objects';

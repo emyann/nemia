@@ -6,7 +6,7 @@
  * the routes once read is `resourcesOf`'s: what its contract proves (contracts/discovery.contract.ts), and the laws it leaves out held
  * here whole, over the real `Api`, each shown refusing an answer that breaks it.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import {
@@ -59,7 +59,7 @@ test('an APIResourceList decodes, and a verb out of RESOURCE_VERBS is refused', 
   assert.throws(() => Schema.decodeUnknownSync(APIResourceList)(wrong));
 });
 
-test('each path of the Api reads to its plural, its namespace, its name and its sub-resource', async (t) => {
+describe('each path of the Api reads to its plural, its namespace, its name and its sub-resource', () => {
   const rows: [string, string, ReturnType<typeof routeOf>][] = [
     ['GET', '/api/namespaces/:namespace/cards', { method: 'GET', plural: 'cards', namespaced: true, item: false, sub: null }],
     [
@@ -87,7 +87,7 @@ test('each path of the Api reads to its plural, its namespace, its name and its 
     ['GET', '/api/:name', null],
     ['GET', '/api/cards//start', null],
   ];
-  for (const [method, path, route] of rows) await t.test(`${method} ${path}`, () => assert.deepEqual(routeOf(method, path), route));
+  for (const [method, path, route] of rows) test(`${method} ${path}`, () => assert.deepEqual(routeOf(method, path), route));
 });
 
 /** Every verb discovery says, in Kubernetes' words. */

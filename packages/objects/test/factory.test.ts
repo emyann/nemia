@@ -4,7 +4,7 @@
  * route's lines as the board read them — as the Api's endpoints answer them and take their writes; and the writes that name a template
  * or a folder, a template given by its name, packed, or by a path of the daemon's machine, which its verb holds to a whole one.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, Factory, FactoryCommands, TemplateGiven } from 'objects';

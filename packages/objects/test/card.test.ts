@@ -2,7 +2,7 @@
  * The Card (`src/card.ts`): a card and a page of cards as the Api's endpoints answer them, every key kept, its optional keys absent where
  * they were; its state a closed word; and the bodies of its verbs as the Api's endpoints take them.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { OpenApi } from 'effect/http-api';

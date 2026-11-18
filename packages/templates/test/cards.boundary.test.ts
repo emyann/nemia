@@ -6,7 +6,7 @@
  * refusal has a fixture that breaks its rule, and files nothing at all. A refusal is held by its exit and by what it filed, never by its
  * words.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';

@@ -2,7 +2,7 @@
  * The docs reach no layer: their manifest names no workspace package, and their code imports none, by its name or by a relative path out
  * of `apps/docs`. They read the repository's text at build, by path from its root.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

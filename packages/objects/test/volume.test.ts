@@ -2,7 +2,7 @@
  * The Volume (`src/volume.ts`): a factory's volume, by its stored name, and a page of them, as the Api's endpoints answer them, every key
  * kept, one missing every optional key read, a gone folder read as not present with why, and one of another kind refused.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, Volume } from 'objects';

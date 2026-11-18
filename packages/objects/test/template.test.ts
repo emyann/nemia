@@ -3,7 +3,7 @@
  * page of them, as the Api's endpoints answer them, every key kept; a parameter whose type is none of its words, and another kind,
  * refused.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, Template } from 'objects';

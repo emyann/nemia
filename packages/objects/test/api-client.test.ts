@@ -5,7 +5,7 @@
  * `Answered`, with the api's own words. The shipped bound, `READ_BOUND_MS`, is not waited out: the test shortens it at the seam the
  * constructor gives for it (`boundMs`), and floors the wait there.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import zlib from 'node:zlib';
@@ -45,7 +45,7 @@ const standIn = http.createServer((req, res) => {
   });
 });
 await new Promise<void>((resolve) => standIn.listen(0, '127.0.0.1', resolve));
-after(() => {
+afterAll(() => {
   standIn.closeAllConnections();
   standIn.close();
 });

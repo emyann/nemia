@@ -3,7 +3,7 @@
  * masked as the api serves them; a builtin server, with no namespace and no status; its transport and state closed words; the write body
  * and the sign-in's answers as the Api's endpoints take and answer them.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, HEADER_MASK, McpServer, McpServerWrite, SignInState } from 'objects';

@@ -26,8 +26,8 @@ export type Truthy<T> = Exclude<T, false | 0 | 0n | '' | null | undefined>;
 /** What a source rings when its event comes (`ring`), and what a wait hears it with (`hear`, which answers how to stop hearing). */
 export type Bell = { ring: () => void; hear: (look: () => void) => () => void };
 
-/** What `until` reads of a test: the signal the runner aborts at its timeout, and where it says what never came. */
-export type Waiter = { signal: AbortSignal; diagnostic: (message: string) => void };
+/** What `until` reads of a test: the signal the runner aborts at its timeout. */
+export type Waiter = { signal: AbortSignal };
 
 /**
  * A bell: each `ring` asks every wait that hears it again.
@@ -65,13 +65,13 @@ const told = (what: string | (() => string)): string => {
  * time. The pace says how often to look, never how long to wait. A pending wait holds the event loop open, so a wait that never comes
  * ends at its test's timeout, never as a loop gone idle; one that cannot read its test's signal fails at once, holding nothing open.
  *
- * @param t the test that waits: its signal ends the wait, and its diagnostics say what never came
+ * @param t the test that waits: its signal ends the wait
  * @param ok the condition, sync or async; what it throws fails the wait, so an assert inside it surfaces
  * @param what the event waited for, as a person reads it after `never came: `; or a function that says it, with the state the wait is
  *   stuck in, asked once, when the wait fails
  * @param how `bell`, rung by the event's source, and `everyMs`, the pace of a read where the event is a state
  * @returns the first truthy answer of `ok`
- * @throws `never came: <what>` once `t.signal` aborts, said also as a diagnostic of the test; or what `ok` threw
+ * @throws `never came: <what>` once `t.signal` aborts, said also on the test's log, since the runner reports its own timeout; or what `ok` threw
  */
 export function until<T>(
   t: Waiter,
@@ -98,7 +98,7 @@ export function until<T>(
     const abort = () => {
       if (settled) return;
       const missed = `never came: ${told(what)}`;
-      t.diagnostic(missed);
+      console.error(missed);
       settle(() => reject(new Error(missed)));
     };
     const ask = async (): Promise<void> => {

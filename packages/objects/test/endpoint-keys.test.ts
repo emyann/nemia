@@ -2,7 +2,7 @@
  * Where a call's input goes on an endpoint (`src/endpoint-keys.ts`, `endpointKeysOf`): its path's keys, its query's but `watch`, its
  * payload's, and whether it answers a stream, read off objects' `Api`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Api, endpointKeysOf } from 'objects';
 

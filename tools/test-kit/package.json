@@ -2,7 +2,7 @@
   "name": "test-kit",
   "version": "1.0.0",
   "private": true,
-  "description": "The mechanics every workspace's tests share: scratch roots, story checkpoints, the repository's files, the import scanners, the folder rule's judgement, the door-debt counter and the names a piece of code has. the setup file that restores what a test mocked. Never shipped.",
+  "description": "The mechanics every workspace's tests share: scratch roots, story checkpoints, the repository's files, the import scanners, the folder rule's judgement, the door-debt counter, the names a piece of code has, and the seat every test file runs in. Never shipped.",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -15,7 +15,7 @@
     "./words": "./words.ts",
     "./fence": "./fence.ts",
     "./package.json": "./package.json",
-    "./restore": "./restore.ts"
+    "./seat": "./seat.ts"
   },
   "scripts": {
     "test": "vitest run",

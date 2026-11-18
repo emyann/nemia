@@ -15,7 +15,7 @@
  * here makes move the bare's base onto the merge GitHub would have made when it is asked to merge. Its subject is git, `gh` and a
  * spawned script: a boundary file.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

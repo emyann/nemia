@@ -4,7 +4,7 @@
  * its `check` — each refusal asserted by the fragments it names, never its sentence; a line each takes read into what its runner sends;
  * and the class each says, which admission reads.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   AGENTS_CARD_WORDS,

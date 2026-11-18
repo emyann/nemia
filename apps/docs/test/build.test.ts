@@ -8,7 +8,7 @@
  * that record names: a record another process writes while the child runs is not the child's doing, and an equality on the whole
  * record read before and after made a neighbour's write this test's failure.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -74,7 +74,7 @@ test('dev starts without the prerender server’s error, renders a page, and reg
     env: { ...process.env, ASTRO_TELEMETRY_DISABLED: '1', ASTRO_DISABLE_UPDATE_CHECK: 'true', NO_COLOR: '1' },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
-  t.after(() => void child.kill('SIGKILL'));
+  t.onTestFinished(() => void child.kill('SIGKILL'));
   child.stdin.on('error', () => undefined);
   for (const stream of [child.stdout, child.stderr])
     stream.on('data', (chunk: Buffer) => {

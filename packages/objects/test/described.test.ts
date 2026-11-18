@@ -10,7 +10,7 @@
  * refused too, so a change that describes a field lowers its count in the same commit. Today's counts, as the baseline's text: `node
  * test/described.test.ts --print`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

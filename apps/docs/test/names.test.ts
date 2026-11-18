@@ -6,7 +6,7 @@
  * contexts' glossary tables are held as a page is: the Glossary page is drawn from their texts, each context's `about` and each term's
  * `meaning`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

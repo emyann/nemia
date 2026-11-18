@@ -72,7 +72,7 @@ test("a factory's generation is its file's, its status the controller's, its pla
   assert.equal(m?.status.applied, '1.2.0');
   assert.equal(m?.status.conditions[0]?.lastTransitionTime, '2026-11-01T00:00:00.000Z');
   assert.deepEqual(m?.status.untrusted, [{ place: repo, harness: 'Claude Code', withheld: 'its hooks' }]);
-  assert.deepEqual(m?.spec.volumes.at(1), { name: 'a', path: '/data/a', readOnly: true }, 'an unnamed volume is read by its name');
+  assert.deepEqual(m?.spec.volumes.find((v) => v.path === '/data/a'), { name: 'a', path: '/data/a', readOnly: true }, 'an unnamed volume is read by its name');
   assert.deepEqual(m?.spec.workflows, ['make']);
 });
 

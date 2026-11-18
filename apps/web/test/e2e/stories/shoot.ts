@@ -349,8 +349,8 @@ function argsOf(argv: readonly string[]) {
 /** Pictures copied from the cache and drawn, on one side. */
 type Counts = { copied: number; rendered: number };
 
-/** What drawing a side is given: the workspace, the cache's folder (none under `--no-cache`), the lockfile, the folder and the browser. */
-type Side = { root: string; cache: string | undefined; lockfile: string; out: string; opened: () => Promise<Browser> };
+/** What drawing a side is given: the workspace, the cache's folder (none under `--no-cache`), the folder and the browser. */
+type Side = { root: string; cache: string | undefined; out: string; opened: () => Promise<Browser> };
 
 /**
  * Each story id of the story files `files` of the tree at `root` among `ids`, with every file, from the root, it is drawn from
@@ -387,9 +387,9 @@ const storyFilesIn = (root: string): string[] => {
  * Pictures `pictured` at the head into `out` as `story-<id>-<theme>.png`: each the cache holds copied, the rest drawn from a build of
  * the checkout's Storybook, made only where one is left to draw, and kept in the cache.
  */
-async function drawnAtHead({ root, cache, lockfile, out, pictured, opened }: Side & { pictured: readonly string[] }): Promise<Counts> {
+async function drawnAtHead({ root, cache, out, pictured, opened }: Side & { pictured: readonly string[] }): Promise<Counts> {
   const wanted = picturesOf(pictured);
-  const keys = keysOf(root, lockfile, reachesOf(root, storyFiles(root), pictured), wanted);
+  const keys = keysOf(root, root, reachesOf(root, storyFiles(root), pictured), wanted);
   const missing = takenFromCache(cache, keys, wanted, out, 'story-');
   if (missing.length === 0) return { copied: wanted.length, rendered: 0 };
   const built = path.join(await scratch('nemia-stories-head-'), 'static');
@@ -415,7 +415,6 @@ async function drawnAtHead({ root, cache, lockfile, out, pictured, opened }: Sid
 async function drawnAtBase({
   root,
   cache,
-  lockfile,
   out,
   commit,
   shot,
@@ -425,7 +424,7 @@ async function drawnAtBase({
   const baseRoot = path.resolve(board, '..', '..');
   const reaches = reachesOf(baseRoot, storyFilesIn(baseRoot), shot);
   const wanted = picturesOf(shot.filter((id) => reaches.has(id)));
-  const keys = keysOf(baseRoot, lockfile, reaches, wanted);
+  const keys = keysOf(baseRoot, root, reaches, wanted);
   const missing = takenFromCache(cache, keys, wanted, out, 'before-');
   const copied = wanted.length - missing.length;
   if (missing.length === 0) return { counts: { copied, rendered: 0 } };
@@ -526,12 +525,11 @@ async function main(): Promise<number> {
   };
   const pictured = [...stories, ...matched.filter((id) => !stories.includes(id))];
   const cache = values['no-cache'] ? undefined : cacheDirOf(root);
-  const lockfile = path.join(root, 'package-lock.json');
   let browser: Browser | undefined;
   const opened = async (): Promise<Browser> => (browser ??= await (await import('playwright')).chromium.launch());
   try {
     if (pictured.length > 0) {
-      report.pictures.head = await drawnAtHead({ root, cache, lockfile, out, pictured, opened });
+      report.pictures.head = await drawnAtHead({ root, cache, out, pictured, opened });
       const shot = stories.filter((id) => THEMES.every((theme) => fs.existsSync(path.join(out, pictureName('story-', { id, theme })))));
       console.log(`stories: ${shot.length} touched stor${shot.length === 1 ? 'y' : 'ies'} pictured, light and dark, in ${out}`);
       if (targetsDir !== undefined && matches.length > 0) await composeAll(root, await opened(), targetsDir, matches, out);
@@ -539,7 +537,7 @@ async function main(): Promise<number> {
       else if (mergeBase === undefined) report.baseWhy = 'no --base was named, so the base was not drawn';
       else {
         const beforeDir = await scratch('nemia-stories-before-');
-        const base = await drawnAtBase({ root, cache, lockfile, out: beforeDir, commit: mergeBase, shot, opened });
+        const base = await drawnAtBase({ root, cache, out: beforeDir, commit: mergeBase, shot, opened });
         report.pictures.base = base.counts;
         if (base.why !== undefined) report.baseWhy = base.why;
         else {

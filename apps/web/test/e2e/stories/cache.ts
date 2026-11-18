@@ -5,10 +5,12 @@
  * A picture's key (`keysOf`) is a SHA-256 over the render settings (`RENDER`), the theme, the story's id, and the path and the bytes'
  * SHA-256 of each file it is drawn from: every file the story file's imports reach and what every story is drawn in (`reachOf`, in
  * `shoot.ts`: the board's own `src`, `.storybook` and `theme` files, followed through their imports and the stylesheets' `@import`s),
- * every file under `apps/web/.storybook/`, `apps/web/theme/` and `apps/web/public/`, the board's `package.json`, `vite.config.ts` and
- * `tsconfig.json`, which Storybook's build reads, and the workspace's `package-lock.json`, which pins every package a story draws
- * from, the board's fonts among them (`@fontsource`). A path is said from the tree's root, so the change's tree and the base's
- * extracted one key a story alike where their bytes agree.
+ * every file under `apps/web/.storybook/`, `apps/web/theme/` and `apps/web/public/`, and the board's `package.json`, `vite.config.ts`
+ * and `tsconfig.json`, which Storybook's build reads, each from the tree drawn; and from the workspace, whose `node_modules` both sides
+ * are drawn over and whose tool draws them (`WORKSPACE_INPUTS`): its `package-lock.json`, which pins every package a story draws from,
+ * the board's fonts among them (`@fontsource`), `objects`' source and `package.json`, the one package of the workspace the board
+ * imports, linked rather than pinned, and the tool's own files, which take the picture. A path is said from its root, so the change's
+ * tree and the base's extracted one key a story alike where their bytes agree.
  *
  * The pictures are kept in the folder `STORIES_CACHE` names, else `apps/web/node_modules/.cache/stories/` in the workspace, which git
  * ignores, as `<key>.png`: a factory may point the variable at a folder its sessions share, so each picture is written beside its
@@ -24,7 +26,6 @@ export const STORIES_CACHE = 'STORIES_CACHE';
 
 /** How a story is drawn: a change to any of it is a change of every key. */
 export const RENDER = {
-  keys: 1,
   viewport: { width: 1280, height: 800 },
   reducedMotion: 'reduce',
   fullPage: true,
@@ -36,6 +37,19 @@ const SHARED_FOLDERS = ['apps/web/.storybook', 'apps/web/theme', 'apps/web/publi
 
 /** The files, from the workspace root, Storybook's build of every story reads. */
 const SHARED_FILES = ['apps/web/package.json', 'apps/web/vite.config.ts', 'apps/web/tsconfig.json'];
+
+/** What every picture is drawn from in the workspace, whichever tree it is of: folders read whole, and files. */
+const WORKSPACE_INPUTS = {
+  folders: ['packages/objects/src'],
+  files: [
+    'package-lock.json',
+    'packages/objects/package.json',
+    'apps/web/test/e2e/stories/shoot.ts',
+    'apps/web/test/e2e/stories/cache.ts',
+    'apps/web/test/e2e/stories/built.ts',
+    'apps/web/test/e2e/board.ts',
+  ],
+};
 
 /** One picture of a story: its id and its theme. */
 export type Picture = { id: string; theme: Theme };
@@ -78,16 +92,24 @@ const digestOf = (file: string): string =>
   fs.existsSync(file) ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : 'absent';
 
 /**
+ * Each file, from `workspace`, every picture is drawn from in it (`WORKSPACE_INPUTS`), with its digest, a line each.
+ * @param workspace The workspace root.
+ */
+export const workspaceDigest = (workspace: string): string =>
+  [...WORKSPACE_INPUTS.folders.flatMap((dir) => filesUnder(workspace, dir)), ...WORKSPACE_INPUTS.files]
+    .map((file) => `workspace:${file}\t${digestOf(path.join(workspace, file))}\n`)
+    .join('');
+
+/**
  * Each picture's key, by its name under no prefix (`<id>-<theme>`).
  * @param root The root of the tree the pictures are drawn from.
- * @param lockfile The lockfile of the packages they are drawn with: the workspace's `package-lock.json`, the base's too, since the base
- *   is drawn over the workspace's `node_modules`.
+ * @param workspace The workspace root: the base too is drawn over its `node_modules`, by its tool (`workspaceDigest`).
  * @param reaches Each story id's files, from `root`, its imports reach (`reachOf`).
  * @param pictures The pictures to key.
  */
 export function keysOf(
   root: string,
-  lockfile: string,
+  workspace: string,
   reaches: ReadonlyMap<string, readonly string[]>,
   pictures: readonly Picture[],
 ): Map<string, string> {
@@ -100,12 +122,12 @@ export function keysOf(
     return made;
   };
   const shared = sharedInputs(root);
-  const lock = digestOf(lockfile);
+  const drawnBy = workspaceDigest(workspace);
   const keys = new Map<string, string>();
   for (const picture of pictures) {
     const files = [...new Set([...(reaches.get(picture.id) ?? []), ...shared])].sort();
     const hash = createHash('sha256');
-    hash.update(`render\t${JSON.stringify(RENDER)}\ntheme\t${picture.theme}\nid\t${picture.id}\npackage-lock.json\t${lock}\n`);
+    hash.update(`render\t${JSON.stringify(RENDER)}\ntheme\t${picture.theme}\nid\t${picture.id}\n${drawnBy}`);
     for (const file of files) hash.update(`${file}\t${digest(file)}\n`);
     keys.set(keyName(picture), hash.digest('hex'));
   }

@@ -264,7 +264,7 @@ test('a pass into an empty --out, or one not there yet, clears nothing and passe
 
 /** Each picture's key of the touched `ids` in the planted tree at `root`, by `<id>-<theme>`, as `shoot.ts` keys them. */
 const keyed = (root: string, ids: readonly string[]): Map<string, string> =>
-  keysOf(root, path.join(root, 'package-lock.json'), reachesOf(root, STORY_FILES, ids), picturesOf(ids));
+  keysOf(root, root, reachesOf(root, STORY_FILES, ids), picturesOf(ids));
 
 /** The planted story files, from the root. */
 const STORY_FILES = [TAG_STORIES, 'apps/web/src/components/run/Card.stories.tsx'];
@@ -292,6 +292,12 @@ test("a picture's key moves with what its story is drawn from, and with nothing 
     ['a file under theme/ no stylesheet imports', { 'apps/web/theme/DESIGN.resolved.md': '# resolved\n' }, EVERY_STORY],
     ['a file under public/', { 'apps/web/public/logo.svg': '<svg/>\n' }, EVERY_STORY],
     ['the lockfile', { 'package-lock.json': '{ "lockfileVersion": 3 }\n' }, EVERY_STORY],
+    ["objects' source, linked into node_modules", { 'packages/objects/src/run.ts': "export const PHASES = ['queued'];\n" }, EVERY_STORY],
+    ["objects' package.json", { 'packages/objects/package.json': '{ "name": "objects" }\n' }, EVERY_STORY],
+    ['a package of the workspace the board does not import', { 'packages/other/src/x.ts': 'export const x = 1;\n' }, []],
+    ['the file that takes the picture', { 'apps/web/test/e2e/board.ts': 'export const photograph = () => 1;\n' }, EVERY_STORY],
+    ['the tool', { 'apps/web/test/e2e/stories/shoot.ts': '// another wait\n' }, EVERY_STORY],
+    ['an e2e file that takes no story picture', { 'apps/web/test/e2e/pages/010-runs.ts': 'export default {};\n' }, []],
   ];
   for (const [what, files, moved] of rows) {
     const { root: at } = planted();
@@ -326,6 +332,20 @@ test('a picture the cache holds is copied byte for byte, the rest are left to dr
   assert.deepEqual(takenFromCache(undefined, keys, wanted, again, 'story-'), wanted, '--no-cache draws every picture');
 });
 
+/**
+ * A stand-in for Storybook's build in the planted workspace, where `buildStorybook` runs it: it writes down the folder each build was
+ * asked in, a line each, in `built.txt` beside it, and fails; the builds asked, by folder.
+ */
+const standInStorybook = (root: string): (() => string[]) => {
+  const bin = path.join(root, 'node_modules', 'storybook', 'dist', 'bin');
+  write(bin, {
+    'dispatcher.js':
+      "const fs = require('node:fs');\nfs.appendFileSync(require('node:path').join(__dirname, 'built.txt'), process.cwd() + '\\n');\nprocess.exit(1);\n",
+  });
+  const built = path.join(bin, 'built.txt');
+  return () => (fs.existsSync(built) ? fs.readFileSync(built, 'utf8').split('\n').filter(Boolean) : []);
+};
+
 /** `shoot.ts --base <base> --out <out>` from the planted board, its cache `cache`, with no browser it could launch: its exit and report. */
 const shot = (root: string, base: string, out: string, cache: string, ...args: string[]) => {
   const ran = spawnSync(process.execPath, [SHOOT, '--base', base, '--out', out, ...args], {
@@ -349,6 +369,7 @@ test('a pass whose every picture the cache holds, at the change and at the base,
   commit(root, 'a part');
   const cache = path.join(root, 'cache');
   fs.mkdirSync(cache);
+  const builds = standInStorybook(root);
   const headKeys = keyed(root, CARD_STORIES);
   git(root, 'checkout', '-q', base);
   const baseKeys = keyed(root, CARD_STORIES);
@@ -357,14 +378,25 @@ test('a pass whose every picture the cache holds, at the change and at the base,
   for (const [name, key] of [...headKeys, ...baseKeys]) fs.writeFileSync(path.join(cache, `${key}.png`), `png of ${name}`);
   const out = path.join(root, 'out');
   const ran = shot(root, 'main', out, cache);
-  assert.equal(ran.status, 0, 'no Storybook built: the planted board has none to build');
+  assert.equal(ran.status, 0);
+  assert.deepEqual(builds(), [], 'no Storybook built on either side');
   assert.deepEqual(ran.report?.pictures, { head: { copied: 4, rendered: 0 }, base: { copied: 4, rendered: 0 } });
   assert.deepEqual([ran.report?.changed, ran.report?.fresh], [[], []], 'pictures of the same bytes are the same');
   for (const [name, key] of headKeys)
     assert.ok(fs.readFileSync(path.join(out, `story-${name}.png`)).equals(fs.readFileSync(path.join(cache, `${key}.png`))), name);
 
-  assert.notEqual(shot(root, 'main', path.join(root, 'out-no-cache'), cache, '--no-cache').status, 0, '--no-cache builds Storybook');
+  const storyPictures = (dir: string) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((name) => name.startsWith('story-')) : []);
+  const uncached = path.join(root, 'out-no-cache');
+  const drawing = shot(root, 'main', uncached, cache, '--no-cache');
+  assert.notEqual(drawing.status, 0, "the stand-in's build fails");
+  assert.deepEqual(builds(), [path.join(root, 'apps', 'web')], '--no-cache built the head to draw');
+  assert.deepEqual(storyPictures(uncached), [], '--no-cache copied no picture');
+
   write(root, { [MONEY]: 'export const dollars = (n: number) => n.toFixed(3);\n' });
   commit(root, 'a lib file');
-  assert.notEqual(shot(root, 'main', path.join(root, 'out-moved'), cache).status, 0, 'a moved input builds Storybook to draw again');
+  const moved = path.join(root, 'out-moved');
+  const redrawn = shot(root, 'main', moved, cache);
+  assert.notEqual(redrawn.status, 0, "the stand-in's build fails");
+  assert.equal(builds().length, 2, 'a moved input built the head again to draw');
+  assert.deepEqual(storyPictures(moved), [], 'no picture of a moved key copied');
 });

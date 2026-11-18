@@ -2,16 +2,18 @@
  * The readiness read (`GET /api/readiness`, `nemia doctor`): every piece a person's server needs to run its factories, each in place,
  * missing or not activated, and what it costs while missing (`cost`), with the fix that puts it there — a command to type, or a fix the
  * server runs itself (`POST /api/readiness/fixes`), its output followed as it runs (`GET /api/readiness/fixes/:id/output`). The group
- * that serves them is `ReadinessGroup`.
+ * that serves them is `ReadinessGroup`, with a harness's checks (`HarnessCheck`: its version, and one tiny real turn started by the server,
+ * `POST /api/readiness/turns`) and the store's milestones (`GET /api/readiness/milestones`).
  */
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
 import { describedNumber } from './meta.ts';
-import { NeedAsk } from './workflow.ts';
+import { HarnessCheck, HarnessTurn, TurnStart } from './harness-check.ts';
+import { Milestones } from './milestones.ts';
+import { ReadinessFix } from './readiness-fix.ts';
 import {
   ADDRESS_KINDS,
-  FIX_KINDS,
   FIX_PHASES,
   FIX_STREAM_EVENTS,
   HARNESS_PARTS,
@@ -20,30 +22,6 @@ import {
   READINESS_STATES,
   type ReadinessCost,
 } from './words.ts';
-
-/**
- * A way to put a piece in place: what it does in words and its command — typed by the person where `startable` is false (`nemia
- * claude-token set`, `loginctl enable-linger`), or started by the server where it is true, which `index` names among the need's fixes —
- * with the answers it asks first, the pattern of a code its output shows, and its kind where it is no `puts` (`typed`, a command the
- * person types on the server; `removes`, one that takes a met piece away, a harness deactivated).
- */
-export const ReadinessFix = Schema.Struct({
-  message: Schema.String.annotate({ description: 'What the fix does, in words.' }),
-  command: Schema.String.annotate({
-    description: 'Its command: typed by the person where startable is false, or started by the server where it is true.',
-  }),
-  startable: Schema.Boolean.annotate({ description: 'Whether the server starts it, not the person.' }),
-  index: Schema.optionalKey(describedNumber("Which of the need's fixes it is; absent where it is not startable.")),
-  asks: Schema.optionalKey(Schema.Array(NeedAsk).annotate({ description: 'The answers it asks first.' })),
-  code: Schema.optionalKey(Schema.String.annotate({ description: 'The pattern of a code its output shows.' })),
-  kind: Schema.optionalKey(
-    Schema.Literals(FIX_KINDS).annotate({
-      description:
-        'Its kind where it is no puts: typed, a command the person types on the server, or removes, one that takes a met piece away.',
-    }),
-  ),
-});
-export type ReadinessFix = typeof ReadinessFix.Type;
 
 /**
  * One piece of the read: its name (a need's name for a declared need), its area, its state, a sentence of what it is or why it is not in
@@ -86,6 +64,12 @@ export const ReadinessPiece = Schema.Struct({
   cost: Schema.optionalKey(
     Schema.Literals(READINESS_COSTS).annotate({
       description: 'What it costs while it is missing; a server that declares none is read as run.',
+    }),
+  ),
+  checks: Schema.optionalKey(
+    Schema.Array(HarnessCheck).annotate({
+      description:
+        "For a harness's install piece in place, its two checks: the version its program answers against the pin, and its last check turn.",
     }),
   ),
 });
@@ -204,6 +188,9 @@ export type FixStreamEvent = typeof FixStreamEvent.Type;
 /** A fix's id in a path. */
 const fixParams = { id: Schema.String.annotate({ description: "The fix's id." }) };
 
+/** A check turn's id in a path. */
+const turnParams = { id: Schema.String.annotate({ description: "The check turn's id." }) };
+
 /** The readiness read and its fixes. */
 export class ReadinessGroup extends HttpApiGroup.make('readiness').add(
   HttpApiEndpoint.get('read', '/api/readiness', { success: Readiness, error: [Invalid, Failed] }).annotate(
@@ -229,5 +216,25 @@ export class ReadinessGroup extends HttpApiGroup.make('readiness').add(
   }).annotate(
     OpenApi.Description,
     "Follows a fix's output as server-sent events while it runs, until it ends. Answers a stream of FixStreamEvent.",
+  ),
+  HttpApiEndpoint.post('turn', '/api/readiness/turns', {
+    payload: TurnStart,
+    success: HarnessTurn,
+    error: [BadRequest, Invalid, Missing, Forbidden, Failed],
+  }).annotate(
+    OpenApi.Description,
+    'Starts one tiny real turn through an installed, signed-in harness, bounded in time and spend, or answers the one of it still running. Answers the HarnessTurn, its check running.',
+  ),
+  HttpApiEndpoint.get('turnOf', '/api/readiness/turns/:id', {
+    params: turnParams,
+    success: HarnessTurn,
+    error: [Missing, Failed],
+  }).annotate(
+    OpenApi.Description,
+    "Reads a check turn by its id: running until it settles, then passed on the harness's answer with what it cost, or failed saying why. Answers the HarnessTurn.",
+  ),
+  HttpApiEndpoint.get('milestones', '/api/readiness/milestones', { success: Milestones, error: [Invalid, Failed] }).annotate(
+    OpenApi.Description,
+    'Reads where the store stands on the way to its first landed change: a harness, a factory, a volume and a run landed, each done by what the store holds now. Answers Milestones.',
   ),
 ) {}

@@ -580,6 +580,16 @@ export {
   type NeedScope,
   HARNESS_PARTS,
   type HarnessPart,
+  HARNESS_CHECKS,
+  type HarnessCheckName,
+  HARNESS_CHECK_STATES,
+  type HarnessCheckState,
+  TURN_FAILURES,
+  type TurnFailure,
+  MILESTONES,
+  type Milestone,
+  MILESTONE_STATES,
+  type MilestoneState,
   TICKET_STATES,
   type TicketState,
   UPGRADE_PHASES,
@@ -593,13 +603,15 @@ export {
   FixStart,
   FixStreamEvent,
   Readiness,
-  ReadinessFix,
   ReadinessGroup,
   ReadinessPiece,
   missingSaid,
   readinessSaid,
   runsWait,
 } from './readiness.ts';
+export { ReadinessFix } from './readiness-fix.ts';
+export { HarnessCheck, HarnessTurn, TurnStart } from './harness-check.ts';
+export { MilestoneRead, Milestones } from './milestones.ts';
 export {
   LinkClaimed,
   LinkMinted,

@@ -54,6 +54,7 @@ function claudeNeeds(): HarnessNeeds {
         },
       ],
     },
+    turnModel: 'haiku',
   };
 }
 

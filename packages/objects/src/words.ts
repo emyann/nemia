@@ -939,6 +939,45 @@ export const HARNESS_PARTS = ['install', 'sign-in'] as const;
 export type HarnessPart = (typeof HARNESS_PARTS)[number];
 
 /**
+ * The two checks a harness's install piece carries (`ReadinessPiece.checks`): its installed program's version, read by running it, at
+ * the pin this release was tested with (`version`), and one tiny real turn through it that answered (`turn`).
+ */
+export const HARNESS_CHECKS = ['version', 'turn'] as const;
+
+/** One of `HARNESS_CHECKS`. */
+export type HarnessCheckName = (typeof HARNESS_CHECKS)[number];
+
+/** Where a harness's check stands: it passed, it failed, its turn is still running, or it was never run. */
+export const HARNESS_CHECK_STATES = ['passed', 'failed', 'running', 'unrun'] as const;
+
+/** One of `HARNESS_CHECK_STATES`. */
+export type HarnessCheckState = (typeof HARNESS_CHECK_STATES)[number];
+
+/**
+ * Why a harness's check turn failed: past its deadline (`deadline`), at its spend cap (`budget`), never started or lost by the engine
+ * (`unstarted`), stopped by a person (`stopped`), or ended by the harness with nothing said, a refusal in its own words (`unanswered`).
+ */
+export const TURN_FAILURES = ['deadline', 'budget', 'unstarted', 'stopped', 'unanswered'] as const;
+
+/** One of `TURN_FAILURES`. */
+export type TurnFailure = (typeof TURN_FAILURES)[number];
+
+/**
+ * The milestones of a store on its way to a first landed change, in order: a harness activated and signed in, a factory filed, a volume
+ * a run would mount, a run landed.
+ */
+export const MILESTONES = ['harness', 'factory', 'volume', 'landed'] as const;
+
+/** One of `MILESTONES`. */
+export type Milestone = (typeof MILESTONES)[number];
+
+/** Where a milestone stands: done by what the store holds now, the next one to do, or one after it. */
+export const MILESTONE_STATES = ['done', 'next', 'later'] as const;
+
+/** One of `MILESTONE_STATES`. */
+export type MilestoneState = (typeof MILESTONE_STATES)[number];
+
+/**
  * Where a ticket stands (`ticketState`, agent-orchestrator's src/pairing/ticket.ts) — a pairing, or a first-visit link: waiting on the
  * person's approval, claimable, claimed for good, or past its time unclaimed.
  */

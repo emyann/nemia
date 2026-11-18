@@ -84,9 +84,9 @@ export const LinkRequest = Schema.Struct({
 });
 export type LinkRequest = typeof LinkRequest.Type;
 
-/** What `POST /api/links` answers, once: the link to open (`<base>/?link=<secret>`), and when it lapses. */
+/** What `POST /api/links` answers, once: the link to open (`<base>/welcome?link=<secret>`), and when it lapses. */
 export const LinkMinted = Schema.Struct({
-  url: Schema.String.annotate({ description: 'The link to open, `<base>/?link=<secret>`.' }),
+  url: Schema.String.annotate({ description: 'The link to open, `<base>/welcome?link=<secret>`.' }),
   expiresAt: Schema.String.annotate({ description: 'When the link lapses, as an ISO 8601 time.' }),
 });
 export type LinkMinted = typeof LinkMinted.Type;

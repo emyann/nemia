@@ -17,10 +17,27 @@
  * - `GET /api/readiness/fixes/:id/output` — what the fix prints, followed, as server-sent events (`followFix`): an `output` event a chunk
  *   of text, from its first byte, then `ended`, its data the `Fix` as JSON, after which the stream closes. 404 before the stream opens for
  *   an id no fix was started under; a read that fails on the way ends the stream, and a `GET` of the fix says where it stands.
+ * - `POST /api/readiness/turns` — one tiny real turn through an installed, signed-in harness, filed on the engine as a job of it under a
+ *   spend cap and a deadline (`startTurn`), or the one of it still running. 404 for a harness that runs none; 422 while it is not
+ *   installed or not signed in, naming the fix; 403 for a session's token, since a turn spends the person's money or quota (`personOnly`).
+ * - `GET /api/readiness/turns/:id` — the turn as it stands (`turnOf`): running, passed on its answer with its cost, or failed saying why.
+ *   404 for an id no turn was started under.
+ * - `GET /api/readiness/milestones` — where the store stands on the way to its first landed change (`milestonesNow`).
  */
 import { Context, Effect, Stream } from 'effect';
 import { readsBounded } from '../objects/answer-bound.ts';
-import { followFix, fixOf, liveFacts, readinessOf, startFix, type FixFollowed, type ReadinessFacts } from 'agent-orchestrator';
+import {
+  followFix,
+  fixOf,
+  liveFacts,
+  milestonesNow,
+  readinessOf,
+  startFix,
+  startTurn,
+  turnOf,
+  type FixFollowed,
+  type ReadinessFacts,
+} from 'agent-orchestrator';
 import { Api, type FixStreamEvent } from 'objects';
 import { answered, answeredWrite } from '../objects/refused.ts';
 import { personOnly } from '../caller/index.ts';
@@ -47,6 +64,14 @@ export const readinessHandlers = readsBounded(Api, 'readiness', (handlers) =>
       }),
     )
     .handle('fixOf', ({ params }) => answeredWrite((s) => s.inRequest(fixOf(params.id))))
+    .handle('turn', ({ payload }) =>
+      answeredWrite((s) => {
+        personOnly(s, 'POST /api/readiness/turns', "the board's Setup, Run the check");
+        return s.inRequest(startTurn(payload));
+      }),
+    )
+    .handle('turnOf', ({ params }) => answeredWrite((s) => s.inRequest(turnOf(params.id))))
+    .handle('milestones', () => answeredWrite((s) => s.inRequest(milestonesNow())))
     .handle('fixOutput', ({ params }) =>
       answered(async (s) => {
         const context = await s.inRequest(Effect.context());

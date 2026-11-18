@@ -250,9 +250,9 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
         output.volumes.length === factory.volumes.length &&
         output.volumes.every(
           (v, i) =>
-            v.path === factory.volumes[i]?.path &&
-            v.readOnly === factory.volumes[i]?.readOnly &&
-            v.origin === factory.volumes[i]?.origin,
+            v.path === factory.volumes.at(i)?.path &&
+            v.readOnly === factory.volumes.at(i)?.readOnly &&
+            v.origin === factory.volumes.at(i)?.origin,
         ),
     },
     hireNames: {

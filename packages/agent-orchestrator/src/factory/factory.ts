@@ -511,12 +511,13 @@ export const folderName = (repo: string): string => {
 };
 
 /**
- * How many of `factory`'s repositories have the folder name `name`: one where the wiring can name it.
+ * How many of `factory`'s repositories, its writable volumes as its file holds them (each named once, as `path.resolve` spelled it), have
+ * the folder name `name`: one where the wiring can name it.
  * @param factory The factory, by its volumes.
  * @param name The folder name asked for.
  */
 export const reposNamed = (factory: Pick<Factory, 'volumes'>, name: string): number =>
-  workedOn(factory).filter((r) => folderName(r) === name).length;
+  factory.volumes.filter((v) => !v.readOnly && folderName(v.path) === name).length;
 
 /**
  * Each repository of `factory`, its writable volumes as `path.resolve` spells them, with its folder's name: what `workflowRepo` is

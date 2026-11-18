@@ -1,6 +1,6 @@
 /**
- * Pictures the board's stories a change touches: `node test/e2e/stories/shoot.ts --base <ref> --out <dir> [--changed <path>…] [--list]`,
- * from `apps/web`.
+ * Pictures the board's stories a change touches: `node test/e2e/stories/shoot.ts --base <ref> --out <dir> [--changed <path>…] [--list]
+ * [--no-cache]`, from `apps/web`.
  *
  * The change's paths are the work's own since the merge base of HEAD and `--base`, as the factory's picture check reads them: its commits
  * along the first parent, and of a merge only its resolution, so a path a merged branch changed is not the work's; `--changed` names
@@ -16,8 +16,13 @@
  * light, then dark (`story-<id>-<theme>.png`); then the same of the merge base, a `git archive` of its `apps/web` extracted into a
  * scratch folder over this checkout's `node_modules`, so both sides are drawn on one machine; and for each story whose pixels differ
  * writes `before-`, `after-` and `diff-<id>-<theme>.png`. Last, `stories.json`: `{ head, base, touched, changed, fresh, baseRendered,
- * baseWhy, matched, matches }` — `fresh` the touched stories the base has none of, `baseRendered` false where the base would not build,
- * with why. No picture goes into git: `--out` is the step's files or a scratch folder.
+ * baseWhy, matched, matches, pictures }` — `fresh` the touched stories the base has none of, `baseRendered` false where the base would
+ * not build, with why, `pictures` how many pictures each side copied from the cache and how many it drew. No picture goes into git:
+ * `--out` is the step's files or a scratch folder.
+ *
+ * On either side, a picture whose key — what its story is drawn from (`keysOf`, `cache.ts`) — the cache holds is copied rather than
+ * drawn, and each picture drawn is kept there; a side with nothing left to draw builds no Storybook, and two pictures of the same
+ * bytes are compared in no browser. `--no-cache` draws every picture, and reads and writes no cache.
  *
  * With `--targets <dir>`, each `target-<id>[-light|-dark].png` there (`targets.ts`) is set beside its story's picture at the head, in
  * the theme it names or both, as `match-<id>-<theme>.png`; a target's story the change does not touch is pictured at the head too, and
@@ -38,6 +43,7 @@ import { importsIn } from 'test-kit/imports';
 import type { StoryReach } from '../../../contracts/touched-stories.contract.ts';
 import { storyModuleOf } from '../../stories.ts';
 import { buildStorybook, builtIds, serveBuilt } from './built.ts';
+import { cacheDirOf, keptInCache, STORIES_CACHE, keysOf, pictureName, picturesOf, RENDER, takenFromCache, type Picture } from './cache.ts';
 import { composeMatch, matchesOf, targetsOf, THEMES, type Match } from './targets.ts';
 import { owesAStory, storiesTouched } from './touched.ts';
 
@@ -208,23 +214,23 @@ async function served<T>(dir: string, use: (at: string) => Promise<T>): Promise<
 }
 
 /**
- * Pictures each of `ids` the Storybook at `dir` holds, in each theme, into `out` as `<prefix><id>-<theme>.png`, by the e2e's
- * `photograph`, which stills every animation for the shot; the ids pictured.
+ * Draws each of `pictures` whose story the Storybook at `dir` holds into `out` as `<prefix><id>-<theme>.png`, by the e2e's
+ * `photograph`, which stills every animation for the shot, theme by theme; the pictures drawn.
  */
-async function shootAll(browser: Browser, dir: string, ids: readonly string[], out: string, prefix: string): Promise<string[]> {
+async function shootAll(browser: Browser, dir: string, pictures: readonly Picture[], out: string, prefix: string): Promise<Picture[]> {
   const { photograph } = await import('../board.ts');
   const held = new Set(builtIds(dir));
-  const shot = ids.filter((id) => held.has(id));
+  const shot = pictures.filter(({ id }) => held.has(id));
   await served(dir, async (at) => {
     for (const theme of THEMES) {
-      const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 }, reducedMotion: 'reduce' });
+      const context = await browser.newContext({ colorScheme: theme, viewport: RENDER.viewport, reducedMotion: RENDER.reducedMotion });
       const page = await context.newPage();
-      for (const id of shot) {
-        await page.goto(`${at}/iframe.html?id=${encodeURIComponent(id)}&viewMode=story`);
+      for (const picture of shot.filter((wanted) => wanted.theme === theme)) {
+        await page.goto(`${at}/iframe.html?id=${encodeURIComponent(picture.id)}&viewMode=story`);
         await page.locator('[data-story-ground], [data-broken]').first().waitFor();
         await page.waitForLoadState('networkidle');
         await page.evaluate(() => document.fonts.ready.then(() => undefined));
-        await photograph(page, path.join(out, `${prefix}${id}-${theme}.png`), { fullPage: true, always: true });
+        await photograph(page, path.join(out, pictureName(prefix, picture)), { fullPage: RENDER.fullPage, always: true });
       }
       await context.close();
     }
@@ -315,9 +321,10 @@ export const clearEarlier = (out: string): number => {
 
 /** The words of `--help`, and of a refusal of the arguments. */
 const USAGE =
-  'usage, from apps/web: node test/e2e/stories/shoot.ts --base <ref> --out <dir> [--targets <dir>] [--changed <path>…] [--list]; ' +
-  '--list prints the touched story ids, bare parts and matches as JSON and pictures nothing; without it, the pictures and ' +
-  'stories.json an earlier pass wrote in --out are removed first, so no step removes them by hand';
+  'usage, from apps/web: node test/e2e/stories/shoot.ts --base <ref> --out <dir> [--targets <dir>] [--changed <path>…] [--list] ' +
+  '[--no-cache]; --list prints the touched story ids, bare parts and matches as JSON and pictures nothing; without it, the pictures ' +
+  'and stories.json an earlier pass wrote in --out are removed first, so no step removes them by hand; --no-cache draws every ' +
+  `picture, where a picture the cache (${STORIES_CACHE}, else apps/web/node_modules/.cache/stories) holds is otherwise copied`;
 
 /** The arguments `argv` gives: the flags, and the paths after `--changed`, which takes every path after it; refuses an unknown flag. */
 function argsOf(argv: readonly string[]) {
@@ -330,12 +337,153 @@ function argsOf(argv: readonly string[]) {
         targets: { type: 'string' },
         changed: { type: 'string', multiple: true },
         list: { type: 'boolean', default: false },
+        'no-cache': { type: 'boolean', default: false },
       },
       allowPositionals: true,
     });
   } catch (err) {
     throw new Refusal(`${(err as Error).message}: ${USAGE}`);
   }
+}
+
+/** Pictures copied from the cache and drawn, on one side. */
+type Counts = { copied: number; rendered: number };
+
+/** What drawing a side is given: the workspace, the cache's folder (none under `--no-cache`), the folder and the browser. */
+type Side = { root: string; cache: string | undefined; out: string; opened: () => Promise<Browser> };
+
+/**
+ * Each story id of the story files `files` of the tree at `root` among `ids`, with every file, from the root, it is drawn from
+ * (`reachOf`).
+ * @param root The root of the tree.
+ * @param files Its story files, from the root.
+ * @param ids The story ids wanted.
+ */
+export const reachesOf = (root: string, files: readonly string[], ids: readonly string[]): Map<string, string[]> => {
+  const drawn = drawnIn(root);
+  const reaches = new Map<string, string[]>();
+  for (const file of files) {
+    const held = idsOf(fs.readFileSync(path.join(root, file), 'utf8')).filter((id) => ids.includes(id));
+    if (held.length === 0) continue;
+    const reach = [...reachOf(root, file, drawn).reaches];
+    for (const id of held) reaches.set(id, reach);
+  }
+  return reaches;
+};
+
+/** The story files of the board extracted at `root`, read off its folder, in path order: a `git archive` holds no repository. */
+const storyFilesIn = (root: string): string[] => {
+  const components = path.join(root, BOARD, 'src', 'components');
+  if (!fs.existsSync(components)) return [];
+  return fs
+    .readdirSync(components, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => path.relative(root, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'))
+    .filter(isStoryFile)
+    .sort();
+};
+
+/**
+ * Pictures `pictured` at the head into `out` as `story-<id>-<theme>.png`: each the cache holds copied, the rest drawn from a build of
+ * the checkout's Storybook, made only where one is left to draw, and kept in the cache.
+ */
+async function drawnAtHead({ root, cache, out, pictured, opened }: Side & { pictured: readonly string[] }): Promise<Counts> {
+  const wanted = picturesOf(pictured);
+  const keys = keysOf(root, root, reachesOf(root, storyFiles(root), pictured), wanted);
+  const missing = takenFromCache(cache, keys, wanted, out, 'story-');
+  if (missing.length === 0) return { copied: wanted.length, rendered: 0 };
+  const built = path.join(await scratch('nemia-stories-head-'), 'static');
+  const why = await buildStorybook(root, path.join(root, BOARD), built);
+  if (why !== undefined) throw new Refusal(why);
+  const held = new Set(builtIds(built));
+  const unbuilt = [...new Set(missing.map(({ id }) => id))].filter((id) => !held.has(id));
+  if (unbuilt.length > 0)
+    throw new Refusal(
+      `Storybook built no story of the ids read off the story files, ${unbuilt.join(', ')}: idsOf has drifted from Storybook's ` +
+        "id rule; compare it with the build's index.json",
+    );
+  const drawn = await shootAll(await opened(), built, missing, out, 'story-');
+  keptInCache(cache, keys, drawn, out, 'story-');
+  return { copied: wanted.length - missing.length, rendered: drawn.length };
+}
+
+/**
+ * Pictures `shot` at `commit`, the merge base, into `out` as `before-<id>-<theme>.png`, each story the base holds: each the cache holds
+ * copied, the rest drawn from a build of the base's board, extracted over the checkout's `node_modules`, made only where one is left to
+ * draw, and kept in the cache; why where the base would not build.
+ */
+async function drawnAtBase({
+  root,
+  cache,
+  out,
+  commit,
+  shot,
+  opened,
+}: Side & { commit: string; shot: readonly string[] }): Promise<{ counts: Counts; why?: string }> {
+  const board = await boardAt(root, commit);
+  const baseRoot = path.resolve(board, '..', '..');
+  const reaches = reachesOf(baseRoot, storyFilesIn(baseRoot), shot);
+  const wanted = picturesOf(shot.filter((id) => reaches.has(id)));
+  const keys = keysOf(baseRoot, root, reaches, wanted);
+  const missing = takenFromCache(cache, keys, wanted, out, 'before-');
+  const copied = wanted.length - missing.length;
+  if (missing.length === 0) return { counts: { copied, rendered: 0 } };
+  const built = path.join(await scratch('nemia-stories-built-base-'), 'static');
+  const why = await buildStorybook(root, board, built);
+  if (why !== undefined) return { counts: { copied, rendered: 0 }, why };
+  const drawn = await shootAll(await opened(), built, missing, out, 'before-');
+  keptInCache(cache, keys, drawn, out, 'before-');
+  return { counts: { copied, rendered: drawn.length } };
+}
+
+/**
+ * The stories of `shot` the base has no picture of, and those whose pictures differ by a pixel, writing `before-`, `after-` and
+ * `diff-<id>-<theme>.png` into `out` for each theme they differ in; two pictures of the same bytes differ in none, and are compared in
+ * no browser.
+ */
+async function compared(
+  opened: () => Promise<Browser>,
+  shot: readonly string[],
+  beforeDir: string,
+  out: string,
+): Promise<{ fresh: string[]; changed: string[] }> {
+  const before = shot.filter((id) => THEMES.every((theme) => fs.existsSync(path.join(beforeDir, pictureName('before-', { id, theme })))));
+  const changed: string[] = [];
+  for (const id of before) {
+    let differs = false;
+    for (const theme of THEMES) {
+      const was = path.join(beforeDir, pictureName('before-', { id, theme }));
+      const now = path.join(out, pictureName('story-', { id, theme }));
+      if (fs.readFileSync(was).equals(fs.readFileSync(now))) continue;
+      const diff = await differ(await opened(), was, now);
+      if (!diff.differs) continue;
+      differs = true;
+      fs.copyFileSync(was, path.join(out, pictureName('before-', { id, theme })));
+      fs.copyFileSync(now, path.join(out, pictureName('after-', { id, theme })));
+      fs.writeFileSync(path.join(out, pictureName('diff-', { id, theme })), diff.png);
+    }
+    if (differs) changed.push(id);
+  }
+  return { fresh: shot.filter((id) => !before.includes(id)), changed };
+}
+
+/** Sets each target of `matches` in `targetsDir` beside its story's picture at the head in `out`, as its `match-<id>-<theme>.png`. */
+async function composeAll(root: string, browser: Browser, targetsDir: string, matches: readonly Match[], out: string): Promise<void> {
+  const short = git(root, ['rev-parse', '--short', 'HEAD']).trim();
+  const css = fs.readFileSync(path.join(root, BOARD, 'theme', 'theme.css'), 'utf8');
+  for (const match of matches) {
+    await composeMatch(browser, {
+      target: path.join(targetsDir, match.target),
+      story: path.join(out, match.story),
+      theme: match.theme,
+      head: short,
+      css,
+      out: path.join(out, match.match),
+    });
+  }
+  console.log(
+    `stories: ${matches.length} match${matches.length === 1 ? '' : 'es'} of a target and its story written, match-<id>-<theme>.png, in ${out}`,
+  );
 }
 
 async function main(): Promise<number> {
@@ -373,74 +521,40 @@ async function main(): Promise<number> {
     baseWhy: null as string | null,
     matched,
     matches,
+    pictures: { head: { copied: 0, rendered: 0 }, base: { copied: 0, rendered: 0 } },
   };
   const pictured = [...stories, ...matched.filter((id) => !stories.includes(id))];
-  if (pictured.length > 0) {
-    const { chromium } = await import('playwright');
-    const browser = await chromium.launch();
-    try {
-      const headBuilt = path.join(await scratch('nemia-stories-head-'), 'static');
-      const why = await buildStorybook(root, path.join(root, BOARD), headBuilt);
-      if (why !== undefined) throw new Refusal(why);
-      const held = new Set(builtIds(headBuilt));
-      const unbuilt = pictured.filter((id) => !held.has(id));
-      if (unbuilt.length > 0)
-        throw new Refusal(
-          `Storybook built no story of the ids read off the story files, ${unbuilt.join(', ')}: idsOf has drifted from Storybook's ` +
-            "id rule; compare it with the build's index.json",
-        );
-      const pictures = await shootAll(browser, headBuilt, pictured, out, 'story-');
-      const shot = pictures.filter((id) => stories.includes(id));
+  const cache = values['no-cache'] ? undefined : cacheDirOf(root);
+  let browser: Browser | undefined;
+  const opened = async (): Promise<Browser> => (browser ??= await (await import('playwright')).chromium.launch());
+  try {
+    if (pictured.length > 0) {
+      report.pictures.head = await drawnAtHead({ root, cache, out, pictured, opened });
+      const shot = stories.filter((id) => THEMES.every((theme) => fs.existsSync(path.join(out, pictureName('story-', { id, theme })))));
       console.log(`stories: ${shot.length} touched stor${shot.length === 1 ? 'y' : 'ies'} pictured, light and dark, in ${out}`);
-      if (targetsDir !== undefined && matches.length > 0) {
-        const short = git(root, ['rev-parse', '--short', 'HEAD']).trim();
-        const css = fs.readFileSync(path.join(root, BOARD, 'theme', 'theme.css'), 'utf8');
-        for (const match of matches) {
-          await composeMatch(browser, {
-            target: path.join(targetsDir, match.target),
-            story: path.join(out, match.story),
-            theme: match.theme,
-            head: short,
-            css,
-            out: path.join(out, match.match),
-          });
-        }
-        console.log(
-          `stories: ${matches.length} match${matches.length === 1 ? '' : 'es'} of a target and its story written, match-<id>-<theme>.png, in ${out}`,
-        );
-      }
+      if (targetsDir !== undefined && matches.length > 0) await composeAll(root, await opened(), targetsDir, matches, out);
       if (shot.length === 0) report.baseWhy = 'the change touches no story, so the base was not drawn';
       else if (mergeBase === undefined) report.baseWhy = 'no --base was named, so the base was not drawn';
       else {
-        const baseBuilt = path.join(await scratch('nemia-stories-built-base-'), 'static');
-        const baseWhy = await buildStorybook(root, await boardAt(root, mergeBase), baseBuilt);
-        if (baseWhy !== undefined) report.baseWhy = baseWhy;
+        const beforeDir = await scratch('nemia-stories-before-');
+        const base = await drawnAtBase({ root, cache, out: beforeDir, commit: mergeBase, shot, opened });
+        report.pictures.base = base.counts;
+        if (base.why !== undefined) report.baseWhy = base.why;
         else {
           report.baseRendered = true;
-          const beforeDir = await scratch('nemia-stories-before-');
-          const before = await shootAll(browser, baseBuilt, shot, beforeDir, 'before-');
-          report.fresh = shot.filter((id) => !before.includes(id));
-          for (const id of before) {
-            let differs = false;
-            for (const theme of THEMES) {
-              const was = path.join(beforeDir, `before-${id}-${theme}.png`);
-              const now = path.join(out, `story-${id}-${theme}.png`);
-              const diff = await differ(browser, was, now);
-              if (!diff.differs) continue;
-              differs = true;
-              fs.copyFileSync(was, path.join(out, `before-${id}-${theme}.png`));
-              fs.copyFileSync(now, path.join(out, `after-${id}-${theme}.png`));
-              fs.writeFileSync(path.join(out, `diff-${id}-${theme}.png`), diff.png);
-            }
-            if (differs) report.changed.push(id);
-          }
+          Object.assign(report, await compared(opened, shot, beforeDir, out));
         }
       }
-    } finally {
-      await browser.close();
     }
+  } finally {
+    await browser?.close();
   }
   fs.writeFileSync(path.join(out, 'stories.json'), `${JSON.stringify(report, null, 2)}\n`);
+  const { head: atHead, base: atBase } = report.pictures;
+  console.log(
+    `stories: pictures copied from ${cache ?? 'no cache'} and drawn: the head ${atHead.copied} and ${atHead.rendered}, ` +
+      `the base ${atBase.copied} and ${atBase.rendered}`,
+  );
   console.log(
     `stories: ${report.changed.length} changed against the base, ${report.fresh.length} new; ` +
       `${report.baseRendered ? 'the base drawn' : `the base not drawn: ${report.baseWhy}`}; ${path.join(out, 'stories.json')}`,

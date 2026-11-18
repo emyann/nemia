@@ -108,7 +108,12 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   what an earlier pass wrote there (each `before-`, `after-`, `diff-`, `story-` and `match-*.png`, and `stories.json`, no other file
   and no folder), so a step shooting again removes no picture by hand; a changed part no story reaches is refused,
   exit 1, named. `--list` prints the touched ids and bare parts as JSON and launches no browser; `--changed <path>…` names the paths
-  instead of git. It builds Storybook twice: a few minutes, about 2.6 GB. `--targets <dir>` sets each `target-<story id>[-light|-dark].png`
+  instead of git. A picture is kept under a key of what its story is drawn from (`keysOf`, `e2e/stories/cache.ts`: the files its
+  imports reach, `.storybook/`, `theme/`, `public/`, the board's `package.json`, `vite.config.ts` and `tsconfig.json`, and from the
+  workspace the root's `package-lock.json`, `objects`' source and `package.json`, the tool's own files and the render settings), in the folder `STORIES_CACHE` names, else `node_modules/.cache/stories/`, and copied
+  rather than drawn on either side while its key holds; a side with nothing left to draw builds no Storybook, `stories.json`'s
+  `pictures` counts each side's copied and drawn, and `--no-cache` draws them all. Drawing builds Storybook once a side: a few
+  minutes, about 2.6 GB. Nothing prunes the cache. `--targets <dir>` sets each `target-<story id>[-light|-dark].png`
   there beside its story at the head, one height, captioned, as `match-<id>-<theme>.png` (`e2e/stories/targets.ts`), listed in
   `stories.json`'s `matched` and `matches`.
 - What a person does to a part — a press, the keyboard, the focus, where a link leads, what a press opens — is its story's play

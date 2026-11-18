@@ -724,6 +724,13 @@ test('REFUSED: a new file in each layer that says a word of another', () => {
   assert.equal(keptBroken(`${texts.harness.get(kept) ?? ''}\n/** Or through Codex. */\n`).length, 1, 'a kept file is held to its count');
   assert.equal(keptBroken('export const x = 1;\n').length, 1, 'a kept file that no longer says the word is taken off');
   assert.deepEqual(planted('harness', kept, texts.harness.get(kept) ?? ''), [], 'a kept file at its count is let through');
+  const harnessCounts = measured(texts.harness, HARNESS);
+  assert.equal(
+    keptBreaks(HARNESS_RULE, harnessCounts, { [kept]: { count: harnessCounts[kept] ?? 0, why: ' ' } }).length,
+    1,
+    'a kept file with no why is refused',
+  );
+  assert.deepEqual(keptBreaks(HARNESS_RULE, harnessCounts, HARNESS_KEPT), [], 'every kept file says why, at its count');
   assert.deepEqual(planted('workflow', 'packages/agent-runtime/src/x.ts', '/** A workflow, under nemia. */\nexport const x = 1;\n'), [
     `packages/agent-runtime/src/x.ts holds 2 workflow words: ${WORKFLOW_RULE.fix}; never add them here`,
   ]);

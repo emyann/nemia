@@ -6,7 +6,8 @@ import { TokenPage } from './TokenPage';
 
 /**
  * The token page, a story a state: on a store marked exposed, a browser that sent no token, and one whose token this Nemia no longer
- * keeps, in the api's words; on a store served on this machine alone, the same two, which name the command that opens the board here (`OPEN_WORDS`) and ask for no token.
+ * keeps, in the api's words; on a store served on this machine alone, the same two, which name the command that opens the board here
+ * (`OPEN_WORDS`) and ask for no token.
  */
 const meta: Meta<typeof TokenPage> = {
   title: 'Frame/TokenPage',
@@ -47,8 +48,8 @@ export const UnknownToken: Story = {
 };
 
 /**
- * On this machine, no token sent: the page names the command that opens the board here (`OPEN_WORDS`) and draws no token field until the person opens the disclosure, which
- * holds the field for someone handed a token.
+ * On this machine, no token sent: the page names the command that opens the board here (`OPEN_WORDS`) and draws no token field until
+ * the person opens the disclosure, which holds the field for someone handed a token.
  */
 export const OpenHere: Story = {
   args: {

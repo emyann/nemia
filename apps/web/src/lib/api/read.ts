@@ -95,9 +95,9 @@ export function decoded<T>(route: string, schema: Schema.Decoder<T>, value: unkn
 }
 
 /**
- * Why the api asks this browser for a token: it sent none (`token-required`, on every store, loopback included), or the one its cookie carries is
- * no token the store keeps (`unknown-token`, one removed since). The two of `objects`' `TOKEN_REFUSALS` a person answers by pasting a
- * token: the other two are a session's and the MCP port's, which a browser never is.
+ * Why the api asks this browser for a token: it sent none (`token-required`, on every store, loopback included), or the one its cookie
+ * carries is no token the store keeps (`unknown-token`, one removed since). The two of `objects`' `TOKEN_REFUSALS` a person answers by
+ * pasting a token: the other two are a session's and the MCP port's, which a browser never is.
  */
 export type TokenAsk = Extract<TokenRefusal, 'token-required' | 'unknown-token'>;
 

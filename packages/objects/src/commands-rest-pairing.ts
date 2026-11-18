@@ -1,7 +1,7 @@
 /**
- * The words of pairing and first-visit links: `nemia pairings ls`, `nemia pairings approve`, `nemia board link` and `nemia open`. The api serves each
- * endpoint with a handler of its own, which judges the caller a person before it approves or mints; the writes are out of an agent's
- * reach (class `none`), since a pairing approved or a link minted ends in a person's token. Pure.
+ * The words of pairing and first-visit links: `nemia pairings ls`, `nemia pairings approve`, `nemia board link` and `nemia open`. The
+ * api serves each endpoint with a handler of its own, which judges the caller a person before it approves or mints; the writes are out
+ * of an agent's reach (class `none`), since a pairing approved or a link minted ends in a person's token. Pure.
  */
 import type { CommandWords } from './command.ts';
 

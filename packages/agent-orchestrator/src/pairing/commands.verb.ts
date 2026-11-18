@@ -1,11 +1,11 @@
 /**
- * The commands of pairing and first-visit links, entries of the command table: `nemia pairings ls`, `nemia pairings approve`,
- * `nemia board link` and `nemia open`. Run at the server's shell, the person's own seat, each reads the store's tickets (`pairing.store.ts`); the api
+ * The commands of pairing and first-visit links, entries of the command table: `nemia pairings ls`, `nemia pairings approve`, `nemia board
+ * link` and `nemia open`. Run at the server's shell, the person's own seat, each reads the store's tickets (`pairing.store.ts`); the api
  * serves the same endpoints with handlers of its own, which judge the caller a person before they approve or mint, so each entry is the
- * command line's and links the endpoint the api serves it on. The writes are out of an agent's reach (class `none`): a pairing approved
- * or a link minted ends in a person's token. No command prints a token: a token is minted at a ticket's claim and handed to the client
- * that claims it: by the claims the api serves alone (`pairingClaimed`, `linkClaimed`), which mint it through the token store once the
- * store's tickets have marked the claim.
+ * command line's and links the endpoint the api serves it on. The writes are out of an agent's reach (class `none`): a pairing approved or
+ * a link minted ends in a person's token. No command prints a token: a token is minted at a ticket's claim and handed to the client that
+ * claims it: by the claims the api serves alone (`pairingClaimed`, `linkClaimed`), which mint it through the token store once the store's
+ * tickets have marked the claim.
  */
 import { Effect } from 'effect';
 import { BOARD_LINK_WORDS, OPEN_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from 'objects';

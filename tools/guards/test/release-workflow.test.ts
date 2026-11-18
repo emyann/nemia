@@ -475,7 +475,11 @@ test('REFUSED: a category drifted from LABELS, internal given a category, and th
 test("REFUSED: a platform's leg gone or on another runner, the archive built whatever the tag job says or off the tag, latest.json attached before the rest, an upload that cannot rerun, a draft never published or published early, and no due step", () => {
   const all = (release: string) => drift(release, text(LABEL_CHECK), text(NOTES));
   refused(all(planted(RELEASE, '          - platform: darwin-arm64\n            runner: macos-15\n', '')), 'matrix', 'the macOS leg gone');
-  refused(all(planted(RELEASE, '          - platform: darwin-x64\n            runner: macos-15-intel\n', '')), 'matrix', 'the Intel Mac leg gone');
+  refused(
+    all(planted(RELEASE, '          - platform: darwin-x64\n            runner: macos-15-intel\n', '')),
+    'matrix',
+    'the Intel Mac leg gone',
+  );
   refused(all(planted(RELEASE, 'runner: ubuntu-24.04-arm\n', 'runner: ubuntu-24.04\n')), 'matrix', 'the arm leg built on x64');
   refused(all(planted(RELEASE, "    if: needs.tag.outputs.due == 'true'\n", '')), 'due', 'every push rebuilding the archives');
   refused(

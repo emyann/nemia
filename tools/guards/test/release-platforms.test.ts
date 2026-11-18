@@ -74,7 +74,11 @@ export const platformDrift = (texts: Texts): string[] => {
     ...differs(NODE, 'pinned Node sums', nodeSums(texts[NODE])),
     ...differs(UPGRADE, 'RELEASE_PLATFORMS', upgradePlatforms(texts[UPGRADE])),
     ...differs(README, 'asset table', readmeAssets(texts[README])),
-    ...differs(LOCK, `${SDK}'s platform packages`, sdk?.filter((p) => (PLATFORMS as readonly string[]).includes(p))),
+    ...differs(
+      LOCK,
+      `${SDK}'s platform packages`,
+      sdk?.filter((p) => (PLATFORMS as readonly string[]).includes(p)),
+    ),
   ];
 };
 

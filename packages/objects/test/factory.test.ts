@@ -15,16 +15,17 @@ const templated = {
   kind: 'Factory',
   metadata: { name: 'mill', creationTimestamp: '2026-11-04T00:00:00.000Z', resourceVersion: 'f1', generation: 3 },
   spec: {
-    repos: ['/repo'],
     workflows: ['build', 'quick'],
     hires: { 'build/implement': 'implementer' },
-    volumes: [{ name: 'data', path: '/a/data', readOnly: true }],
+    volumes: [
+      { name: 'repo', path: '/repo', readOnly: false, origin: 'https://example.com/o/r.git' },
+      { name: 'data', path: '/a/data', readOnly: true },
+    ],
     harnessSettings: { claude: { model: 'opus' } },
     revisions: 'follow',
     template: { source: 'sdlc', version: '1.2.0', params: { repo: '/repo', strict: true, cap: 3 } },
     level: 'semi-auto',
     costLines: { build: 80 },
-    origins: { '/repo': 'https://example.com/o/r.git' },
     workflowRepos: { build: 'repo' },
   },
   status: {
@@ -50,14 +51,14 @@ const bare = {
   apiVersion: API_VERSION,
   kind: 'Factory',
   metadata: { name: 'default', creationTimestamp: '2026-11-04T00:00:00.000Z', resourceVersion: 'f0' },
-  spec: { repos: ['/repo'], hires: {}, volumes: [] },
+  spec: { hires: {}, volumes: [{ path: '/repo', readOnly: false }] },
   status: { conditions: [], untrusted: [] },
 } as const;
 
 const stray = {
   ...bare,
   metadata: { ...bare.metadata, name: 'broken' },
-  spec: { repos: [], hires: {}, volumes: [] },
+  spec: { hires: {}, volumes: [] },
   status: { conditions: [], untrusted: [], error: 'broken.json does not read as JSON' },
 } as const;
 
@@ -105,10 +106,10 @@ test("the Api's commands answer the old route's lines, with unschedule by workfl
   const commands = {
     attach: 'nemia factory attach mill <workflow>',
     rm: 'nemia factory rm mill',
-    add: 'nemia factory add mill --repo <path>',
+    add: 'nemia factory add mill --volume <path|url>:rw',
     schedule: 'nemia factory schedule mill <workflow> --cron <expr> --brief <text>',
     trust: 'nemia factory trust mill',
-    volume: 'nemia factory volume add mill <path>:ro|:rw',
+    volume: 'nemia factory volume add mill <path|url>:ro|:rw',
     unschedule: { build: 'nemia factory unschedule mill build' },
     volumeRm: { data: 'nemia factory volume rm mill /a/data' },
   };
@@ -151,26 +152,28 @@ test("an upgrade's conflict names the proposal its resolution waits on: its phas
 
 test("a template travels by its name, packed in base64, or by a path of the daemon's machine; REFUSED: none of them, or no text", () => {
   for (const template of [{ name: 'sdlc' }, { archive: 'H4sIAAAA' }, { path: '/srv/sdlc' }])
-    assert.deepEqual(taken('factories', 'apply', { template, repos: ['/srv/repo'] }), { template, repos: ['/srv/repo'] });
-  assert.equal(taken('factories', 'apply', { template: { path: 7 }, repos: [] }), undefined);
-  assert.equal(taken('factories', 'apply', { template: {}, repos: [] }), undefined);
-  assert.deepEqual(taken('factories', 'apply', {}), {}, "a template or repositories left out are the verb's to refuse, in its words");
+    assert.deepEqual(taken('factories', 'apply', { template, volumes: ['/srv/repo:rw'] }), { template, volumes: ['/srv/repo:rw'] });
+  assert.equal(taken('factories', 'apply', { template: { path: 7 }, volumes: [] }), undefined);
+  assert.equal(taken('factories', 'apply', { template: {}, volumes: [] }), undefined);
+  assert.deepEqual(taken('factories', 'apply', {}), {}, "a template left out is the verb's to refuse, in its words");
   assert.equal(Schema.decodeUnknownExit(TemplateGiven)({ name: 1 })._tag, 'Failure');
 });
 
-test('a factory filed and a volume mounted and taken off, as the Api takes and answers them; REFUSED: a filing whose repos are no list', () => {
-  const filing = { name: 'mill', repos: ['/srv/repo'], noTrust: true };
+test('a factory filed and a volume mounted and taken off, as the Api takes and answers them; REFUSED: a filing whose volumes are no list', () => {
+  const filing = { name: 'mill', volumes: ['/srv/repo:rw'], noTrust: true };
   assert.deepEqual(taken('factories', 'create', filing), filing);
-  assert.equal(taken('factories', 'create', { name: 'mill', repos: '/srv/repo' }), undefined);
+  assert.equal(taken('factories', 'create', { name: 'mill', volumes: '/srv/repo:rw' }), undefined);
   const created = {
     name: 'mill',
-    repos: ['/srv/repo'],
+    volumes: [{ path: '/srv/repo', readOnly: false }],
     file: '/store/factories/mill.json',
     trusts: [{ place: '/srv/repo', unasked: 'no harness keeps a trust' }],
   };
   assert.deepEqual(answered('factories', 'create', created), created);
   assert.deepEqual(taken('factories', 'addVolume', { volume: '/srv/data:ro' }), { volume: '/srv/data:ro' });
-  const added = { file: '/store/factories/mill.json', volume: { path: '/srv/data', readOnly: true }, was: null };
+  const cloned = { volume: 'https://example.com/o/r.git:rw', noTrust: true };
+  assert.deepEqual(taken('factories', 'addVolume', cloned), cloned);
+  const added = { file: '/store/factories/mill.json', volume: { path: '/srv/data', readOnly: true }, was: null, trusts: [] };
   assert.deepEqual(answered('factories', 'addVolume', added), added);
   const removed = { file: '/store/factories/mill.json', removed: '/srv/data' };
   assert.deepEqual(answered('factories', 'removeVolume', removed), removed);
@@ -197,7 +200,7 @@ test('a preview answers an upgrade or a takeover, told apart by kind; REFUSED: a
     kind: 'adopt',
     plan: {
       factory: 'mill',
-      kept: { repos: ['/srv/repo'], schedules: [], instruction: false, volumes: [], settings: [] },
+      kept: { schedules: [], instruction: false, volumes: ['/srv/repo'], settings: [] },
       workflows: { added: ['press'], dropped: [], kept: [] },
       hires: [{ step: 'press/draft', kind: 'added', now: 'drafter' }],
       revisions: { was: 'pinned', now: 'pinned' },
@@ -221,7 +224,7 @@ test('a preview answers an upgrade or a takeover, told apart by kind; REFUSED: a
 
 test("an apply, a takeover, an upgrade and a conflict's choice, as the Api takes and answers them; REFUSED: a choice's file as a path", () => {
   const template = { source: '/store/templates-given/ab.tgz', version: '1.0.0', params: { budget: 7 } };
-  const applied = { name: 'mill', repos: ['/srv/repo'], file: '/f', template, place: template.source, tree: '/t', trusts: [] };
+  const applied = { name: 'mill', volumes: [], file: '/f', template, place: template.source, tree: '/t', trusts: [] };
   assert.deepEqual(answered('factories', 'apply', applied), applied);
   assert.deepEqual(taken('factories', 'adopt', { template: { name: 'sdlc' }, plan: 'sha256:cd' }), {
     template: { name: 'sdlc' },

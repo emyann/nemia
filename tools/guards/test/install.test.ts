@@ -167,7 +167,7 @@ test('REFUSED: an argument the installer does not take exits 2, and a flag with 
 
 /**
  * Stand-in `loginctl` and `systemctl` that answer yes, and the openers `open` and `xdg-open`, which log what they were handed to
- * `$OPEN_LOG` and exit `$OPEN_EXIT`, first on PATH, so a service install touches neither of the machine's and no browser opens.
+ * `$OPEN_LOG` and exit `${OPEN_EXIT:-0}`, first on PATH, so a service install touches neither of the machine's and no browser opens.
  */
 const systemStandIns = (): string => {
   const dir = fs.realpathSync(scratch('install-system-'));

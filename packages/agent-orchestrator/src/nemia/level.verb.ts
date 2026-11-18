@@ -100,7 +100,7 @@ const levelNow = (e: Engine) =>
       reach: open ? reachOf(sessionId, bridge) : [],
       bridge,
       stopped: ended && !rested,
-      rests: !open && untrusted === null,
+      rests: !(open && !view.state.stopRequested) && untrusted === null,
       spend: filed ? spendOf(view) : null,
       allows: yield* tried(() => promptAllows(home)),
       factories,

@@ -396,7 +396,8 @@ const herSubscription = Effect.fn('herSubscription')(function* () {
 
 /**
  * One beat: the levels, the keeper's record of her session (`readSession`, her tasks by `herTasks`), her current task, her subscription,
- * her folder's trust (`trustedFolder`), her chat's files and the person's custom words read; whether the conversation is quiet enough
+ * her folder's trust (`trustedFolder`), her chat's files and the person's custom words read (words that do not read are owed as changed,
+ * so their refusal is said by the act that tells her them, and no other act waits on it); whether the conversation is quiet enough
  * for her to rest (`quietOf`, her idle mark against the latest word said or answered to her, at least `restAfterMs` old on the wall
  * clock); whether the person spoke after her task was seen ended with no rest (a chat entry, an answer, or a level set after the mark);
  * her folder trusted by the keeper before she is filed where it is not (`trustHer`, the filing left undone where the trust was refused),
@@ -431,7 +432,10 @@ export const keepOnce = Effect.fn('keepOnce')(function* (restAfterMs: number = D
     idle,
     idleMarked: quiet.marked,
     quiet: quiet.quiet,
-    stale: customChanged(readTold(home), yield* herCustom(), filedPrompt(home)),
+    stale: yield* herCustom().pipe(
+      Effect.map((custom) => customChanged(readTold(home), custom, filedPrompt(home))),
+      Effect.orElseSucceed(() => true),
+    ),
     up,
     asking,
     closing,

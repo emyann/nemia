@@ -146,7 +146,10 @@ export const workedOn = (factory: Pick<Factory, 'volumes'>): string[] => [
  */
 export const readOnlyVolumes = (factory: Pick<Factory, 'volumes'>): Volume[] => factory.volumes.filter((v) => v.readOnly);
 
-/** The line that gives a factory its first repository to work on, as every refusal of a factory with none names it. */
+/**
+ * The line that gives a factory its first repository to work on, as every refusal of a factory with none names it.
+ * @param factory The factory's name.
+ */
 export const volumeAddLine = (factory: string): string => `nemia factory volume add ${factory} <path|url>:rw`;
 
 /**

@@ -3,7 +3,9 @@
  * to search, and which reads and verbs come first. A host that defers a server's tools (a tool search, the MCP spec's progressive
  * discovery) shows a model these words and the tools' names alone, so they say what a search should ask for. Generic: they name no factory,
  * repository or agent, and no tool the port does not list (`port.test.ts` holds both, and the bound a host cuts them at,
- * `INSTRUCTIONS_BOUND`).
+ * `INSTRUCTIONS_BOUND`). They say the ways a session is told of the feed, the most direct first, so an agent that lands on `wait` finds
+ * the two that need no polling: the channel the client spawns on the session's own machine, which a remote port cannot be and can only
+ * point at, and a listen stream; this file is the one of the api that may name that channel's harness (`words.test.ts`, `HARNESS_KEPT`).
  */
 import { RUN_STATES } from 'objects';
 
@@ -36,6 +38,11 @@ export const PORT_INSTRUCTIONS = [
   "The feed of what happens in the store is offered as resources too: nemia:///api/events, or one factory's at",
   'nemia:///api/namespaces/<factory>/events, each taking labelSelector=<selector> (repeatable, any one kept). Subscribe with',
   'subscriptions/listen (resourceSubscriptions) to be told of each new event, and read the resource (resources/read) for the newest.',
+  '',
+  'How a session is told of the feed without polling, the most direct first:',
+  "- in Claude Code, nemia channel, added as a channel, pushes each line into the session as it happens (the docs' Channel page);",
+  "- any client that holds a subscriptions/listen stream is sent notifications/resources/updated for the feed's resources;",
+  '- a client that can only call tools calls `wait` again from the cursor it answered: the fallback, which polls.',
   '',
   'Each tool says the nemia command it is and the endpoint it calls. A list answers a page at a time: its last line names the',
   'continue token of the next. A refusal says what to do next.',

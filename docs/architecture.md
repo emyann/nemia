@@ -406,7 +406,8 @@ else the move and where it goes.
 
 **Words of another layer, in every layer today**: a harness's words outside the runtime, a workflow's inside it, and this repository's
 team in the packages, each file counted against a baseline that only shrinks (`HARNESS_WORDS`, `WORKFLOW_WORDS` and `TEAM_NAMES` in
-`packages/agent-orchestrator/test/words.test.ts`), each entry naming its card, else the move and where it goes.
+`packages/agent-orchestrator/test/words.test.ts`), each entry naming its card, else the move and where it goes. Beside them, the files
+kept saying a harness's word for good (`HARNESS_KEPT`, rule 4) are no debt and do not shrink: each is held to its count, with why.
 
 Nothing here moves until its own card; a change elsewhere does not move it on the side.
 
@@ -723,7 +724,9 @@ of values passes the typecheck and fails only as the modules load. Test: `apps/a
 
 **4. Each layer says its own words**, held by `packages/agent-orchestrator/test/words.test.ts`. A harness's words — Claude Code's,
 Codex's and Anthropic's names, and the runtime's own permission modes and sandboxes but the plain English ones — stay in
-packages/agent-runtime: not in the orchestrator's `src` and `bin`, `apps/api/src` or `apps/web/src`. A workflow's words — a workflow,
+packages/agent-runtime: not in the orchestrator's `src` and `bin`, `apps/api/src` or `apps/web/src`, but in the few files
+`HARNESS_KEPT` names, each held to its count with why: a file that points a client at what only one harness offers (the MCP port's
+instructions, at the channel Claude Code starts over stdio, which a remote port cannot be). A workflow's words — a workflow,
 a step, a gate, a factory, a closeout, the orchestrator, `wf` and Nemia — stay out of the runtime's `src` and `bin`. The nemia factory's
 team — the agents of `packages/templates/sdlc/agents/`, Ada who left it, and the owner's factory, `pipao` — stays out of every package's `src`, `test`, `bin` and
 `place` and every app's `src` and `test`, tests included, so that no product test passes only with the team present; nor does any of

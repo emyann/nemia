@@ -182,7 +182,7 @@ export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
     error: [...objectErrors, Failed],
   }).annotate(
     OpenApi.Description,
-    "Gives a long-lived task a subscription to the feed under the name in the path: the lines its selectors and level keep, said to it from the feed's end, in digests where asked. Answers Subscribed with a 201, the subscription as written.",
+    "Gives a long-lived task a subscription to the feed under the name in the path: the lines its selectors and level keep, said to it from the feed's end, in digests where asked. It gives the feed to a long-lived task of this store's engine alone, and is no way for a client outside it to be told of the feed. Answers Subscribed with a 201, the subscription as written.",
   ),
   HttpApiEndpoint.delete('unsubscribe', '/api/subscriptions/:name', {
     params: subscriptionParams,

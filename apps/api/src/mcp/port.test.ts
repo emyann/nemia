@@ -259,6 +259,33 @@ for (const era of ERAS)
     await client.close();
   });
 
+test('the port says how a session is told of the feed without polling, most direct first, where an agent on wait or subscribe finds it', async () => {
+  const client = await connected(app);
+  const instructions = client.getInstructions() ?? '';
+  const ways = ['nemia channel', 'notifications/resources/updated', '`wait` again from the cursor'].map((w) => instructions.indexOf(w));
+  assert.ok(
+    ways.every((at) => at >= 0),
+    'the instructions name the channel, the listen stream and the fallback',
+  );
+  assert.deepEqual(
+    [...ways].sort((a, b) => a - b),
+    ways,
+    'the channel first, then the listen stream, then waiting again',
+  );
+  assert.ok(ways[0] > instructions.indexOf('nemia:///api/events'), "said after the feed's resources");
+  const { tools } = await client.listTools();
+  const describedAs = (name: string): string => tools.find((t) => t.name === name)?.description ?? '';
+  const wait = describedAs('wait');
+  assert.ok(wait.includes('fallback') && wait.includes('instructions'), 'wait says it is the fallback and the instructions name the rest');
+  assert.ok(wait.includes('channel') && wait.includes('subscriptions/listen'), 'wait names the two ways that need no polling');
+  const subscribe = describedAs('subscribe');
+  assert.ok(
+    subscribe.includes("this store's engine") && subscribe.includes('no way for a client outside it'),
+    'subscribe says it feeds a task of the engine, no outside client',
+  );
+  await client.close();
+});
+
 test("an agent answers a gate's questions over the port as the tools say: decide lists them, an approval of their titles and labels is taken", async () => {
   const id = 'r-port-asks';
   askingAtGate(id);

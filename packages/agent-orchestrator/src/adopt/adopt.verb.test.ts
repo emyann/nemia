@@ -90,7 +90,7 @@ function repoAndTemplate(): { repo: string; dir: string } {
 
 /** A hand-made factory `name` on `repo`, offering the team's `dev`. */
 async function madeByHand(t: { mock: { method: Function } }, name: string, repo: string): Promise<void> {
-  await printedBy(t, 'factory', 'add', name, '--repo', repo, '--no-trust');
+  await printedBy(t, 'factory', 'add', name, '--volume', `${repo}:rw`, '--no-trust');
   await printedBy(t, 'factory', 'attach', name, 'dev');
 }
 
@@ -163,7 +163,10 @@ test('a hand-made factory taken over by a template: previewed, written, its card
     const template = file.template as { source: string; version: string; params: Record<string, unknown> };
     assert.equal(template.source, dir);
     assert.deepEqual(template.params, {});
-    assert.deepEqual(file.repos, [repo]);
+    assert.deepEqual(
+      file.volumes.filter((v: { readOnly: boolean }) => !v.readOnly).map((v: { path: string }) => v.path),
+      [repo],
+    );
     assert.deepEqual(Object.keys(file.schedules as object), ['dev']);
     assert.deepEqual(file.instruction, { store: true });
     assert.deepEqual(file.later, { kept: true });
@@ -228,7 +231,7 @@ test('what nemia factory adopt refuses, each with nothing written', async (t) =>
   });
 
   await t.test('a factory made from a template already: Conflict, naming the upgrade', async (t) => {
-    await printedBy(t, 'factory', 'apply', 'made', '--template', dir, '--repo', repo, '--no-trust');
+    await printedBy(t, 'factory', 'apply', 'made', '--template', dir, '--volume', `${repo}:rw`, '--no-trust');
     await nothingWritten(
       ['factory', 'adopt', 'made', '--template', dir, '--plan', 'sha256:0'],
       refusedWith('Conflict', /nemia factory upgrade made/),

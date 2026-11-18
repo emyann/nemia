@@ -12,6 +12,7 @@ import { Schema } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import type { FactoryListing } from '../factory.ts';
 import { factoryCommands, factoryObjectsOf, type FactoryListed } from './factory.verb.ts';
+import { volumeBase } from '../volume/volume.ts';
 
 const home = scratch('nemia-factory-object-');
 const repo = scratch('nemia-factory-object-repo-');
@@ -19,11 +20,13 @@ const repo = scratch('nemia-factory-object-repo-');
 const acme: FactoryListing = {
   name: 'acme',
   file: path.join(home, 'factories', 'acme.json'),
-  repos: [repo],
+  volumes: [
+    { path: repo, readOnly: false },
+    { path: '/data/a', readOnly: true },
+  ],
   workflows: ['make'],
   hires: { 'make/implement': 'implementer' },
   schedules: {},
-  volumes: [{ path: '/data/a', readOnly: true }],
   generation: 3,
 };
 const stray: FactoryListing = { name: 'broken', file: path.join(home, 'factories', 'broken.json'), error: 'does not read as JSON' };
@@ -58,7 +61,7 @@ const byName = (name: string) => objects.find((o) => o.metadata.name === name);
 test('the default factory is listed first, on no repository, offering every workflow and hiring no one', () => {
   const d = objects[0];
   assert.equal(d?.metadata.name, 'default');
-  assert.deepEqual(d?.spec, { repos: [], hires: {}, volumes: [] }, 'no `workflows` key: it offers every workflow found');
+  assert.deepEqual(d?.spec, { hires: {}, volumes: [] }, 'no `workflows` key: it offers every workflow found');
   assert.equal(d?.metadata.namespace, undefined, 'a Factory is cluster-scoped');
 });
 
@@ -69,7 +72,7 @@ test("a factory's generation is its file's, its status the controller's, its pla
   assert.equal(m?.status.applied, '1.2.0');
   assert.equal(m?.status.conditions[0]?.lastTransitionTime, '2026-11-01T00:00:00.000Z');
   assert.deepEqual(m?.status.untrusted, [{ place: repo, harness: 'Claude Code', withheld: 'its hooks' }]);
-  assert.deepEqual(m?.spec.volumes, [{ name: 'a', path: '/data/a', readOnly: true }], 'an unnamed volume is read by its name');
+  assert.deepEqual(m?.spec.volumes.at(1), { name: 'a', path: '/data/a', readOnly: true }, 'an unnamed volume is read by its name');
   assert.deepEqual(m?.spec.workflows, ['make']);
 });
 
@@ -131,29 +134,32 @@ test("a factory's commands are the lines a person types for it, with each schedu
   assert.deepEqual(factoryCommands(m, ['nightly']), {
     attach: 'nemia factory attach acme <workflow>',
     rm: 'nemia factory rm acme',
-    add: 'nemia factory add acme --repo <path>',
+    add: 'nemia factory add acme --volume <path|url>:rw',
     schedule: 'nemia factory schedule acme <workflow> --cron <expr> --brief <text>',
     trust: 'nemia factory trust acme',
-    volume: 'nemia factory volume add acme <path>:ro|:rw',
+    volume: 'nemia factory volume add acme <path|url>:ro|:rw',
     unschedule: { nightly: 'nemia factory unschedule acme nightly' },
-    volumeRm: { a: 'nemia factory volume rm acme /data/a' },
+    volumeRm: { a: 'nemia factory volume rm acme /data/a', [volumeBase(repo)]: `nemia factory volume rm acme ${repo}` },
   });
   assert.match(factoryCommands(m, []).attach, /^nemia factory attach acme/);
 });
 
-test("a factory's origins are its spec's where its file names any, and no key where it names none", () => {
+test("a cloned volume's origin is on its spec, and a volume given no URL has none", () => {
   const into = path.join(home, 'clones', 'h', 'o', 'r');
   const mill: FactoryListing = {
     ...acme,
     name: 'mill',
     file: path.join(home, 'factories', 'mill.json'),
-    repos: [into],
-    origins: { [into]: 'https://h/o/r.git' },
+    volumes: [{ path: into, readOnly: false, origin: 'https://h/o/r.git' }],
   };
   const { name: _n, file: _f, ...millFiled } = mill;
   fs.writeFileSync(mill.file, JSON.stringify(millFiled));
   const served = factoryObjectsOf({ factories: [mill], untrusted: [] }, home).find((o) => o.metadata.name === 'mill');
-  assert.deepEqual(served?.spec.origins, { [into]: 'https://h/o/r.git' });
+  assert.equal(served?.spec.volumes.at(0)?.origin, 'https://h/o/r.git');
   assert.ok(served && Schema.is(FactorySchema)(served));
-  assert.equal('origins' in (byName('acme')?.spec ?? {}), false, 'a factory given no URL serves none');
+  assert.equal(
+    byName('acme')?.spec.volumes.some((v) => 'origin' in v),
+    false,
+    'a volume given no URL serves none',
+  );
 });

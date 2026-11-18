@@ -132,7 +132,7 @@ test('a switch onto another template: previewed with no common base, held to its
 
   await s.test('a factory applied from team at 0.1.0, nothing edited on its tree, its base named team', async () => {
     dirs = templates();
-    await stage.main(['factory', 'apply', 'crew', '--template', dirs.team, '--repo', dirs.repo]);
+    await stage.main(['factory', 'apply', 'crew', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
     const status = reconciled(factory('crew'));
     assert.deepEqual([status.conditions[0]?.reason, status.template, status.version], ['Rendered', 'team', '0.1.0']);
     assert.ok(fs.existsSync(path.join(tree(), ALMA)), 'the tree holds the agent only team has');
@@ -259,7 +259,7 @@ test('a switch onto another template: previewed with no common base, held to its
 test('a base whose status names no template is refused a switch until a pass names it; an upgrade under way stays three-way', async (t) => {
   t.mock.method(console, 'log', () => {});
   const dirs = templates();
-  await stage.main(['factory', 'apply', 'later', '--template', dirs.team, '--repo', dirs.repo]);
+  await stage.main(['factory', 'apply', 'later', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('later'));
   const diff = ['factory', 'diff', 'later', '--to', '1.0.0', '--template', dirs.other];
   const unnamed = (change: (status: Record<string, unknown>) => void = () => {}) => {
@@ -291,7 +291,7 @@ test('a base whose status names no template is refused a switch until a pass nam
 test('a base unnamed whose template cannot be read is named by no pass, and the refusal says to put the template back', async (t) => {
   t.mock.method(console, 'log', () => {});
   const dirs = templates();
-  await stage.main(['factory', 'apply', 'moved', '--template', dirs.team, '--repo', dirs.repo]);
+  await stage.main(['factory', 'apply', 'moved', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('moved'));
   const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(ROOT, 'moved'), 'utf8'));
   fs.writeFileSync(statusFile(ROOT, 'moved'), JSON.stringify(status));
@@ -315,7 +315,7 @@ test('a base unnamed whose template cannot be read is named by no pass, and the 
 test('a factory whose template changed under its version is named after that template, and switched from it with no base', async (t) => {
   t.mock.method(console, 'log', () => {});
   const dirs = templates();
-  await stage.main(['factory', 'apply', 'kit', '--template', dirs.team, '--repo', dirs.repo]);
+  await stage.main(['factory', 'apply', 'kit', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('kit'));
   rewrite(dirs.team, RULES, 'Never push.', 'Never push to main.');
   const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(ROOT, 'kit'), 'utf8'));

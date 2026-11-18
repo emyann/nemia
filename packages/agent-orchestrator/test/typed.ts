@@ -29,6 +29,7 @@ import { placedIn, type Engine } from '../src/cli/flags.ts';
 import { main } from '../src/cli/main.ts';
 import type { Listing, RunsListed } from '../src/list/list.ts';
 import { readFactoriesAt } from '../src/factory/factory.store.ts';
+import { workedOn } from '../src/factory/factory.ts';
 import { START, StartInput, startedFacts, type Started } from '../src/start/commands.verb.ts';
 import type { RunStartedFacts } from 'objects';
 
@@ -147,17 +148,15 @@ function foldered(argv: readonly string[], env: Env): readonly string[] {
   const repoAt = argv.indexOf('--repo');
   const factoryAt = argv.indexOf('--factory');
   const factory = factoryAt < 0 ? undefined : readFactoriesAt(env.WF_ROOT ?? '').find((f) => f.name === argv[factoryAt + 1]);
-  const filed = factory && 'repos' in factory ? factory : undefined;
-  const repos = [
-    ...(filed?.tree === undefined ? [] : [filed.tree]),
-    ...(repoAt < 0 ? [...(filed?.repos ?? []), '.'] : [argv[repoAt + 1] ?? '.']),
-  ];
+  const filed = factory && 'volumes' in factory ? factory : undefined;
+  const worked = filed === undefined ? [] : workedOn(filed);
+  const repos = [...(filed?.tree === undefined ? [] : [filed.tree]), ...(repoAt < 0 ? [...worked, '.'] : [argv[repoAt + 1] ?? '.'])];
   const found = [
     ...repos.map((repo) => path.join(path.resolve(repo), 'workflows', name)),
     path.join(env.WF_ROOT ?? '', 'workflows', name),
   ].find((dir) => fs.existsSync(dir));
   const named = found === undefined ? argv : argv.map((word, i) => (i === at + 1 ? found : word));
-  const [only, ...more] = filed?.repos ?? [];
+  const [only, ...more] = worked;
   return repoAt < 0 && only !== undefined && more.length === 0 ? [...named, '--repo', only] : named;
 }
 

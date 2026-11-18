@@ -1,6 +1,6 @@
 /**
- * A factory's repositories named by git URL: what `--repo` is read as, in the facts that span two values a law cannot state
- * (`cloneTarget`'s table); and the person's story, told as one test — `nemia factory add --repo <url>` cloning before it files, refused
+ * A factory's repositories named by git URL: what a volume's URL is read as, in the facts that span two values a law cannot state
+ * (`cloneTarget`'s table); and the person's story, told as one test — `nemia factory add --volume <url>:rw` cloning before it files, refused
  * with nothing filed where the URL is no clone's, and the daemon's sweep (`clonesOnce`) making again a clone whose folder went, saying
  * one it cannot make once, and asking nothing of a factory given no URL. On the test place, a store of its own at `ROOT`.
  */
@@ -44,7 +44,7 @@ test('a checkout read as a clone the store keeps exactly when it lies inside its
     await t.test(path.relative(ROOT, repo) || '(the store)', () => assert.equal(isCloneFolder(ROOT, repo), cloned));
 });
 
-test('a --repo value read as a path or as the folder its clone is kept in, one repository named any way one folder, a plain URL kept under its host', async (t) => {
+test('a volume read as a path or as the folder its clone is kept in, one repository named any way one folder, a plain URL kept under its host', async (t) => {
   const rows: readonly (readonly [string, string])[] = [
     ['git@GitHub.com:o/r.git', 'github.com/o/r'],
     ['ssh://git@github.com/o/r', 'github.com/o/r'],
@@ -115,19 +115,18 @@ test('a factory on a repository named by URL: cloned as it is added, refused wit
   const into = cloneOf(dir);
 
   await s.test('added by URL, the repository is cloned under clones/ and filed with its origin', async (c) => {
-    await typed(c, ['factory', 'add', 'mill', '--repo', url, '--no-trust']);
+    await typed(c, ['factory', 'add', 'mill', '--volume', `${url}:rw`, '--no-trust']);
     const mill = readFactoriesAt(ROOT).find((f) => f.name === 'mill');
     assert.ok(mill && !('error' in mill));
-    assert.deepEqual(mill.repos, [into]);
-    assert.deepEqual(mill.origins, { [into]: url });
+    assert.deepEqual(mill.volumes, [{ path: into, readOnly: false, origin: url, name: 'r' }]);
     assert.equal(stand().world.head(into), head);
   });
 
   await s.test('REFUSED: a scheme no clone is made over, a URL with a password, and one naming no repository, nothing filed', async (c) => {
-    await refusedFiling(c, ['factory', 'add', 'ftp', '--repo', 'ftp://h/o/r'], 'ftp');
-    await refusedFiling(c, ['factory', 'add', 'secret', '--repo', 'https://u:p@h/o/r'], 'secret');
+    await refusedFiling(c, ['factory', 'add', 'ftp', '--volume', 'ftp://h/o/r:rw'], 'ftp');
+    await refusedFiling(c, ['factory', 'add', 'secret', '--volume', 'https://u:p@h/o/r:rw'], 'secret');
     const none = pathToFileURL(path.join(scratch('wf-clones-none-'), 'none')).href;
-    await refusedFiling(c, ['factory', 'add', 'none', '--repo', none], 'none');
+    await refusedFiling(c, ['factory', 'add', 'none', '--volume', `${none}:rw`], 'none');
   });
 
   await s.test('the sweep makes a clone whose folder went again, and asks nothing of one that is there', async () => {
@@ -155,7 +154,7 @@ test('a factory on a repository named by URL: cloned as it is added, refused wit
     fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
     const plain = scratch('wf-clones-plain-');
     stand().world.repository(plain, {});
-    await typed(c, ['factory', 'add', 'plain', '--repo', plain, '--no-trust']);
+    await typed(c, ['factory', 'add', 'plain', '--volume', `${plain}:rw`, '--no-trust']);
     const asked: string[] = [];
     const recording = placeOver(stand().place, {
       clone: ({ into: folder }) => {

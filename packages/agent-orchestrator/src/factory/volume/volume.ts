@@ -34,7 +34,7 @@ export function volumeOf(spelled: string, cwd: string, home: string): Volume | s
     return `${spelled} says no mode: a volume is marked read-only or writable, as compose marks one — ${SPELLED}. Nothing was changed.`;
   if (!given.trim()) return `${spelled} names no folder: give its path before the mark — ${SPELLED}. Nothing was changed.`;
   const target = cloneTarget(given);
-  if (target.kind === 'refused') return `${target.message} Nothing was changed.`;
+  if (target.kind === 'refused') return target.message;
   if (target.kind === 'path') return { path: path.resolve(cwd, given), readOnly };
   return { path: cloneFolder(home, target.folder), readOnly, origin: given };
 }
@@ -47,11 +47,12 @@ const within = (inner: string, outer: string): boolean => {
 
 /**
  * Why `volume` cannot be a volume of `factory`, or undefined: a path that is no directory (`isDirectory` looks), but a clone, made after
- * this judgement; a writable one inside another writable volume of the factory or holding one, which would let a step write a repository
- * outside its worktree, the run's own included (a volume of its own path is replaced, and taken); one at or inside the store
- * `storeRoot`, whose runs, cards and worktrees no step reads around its doors, but a clone the store keeps for it; and a writable one that
- * holds the store, which would let a step write them. A read-only one inside a repository it works on, or holding the store, a person's
- * home say, is taken. Whether a writable one is a git repository is the place's to say, at the verb.
+ * this judgement; a writable one inside another writable volume of the factory or holding one, which a run works on in a worktree of its
+ * own and mounts read-only (a volume of its own path is replaced, and taken); and a read-only one at or inside the store `storeRoot`,
+ * whose runs, cards and worktrees no step reads around its doors, but a clone the store keeps for it. A writable one is a repository a run works on in a worktree, as a
+ * factory's repositories always were, so the store, which keeps the clones, refuses none; a read-only one inside a repository it works
+ * on, or holding the store, a person's home say, is taken. Whether a writable one is a git repository is the place's to say, at the
+ * verb.
  * @param factory The factory: its name, said in a refusal, and its volumes.
  * @param volume The volume to mount: its path, whether it is read-only, and the URL it is cloned from, where it is one.
  * @param storeRoot The store's root.
@@ -71,10 +72,8 @@ export function volumeRefusal(
   const reached = workedOn(factory).find((r) => r !== at && (within(at, r) || within(r, at)));
   if (!volume.readOnly && reached !== undefined)
     return `${at} ${within(at, reached) ? 'is inside' : 'holds'} ${reached}, a repository the factory ${factory.name} works on, and a run works in one of them alone, in a worktree of its own: give it read-only — ${at}:ro — or take the other off first (nemia factory volume rm ${factory.name} ${reached}). Nothing was changed.`;
-  if (!clone && within(at, store))
+  if (volume.readOnly && !clone && within(at, store))
     return `${at} is inside Nemia's store, ${store}, whose runs, cards and worktrees a step reaches only through its verbs: mount a folder outside it. Nothing was changed.`;
-  if (!volume.readOnly && within(store, at))
-    return `${at} holds Nemia's store, ${store}, and a writable volume would let a step write its runs and cards: mount it read-only — ${at}:ro — or mount a folder beside the store. Nothing was changed.`;
   return undefined;
 }
 

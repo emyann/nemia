@@ -17,7 +17,9 @@ import { hireRefusalOf, type Factory, workedOn } from '../factory.ts';
  */
 function rootsOf(home: string, factory: Factory, workflow: string): readonly string[] {
   if (factory.tree === undefined) return [...workedOn(factory), home];
-  const holder = [factory.tree, ...workedOn(factory), home].find((root) => fs.existsSync(path.join(path.resolve(root), 'workflows', workflow)));
+  const holder = [factory.tree, ...workedOn(factory), home].find((root) =>
+    fs.existsSync(path.join(path.resolve(root), 'workflows', workflow)),
+  );
   return holder === undefined ? [] : [holder];
 }
 

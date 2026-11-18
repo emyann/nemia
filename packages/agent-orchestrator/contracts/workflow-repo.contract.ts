@@ -62,8 +62,7 @@ const workflowRepoSpec = spec<
       condition: ({ input: [repos], output }) => repos.length === 0 || !('refused' in output && output.refused === 'none'),
     },
     unknownNameRefused: {
-      description:
-        'A workflow the wiring names a repository for by a name no repository of a factory with some has is refused as unknown',
+      description: 'A workflow the wiring names a repository for by a name no repository of a factory with some has is refused as unknown',
       condition: ({ input: [repos, wired, workflow], output }) => {
         const name = wiredName(wired, workflow);
         return (

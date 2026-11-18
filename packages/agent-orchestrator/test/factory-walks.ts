@@ -22,10 +22,10 @@ type Door = FactoryDoorShape;
 
 const nameOf = (name: string): FactoryName => FactoryName.read(name);
 
-/** A factory as `nemia factory add` files one: one repository, nothing attached, hired or scheduled. */
+/** A factory as `nemia factory add` files one: one writable volume, the repository it works on, nothing attached, hired or scheduled. */
 export const aFactory = (name: string, more: Partial<Factory> = {}): Factory => ({
   name,
-  repos: ['/repo'],
+  volumes: [{ path: '/repo', readOnly: false }],
   workflows: [],
   hires: {},
   schedules: {},
@@ -83,10 +83,16 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       name: 'what was filed',
       walk: ({ door }) => {
         filed(door, 'acme', { workflows: ['build'], hires: { 'build/implement': 'implementer' } });
-        const { name, repos, workflows, hires, schedules } = readFiled(door, 'acme');
-        return { name, repos, workflows, hires, schedules };
+        const { name, volumes, workflows, hires, schedules } = readFiled(door, 'acme');
+        return { name, volumes, workflows, hires, schedules };
       },
-      says: { name: 'acme', repos: ['/repo'], workflows: ['build'], hires: { 'build/implement': 'implementer' }, schedules: {} },
+      says: {
+        name: 'acme',
+        volumes: [{ path: '/repo', readOnly: false }],
+        workflows: ['build'],
+        hires: { 'build/implement': 'implementer' },
+        schedules: {},
+      },
     },
   ],
   'factories.create': [
@@ -95,10 +101,10 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       name: 'REFUSED: a name taken is a Conflict, the first left as it was',
       walk: ({ door }) => {
         filed(door, 'acme');
-        const again = act(door.factories.create(aFactory('acme', { repos: ['/other'] })));
-        return { again, repos: readFiled(door, 'acme').repos };
+        const again = act(door.factories.create(aFactory('acme', { volumes: [{ path: '/other', readOnly: false }] })));
+        return { again, volumes: readFiled(door, 'acme').volumes };
       },
-      says: { again: { refused: 'Conflict' }, repos: ['/repo'] },
+      says: { again: { refused: 'Conflict' }, volumes: [{ path: '/repo', readOnly: false }] },
     },
     {
       name: 'REFUSED: a name that is no slug is Invalid, nothing filed',
@@ -111,8 +117,25 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: { made: { refused: 'Conflict' }, list: ['default'] },
     },
     {
-      name: 'REFUSED: no repository is Invalid, nothing filed',
-      walk: ({ door }) => ({ made: act(door.factories.create(aFactory('acme', { repos: [] }))), list: done(door.factories.list()) }),
+      name: 'a factory with no volume is filed: it is given its volumes after',
+      walk: ({ door }) => ({ made: done(door.factories.create(aFactory('acme', { volumes: [] }))), list: done(door.factories.list()) }),
+      says: { made: '<root>/factories/acme.json', list: ['default', 'acme'] },
+    },
+    {
+      name: 'REFUSED: a volume named twice is Invalid, nothing filed',
+      walk: ({ door }) => ({
+        made: act(
+          door.factories.create(
+            aFactory('acme', {
+              volumes: [
+                { path: '/repo', readOnly: false },
+                { path: '/repo', readOnly: true },
+              ],
+            }),
+          ),
+        ),
+        list: done(door.factories.list()),
+      }),
       says: { made: { refused: 'Invalid' }, list: ['default'] },
     },
   ],

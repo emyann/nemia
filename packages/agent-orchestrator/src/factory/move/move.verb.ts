@@ -182,7 +182,9 @@ function decided(home: string, source: Factory, write: FactoryImportWrite): Deci
   const keys = new Set(readOnly.map(volumeKey));
   const repos = source.volumes.filter((v) => !v.readOnly).map((v) => v.path);
   for (const repo of Object.keys(typedRepos).filter((r) => !repos.includes(r)))
-    out.refused.push(`--repo ${repo}= names no repository of ${source.name}: give one of ${repos.join(', ') || 'none, since it works on none'}.`);
+    out.refused.push(
+      `--repo ${repo}= names no repository of ${source.name}: give one of ${repos.join(', ') || 'none, since it works on none'}.`,
+    );
   for (const key of Object.keys(typedVolumes).filter((k) => !keys.has(k)))
     out.refused.push(
       `--volume ${key}= names no volume of ${source.name}: give one of ${[...keys].join(', ') || 'none, since it mounts none'}.`,
@@ -310,10 +312,12 @@ export const factoryImported = Effect.fn('factoryImported')(function* (
     file: filed.file,
     repos: workedOn(factory),
     cloned: Object.values(decision.origins),
-    volumes: source.volumes.filter((v) => v.readOnly).map((volume) => ({
-      name: volumeKey(volume),
-      path: decision.volumes[volumeKey(volume)] ?? volume.path,
-    })),
+    volumes: source.volumes
+      .filter((v) => v.readOnly)
+      .map((volume) => ({
+        name: volumeKey(volume),
+        path: decision.volumes[volumeKey(volume)] ?? volume.path,
+      })),
     cards: filed.cards,
     untrusted: workedOn(factory),
   } satisfies FactoryImported;

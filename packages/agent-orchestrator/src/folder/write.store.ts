@@ -306,7 +306,7 @@ function workflowPlaceRefusal(home: string, at: string, repo?: string): string |
   const holder = path.dirname(at);
   const store = path.resolve(home, 'workflows');
   if (isWorkflowsHolderAt(home, holder, repo)) return undefined;
-  return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's the store knows (<repo>/workflows/<name>, for a factory's repo), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${at} all the same.`;
+  return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's the store knows (<repo>/workflows/<name>, for a factory's repo), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, give its repository to a factory (nemia factory volume add <factory> <repo>:rw), or pass { anywhere: true } to write ${at} all the same.`;
 }
 
 /** The factories of the store `home`, as the Factory door lists each with its file. */

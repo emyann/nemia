@@ -746,7 +746,7 @@ function repositoryPieces(memo: NeedsMemo, factories: readonly FactoryListing[],
 function factoryPiece(factories: readonly FactoryListing[]): ReadinessPiece {
   if (!factories.length)
     return piece(FACTORY, 'missing', 'no factory is filed: a run starts in one', [
-      typed('file one from a template, on a repository', 'nemia factory add <name> --template <template> --repo <url>'),
+      typed('file one from a template, on a repository', 'nemia factory apply <name> --template <template> --volume <url>:rw'),
     ]);
   return piece(
     FACTORY,

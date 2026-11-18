@@ -104,7 +104,7 @@ async function upgraded(
   exportTemplate({ dir: at, from: repo });
   written(at, 'skills/review-a-change/notes/how.md', 'Name the file.\n');
   written(at, 'carried/land.ts', 'export const land = 1;\n');
-  await printedBy(t, 'factory', 'apply', name, '--template', at, '--repo', repo);
+  await printedBy(t, 'factory', 'apply', name, '--template', at, '--volume', `${repo}:rw`);
   reconciled(factory(name));
   edit(at, 'nemia.yaml', (spec) => {
     spec.version = '0.2.0';

@@ -1,6 +1,6 @@
 /**
  * The trust of a factory's places, at each verb that asks it, told as one story (`story`): `nemia factory add` and `nemia factory trust`
- * typed on a repository, a plain folder and a workspace cut from a repository, each leaving the harness's one key on the folder the
+ * typed on a repository, a second one and a workspace cut from a repository, each leaving the harness's one key on the folder the
  * harness keeps it under, in a harness file of the test's own; `--no-trust` and a place already trusted writing nothing; the listing
  * saying a place that is not trusted, and nothing once it is; and where nothing is trusted: no factory, a place that does not answer, a
  * harness file that does not read. Each verb is run onto its handler as the api calls it (`typed`), and what it answers is read: the
@@ -67,16 +67,26 @@ const trusted = (): string[] => {
     .sort();
 };
 
-/** A repository of this test's place at `<area>/repo`, a workspace cut from it at `<area>/ws`, and a folder in no repository. */
-function places(): { repo: string; workspace: string; plain: string } {
+/**
+ * A repository of this test's place at `<area>/repo`, a workspace cut from it at `<area>/ws`, a second repository at `<area>/plain`, its
+ * own root, and a folder in no repository at `<area>/notes`, which a factory takes read-only alone.
+ */
+function places(): { repo: string; workspace: string; plain: string; notes: string } {
   const area = scratch('wf-trust-places-');
-  const [repo, workspace, plain] = [path.join(area, 'repo'), path.join(area, 'ws'), path.join(area, 'plain')];
+  const [repo, workspace, plain, notes] = ['repo', 'ws', 'plain', 'notes'].map((leaf) => path.join(area, leaf)) as [
+    string,
+    string,
+    string,
+    string,
+  ];
   fs.mkdirSync(repo);
   fs.mkdirSync(plain);
+  fs.mkdirSync(notes);
   stand().world.repository(repo, { 'a.txt': 'one\n' });
+  stand().world.repository(plain, {});
   const made = stand().place.askNow('make', { repo, at: workspace, run: 'r', leaf: 'one', from: 'main', also: [] });
   assert.ok('answer' in made, JSON.stringify(made));
-  return { repo, workspace, plain };
+  return { repo, workspace, plain, notes };
 }
 
 /** The harness's file without its trust of `folder`, as a person takes one back by hand. */
@@ -90,11 +100,11 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
   const s = story(t);
 
   await s.test(
-    'factory add trusts a repository on its root, a plain folder on itself, and a workspace on the repository it was cut from',
+    'factory add trusts each writable volume, a repository on its root and a workspace on the repository it was cut from',
     async () => {
       anew();
       const { repo, workspace, plain } = places();
-      const added = await asked(['factory', 'add', 'one', '--repo', repo, '--repo', plain]);
+      const added = await asked(['factory', 'add', 'one', '--volume', `${repo}:rw`, '--volume', `${plain}:rw`]);
       assert.deepEqual(trusted(), [plain, repo].sort());
       const written = wrote(added);
       assert.deepEqual(
@@ -113,7 +123,7 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
       assert.ok(written[0]?.grants.includes(`${repo}/.claude/settings.json`), written[0]?.grants);
 
       fs.rmSync(file);
-      const inside = await asked(['factory', 'add', 'two', '--repo', workspace]);
+      const inside = await asked(['factory', 'add', 'two', '--volume', `${workspace}:rw`]);
       assert.deepEqual(trusted(), [repo], 'the key is on the main checkout, and none on the workspace');
       assert.deepEqual(
         wrote(inside).map((one) => [one.place, one.folder]),
@@ -124,13 +134,15 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
 
   await s.test('a place already trusted is left byte for byte and nothing is said of it; --no-trust writes nothing', async () => {
     anew();
-    const { repo, plain } = places();
-    await typed(['factory', 'add', 'one', '--repo', repo]);
+    const { repo, plain, notes } = places();
+    await typed(['factory', 'add', 'one', '--volume', `${repo}:rw`]);
     const bytes = fs.readFileSync(file);
-    assert.deepEqual(said(await asked(['factory', 'add', 'two', '--repo', repo])), []);
+    assert.deepEqual(said(await asked(['factory', 'add', 'two', '--volume', `${repo}:rw`])), []);
     assert.ok(fs.readFileSync(file).equals(bytes));
 
-    assert.deepEqual((await asked(['factory', 'add', 'three', '--repo', plain, '--no-trust'])).trusts, []);
+    assert.deepEqual((await asked(['factory', 'add', 'three', '--volume', `${plain}:rw`, '--no-trust'])).trusts, []);
+    assert.ok(fs.readFileSync(file).equals(bytes));
+    assert.deepEqual((await asked(['factory', 'add', 'four', '--volume', `${notes}:ro`])).trusts, [], 'a read-only volume is not trusted');
     assert.ok(fs.readFileSync(file).equals(bytes));
     assert.deepEqual(trusted(), [repo]);
   });
@@ -140,7 +152,7 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
     async () => {
       anew();
       const { repo, workspace, plain } = places();
-      await typed(['factory', 'add', 'one', '--repo', workspace, '--repo', plain, '--no-trust']);
+      await typed(['factory', 'add', 'one', '--volume', `${workspace}:rw`, '--volume', `${plain}:rw`, '--no-trust']);
       const lacking = await untrusted();
       assert.deepEqual(
         lacking.map((one) => [one.factory, one.harness, one.place, one.never]),
@@ -195,7 +207,7 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
       anew();
       const { repo } = places();
       const deaf = placeOver(stand().place, { root: () => unreadBy('root', 'the place did not answer in time') });
-      const added = await asked(['factory', 'add', 'one', '--repo', repo], deaf);
+      const added = await asked(['factory', 'add', 'one', '--volume', `${repo}:rw`], deaf);
       assert.deepEqual(
         readFactoriesAt(ROOT).map((f) => f.name),
         ['one'],
@@ -216,7 +228,7 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
       anew();
       const { repo } = places();
       fs.writeFileSync(file, '{');
-      const added = await asked(['factory', 'add', 'one', '--repo', repo]);
+      const added = await asked(['factory', 'add', 'one', '--volume', `${repo}:rw`]);
       assert.equal(fs.readFileSync(file, 'utf8'), '{');
       assert.equal(readFactoriesAt(ROOT).length, 1);
       const refused = added.trusts.flatMap((one) => ('refused' in one && one.refused !== null ? [one] : []));

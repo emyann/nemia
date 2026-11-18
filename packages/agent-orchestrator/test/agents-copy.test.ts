@@ -144,7 +144,7 @@ test('copy an agent into the library: hired and run under its new name, copied a
     fs.writeFileSync(path.join(repo, 'README.md'), 'x\n');
     stage.place().world.repository(repo, {});
     stage.place().world.commit(repo, 'base');
-    addFactoryAt(ROOT, { name: 'acme', repos: [repo] });
+    addFactoryAt(ROOT, { name: 'acme', volumes: [repo].map((r) => `${r}:rw`) });
     attachWorkflowAt(ROOT, { factory: 'acme', workflow: 'build' });
     hireAgentAt(ROOT, { factory: 'acme', agent: 'implementer', step: 'build/implement' });
     hireAgentAt(ROOT, { factory: 'acme', agent: 'critic', step: 'build/review' });
@@ -197,7 +197,7 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
       const home = scratch('wf-agents-copy-home-');
       const unknown = scratch('wf-agents-copy-unknown-');
       fs.cpSync(FIXTURE, unknown, { recursive: true });
-      addFactoryAt(home, { name: 'sources', repos: [repo] });
+      addFactoryAt(home, { name: 'sources', volumes: [repo].map((r) => `${r}:rw`) });
       const team = teamCopy();
       await copy({ file: path.join(team, 'agents', 'implementer.md') }, home);
       const { sources } = await sourcesAt({ at: path.join(team, 'agents'), home });

@@ -367,7 +367,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       writeAgent(ROOT, agents, scribe, { version: null, repo: checkout });
       assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), 'the repository the caller names');
       fs.rmSync(path.join(agents, 'scribe.md'));
-      addFactoryAt(ROOT, { name: 'agent-known', repos: [checkout] });
+      addFactoryAt(ROOT, { name: 'agent-known', volumes: [checkout].map((r) => `${r}:rw`) });
       writeAgent(ROOT, agents, scribe, v);
       assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), "a factory's repository");
     },

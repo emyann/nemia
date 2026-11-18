@@ -190,10 +190,7 @@ export type InstructionPlace = { in: 'folder'; folder: string; path: string; fil
  * @param factory The factory, by its name, its volumes, its instruction's key and its tree.
  * @param storeFile The file the store keeps the factory's instruction in.
  */
-export function instructionAt(
-  factory: Pick<Factory, 'name' | 'volumes' | 'instruction' | 'tree'>,
-  storeFile: string,
-): InstructionPlace {
+export function instructionAt(factory: Pick<Factory, 'name' | 'volumes' | 'instruction' | 'tree'>, storeFile: string): InstructionPlace {
   if (factory.tree !== undefined) return { in: 'store', file: path.join(factory.tree, DEFAULT_INSTRUCTION) };
   const at = factory.instruction;
   if (at !== undefined && 'store' in at) return { in: 'store', file: storeFile };
@@ -715,7 +712,7 @@ export const factoryMountRefusal = (factory: Pick<Factory, 'name'>, where: strin
   `${why}\nThat folder is the factory ${factory.name}'s: a run in it mounts every repository of the factory but its own, read-only, ` +
   `for each local step, and none is left off by hand. Hire into ${where} an agent whose harness holds the mount ` +
   `(nemia factory hire ${factory.name} <agent> --step ${where}); move or rename the folder, then file the factory again on its new path ` +
-  `(nemia factory rm ${factory.name}, then nemia factory add ${factory.name} --repo <path> for each, and attach and hire again); ` +
+  `(nemia factory volume rm ${factory.name} <path>, then nemia factory volume add ${factory.name} <new path>:rw, and attach again); ` +
   `or start it in a factory whose repositories that step's harness can hold. Nothing was written.`;
 
 /**
@@ -962,7 +959,7 @@ export function factoryLines(
  * @param names The store's factories, by name.
  */
 export const noFactoryLine = (name: string, names: readonly string[]): string =>
-  `no factory ${name} in the store. ${names.length ? `Its factories are: ${[...names].sort().join(', ')}.` : 'It has none but the default: file one with nemia factory add <name> --repo <path>.'}`;
+  `no factory ${name} in the store. ${names.length ? `Its factories are: ${[...names].sort().join(', ')}.` : 'It has none but the default: file one with nemia factory add <name> --volume <path|url>:rw.'}`;
 
 /**
  * Why `factory` cannot be relieved of `workflow`: it has not attached it, naming those it offers.

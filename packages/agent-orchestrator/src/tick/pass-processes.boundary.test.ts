@@ -229,7 +229,7 @@ test('two factories on two repositories ask one place, the instance the pass is 
     ['left', left],
     ['right', right],
   ] as const) {
-    addFactoryAt(ROOT, { name, repos: [repo] });
+    addFactoryAt(ROOT, { name, volumes: [repo].map((r) => `${r}:rw`) });
     attachWorkflowAt(ROOT, { factory: name, workflow: 'hired' });
     hireAgentAt(ROOT, { factory: name, agent: 'worker', step: 'hired/work' });
   }

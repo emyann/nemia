@@ -1,5 +1,5 @@
 /**
- * What a factory's `--repo` names (`cloneTarget`): a directory of this machine, or a repository by its git URL, kept as a clone under
+ * What a factory's volume, or an import's `--repo`, names (`cloneTarget`): a directory of this machine, or a repository by its git URL, kept as a clone under
  * the store's `clones/` folder (`cloneFolder`), or neither. Pure: the clone itself is the place's (`clone`), and the sweep that keeps it
  * is `clones.verb.ts`'s. `contracts/clone-target.contract.ts` proves what a value is read as and what folder a URL is given.
  */
@@ -94,29 +94,29 @@ const plain = (text: string): boolean =>
   !text.includes(' ') && !text.includes('%') && !text.includes('\\') && !text.includes(':') && !text.includes('@');
 
 /**
- * What `given`, a factory's `--repo`, names. A path, as git reads one, is a directory as before. A URL is kept as a clone in the folder
+ * What `given`, a factory's volume or an import's `--repo`, names. A path, as git reads one, is a directory as before. A URL is kept as a clone in the folder
  * of its host and path, its user, port, scheme and `.git` dropped, so one repository named two ways is one clone. Refused: a URL that
  * carries a password (the machine holds the credential, never Nemia), a scheme a clone is not made over, and a URL that names no plain
  * host and path.
- * @param given The factory's `--repo` as the person typed it.
+ * @param given The volume or the `--repo` as the person typed it, its mark taken off.
  */
 export const cloneTarget: CloneTargetOf = (given) => {
   if (isPath(given)) return { kind: 'path' };
   if (holdsPassword(given))
     return {
       kind: 'refused',
-      message: `--repo carries a password, and Nemia holds no credential: give the URL without it, and let the git of the machine Nemia's daemon runs on hold the credential (a credential helper for the host, or an SSH key). Nothing was filed.`,
+      message: `The URL carries a password, and Nemia holds no credential: give the URL without it, and let the git of the machine Nemia's daemon runs on hold the credential (a credential helper for the host, or an SSH key). Nothing was filed.`,
     };
   if (given.includes('://') && !knownScheme(given))
     return {
       kind: 'refused',
-      message: `--repo ${given} names a scheme Nemia does not clone over: give the repository as ${FORMS}. Nothing was filed.`,
+      message: `${given} names a scheme Nemia does not clone over: give the repository as ${FORMS}. Nothing was filed.`,
     };
   const folder = joinedFolder(hostOf(given), named(pathOf(given)));
   if (staysUnder(folder) && plain(folder) && !folder.endsWith('.git')) return { kind: 'url', folder };
   return {
     kind: 'refused',
-    message: `--repo ${given} is read as a git URL, and it names no host and repository Nemia can keep a clone of: give one as ${FORMS}, or the path of a directory of the machine Nemia's daemon runs on. Nothing was filed.`,
+    message: `${given} is read as a git URL, and it names no host and repository Nemia can keep a clone of: give one as ${FORMS}, or the path of a directory of the machine Nemia's daemon runs on. Nothing was filed.`,
   };
 };
 

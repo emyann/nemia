@@ -89,7 +89,7 @@ function fresh(): { repos: string[]; team: string; plain: string; notes: string 
   });
   const notes = workflow(team, 'notes', { write: '---\nworkspace: folder\nagent: implementer\n---\nWrite it.\n' });
   const repos = [aRepo(), aRepo(), aRepo()].sort();
-  addFactoryAt(ROOT, { name: 'trio', repos });
+  addFactoryAt(ROOT, { name: 'trio', volumes: repos.map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'plain', repo: path.basename(repos[0]) });
   attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'notes' });
   return { repos, team, plain, notes };
@@ -290,7 +290,7 @@ test('where a run mounts less: the default factory and a factory of one reposito
   await s.test(
     "a run in the default factory, or in a factory of one repository, given no input, mounts nothing but its workflow's files, review's own folder and what implement handed over",
     async () => {
-      addFactoryAt(ROOT, { name: 'solo', repos: [repos[0]] });
+      addFactoryAt(ROOT, { name: 'solo', volumes: [`${repos[0]}:rw`] });
       attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'plain' });
       for (const factory of [undefined, 'default', 'solo']) {
         const run = await stage.runPlaced(
@@ -341,7 +341,7 @@ test('where a run mounts less: the default factory and a factory of one reposito
     fs.writeFileSync(path.join(ROOT, 'a2a-agents.json'), JSON.stringify({ peer: { url: 'https://peer.example' } }));
     const asked = workflow(team, 'asked', { ask: '---\nplace: git\nharness: a2a:peer\n---\nAsk it.\n' });
     const [own, other] = [aRepo(), aRepo()];
-    addFactoryAt(ROOT, { name: 'peers', repos: [own, other] });
+    addFactoryAt(ROOT, { name: 'peers', volumes: [own, other].map((r) => `${r}:rw`) });
     attachWorkflowAt(ROOT, { factory: 'peers', workflow: 'asked' });
     const run = await stage.runPlaced(startRun({ brief: 'ask it', repo: own, workflowDir: asked, isolate: false, factory: 'peers' }));
     assert.deepEqual(run.mounts, readOnly(other), 'the run mounts it');
@@ -378,7 +378,7 @@ const at = (plain: string, repo: string, factory?: string) => ({
 });
 /** `name` filed on `repos`, `plain` attached. */
 const factoryOf = (name: string, repos: string[]) => {
-  addFactoryAt(ROOT, { name, repos });
+  addFactoryAt(ROOT, { name, volumes: repos.map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: name, workflow: 'plain' });
 };
 /** The workflow `coded`, one step whose hired agent `coder` runs on codex with `agent`'s keys, and `code`'s own lines. */
@@ -403,7 +403,7 @@ test("REFUSED at nemia start: a factory's folder a step cannot be filed, each In
         "the factory trio's",
         'nemia factory hire trio <agent> --step coded/code',
       );
-      addFactoryAt(ROOT, { name: 'solo', repos: [repos[0]] });
+      addFactoryAt(ROOT, { name: 'solo', volumes: [`${repos[0]}:rw`] });
       attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'coded' });
       hireAgentAt(ROOT, { factory: 'solo', agent: 'coder', step: 'coded/code' });
       const run = await stage.runPlaced(startRun(at(dir, repos[0], 'solo')));
@@ -412,16 +412,21 @@ test("REFUSED at nemia start: a factory's folder a step cannot be filed, each In
   );
 
   await t.test(
-    "a writable volume on a harness that holds only read-only mounts, naming the volume's fixes; marked read-only, the same step starts",
+    'a writable volume is a repository the factory works on, mounted read-only beside a run on another; a read-only one is mounted as marked',
     async () => {
       const { repos, team } = fresh();
       const dir = coded(team, 'trio', 'sandbox: workspace-write\n');
+      const extra = aRepo();
       const volume = scratch('wf-mounts-volume-');
-      await typed(['factory', 'volume', 'add', 'trio', `${volume}:rw`]);
-      await refused({ ...at(dir, repos[0], 'trio') }, volume, 'nemia factory volume add trio <path>:ro', 'nemia factory volume rm trio');
+      await typed(['factory', 'volume', 'add', 'trio', `${extra}:rw`]);
       await typed(['factory', 'volume', 'add', 'trio', `${volume}:ro`]);
       const run = await stage.runPlaced(startRun(at(dir, repos[0], 'trio')));
-      assert.deepEqual(runRecord(ROOT, run.id).volumes, readOnly(volume));
+      const record = runRecord(ROOT, run.id);
+      assert.deepEqual(record.volumes, readOnly(volume));
+      assert.equal(
+        record.mounts?.some((m) => m.path === extra && m.readOnly),
+        true,
+      );
     },
   );
 
@@ -434,8 +439,8 @@ test("REFUSED at nemia start: a factory's folder a step cannot be filed, each In
       `\`mounts\` gives the session ${JSON.stringify(spaced)} read-only`,
       "That folder is the factory spaced's",
       'nemia factory hire spaced <agent> --step plain/implement',
-      'nemia factory rm spaced',
-      'nemia factory add spaced --repo <path>',
+      'nemia factory volume rm spaced <path>',
+      'nemia factory volume add spaced <new path>:rw',
       'start it in a factory',
       'Nothing was written.',
     );
@@ -542,12 +547,72 @@ test('the folders a step is filed, read by their pure functions and by the model
 
   await t.test("factoryMounts: a factory's repositories as path.resolve spells them, sorted and once each, but the run's own", () => {
     const [a, b, c] = ['/srv/a', '/srv/b', '/srv/c'];
-    assert.deepEqual(factoryMounts({ repos: [a, b] }, a), readOnly(b));
-    assert.deepEqual(factoryMounts({ repos: [a, b] }, `${a}/`), readOnly(b), 'the run on a/, through path.resolve');
-    assert.deepEqual(factoryMounts({ repos: [`${b}/`, a] }, undefined), readOnly(a, b), 'a folder run mounts them all, sorted');
-    assert.deepEqual(factoryMounts({ repos: [c, a, b] }, b), readOnly(a, c), 'listed out of order, given sorted');
-    assert.deepEqual(factoryMounts({ repos: [a, `${a}/.`] }, undefined), readOnly(a), 'one folder named twice is mounted once');
-    assert.deepEqual(factoryMounts({ repos: [a] }, a), [], 'a factory of one repository mounts none');
+    assert.deepEqual(
+      factoryMounts(
+        {
+          volumes: [
+            { path: a, readOnly: false },
+            { path: b, readOnly: false },
+          ],
+        },
+        a,
+      ),
+      readOnly(b),
+    );
+    assert.deepEqual(
+      factoryMounts(
+        {
+          volumes: [
+            { path: a, readOnly: false },
+            { path: b, readOnly: false },
+          ],
+        },
+        `${a}/`,
+      ),
+      readOnly(b),
+      'the run on a/, through path.resolve',
+    );
+    assert.deepEqual(
+      factoryMounts(
+        {
+          volumes: [
+            { path: `${b}/`, readOnly: false },
+            { path: a, readOnly: false },
+          ],
+        },
+        undefined,
+      ),
+      readOnly(a, b),
+      'a folder run mounts them all, sorted',
+    );
+    assert.deepEqual(
+      factoryMounts(
+        {
+          volumes: [
+            { path: c, readOnly: false },
+            { path: a, readOnly: false },
+            { path: b, readOnly: false },
+          ],
+        },
+        b,
+      ),
+      readOnly(a, c),
+      'listed out of order, given sorted',
+    );
+    assert.deepEqual(
+      factoryMounts(
+        {
+          volumes: [
+            { path: a, readOnly: false },
+            { path: `${a}/.`, readOnly: false },
+          ],
+        },
+        undefined,
+      ),
+      readOnly(a),
+      'one folder named twice is mounted once',
+    );
+    assert.deepEqual(factoryMounts({ volumes: [{ path: a, readOnly: false }] }, a), [], 'a factory of one repository mounts none');
   });
 
   await t.test(

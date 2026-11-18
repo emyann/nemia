@@ -192,11 +192,7 @@ export const filedOf = (listing: FactoryListing, home: string): FiledFactory => 
  * @param home The store's root, whose time of birth is the default factory's.
  */
 export const defaultFactoryObject = (home: string): FactoryObject =>
-  objectOf(
-    { name: DEFAULT_NAMESPACE, creationTimestamp: bornAt(home) },
-    { hires: {}, volumes: [] },
-    { conditions: [], untrusted: [] },
-  );
+  objectOf({ name: DEFAULT_NAMESPACE, creationTimestamp: bornAt(home) }, { hires: {}, volumes: [] }, { conditions: [], untrusted: [] });
 
 /**
  * Every factory's object: the default, then each of `listed`, read at `home`.
@@ -214,7 +210,7 @@ export const factoryObjectsOf = (listed: FactoryListed, home: string): FactoryOb
  */
 export const noFactory = (name: string): Missing =>
   new Missing({
-    message: `no factory ${name}: list them with nemia factory (GET /api/factories), or file one with nemia factory add ${name} --repo <path>`,
+    message: `no factory ${name}: list them with nemia factory (GET /api/factories), or file one with nemia factory add ${name} --volume <path|url>:rw`,
   });
 
 /**
@@ -292,10 +288,10 @@ export const factoryCommands = (factory: FiledFactory, schedules: readonly strin
   return {
     attach: commandLine(named('factory attach'), { factory: name }),
     rm: commandLine(named('factory rm'), { factory: name }),
-    add: commandLine(named('factory add'), { name }, { repos: '<path>' }),
+    add: commandLine(named('factory add'), { name }, { volumes: '<path|url>:rw' }),
     schedule: commandLine(named('factory schedule'), { factory: name }, { cron: '<expr>', brief: '<text>' }),
     trust: commandLine(named('factory trust'), { factory: name }),
-    volume: commandLine(named('factory volume add'), { factory: name, volume: '<path>:ro|:rw' }),
+    volume: commandLine(named('factory volume add'), { factory: name, volume: '<path|url>:ro|:rw' }),
     unschedule: Object.fromEntries(
       schedules.map((workflow) => [workflow, commandLine(named('factory unschedule'), { factory: name, workflow })]),
     ),

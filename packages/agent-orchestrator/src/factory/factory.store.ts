@@ -274,8 +274,7 @@ export function volumesGiven(home: string, name: string, given: readonly string[
   const refusals: string[] = [];
   for (const spelled of given) {
     const volume = volumeOf(spelled, cwd, home);
-    const refused =
-      typeof volume === 'string' ? volume : volumeRefusal({ name, volumes }, volume, home, (at) => isDirectory(at));
+    const refused = typeof volume === 'string' ? volume : volumeRefusal({ name, volumes }, volume, home, (at) => isDirectory(at));
     if (refused !== undefined) refusals.push(refused);
     else if (typeof volume !== 'string') volumes = withVolume({ volumes }, volume).volumes;
   }
@@ -304,15 +303,15 @@ const workedOnNone = (volumes: readonly Volume[]): boolean => volumes.every((v) 
  * the file already there, `Conflict`, the file left as it was. A hand-made factory that works on no repository keeps its instruction in
  * the store, so a volume given it later does not move where it is read.
  * @param home The store's root.
- * @param opts The factory's name, each `--volume` as typed, none or several, the folder a relative one is resolved from, and the template
- * it is made from, where it is one.
+ * @param opts The factory's name, each `--volume` as typed, none or several, the folder a relative one is resolved from (where `nemia`
+ * runs where none is given), and the template it is made from, where it is one.
  */
 export function addFactoryAt(
   home: string,
-  opts: { name: string; volumes: readonly string[]; cwd: string; template?: FactoryTemplate },
+  opts: { name: string; volumes: readonly string[]; cwd?: string; template?: FactoryTemplate },
 ): { factory: Factory; file: string } {
   refuseName(opts.name, 'add');
-  const volumes = volumesGiven(home, opts.name, opts.volumes, opts.cwd);
+  const volumes = volumesGiven(home, opts.name, opts.volumes, opts.cwd ?? process.cwd());
   const template = opts.template;
   const made = template === undefined ? {} : { template, tree: treeDir(home, opts.name) };
   const stored = template === undefined && workedOnNone(volumes) ? { instruction: { store: true as const } } : {};

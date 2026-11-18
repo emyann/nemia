@@ -57,7 +57,7 @@ const { feedCursorRefusal, freshFeedMemo, readFeed, watchFeed } = store;
 const recordFeed = (...args: Parameters<typeof store.recordFeed>) => store.recordFeed(...args).lines;
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
-const refusedWith = () => (err: Error & { exitCode?: number }) => err.exitCode === 2 && test.todo(err.message);
+const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
 
 /** A store with no feed. */
 const emptyStore = () => fs.rmSync(FEED, { force: true });

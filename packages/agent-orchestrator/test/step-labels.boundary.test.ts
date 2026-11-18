@@ -147,7 +147,7 @@ const HANDED: Row[] = [
       withEnv(t, { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', NEMIA_TOOL_DETAILS: 'true' });
       const said = t.mock.method(console, 'error', () => {});
       engineNow();
-      const lines = said.mock.calls.map((c) => String(c.arguments[0])).filter((line) => line.includes('NEMIA_TOOL_DETAILS'));
+      const lines = said.mock.calls.map((c) => String(c[0])).filter((line) => line.includes('NEMIA_TOOL_DETAILS'));
       assert.equal(lines.length, 1, lines.join('\n'));
       assert.ok(lines[0].startsWith('nemia: ') && lines[0].includes('"true"'), lines[0]);
     },

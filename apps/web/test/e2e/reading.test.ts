@@ -18,7 +18,7 @@ beforeAll(async () => {
   const dir = await storybookFor(scratch('nemia-reading-storybook-'));
   served = await serveBuilt(dir);
   browser = await chromium.launch();
-}, WAITED);
+}, WAITED.timeout);
 afterAll(async () => {
   await browser?.close();
   served?.close();

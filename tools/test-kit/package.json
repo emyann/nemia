@@ -15,7 +15,8 @@
     "./words": "./words.ts",
     "./fence": "./fence.ts",
     "./package.json": "./package.json",
-    "./seat": "./seat.ts"
+    "./seat": "./seat.ts",
+    "./probe": "./probe.ts"
   },
   "scripts": {
     "test": "vitest run",

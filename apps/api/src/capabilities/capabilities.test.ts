@@ -345,7 +345,9 @@ test('each server is asked once while an app runs: requests after the first, and
   const { app: own } = appOf(Layer.merge(liveOf(), ApiConfig.layer(process.env)));
   const factory = 'caps-asked-once';
   addFactory({ name: factory, repos: [repo] });
-  t.onTestFinished(() => removeFactory(factory));
+  t.onTestFinished(() => {
+    removeFactory(factory);
+  });
   const capabilitiesOf = async (): Promise<CapabilitiesWithSteps> => {
     const res = await own.request(`/api/capabilities?factory=${factory}`);
     assert.equal(res.status, 200);

@@ -137,7 +137,9 @@ const collector = async (t: TestContext) => {
     });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  t.onTestFinished(() => server.close());
+  t.onTestFinished(() => {
+    server.close();
+  });
   const { port } = server.address() as { port: number };
   return { endpoint: `http://127.0.0.1:${port}`, posts };
 };

@@ -206,13 +206,14 @@ export function unharnessed(text: string, harness = './harness.ts'): string | nu
 }
 
 /**
- * Why the api's `test` script may run a test file before this harness is installed, or null when it may not: it loads
- * `./test/harness.ts` with `--import` (`--import ./test/harness.ts` or `--import=./test/harness.ts`) before the first test file it names.
+ * Why the api's Vitest config may run a test file before this harness is installed, or null when it may not: its `setupFiles` names
+ * `./test/harness.ts` first, before any other setup file, so it is loaded before each test file.
+ *
+ * @param config the text of the api's `vitest.config.ts`
  */
-export function scriptUnharnessed(script: string): string | null {
-  const words = script.trim().split(/\s+/);
-  const at = words.findIndex((w, i) => w === '--import=./test/harness.ts' || (w === '--import' && words[i + 1] === './test/harness.ts'));
-  const firstFile = words.findIndex((w, i) => i > 0 && !w.startsWith('-') && words[i - 1] !== '--import');
-  if (words[0] === 'node' && at > 0 && (firstFile < 0 || at < firstFile)) return null;
-  return `the test script (${script}) runs its test files without the harness. Make it \`node --import ./test/harness.ts --test …\`.`;
+export function configUnharnessed(config: string): string | null {
+  const files = /\bsetupFiles:\s*\[([^\]]*)\]/.exec(config)?.[1];
+  const first = files === undefined ? undefined : /^\s*['"]([^'"]+)['"]/.exec(files)?.[1];
+  if (first === './test/harness.ts') return null;
+  return "the Vitest config runs its test files without the harness first. Make its `setupFiles` begin with './test/harness.ts'.";
 }

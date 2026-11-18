@@ -42,7 +42,9 @@ test(
     const folder = path.join(root, 'factories', 'shaped');
     assert.deepEqual(fs.existsSync(folder) ? fs.readdirSync(folder) : [], [], 'apply files the factory file alone');
     const up = nodeChild(`process.argv = [process.argv[0], ${JSON.stringify(BIN)}, 'up']; await import(${JSON.stringify(BIN)});`, env);
-    t.onTestFinished(() => up.child.kill());
+    t.onTestFinished(() => {
+      up.child.kill();
+    });
     const status = path.join(folder, 'status.json');
     const tree = path.join(folder, 'tree', 'factory.json');
     await up.until(() => fs.existsSync(status) && fs.existsSync(tree), "the controller writes the factory's status and seeds its tree");

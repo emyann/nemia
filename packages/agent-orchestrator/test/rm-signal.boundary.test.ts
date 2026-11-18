@@ -125,7 +125,9 @@ test("a SIGINT to nemia rm is not passed on to the git its place's remove runs: 
   assert.ok(killGroup(pgid), "the group of remove's git is killed");
   await waitFor(() => groupOf(pgid).length === 0);
   const again = rmIn({ ...env, PATH: process.env.PATH });
-  t.onTestFinished(() => again.child.kill('SIGKILL'));
+  t.onTestFinished(() => {
+    again.child.kill('SIGKILL');
+  });
   const ended2 = await again.closed;
   assert.equal(ended2.code, 0, `nemia rm again forgets the run; it said: ${again.err()}`);
   assert.ok(!fs.existsSync(wt), 'its worktree is gone');

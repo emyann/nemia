@@ -41,9 +41,9 @@ test("REFUSED: a Vitest config with no default timeout, or another than `WAITED`
   const refused = [
     `the Vitest config gives no testTimeout: ${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`,
   ];
-  assert.deepEqual(timeoutBreaks("node --test --test-concurrency=2 'test/*.test.ts'"), refused, 'none');
-  assert.deepEqual(timeoutBreaks("node --test --test-concurrency=2 --test-timeout=600000 'test/*.test.ts'"), refused, 'a longer one');
-  assert.deepEqual(timeoutBreaks(`node --test --test-concurrency=2 --test-timeout=${WAITED.timeout} 'test/*.test.ts'`), [], 'its own');
+  assert.deepEqual(timeoutBreaks('export default { test: { maxWorkers: 2 } };'), refused, 'none');
+  assert.deepEqual(timeoutBreaks('test: {\n    testTimeout: 600_000,\n  }'), refused, 'a longer one');
+  assert.deepEqual(timeoutBreaks(`test: {\n    testTimeout: ${WAITED.timeout},\n  }`), [], 'its own');
 });
 
 /** What a count is held to: how many a file has, and why each is no wait. */

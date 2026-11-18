@@ -424,10 +424,11 @@ describe(
     beforeAll(async () => {
       pass = emptyFeed();
       await pass({ 'r-1': planAt('running') });
+      size = end();
     });
-    const size = end();
+    let size!: number;
     const whatToPass = ['Last-Event-ID', 'pass none to read the feed from the start'];
-    const cursors: [string, string, Record<string, string>, string[]][] = [
+    const cursors = (size: number): [string, string, Record<string, string>, string[]][] => [
       [
         'inside a line, by address',
         `?after=${size - 2}`,
@@ -450,9 +451,12 @@ describe(
       ['below zero', '?after=-1', {}, ['`-1` is not a cursor this feed gave', 'a whole number of bytes']],
       ['a Last-Event-ID no stream sent', '', { 'Last-Event-ID': 'page-2' }, ['`page-2`', 'not a cursor this feed gave']],
     ];
-    for (const [name, query, headers, facts] of cursors)
-      test(`a cursor the feed never gave is a 400 naming it and what to pass: ${name}`, () =>
-        refusedBefore(query, headers, 400, [...facts, ...whatToPass]));
+    cursors(0).forEach(([name], i) =>
+      test(`a cursor the feed never gave is a 400 naming it and what to pass: ${name}`, () => {
+        const [, query, headers, facts] = cursors(size)[i]!;
+        return refusedBefore(query, headers, 400, [...facts, ...whatToPass]);
+      }),
+    );
     test('a cursor the feed gave is taken', async () => {
       const taken = await open(`?after=${size}`);
       await taken.reader.cancel();
@@ -502,7 +506,7 @@ const BEAT_MS = 50;
  */
 const FAILING_FOR_MS = 500;
 /** An app whose feed reader beats every `BEAT_MS` (`Beats.feed`), disposed after the test that built it. */
-const beatenApp = (t: { onTestFinished: (fn: () => unknown) => void }) => {
+const beatenApp = (t: { onTestFinished: (fn: () => Promise<void> | void) => void }) => {
   const own = appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), feed: `${BEAT_MS} millis` })));
   t.onTestFinished(() => own.runtime.dispose());
   return own.app;

@@ -194,7 +194,9 @@ describe('placeFor: the repository and the factory a request is answered on, and
   });
   test("a factory that works on the api's own and another, asked with no ?repo=, is a 422 naming the ?repo= — the api's own is not filled in; named, it is read", async (t) => {
     addFactory({ name: 'owned', repos: [own, repoR] });
-    t.onTestFinished(() => removeFactory('owned'));
+    t.onTestFinished(() => {
+      removeFactory('owned');
+    });
     const sorted = [own, repoR].sort();
     const fallen = await workflowsListed<never>(app, 'factory=owned');
     assert.equal(fallen.status, 422, JSON.stringify(fallen.body));

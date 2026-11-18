@@ -668,7 +668,7 @@ describe("what a run accepts of a closeout's files, and what it refuses", () => 
       'each exists: looking would have found it',
     );
     const looked = spies
-      .flatMap((spy) => spy.mock.calls.map((call) => String(call.arguments[0])))
+      .flatMap((spy) => spy.mock.calls.map((call) => String(call[0])))
       .filter((p) => outside.some((o) => path.resolve(p) === path.resolve(o)));
     assert.deepEqual(looked, [], 'refused without being opened, stat-ed or resolved');
     for (const spy of spies) spy.mockRestore();

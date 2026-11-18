@@ -237,12 +237,12 @@ const landingAt = (id: string, check: CheckVerdict, checkRan: number, deadline?:
 type Row = { name: string; check: () => void };
 
 /** Runs `rows` as subtests of `t`, in order. */
-const rowsOf = async (rows: readonly Row[]) => {
-  for (const row of rows) test.todo(row.name);
+const rowsOf = async (t: { test: (name: string, fn: () => void) => Promise<unknown> }, rows: readonly Row[]) => {
+  for (const row of rows) await t.test(row.name, row.check);
 };
 
-describe('`dayOf`, `dayPlus` and `keysOf`: the UTC day of a time, the day n days off, and the keys a run carries', () => {
-  rowsOf([
+test('`dayOf`, `dayPlus` and `keysOf`: the UTC day of a time, the day n days off, and the keys a run carries', async (t) => {
+  await rowsOf(t, [
     { name: '23:59Z is its own day', check: () => assert.equal(dayOf('2026-09-10T23:59:00.000Z'), '2026-09-10') },
     { name: '00:01Z the next morning is the next', check: () => assert.equal(dayOf('2026-09-11T00:01:00.000Z'), '2026-09-11') },
     {
@@ -328,8 +328,8 @@ const secondTry = () =>
 const declaredSpec = { design: { 'write-a-spec': [readWithRead] } };
 const planner = [step('design', [], { by: 'planner' })];
 
-describe("`factsOf`: one run's timeline and record as a fact per try that ended, and one for the run once it finished", () => {
-  rowsOf([
+test("`factsOf`: one run's timeline and record as a fact per try that ended, and one for the run once it finished", async (t) => {
+  await rowsOf(t, [
     {
       name: 'rounds are the rounds of the step with `loop:`',
       check: () => assert.deepEqual(factsOf(twoRounds('r1')).runs[0].rounds, [2]),
@@ -703,7 +703,7 @@ describe("`factsOf`: one run's timeline and record as a fact per try that ended,
   ]);
 });
 
-describe('`headlineOf`: the headline numbers of a set of facts, each mean over what was measured and null over nothing', () => {
+test('`headlineOf`: the headline numbers of a set of facts, each mean over what was measured and null over nothing', async (t) => {
   const headline = (...reads: ReturnType<typeof readOf>[]) => headlineOf(factsOfAll(...reads));
   const old = (id: string) =>
     readOf(id, prose, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
@@ -715,7 +715,7 @@ describe('`headlineOf`: the headline numbers of a set of facts, each mean over w
     ],
     implement: [{ end: at(3, JOBS_DAY) }],
   };
-  rowsOf([
+  await rowsOf(t, [
     {
       name: 'the mean rounds to acceptance, whatever the looping step is called',
       check: () => assert.equal(headline(twoRounds('r1'), twoRounds('r2', renamedLoop)).rounds, 2),
@@ -791,8 +791,8 @@ describe('`headlineOf`: the headline numbers of a set of facts, each mean over w
 
 const landingOf = (r: ReturnType<typeof readOf>) => slowLandingsOf(factsOf(r).tries);
 
-describe('`slowLandingsOf`: each landing check that passed in more than half the deadline its task was filed with', () => {
-  rowsOf([
+test('`slowLandingsOf`: each landing check that passed in more than half the deadline its task was filed with', async (t) => {
+  await rowsOf(t, [
     {
       name: 'a passed landing check over half its deadline is named, with its time, the deadline and the share',
       check: () => {
@@ -909,8 +909,8 @@ const HEALTH = {
   quota: [{ harness: 'h', window: 'week', latest: 41.6, peak: 50 }],
 };
 
-describe('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled per step, and tiled over the last 14 days', () => {
-  rowsOf([
+test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled per step, and tiled over the last 14 days', async (t) => {
+  await rowsOf(t, [
     {
       name: 'a try falls on the UTC day it ended: 23:59Z and 00:01Z the next morning are two days',
       check: () => {
@@ -1228,9 +1228,9 @@ const statsOfReads = (reads: ReturnType<typeof readOf>[], query = {}, now = NOW)
 /** The row of `name` of the steps of `s`'s every run. */
 const stepRowOf = (s: ReturnType<typeof statsOf>, name: string) => s.all.steps.find((r) => r.step === name);
 
-describe('what `nemia stats` prints is made of: null where nothing was measured, each row the client words', () => {
+test('what `nemia stats` prints is made of: null where nothing was measured, each row the client words', async (t) => {
   const empty = statsOf({ tries: [], runs: [], frozen: [] }, {}, NOW);
-  rowsOf([
+  await rowsOf(t, [
     {
       name: 'a fortnight with no run finished measured no round and recorded no landing',
       check: () => {

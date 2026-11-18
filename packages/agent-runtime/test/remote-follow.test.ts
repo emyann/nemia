@@ -298,7 +298,9 @@ describe('a streaming agent followed through drops: subscribed again, read whole
       const taskId = s.tasks().at(-1)!;
       const before = resubscribes(s);
       s.subscriptions.refuse = true;
-      t.onTestFinished(() => (s.subscriptions.refuse = false));
+      t.onTestFinished(() => {
+        s.subscriptions.refuse = false;
+      });
       const got: Followed[] = [];
       const ended = drained(ops.follow!('ae/drops/1'), got);
       await until(t, () => resubscribes(s) - before === RESUBSCRIBES + 1, 'every subscription refused', { everyMs: 20 });
@@ -350,7 +352,9 @@ describe('a streaming agent followed through drops: subscribed again, read whole
       const ended = drained(ops.follow!('ae/ends/1'), got);
       await holds(t, got, 1);
       s.subscriptions.refuse = true;
-      t.onTestFinished(() => (s.subscriptions.refuse = false));
+      t.onTestFinished(() => {
+        s.subscriptions.refuse = false;
+      });
       assert.equal(s.cut(), 1, 'the one subscription cut');
       s.move(taskId, { state: 'completed', words: 'done' });
       const exit = await ended;
@@ -365,7 +369,9 @@ describe('a streaming agent followed through drops: subscribed again, read whole
       const ops = await opsOn(s, 'ae/quiet/1', { quietMs: 100 });
       const taskId = s.tasks().at(-1)!;
       s.subscriptions.mute = true;
-      t.onTestFinished(() => (s.subscriptions.mute = false));
+      t.onTestFinished(() => {
+        s.subscriptions.mute = false;
+      });
       const made = vi.spyOn(globalThis, 'fetch');
       const got: Followed[] = [];
       const ended = drained(ops.follow!('ae/quiet/1'), got);
@@ -375,7 +381,7 @@ describe('a streaming agent followed through drops: subscribed again, read whole
       s.move(taskId, { state: 'completed', words: 'done' });
       assert.ok(Exit.isSuccess(await ended), 'silence is no drop: the follow ends as the session does');
       assert.deepEqual(shown(got), ['state working', 'events assistant "reading"', 'events assistant "done"', 'state completed']);
-      assert.ok(made.mock.calls.filter((call) => subscribes(call.arguments)).length >= 2, 'subscribed again after each silence');
+      assert.ok(made.mock.calls.filter((call) => subscribes(call)).length >= 2, 'subscribed again after each silence');
     },
   );
   c.test(

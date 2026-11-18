@@ -35,7 +35,9 @@ describe('processesNow reads this user processes with the variables asked for, a
     folder = path.join(scratch('ae-processes-'), 'work');
     fs.mkdirSync(folder);
     child = waiting(folder, { AE_PROCESSES_MARK: 'here', AE_PROCESSES_OTHER: 'unasked' });
-    t.onTestFinished(() => child.kill('SIGKILL'));
+    t.onTestFinished(() => {
+      child.kill('SIGKILL');
+    });
     pid = child.pid;
     assert.equal(typeof pid, 'number', 'the child had a pid');
     if (pid === undefined) return;

@@ -384,8 +384,8 @@ const tsUnder = (dir: string): Map<string, string> =>
   );
 
 /** The files of the client's sources whose text `pattern` matches, by their path from the client's folder. */
-const spelling = (): string[] =>
-  [...tsUnder(path.join(CLI, 'src'))].filter(([, text]) => test.todo(text)).map(([file]) => path.relative(CLI, file));
+const spelling = (pattern: RegExp): string[] =>
+  [...tsUnder(path.join(CLI, 'src'))].filter(([, text]) => pattern.test(text)).map(([file]) => path.relative(CLI, file));
 
 test("nothing is forwarded: no file of the client's sources spells FORWARD_VARIABLES or NEMIA_SERVER", () => {
   assert.ok(spelling(/\bchosenOf\b/).includes(path.join('src', 'context.ts')), "the scan reads the client: it finds the context's choice");

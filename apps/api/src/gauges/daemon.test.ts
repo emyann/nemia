@@ -4,8 +4,7 @@
  * (`root`).
  */
 import { root } from '../../test/harness.ts';
-import { beforeAll, describe, test } from 'vitest';
-import { teardowns } from 'test-kit/checkpoints';
+import { afterEach, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -74,13 +73,9 @@ const passAt = (at: string, unobserved?: string[]): PassCostRead => ({
 const UNREAD = ['harness `claude`: claude agents: timed out'];
 
 describe('GET /api/daemon: the standing of each daemon.json, as `nemia ls` judges it, and the file never written', () => {
-  beforeAll(() => {
-    const t = teardowns();
-    t.afterEach(() => {
-      fs.rmSync(FILE, { recursive: true, force: true });
-      fs.rmSync(STATS, { force: true });
-    });
-    return t.end;
+  afterEach(() => {
+    fs.rmSync(FILE, { recursive: true, force: true });
+    fs.rmSync(STATS, { force: true });
   });
   test('with no daemon.json, nothing ticks the store, and the api makes none', async () => {
     const d = await get();

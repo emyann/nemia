@@ -46,7 +46,7 @@ async function watched(
   const command = COMMANDS.find((c) => c.name === name)!;
   const handler = command.handler.bind(command);
   const handed: Args[] = [];
-  const watch = vi.spyOn(command, 'handler').mockImplementation((args: Args, kept?: never) => {
+  const watch = vi.spyOn(command, 'handler').mockImplementation((args: Args, kept?: Parameters<typeof handler>[1]) => {
     handed.push(args);
     return handler(args, kept);
   });

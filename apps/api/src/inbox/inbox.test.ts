@@ -424,7 +424,9 @@ test("a card whose start fails without a refusal — its repository's `.worktree
   fs.symlinkSync('.worktreeinclude', path.join(odd, '.worktreeinclude'));
   const said = vi.spyOn(console, 'error').mockImplementation(() => {});
   const factory = onFolder(odd);
-  t.onTestFinished(() => removeFactory(factory));
+  t.onTestFinished(() => {
+    removeFactory(factory);
+  });
   const { card } = onStore(addToInbox({ text: 'Its include file is a link to itself', factory }));
   let failure: (Error & { exitCode?: unknown }) | undefined;
   try {
@@ -441,9 +443,9 @@ test("a card whose start fails without a refusal — its repository's `.worktree
   assert.equal(((await res.json()) as Refused).error, failure.message);
   assert.deepEqual(runFiles(), [], 'no run written');
   assert.deepEqual(cards(), [`${card.name}.md`], 'the card stays');
-  const errors = said.mock.calls.filter((call) => call.arguments[0] instanceof Error);
+  const errors = said.mock.calls.filter((call) => call[0] instanceof Error);
   assert.equal(errors.length, 1, 'the failure said once on stderr');
-  const lines = said.mock.calls.filter((call) => typeof call.arguments[0] === 'string').map((call) => String(call.arguments[0]));
+  const lines = said.mock.calls.filter((call) => typeof call[0] === 'string').map((call) => String(call[0]));
   assert.equal(lines.length, 1, `beside it, the request's own line at Error: ${JSON.stringify(lines)}`);
   assert.match(lines[0], new RegExp(`^\\d\\d:\\d\\d:\\d\\d {2}POST /api/namespaces/${factory}/cards/[^ ]+/start 500 \\d+ms$`));
 });

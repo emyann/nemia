@@ -202,7 +202,9 @@ describe('follow: the transport and the protocol of a followed conversation, eac
     window.cancelAnimationFrame = function (this: unknown) {
       if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
     };
-    t.onTestFinished(() => Object.assign(window, { requestAnimationFrame: request, cancelAnimationFrame: cancel }));
+    t.onTestFinished(() => {
+      Object.assign(window, { requestAnimationFrame: request, cancelAnimationFrame: cancel });
+    });
 
     let state = blank();
     const stream = new Stream();

@@ -237,7 +237,9 @@ describe('a hand daemon handed to the service: install, --take-over <pid>, resta
   beforeAll(() => {
     const t = teardowns();
     telling = true;
-    t.onTestFinished(() => (telling = false));
+    t.onTestFinished(() => {
+      telling = false;
+    });
     return t.end;
   });
   const s = story(test);

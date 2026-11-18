@@ -472,7 +472,7 @@ const throughCheck = async (keys: string, phase: TaskPhase, exitCode?: number) =
 const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
 /** The asks waiting in a run's directory, by name. */
 const asksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f.startsWith('retry-')) : []);
-const refusedWith = () => (err: Error & { exitCode?: number }) => err.exitCode === 2 && test.todo(err.message);
+const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
 /**
  * What a verb refused with, once it has said it was a refusal — for a message to read more than one thing in, and to read something
  * out of.

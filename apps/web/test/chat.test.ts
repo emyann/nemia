@@ -919,7 +919,7 @@ describe('reading her chat: one stream opened after the first read, from its cur
     assert.ok(done(), 'the read answers');
   };
   const told = story(test);
-  const open = () => {};
+  let open = () => {};
   told.test('the first read answered, one stream is opened from its cursor, whoever reads her', async () => {
     globalThis.fetch = async () =>
       new Response(JSON.stringify({ events: [], before: null, cursor: 'c:1', presence: up }), {

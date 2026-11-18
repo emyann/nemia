@@ -295,7 +295,7 @@ test('REFUSED as findings on the screen, never silently: a path that climbs out 
   ].map((method) => vi.spyOn(fs, method as 'statSync'));
   const looked = () =>
     spies
-      .flatMap((spy) => spy.mock.calls.flatMap((call) => call.arguments.slice(0, 2).filter((a) => typeof a === 'string')))
+      .flatMap((spy) => spy.mock.calls.flatMap((call) => call.slice(0, 2).filter((a) => typeof a === 'string')))
       .filter((p) => path.resolve(p) === secret);
   const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   const named = [climbs, 'never-written.md', 'shots', 'leak.txt'];

@@ -65,7 +65,7 @@ export function story<T extends Skips>(test: Teller<T>): Story<T> {
 /** The teardowns a `describe`'s setup filed, run once its tests are done. */
 export type Held = {
   /** Files `fn` to run when the describe's tests are done, after those filed before it. */
-  onTestFinished: (fn: () => unknown) => void;
+  onTestFinished: (fn: () => Promise<void> | void) => void;
   /** Runs each teardown filed, in the order filed: what the `beforeAll` that made it returns. */
   end: () => Promise<void>;
 };

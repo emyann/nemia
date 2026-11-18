@@ -113,7 +113,9 @@ test("a stream whose relay settles once the runtime is disposed drops its closin
   const unhandled: unknown[] = [];
   const caught = (err: unknown): void => void unhandled.push(err);
   process.on('unhandledRejection', caught);
-  t.onTestFinished(() => process.off('unhandledRejection', caught));
+  t.onTestFinished(() => {
+    process.off('unhandledRejection', caught);
+  });
   await runtime.dispose();
   await assert.rejects(() => runtime.runPromise(Effect.void), 'a disposed runtime says nothing more');
   await res.body!.cancel();

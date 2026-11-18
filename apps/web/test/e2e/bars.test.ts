@@ -26,7 +26,7 @@ beforeAll(async () => {
   served = await serveBuilt(await storybookFor(scratch('nemia-bars-storybook-')));
   browsers.classic = await launch('classic');
   browsers.overlay = await launch('overlay');
-}, WAITED);
+}, WAITED.timeout);
 afterAll(async () => {
   await browsers.classic?.close();
   await browsers.overlay?.close();

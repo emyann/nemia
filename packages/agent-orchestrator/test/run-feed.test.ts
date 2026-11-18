@@ -1077,7 +1077,9 @@ describe('a feed cut under a watch — truncated, deleted, replaced — is said 
     const t = teardowns();
     emptyStore();
     spoke = bell();
-    t.onTestFinished(() => watch?.stop());
+    t.onTestFinished(() => {
+      watch?.stop();
+    });
     return t.end;
   });
   const s = story(test);

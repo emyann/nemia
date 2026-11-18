@@ -20,9 +20,9 @@ const DIAMOND: readonly PlanFile[] = [
  * and naming each of `fixes`, the key, the card or the command its fix turns on.
  */
 const refusedWith =
-  (...fixes: string[]) =>
+  (pattern: RegExp, ...fixes: string[]) =>
   (err: Error & { exitCode?: number }) =>
-    err instanceof WorkflowError && err.exitCode === 2 && test.todo(err.message) && fixes.every((fix) => err.message.includes(fix));
+    err instanceof WorkflowError && err.exitCode === 2 && pattern.test(err.message) && fixes.every((fix) => err.message.includes(fix));
 
 test('a card is its file: the name without .md, `workflow:` and `after:` from its frontmatter, the body as its brief — and README.md is not a card', () => {
   const cards = parsePlan([

@@ -335,7 +335,9 @@ describe('one broken run does not stop the others: each left out and said once, 
     'under a pause, a pass and `nemia ls` over a run at work whose folder stops loading finish, its finishing tasks read without it',
     async (c) => {
       putPause(ROOT, { why: 'a test pauses', by: 'ann' });
-      c.onTestFinished(() => resumePause(ROOT));
+      c.onTestFinished(() => {
+        resumePause(ROOT);
+      });
       const paused = await pass();
       assert.ok(paused.pause, 'the pass read the pause');
       assert.ok(

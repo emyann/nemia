@@ -16,7 +16,7 @@ let served: { at: string; close: () => void };
 beforeAll(async () => {
   served = await serveBuilt(await storybookFor(scratch('nemia-secondary-storybook-')));
   browser = await chromium.launch();
-}, WAITED);
+}, WAITED.timeout);
 afterAll(async () => {
   await browser?.close();
   served?.close();

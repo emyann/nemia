@@ -19,7 +19,7 @@ beforeAll(async () => {
   ids = builtIds(dir);
   served = await serveBuilt(dir);
   browser = await chromium.launch();
-}, WAITED);
+}, WAITED.timeout);
 afterAll(async () => {
   await browser?.close();
   served?.close();

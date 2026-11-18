@@ -161,8 +161,8 @@ describe('the export reads the source whole and writes nothing of it', () => {
     readonly file: string;
     readonly left: readonly { readonly name: string; readonly why: string }[];
     readonly stays: readonly string[];
-    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
     readonly template?: { readonly name: string } | { readonly archive: string } | { readonly path: string } | undefined;
+    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
   };
   beforeAll(async () => {
     src = side('wf-move-src-');
@@ -220,8 +220,8 @@ describe('the import files the factory on the target, clones its repositories, a
     readonly file: string;
     readonly left: readonly { readonly name: string; readonly why: string }[];
     readonly stays: readonly string[];
-    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
     readonly template?: { readonly name: string } | { readonly archive: string } | { readonly path: string } | undefined;
+    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
   };
   let dst!: Side;
   let answered!: {
@@ -289,8 +289,8 @@ describe('REFUSED: the import refuses before anything is written, and writes not
     readonly file: string;
     readonly left: readonly { readonly name: string; readonly why: string }[];
     readonly stays: readonly string[];
-    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
     readonly template?: { readonly name: string } | { readonly archive: string } | { readonly path: string } | undefined;
+    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
   };
   let local!: FactoryExport;
   beforeAll(async () => {

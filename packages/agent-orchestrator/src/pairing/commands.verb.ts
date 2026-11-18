@@ -1,6 +1,6 @@
 /**
- * The commands of pairing and first-visit links, entries of the command table: `nemia pairings ls`, `nemia pairings approve` and
- * `nemia board link`. Run at the server's shell, the person's own seat, each reads the store's tickets (`pairing.store.ts`); the api
+ * The commands of pairing and first-visit links, entries of the command table: `nemia pairings ls`, `nemia pairings approve`,
+ * `nemia board link` and `nemia open`. Run at the server's shell, the person's own seat, each reads the store's tickets (`pairing.store.ts`); the api
  * serves the same endpoints with handlers of its own, which judge the caller a person before they approve or mint, so each entry is the
  * command line's and links the endpoint the api serves it on. The writes are out of an agent's reach (class `none`): a pairing approved
  * or a link minted ends in a person's token. No command prints a token: a token is minted at a ticket's claim and handed to the client
@@ -8,7 +8,7 @@
  * store's tickets have marked the claim.
  */
 import { Effect } from 'effect';
-import { BOARD_LINK_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from 'objects';
+import { BOARD_LINK_WORDS, OPEN_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from 'objects';
 import type { LinkMinted, Pairing, PairingClaimed, PairingList } from 'objects';
 import type { Args } from '../command/command.ts';
 import type { Served } from '../command/entry.verb.ts';
@@ -102,14 +102,20 @@ export const PAIRINGS_APPROVE: Served<Pairing> = {
   handler: (args: Args) => Effect.flatMap(StoreRoot, (home) => tried(() => pairingApproved(home, String(args.code ?? ''), Date.now()))),
 };
 
+/**
+ * A first-visit link minted for the store, under `--base` where given, else the board's own address (`boardBase`).
+ * @param args The words typed after the command's name, whose `base` is read.
+ */
+const linkHandler = (args: Args) =>
+  Effect.flatMap(StoreRoot, (home) =>
+    tried(() => linkMinted(home, typeof args.base === 'string' ? args.base : boardBase(leaseUrl(home), process.env), Date.now())),
+  );
+
 /** `nemia board link [--base <url>]`. */
-export const BOARD_LINK: Served<LinkMinted> = {
-  ...BOARD_LINK_WORDS,
-  handler: (args: Args) =>
-    Effect.flatMap(StoreRoot, (home) =>
-      tried(() => linkMinted(home, typeof args.base === 'string' ? args.base : boardBase(leaseUrl(home), process.env), Date.now())),
-    ),
-};
+export const BOARD_LINK: Served<LinkMinted> = { ...BOARD_LINK_WORDS, handler: linkHandler };
+
+/** `nemia open [--base <url>]`: the same link, which the client opens in this machine's browser. */
+export const OPEN: Served<LinkMinted> = { ...OPEN_WORDS, handler: linkHandler };
 
 /** The pairing commands, in the order `nemia`'s help lists them. */
-export const PAIRING_COMMANDS: readonly Served[] = [PAIRINGS_LS, PAIRINGS_APPROVE, BOARD_LINK] as readonly Served[];
+export const PAIRING_COMMANDS: readonly Served[] = [PAIRINGS_LS, PAIRINGS_APPROVE, BOARD_LINK, OPEN] as readonly Served[];

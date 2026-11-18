@@ -88,6 +88,12 @@ export class Unauthorized extends Schema.Class<Unauthorized>('Unauthorized')(
         description: "Why the session token was refused, as a code: never minted, or its session's try no longer live.",
       }),
     ),
+    exposed: Schema.optionalKey(
+      Schema.Boolean.annotate({
+        description:
+          'Whether the store is marked exposed, reached beyond this machine (WF_EXPOSED); false where it is served on this machine alone, where nemia open signs a browser in.',
+      }),
+    ),
   },
   { httpApiStatus: 401 },
 ) {}

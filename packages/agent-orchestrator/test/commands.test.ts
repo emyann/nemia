@@ -168,6 +168,7 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['pairings ls', 'cli'],
       ['pairings approve', 'cli'],
       ['board link', 'cli'],
+      ['open', 'cli'],
       ['claude-token set', 'cli'],
       ['claude-token status', 'cli'],
       ['claude-token rm', 'cli'],

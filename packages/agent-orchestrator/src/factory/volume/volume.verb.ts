@@ -20,6 +20,10 @@ import { cloned } from '../clones/clones.verb.ts';
 import { PlaceService } from '../../place/place.store.ts';
 import { rootOf } from '../../trust/untrusted.verb.ts';
 import { trustPlaces } from '../../trust/trust.verb.ts';
+import { EngineService } from '../../runtime-client.ts';
+import { howOf } from '../../summary/how.verb.ts';
+import { runsWorkingOn } from '../../summary/summary.verb.ts';
+import type { Kept } from '../../command/entry.verb.ts';
 import type { PlaceTrust } from '../../trust/trust.ts';
 
 /** The text under `key`, as the spec read it. */
@@ -61,15 +65,43 @@ export const volumesTrusted = (volumes: readonly Volume[], noTrust: boolean) =>
   noTrust ? Effect.succeed([] as PlaceTrust[]) : trustPlaces(workedOn({ volumes }));
 
 /**
+ * Why the repository `at` of the factory `factory` may not stop being worked on — taken off, or given again read-only — or undefined: the
+ * wiring names it for a workflow (`wiredOn`), or a run of the factory still in play works on it (`runsWorkingOn`), each `Conflict` naming
+ * what frees it: the attach that places the workflow elsewhere, or the cancel of the run, or its end. A read-only volume is no repository,
+ * and none of this is asked of it.
+ * @param factory The factory, as its file reads.
+ * @param at The repository, by its whole path.
+ * @param kept What the request keeps between reads: the informer the runs are judged through.
+ * @param done What would have been done, said as not done.
+ */
+const workedOnStill = Effect.fn('workedOnStill')(function* (factory: Factory, at: string, kept: Kept | undefined, done: string) {
+  const wired = wiredOn(factory, at);
+  if (wired.length)
+    return yield* Effect.fail(
+      new Conflict({
+        message: `${at} is the repository the factory ${factory.name}'s wiring names for ${wired.join(', ')}: place ${wired.length > 1 ? 'each' : 'it'} on another first — nemia factory attach ${factory.name} ${wired[0]} --repo <name>. Nothing was ${done}.`,
+      }),
+    );
+  const runs = yield* runsWorkingOn(yield* EngineService, yield* howOf(kept), factory.name, at);
+  if (runs.length)
+    return yield* Effect.fail(
+      new Conflict({
+        message: `${at} is the repository ${runs.length > 1 ? 'runs' : 'the run'} ${runs.join(', ')} of the factory ${factory.name} ${runs.length > 1 ? 'work' : 'works'} on, not ended: wait for ${runs.length > 1 ? 'them' : 'it'} to end, or stop ${runs.length > 1 ? 'each' : 'it'} — ${runs.map((r) => `nemia cancel ${r}`).join(', ')} — then again. Nothing was ${done}.`,
+      }),
+    );
+});
+
+/**
  * `nemia factory volume add`: a folder, or a git URL cloned under the store, given to the factory, read-only (`:ro`) or writable (`:rw`), a
  * second of one path replacing the first in its place; a writable one is then trusted unless `noTrust`. Refused before anything is
  * written: a spelling with no mark or another, or a URL `cloneTarget` refuses (`volumeOf`), the default factory and a name with no
- * factory, and a folder that is no directory, a writable one inside another or holding one, or one that reaches the store
- * (`volumeRefusal`), each `Invalid`; then a clone the place does not make, and a writable one in no git repository.
+ * factory, each `Invalid`; a writable one given again read-only while it is still worked on (`workedOnStill`, `Conflict`); a folder that
+ * is no directory, a writable one inside another or holding one, or one that reaches the store (`volumeRefusal`, `Invalid`); then a
+ * clone the place does not make, and a writable one in no git repository.
  */
 export const FACTORY_VOLUME_ADD: Served<Added> = {
   ...FACTORY_VOLUME_ADD_WORDS,
-  handler: (args) => {
+  handler: (args, kept) => {
     const name = textOf(args, 'factory');
     return Effect.gen(function* () {
       const home = yield* StoreRoot;
@@ -78,6 +110,8 @@ export const FACTORY_VOLUME_ADD: Served<Added> = {
       yield* tried(() => refuseName(name, 'volume'));
       const door = yield* FactoryDoor;
       const factory = yield* filedFactory(name, 'volume');
+      const over = factory.volumes.find((v) => path.resolve(v.path) === volume.path);
+      if (volume.readOnly && over !== undefined && !over.readOnly) yield* workedOnStill(factory, volume.path, kept, 'changed');
       const refused = volumeRefusal(factory, volume, home, isDirectory);
       if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
       yield* cloned(clonesOf([volume]));
@@ -106,11 +140,11 @@ const wiredOn = (factory: Pick<Factory, 'volumes' | 'workflowRepos'>, at: string
 /**
  * `nemia factory volume rm`: a volume taken off a factory, by its path, or the URL it was cloned from; runs started after mount it no
  * more, and a run in flight keeps what it began with. Refused: a path it does not reach (`Missing`), and a writable one the wiring names
- * for a workflow (`Conflict`), until the workflow is placed on another (`nemia factory attach … --repo`).
+ * for a workflow or a run in play works on (`workedOnStill`, `Conflict`).
  */
 export const FACTORY_VOLUME_RM: Served<{ file: string; removed: string }> = {
   ...FACTORY_VOLUME_RM_WORDS,
-  handler: (args) => {
+  handler: (args, kept) => {
     const name = textOf(args, 'factory');
     return Effect.gen(function* () {
       yield* tried(() => refuseName(name, 'volume'));
@@ -129,13 +163,7 @@ export const FACTORY_VOLUME_RM: Served<{ file: string; removed: string }> = {
           }),
         );
       }
-      const wired = wiredOn(factory, at);
-      if (wired.length)
-        return yield* Effect.fail(
-          new Conflict({
-            message: `${at} is the repository the factory ${name}'s wiring names for ${wired.join(', ')}: place ${wired.length > 1 ? 'each' : 'it'} on another first — nemia factory attach ${name} ${wired[0]} --repo <name> — then take it off. Nothing was removed.`,
-          }),
-        );
+      if (volumes.some((v) => v.path === at && !v.readOnly)) yield* workedOnStill(factory, at, kept, 'removed');
       const left = factory.volumes.filter((v) => path.resolve(v.path) !== at);
       const file = yield* door.factories.rewrite({ ...factory, volumes: left });
       return { file, removed: at };

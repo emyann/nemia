@@ -461,7 +461,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   );
 
   await s.test(
-    'a run started then mounts the volumes, frozen on its record and said at its start; a volume removed after changes no run started',
+    'a run started then mounts the volumes, frozen on its record and said at its start; a volume removed after changes no run started; REFUSED the repository a run in play works on, taken off or made read-only',
     async () => {
       const f = path.basename(file, '.json');
       const filed = readFactoryAt(ROOT, f).volumes;
@@ -485,6 +485,13 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       const gone = unwired[0]?.path ?? '';
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, gone]), 'Missing', gone);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, a]), 'Conflict', 'nemia factory attach');
+      assert.equal(runRecord(ROOT, id).repo, a, 'the run works on the repository build is wired to');
+      await typedFrom(ROOT, ['factory', 'attach', f, path.basename(build), '--repo', path.basename(b)]);
+      const wired = fs.readFileSync(file, 'utf8');
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, a]), 'Conflict', id, `nemia cancel ${id}`);
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, `${a}:ro`]), 'Conflict', id, `nemia cancel ${id}`);
+      assert.equal(fs.readFileSync(file, 'utf8'), wired, 'nothing written');
+      await typedFrom(ROOT, ['factory', 'attach', f, path.basename(build), '--repo', path.basename(a)]);
     },
   );
 

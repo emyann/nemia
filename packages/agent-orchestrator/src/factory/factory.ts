@@ -476,22 +476,22 @@ export function factoryRepo(factory: Pick<Factory, 'volumes'> | undefined, named
 export type { NamedRepo, WorkflowRepoOf, WorkflowRepoRefusal } from '../../contracts/workflow-repo.contract.ts';
 
 /**
- * The repository a run of `workflow` works on in a factory of `repos`, each with its folder name: the one named `wired[workflow]`,
+ * The repository a run of `workflow` works on in a factory of `worked`, each with its folder name: the one named `wired[workflow]`,
  * else the only one; refused where the factory has none (`none`), several and names none (`unwired`), names one none has (`unknown`),
  * or one two share (`shared`). A prototype's name (`constructor`) names no workflow's repository: the wiring is a person's file, read as JSON.
- * @param repos The factory's repositories, each with its folder name.
+ * @param worked The factory's repositories, each with its folder name.
  * @param wired The repository each workflow works on, by its folder name, or undefined where the factory names none.
  * @param workflow The workflow's folder name.
  */
-export const workflowRepo: WorkflowRepo = (repos, wired, workflow) => {
-  if (repos.length === 0) return { refused: 'none' };
+export const workflowRepo: WorkflowRepo = (worked, wired, workflow) => {
+  if (worked.length === 0) return { refused: 'none' };
   const name = wired !== undefined && Object.hasOwn(wired, workflow) ? wired[workflow] : undefined;
   if (name === undefined) {
-    const [only, ...more] = repos;
+    const [only, ...more] = worked;
     if (only === undefined || more.length) return { refused: 'unwired' };
     return { repo: only.path };
   }
-  const [one, ...others] = repos.filter((r) => r.name === name);
+  const [one, ...others] = worked.filter((r) => r.name === name);
   if (one === undefined) return { refused: 'unknown' };
   if (others.length) return { refused: 'shared' };
   return { repo: one.path };
@@ -623,11 +623,11 @@ export function repoNameRefusal(factory: Pick<Factory, 'name' | 'volumes'>, work
  * @param repo The repository the run is asked on.
  */
 export function outsideRefusal(factory: Pick<Factory, 'name' | 'volumes'>, repo: string): string | undefined {
-  const repos = workedOn(factory);
-  if (repos.includes(path.resolve(repo))) return undefined;
-  if (!repos.length)
+  const worked = workedOn(factory);
+  if (worked.includes(path.resolve(repo))) return undefined;
+  if (!worked.length)
     return `${repo}: the factory ${factory.name} works on no repository yet: give it one to work on with ${volumeAddLine(factory.name)}. Nothing was started.`;
-  const sorted = [...repos].sort();
+  const sorted = [...worked].sort();
   return `${repo}: the factory ${factory.name} works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — --repo ${sorted[0]} — or give the factory this one to work on: nemia factory volume add ${factory.name} ${path.resolve(repo)}:rw. Nothing was started.`;
 }
 
@@ -763,19 +763,19 @@ const writableSaid = (workflow: string, step: Pick<StepSpec, 'name' | 'writable'
 
 /**
  * Why the name `name` a step's `writable:` gives (`said`) names no folder the run can mount writable, or undefined: none or two of the
- * factory's repositories (`repos`, resolved) have it as their directory's name, or the one that does is no directory at start — it is
+ * factory's repositories (`worked`, resolved) have it as their directory's name, or the one that does is no directory at start — it is
  * not among `mounts`. The run's own repository (`own`) is the step's workspace already, and taken.
  */
 function writableNameRefusal(
   said: string,
   name: string,
-  repos: readonly string[],
+  worked: readonly string[],
   own: string | undefined,
   mounts: readonly Mount[],
 ): string | undefined {
-  const named = repos.filter((r) => path.basename(r) === name);
+  const named = worked.filter((r) => path.basename(r) === name);
   if (!named.length) {
-    const names = [...new Set(repos.map((r) => path.basename(r)))].sort().join(', ');
+    const names = [...new Set(worked.map((r) => path.basename(r)))].sort().join(', ');
     return `${said} names \`${name}\`, and no folder of the factory has that name — its folders are ${names}. Name one of them by its directory's name, or delete the name. Nothing was started.`;
   }
   if (named.length > 1)
@@ -801,14 +801,14 @@ export function writableRefusal(
   repo: string | undefined,
   mounts: readonly Mount[],
 ): string | undefined {
-  const repos = factory === undefined ? [] : workedOn(factory);
+  const worked = factory === undefined ? [] : workedOn(factory);
   const own = repo === undefined ? undefined : path.resolve(repo);
   for (const step of steps.filter((s) => s.writable?.length)) {
     const said = writableSaid(workflow, step);
     if (!factory)
       return `${said} names folders of the run's factory, and this run is started in none, so it mounts no folder. Start it in a factory — nemia start --factory <name> — or delete the line. Nothing was started.`;
     for (const name of step.writable ?? []) {
-      const why = writableNameRefusal(said, name, repos, own, mounts);
+      const why = writableNameRefusal(said, name, worked, own, mounts);
       if (why) return why;
     }
   }

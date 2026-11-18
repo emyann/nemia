@@ -19,11 +19,11 @@ const cloneRefusal = Effect.fn('cloneRefusal')(function* (url: string, into: str
 });
 
 /**
- * Each of `origins`, a folder to the URL it is cloned from, cloned there where it is not yet. Refused, `Invalid`, at the first the place
+ * Each of `urls`, a folder to the URL it is cloned from, cloned there where it is not yet. Refused, `Invalid`, at the first the place
  * did not clone, in its words, nothing filed: a factory is filed on clones that are there.
  */
-export const cloned = Effect.fn('cloned')(function* (origins: Readonly<Record<string, string>>) {
-  for (const [into, url] of Object.entries(origins)) {
+export const cloned = Effect.fn('cloned')(function* (urls: Readonly<Record<string, string>>) {
+  for (const [into, url] of Object.entries(urls)) {
     const refused = yield* cloneRefusal(url, into);
     if (refused !== undefined) return yield* Effect.fail(new Invalid({ message: `${refused} Nothing was filed.` }));
   }

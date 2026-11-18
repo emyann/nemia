@@ -98,8 +98,8 @@ Setting `NEMIA_CONTEXT=<name>` picks another context for one command. Under a re
 proposals, the inbox, decisions) reach the server, and so does every other verb about the store: `nemia` parses it, checks it and
 prints its answer on your laptop as it always does, and the server does the work. The files a command names on your laptop, a card
 for `nemia inbox add -f`, a template folder or archive for `nemia factory apply --template`, a file for `nemia factory resolve
---file`, travel with the request. A repository path (`--repo`) or a volume's path names a folder on the server's machine, not on
-yours; a repository's git URL is cloned on the server, with the server's own git credentials. A verb no endpoint of the server serves yet is refused, naming the context to leave (`NEMIA_CONTEXT=local`) or the machine to
+--file`, travel with the request. A volume's path (`--volume`) names a folder on the server's machine, not on
+yours; a volume's git URL is cloned on the server, with the server's own git credentials. A verb no endpoint of the server serves yet is refused, naming the context to leave (`NEMIA_CONTEXT=local`) or the machine to
 run it on.
 
 The machine's own verbs always act on the machine you type them on: the service, upgrade, the daemon (`nemia up`, `nemia tick`), the
@@ -198,10 +198,10 @@ quota, sign in on the server with the Claude Code the sessions run — the board
 
 ## A repository by its URL
 
-A factory may name a repository by its git URL rather than a folder of the machine:
+A factory's volume may be a repository's git URL rather than a folder of the machine:
 
 ```bash
-nemia factory add mill --repo git@github.com:you/mill.git
+nemia factory add mill --volume git@github.com:you/mill.git:rw
 ```
 
 Nemia clones it under `~/.agent-workflows/clones/<host>/<path>` before it files the factory, and the daemon clones it again if that
@@ -216,7 +216,7 @@ disk. A failed install is tried again at the next cut, and the step is told to r
 an environment variable (an install script that needs one) needs it set in the daemon's environment. A repository with no
 `package-lock.json` gets nothing installed.
 
-From a laptop under a remote context, the same line (and `nemia factory apply … --repo <url>`) files the factory on the server: the
+From a laptop under a remote context, the same line (and `nemia factory apply … --volume <url>:rw`, or `nemia factory volume add`) files the factory on the server: the
 server clones the repository with its own credentials, so the SSH key or the credential helper is set up there, not on the laptop.
 
 ## Signing Codex in

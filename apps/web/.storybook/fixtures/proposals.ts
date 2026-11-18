@@ -64,7 +64,7 @@ export const factoryView = (name: string, isDefault = false): Factory => ({
   commands: {
     attach: `nemia factory attach ${name} <workflow>`,
     rm: `nemia factory rm ${name}`,
-    add: `nemia factory add ${name} --repo /work/nemia`,
+    add: `nemia factory add ${name} --volume /work/nemia:rw`,
     schedule: `nemia schedule add <workflow> -n ${name}`,
     trust: `nemia factory trust ${name}`,
     volume: `nemia volume add <name> -n ${name}`,

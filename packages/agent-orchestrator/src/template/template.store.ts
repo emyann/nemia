@@ -274,10 +274,10 @@ function factorySource(
   const { name } = factory;
   const outside = outsideRefusal(factory, from);
   if (outside) {
-    const repos = workedOn(factory).sort();
-    if (!repos.length) throw new Invalid({ message: outside.replace('Nothing was started.', 'Nothing was written.') });
+    const worked = workedOn(factory).sort();
+    if (!worked.length) throw new Invalid({ message: outside.replace('Nothing was started.', 'Nothing was written.') });
     throw new Invalid({
-      message: `${from}: the factory ${name} works on ${repos.join(', ')}, and its workflows are read from one of them: --from ${repos[0]}. Nothing was written.`,
+      message: `${from}: the factory ${name} works on ${worked.join(', ')}, and its workflows are read from one of them: --from ${worked[0]}. Nothing was written.`,
     });
   }
   if (instruction.error) refusals.push(`the factory ${name}'s instruction: ${instruction.error}`);

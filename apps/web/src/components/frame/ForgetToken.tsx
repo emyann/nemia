@@ -17,8 +17,9 @@ export function ForgetToken() {
     <section data-forget-token className="flex flex-col gap-2">
       <h2 className="text-title-medium">This browser</h2>
       <p className="text-body-medium text-muted-foreground">
-        Nemia asks every browser for a token once, on its own machine as from beyond it, and this browser keeps it for thirty days. Forget
-        it to leave this browser sending none: the token itself stays the store's until it is retired, on the Tokens tab or at its machine.
+        Nemia asks every browser for a token once, on its own machine as from beyond it, and this browser keeps it while you use it, until
+        thirty days after your last visit. Forget it to leave this browser sending none: the token itself stays the store's until it is
+        retired, on the Tokens tab or at its machine.
       </p>
       <div>
         <Button

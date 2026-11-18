@@ -110,4 +110,9 @@ export const OPEN_WORDS = {
 } as const satisfies CommandWords;
 
 /** The pairing commands' words, in the order the help lists them. */
-export const REST_PAIRING_WORDS = [PAIRINGS_LS_WORDS, PAIRINGS_APPROVE_WORDS, BOARD_LINK_WORDS, OPEN_WORDS] as const satisfies readonly CommandWords[];
+export const REST_PAIRING_WORDS = [
+  PAIRINGS_LS_WORDS,
+  PAIRINGS_APPROVE_WORDS,
+  BOARD_LINK_WORDS,
+  OPEN_WORDS,
+] as const satisfies readonly CommandWords[];

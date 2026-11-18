@@ -102,9 +102,9 @@ export const PRUNE_WORDS =
 
 /**
  * The one line under her name in her chat's header, off what the api answers of her and where she is (`presence`): `Down since 6:10 PM`
- * while her session is not up and no message would start it, `Resting` where one would, `Answering` while a turn is in progress, else `Up: her session runs`, each followed by what her sessions
- * cost where the api counted it. The cost is what her ended sessions cost, whole (`spendWords`, which the header carries as its title),
- * never a day's: nothing the board reads counts a day of hers.
+ * while her session is not up and no message would start it, `Resting` where one would, `Answering` while a turn is in progress, else
+ * `Up: her session runs`, each followed by what her sessions cost where the api counted it. The cost is what her ended sessions cost, whole
+ * (`spendWords`, which the header carries as its title), never a day's: nothing the board reads counts a day of hers.
  * @param nemia What the api answers of her, or undefined while it is unread.
  * @param presence Where she is: down, answering, or with a message not sent.
  * @param now The instant it is now, against which the time she went down is said.

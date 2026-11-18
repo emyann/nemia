@@ -196,9 +196,9 @@ const nemiaDueSpec = spec<(keeping: Keeping, task: HerTask | undefined, subscrib
 export type NemiaDue = Implementation<typeof nemiaDueSpec>;
 
 /**
- * What `quietOf` reads, each a whole number of milliseconds, a moment on the wall clock since the epoch: `idleSince`, the keeper's idle mark of her current task (null
- * where none); `lastSaid`, the latest word the runtime journalled as said to it (null where none); `now`; and `restAfterMs`, how long a
- * quiet conversation lasts before she rests (`NEMIA_REST_AFTER`).
+ * What `quietOf` reads, each a whole number of milliseconds, a moment on the wall clock since the epoch: `idleSince`, the keeper's idle
+ * mark of her current task (null where none); `lastSaid`, the latest word the runtime journalled as said to it (null where none); `now`;
+ * and `restAfterMs`, how long a quiet conversation lasts before she rests (`NEMIA_REST_AFTER`).
  */
 export type IdleRead = { idleSince: number | null; lastSaid: number | null; now: number; restAfterMs: number };
 

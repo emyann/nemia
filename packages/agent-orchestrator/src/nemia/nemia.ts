@@ -126,24 +126,36 @@ const proper = (task: string | undefined, s: HerSubscription | undefined): boole
 export const nemiaDue: NemiaDue = (keeping, task, subscribed) => {
   const k = keeping;
   const dropped: NemiaAct[] = subscribed === undefined ? [] : ['drop'];
-  if (!isOpen(task)) {
-    const wanted = k.above || k.owed === true || k.answered === true;
-    if (wanted && (task === undefined || k.rested === true || k.heard === true))
-      return [...dropped, ...(k.trusted === false ? (['trust'] as const) : []), 'file'];
-    const unheard = task !== undefined && k.rested !== true && k.heard !== true;
-    return [...dropped, ...(unheard && k.stoppedMarked !== true ? (['markStopped'] as const) : [])];
-  }
-  const quiet = k.quiet === true && k.idle === true && k.owed !== true && k.answered !== true && k.asking !== true && k.closing !== true;
-  if (k.rested === true || (!k.above && quiet)) return ['rest', ...dropped];
-  const mine = proper(k.task, subscribed);
-  if (k.above && !mine) return [...dropped, 'subscribe'];
+  if (!isOpen(task)) return [...dropped, ...dueClosed(k, task !== undefined)];
+  if (k.rested === true || (!k.above && quietNow(k))) return ['rest', ...dropped];
+  if (k.above && !proper(k.task, subscribed)) return [...dropped, 'subscribe'];
+  return [...(k.above ? [] : dropped), ...spoken(k)];
+};
+
+/** Whether a word of the person's waits for her: a message in her outbox or an answer to her question. */
+const waiting = (k: Keeping): boolean => k.owed === true || k.answered === true;
+
+/**
+ * What is owed where no task of hers is open, its subscription aside: her folder trusted where needed and a task filed, where she is
+ * wanted and her last task (`filed`) was put to rest or the person spoke after it ended; else a task ended from outside marked once.
+ */
+const dueClosed = (k: Keeping, filed: boolean): NemiaAct[] => {
+  const spoke = k.rested === true || k.heard === true;
+  if ((k.above || waiting(k)) && (!filed || spoke)) return [...(k.trusted === false ? (['trust'] as const) : []), 'file'];
+  return filed && !spoke && k.stoppedMarked !== true ? ['markStopped'] : [];
+};
+
+/** Whether the conversation is quiet long enough for her to rest: idle, nothing waiting, no question of hers open. */
+const quietNow = (k: Keeping): boolean => k.quiet === true && k.idle === true && !waiting(k) && k.asking !== true && k.closing !== true;
+
+/** What the keeper says to her open session: custom words changed, and what the chat owes where her session is up; its idle mark. */
+const spoken = (k: Keeping): NemiaAct[] => {
   const up = k.up === true;
   return [
-    ...(k.above ? [] : dropped),
     ...(k.stale === true ? (['sayCustom'] as const) : []),
-    ...(k.owed === true && up ? (['sayOutbox'] as const) : []),
-    ...((k.asking === true || k.closing === true) && up ? (['record'] as const) : []),
-    ...(k.answered === true && up ? (['answer'] as const) : []),
+    ...(up && k.owed === true ? (['sayOutbox'] as const) : []),
+    ...(up && (k.asking === true || k.closing === true) ? (['record'] as const) : []),
+    ...(up && k.answered === true ? (['answer'] as const) : []),
     ...(k.idle === true && k.idleMarked !== true ? (['markIdle'] as const) : []),
   ];
 };

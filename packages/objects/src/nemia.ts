@@ -46,8 +46,9 @@ export const FactoryLevel = Schema.Struct({
 /**
  * Where Nemia is, as `nemia level --json` prints it: the store's level and since when, her task, its phase and its session where one is
  * filed, how a person reaches her session (`reach`), its web link (`bridge`, null where not bridged), whether it ended with no rest
- * (`stopped`), whether no task of hers is open and a message starts one (`rests`), what her ended sessions cost (`spend`), what a person allowed her at a prompt (`allows`), each factory's level, the default
- * factory first, and why the keeper could not trust her folder (`untrusted`, null where it is trusted or the write was not refused).
+ * (`stopped`), whether no task of hers is open and a message starts one (`rests`), what her ended sessions cost (`spend`), what a person
+ * allowed her at a prompt (`allows`), each factory's level, the default factory first, and why the keeper could not trust her folder
+ * (`untrusted`, null where it is trusted or the write was not refused).
  */
 export const NemiaLevel = Schema.Struct({
   level: LevelWord.annotate({ description: "The store's level (`nemia level <level>`): manual, semi-auto or auto." }),

@@ -508,9 +508,9 @@ export const chatAnswer = Effect.fn('chatAnswer')(function* (place: ChatPlace, g
 });
 
 /**
- * The turn the current task of the chat at `place` is answering stopped, and the stop as its record keeps it: the runtime ends the turn through
- * its harness and leaves the session open, and the stop is appended to the chat's own `stops.jsonl`, which the projection draws as the
- * keeper's quiet marker. The turn is ended before the line is written: a stop on the record is a turn the runtime stopped.
+ * The turn the current task of the chat at `place` is answering stopped, and the stop as its record keeps it: the runtime ends the turn
+ * through its harness and leaves the session open, and the stop is appended to the chat's own `stops.jsonl`, which the projection draws as
+ * the keeper's quiet marker. The turn is ended before the line is written: a stop on the record is a turn the runtime stopped.
  *
  * Refused (`Conflict`) where no task is filed, and in the runtime's own words where it will not end the turn — she is not answering,
  * her session is not running, or her harness cannot end a turn without ending it.

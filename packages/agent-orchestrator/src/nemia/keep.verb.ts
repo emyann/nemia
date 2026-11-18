@@ -1,16 +1,16 @@
 /**
  * The keeper of Nemia: each beat, the levels read again (`levelsNow`), the keeper's record of her session (`session.json`: her tasks and
  * the marks of her current one), her current task read off the engine, her subscription off the store and her chat's files, and what is
- * owed done (`nemiaDue`). Two roles on one session. **Conversation**: a word of the person's in her chat files her where no task of hers
- * is open, at any level, as a new task continuing her last session (`resumeFrom`), after her harness's trust is given to her own folder
- * where it is not (`trustHer`), why where that write is refused recorded for the person (`writeUntrusted`); at `manual`, once her session
- * has been idle `restAfter` since the last word said to her (`quietOf`), she is put to rest: the record marked, then her task stopped.
- * **Operating**: while any factory is above `manual` she is filed and kept, subscribed with her floor (`NEMIA_FLOOR`), and never rests; once
- * none is, her subscription is dropped and the conversation goes on until it is quiet. While the keeper speaks to her session, the
- * person's custom words are said to it (`sayCustom`) once they are not those she was last filed or told with (`customChanged`), and,
- * while it is live, the person's chat words (`sayOutbox`), the questions it holds open written down (`recordAsks`) and the person's answers
- * carried (`answersDue`). A task that ended with no rest of the keeper's is marked so, and filed again only on a word of the person's
- * after the mark. Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say.
+ * owed done (`nemiaDue`). Two roles on one session. **Conversation**: a word of the person's in her chat files her where no task of hers is
+ * open, at any level, as a new task continuing her last session (`resumeFrom`), after her harness's trust is given to her own folder where
+ * it is not (`trustHer`), why where that write is refused recorded for the person (`writeUntrusted`); at `manual`, once her session has
+ * been idle `restAfter` since the last word said to her (`quietOf`), she is put to rest: the record marked, then her task stopped.
+ * **Operating**: while any factory is above `manual` she is filed and kept, subscribed with her floor (`NEMIA_FLOOR`), and never rests;
+ * once none is, her subscription is dropped and the conversation goes on until it is quiet. While the keeper speaks to her session, the
+ * person's custom words are said to it (`sayCustom`) once they are not those she was last filed or told with (`customChanged`), and, while
+ * it is live, the person's chat words (`sayOutbox`), the questions it holds open written down (`recordAsks`) and the person's answers
+ * carried (`answersDue`). A task that ended with no rest of the keeper's is marked so, and filed again only on a word of the person's after
+ * the mark. Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer, and
  * her subscription through the Subscription door (`SubscriptionDoor`) and the person's custom words for her through the Agent door

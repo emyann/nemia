@@ -26,11 +26,12 @@ import { LEVEL_FORM, type Level, type LevelFile } from './nemia.ts';
 /**
  * Where Nemia is, as `nemia level` answers: the store's `level` and since when; each factory's level (`factories`), the default factory
  * first; her task, its phase and its session where one is filed; how a person reaches her session (`reach`), and her session's web link
- * where it was asked (`bridge`, null where not; `bridgeOf`); whether her task ended with no rest of the keeper's (`stopped`, filed
- * again on the person's next word); whether no task of hers is open and a message in her chat would start one (`rests`); what her sessions cost (`spend`, counted as each ends, as a step's; null where none is filed); and the allow
- * rules a person gave her at a prompt (`allows`); and why the keeper could not trust her folder, naming the fix (`untrusted`, the keeper's
- * record), null where her harness trusts it or keeps no trust, or where the keeper's write was not refused: the keeper trusts her own
- * folder itself before it files her, and no person runs a command for it.
+ * where it was asked (`bridge`, null where not; `bridgeOf`); whether her task ended with no rest of the keeper's (`stopped`, filed again on
+ * the person's next word); whether no task of hers is open and a message in her chat would start one (`rests`); what her sessions cost
+ * (`spend`, counted as each ends, as a step's; null where none is filed); and the allow rules a person gave her at a prompt (`allows`); and
+ * why the keeper could not trust her folder, naming the fix (`untrusted`, the keeper's record), null where her harness trusts it or keeps
+ * no trust, or where the keeper's write was not refused: the keeper trusts her own folder itself before it files her, and no person runs a
+ * command for it.
  */
 export type NemiaLevel = {
   level: Level;

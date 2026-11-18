@@ -1,5 +1,6 @@
 /**
- * A first-visit link, claimed as the board loads (`<base>/?link=<secret>`, printed at the server's shell): its secret is taken off the
+ * A first-visit link, claimed as the board loads (`<base>/welcome?link=<secret>`, printed at the server's shell; a link may name any
+ * path of the board): its secret is taken off the
  * address at once, whether the claim then succeeds or not, so the address bar, its history and a copy of it never carry it; then it is
  * claimed (`POST /api/links/claim`), which sets this browser's cookie, before the board makes its first read. A link refused — used,
  * lapsed, or no link of this Nemia's — is kept for the visit, and the sign-in says it (`useLinkRefused`).

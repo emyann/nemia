@@ -580,16 +580,6 @@ export {
   type NeedScope,
   HARNESS_PARTS,
   type HarnessPart,
-  HARNESS_CHECKS,
-  type HarnessCheckName,
-  HARNESS_CHECK_STATES,
-  type HarnessCheckState,
-  TURN_FAILURES,
-  type TurnFailure,
-  MILESTONES,
-  type Milestone,
-  MILESTONE_STATES,
-  type MilestoneState,
   TICKET_STATES,
   type TicketState,
   UPGRADE_PHASES,
@@ -598,20 +588,10 @@ export {
   type UpgradeStreamEventName,
 } from './words.ts';
 export { PreviousRelease, Upgrade, UpgradeStart, UpgradeStreamEvent, UpgradesGroup, UpgradesRead } from './upgrade.ts';
-export {
-  Fix,
-  FixStart,
-  FixStreamEvent,
-  Readiness,
-  ReadinessGroup,
-  ReadinessPiece,
-  missingSaid,
-  readinessSaid,
-  runsWait,
-} from './readiness.ts';
-export { ReadinessFix } from './readiness-fix.ts';
-export { HarnessCheck, HarnessTurn, TurnStart } from './harness-check.ts';
-export { MilestoneRead, Milestones } from './milestones.ts';
+export { Fix, FixStart, FixStreamEvent, Readiness, ReadinessFix, ReadinessGroup, ReadinessPiece } from './readiness.ts';
+export { HarnessCheck, HarnessTurn, MilestoneRead, Milestones, TurnStart, missingSaid, readinessSaid, runsWait } from './readiness.ts';
+export { HARNESS_CHECKS, HARNESS_CHECK_STATES, MILESTONES, MILESTONE_STATES, TURN_FAILURES } from './words.ts';
+export type { HarnessCheckName, HarnessCheckState, Milestone, MilestoneState, TurnFailure } from './words.ts';
 export {
   LinkClaimed,
   LinkMinted,

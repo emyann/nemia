@@ -12,6 +12,10 @@ import { describedNumber } from './meta.ts';
 import { HarnessCheck, HarnessTurn, TurnStart } from './harness-check.ts';
 import { Milestones } from './milestones.ts';
 import { ReadinessFix } from './readiness-fix.ts';
+
+export { ReadinessFix } from './readiness-fix.ts';
+export { HarnessCheck, HarnessTurn, TurnStart } from './harness-check.ts';
+export { MilestoneRead, Milestones } from './milestones.ts';
 import {
   ADDRESS_KINDS,
   FIX_PHASES,

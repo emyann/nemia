@@ -8,8 +8,11 @@ import { PieceFixes, type Starts } from './ReadinessList';
 /** A harness the question offers: its pieces as the read answered them. */
 type Choice = HarnessChoiceRow<ReadinessPiece>;
 
-/** The harness whose install was started on this visit: its row, the install's run as it is followed, and whether it is in place. */
-type Activation = { choice: Choice; run?: ReactNode; installed: boolean };
+/**
+ * The harness whose install was started on this visit: its row, the install's run as it is followed, whether it is in place, and its two
+ * checks once it is (`HarnessChecks`).
+ */
+type Activation = { choice: Choice; run?: ReactNode; installed: boolean; checks?: ReactNode };
 
 /** One harness offered: the install piece's sentence as its title, the harness as the read names it, and Activate. */
 function Option({ choice, starts }: { choice: Choice; starts: Starts }) {
@@ -50,15 +53,19 @@ function Option({ choice, starts }: { choice: Choice; starts: Starts }) {
  * (`harnessChoices`) — the sentence its install piece says, and Activate, which starts the install's fix (`onStart`) — and Skip, where
  * it is given, which keeps the skip in this browser (`onSkip`). Once one is activated on this visit (`activation`), it shows that harness
  * alone: the install's run as it is followed, then, the install in place, its sign-in piece's fixes — a command to type with the control
- * that copies it, or a fix the server runs, started the same way.
+ * that copies it, or a fix the server runs, started the same way — and its two checks. `lead`, where it is given, says in its place
+ * what the question is for (the welcome's one line), and `level` the rank of its heading on its page (3 where it is left out).
  */
 export function HarnessChoice({
   choices,
   activation,
   onSkip,
+  lead,
+  level = 3,
   ...starts
-}: { choices: readonly Choice[]; activation?: Activation; onSkip?: () => void } & Starts) {
+}: { choices: readonly Choice[]; activation?: Activation; onSkip?: () => void; lead?: string; level?: 2 | 3 } & Starts) {
   const signIn = activation?.choice.signIn;
+  const Heading = level === 2 ? 'h2' : 'h3';
   return (
     <CutFrame size={12}>
       <section
@@ -67,12 +74,13 @@ export function HarnessChoice({
         className="flex flex-col gap-3 p-4"
       >
         <header className="flex flex-col gap-1">
-          <h3 id="harness-choice" className="text-title-small font-title-small">
+          <Heading id="harness-choice" className="text-title-small font-title-small">
             {activation === undefined ? 'Which harness should run your sessions?' : 'Activating the harness'}
-          </h3>
+          </Heading>
           <p className="text-body-medium text-on-surface-variant">
             {activation === undefined
-              ? 'A session runs on a harness this server installs for you. Activate one now, or skip and activate one from the list below when you need it.'
+              ? (lead ??
+                'A session runs on a harness this server installs for you. Activate one now, or skip and activate one from the list below when you need it.')
               : activation.installed
                 ? 'It is installed. Sign it in, and a session can start on it.'
                 : 'The server installs it: its output shows here as it runs.'}
@@ -107,6 +115,7 @@ export function HarnessChoice({
                 {signIn.message}
               </p>
             )}
+            {activation.installed && activation.checks}
           </div>
         )}
       </section>

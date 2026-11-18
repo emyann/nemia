@@ -3,7 +3,7 @@
  * that names another word fails `npm run typecheck` until the runtime's list names it too, while a line that already says it reads as
  * `unknown`. The test below only runs what the typecheck already judged.
  */
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { McpServerConfigForProcessTransport, SDKMessageOrigin } from '@anthropic-ai/claude-agent-sdk';
 import type { McpTransport } from '../src/harness/mcp.ts';

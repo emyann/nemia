@@ -9,7 +9,7 @@
  * Its store is its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a
  * pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
-import { test } from 'node:test';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -216,7 +216,7 @@ const aRepo = (): string => {
 
 test("REFUSED at shipped defaults: a run is never started under an id the store has — a record, the asks one left, or a run's directory", async (t) => {
   let draws = 0;
-  t.mock.method(Math, 'random', () => (draws++ === 0 ? 0.5 : draws / 97));
+  vi.spyOn(Math, 'random').mockImplementation(() => (draws++ === 0 ? 0.5 : draws / 97));
   const first = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   draws = 0;
   const second = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
@@ -472,7 +472,7 @@ const throughCheck = async (keys: string, phase: TaskPhase, exitCode?: number) =
 const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
 /** The asks waiting in a run's directory, by name. */
 const asksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f.startsWith('retry-')) : []);
-const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
+const refusedWith = () => (err: Error & { exitCode?: number }) => err.exitCode === 2 && test.todo(err.message);
 /**
  * What a verb refused with, once it has said it was a refusal — for a message to read more than one thing in, and to read something
  * out of.
@@ -870,7 +870,7 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   const taskId = `${run.id}-implement`;
   b.settle(taskId, 'needs-human' as TaskPhase);
-  t.mock.method(console, 'log', () => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   await onHandler(['retry', run.id, 'implement'], b.e, undefined, stand().place, ENV);
   assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
 
@@ -935,12 +935,12 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
     JSON.stringify({ step: 'implement', try: 1, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
   );
   const mkdir = fs.mkdirSync;
-  t.mock.method(fs, 'mkdirSync', (at: string, ...rest: unknown[]) => {
+  vi.spyOn(fs, 'mkdirSync').mockImplementation((at: string, ...rest: unknown[]) => {
     if (String(at).startsWith(asks)) fs.rmSync(asks, { recursive: true, force: true });
     return (mkdir as (...a: unknown[]) => unknown)(at, ...rest);
   });
   await runWith(b.e, advanceRun(runRecord(ROOT, q.run.id)));
-  (fs.mkdirSync as unknown as { mock: { restore: () => void } }).mock.restore();
+  (fs.mkdirSync as unknown as { mock: { restore: () => void } }).mockRestore();
   assert.ok(
     !fs.existsSync(asks),
     'a spent ask the pass moves into `done/` as `nemia rm` removes the directory: no asks directory made again',

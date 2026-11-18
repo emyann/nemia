@@ -14,7 +14,7 @@
 import { createFactoryAt } from '../factory/factory.store.ts';
 import path from 'node:path';
 import fs from 'node:fs';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
@@ -223,9 +223,8 @@ test("a need of a factory whose places are not trusted is unknown, its check nev
   assert.equal(fs.existsSync(path.join(repo, 'ran-here')), false, 'its check never ran in the repository');
 });
 
-test(
+test.skipIf(INSTALLED_BESIDE_NODE)(
   'a harness nobody activated and no workflow runs on is inactive, its install offered, and counts against nothing until it is installed or named',
-  { skip: INSTALLED_BESIDE_NODE },
   async (t) => {
     const [other, declaration] = Object.entries(HARNESS_DECLARATIONS).find(([name, d]) => name !== DEFAULT_HARNESS && d.needs) ?? [];
     assert.ok(other !== undefined && declaration?.needs !== undefined, 'the runtime declares a second harness with needs');
@@ -237,7 +236,7 @@ test(
       .split(path.delimiter)
       .filter((dir) => !fs.existsSync(path.join(dir, name)))
       .join(path.delimiter);
-    t.after(() => {
+    t.onTestFinished(() => {
       process.env.PATH = ambient;
     });
     const states = (got: { pieces: readonly { harness?: { name: string }; state: string }[] }) =>
@@ -280,7 +279,7 @@ test(
  * The second harness the runtime declares with needs, its program taken off this process's PATH for the test `t`, and a read of the store
  * `home` that answers that harness's two pieces' states and whether the read is ready.
  */
-const secondHarness = (t: { after: (fn: () => void) => void }) => {
+const secondHarness = (t: { onTestFinished: (fn: () => void) => void }) => {
   const [other, declaration] = Object.entries(HARNESS_DECLARATIONS).find(([name, d]) => name !== DEFAULT_HARNESS && d.needs) ?? [];
   assert.ok(other !== undefined && declaration?.needs !== undefined, 'the runtime declares a second harness with needs');
   const program = declaration.needs.program;
@@ -289,7 +288,7 @@ const secondHarness = (t: { after: (fn: () => void) => void }) => {
     .split(path.delimiter)
     .filter((dir) => !fs.existsSync(path.join(dir, program)))
     .join(path.delimiter);
-  t.after(() => {
+  t.onTestFinished(() => {
     process.env.PATH = ambient;
   });
   const readAt = async (home: string) => {
@@ -304,9 +303,8 @@ const secondHarness = (t: { after: (fn: () => void) => void }) => {
   return { other, readAt };
 };
 
-test(
+test.skipIf(INSTALLED_BESIDE_NODE)(
   "a store agent hired into a factory's step names its harness to the read, as it holds a run on it",
-  { skip: INSTALLED_BESIDE_NODE },
   async (t) => {
     const { other, readAt } = secondHarness(t);
     const home = scratch('wf-readiness-hired-');
@@ -328,9 +326,8 @@ test(
   },
 );
 
-test(
+test.skipIf(INSTALLED_BESIDE_NODE)(
   'a run of no factory that has filed nothing names the harness its frozen steps run on, and names it no more once a step is filed',
-  { skip: INSTALLED_BESIDE_NODE },
   async (t) => {
     const { other, readAt } = secondHarness(t);
     const home = scratch('wf-readiness-run-');
@@ -426,8 +423,11 @@ test('memory-fit: the sessions at once, each at its request else its limit, agai
   names(refused?.message, 'WF_MEMORY_REQUEST=4Gi');
 });
 
-test('sessions-slice: the slice the sessions run under, read fresh, has a ceiling at or under what the machine allocates, else the command that sets it', async (t) => {
-  const GIB = 2 ** 30;
+describe('sessions-slice: the slice the sessions run under, read fresh, has a ceiling at or under what the machine allocates, else the command that sets it', () => {
+  let GIB!: number;
+  beforeAll(() => {
+    GIB = 2 ** 30;
+  });
   const SHOW = (slice: string) => `systemctl --user show ${slice} -p MemoryMax --value`;
   const sliceOf = async (env: Record<string, string>, answers: Record<string, CommandRead> = {}, more: Partial<ReadinessFacts> = {}) =>
     (await read({ ...facts({ PATH: '/usr/bin', ...env }, answers), memoryBytes: 16 * GIB, ...more }, identity('exit 0'))).pieces.find(
@@ -436,45 +436,44 @@ test('sessions-slice: the slice the sessions run under, read fresh, has a ceilin
   const fixesOf = (p: { fixes: readonly { command: string; kind?: string }[] } | undefined) => p?.fixes.map((f) => [f.command, f.kind]);
   const SIZED = [['nemia service install --size auto', 'typed']];
   const OURS = { WF_CGROUP_PARENT: 'nemia-sessions.slice' };
-
-  await t.test('no slice set: the sessions are in the user manager’s own, which nothing caps', async () => {
+  test('no slice set: the sessions are in the user manager’s own, which nothing caps', async () => {
     const p = await sliceOf({});
     assert.deepEqual([p?.state, p?.area, p?.cost], ['missing', 'machine', 'server']);
     assert.deepEqual(fixesOf(p), SIZED);
   });
-  await t.test('Nemia’s slice with no ceiling: missing, sized again', async () => {
+  test('Nemia’s slice with no ceiling: missing, sized again', async () => {
     const p = await sliceOf(OURS, { [SHOW('nemia-sessions.slice')]: { code: 0, out: 'infinity\n' } });
     assert.equal(p?.state, 'missing');
     assert.deepEqual(fixesOf(p), SIZED);
   });
-  await t.test('a ceiling at what the machine allocates, 16 GiB less 2 GiB kept: met', async () => {
+  test('a ceiling at what the machine allocates, 16 GiB less 2 GiB kept: met', async () => {
     const p = await sliceOf(OURS, { [SHOW('nemia-sessions.slice')]: { code: 0, out: '15032385536\n' } });
     assert.equal(p?.state, 'met');
     assert.deepEqual(p?.fixes, []);
   });
-  await t.test('a ceiling above it: missing, naming both', async () => {
+  test('a ceiling above it: missing, naming both', async () => {
     const p = await sliceOf(OURS, { [SHOW('nemia-sessions.slice')]: { code: 0, out: '16106127360\n' } });
     assert.equal(p?.state, 'missing');
     names(p?.message, '15360 MiB', '14336 MiB');
     assert.deepEqual(fixesOf(p), SIZED);
   });
-  await t.test('a slice the person named: the fix sets its ceiling with systemctl', async () => {
+  test('a slice the person named: the fix sets its ceiling with systemctl', async () => {
     const p = await sliceOf({ WF_CGROUP_PARENT: 'sessions.slice' }, { [SHOW('sessions.slice')]: { code: 0, out: 'infinity\n' } });
     assert.equal(p?.state, 'missing');
     assert.deepEqual(fixesOf(p), [['systemctl --user set-property sessions.slice MemoryMax=15032385536', 'typed']]);
   });
-  await t.test('a higher floor leaves less allocated: 12 GiB is over 8 GiB', async () => {
+  test('a higher floor leaves less allocated: 12 GiB is over 8 GiB', async () => {
     const p = await sliceOf({ ...OURS, WF_MEMORY_RESERVED: '8Gi' }, { [SHOW('nemia-sessions.slice')]: { code: 0, out: '12884901888\n' } });
     assert.equal(p?.state, 'missing');
     names(p?.message, '8192 MiB');
   });
-  await t.test('not known: systemctl not run, failing or answering nothing, no cgroup v2, or the memory unread', async () => {
+  test('not known: systemctl not run, failing or answering nothing, no cgroup v2, or the memory unread', async () => {
     for (const answer of [undefined, { code: 1, out: '' }, { code: 0, out: '' }, { code: 0, out: '12G\n' }] as CommandRead[])
       assert.equal((await sliceOf(OURS, { [SHOW('nemia-sessions.slice')]: answer }))?.state, 'unknown', JSON.stringify(answer));
     assert.equal((await sliceOf(OURS, {}, { exists: () => false }))?.state, 'unknown', 'no cgroup v2');
     assert.equal((await sliceOf(OURS, {}, { memoryBytes: undefined }))?.state, 'unknown', 'memory unread');
   });
-  await t.test('a slice the daemon would refuse: missing, in its words', async () => {
+  test('a slice the daemon would refuse: missing, in its words', async () => {
     const p = await sliceOf({ WF_CGROUP_PARENT: 'bad' });
     assert.equal(p?.state, 'missing');
     names(p?.message, 'WF_CGROUP_PARENT=bad');

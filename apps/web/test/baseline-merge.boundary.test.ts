@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { scratch } from 'test-kit/scratch';
 import type { BaselineList } from '../contracts/baseline-shard.contract.ts';
 import { FOLDER, LISTS, shardOf } from './baseline.ts';

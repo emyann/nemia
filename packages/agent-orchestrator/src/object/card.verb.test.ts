@@ -8,7 +8,7 @@ import type { StoreRoot } from '../config/root.store.ts';
 import type { StoreConfig } from '../config/config.store.ts';
 import { configGiven } from '../../test/config-given.ts';
 import { STORE } from '../../test/ambient.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Exit } from 'effect';
 import { CardDoor } from '../cards/cards.store.ts';

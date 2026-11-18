@@ -5,7 +5,7 @@
  * The `wf` word itself is held by `tools/guards/test/glossary.test.ts`, through the run core's glossary table (`glossary.json`, whose
  * term Nemia retires `wf`): each file of the package that still says it is counted, and the count only shrinks.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

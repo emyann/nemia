@@ -12,7 +12,7 @@
  * path a helper of another workspace builds, and a read of the repository's root with nothing after it. Those reads are named in the
  * task's inputs by hand, as a whole-repository scan's are.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

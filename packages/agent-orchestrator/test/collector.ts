@@ -2,7 +2,7 @@
  * A scratch OTLP collector on loopback for a test that exports (`collector`), and what a body posted to its `/v1/metrics` says of the
  * series it names (`seriesOf`).
  */
-import type { TestContext } from 'node:test';
+import type { TestContext } from 'vitest';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
@@ -23,7 +23,7 @@ export async function collector(t: TestContext) {
     });
   });
   await new Promise<void>((listening) => server.listen(0, '127.0.0.1', listening));
-  t.after(() => new Promise<void>((closed) => server.close(() => closed())));
+  t.onTestFinished(() => new Promise<void>((closed) => server.close(() => closed())));
   const posted = (path: string, word: string) =>
     new Promise<string>((found) => {
       const had = posts.find((p) => p.path === path && p.body.includes(word));

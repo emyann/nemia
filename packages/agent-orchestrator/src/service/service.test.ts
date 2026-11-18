@@ -2,7 +2,7 @@
  * The login service's pure part: the system a machine has, the refusals of a name and an environment, the unit's and the plist's text and
  * their reading back, the system's state read, and `nemia service status`'s lines. Nothing here writes a file or runs a program.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { LET_GO_MS } from 'agent-runtime';
 import type { DaemonStanding } from '../daemon/daemon.ts';
@@ -155,7 +155,7 @@ test('a plist’s values are XML-escaped and read back as given', () => {
   assert.deepEqual(plistRead(text), { node: odd.node, entry: odd.entry, cwd: odd.cwd, env: [['NOTE', 'x < y & z > "w"']] });
 });
 
-test('REFUSED: an --env, a store name or a system the service cannot be installed with, each naming its fix', async (t) => {
+describe('REFUSED: an --env, a store name or a system the service cannot be installed with, each naming its fix', () => {
   const ANN = '/srv/ann/.agent-workflows';
   const refused: readonly (readonly [string, () => string | null, RegExp])[] = [
     ['an --env with no value', () => envRefusal(['PORT']), /--env PORT has no value/],
@@ -179,13 +179,13 @@ test('REFUSED: an --env, a store name or a system the service cannot be installe
     ['Linux without systemd', () => refusalOf(systemOf({ platform: 'linux', wsl: false, systemd: false })), /runs without systemd/],
     ['Windows', () => refusalOf(systemOf({ platform: 'win32', wsl: false, systemd: false })), /win32 has no login service/],
   ];
-  for (const [name, refusal, names] of refused) await t.test(name, () => assert.match(refusal() ?? '', names));
-  await t.test('WSL says how to turn systemd on', () => {
+  for (const [name, refusal, names] of refused) test(name, () => assert.match(refusal() ?? '', names));
+  test('WSL says how to turn systemd on', () => {
     const wsl = refusalOf(systemOf({ platform: 'linux', wsl: true, systemd: false })) ?? '';
     for (const word of ['[boot]', 'systemd=true', 'wsl --shutdown', 'npm start in apps/api']) assert.ok(wsl.includes(word), word);
     assert.doesNotMatch(refusalOf(systemOf({ platform: 'linux', wsl: false, systemd: false })) ?? '', /wsl\.conf/);
   });
-  await t.test('what passes: plain --envs, the default store or a named one, systemd and launchd', () => {
+  test('what passes: plain --envs, the default store or a named one, systemd and launchd', () => {
     assert.equal(envRefusal(['PORT=8790', 'OTEL_SERVICE_NAME=nemia-trial', 'EMPTY=']), null);
     assert.equal(nameRefusal(undefined, ANN, ANN), null);
     assert.equal(nameRefusal('nemia-trial', '/srv/trial', ANN), null);

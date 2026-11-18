@@ -2,7 +2,7 @@
  * The table's words: no name carries a refused word but those still pending, and only approve and retry answer. That every entry says its
  * class under `class`, one of `CommandClass`, the compiler holds: the two lines at the end are refused by it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { ANSWERS, PENDING, REFUSED_FLAGS, REFUSED_WORDS } from '../../test/command-words.ts';
 import type { CommandSpec } from './command.ts';

@@ -4,7 +4,8 @@
  * `feed.lock` in turn — a holder stopped is waited for up to `FEED_LOCK_WAIT_MS` and named, a dead one broken, and a writer
  * stopped between its journal and its feed line keeps a rotation out until it has written both.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
@@ -59,16 +60,26 @@ const onDisk = (root: string) =>
     .map((f) => (fs.existsSync(path.join(root, f)) ? fs.readFileSync(path.join(root, f), 'utf8') : ''))
     .join('');
 
-test('a feed is rotated by two forgets while readers are parked in it: each reads on, the lines kept, in order, once, the forgotten counted', async (t) => {
-  const s = story(t);
-  const { root, ops, head, sealed } = await store();
-  const lines = [...Array(30).keys()].map((i) => i + 1);
+describe('a feed is rotated by two forgets while readers are parked in it: each reads on, the lines kept, in order, once, the forgotten counted', () => {
+  let root!: string;
+  let ops!: import('../src/index.ts').BodiedJournalOps;
+  let head!: string;
+  let sealed!: string;
+  let lines!: number[];
+  let parked!: { n: number; at: number }[];
+  let was!: Map<number, { entries: Line[]; cursor: number; forgotten?: number }>;
+  beforeAll(async () => {
+    const t = teardowns();
+    ({ root, ops, head, sealed } = await store());
+    lines = [...Array(30).keys()].map((i) => i + 1);
+    parked = [5, 7, 20].map((n) => ({ n, at: cursorAfter(head, n) }));
+    was = new Map<number, Awaited<ReturnType<typeof read>>>();
+    for (const { n, at } of parked) was.set(n, await read(ops, at));
+    return t.end;
+  });
+  const s = story(test);
   const linesAfterOf = (ids: readonly string[], from = 0) => lines.filter((n) => n > from && ids.includes(ownerOf(n))).length;
-  const parked = [5, 7, 20].map((n) => ({ n, at: cursorAfter(head, n) }));
-  const was = new Map<number, Awaited<ReturnType<typeof read>>>();
-  for (const { n, at } of parked) was.set(n, await read(ops, at));
-
-  await s.test(
+  s.test(
     "a forget of a rotates the feed: every line of a's is gone from the disk, and the lines before the rotation are sealed",
     async () => {
       const rotated = await forget(ops, ['a']);
@@ -81,8 +92,7 @@ test('a feed is rotated by two forgets while readers are parked in it: each read
       assert.ok(!fs.existsSync(path.join(root, 'tasks', 'a.jsonl')), "and a's journal is gone");
     },
   );
-
-  await s.test(
+  s.test(
     'a reader parked at line 7 and one at line 20 each read on across the rotation: the lines kept, in order, once, the forgotten counted',
     async () => {
       for (const from of [7, 20]) {
@@ -98,8 +108,7 @@ test('a feed is rotated by two forgets while readers are parked in it: each read
       }
     },
   );
-
-  await s.test('a reader parked inside a run of forgotten lines is told of those after it alone', async () => {
+  s.test('a reader parked inside a run of forgotten lines is told of those after it alone', async () => {
     const gone = (n: number) => ownerOf(n) !== 'b';
     assert.ok(gone(5) && gone(6) && gone(20) && gone(21), 'lines 5 and 6, and 20 and 21, are each one run of the forgotten');
     await forget(ops, ['c']);
@@ -110,8 +119,7 @@ test('a feed is rotated by two forgets while readers are parked in it: each read
       assert.equal(now.entries.length, after.filter((m) => !gone(m)).length, 'and reads the kept ones');
     }
   });
-
-  await s.test(
+  s.test(
     'a line appended after the rotations comes after every cursor before them, and a read from 0 counts every line forgotten',
     async () => {
       const at7 = was.get(7)!;
@@ -398,30 +406,26 @@ const storeOf = async (counts: Record<string, number>) => {
   return ops;
 };
 
-test("a store's count of each task's feed lines, and what a rotation answers it forgot of each", async (t) => {
-  await t.test('a rotation answers the lines it forgot of each task, and leaves out a task given that had none', async () => {
+describe("a store's count of each task's feed lines, and what a rotation answers it forgot of each", () => {
+  test('a rotation answers the lines it forgot of each task, and leaves out a task given that had none', async () => {
     const ops = await storeOf({ a: 3, c: 2, b: 5 });
     const rotated = await forget(ops, ['a', 'b', 'z']);
     assert.deepEqual(rotated?.linesByTask, { a: 3, b: 5 });
     assert.equal(rotated?.linesForgotten, 8);
   });
-
-  await t.test(
-    "the store's count of each task's feed lines is what a rotation then forgets of it, skips a line forgotten before, and is no prefix match",
-    async () => {
-      const ops = await storeOf({ a: 3, ab: 4, b: 5, c: 2 });
-      const counted = (ids: string[]) => Effect.runPromise(ops.feedLines!(ids));
-      assert.deepEqual(await counted(['a', 'b', 'z']), { a: 3, b: 5, z: 0 });
-      assert.deepEqual(await counted(['ab']), { ab: 4 }, "an id another task's begins with counts its own lines alone");
-      await forget(ops, ['c']);
-      await Effect.runPromise(ops.append('d', filed(40) as never));
-      assert.deepEqual(
-        await counted(['a', 'c', 'd']),
-        { a: 3, c: 0, d: 1 },
-        'the lines a rotation forgot are not counted; those it sealed and those after it are',
-      );
-      const rotated = await forget(ops, ['a', 'b', 'c', 'd']);
-      assert.deepEqual(rotated?.linesByTask, { a: 3, b: 5, d: 1 });
-    },
-  );
+  test("the store's count of each task's feed lines is what a rotation then forgets of it, skips a line forgotten before, and is no prefix match", async () => {
+    const ops = await storeOf({ a: 3, ab: 4, b: 5, c: 2 });
+    const counted = (ids: string[]) => Effect.runPromise(ops.feedLines!(ids));
+    assert.deepEqual(await counted(['a', 'b', 'z']), { a: 3, b: 5, z: 0 });
+    assert.deepEqual(await counted(['ab']), { ab: 4 }, "an id another task's begins with counts its own lines alone");
+    await forget(ops, ['c']);
+    await Effect.runPromise(ops.append('d', filed(40) as never));
+    assert.deepEqual(
+      await counted(['a', 'c', 'd']),
+      { a: 3, c: 0, d: 1 },
+      'the lines a rotation forgot are not counted; those it sealed and those after it are',
+    );
+    const rotated = await forget(ops, ['a', 'b', 'c', 'd']);
+    assert.deepEqual(rotated?.linesByTask, { a: 3, b: 5, d: 1 });
+  });
 });

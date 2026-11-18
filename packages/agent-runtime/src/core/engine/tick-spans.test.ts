@@ -4,7 +4,7 @@
  * and how many the memo kept (`tasks`, `kept`); the pass that lets the sessions go traces each release (`releaseFinished`), with its
  * `task`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Layer, Tracer } from 'effect';
 import { Journal } from './journal.ts';

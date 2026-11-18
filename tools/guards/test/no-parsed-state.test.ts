@@ -12,7 +12,7 @@
  * The test reads files outside this package; the apps' source is among `guards#test`'s inputs in `turbo.json`, and the packages' reach
  * it through its dependency on `agent-orchestrator`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { PARSED_STATE } from './no-parsed-state.baseline.ts';
 import { counted, namesState, parsedStates, repositoryCounts } from './parsed-state.ts';

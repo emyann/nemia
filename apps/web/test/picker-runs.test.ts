@@ -2,7 +2,7 @@
  * What a picker offers past the open runs (`finishedPagesQuery`, src/lib/api/runs.ts, read by `usePickerRuns`): the finished runs a page
  * at a time, each page asked from the token the one before it answered, so a finished run on any page can still be picked.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import { finishedPagesQuery } from '../src/lib/api/runs.ts';
@@ -25,7 +25,7 @@ test('finishedPagesQuery: a finished run only the second page holds is offered o
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
   };
   const client = new QueryClient();
-  t.after(() => {
+  t.onTestFinished(() => {
     client.clear();
     globalThis.fetch = before;
   });

@@ -14,7 +14,7 @@
  * token or by its session — and the run serves it where the write is read.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -115,9 +115,11 @@ const run = (id = R, namespace = 'default') => `/api/namespaces/${namespace}/run
 /** The status `res` answered, and its body read as JSON. */
 const answered = async (res: Response) => ({ status: res.status, body: (await res.json()) as Record<string, unknown> });
 
-test("each action answers its status on the run's namespaced path, and refuses as its command does", async (t) => {
-  seed();
-  await t.test('retry, approve and say are accepted, 202, each with what its command answers', async () => {
+describe("each action answers its status on the run's namespaced path, and refuses as its command does", () => {
+  beforeAll(() => {
+    seed();
+  });
+  test('retry, approve and say are accepted, 202, each with what its command answers', async () => {
     const retried = await answered(
       await send('POST', `${run()}/steps/implement/retry`, { mode: 'continue', message: 'The one in compose.' }),
     );
@@ -130,21 +132,18 @@ test("each action answers its status on the run's namespaced path, and refuses a
     assert.equal(said.status, 202, JSON.stringify(said.body));
     assert.equal(said.body.text, 'Widen the scope.');
   });
-  await t.test('a former mode is still taken, and answered with a hint naming the spelling to send now', async () => {
+  test('a former mode is still taken, and answered with a hint naming the spelling to send now', async () => {
     const nudged = await answered(await send('POST', `${run()}/steps/nudged/retry`, { mode: 'nudge' }));
     assert.equal(nudged.status, 202, JSON.stringify(nudged.body));
     assert.equal(typeof nudged.body.hint, 'string', 'the hint is said');
     assert.match(String(nudged.body.hint), /continue/);
   });
-  await t.test(
-    "REFUSED: a refresh of a run already on its workflow's newest revision is its Conflict, 409 — routes.test.ts's merge of the base its 202",
-    async () => {
-      const refreshed = await answered(await send('POST', `${run()}/refresh`, {}));
-      assert.equal(refreshed.status, 409, JSON.stringify(refreshed.body));
-      assert.match(String(refreshed.body.error), /nemia refresh ra-run/, 'the command that takes them, named');
-    },
-  );
-  await t.test("labels, hold and its lift answer 200, a run of a factory's in its own namespace", async () => {
+  test("REFUSED: a refresh of a run already on its workflow's newest revision is its Conflict, 409 — routes.test.ts's merge of the base its 202", async () => {
+    const refreshed = await answered(await send('POST', `${run()}/refresh`, {}));
+    assert.equal(refreshed.status, 409, JSON.stringify(refreshed.body));
+    assert.match(String(refreshed.body.error), /nemia refresh ra-run/, 'the command that takes them, named');
+  });
+  test("labels, hold and its lift answer 200, a run of a factory's in its own namespace", async () => {
     const labelled = await answered(await send('POST', `${run(MILL, 'mill')}/labels`, { labels: ['team=core'] }));
     assert.equal(labelled.status, 200, JSON.stringify(labelled.body));
     const held = await answered(await send('POST', `${run()}/hold`, { until: [OTHER], why: 'After the other.' }));
@@ -154,7 +153,7 @@ test("each action answers its status on the run's namespaced path, and refuses a
     assert.equal(lifted.status, 200, JSON.stringify(lifted.body));
     assert.deepEqual([lifted.body.id, lifted.body.lifted], [R, true]);
   });
-  await t.test('REFUSED: a run or a step the store lacks, and a run addressed in another namespace, are each 404', async () => {
+  test('REFUSED: a run or a step the store lacks, and a run addressed in another namespace, are each 404', async () => {
     for (const [method, address, body] of [
       ['POST', `${run('ra-none')}/steps/plan/approve`, {}],
       ['POST', `${run()}/steps/nope/approve`, {}],
@@ -169,43 +168,34 @@ test("each action answers its status on the run's namespaced path, and refuses a
       assert.equal(typeof res.body.error, 'string');
     }
   });
-  await t.test(
-    "REFUSED: the command's Conflict is a 409 — an approval of a step at no gate, the removal of a run that is no try",
-    async () => {
-      const approve = await answered(await send('POST', `${run()}/steps/review/approve`, {}));
-      assert.equal(approve.status, 409, JSON.stringify(approve.body));
-      const removal = await answered(await send('DELETE', run(OTHER)));
-      assert.equal(removal.status, 409, JSON.stringify(removal.body));
-    },
-  );
-  await t.test("REFUSED: the command's check is a 422 — a hold put by no one, a run's labels with none", async () => {
+  test("REFUSED: the command's Conflict is a 409 — an approval of a step at no gate, the removal of a run that is no try", async () => {
+    const approve = await answered(await send('POST', `${run()}/steps/review/approve`, {}));
+    assert.equal(approve.status, 409, JSON.stringify(approve.body));
+    const removal = await answered(await send('DELETE', run(OTHER)));
+    assert.equal(removal.status, 409, JSON.stringify(removal.body));
+  });
+  test("REFUSED: the command's check is a 422 — a hold put by no one, a run's labels with none", async () => {
     const hold = await answered(await send('POST', `${run()}/hold`, { until: [OTHER], by: ' ' }));
     assert.equal(hold.status, 422, JSON.stringify(hold.body));
     const labels = await answered(await send('POST', `${run()}/labels`, { labels: [] }));
     assert.equal(labels.status, 422, JSON.stringify(labels.body));
   });
-  await t.test(
-    "a key the action's Schema does not hold is no part of it: `off` sent to a hold puts it, never lifts it; a body that is no JSON is a 400",
-    async () => {
-      const off = await answered(await send('POST', `${run()}/hold`, { until: [OTHER], off: true }));
-      assert.equal(off.status, 200, JSON.stringify(off.body));
-      assert.deepEqual([off.body.id, off.body.lifted], [R, false], 'the hold put, its lift a DELETE alone');
-      const notJson = await answered(await send('POST', `${run()}/steps/talk/say`, 'Widen it.'));
-      assert.equal(notJson.status, 400, JSON.stringify(notJson.body));
-    },
-  );
-  await t.test(
-    'REFUSED: a start of a workflow the store lacks is a 404 — a `card` beside it a 400 naming it, refused before the workflow is looked for',
-    async () => {
-      const briefless = await answered(await send('POST', '/api/namespaces/default/runs', { workflow: 'no-such-workflow' }));
-      assert.ok([404, 422].includes(briefless.status), JSON.stringify(briefless.body));
-      const carded = await answered(
-        await send('POST', '/api/namespaces/default/runs', { workflow: 'no-such-workflow', card: 'c', brief: 'b' }),
-      );
-      assert.equal(carded.status, 400, JSON.stringify(carded.body));
-      assert.equal((carded.body as { field?: string }).field, 'payload.card', "the key refused: a card is started at the Card's own path");
-    },
-  );
+  test("a key the action's Schema does not hold is no part of it: `off` sent to a hold puts it, never lifts it; a body that is no JSON is a 400", async () => {
+    const off = await answered(await send('POST', `${run()}/hold`, { until: [OTHER], off: true }));
+    assert.equal(off.status, 200, JSON.stringify(off.body));
+    assert.deepEqual([off.body.id, off.body.lifted], [R, false], 'the hold put, its lift a DELETE alone');
+    const notJson = await answered(await send('POST', `${run()}/steps/talk/say`, 'Widen it.'));
+    assert.equal(notJson.status, 400, JSON.stringify(notJson.body));
+  });
+  test('REFUSED: a start of a workflow the store lacks is a 404 — a `card` beside it a 400 naming it, refused before the workflow is looked for', async () => {
+    const briefless = await answered(await send('POST', '/api/namespaces/default/runs', { workflow: 'no-such-workflow' }));
+    assert.ok([404, 422].includes(briefless.status), JSON.stringify(briefless.body));
+    const carded = await answered(
+      await send('POST', '/api/namespaces/default/runs', { workflow: 'no-such-workflow', card: 'c', brief: 'b' }),
+    );
+    assert.equal(carded.status, 400, JSON.stringify(carded.body));
+    assert.equal((carded.body as { field?: string }).field, 'payload.card', "the key refused: a card is started at the Card's own path");
+  });
 });
 
 test("REFUSED: a body its action's Schema refuses is a 400 naming the key, before any command runs — nothing written", async () => {
@@ -287,12 +277,13 @@ const sessionToken = (id: string, step: string, task: string) =>
     }).pipe(Effect.provide(tokenDoorFiles(root))),
   );
 
-test('each write keeps who acted, by the token its request presented, and the run serves it where the write is read', async (t) => {
-  seed();
+describe('each write keeps who acted, by the token its request presented, and the run serves it where the write is read', () => {
+  beforeAll(() => {
+    seed();
+  });
   const status = async (id: string) => (await objectOf(app(), id)).status;
   const person = { kind: 'person', token: 'harness' } as const;
-
-  await t.test("the person's approval at a gate, under the token the seat presents: answered and served on the step's gate", async () => {
+  test("the person's approval at a gate, under the token the seat presents: answered and served on the step's gate", async () => {
     task('t-by-plan', 'succeeded', DONE);
     record('ra-by-person', { plan: 't-by-plan', implement: null }, { gated: 'plan' });
     const approved = await answered(await send('POST', `${run('ra-by-person')}/steps/plan/approve`, { message: 'Go.' }));
@@ -301,8 +292,7 @@ test('each write keeps who acted, by the token its request presented, and the ru
     const gate = (await status('ra-by-person')).steps.find((s) => s.name === 'plan')?.gate;
     assert.deepEqual(gate?.approval?.actor, person, "and served on the step's gate");
   });
-
-  await t.test("an agent's standing token, let through by the person's rule: the approval names the agent and its token", async () => {
+  test("an agent's standing token, let through by the person's rule: the approval names the agent and its token", async () => {
     const level = path.join(root, 'nemia', 'level.json');
     const rules = path.join(root, 'auto', 'operator.json');
     write(level, JSON.stringify({ level: 'auto', since: at(0) }));
@@ -323,8 +313,7 @@ test('each write keeps who acted, by the token its request presented, and the ru
       fs.rmSync(rules, { force: true });
     }
   });
-
-  await t.test("a session's token: a hold keeps its free-text `by` and, beside it, the session's agent, run and step", async () => {
+  test("a session's token: a hold keeps its free-text `by` and, beside it, the session's agent, run and step", async () => {
     task('t-by-session', 'working');
     record('ra-by-session', { review: 't-by-session' });
     const asSession = { ...BOARD, authorization: `Bearer ${sessionToken('ra-by-session', 'review', 't-by-session')}` };
@@ -336,8 +325,7 @@ test('each write keeps who acted, by the token its request presented, and the ru
     assert.deepEqual((await status(OTHER)).holding?.actor, session, "and served on the run's holding");
     assert.equal((await send('DELETE', `${run(OTHER)}/hold`)).status, 200);
   });
-
-  await t.test("a cancel keeps who called the run off, answered and served on the run's status", async () => {
+  test("a cancel keeps who called the run off, answered and served on the run's status", async () => {
     task('t-by-called', 'working');
     record('ra-by-called', { implement: 't-by-called' });
     const cancelled = await answered(await send('POST', `${run('ra-by-called')}/cancel`, {}));

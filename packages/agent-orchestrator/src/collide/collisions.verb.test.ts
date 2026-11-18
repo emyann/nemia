@@ -2,7 +2,7 @@
  * The collisions an ending's decision reads live (`collisionsAt`): no other run's steps are read unless ours has a branch ahead of its
  * base, so a run beside ours whose folder no longer loads does not fail a decision that asks nothing.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Effect, Exit } from 'effect';

@@ -5,7 +5,7 @@
  * load, where no root was given. `stepsOrNone` and `unloadedOf` read the refusal alone, and `stepsOrWhy`
  * keeps its reason, as `parentRecord` does for a run waited on.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

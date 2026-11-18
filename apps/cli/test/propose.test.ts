@@ -6,7 +6,7 @@
  * refused with the exit code of every refusal; and `nemia apply` of a Delegation (created, then configured) and of a Proposal (refused,
  * naming `nemia propose`). The codes and the requests are asserted, never a sentence.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -152,7 +152,7 @@ const stub = http.createServer((req, res) => {
   });
 });
 await new Promise<void>((resolve) => stub.listen(0, '127.0.0.1', resolve));
-after(() => {
+afterAll(() => {
   stub.closeAllConnections();
   stub.close();
 });

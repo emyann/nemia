@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -71,9 +71,9 @@ const ROWS: readonly Row[] = [
   },
 ];
 
-test('projectAllows: what a directory and a harness grant a job', async (t) => {
+describe('projectAllows: what a directory and a harness grant a job', () => {
   for (const row of ROWS)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const dir = dirWith(row.settings, row.local);
       for (const harness of row.harnesses) assert.deepEqual(projectAllows(harness, dir), row.allows, harness);
     });

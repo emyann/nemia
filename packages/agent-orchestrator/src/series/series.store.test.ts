@@ -10,7 +10,7 @@
  * A store of its own at `ROOT`, given as `ENV`.
  */
 import { type Env, settingsOf } from '../config/config.store.ts';
-import { test, type TestContext } from 'node:test';
+import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { testEngine } from 'agent-runtime/testing';
@@ -193,9 +193,9 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
   },
 ];
 
-test('`appendLines`, `readDay`, `lastLine` and `rangeOf`: what the files of a tier hold, and what they refuse', async (t) => {
+describe('`appendLines`, `readDay`, `lastLine` and `rangeOf`: what the files of a tier hold, and what they refuse', () => {
   for (const row of FILES)
-    await t.test(row.name, async (sub) => {
+    test(row.name, async (sub) => {
       fresh();
       await row.check(sub);
     });
@@ -318,9 +318,9 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
   },
 ];
 
-test('`keepSeries`, `seriesRead` and `seriesHealth`: the series kept on a pass, and read over a range or a period', async (t) => {
+describe('`keepSeries`, `seriesRead` and `seriesHealth`: the series kept on a pass, and read over a range or a period', () => {
   for (const row of KEPT)
-    await t.test(row.name, async (sub) => {
+    test(row.name, async (sub) => {
       fresh();
       await row.check(sub);
     });

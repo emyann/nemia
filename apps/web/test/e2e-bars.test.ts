@@ -3,7 +3,7 @@
  * a name is kept when its point is far enough from the ground, each name once, and in one order whichever point crossed first, so
  * that a borderline pixel at the first depth cannot refuse a case both cuts spilled in. `npm run e2e` reads the painted pixels.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spilledOver, type Rgb } from './e2e/pixels.ts';
 

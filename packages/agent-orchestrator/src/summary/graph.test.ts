@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { DEFAULT_ROUNDS, parseWorkflow, validate, type StepSpec } from '../workflow.ts';
 import path from 'node:path';
@@ -116,8 +116,8 @@ test("a run's graph: the judged steps' edges, and a root for each step the run s
   );
 });
 
-test('an `input` edge per step a step reads the output of, drawn after its `after` edges and before its `loop` edge', async (t) => {
-  await t.test('a step reading a step it waits on draws one `input` edge beside its `after` edge', () => {
+describe('an `input` edge per step a step reads the output of, drawn after its `after` edges and before its `loop` edge', () => {
+  test('a step reading a step it waits on draws one `input` edge beside its `after` edge', () => {
     assert.deepEqual(
       inputGraphOf([
         { name: 'design', after: [] },
@@ -130,13 +130,13 @@ test('an `input` edge per step a step reads the output of, drawn after its `afte
       ],
     );
   });
-  await t.test('an `input` naming a step not given, or the step itself, draws nothing', () => {
+  test('an `input` naming a step not given, or the step itself, draws nothing', () => {
     assert.deepEqual(inputGraphOf([{ name: 'review', after: [], input: ['gone', 'review'] }]), {
       roots: ['review'],
       edges: [],
     });
   });
-  await t.test('the page and the list draw no `input` edge', () => {
+  test('the page and the list draw no `input` edge', () => {
     assert.deepEqual(
       graphOf([
         { name: 'design', after: [] },
@@ -145,7 +145,7 @@ test('an `input` edge per step a step reads the output of, drawn after its `afte
       [],
     );
   });
-  await t.test('a workflow read from its files draws the edge its `input:` says', () => {
+  test('a workflow read from its files draws the edge its `input:` says', () => {
     const steps = workflow(
       {
         design: '---\noutput: plan.json\n---\nDesign it.\n',

@@ -6,7 +6,7 @@
  * step's run would commit: delete it. `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it launches Chromium,
  * through Vitest.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';

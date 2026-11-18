@@ -5,7 +5,7 @@
  * back what a store wrote. Imports are read by TypeScript's own scan, so an import broken over lines, an `export … from` and a dynamic
  * `import()` are each found.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

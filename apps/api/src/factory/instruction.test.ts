@@ -5,7 +5,7 @@
  * refusal leaves the factory's file and the store's folder as they were.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -58,9 +58,9 @@ function packageSays(call: () => unknown): string {
   throw new Error('the package refused nothing');
 }
 
-test("a person moves a factory's instruction from its folder to the store, writes its words, and takes both back", async (t) => {
-  const s = story(t);
-  await s.test("GET reads NEMIA.md in the factory's first folder", async () => {
+describe("a person moves a factory's instruction from its folder to the store, writes its words, and takes both back", () => {
+  const s = story(test);
+  s.test("GET reads NEMIA.md in the factory's first folder", async () => {
     const bare = await answered(app.request('/api/factories/mill/instruction'));
     assert.deepEqual(bare, {
       name: 'mill',
@@ -74,14 +74,14 @@ test("a person moves a factory's instruction from its folder to the store, write
     fs.writeFileSync(path.join(folder, 'NEMIA.md'), 'Read the folder.\n');
     assert.equal((await answered(app.request('/api/factories/mill/instruction'))).words, 'Read the folder.\n');
   });
-  await s.test("PUT a path reads that file, and the factory's file keeps it", async () => {
+  s.test("PUT a path reads that file, and the factory's file keeps it", async () => {
     fs.mkdirSync(path.join(folder, 'docs'));
     fs.writeFileSync(path.join(folder, 'docs', 'NEMIA.md'), 'Read the docs.\n');
     const moved = await answered(send('PUT', '/api/factories/mill/instruction', { path: 'docs/NEMIA.md' }));
     assert.deepEqual([moved.path, moved.file, moved.words], ['docs/NEMIA.md', path.join(folder, 'docs', 'NEMIA.md'), 'Read the docs.\n']);
     assert.deepEqual(JSON.parse(fs.readFileSync(RECORD, 'utf8')).instruction, { path: 'docs/NEMIA.md' });
   });
-  await s.test("PUT the store, then its words, writes the store's file and leaves the folder's", async () => {
+  s.test("PUT the store, then its words, writes the store's file and leaves the folder's", async () => {
     const stored = await answered(send('PUT', '/api/factories/mill/instruction', { store: true }));
     assert.deepEqual([stored.store, stored.file, stored.words], [true, path.join(STORE, 'NEMIA.md'), null]);
     const written = await answered(send('PUT', '/api/factories/mill/instruction/words', { words: '  Keep it short.\n\n' }));
@@ -92,19 +92,19 @@ test("a person moves a factory's instruction from its folder to the store, write
       'Read the folder.\n',
     );
   });
-  await s.test("DELETE the words clears the store's file", async () => {
+  s.test("DELETE the words clears the store's file", async () => {
     const cleared = await answered(send('DELETE', '/api/factories/mill/instruction/words', {}));
     assert.deepEqual([cleared.words, cleared.stored, fs.existsSync(path.join(STORE, 'NEMIA.md'))], [null, false, false]);
   });
-  await s.test("DELETE the instruction reads the folder's NEMIA.md again, the key gone from the factory's file", async () => {
+  s.test("DELETE the instruction reads the folder's NEMIA.md again, the key gone from the factory's file", async () => {
     const back = await answered(send('DELETE', '/api/factories/mill/instruction', {}));
     assert.deepEqual([back.path, back.store, back.words], [null, false, 'Read the folder.\n']);
     assert.equal('instruction' in JSON.parse(fs.readFileSync(RECORD, 'utf8')), false, 'a clear removes the key');
   });
 });
 
-test('the instruction routes: what a read or a write refuses, changing nothing', async (t) => {
-  await t.test("a factory the store does not have is a 404 in the package's words", async () => {
+describe('the instruction routes: what a read or a write refuses, changing nothing', () => {
+  test("a factory the store does not have is a 404 in the package's words", async () => {
     const ghost = await refused(() => app.request('/api/factories/ghost/instruction'), 404);
     assert.equal(
       ghost,
@@ -113,7 +113,7 @@ test('the instruction routes: what a read or a write refuses, changing nothing',
     for (const fact of ['ghost', 'mill']) assert.ok(ghost.includes(fact), `${fact}: ${ghost}`);
     assert.match(await refused(() => send('PUT', '/api/factories/ghost/instruction', { store: true }), 404), /Nothing was changed\.$/);
   });
-  await t.test("the default factory is a 409 in the package's words", async () => {
+  test("the default factory is a 409 in the package's words", async () => {
     const fallback = await refused(() => app.request('/api/factories/default/instruction'), 409);
     assert.equal(
       fallback,
@@ -121,32 +121,29 @@ test('the instruction routes: what a read or a write refuses, changing nothing',
     );
     await refused(() => send('PUT', '/api/factories/default/instruction/words', { words: 'No.' }), 409);
   });
-  await t.test("words for an instruction kept in the folder are a 409 naming the folder's file, and no store file is written", async () => {
+  test("words for an instruction kept in the folder are a 409 naming the folder's file, and no store file is written", async () => {
     const inFolder = await refused(() => send('PUT', '/api/factories/mill/instruction/words', { words: 'Not here.' }), 409);
     assert.ok(inFolder.includes(path.join(folder, 'NEMIA.md')), inFolder);
     assert.equal(fs.existsSync(path.join(STORE, 'NEMIA.md')), false, 'no store file is written for words refused');
   });
-  await t.test(
-    "a path out of the folder or an absolute one is a 422 in the package's words, and none at all a 400 naming the document",
-    async () => {
-      const out = await refused(() => send('PUT', '/api/factories/mill/instruction', { path: '../NEMIA.md' }), 422);
-      assert.equal(
-        out,
-        packageSays(() => setInstruction({ factory: 'mill', at: { path: '../NEMIA.md' } })),
-      );
-      const absolute = await refused(() => send('PUT', '/api/factories/mill/instruction', { path: '/etc/passwd' }), 422);
-      assert.ok(absolute.includes('is absolute'), absolute);
-      const none = await refused(() => send('PUT', '/api/factories/mill/instruction', {}), 400);
-      assert.ok(none.includes('GET /openapi/v3/nemia/v1'), none);
-    },
-  );
-  await t.test('blank words for the store are a 422', async () => {
+  test("a path out of the folder or an absolute one is a 422 in the package's words, and none at all a 400 naming the document", async () => {
+    const out = await refused(() => send('PUT', '/api/factories/mill/instruction', { path: '../NEMIA.md' }), 422);
+    assert.equal(
+      out,
+      packageSays(() => setInstruction({ factory: 'mill', at: { path: '../NEMIA.md' } })),
+    );
+    const absolute = await refused(() => send('PUT', '/api/factories/mill/instruction', { path: '/etc/passwd' }), 422);
+    assert.ok(absolute.includes('is absolute'), absolute);
+    const none = await refused(() => send('PUT', '/api/factories/mill/instruction', {}), 400);
+    assert.ok(none.includes('GET /openapi/v3/nemia/v1'), none);
+  });
+  test('blank words for the store are a 422', async () => {
     await answered(send('PUT', '/api/factories/mill/instruction', { store: true }));
     const blank = await refused(() => send('PUT', '/api/factories/mill/instruction/words', { words: ' \n' }), 422);
     assert.match(blank, /^the instruction of mill is blank/);
     await answered(send('DELETE', '/api/factories/mill/instruction', {}));
   });
-  await t.test("a name that is no factory's is a 422 in the package's words, to read and to write", async () => {
+  test("a name that is no factory's is a 422 in the package's words, to read and to write", async () => {
     await refused(() => app.request('/api/factories/Not%20One/instruction'), 422);
     await refused(() => send('PUT', '/api/factories/Not%20One/instruction/words', { words: 'x' }), 422);
   });

@@ -2,7 +2,7 @@
  * `nemia up` as a person runs it: a process of its own, whose passes are said through the telemetry it provides (`telemetryLayer`), each
  * log printed as its line — the time, two spaces, the words — on stdout. A store paused before it starts is said Paused on its first pass.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { nodeChild } from './child.ts';
@@ -25,7 +25,7 @@ test("nemia up says a pass's lines on stdout, through the logger its process pro
   };
   await typed(['pause'], engine(env), undefined, builtinGitPlace, env);
   const up = nodeChild(`process.argv = [process.argv[0], ${JSON.stringify(BIN)}, 'up']; await import(${JSON.stringify(BIN)});`, env);
-  t.after(() => up.child.kill());
+  t.onTestFinished(() => up.child.kill());
   await up.until(() => /Paused /.test(up.out() + up.err()), 'nemia up says the pause, in whatever form');
   assert.match(up.out(), /^\d\d:\d\d:\d\d {2}Paused .* — nothing runs and nothing new starts; nemia resume resumes it$/m);
 });

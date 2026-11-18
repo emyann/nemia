@@ -2,15 +2,15 @@
  * Nemia's face wears one expression for every presence that holds at once, picked in the owner's order: runs that wait on you > her
  * asks unanswered > not sent > down > answering > unread > up. Her cues say every presence that holds, in the same order.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { cuesOf, faceOf, UP, type Presence } from '../src/lib/presence.ts';
 
 /** Every presence holding at once. */
 const ALL: Presence = { runsWaiting: 2, asksWaiting: 1, notSent: true, down: true, answering: true, unread: 1 };
 
-test("faceOf, cuesOf: the face and the cues of every presence that holds, in the owner's order", async (t) => {
-  await t.test('the face is the first presence that holds in the owner’s order, each winner taken away in turn', () => {
+describe("faceOf, cuesOf: the face and the cues of every presence that holds, in the owner's order", () => {
+  test('the face is the first presence that holds in the owner’s order, each winner taken away in turn', () => {
     const steps: [Partial<Presence>, string][] = [
       [{}, 'surprised'],
       [{ runsWaiting: 0 }, 'surprised'],
@@ -30,7 +30,7 @@ test("faceOf, cuesOf: the face and the cues of every presence that holds, in the
       steps.map(([, face]) => face),
     );
   });
-  await t.test('each pair of neighbours in the order: the earlier wins whichever way they meet', () => {
+  test('each pair of neighbours in the order: the earlier wins whichever way they meet', () => {
     assert.equal(faceOf({ ...UP, runsWaiting: 1, asksWaiting: 1 }), 'surprised');
     assert.equal(faceOf({ ...UP, asksWaiting: 1, notSent: true }), 'surprised');
     assert.equal(faceOf({ ...UP, notSent: true, down: true }), 'unsure');
@@ -39,7 +39,7 @@ test("faceOf, cuesOf: the face and the cues of every presence that holds, in the
     assert.equal(faceOf({ ...UP, unread: 3 }), 'happy');
     assert.equal(faceOf(UP), 'idle');
   });
-  await t.test('the cues say every presence that holds, in the owner’s order, each in its hue and words', () => {
+  test('the cues say every presence that holds, in the owner’s order, each in its hue and words', () => {
     assert.deepEqual(cuesOf(ALL), [
       { hue: 'yours', words: '2 wait on you' },
       { hue: 'yours', words: '1 ask of hers' },

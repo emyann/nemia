@@ -13,7 +13,7 @@
  *
  * Each rule is a pure function over a file's text, proven first on planted sources it must refuse.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

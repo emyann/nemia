@@ -3,7 +3,7 @@
  * tag, its tries and rounds, its time, its five facts, its spend, its note and its action; and the query that opens it as a sheet
  * (src/lib/useSheetPreview.ts).
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { RunDetail } from '../src/lib/runView.ts';
 import { kindOf, stepCardOf, type StepCardFacts, type StepKind } from '../src/lib/stepCard.ts';
@@ -87,37 +87,34 @@ test('kindOf: the five kinds of a card, from the phase the api carries', () => {
   assert.equal(kindOf('waiting', 'awaiting-approval', false), 'gate', 'a gate held before its step is filed is a gate all the same');
 });
 
-test("stepCardOf: a step's card in each of its states, its facts, its note and its words", async (t) => {
-  await t.test(
-    'a step at work: alive, its try and round of the loop, how long since its session started, and no spend measured yet',
-    () => {
-      const card = cardOf('implement', STATUSES, [
-        quiet('implement', 'running (working)', {
-          tries: [aTry(1)],
-          spent: null,
-          denied: { words: '1 call denied: Bash(cd)', calls: ['Bash(cd)'] },
-        }),
-        quiet('review', 'waiting', { spec: { ...step().spec!, loop: 'implement', rounds: 3 }, tries: [] }),
-      ]);
-      assert.equal(card.kind, 'work');
-      assert.equal(card.hue, 'alive');
-      assert.deepEqual(card.tag, { word: PERSON.working.rail, color: 'secondary', variant: 'tonal' });
-      assert.deepEqual(card.agent, { name: 'Ada', initial: 'A', role: 'Software engineer' });
-      assert.equal(card.place, 'try 1 · round 1 of 3');
-      assert.equal(card.time?.label, 'At work');
-      assert.equal(card.time?.value, '18m');
-      assert.match(card.time?.note ?? '', /^since /);
-      assert.deepEqual(card.spend, { kind: 'words', label: 'Spent', said: 'not measured yet', note: 'of $10' });
-      assert.deepEqual(card.note, { text: '1 call denied: Bash(cd)', icon: 'shield' });
-      assert.deepEqual(card.action, { words: 'Open the step', runId: 'r-1', step: 'implement' });
-    },
-  );
-  await t.test('a step at work is drawn with no meter, even where a spend was measured before its try', () => {
+describe("stepCardOf: a step's card in each of its states, its facts, its note and its words", () => {
+  test('a step at work: alive, its try and round of the loop, how long since its session started, and no spend measured yet', () => {
+    const card = cardOf('implement', STATUSES, [
+      quiet('implement', 'running (working)', {
+        tries: [aTry(1)],
+        spent: null,
+        denied: { words: '1 call denied: Bash(cd)', calls: ['Bash(cd)'] },
+      }),
+      quiet('review', 'waiting', { spec: { ...step().spec!, loop: 'implement', rounds: 3 }, tries: [] }),
+    ]);
+    assert.equal(card.kind, 'work');
+    assert.equal(card.hue, 'alive');
+    assert.deepEqual(card.tag, { word: PERSON.working.rail, color: 'secondary', variant: 'tonal' });
+    assert.deepEqual(card.agent, { name: 'Ada', initial: 'A', role: 'Software engineer' });
+    assert.equal(card.place, 'try 1 · round 1 of 3');
+    assert.equal(card.time?.label, 'At work');
+    assert.equal(card.time?.value, '18m');
+    assert.match(card.time?.note ?? '', /^since /);
+    assert.deepEqual(card.spend, { kind: 'words', label: 'Spent', said: 'not measured yet', note: 'of $10' });
+    assert.deepEqual(card.note, { text: '1 call denied: Bash(cd)', icon: 'shield' });
+    assert.deepEqual(card.action, { words: 'Open the step', runId: 'r-1', step: 'implement' });
+  });
+  test('a step at work is drawn with no meter, even where a spend was measured before its try', () => {
     const card = cardOf('implement', STATUSES, [quiet('implement', 'running (working)', { tries: [aTry(2)] })]);
     assert.equal(card.spend?.kind, 'words');
     assert.equal(card.spend?.kind === 'words' && card.spend.said, 'not measured yet');
   });
-  await t.test('a step at its gate: yours, waiting since its session ended, its spend on a meter, and Read and approve', () => {
+  test('a step at its gate: yours, waiting since its session ended, its spend on a meter, and Read and approve', () => {
     const card = cardOf('design', { ...STATUSES, design: 'awaiting approval' }, [
       quiet('design', 'awaiting approval', {
         tries: [aTry(1)],
@@ -136,7 +133,7 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     assert.deepEqual(card.note, { text: 'Nine questions for you, each with a recommendation.', icon: 'info' });
     assert.equal(card.action.words, 'Read and approve');
   });
-  await t.test('a step done: no hue, its tries counted, when it ended and how long it ran, its spend on a meter', () => {
+  test('a step done: no hue, its tries counted, when it ended and how long it ran, its spend on a meter', () => {
     const card = cardOf('design', STATUSES, [quiet('design', 'verified ✓', { tries: [aTry(1), aTry(2)] })]);
     assert.equal(card.kind, 'done');
     assert.equal(card.hue, 'none');
@@ -147,11 +144,11 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     assert.deepEqual(card.spend, { kind: 'meter', label: 'Spent', value: 3.71, max: 10, said: '$3.71 of $10' });
     assert.equal(card.note, null);
   });
-  await t.test('a step done with no budget says its spend alone, with no meter', () => {
+  test('a step done with no budget says its spend alone, with no meter', () => {
     const card = cardOf('design', STATUSES, [quiet('design', 'verified ✓', { tries: [aTry(1)], budget: null })]);
     assert.deepEqual(card.spend, { kind: 'words', label: 'Spent', said: '$3.71', note: '' });
   });
-  await t.test('a step to come: no hue, the rounds it may run, after the steps it waits for, and its budget as words', () => {
+  test('a step to come: no hue, the rounds it may run, after the steps it waits for, and its budget as words', () => {
     const card = cardOf('review', STATUSES, [
       quiet('review', 'waiting', {
         tries: [],
@@ -169,7 +166,7 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     assert.deepEqual(card.time, { label: 'Starts', value: 'after implement', note: '', ink: 'muted' });
     assert.deepEqual(card.spend, { kind: 'words', label: 'Budget', said: '$16', note: '' });
   });
-  await t.test('a step that failed: no hue, failed at its end, and its check refusal as the note', () => {
+  test('a step that failed: no hue, failed at its end, and its check refusal as the note', () => {
     const card = cardOf('implement', { ...STATUSES, implement: 'failed ✗ check (exit 1)' }, [
       quiet('implement', 'failed ✗ check (exit 1)', {
         tries: [aTry(1)],
@@ -184,7 +181,7 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     assert.equal(card.time?.ink, 'failure');
     assert.deepEqual(card.note, { text: 'It failed its check (exit 1).', icon: 'fail' });
   });
-  await t.test("the agent's last line comes first in the note, before the calls denied", () => {
+  test("the agent's last line comes first in the note, before the calls denied", () => {
     const card = cardOf('implement', STATUSES, [
       quiet('implement', 'running (working)', {
         tries: [aTry(1)],
@@ -194,7 +191,7 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     ]);
     assert.deepEqual(card.note, { text: 'Writing the e2e page.', icon: 'info' });
   });
-  await t.test('the five session facts, whole, from what the try was filed with', () => {
+  test('the five session facts, whole, from what the try was filed with', () => {
     const card = cardOf('implement', STATUSES, [
       quiet('implement', 'running (working)', {
         tries: [aTry(1)],
@@ -210,14 +207,14 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
       { key: 'Permission', value: 'auto' },
     ]);
   });
-  await t.test('no card says its place among the run\'s steps: "step x of y" is the rail\'s', () => {
+  test('no card says its place among the run\'s steps: "step x of y" is the rail\'s', () => {
     const cards = [
       cardOf('implement', STATUSES, [quiet('implement', 'running (working)', { tries: [aTry(1)] })]),
       cardOf('design', STATUSES, [quiet('design', 'verified ✓', { tries: [aTry(1), aTry(2)] })]),
     ];
     for (const card of cards) assert.doesNotMatch(JSON.stringify(card), /step \d+ of \d+|\(\d+ of \d+\)/);
   });
-  await t.test('while the run is read, the card says what the row knows and nothing it has not read', () => {
+  test('while the run is read, the card says what the row knows and nothing it has not read', () => {
     const row = summary(Object.entries(STATUSES));
     const card = stepCardOf({ run: row, step: 'implement', now: NOW });
     assert.equal(card.hue, 'alive');
@@ -229,18 +226,15 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
   });
 });
 
-test("useSheetPreview: where a step's card opens, and which stays open", async (t) => {
-  await t.test(
-    "a step's card stands beside its rail where the window has room for it on a side, and under the rail where it has none",
-    () => {
-      assert.equal(previewSide({ left: 671, right: 799 }, 1280), 'end top', 'room after a rail in the table in flight');
-      assert.equal(previewSide({ left: 783, right: 1223 }, 1280), 'end top', 'room before the rail of a waiting card at the right');
-      assert.equal(previewSide({ left: CARD_REACH, right: 1000 }, 1000), 'end top', 'room before, just');
-      assert.equal(previewSide({ left: 0, right: 1000 - CARD_REACH }, 1000), 'end top', 'room after, just');
-      assert.equal(previewSide({ left: 278, right: 830 }, 1100), 'bottom start', 'a wide rail in a narrower window leaves room on no side');
-    },
-  );
-  await t.test('a card stays the open one when the card a pointer slid away from closes after it opened', () => {
+describe("useSheetPreview: where a step's card opens, and which stays open", () => {
+  test("a step's card stands beside its rail where the window has room for it on a side, and under the rail where it has none", () => {
+    assert.equal(previewSide({ left: 671, right: 799 }, 1280), 'end top', 'room after a rail in the table in flight');
+    assert.equal(previewSide({ left: 783, right: 1223 }, 1280), 'end top', 'room before the rail of a waiting card at the right');
+    assert.equal(previewSide({ left: CARD_REACH, right: 1000 }, 1000), 'end top', 'room before, just');
+    assert.equal(previewSide({ left: 0, right: 1000 - CARD_REACH }, 1000), 'end top', 'room after, just');
+    assert.equal(previewSide({ left: 278, right: 830 }, 1100), 'bottom start', 'a wide rail in a narrower window leaves room on no side');
+  });
+  test('a card stays the open one when the card a pointer slid away from closes after it opened', () => {
     assert.equal(aCardOpen(), false, 'no card open at first');
     cardOpened('review', true);
     assert.equal(aCardOpen(), true, 'a card opened');

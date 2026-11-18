@@ -2,7 +2,7 @@
  * What waits on the person (`waits.ts`): a table of the words `waitsOnPerson` says of a step's standing. Which reasons wait is the
  * table's type (`Record<StepReason, boolean>`) and `nemia-shipped.test.ts`'s sections of `bring-what-waits`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { waitsOnPerson } from './waits.ts';
 
@@ -34,9 +34,9 @@ const SAYS: Array<[row: string, standing: Parameters<typeof waitsOnPerson>[0], e
   ],
 ];
 
-test('waitsOnPerson', async (t) => {
+describe('waitsOnPerson', () => {
   for (const [row, standing, expected] of SAYS) {
-    await t.test(row, () => {
+    test(row, () => {
       assert.equal(waitsOnPerson(standing), expected);
     });
   }

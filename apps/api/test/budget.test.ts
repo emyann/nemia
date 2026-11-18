@@ -12,7 +12,8 @@
  * the run records this file seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn.
  */
 import { root, SEATED } from './harness.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -274,107 +275,91 @@ const roundRefuses = async (step: string | undefined, budget: number | undefined
 /** `usedLines`' two lines, without their labels: what `nemia decide` prints beside a check. */
 const wordsOf = (usage: object) => usedLines(usage).map((line) => line.replace(/^\w+\s+/, ''));
 
-test("a raise the package refuses, by POST …/retry of a try and of a round: its status, the facts its words name, the verb's own words — and nothing written", async (t) => {
-  await t.test(
-    "REFUSED at shipped defaults: a try's budget not above zero — 0, below it — is a 422 in `nemia retry --budget`'s words, one that is no number a 400 naming `budget`; a budget on a recheck a 422",
-    async () => {
-      for (const budget of [0, -1]) {
-        const how: RetryHow = { mode: 'continue', budget };
-        const res = await askTry('tokens', how);
-        assert.equal(res.status, 422, String(budget));
-        const { error } = (await res.json()) as Refused;
-        assert.ok(error.startsWith(`--budget ${budget} is not an amount.`), error);
-      }
-      for (const budget of ['five', '5', null]) {
-        const res = await askTry('tokens', { mode: 'continue', budget });
-        assert.equal(res.status, 400, JSON.stringify(budget));
-        const { field } = (await res.json()) as { field?: string };
-        assert.ok(field?.startsWith('payload.budget'), `${JSON.stringify(budget)}: ${field}`);
-      }
+describe("a raise the package refuses, by POST …/retry of a try and of a round: its status, the facts its words name, the verb's own words — and nothing written", () => {
+  test("REFUSED at shipped defaults: a try's budget not above zero — 0, below it — is a 422 in `nemia retry --budget`'s words, one that is no number a 400 naming `budget`; a budget on a recheck a 422", async () => {
+    for (const budget of [0, -1]) {
+      const how: RetryHow = { mode: 'continue', budget };
+      const res = await askTry('tokens', how);
+      assert.equal(res.status, 422, String(budget));
+      const { error } = (await res.json()) as Refused;
+      assert.ok(error.startsWith(`--budget ${budget} is not an amount.`), error);
+    }
+    for (const budget of ['five', '5', null]) {
+      const res = await askTry('tokens', { mode: 'continue', budget });
+      assert.equal(res.status, 400, JSON.stringify(budget));
+      const { field } = (await res.json()) as { field?: string };
+      assert.ok(field?.startsWith('payload.budget'), `${JSON.stringify(budget)}: ${field}`);
+    }
 
-      const recheck: RetryHow = { mode: 'recheck', budget: 5 };
-      const rechecked = await askTry('tokens', recheck);
-      assert.equal(rechecked.status, 422);
-      const { error: noSession } = (await rechecked.json()) as Refused;
-      assert.ok(noSession.startsWith("--budget raises a step's cap"), noSession);
-      assert.ok(noSession.includes('--recheck files none'), noSession);
-      nothingWritten('a budget that is not an amount');
-    },
-  );
-
-  await t.test(
-    "REFUSED at shipped defaults: a try's raise not above what the step has cost, none, or of a step not held on its try, is a 409 in `retryRefusal`'s words, verbatim",
-    async () => {
-      const refusals: Array<[RetryHow, string[]]> = [
-        [{ mode: 'continue', budget: 4 }, ['--budget 4 is not above $4.25', "what tokens's tries have cost"]],
-        [{ mode: 'fresh', budget: 4.25 }, ['--budget 4.25 is not above $4.25', "what tokens's tries have cost"]],
-        [{ mode: 'continue' }, ['tokens is over budget: ', 'its tries have cost $4.25 of its $3 budget', 'until a person raises the cap.']],
-      ];
-      for (const [how, [start, ...facts]] of refusals) {
-        const res = await askTry('tokens', how);
-        assert.equal(res.status, 409, JSON.stringify(how));
-        const { error } = (await res.json()) as Refused;
-        assert.equal(error, await retryRefuses('tokens', how), `${JSON.stringify(how)}: retryRefusal's words, verbatim`);
-        assert.ok(error.startsWith(start), error);
-        for (const fact of facts) assert.ok(error.includes(fact), `${fact} in ${error}`);
-      }
-      const implement = await askTry('implement', { mode: 'continue', budget: 5 });
-      assert.equal(implement.status, 409, "a raise of a step that is not held on its try: implement goes again with review's round");
-      assert.equal(((await implement.json()) as Refused).error, await retryRefuses('implement', { mode: 'continue', budget: 5 }));
-      nothingWritten('a raise the package refuses');
-    },
-  );
-
-  await t.test(
-    "REFUSED at shipped defaults: a round's budget not above zero is a 422 in `nemia retry --round --budget`'s words; a word for it, a round that is not `true`, and a body that is no object, are 400s",
-    async () => {
-      const zero = await askRound({ budget: 0 });
-      assert.equal(zero.status, 422);
-      const { error: notAnAmount } = (await zero.json()) as Refused;
-      assert.equal(notAnAmount, await roundRefuses(undefined, 0));
-      assert.ok(notAnAmount.startsWith('--budget 0 is not an amount.'), notAnAmount);
-      const word = await askRound({ step: 'review', budget: 'five' });
-      assert.equal(word.status, 400);
-      assert.ok(((await word.json()) as { field?: string }).field?.startsWith('payload.budget'));
-      const notTrue = await askRound({ round: 'yes' });
-      assert.equal(notTrue.status, 400);
-      assert.ok(((await notTrue.json()) as { field?: string }).field?.startsWith('payload.round'));
-      assert.equal((await post(`/api/namespaces/default/runs/${R}/steps/review/retry`, ['review'])).status, 400, 'a list is no body');
-      nothingWritten('a round body that is not one');
-    },
-  );
-
-  await t.test(
-    "REFUSED at shipped defaults: a round's raise not above what the loop's steps have cost, none, or a step with no loop, is a 409 in `roundAsk`'s words; a run or step not there a 404",
-    async () => {
-      const refusals: Array<[string, number | undefined, string[]]> = [
-        ['review', 2, ['--budget 2 is not above $2.10', 'what implement has cost']],
-        ['review', undefined, ['review asked for round 3', 'implement has cost $2.10 of its $2 budget']],
-        ['tokens', 5, ['tokens has no `loop:`']],
-      ];
-      for (const [step, budget, [start, ...facts]] of refusals) {
-        const res = await askRound({ step, ...(budget !== undefined ? { budget } : {}) });
-        assert.equal(res.status, 409, `${step} ${budget}`);
-        const { error } = (await res.json()) as Refused;
-        assert.equal(error, await roundRefuses(step, budget));
-        assert.ok(error.startsWith(start), error);
-        for (const fact of facts) assert.ok(error.includes(fact), `${fact} in ${error}`);
-      }
-      const noStep = await askRound({ step: 'deploy', budget: 5 });
-      assert.equal(noStep.status, 404);
-      assert.match(((await noStep.json()) as Refused).error, new RegExp(`^Run '${R}' has no step 'deploy'`));
-      const noRun = await askRound({ budget: 5 }, 'r-nope');
-      assert.equal(noRun.status, 404);
-      assert.match(((await noRun.json()) as Refused).error, /^No run 'r-nope'/);
-      nothingWritten('a round the package refuses');
-    },
-  );
+    const recheck: RetryHow = { mode: 'recheck', budget: 5 };
+    const rechecked = await askTry('tokens', recheck);
+    assert.equal(rechecked.status, 422);
+    const { error: noSession } = (await rechecked.json()) as Refused;
+    assert.ok(noSession.startsWith("--budget raises a step's cap"), noSession);
+    assert.ok(noSession.includes('--recheck files none'), noSession);
+    nothingWritten('a budget that is not an amount');
+  });
+  test("REFUSED at shipped defaults: a try's raise not above what the step has cost, none, or of a step not held on its try, is a 409 in `retryRefusal`'s words, verbatim", async () => {
+    const refusals: Array<[RetryHow, string[]]> = [
+      [{ mode: 'continue', budget: 4 }, ['--budget 4 is not above $4.25', "what tokens's tries have cost"]],
+      [{ mode: 'fresh', budget: 4.25 }, ['--budget 4.25 is not above $4.25', "what tokens's tries have cost"]],
+      [{ mode: 'continue' }, ['tokens is over budget: ', 'its tries have cost $4.25 of its $3 budget', 'until a person raises the cap.']],
+    ];
+    for (const [how, [start, ...facts]] of refusals) {
+      const res = await askTry('tokens', how);
+      assert.equal(res.status, 409, JSON.stringify(how));
+      const { error } = (await res.json()) as Refused;
+      assert.equal(error, await retryRefuses('tokens', how), `${JSON.stringify(how)}: retryRefusal's words, verbatim`);
+      assert.ok(error.startsWith(start), error);
+      for (const fact of facts) assert.ok(error.includes(fact), `${fact} in ${error}`);
+    }
+    const implement = await askTry('implement', { mode: 'continue', budget: 5 });
+    assert.equal(implement.status, 409, "a raise of a step that is not held on its try: implement goes again with review's round");
+    assert.equal(((await implement.json()) as Refused).error, await retryRefuses('implement', { mode: 'continue', budget: 5 }));
+    nothingWritten('a raise the package refuses');
+  });
+  test("REFUSED at shipped defaults: a round's budget not above zero is a 422 in `nemia retry --round --budget`'s words; a word for it, a round that is not `true`, and a body that is no object, are 400s", async () => {
+    const zero = await askRound({ budget: 0 });
+    assert.equal(zero.status, 422);
+    const { error: notAnAmount } = (await zero.json()) as Refused;
+    assert.equal(notAnAmount, await roundRefuses(undefined, 0));
+    assert.ok(notAnAmount.startsWith('--budget 0 is not an amount.'), notAnAmount);
+    const word = await askRound({ step: 'review', budget: 'five' });
+    assert.equal(word.status, 400);
+    assert.ok(((await word.json()) as { field?: string }).field?.startsWith('payload.budget'));
+    const notTrue = await askRound({ round: 'yes' });
+    assert.equal(notTrue.status, 400);
+    assert.ok(((await notTrue.json()) as { field?: string }).field?.startsWith('payload.round'));
+    assert.equal((await post(`/api/namespaces/default/runs/${R}/steps/review/retry`, ['review'])).status, 400, 'a list is no body');
+    nothingWritten('a round body that is not one');
+  });
+  test("REFUSED at shipped defaults: a round's raise not above what the loop's steps have cost, none, or a step with no loop, is a 409 in `roundAsk`'s words; a run or step not there a 404", async () => {
+    const refusals: Array<[string, number | undefined, string[]]> = [
+      ['review', 2, ['--budget 2 is not above $2.10', 'what implement has cost']],
+      ['review', undefined, ['review asked for round 3', 'implement has cost $2.10 of its $2 budget']],
+      ['tokens', 5, ['tokens has no `loop:`']],
+    ];
+    for (const [step, budget, [start, ...facts]] of refusals) {
+      const res = await askRound({ step, ...(budget !== undefined ? { budget } : {}) });
+      assert.equal(res.status, 409, `${step} ${budget}`);
+      const { error } = (await res.json()) as Refused;
+      assert.equal(error, await roundRefuses(step, budget));
+      assert.ok(error.startsWith(start), error);
+      for (const fact of facts) assert.ok(error.includes(fact), `${fact} in ${error}`);
+    }
+    const noStep = await askRound({ step: 'deploy', budget: 5 });
+    assert.equal(noStep.status, 404);
+    assert.match(((await noStep.json()) as Refused).error, new RegExp(`^Run '${R}' has no step 'deploy'`));
+    const noRun = await askRound({ budget: 5 }, 'r-nope');
+    assert.equal(noRun.status, 404);
+    assert.match(((await noRun.json()) as Refused).error, /^No run 'r-nope'/);
+    nothingWritten('a round the package refuses');
+  });
 });
 
-test('a run whose steps went over their budgets: what each try cost, the steps held on their caps on the list, the detail and the decision, nothing offered once pruned — then raised, a try and a round', async (t) => {
-  const s = story(t);
-
-  await s.test(
+describe('a run whose steps went over their budgets: what each try cost, the steps held on their caps on the list, the detail and the decision, nothing offered once pruned — then raised, a try and a round', () => {
+  const s = story(test);
+  s.test(
     "a measured try's cost is on the detail — the engine's costUsd, apiMs and toolMs beside `nemia decide`'s words — an unmeasured one is null, never 0, and the run's total is `nemia ls`'s",
     async () => {
       const run = await detail();
@@ -473,8 +458,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       );
     },
   );
-
-  await s.test(
+  s.test(
     "a step over its budget, on the list and on the detail, in `nemia ls`'s words — waiting on you, and moving nothing — with its cap, what it has cost of it, and the raise the package takes",
     async () => {
       const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
@@ -518,8 +502,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       assert.equal(implement.raise, null, "implement goes again only with review's round");
     },
   );
-
-  await s.test(
+  s.test(
     "the decision says what `nemia decide` says of steps held on their budget — the OVER BUDGET line, the run's cost — and offers the raise, a try's and a round's",
     async () => {
       const said = await runWith(engine(), decideRun(R));
@@ -548,8 +531,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       );
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED once pruned: steps over their budget are offered no raise — the decision's OVER BUDGET line is `nemia decide`'s, says the run was pruned where it said it waits on you, and no step carries a raise",
     async () => {
       const marker = path.join(root, 'runs', `${R}.pruned`);
@@ -595,8 +577,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       nothingWritten('reading a pruned run asks for nothing');
     },
   );
-
-  await s.test(
+  s.test(
     "a raise as the board sends it is the package's ask: a try's and a round's, 202, the budget on the ask and nothing else written — and the step waits on nobody",
     async () => {
       const res = await askTry('tokens', { mode: 'continue', budget: 5 });
@@ -633,12 +614,16 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
   );
 });
 
-test('steps past their budget on their own work: one that signed off blocked is answered with its raise on the same ask — refused without one, or below the spend — and one refused by its check is rechecked with neither, as `nemia decide` offers them', async (t) => {
-  const s = story(t);
+describe('steps past their budget on their own work: one that signed off blocked is answered with its raise on the same ask — refused without one, or below the spend — and one refused by its check is rechecked with neither, as `nemia decide` offers them', () => {
+  let asks!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    asks = path.join(root, 'runs', `${R2}.asks`);
+    return t.end;
+  });
+  const s = story(test);
   const answer = 'Warm ones.';
-  const asks = path.join(root, 'runs', `${R2}.asks`);
-
-  await s.test(
+  s.test(
     'each reads over budget however it ended, waiting on you, offered the raise in the ways its end takes a try, and `nemia decide` answers the blocked one with the raise and the answer on one ask',
     async () => {
       const run = await detail(R2);
@@ -665,8 +650,7 @@ test('steps past their budget on their own work: one that signed off blocked is 
       );
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED at shipped defaults: its answer without a raise, or with one not above the spend, is a 409 in `retryRefusal`'s words, and nothing is written",
     async () => {
       const refusals: Array<[RetryHow, string[]]> = [
@@ -687,34 +671,29 @@ test('steps past their budget on their own work: one that signed off blocked is 
       assert.equal(fs.existsSync(asks), false, 'nothing is written on a refusal');
     },
   );
+  s.test('the answer and the raise, as the board sends them, are one ask, 202; the refused check is rechecked with no budget', async () => {
+    const answered = await askTry('palette', { mode: 'continue', budget: 2, message: answer }, BOARD, R2);
+    assert.equal(answered.status, 202, await answered.clone().text());
+    assert.deepEqual(await answered.json(), { try: 2, file: askFile(root, R2, 'palette', 2), stopFirst: false });
+    const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R2, 'palette', 2), 'utf8'));
+    assert.deepEqual(
+      written,
+      { step: 'palette', try: 2, mode: 'continue', message: answer, budget: 2, actor: SEATED },
+      'one ask, the next try filed with it, and who asked it',
+    );
+    assert.ok(!Number.isNaN(Date.parse(when)), when);
 
-  await s.test(
-    'the answer and the raise, as the board sends them, are one ask, 202; the refused check is rechecked with no budget',
-    async () => {
-      const answered = await askTry('palette', { mode: 'continue', budget: 2, message: answer }, BOARD, R2);
-      assert.equal(answered.status, 202, await answered.clone().text());
-      assert.deepEqual(await answered.json(), { try: 2, file: askFile(root, R2, 'palette', 2), stopFirst: false });
-      const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R2, 'palette', 2), 'utf8'));
-      assert.deepEqual(
-        written,
-        { step: 'palette', try: 2, mode: 'continue', message: answer, budget: 2, actor: SEATED },
-        'one ask, the next try filed with it, and who asked it',
-      );
-      assert.ok(!Number.isNaN(Date.parse(when)), when);
-
-      const rechecked = await askTry('lint', { mode: 'recheck' }, BOARD, R2);
-      assert.equal(rechecked.status, 202, await rechecked.clone().text());
-      assert.deepEqual(await rechecked.json(), { try: 2, file: askFile(root, R2, 'lint', 2), stopFirst: false });
-      const { at: _, ...recheck } = JSON.parse(fs.readFileSync(askFile(root, R2, 'lint', 2), 'utf8'));
-      assert.deepEqual(
-        recheck,
-        { step: 'lint', try: 2, mode: 'recheck', actor: SEATED },
-        'no budget: a recheck files no session to spend it',
-      );
-    },
-  );
-
-  await s.test('both read their asks in notes, as `nemia ls` has them until the tick files them, and neither is waited on', async () => {
+    const rechecked = await askTry('lint', { mode: 'recheck' }, BOARD, R2);
+    assert.equal(rechecked.status, 202, await rechecked.clone().text());
+    assert.deepEqual(await rechecked.json(), { try: 2, file: askFile(root, R2, 'lint', 2), stopFirst: false });
+    const { at: _, ...recheck } = JSON.parse(fs.readFileSync(askFile(root, R2, 'lint', 2), 'utf8'));
+    assert.deepEqual(
+      recheck,
+      { step: 'lint', try: 2, mode: 'recheck', actor: SEATED },
+      'no budget: a recheck files no session to spend it',
+    );
+  });
+  s.test('both read their asks in notes, as `nemia ls` has them until the tick files them, and neither is waited on', async () => {
     const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R2)));
     const after = await detail(R2);
     assert.deepEqual(

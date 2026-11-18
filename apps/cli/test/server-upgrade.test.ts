@@ -6,7 +6,7 @@
  * through and told after a success to bring this machine level. Its words are nobody's to check: a test asserts the code and the
  * command named.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
@@ -117,7 +117,7 @@ function standIn(stand: Stand, upgrades = true): http.Server {
 }
 
 const servers: http.Server[] = [];
-after(() => {
+afterAll(() => {
   for (const s of servers) {
     s.closeAllConnections();
     s.close();

@@ -2,7 +2,7 @@
  * The workflow folders a place holds (`foldersIn`): each folder directly in it, sorted, but a hidden one, `agents/` and `skills/`; none
  * where the place is not there, and a refusal naming the fix where it cannot be listed.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,7 +25,7 @@ test('REFUSED: a place that cannot be listed, naming the folder and what to chec
   const dir = scratch('wf-lookup-');
   fs.mkdirSync(path.join(dir, 'build'));
   fs.chmodSync(dir, 0o000);
-  t.after(() => fs.chmodSync(dir, 0o700));
+  t.onTestFinished(() => fs.chmodSync(dir, 0o700));
   if (process.getuid?.() === 0) return t.skip('root lists any folder');
   let message = '';
   try {

@@ -14,7 +14,7 @@
  * harness says such a session waits for is `test/remote.test.ts`'s.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -162,70 +162,59 @@ const refusedWith = async (res: Response, status: number, said: string): Promise
   return ((await res.json()) as { error: string }).error;
 };
 
-test('POST …/retry: what it refuses — a message it will not carry, a step not waiting on a person, a body that is not an ask, a run or step not there — and nothing written, no session stopped', async (t) => {
-  await t.test(
-    'REFUSED at shipped defaults: an empty message, and a message on a recheck, are 422s, each naming the flag it is of',
-    async () => {
-      for (const [step, how, fact] of [
-        ['implement', { mode: 'continue', message: '' }, /^--message is empty/],
-        ['implement', { mode: 'fresh', message: '  \n ' }, /^--message is empty/],
-        ['theme', { mode: 'recheck', message: 'Look again.' }, /^--message carries[^]*--recheck files no session/],
-      ] as const)
-        assert.match(await refusedWith(await ask(step, how), 422, JSON.stringify(how)), fact);
-      nothingWritten('a message the package refuses');
-    },
-  );
-
-  await t.test(
-    'REFUSED at shipped defaults: a step not waiting on a person, a session still working however it is asked, a recheck of a session the harness blocked, and a recheck with no check that failed are 409s, each naming why',
-    async () => {
-      const cases: Array<[string, RetryHow, RegExp]> = [
-        ['tokens', { mode: 'continue' }, /^tokens signed off done and declares no check/],
-        ['review', { mode: 'continue', message: 'Start.' }, /^review has not been filed yet/],
-        ['working', { mode: 'continue' }, /^working is still running/],
-        ['working', { mode: 'fresh', message: 'Start again.' }, /^working is still running/],
-        ['held', { mode: 'recheck' }, /^--recheck [^]* held is running, its session blocked/],
-        ['implement', { mode: 'recheck' }, /^--recheck [^]* implement signed off blocked[^]*no check/],
-      ];
-      for (const [step, how, fact] of cases)
-        assert.match(await refusedWith(await ask(step, how), 409, `${step} ${JSON.stringify(how)}`), fact);
-      assert.equal(standIn().stopped.length, 0, 'no session stopped');
-      nothingWritten('a step the package will not try again');
-    },
-  );
-
-  await t.test(
-    'REFUSED: a body `RunRetry` does not read (400, naming the key), one it reads and the entry refuses (422, naming the key), and a run or a step that does not exist (404)',
-    async () => {
-      const unread: Array<[unknown, string]> = [
-        ['not json', 'payload'],
-        [['continue'], 'payload'],
-        [{}, 'payload.mode'],
-        [{ mode: 'again' }, 'payload.mode'],
-        [{ mode: 'continue', message: 42 }, 'payload.message'],
-        [{ mode: 'fresh', model: 3 }, 'payload.model'],
-        [{ mode: 'continue', budget: 'five' }, 'payload.budget'],
-      ];
-      for (const [body, field] of unread) {
-        const res = await ask('implement', body);
-        assert.equal(res.status, 400, JSON.stringify(body));
-        const said = (await res.json()) as { field?: string };
-        assert.ok(said.field?.startsWith(field), `${JSON.stringify(body)} names ${field}: ${JSON.stringify(said)}`);
-      }
-      const refused: Array<[unknown, RegExp]> = [
-        [{ mode: 'continue', model: 'opus' }, /^`model`[^]*goes with "mode": "fresh"/],
-        [{ mode: 'fresh', model: '' }, /^`model` is blank/],
-        [{ mode: 'fresh', model: '  ' }, /^`model` is blank/],
-      ];
-      for (const [body, fact] of refused) assert.match(await refusedWith(await ask('implement', body), 422, JSON.stringify(body)), fact);
-      assert.match(await refusedWith(await ask('implement', { mode: 'continue' }, BOARD, 'r-nope'), 404, 'no run'), /^No run 'r-nope'/);
-      assert.match(
-        await refusedWith(await ask('deploy', { mode: 'continue' }), 404, 'no step'),
-        new RegExp(`^Run '${R}' has no step 'deploy'`),
-      );
-      nothingWritten('a body that is not an ask');
-    },
-  );
+describe('POST …/retry: what it refuses — a message it will not carry, a step not waiting on a person, a body that is not an ask, a run or step not there — and nothing written, no session stopped', () => {
+  test('REFUSED at shipped defaults: an empty message, and a message on a recheck, are 422s, each naming the flag it is of', async () => {
+    for (const [step, how, fact] of [
+      ['implement', { mode: 'continue', message: '' }, /^--message is empty/],
+      ['implement', { mode: 'fresh', message: '  \n ' }, /^--message is empty/],
+      ['theme', { mode: 'recheck', message: 'Look again.' }, /^--message carries[^]*--recheck files no session/],
+    ] as const)
+      assert.match(await refusedWith(await ask(step, how), 422, JSON.stringify(how)), fact);
+    nothingWritten('a message the package refuses');
+  });
+  test('REFUSED at shipped defaults: a step not waiting on a person, a session still working however it is asked, a recheck of a session the harness blocked, and a recheck with no check that failed are 409s, each naming why', async () => {
+    const cases: Array<[string, RetryHow, RegExp]> = [
+      ['tokens', { mode: 'continue' }, /^tokens signed off done and declares no check/],
+      ['review', { mode: 'continue', message: 'Start.' }, /^review has not been filed yet/],
+      ['working', { mode: 'continue' }, /^working is still running/],
+      ['working', { mode: 'fresh', message: 'Start again.' }, /^working is still running/],
+      ['held', { mode: 'recheck' }, /^--recheck [^]* held is running, its session blocked/],
+      ['implement', { mode: 'recheck' }, /^--recheck [^]* implement signed off blocked[^]*no check/],
+    ];
+    for (const [step, how, fact] of cases)
+      assert.match(await refusedWith(await ask(step, how), 409, `${step} ${JSON.stringify(how)}`), fact);
+    assert.equal(standIn().stopped.length, 0, 'no session stopped');
+    nothingWritten('a step the package will not try again');
+  });
+  test('REFUSED: a body `RunRetry` does not read (400, naming the key), one it reads and the entry refuses (422, naming the key), and a run or a step that does not exist (404)', async () => {
+    const unread: Array<[unknown, string]> = [
+      ['not json', 'payload'],
+      [['continue'], 'payload'],
+      [{}, 'payload.mode'],
+      [{ mode: 'again' }, 'payload.mode'],
+      [{ mode: 'continue', message: 42 }, 'payload.message'],
+      [{ mode: 'fresh', model: 3 }, 'payload.model'],
+      [{ mode: 'continue', budget: 'five' }, 'payload.budget'],
+    ];
+    for (const [body, field] of unread) {
+      const res = await ask('implement', body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      const said = (await res.json()) as { field?: string };
+      assert.ok(said.field?.startsWith(field), `${JSON.stringify(body)} names ${field}: ${JSON.stringify(said)}`);
+    }
+    const refused: Array<[unknown, RegExp]> = [
+      [{ mode: 'continue', model: 'opus' }, /^`model`[^]*goes with "mode": "fresh"/],
+      [{ mode: 'fresh', model: '' }, /^`model` is blank/],
+      [{ mode: 'fresh', model: '  ' }, /^`model` is blank/],
+    ];
+    for (const [body, fact] of refused) assert.match(await refusedWith(await ask('implement', body), 422, JSON.stringify(body)), fact);
+    assert.match(await refusedWith(await ask('implement', { mode: 'continue' }, BOARD, 'r-nope'), 404, 'no run'), /^No run 'r-nope'/);
+    assert.match(
+      await refusedWith(await ask('deploy', { mode: 'continue' }), 404, 'no step'),
+      new RegExp(`^Run '${R}' has no step 'deploy'`),
+    );
+    nothingWritten('a body that is not an ask');
+  });
 });
 
 /** One event of a session's transcript, as the engine's `transcript` answers it. */
@@ -288,12 +277,11 @@ test("a blocked session's last line is what it said last — its last `text` or 
   );
 });
 
-test('a person answers a blocked step, rechecks a refused check and continues the sessions the harness blocked — each the package’s ask, read on the list and the detail — and reads the answer on its try once the tick took it', async (t) => {
-  const s = story(t);
+describe('a person answers a blocked step, rechecks a refused check and continues the sessions the harness blocked — each the package’s ask, read on the list and the detail — and reads the answer on its try once the tick took it', () => {
+  const s = story(test);
   const tasksOf = () => ['t-held', 't-idle'].map((id) => JSON.stringify(standIn().tasks.get(id)));
   let tasks: string[] = [];
-
-  await s.test(
+  s.test(
     "an answer as the board sends it is the package's ask: 202 with the try, its file and no `stopFirst`, the run's record untouched, and the step reads `try 2 asked` and waits on nobody — a second ask refused, a refused check rechecked",
     async () => {
       tasks = tasksOf();
@@ -350,8 +338,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       });
     },
   );
-
-  await s.test(
+  s.test(
     "a session the harness blocked is continued as `nemia retry` continues it: 202 with the package's `stopFirst`, the ask written with its mode and nothing else — no session stopped, the engine's tasks and the run's record as they were — and the step reads `nemia ls`'s `stopping its blocked session`",
     async () => {
       const res = await ask('held', { mode: 'nudge' });
@@ -425,8 +412,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       assert.equal(standIn().stopped.length, 0, 'and still nothing is stopped');
     },
   );
-
-  await s.test(
+  s.test(
     "a try a person answered carries the answer and who gave it, as `nemia decide` prints it — the note says `answered`, as `list`'s does — and a try nobody answered, none",
     async () => {
       const A = 'r-answered';

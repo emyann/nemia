@@ -16,7 +16,7 @@
  * Where the steps are is `ci-workflow.ts` (`scanStep`, `allowlistStep`, `ALLOWLIST_STEP`); the workflow's agreement with the repository
  * is held in `ci-workflow.test.ts`, which refuses a scan without its flags and an allowlist that is not scoped to its rule.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';

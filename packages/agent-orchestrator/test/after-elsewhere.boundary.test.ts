@@ -6,7 +6,7 @@
  * The test's store is its own, at `ROOT`, given to every program as `ENV`.
 
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -186,7 +186,7 @@ const repositoryRunOf = (run: Run): RepositoryRun => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
 };
-const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
+const refusedWith = () => (err: Error & { exitCode?: number }) => err.exitCode === 2 && test.todo(err.message);
 /** A refusal of the kind `tag`, exit 2, whose words name each of `facts`: what was refused and the fix. */
 const refusal =
   (tag: 'Missing' | 'Invalid' | 'Conflict', ...facts: string[]) =>

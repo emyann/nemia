@@ -5,7 +5,7 @@
  * the place a card was read from (`from`). In a scratch store whose repository is the api's own, beside a factory's repository.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

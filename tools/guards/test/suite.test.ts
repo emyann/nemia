@@ -19,7 +19,7 @@
  * A package here is each workspace the root `package.json` names (`workspaces` of `test-kit/repo`): `tools/guards`, the home of the
  * repository's own guards, is held as every package is.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

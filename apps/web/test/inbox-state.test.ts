@@ -3,7 +3,7 @@
  * never rebuilds it from the runs a card was started as: whether a card started is its state's kind (`CARD_KIND`, src/lib/inbox.ts). A
  * test of what `src/` says about the inbox, read as text.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

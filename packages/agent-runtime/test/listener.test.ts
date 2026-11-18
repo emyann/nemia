@@ -8,7 +8,7 @@
  * It binds a socket of its own and speaks HTTP to it, and reaches nothing outside this process: no git, no process started, no
  * real place and no real engine, so it is no boundary test.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { Effect, Exit, Scope, Stream } from 'effect';
@@ -95,12 +95,12 @@ const call = (served: Served, body: unknown, authorization?: string) =>
 
 const rpc = (method: string, params: unknown) => ({ jsonrpc: '2.0', id: 7, method, params });
 
-test(
+describe(
   'a holder serves its port: bound on loopback, its card and a getTask answered, a subscription flushed before the turn ends, its token kept and gone with the scope',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    await s.test('the port binds a port of its own on loopback, and answers the card it declares', async () => {
+  () => {
+    const s = story(test);
+    s.test('the port binds a port of its own on loopback, and answers the card it declares', async () => {
       const { served, close } = await holding(handOps(Promise.resolve()));
       try {
         const url = new URL(served.url);
@@ -117,8 +117,7 @@ test(
         await close();
       }
     });
-
-    await s.test('getTask over the wire answers the session the driver lists', async () => {
+    s.test('getTask over the wire answers the session the driver lists', async () => {
       const { served, close } = await holding(handOps(Promise.resolve()));
       try {
         const answered = await call(served, rpc('GetTask', { tenant: '', id: NAME }), `Bearer ${served.token}`);
@@ -129,8 +128,7 @@ test(
         await close();
       }
     });
-
-    await s.test('a subscription is an event stream, framed and flushed, whose first answer comes before the turn is over', async () => {
+    s.test('a subscription is an event stream, framed and flushed, whose first answer comes before the turn is over', async () => {
       const held = gate();
       const { served, close } = await holding(handOps(held.opened));
       try {
@@ -165,11 +163,10 @@ test(
         await close();
       }
     });
-
-    await s.test('the token is kept 0600 in a 0700 folder, is what the hold answered, and goes with the scope', async (t) => {
+    s.test('the token is kept 0600 in a 0700 folder, is what the hold answered, and goes with the scope', async (t) => {
       const held = gate();
       const { root, served, close } = await holding(handOps(held.opened));
-      t.after(async () => {
+      t.onTestFinished(async () => {
         held.open();
         await close();
       });
@@ -197,8 +194,8 @@ test(
   },
 );
 
-test('REFUSED at the port: no token or a wrong one in HTTP 401, a method not served or of ours in a JSON-RPC error, and a path, a method or a body it does not take', async (t) => {
-  await t.test('REFUSED, at shipped defaults: a request with no token, one with a wrong token, and a card read with neither', async () => {
+describe('REFUSED at the port: no token or a wrong one in HTTP 401, a method not served or of ours in a JSON-RPC error, and a path, a method or a body it does not take', () => {
+  test('REFUSED, at shipped defaults: a request with no token, one with a wrong token, and a card read with neither', async () => {
     const { served, close } = await holding(handOps(Promise.resolve()));
     try {
       for (const [what, authorization] of [
@@ -217,8 +214,7 @@ test('REFUSED at the port: no token or a wrong one in HTTP 401, a method not ser
       await close();
     }
   });
-
-  await t.test('REFUSED with the right token: a send, a stop, a listing and a method of ours — and no body names the token', async () => {
+  test('REFUSED with the right token: a send, a stop, a listing and a method of ours — and no body names the token', async () => {
     const { served, close } = await holding(handOps(Promise.resolve()));
     try {
       const bearer = `Bearer ${served.token}`;
@@ -237,8 +233,7 @@ test('REFUSED at the port: no token or a wrong one in HTTP 401, a method not ser
       await close();
     }
   });
-
-  await t.test('a path, a method and a body the port does not take are refused by themselves', async () => {
+  test('a path, a method and a body the port does not take are refused by themselves', async () => {
     const { served, close } = await holding(handOps(Promise.resolve()));
     try {
       const bearer = `Bearer ${served.token}`;
@@ -255,8 +250,8 @@ test('REFUSED at the port: no token or a wrong one in HTTP 401, a method not ser
   });
 });
 
-test("the holder's token: one of its own each hold, read back as written, nothing for a store with none or once forgotten, and nothing made by the read", async (t) => {
-  await t.test('a second hold answers a token of its own', async () => {
+describe("the holder's token: one of its own each hold, read back as written, nothing for a store with none or once forgotten, and nothing made by the read", () => {
+  test('a second hold answers a token of its own', async () => {
     const first = await holding(handOps(Promise.resolve()));
     await first.close();
     const second = await holding(handOps(Promise.resolve()));
@@ -267,21 +262,18 @@ test("the holder's token: one of its own each hold, read back as written, nothin
       await second.close();
     }
   });
-
-  await t.test('holderTokenOf answers what writeToken wrote', () => {
+  test('holderTokenOf answers what writeToken wrote', () => {
     const root = scratch('token-read');
     const token = tokenOf();
     writeToken(root, token);
     assert.equal(holderTokenOf(root), token);
   });
-
-  await t.test('holderTokenOf answers nothing for a store with no a2a folder, and makes none', () => {
+  test('holderTokenOf answers nothing for a store with no a2a folder, and makes none', () => {
     const root = scratch('token-none');
     assert.equal(holderTokenOf(root), undefined);
     assert.equal(fs.existsSync(tokenFolderOf(root)), false, 'the read makes no folder');
   });
-
-  await t.test('holderTokenOf answers nothing once the token is forgotten', () => {
+  test('holderTokenOf answers nothing once the token is forgotten', () => {
     const root = scratch('token-forgotten');
     writeToken(root, tokenOf());
     forgetToken(root);
@@ -312,7 +304,7 @@ test('a subscription that fails before its first answer is a JSON-RPC error in a
 test('a follower that goes away lets the holder’s follow go, though its session says nothing', WAITED, async (t) => {
   const letGo = { done: false };
   const { served, close } = await holding(silentOps(letGo));
-  t.after(close);
+  t.onTestFinished(close);
   const answered = await call(served, rpc('SubscribeToTask', { tenant: '', id: NAME }), `Bearer ${served.token}`);
   assert.equal(answered.status, 200);
   const reader = answered.body!.getReader();

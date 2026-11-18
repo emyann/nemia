@@ -15,7 +15,7 @@
  * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder. Every child is waited on for
  * its end, or for the line it says, never for a length of time.
  */
-import { test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -264,7 +264,7 @@ const lease = (url: string | undefined): void => {
 
 const api = await startApi();
 lease(api.url);
-test.after(() => api.stop());
+afterAll(() => api.stop());
 
 /**
  * A laptop whose context in use is a remote daemon, the api serving the seeded store, with a token the store minted: its own store root
@@ -330,7 +330,7 @@ test('`nemia ls` over a runs list answered in pages prints a line per run of eve
   const address = paging.address();
   assert.ok(address !== null && typeof address === 'object');
   lease(`http://127.0.0.1:${address.port}`);
-  t.after(async () => {
+  t.onTestFinished(async () => {
     lease(api.url);
     paging.closeAllConnections();
     await new Promise((resolve) => paging.close(resolve));
@@ -704,7 +704,7 @@ test('REFUSED: a bare 404 — an api older than this nemia, that serves none of 
   const address = old.address();
   assert.ok(address !== null && typeof address === 'object');
   lease(`http://127.0.0.1:${address.port}`);
-  t.after(async () => {
+  t.onTestFinished(async () => {
     lease(api.url);
     await new Promise((resolve) => old.close(resolve));
   });
@@ -716,7 +716,7 @@ test('REFUSED: a bare 404 — an api older than this nemia, that serves none of 
 
 test('REFUSED: with no api serving the store and none started, each read exits 2 naming `nemia up`, never `--local`', async (t) => {
   lease(undefined);
-  t.after(() => lease(api.url));
+  t.onTestFinished(() => lease(api.url));
   for (const argv of [['show', RUN], ['closeout', RUN, 'build'], ['ls'], ['inbox']]) {
     const read = await nemia(argv);
     assert.equal(read.code, 2, `${argv.join(' ')}: ${read.err}`);

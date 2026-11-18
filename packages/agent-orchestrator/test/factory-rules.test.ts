@@ -13,7 +13,8 @@
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -90,15 +91,22 @@ const answeredBy = async (...argv: string[]): Promise<Instruction> => (await sta
 const keysOf = (steps: readonly StepSpec[]) =>
   steps.map(({ body: _b, agent, ...keys }) => ({ ...keys, agent: { ...agent, factoryRules: undefined } }));
 
-test("a factory's rules and its instruction, from none to cleared: told as their own layer, frozen at the start, reaching later runs", async (t) => {
-  const s = story(t);
-  const here = fresh();
-  const FILE = here.file;
-  const record = path.join(ROOT, 'factories', 'pipao.json');
+describe("a factory's rules and its instruction, from none to cleared: told as their own layer, frozen at the start, reaching later runs", () => {
+  let here!: { repo: string; dev: string; file: string };
+  let FILE!: string;
+  let record!: string;
+  let told!: import('../src/start/start.verb.ts').StartedRun;
+  beforeAll(() => {
+    const t = teardowns();
+    here = fresh();
+    FILE = here.file;
+    record = path.join(ROOT, 'factories', 'pipao.json');
+    told = none;
+    return t.end;
+  });
+  const s = story(test);
   let none = { id: '' } as Awaited<ReturnType<typeof started>>;
-  let told = none;
-
-  await s.test('a factory with no rules reads none, and a run started in it is told none: no key on a step', async () => {
+  s.test('a factory with no rules reads none, and a run started in it is told none: no key on a step', async () => {
     assert.equal(rulesAt(ROOT, { name: 'pipao' }), FILE);
     assert.deepEqual(readRules(FILE), { words: null, error: null }, 'no file: no rules, and nothing wrong');
     const read = await rulesOf({ factory: 'pipao' });
@@ -106,15 +114,13 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     none = await started(here, 'no rules', 'pipao');
     for (const step of frozen(none.id)) assert.equal('factoryRules' in step.agent!, false, step.name);
   });
-
-  await s.test('`nemia factory rules` writes them trimmed, and reads them back', async () => {
+  s.test('`nemia factory rules` writes them trimmed, and reads them back', async () => {
     const written = await rulesOf({ factory: 'pipao', words: '\n\nBefore: never push on a Friday.\n\n' });
     assert.deepEqual(written, { name: 'pipao', file: FILE, words: 'Before: never push on a Friday.', error: null });
     assert.equal(fs.readFileSync(FILE, 'utf8'), 'Before: never push on a Friday.\n');
     assert.deepEqual(factoryRules(ROOT, 'pipao'), written);
   });
-
-  await s.test("`nemia start` freezes them on every step, after the agent's own, and they are all that was added", async () => {
+  s.test("`nemia start` freezes them on every step, after the agent's own, and they are all that was added", async () => {
     told = await started(here, 'freeze the rules', 'pipao');
     const steps = frozen(told.id);
     assert.deepEqual(
@@ -131,8 +137,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     assert.equal(promptOf(told, 'implement').replace(layer, ''), promptOf(none, 'implement'), 'the rules are all that was added');
     assert.deepEqual(keysOf(frozen(told.id)), keysOf(frozen(none.id)), 'and no key of a step moved');
   });
-
-  await s.test('an edit, then a clear, after the start reach no step of the run started', async () => {
+  s.test('an edit, then a clear, after the start reach no step of the run started', async () => {
     writeRules(ROOT, { name: 'pipao' }, 'After: push whenever.');
     for (const when of ['after an edit', 'after a removal']) {
       for (const step of frozen(told.id)) {
@@ -149,15 +154,13 @@ test("a factory's rules and its instruction, from none to cleared: told as their
       );
     }
   });
-
-  await s.test('a run started after them is told the rules written since', async () => {
+  s.test('a run started after them is told the rules written since', async () => {
     writeRules(ROOT, { name: 'pipao' }, 'After: push whenever.');
     const later = await started(here, 'the later rules', 'pipao');
     for (const step of frozen(later.id)) assert.equal(step.agent?.factoryRules, 'After: push whenever.', step.name);
     assert.ok(promptOf(later, 'implement').includes('After: push whenever.'));
   });
-
-  await s.test("a run in the default factory is told none, a RULES.md under factories/default being no factory's", async () => {
+  s.test("a run in the default factory is told none, a RULES.md under factories/default being no factory's", async () => {
     fs.mkdirSync(path.join(ROOT, 'factories', 'default'), { recursive: true });
     fs.writeFileSync(path.join(ROOT, 'factories', 'default', 'RULES.md'), `${RULES}\n`);
     const inDefault = await started(here, 'the default factory');
@@ -168,54 +171,44 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     assert.equal(promptOf(none, 'implement'), promptOf(inDefault, 'implement'), 'the prompt byte for byte');
     fs.rmSync(path.join(ROOT, 'factories', 'default'), { recursive: true });
   });
-
-  await s.test(
-    "a factory's page of a step loads it with the rules, and leaves out rules that cannot be told, refusing nothing",
-    async () => {
-      const step = async (): Promise<StepSpec> => {
-        const args = { from: 'user', name: 'dev', step: 'implement', dir: here.dev, factory: 'pipao' };
-        return (await stage.runWith(stage.board().e, WORKFLOWS_STEP.handler(args))).step!;
-      };
-      clearRules(ROOT, { name: 'pipao' });
-      assert.equal((await step()).agent?.factoryRules, undefined);
-      writeRules(ROOT, { name: 'pipao' }, RULES);
-      const loaded = await step();
-      assert.equal(loaded.agent?.factoryRules, RULES);
-      assert.ok(at(loaded.body, 'Make the change you were asked for') < at(loaded.body, RULES), loaded.body);
-      fs.writeFileSync(FILE, '---\ntools: Bash\n---\nUse Bash.\n');
-      const refused = await step();
-      assert.equal(refused.agent?.factoryRules, undefined, 'a listing refuses nothing: the start will');
-      assert.equal(refused.body.includes('Use Bash'), false, refused.body);
-    },
-  );
-
-  await s.test('rules that cannot be told are read with why; cleared, they are gone', async () => {
+  s.test("a factory's page of a step loads it with the rules, and leaves out rules that cannot be told, refusing nothing", async () => {
+    const step = async (): Promise<StepSpec> => {
+      const args = { from: 'user', name: 'dev', step: 'implement', dir: here.dev, factory: 'pipao' };
+      return (await stage.runWith(stage.board().e, WORKFLOWS_STEP.handler(args))).step!;
+    };
+    clearRules(ROOT, { name: 'pipao' });
+    assert.equal((await step()).agent?.factoryRules, undefined);
+    writeRules(ROOT, { name: 'pipao' }, RULES);
+    const loaded = await step();
+    assert.equal(loaded.agent?.factoryRules, RULES);
+    assert.ok(at(loaded.body, 'Make the change you were asked for') < at(loaded.body, RULES), loaded.body);
+    fs.writeFileSync(FILE, '---\ntools: Bash\n---\nUse Bash.\n');
+    const refused = await step();
+    assert.equal(refused.agent?.factoryRules, undefined, 'a listing refuses nothing: the start will');
+    assert.equal(refused.body.includes('Use Bash'), false, refused.body);
+  });
+  s.test('rules that cannot be told are read with why; cleared, they are gone', async () => {
     fs.writeFileSync(FILE, '---\nmodel: opus\n---\n');
     const read = await rulesOf({ factory: 'pipao' });
     names(read.error, 'frontmatter');
     assert.equal(clearRules(ROOT, { name: 'pipao' }), true);
   });
-
-  await s.test(
-    'the instruction, kept in the folder by default: NEMIA.md in its first folder, no words while no file is there',
-    async () => {
-      assert.deepEqual(factoryInstruction(ROOT, 'pipao'), {
-        name: 'pipao',
-        path: null,
-        store: false,
-        file: path.join(here.repo, 'NEMIA.md'),
-        words: null,
-        error: null,
-        stored: false,
-      });
-      fs.writeFileSync(path.join(here.repo, 'NEMIA.md'), 'Ship small.\n');
-      assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Ship small.\n');
-      const read = await answeredBy('factory', 'instruction', 'pipao');
-      assert.deepEqual([read.file, read.store, read.words], [path.join(here.repo, 'NEMIA.md'), false, 'Ship small.\n']);
-    },
-  );
-
-  await s.test('`nemia factory instruction` writes where it is kept, a path or the store, every other key of the file kept', () => {
+  s.test('the instruction, kept in the folder by default: NEMIA.md in its first folder, no words while no file is there', async () => {
+    assert.deepEqual(factoryInstruction(ROOT, 'pipao'), {
+      name: 'pipao',
+      path: null,
+      store: false,
+      file: path.join(here.repo, 'NEMIA.md'),
+      words: null,
+      error: null,
+      stored: false,
+    });
+    fs.writeFileSync(path.join(here.repo, 'NEMIA.md'), 'Ship small.\n');
+    assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Ship small.\n');
+    const read = await answeredBy('factory', 'instruction', 'pipao');
+    assert.deepEqual([read.file, read.store, read.words], [path.join(here.repo, 'NEMIA.md'), false, 'Ship small.\n']);
+  });
+  s.test('`nemia factory instruction` writes where it is kept, a path or the store, every other key of the file kept', () => {
     const others = JSON.parse(fs.readFileSync(record, 'utf8'));
     setInstructionAt(ROOT, { factory: 'pipao', at: { path: 'docs/../docs/X.md' } });
     assert.deepEqual(JSON.parse(fs.readFileSync(record, 'utf8')), { ...others, instruction: { path: 'docs/X.md' } });
@@ -223,8 +216,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     assert.deepEqual(JSON.parse(fs.readFileSync(record, 'utf8')), { ...others, instruction: { store: true } });
     assert.deepEqual(readFactoryAt(ROOT, 'pipao').instruction, { store: true });
   });
-
-  await s.test('kept in the store: `nemia factory instruct` writes its words trimmed, and the words a file holds', async () => {
+  s.test('kept in the store: `nemia factory instruct` writes its words trimmed, and the words a file holds', async () => {
     const written = await stage.runWith(
       stage.board().e,
       FACTORY_INSTRUCT.handler({ factory: 'pipao', words: '  Ship small.  ', clear: false }),
@@ -236,16 +228,14 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     assert.deepEqual([again.file, again.removed], [kept, undefined]);
     assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Be brief.\n');
   });
-
-  await s.test('moved out of the store, the stored words are kept unread; back, they are read', () => {
+  s.test('moved out of the store, the stored words are kept unread; back, they are read', () => {
     setInstructionAt(ROOT, { factory: 'pipao', at: undefined });
     const moved = factoryInstruction(ROOT, 'pipao');
     assert.deepEqual([moved.store, moved.words, moved.stored], [false, 'Ship small.\n', true], "the folder's file is read");
     setInstructionAt(ROOT, { factory: 'pipao', at: { store: true } });
     assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Be brief.\n');
   });
-
-  await s.test('`nemia factory instruct --clear` removes the words; a clear of where it is kept removes the key, never null', async () => {
+  s.test('`nemia factory instruct --clear` removes the words; a clear of where it is kept removes the key, never null', async () => {
     const kept = path.join(ROOT, 'factories', 'pipao', 'NEMIA.md');
     const cleared = await answeredBy('factory', 'instruct', 'pipao', '--clear');
     assert.deepEqual([cleared.file, cleared.removed], [kept, true]);
@@ -255,16 +245,18 @@ test("a factory's rules and its instruction, from none to cleared: told as their
   });
 });
 
-test('REFUSED at shipped defaults: rules that cannot be told stop a start in the factory, naming the file and the clear; no run written', async (t) => {
+describe('REFUSED at shipped defaults: rules that cannot be told stop a start in the factory, naming the file and the clear; no run written', () => {
+  beforeAll(() => {
+    fs.writeFileSync(outside, 'Words from elsewhere.\n');
+  });
   const outside = path.join(ROOT, 'elsewhere.md');
-  fs.writeFileSync(outside, 'Words from elsewhere.\n');
   const rows: Array<[string, (file: string) => void, string]> = [
     ['a frontmatter block', (file) => fs.writeFileSync(file, '---\ntools: Bash\n---\nUse Bash.\n'), 'frontmatter'],
     ['a link', (file) => fs.symlinkSync(outside, file), 'link'],
     ['a directory', (file) => fs.mkdirSync(file), 'not a file'],
   ];
   for (const [row, plant, fact] of rows)
-    await t.test(row, async () => {
+    test(row, async () => {
       const here = fresh();
       fs.mkdirSync(path.dirname(here.file), { recursive: true });
       plant(here.file);

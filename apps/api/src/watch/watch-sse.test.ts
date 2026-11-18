@@ -5,7 +5,7 @@
  * abort of the HttpApi stream ends its fiber; and `OpenApi.fromApi` documents the endpoint's answer as `text/event-stream`.
  */
 import '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServer } from 'effect/http';

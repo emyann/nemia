@@ -9,7 +9,7 @@
  * `design` running as the engine's task `TASK`).
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -174,19 +174,80 @@ test('REFUSED: a token whose session no longer runs is 401 session-ended', async
   assert.equal(((await res.json()) as { reason?: string }).reason, 'session-ended');
 });
 
-test('a proposal filed by a live session names its agent, run and step; the person approves it and it is applied into the tree', async (t) => {
-  sessionRunning();
-  const was = planText();
-  const created = await ask(`${ns}/proposals`, 'POST', { objects: [await devChanged('Plan it twice.\n')] }, token);
-  assert.equal(created.status, 201);
-  const proposal = (await created.json()) as Proposal;
-  await t.test('filed waiting, proposed by the session, nothing written yet', () => {
+describe('a proposal filed by a live session names its agent, run and step; the person approves it and it is applied into the tree', () => {
+  let was!: string;
+  let created!: Response;
+  let proposal!: {
+    readonly apiVersion: 'nemia/v1';
+    readonly kind: 'Proposal';
+    readonly metadata: {
+      readonly name: string;
+      readonly creationTimestamp: string;
+      readonly resourceVersion: string;
+      readonly labels?: { readonly [x: string]: string } | undefined;
+      readonly namespace?: string | undefined;
+      readonly generation?: number | undefined;
+    };
+    readonly spec: {
+      readonly objects: readonly {
+        readonly kind: 'Workflow' | 'Agent' | 'Skill' | 'Hire' | 'McpServer' | 'Factory' | 'LibraryAdd';
+        readonly metadata: {
+          readonly name: string;
+          readonly namespace?: string | undefined;
+          readonly resourceVersion?: string | undefined;
+        };
+        readonly apiVersion?: 'nemia/v1' | undefined;
+        readonly spec?: unknown;
+        readonly verb?: 'create' | 'update' | 'delete' | undefined;
+      }[];
+      readonly why?: string | undefined;
+      readonly applyAt?: 'approval' | 'run-end' | undefined;
+    };
+    readonly status: {
+      readonly widens: boolean;
+      readonly phase: 'failed' | 'waiting' | 'approved' | 'applied' | 'declined' | 'stale' | 'dropped';
+      readonly proposedBy: { readonly agent?: string | undefined; readonly run?: string | undefined; readonly step?: string | undefined };
+      readonly changes: readonly {
+        readonly resource: string;
+        readonly name: string;
+        readonly verb: 'create' | 'update' | 'delete';
+        readonly access: 'widens' | 'narrows' | 'same';
+      }[];
+      readonly message?: string | undefined;
+      readonly revisions?: readonly string[] | undefined;
+      readonly approvedBy?:
+        | { readonly at: string; readonly by: 'person' | 'rule'; readonly agent?: string | undefined; readonly rule?: string | undefined }
+        | undefined;
+      readonly before?:
+        | readonly {
+            readonly kind: 'Workflow' | 'Agent' | 'Skill' | 'Hire' | 'McpServer' | 'Factory' | 'LibraryAdd';
+            readonly metadata: {
+              readonly name: string;
+              readonly namespace?: string | undefined;
+              readonly resourceVersion?: string | undefined;
+            };
+            readonly apiVersion?: 'nemia/v1' | undefined;
+            readonly spec?: unknown;
+            readonly verb?: 'create' | 'update' | 'delete' | undefined;
+          }[]
+        | undefined;
+      readonly written?: readonly string[] | undefined;
+    };
+  };
+  beforeAll(async () => {
+    sessionRunning();
+    was = planText();
+    created = await ask(`${ns}/proposals`, 'POST', { objects: [await devChanged('Plan it twice.\n')] }, token);
+    assert.equal(created.status, 201);
+    proposal = (await created.json()) as Proposal;
+  });
+  test('filed waiting, proposed by the session, nothing written yet', () => {
     assert.equal(proposal.kind, 'Proposal');
     assert.equal(proposal.status.phase, 'waiting');
     assert.deepEqual(proposal.status.proposedBy, { agent: 'implementer', run: RUN, step: 'design' });
     assert.equal(planText(), was);
   });
-  await t.test('listed and read in its namespace', async () => {
+  test('listed and read in its namespace', async () => {
     const list = (await (await app().request(`${ns}/proposals`)).json()) as { kind: string; items: Proposal[] };
     assert.equal(list.kind, 'ProposalList');
     assert.deepEqual(
@@ -201,12 +262,12 @@ test('a proposal filed by a live session names its agent, run and step; the pers
     assert.equal((await app().request(`${ns}/proposals/${proposal.metadata.name}`)).status, 200);
     assert.equal((await app().request(`${ns}/proposals/nothing-here`)).status, 404);
   });
-  await t.test('REFUSED: the session declining it, which is the person alone, is 403 person-only', async () => {
+  test('REFUSED: the session declining it, which is the person alone, is 403 person-only', async () => {
     const res = await ask(`${ns}/proposals/${proposal.metadata.name}/decline`, 'POST', {}, token);
     assert.equal(res.status, 403);
     assert.equal(((await res.json()) as { reason?: string }).reason, 'person-only');
   });
-  await t.test("the person's approval answers 200 applied, and the tree holds the change", async () => {
+  test("the person's approval answers 200 applied, and the tree holds the change", async () => {
     const res = await ask(`${ns}/proposals/${proposal.metadata.name}/approve`, 'POST', {});
     assert.equal(res.status, 200);
     const applied = (await res.json()) as Proposal;
@@ -214,7 +275,7 @@ test('a proposal filed by a live session names its agent, run and step; the pers
     assert.equal(applied.status.approvedBy?.by, 'person');
     assert.match(planText(), /Plan it twice\./);
   });
-  await t.test('a proposal of the person is proposed by no one, and declined by them', async () => {
+  test('a proposal of the person is proposed by no one, and declined by them', async () => {
     const res = await ask(`${ns}/proposals`, 'POST', { objects: [await devChanged('Again.\n')] });
     assert.equal(res.status, 201);
     const mine = (await res.json()) as Proposal;
@@ -223,7 +284,7 @@ test('a proposal filed by a live session names its agent, run and step; the pers
     assert.equal(declined.status, 200);
     assert.equal(((await declined.json()) as Proposal).status.phase, 'declined');
   });
-  await t.test('listed by phase: ?fieldSelector=status.phase keeps the proposals in it, or in every other by !=', async () => {
+  test('listed by phase: ?fieldSelector=status.phase keeps the proposals in it, or in every other by !=', async () => {
     const phases = async (selector: string) => {
       const res = await app().request(`${ns}/proposals?fieldSelector=${encodeURIComponent(selector)}`);
       assert.equal(res.status, 200, selector);
@@ -234,20 +295,20 @@ test('a proposal filed by a live session names its agent, run and step; the pers
     assert.deepEqual(await phases('status.phase!=applied'), ['declined']);
     assert.deepEqual((await phases('')).sort(), ['applied', 'declined']);
   });
-  await t.test('REFUSED: a fieldSelector that names no phase, or another field, is 422', async () => {
+  test('REFUSED: a fieldSelector that names no phase, or another field, is 422', async () => {
     for (const selector of ['status.phase=pending', 'status.state=waiting'])
       assert.equal((await app().request(`${ns}/proposals?fieldSelector=${encodeURIComponent(selector)}`)).status, 422, selector);
   });
 });
 
-test("a Workflow proposed as the namespace serves it reports the access of its fence keys alone, its agents' denies and hire never read as a change", async (t) => {
+describe("a Workflow proposed as the namespace serves it reports the access of its fence keys alone, its agents' denies and hire never read as a change", () => {
   const accessOf = async (change: (step: ServedStep) => ServedStep) => {
     const res = await ask(`${ns}/proposals`, 'POST', { objects: [await fencedChanged(change)] });
     assert.equal(res.status, 201);
     const proposal = (await res.json()) as Proposal;
     return { access: proposal.status.changes.map((c) => c.access), widens: proposal.status.widens };
   };
-  await t.test('as served, unchanged: same', async () => {
+  test('as served, unchanged: same', async () => {
     const served = (await (await app().request(`${ns}/workflows/fenced`)).json()) as { spec: { steps: ServedStep[] } };
     const keys = Object.fromEntries(served.spec.steps.map((s) => [s.name, s.keys]));
     assert.deepEqual(
@@ -258,13 +319,13 @@ test("a Workflow proposed as the namespace serves it reports the access of its f
     assert.equal(keys.review?.agent, 'reader', 'the served review step carries the agent hired into it, which its file does not write');
     assert.deepEqual(await accessOf((s) => s), { access: ['same'], widens: false });
   });
-  await t.test("a step's body changed: same", async () => {
+  test("a step's body changed: same", async () => {
     assert.deepEqual(await accessOf((s) => (s.name === 'review' ? { ...s, body: 'Review it twice.\n' } : s)), {
       access: ['same'],
       widens: false,
     });
   });
-  await t.test("a step's allow added: widens", async () => {
+  test("a step's allow added: widens", async () => {
     const added = (s: ServedStep) => (s.name === 'design' ? { ...s, keys: { ...s.keys, allowedTools: ['Bash(npm test)'] } } : s);
     assert.deepEqual(await accessOf(added), { access: ['widens'], widens: true });
   });

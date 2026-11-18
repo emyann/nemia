@@ -9,7 +9,8 @@
  * incremental read (a journal replaced, cut, rewritten, gone), the files store's own refusals under the feed's lock and the schema's
  * completeness stay focused.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -50,26 +51,36 @@ const costOf = async (ops: ReturnType<typeof Journal.filesOps>, taskId = 't1') =
 /** How many tasks the story's engine files and keeps at work. */
 const N = 12;
 
-test('a board on files is read for what was appended alone: by a pass, a view and a fresh reader, a torn last line never handed on', async (t) => {
-  const s = story(t);
-  const board = path.join(root(), 'board');
-  const sessions = new Map<string, AsyncSighting>();
-  const working: AsyncRunner = {
-    spawn: async (r) => {
-      sessions.set(r.name, { sessionId: `s-${r.name}`, state: 'working' });
-    },
-    observe: async () => new Map(sessions),
-    stop: async () => {},
-    logs: async () => '',
-  };
-  const { Engine } = await import('../../index.ts');
-  const { builtEngine } = await import('../../../test/engine.ts');
-  const engine = builtEngine(Engine.layer({ root: board, harnesses: { working: asyncOps(working) }, defaultHarness: 'working' }));
-  const feedFile = path.join(board, 'feed.jsonl');
+describe('a board on files is read for what was appended alone: by a pass, a view and a fresh reader, a torn last line never handed on', () => {
+  let board!: string;
+  let sessions!: Map<string, AsyncSighting>;
+  let working!: AsyncRunner;
+  let Engine!: typeof import('../../index.ts').Engine;
+  let builtEngine!: <E>(layer: import('effect/Layer').Layer<import('../../index.ts').Engine, E>) => import('../../index.ts').EngineShape;
+  let engine!: import('../../index.ts').EngineShape;
+  let feedFile!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    board = path.join(root(), 'board');
+    sessions = new Map<string, AsyncSighting>();
+    working = {
+      spawn: async (r) => {
+        sessions.set(r.name, { sessionId: `s-${r.name}`, state: 'working' });
+      },
+      observe: async () => new Map(sessions),
+      stop: async () => {},
+      logs: async () => '',
+    };
+    ({ Engine } = await import('../../index.ts'));
+    ({ builtEngine } = await import('../../../test/engine.ts'));
+    engine = builtEngine(Engine.layer({ root: board, harnesses: { working: asyncOps(working) }, defaultHarness: 'working' }));
+    feedFile = path.join(board, 'feed.jsonl');
+    return t.end;
+  });
+  const s = story(test);
   const sizeOf = (file: string) => fs.statSync(file).size;
   const ids: string[] = [];
-
-  await s.test('a pass over tasks at work whose journals nothing has written to reads no byte', async () => {
+  s.test('a pass over tasks at work whose journals nothing has written to reads no byte', async () => {
     const cwd = scratch('ae-cursor-cwd-');
     for (let i = 0; i < N; i++) ids.push(await Effect.runPromise(engine.file({ brief: `task ${i}`, cwd })));
     let size = -1;
@@ -85,15 +96,13 @@ test('a board on files is read for what was appended alone: by a pass, a view an
     assert.equal(after.bytesRead - before.bytesRead, 0, 'no byte read');
     assert.equal(after.reads - before.reads, 0, 'no read made');
   });
-
-  await s.test('a view of a task at work whose journal nothing has written to reads no byte', async () => {
+  s.test('a view of a task at work whose journal nothing has written to reads no byte', async () => {
     const before = Effect.runSync(engine.io());
     const view = await Effect.runPromise(engine.view(ids[0]));
     assert.ok(!view.state.settled, 'the task is at work');
     assert.equal(Effect.runSync(engine.io()).bytesRead - before.bytesRead, 0);
   });
-
-  await s.test(
+  s.test(
     "a pass after another writer appends one event to one task's journal reads that line and the feed's growth, and nothing else",
     async () => {
       const journal = path.join(board, 'tasks', `${ids[4]}.jsonl`);
@@ -111,8 +120,7 @@ test('a board on files is read for what was appended alone: by a pass, a view an
       assert.equal(read, grown + appended, `read ${read}; the feed grew ${grown} and the journal ${appended}`);
     },
   );
-
-  await s.test('a half-written trailing line is never handed to a consumer', async () => {
+  s.test('a half-written trailing line is never handed to a consumer', async () => {
     const end = sizeOf(feedFile);
     const whole = (await run(board, feedFrom(0))).entries.map((e) => e.taskId);
     fs.appendFileSync(feedFile, '{"taskId":"t2","eve');
@@ -131,8 +139,7 @@ test('a board on files is read for what was appended alone: by a pass, a view an
       'the cursor stops before the partial line, so the line is delivered once it is complete',
     );
   });
-
-  await s.test('a second read of a journal nothing has written to reads no byte', async () => {
+  s.test('a second read of a journal nothing has written to reads no byte', async () => {
     await run(
       board,
       fileEach(['t1']).pipe(
@@ -238,8 +245,8 @@ const CAPPED = [
   },
 ];
 
-test("upgrade: a journal an older runtime wrote, or a consumer's own store holds, reads in today's shape, and no byte on disk changes", async (t) => {
-  await t.test("an old filed event is read with the harness's arguments under config, and nothing on disk is rewritten", async () => {
+describe("upgrade: a journal an older runtime wrote, or a consumer's own store holds, reads in today's shape, and no byte on disk changes", () => {
+  test("an old filed event is read with the harness's arguments under config, and nothing on disk is rewritten", async () => {
     const dir = legacyStore({ 't-old': [LEGACY, STARTING] });
     const before = bytesOf(dir);
     const [filed, starting] = await run(dir, readOf('t-old'));
@@ -263,8 +270,7 @@ test("upgrade: a journal an older runtime wrote, or a consumer's own store holds
     );
     assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
   });
-
-  await t.test('a store with tasks filed on both sides of the change reads them alike, and the engine folds each', async () => {
+  test('a store with tasks filed on both sides of the change reads them alike, and the engine folds each', async () => {
     const engine = await engineOver(legacyStore({ 't-new': [TODAY], 't-old': [LEGACY] }));
     const old = await Effect.runPromise(engine.view('t-old'));
     assert.deepEqual(old.state.config, {
@@ -279,40 +285,35 @@ test("upgrade: a journal an older runtime wrote, or a consumer's own store holds
     assert.equal('budgetUsd' in old.state, false, 'the cap included');
     assert.deepEqual((await Effect.runPromise(engine.view('t-new'))).state.config, { model: 'haiku' });
   });
-
-  await t.test(
-    "config is the newer word: a value there is kept over one beside it, and an undefined one is no argument — in a consumer's store that keeps the key JSON drops",
-    async () => {
-      const dir = legacyStore({
-        t: [{ ...LEGACY, config: { model: 'haiku' } }],
-        bare: [{ ...TODAY, config: undefined, model: undefined }],
-      });
-      const [both] = await run(dir, readOf('t'));
-      assert.deepEqual((both as { config?: unknown }).config, {
-        budgetUsd: 2,
-        model: 'haiku',
-        permissionMode: 'dontAsk',
-        tools: ['Read'],
-        worktree: true,
-        contextTokens: 200000,
-      });
-      const [bare] = await Effect.runPromise(
-        readOf('bare').pipe(
-          Effect.provide(
-            Journal.layer({
-              append: () => Effect.void,
-              list: Effect.succeed(['bare']),
-              feed: () => Effect.succeed({ entries: [], cursor: 0 }),
-              read: () => Effect.succeed([{ ...TODAY, config: undefined, model: undefined } as unknown as Event]),
-            }),
-          ),
+  test("config is the newer word: a value there is kept over one beside it, and an undefined one is no argument — in a consumer's store that keeps the key JSON drops", async (t) => {
+    const dir = legacyStore({
+      t: [{ ...LEGACY, config: { model: 'haiku' } }],
+      bare: [{ ...TODAY, config: undefined, model: undefined }],
+    });
+    const [both] = await run(dir, readOf('t'));
+    assert.deepEqual((both as { config?: unknown }).config, {
+      budgetUsd: 2,
+      model: 'haiku',
+      permissionMode: 'dontAsk',
+      tools: ['Read'],
+      worktree: true,
+      contextTokens: 200000,
+    });
+    const [bare] = await Effect.runPromise(
+      readOf('bare').pipe(
+        Effect.provide(
+          Journal.layer({
+            append: () => Effect.void,
+            list: Effect.succeed(['bare']),
+            feed: () => Effect.succeed({ entries: [], cursor: 0 }),
+            read: () => Effect.succeed([{ ...TODAY, config: undefined, model: undefined } as unknown as Event]),
+          }),
         ),
-      );
-      assert.ok(!('model' in bare) && !('config' in bare), JSON.stringify(bare));
-    },
-  );
-
-  await t.test("a consumer's own store is read in today's shape too: the upgrade is the Journal's, not the files'", async () => {
+      ),
+    );
+    assert.ok(!('model' in bare) && !('config' in bare), JSON.stringify(bare));
+  });
+  test("a consumer's own store is read in today's shape too: the upgrade is the Journal's, not the files'", async () => {
     const { Engine } = await import('../../index.ts');
     const { builtEngine } = await import('../../../test/engine.ts');
     const events = [LEGACY as unknown as Event];
@@ -330,217 +331,188 @@ test("upgrade: a journal an older runtime wrote, or a consumer's own store holds
     assert.deepEqual((await Effect.runPromise(engine.view('t-old'))).state.config?.model, 'opus');
     assert.deepEqual(events[0], LEGACY, "and the consumer's record is not touched");
   });
+  test("a journal from a runtime that judged the spend cap reads its caps under config and a capped end as the harness's, with the limit beside it — and no byte on disk changes", async () => {
+    const dir = legacyStore({ 't-capped': CAPPED });
+    const before = bytesOf(dir);
+    const events = await run(dir, readOf('t-capped'));
+    assert.deepEqual(events[0], {
+      kind: 'filed',
+      at: CAPPED[0].at,
+      brief: 'b',
+      cwd: '/r',
+      holdOpen: true,
+      config: { budgetUsd: 1, model: 'haiku' },
+    });
+    assert.deepEqual(
+      events[4],
+      { kind: 'input', at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 0.5 } },
+      "a turn's cap is that turn's configuration",
+    );
+    assert.deepEqual(
+      events[7],
+      { ...CAPPED[7], reason: 'harness', limit: 'budget' },
+      'the end the runtime judged `budget` is the harness ending it at that limit',
+    );
+    assert.deepEqual(
+      events[3],
+      { ...CAPPED[3], observed: 'succeeded' },
+      'an end at no limit is as written, its former `done` read as `succeeded`',
+    );
+    assert.deepEqual(events[8], CAPPED[8], 'and what was settled stays settled, in its words');
+    const { entries } = await run(dir, feedFrom(0));
+    assert.deepEqual(
+      entries.map((e) => e.event),
+      events,
+      'the feed reads the same shape as the task',
+    );
+    assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
 
-  await t.test(
-    "a journal from a runtime that judged the spend cap reads its caps under config and a capped end as the harness's, with the limit beside it — and no byte on disk changes",
-    async () => {
-      const dir = legacyStore({ 't-capped': CAPPED });
-      const before = bytesOf(dir);
-      const events = await run(dir, readOf('t-capped'));
-      assert.deepEqual(events[0], {
-        kind: 'filed',
-        at: CAPPED[0].at,
-        brief: 'b',
-        cwd: '/r',
-        holdOpen: true,
-        config: { budgetUsd: 1, model: 'haiku' },
-      });
-      assert.deepEqual(
-        events[4],
-        { kind: 'input', at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 0.5 } },
-        "a turn's cap is that turn's configuration",
-      );
-      assert.deepEqual(
-        events[7],
-        { ...CAPPED[7], reason: 'harness', limit: 'budget' },
-        'the end the runtime judged `budget` is the harness ending it at that limit',
-      );
-      assert.deepEqual(
-        events[3],
-        { ...CAPPED[3], observed: 'succeeded' },
-        'an end at no limit is as written, its former `done` read as `succeeded`',
-      );
-      assert.deepEqual(events[8], CAPPED[8], 'and what was settled stays settled, in its words');
-      const { entries } = await run(dir, feedFrom(0));
-      assert.deepEqual(
-        entries.map((e) => e.event),
-        events,
-        'the feed reads the same shape as the task',
-      );
-      assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
-
-      const { state } = await Effect.runPromise((await engineOver(dir)).view('t-capped'));
-      assert.deepEqual(state.inputs, [{ at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 0.5 } }]);
-      assert.deepEqual(
-        state.attempts.map((a) => [a.ended, a.reason, a.limit]),
-        [
-          ['succeeded', 'harness', undefined],
-          ['failed', 'harness', 'budget'],
-        ],
-      );
-      assert.equal(state.config?.budgetUsd, 1);
-    },
-  );
-
-  await t.test("an input's cap is laid under a config it already has, never over it: config is the newer word", async () => {
+    const { state } = await Effect.runPromise((await engineOver(dir)).view('t-capped'));
+    assert.deepEqual(state.inputs, [{ at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 0.5 } }]);
+    assert.deepEqual(
+      state.attempts.map((a) => [a.ended, a.reason, a.limit]),
+      [
+        ['succeeded', 'harness', undefined],
+        ['failed', 'harness', 'budget'],
+      ],
+    );
+    assert.equal(state.config?.budgetUsd, 1);
+  });
+  test("an input's cap is laid under a config it already has, never over it: config is the newer word", async (t) => {
     const [input] = await run(legacyStore({ t: [{ ...CAPPED[4], config: { budgetUsd: 2 } }] }), readOf('t'));
     assert.deepEqual(input, { kind: 'input', at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 2 } });
   });
-
-  await t.test(
-    "a filing that asked for remoteControl, Claude Code's bridge to claude.ai, — under config, or beside it from before config — reads it as Claude Code's flag in config.claude, and no byte on disk changes",
-    async () => {
-      const dir = legacyStore({
-        under: [{ ...TODAY, config: { background: true, remoteControl: true } }],
-        beside: [{ ...TODAY, config: undefined, background: true, remoteControl: true }],
-        both: [
-          {
-            ...TODAY,
-            config: { background: true, remoteControl: true, claude: { appendSystemPromptFile: 'p.md', remoteControl: 'phone' } },
-          },
-        ],
-        off: [{ ...TODAY, config: { model: 'haiku', remoteControl: false } }],
-      });
-      const before = bytesOf(dir);
-      const read = async (id: string) => ((await run(dir, readOf(id)))[0] as { config?: unknown }).config;
-      assert.deepEqual(await read('under'), { claude: { remoteControl: true } });
-      assert.deepEqual(await read('beside'), { claude: { remoteControl: true } });
-      assert.deepEqual(
-        await read('both'),
-        { claude: { remoteControl: 'phone', appendSystemPromptFile: 'p.md' } },
-        'a flag already in config.claude is the newer word, and is kept',
-      );
-      assert.deepEqual(
-        Object.keys(((await read('both')) as { claude: object }).claude),
-        ['remoteControl', 'appendSystemPromptFile'],
-        'the bridge goes first, where the runtime gave it',
-      );
-      assert.deepEqual(await read('off'), { model: 'haiku' }, '`false` asked for nothing, and is no flag: dropped');
-      const { entries } = await run(dir, feedFrom(0));
-      assert.deepEqual(
-        entries.find((e) => e.taskId === 'under')?.event,
-        (await run(dir, readOf('under')))[0],
-        'the feed reads the same shape',
-      );
-      assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
-      const { state } = await Effect.runPromise((await engineOver(dir)).view('under'));
-      assert.deepEqual(state.config, { claude: { remoteControl: true } });
-    },
-  );
-
-  await t.test(
-    'a filing that asked for `background`, the `claude --bg` road this runtime no longer runs — under config, or beside it — reads without it, the rest of its config kept, and no byte on disk changes',
-    async () => {
-      const dir = legacyStore({
-        on: [{ ...TODAY, config: { background: true, model: 'haiku' } }],
-        off: [{ ...TODAY, config: { background: false } }],
-        beside: [{ ...TODAY, config: { model: 'haiku' }, background: true }],
-        held: [{ ...TODAY, restartPolicy: 'Always', config: { background: true, claude: { remoteControl: true } } }],
-      });
-      const before = bytesOf(dir);
-      const filed = async (id: string) =>
-        (await run(dir, readOf(id)))[0] as { config?: unknown; background?: unknown; restartPolicy?: unknown };
-      assert.deepEqual((await filed('on')).config, { model: 'haiku' });
-      assert.equal((await filed('off')).config, undefined, 'a config that held nothing else is no config');
-      const beside = await filed('beside');
-      assert.deepEqual([beside.config, Object.hasOwn(beside, 'background')], [{ model: 'haiku' }, false], 'beside config: dropped too');
-      const held = await filed('held');
-      assert.deepEqual(
-        [held.restartPolicy, held.config],
-        ['Always', { claude: { remoteControl: true } }],
-        'a long-lived session stays one',
-      );
-      assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
-      const { state } = await Effect.runPromise((await engineOver(dir)).view('held'));
-      assert.deepEqual(state.config, { claude: { remoteControl: true } });
-    },
-  );
-
-  await t.test(
-    "Codex's arguments are read from a journal as filed, and the engine folds them onto the task's config — and no byte on disk changes",
-    async () => {
-      const codex = { ...TODAY, config: { model: 'gpt-5', codex: { trustFrom: '/repo' } } };
-      const dir = legacyStore({ 't-codex': [codex] });
-      const before = bytesOf(dir);
-      const [filed] = await run(dir, readOf('t-codex'));
-      assert.deepEqual(filed, codex);
-      assert.deepEqual((await Effect.runPromise((await engineOver(dir)).view('t-codex'))).state.config, {
-        model: 'gpt-5',
-        codex: { trustFrom: '/repo' },
-      });
-      assert.deepEqual(bytesOf(dir), before);
-    },
-  );
-
-  await t.test(
-    "a journal written before the runtime's words took their names reads in today's — closedOut, responses, projectMcp, a former reason as the harness's end — and no byte on disk changes",
-    async () => {
-      const dir = legacyStore({ 't-words': RENAMED });
-      const before = bytesOf(dir);
-      const events = await run(dir, readOf('t-words'));
-      const [filed, , , quiet, input, , , measured, counted, unstated] = RENAMED;
-      assert.deepEqual(events[0], { ...filed, config: { model: 'haiku', projectMcp: ['repo'] } }, 'the servers kept by their new name');
-      assert.deepEqual(
-        events[3],
-        { ...quiet, reason: 'harness', closedOut: false, former: 'unsigned', usage: { responses: 3 } },
-        "a former reason is the harness's end with no statement, the reason it was written with kept as `former`",
-      );
-      assert.deepEqual(events[4], { ...input, config: { projectMcp: [] } }, "a turn's configuration by its new name too");
-      assert.deepEqual(events[7], { ...measured, usage: { responses: 1, toolCalls: 2 } });
-      assert.deepEqual(events[8], { ...counted, usage: { responses: 2 } });
-      const { stated: _, ...unsaid } = unstated as { stated?: boolean };
-      assert.deepEqual(
-        events[9],
-        { ...unsaid, closedOut: false, usage: { responses: 2 } },
-        'an end with no statement says so by its new name',
-      );
-      const read = JSON.stringify(events);
-      for (const left of ['"checkoutMcp"', '"stated"', '"turns"', '"reason":"unsigned"'])
-        assert.ok(!read.includes(left), `${left} in ${read}`);
-      const { entries } = await run(dir, feedFrom(0));
-      assert.deepEqual(
-        entries.map((e) => e.event),
-        events,
-        'the feed reads the same shape as the task',
-      );
-      assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
-      const { state } = await Effect.runPromise((await engineOver(dir)).view('t-words'));
-      assert.deepEqual(state.config, { model: 'haiku', projectMcp: ['repo'] });
-      assert.deepEqual(
-        state.attempts.map((a) => [a.ended, a.reason, a.closedOut, a.former, a.usage?.responses]),
-        [
-          ['failed', 'harness', false, 'unsigned', 3],
-          ['succeeded', 'harness', false, undefined, 2],
-        ],
-      );
-    },
-  );
-
-  await t.test(
-    'an end that says the skills its session loaded and no denials read as denied nothing, `[]`: the stream that says skills measured denials; one that says neither is left as it is, and no byte on disk changes',
-    async () => {
-      const end = { kind: 'ended', at: '2026-09-24T00:00:03Z', attempt: 1, sessionId: 's-1', observed: 'succeeded', reason: 'harness' };
-      const journal = (more: object) => [
-        TODAY,
-        { kind: 'starting', at: '2026-09-24T00:00:01Z', attempt: 1 },
-        { kind: 'spawned', at: '2026-09-24T00:00:02Z', attempt: 1 },
-        { ...end, ...more },
-      ];
-      const dir = legacyStore({
-        skilled: journal({ skills: ['look'] }),
-        unskilled: journal({}),
-        denied: journal({ skills: [], denials: [{ tool: 'Bash', what: 'ls' }] }),
-      });
-      const before = bytesOf(dir);
-      const endOf = async (id: string) => (await run(dir, readOf(id)))[3] as { denials?: unknown };
-      assert.deepEqual((await endOf('skilled')).denials, [], 'skills said: denials were measured, and none came');
-      assert.equal(Object.hasOwn(await endOf('unskilled'), 'denials'), false, 'neither said: not measured, left so');
-      assert.deepEqual((await endOf('denied')).denials, [{ tool: 'Bash', what: 'ls' }], 'denials said: kept');
-      assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
-      const { state } = await Effect.runPromise((await engineOver(dir)).view('skilled'));
-      assert.deepEqual(state.attempts[0]?.denials, []);
-    },
-  );
+  test("a filing that asked for remoteControl, Claude Code's bridge to claude.ai, — under config, or beside it from before config — reads it as Claude Code's flag in config.claude, and no byte on disk changes", async () => {
+    const dir = legacyStore({
+      under: [{ ...TODAY, config: { background: true, remoteControl: true } }],
+      beside: [{ ...TODAY, config: undefined, background: true, remoteControl: true }],
+      both: [
+        {
+          ...TODAY,
+          config: { background: true, remoteControl: true, claude: { appendSystemPromptFile: 'p.md', remoteControl: 'phone' } },
+        },
+      ],
+      off: [{ ...TODAY, config: { model: 'haiku', remoteControl: false } }],
+    });
+    const before = bytesOf(dir);
+    const read = async (id: string) => ((await run(dir, readOf(id)))[0] as { config?: unknown }).config;
+    assert.deepEqual(await read('under'), { claude: { remoteControl: true } });
+    assert.deepEqual(await read('beside'), { claude: { remoteControl: true } });
+    assert.deepEqual(
+      await read('both'),
+      { claude: { remoteControl: 'phone', appendSystemPromptFile: 'p.md' } },
+      'a flag already in config.claude is the newer word, and is kept',
+    );
+    assert.deepEqual(
+      Object.keys(((await read('both')) as { claude: object }).claude),
+      ['remoteControl', 'appendSystemPromptFile'],
+      'the bridge goes first, where the runtime gave it',
+    );
+    assert.deepEqual(await read('off'), { model: 'haiku' }, '`false` asked for nothing, and is no flag: dropped');
+    const { entries } = await run(dir, feedFrom(0));
+    assert.deepEqual(
+      entries.find((e) => e.taskId === 'under')?.event,
+      (await run(dir, readOf('under')))[0],
+      'the feed reads the same shape',
+    );
+    assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
+    const { state } = await Effect.runPromise((await engineOver(dir)).view('under'));
+    assert.deepEqual(state.config, { claude: { remoteControl: true } });
+  });
+  test('a filing that asked for `background`, the `claude --bg` road this runtime no longer runs — under config, or beside it — reads without it, the rest of its config kept, and no byte on disk changes', async () => {
+    const dir = legacyStore({
+      on: [{ ...TODAY, config: { background: true, model: 'haiku' } }],
+      off: [{ ...TODAY, config: { background: false } }],
+      beside: [{ ...TODAY, config: { model: 'haiku' }, background: true }],
+      held: [{ ...TODAY, restartPolicy: 'Always', config: { background: true, claude: { remoteControl: true } } }],
+    });
+    const before = bytesOf(dir);
+    const filed = async (id: string) =>
+      (await run(dir, readOf(id)))[0] as { config?: unknown; background?: unknown; restartPolicy?: unknown };
+    assert.deepEqual((await filed('on')).config, { model: 'haiku' });
+    assert.equal((await filed('off')).config, undefined, 'a config that held nothing else is no config');
+    const beside = await filed('beside');
+    assert.deepEqual([beside.config, Object.hasOwn(beside, 'background')], [{ model: 'haiku' }, false], 'beside config: dropped too');
+    const held = await filed('held');
+    assert.deepEqual([held.restartPolicy, held.config], ['Always', { claude: { remoteControl: true } }], 'a long-lived session stays one');
+    assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
+    const { state } = await Effect.runPromise((await engineOver(dir)).view('held'));
+    assert.deepEqual(state.config, { claude: { remoteControl: true } });
+  });
+  test("Codex's arguments are read from a journal as filed, and the engine folds them onto the task's config — and no byte on disk changes", async () => {
+    const codex = { ...TODAY, config: { model: 'gpt-5', codex: { trustFrom: '/repo' } } };
+    const dir = legacyStore({ 't-codex': [codex] });
+    const before = bytesOf(dir);
+    const [filed] = await run(dir, readOf('t-codex'));
+    assert.deepEqual(filed, codex);
+    assert.deepEqual((await Effect.runPromise((await engineOver(dir)).view('t-codex'))).state.config, {
+      model: 'gpt-5',
+      codex: { trustFrom: '/repo' },
+    });
+    assert.deepEqual(bytesOf(dir), before);
+  });
+  test("a journal written before the runtime's words took their names reads in today's — closedOut, responses, projectMcp, a former reason as the harness's end — and no byte on disk changes", async () => {
+    const dir = legacyStore({ 't-words': RENAMED });
+    const before = bytesOf(dir);
+    const events = await run(dir, readOf('t-words'));
+    const [filed, , , quiet, input, , , measured, counted, unstated] = RENAMED;
+    assert.deepEqual(events[0], { ...filed, config: { model: 'haiku', projectMcp: ['repo'] } }, 'the servers kept by their new name');
+    assert.deepEqual(
+      events[3],
+      { ...quiet, reason: 'harness', closedOut: false, former: 'unsigned', usage: { responses: 3 } },
+      "a former reason is the harness's end with no statement, the reason it was written with kept as `former`",
+    );
+    assert.deepEqual(events[4], { ...input, config: { projectMcp: [] } }, "a turn's configuration by its new name too");
+    assert.deepEqual(events[7], { ...measured, usage: { responses: 1, toolCalls: 2 } });
+    assert.deepEqual(events[8], { ...counted, usage: { responses: 2 } });
+    const { stated: _, ...unsaid } = unstated as { stated?: boolean };
+    assert.deepEqual(
+      events[9],
+      { ...unsaid, closedOut: false, usage: { responses: 2 } },
+      'an end with no statement says so by its new name',
+    );
+    const read = JSON.stringify(events);
+    for (const left of ['"checkoutMcp"', '"stated"', '"turns"', '"reason":"unsigned"'])
+      assert.ok(!read.includes(left), `${left} in ${read}`);
+    const { entries } = await run(dir, feedFrom(0));
+    assert.deepEqual(
+      entries.map((e) => e.event),
+      events,
+      'the feed reads the same shape as the task',
+    );
+    assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
+    const { state } = await Effect.runPromise((await engineOver(dir)).view('t-words'));
+    assert.deepEqual(state.config, { model: 'haiku', projectMcp: ['repo'] });
+    assert.deepEqual(
+      state.attempts.map((a) => [a.ended, a.reason, a.closedOut, a.former, a.usage?.responses]),
+      [
+        ['failed', 'harness', false, 'unsigned', 3],
+        ['succeeded', 'harness', false, undefined, 2],
+      ],
+    );
+  });
+  test('an end that says the skills its session loaded and no denials read as denied nothing, `[]`: the stream that says skills measured denials; one that says neither is left as it is, and no byte on disk changes', async () => {
+    const end = { kind: 'ended', at: '2026-09-24T00:00:03Z', attempt: 1, sessionId: 's-1', observed: 'succeeded', reason: 'harness' };
+    const journal = (more: object) => [
+      TODAY,
+      { kind: 'starting', at: '2026-09-24T00:00:01Z', attempt: 1 },
+      { kind: 'spawned', at: '2026-09-24T00:00:02Z', attempt: 1 },
+      { ...end, ...more },
+    ];
+    const dir = legacyStore({
+      skilled: journal({ skills: ['look'] }),
+      unskilled: journal({}),
+      denied: journal({ skills: [], denials: [{ tool: 'Bash', what: 'ls' }] }),
+    });
+    const before = bytesOf(dir);
+    const endOf = async (id: string) => (await run(dir, readOf(id)))[3] as { denials?: unknown };
+    assert.deepEqual((await endOf('skilled')).denials, [], 'skills said: denials were measured, and none came');
+    assert.equal(Object.hasOwn(await endOf('unskilled'), 'denials'), false, 'neither said: not measured, left so');
+    assert.deepEqual((await endOf('denied')).denials, [{ tool: 'Bash', what: 'ls' }], 'denials said: kept');
+    assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
+    const { state } = await Effect.runPromise((await engineOver(dir)).view('skilled'));
+    assert.deepEqual(state.attempts[0]?.denials, []);
+  });
 });
 
 /**
@@ -597,62 +569,47 @@ const refusedRead = async (lines: object[]) => {
   return error;
 };
 
-test('decode: an entry no runtime wrote fails its read, naming the task, the entry and its first wrong field; one it wrote is read back as written', async (t) => {
-  await t.test(
-    'a journal line of a kind no runtime writes fails the read, naming the task, the entry and the kinds, and saying to take it out',
-    async () => {
-      const error = await refusedRead([TODAY, { kind: 'nudged', at: '2026-09-24T00:00:01Z' }]);
-      naming(error.message, 'entry 2 is no event', '"nudged"', 'the kinds are filed,', 'take it out');
-    },
-  );
-
-  await t.test('an event of a known kind missing a field it always carries fails the read, naming the field', async () => {
+describe('decode: an entry no runtime wrote fails its read, naming the task, the entry and its first wrong field; one it wrote is read back as written', () => {
+  test('a journal line of a kind no runtime writes fails the read, naming the task, the entry and the kinds, and saying to take it out', async () => {
+    const error = await refusedRead([TODAY, { kind: 'nudged', at: '2026-09-24T00:00:01Z' }]);
+    naming(error.message, 'entry 2 is no event', '"nudged"', 'the kinds are filed,', 'take it out');
+  });
+  test('an event of a known kind missing a field it always carries fails the read, naming the field', async () => {
     const { at: _, ...noTime } = TODAY;
     const error = await refusedRead([noTime]);
     naming(error.message, 'entry 1 is a `filed` event', '`at` is missing');
   });
-
-  await t.test('a field of the wrong type fails the read, saying what is there and what the runtime writes', async () => {
+  test('a field of the wrong type fails the read, saying what is there and what the runtime writes', async () => {
     const error = await refusedRead([TODAY, { kind: 'measured', at: '2026-09-24T00:00:01Z', attempt: 1, usage: { responses: 'three' } }]);
     naming(error.message, 'entry 2 is a `measured` event', '`usage.responses` is "three"', 'writes number');
   });
-
-  await t.test(
-    'a counted entry is read back as written; one whose usage no runtime wrote fails the read as a measured one does',
-    async () => {
-      const usage = { responses: 3, outputTokens: 40 };
-      const events = await run(
-        legacyStore({ 't-ok': [TODAY, { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage }] }),
-        readOf('t-ok'),
-      );
-      assert.deepEqual(events.at(-1), { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage });
-      const error = await refusedRead([TODAY, { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage: { responses: 'three' } }]);
-      naming(error.message, 'entry 2 is a `counted` event', '`usage.responses` is "three"', 'writes number');
-    },
-  );
-
-  await t.test('an exited entry is read back as written; one whose exit code is no number fails the read, naming the field', async () => {
+  test('a counted entry is read back as written; one whose usage no runtime wrote fails the read as a measured one does', async () => {
+    const usage = { responses: 3, outputTokens: 40 };
+    const events = await run(
+      legacyStore({ 't-ok': [TODAY, { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage }] }),
+      readOf('t-ok'),
+    );
+    assert.deepEqual(events.at(-1), { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage });
+    const error = await refusedRead([TODAY, { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage: { responses: 'three' } }]);
+    naming(error.message, 'entry 2 is a `counted` event', '`usage.responses` is "three"', 'writes number');
+  });
+  test('an exited entry is read back as written; one whose exit code is no number fails the read, naming the field', async () => {
     const exited = { kind: 'exited', at: '2026-09-24T00:00:01Z', attempt: 1, exitCode: 0 };
     const events = await run(legacyStore({ 't-ok': [TODAY, exited] }), readOf('t-ok'));
     assert.deepEqual(events.at(-1), exited);
     const error = await refusedRead([TODAY, { ...exited, exitCode: 'zero' }]);
     naming(error.message, 'entry 2 is a `exited` event', '`exitCode`');
   });
-
-  await t.test(
-    'a denied entry is read back as written, with its call or without; one that names no tool fails the read, naming the field',
-    async () => {
-      const entries = [
-        { kind: 'denied', at: '2026-09-24T00:00:01Z', attempt: 1, tool: 'Bash', what: 'ls' },
-        { kind: 'denied', at: '2026-09-24T00:00:02Z', attempt: 1, tool: 'WebFetch' },
-      ];
-      const events = await run(legacyStore({ 't-ok': [TODAY, ...entries] }), readOf('t-ok'));
-      assert.deepEqual(events.slice(1), entries);
-      const error = await refusedRead([TODAY, { kind: 'denied', at: '2026-09-24T00:00:01Z', attempt: 1, what: 'ls' }]);
-      naming(error.message, 'entry 2 is a `denied` event', '`tool` is missing');
-    },
-  );
-
+  test('a denied entry is read back as written, with its call or without; one that names no tool fails the read, naming the field', async () => {
+    const entries = [
+      { kind: 'denied', at: '2026-09-24T00:00:01Z', attempt: 1, tool: 'Bash', what: 'ls' },
+      { kind: 'denied', at: '2026-09-24T00:00:02Z', attempt: 1, tool: 'WebFetch' },
+    ];
+    const events = await run(legacyStore({ 't-ok': [TODAY, ...entries] }), readOf('t-ok'));
+    assert.deepEqual(events.slice(1), entries);
+    const error = await refusedRead([TODAY, { kind: 'denied', at: '2026-09-24T00:00:01Z', attempt: 1, what: 'ls' }]);
+    naming(error.message, 'entry 2 is a `denied` event', '`tool` is missing');
+  });
   const end = (attempt: number, more: object) => ({
     kind: 'ended',
     at: '2026-09-24T00:00:01Z',
@@ -662,128 +619,99 @@ test('decode: an entry no runtime wrote fails its read, naming the task, the ent
     reason: 'harness',
     ...more,
   });
-
-  await t.test(
-    'the skills an end names are read back as written, an empty list kept; a list of anything but names fails the read',
-    async () => {
-      const read = await run(
-        legacyStore({ 't-skills': [TODAY, end(1, { skills: [] }), end(2, { skills: ['look'] })] }),
-        readOf('t-skills'),
-      );
-      assert.deepEqual(
-        read.map((e) => (e.kind === 'ended' ? e.skills : undefined)),
-        [undefined, [], ['look']],
-      );
-      const error = await refusedRead([TODAY, end(1, { skills: 'look' })]);
-      naming(error.message, 'entry 2 is a `ended` event, and its `skills` is "look"');
-    },
-  );
-
-  await t.test(
-    'the model an end names is read back as written, and folds onto the attempt; an end an older runtime wrote names none',
-    async () => {
-      const starting = (attempt: number) => ({ kind: 'starting', at: '2026-09-24T00:00:00Z', attempt, name: `ae-t-model-${attempt}` });
-      const read = await run(
-        legacyStore({ 't-model': [TODAY, starting(1), end(1, {}), starting(2), end(2, { ranOn: 'claude-opus-5-5' })] }),
-        readOf('t-model'),
-      );
-      assert.deepEqual(
-        read.map((e) => (e.kind === 'ended' ? e.ranOn : undefined)),
-        [undefined, undefined, undefined, undefined, 'claude-opus-5-5'],
-        'an end an older runtime wrote carries no model, and nothing is invented for it',
-      );
-      assert.deepEqual(
-        fold('t-model', read).attempts.map((a) => a.ranOn),
-        [undefined, 'claude-opus-5-5'],
-        "and the model an end does name is the attempt's, so a person reading a task sees which model its session ran on",
-      );
-      const error = await refusedRead([TODAY, starting(1), end(1, { ranOn: 5 })]);
-      naming(error.message, 'entry 3 is a `ended` event, and its `ranOn` is 5');
-    },
-  );
-
-  await t.test(
-    'the termination message an end carries is read back as written and folds onto the attempt; an end with none folds with none',
-    async () => {
-      const starting = (attempt: number) => ({ kind: 'starting', at: '2026-09-24T00:00:00Z', attempt });
-      const read = await run(
-        legacyStore({ 't-term': [TODAY, starting(1), end(1, {}), starting(2), end(2, { terminationMessage: 'route: web\n' })] }),
-        readOf('t-term'),
-      );
-      assert.deepEqual(
-        read.map((e) => (e.kind === 'ended' ? e.terminationMessage : undefined)),
-        [undefined, undefined, undefined, undefined, 'route: web\n'],
-      );
-      assert.deepEqual(
-        fold('t-term', read).attempts.map((a) => a.terminationMessage),
-        [undefined, 'route: web\n'],
-      );
-      await refusedRead([TODAY, starting(1), end(1, { terminationMessage: 5 })]);
-    },
-  );
-
-  await t.test(
-    'the code and harness version an image entry names are read back as written and fold onto the attempt, the latest winning; a journal with none folds with neither',
-    async () => {
-      const starting = (attempt: number) => ({ kind: 'starting', at: '2026-09-24T00:00:00Z', attempt });
-      const image = (o: object) => ({ kind: 'image', at: '2026-09-24T00:00:01Z', attempt: 2, ...o });
-      const read = await run(
-        legacyStore({
-          't-image': [
-            TODAY,
-            starting(1),
-            end(1, {}),
-            starting(2),
-            image({ image: '/r/v1', harnessVersion: '2.1.315' }),
-            image({ image: '/r/v2' }),
-          ],
-        }),
-        readOf('t-image'),
-      );
-      assert.deepEqual(
-        fold('t-image', read).attempts.map((a) => [a.image, a.harnessVersion]),
-        [
-          [undefined, undefined],
-          ['/r/v2', '2.1.315'],
+  test('the skills an end names are read back as written, an empty list kept; a list of anything but names fails the read', async () => {
+    const read = await run(legacyStore({ 't-skills': [TODAY, end(1, { skills: [] }), end(2, { skills: ['look'] })] }), readOf('t-skills'));
+    assert.deepEqual(
+      read.map((e) => (e.kind === 'ended' ? e.skills : undefined)),
+      [undefined, [], ['look']],
+    );
+    const error = await refusedRead([TODAY, end(1, { skills: 'look' })]);
+    naming(error.message, 'entry 2 is a `ended` event, and its `skills` is "look"');
+  });
+  test('the model an end names is read back as written, and folds onto the attempt; an end an older runtime wrote names none', async () => {
+    const starting = (attempt: number) => ({ kind: 'starting', at: '2026-09-24T00:00:00Z', attempt, name: `ae-t-model-${attempt}` });
+    const read = await run(
+      legacyStore({ 't-model': [TODAY, starting(1), end(1, {}), starting(2), end(2, { ranOn: 'claude-opus-5-5' })] }),
+      readOf('t-model'),
+    );
+    assert.deepEqual(
+      read.map((e) => (e.kind === 'ended' ? e.ranOn : undefined)),
+      [undefined, undefined, undefined, undefined, 'claude-opus-5-5'],
+      'an end an older runtime wrote carries no model, and nothing is invented for it',
+    );
+    assert.deepEqual(
+      fold('t-model', read).attempts.map((a) => a.ranOn),
+      [undefined, 'claude-opus-5-5'],
+      "and the model an end does name is the attempt's, so a person reading a task sees which model its session ran on",
+    );
+    const error = await refusedRead([TODAY, starting(1), end(1, { ranOn: 5 })]);
+    naming(error.message, 'entry 3 is a `ended` event, and its `ranOn` is 5');
+  });
+  test('the termination message an end carries is read back as written and folds onto the attempt; an end with none folds with none', async () => {
+    const starting = (attempt: number) => ({ kind: 'starting', at: '2026-09-24T00:00:00Z', attempt });
+    const read = await run(
+      legacyStore({ 't-term': [TODAY, starting(1), end(1, {}), starting(2), end(2, { terminationMessage: 'route: web\n' })] }),
+      readOf('t-term'),
+    );
+    assert.deepEqual(
+      read.map((e) => (e.kind === 'ended' ? e.terminationMessage : undefined)),
+      [undefined, undefined, undefined, undefined, 'route: web\n'],
+    );
+    assert.deepEqual(
+      fold('t-term', read).attempts.map((a) => a.terminationMessage),
+      [undefined, 'route: web\n'],
+    );
+    await refusedRead([TODAY, starting(1), end(1, { terminationMessage: 5 })]);
+  });
+  test('the code and harness version an image entry names are read back as written and fold onto the attempt, the latest winning; a journal with none folds with neither', async () => {
+    const starting = (attempt: number) => ({ kind: 'starting', at: '2026-09-24T00:00:00Z', attempt });
+    const image = (o: object) => ({ kind: 'image', at: '2026-09-24T00:00:01Z', attempt: 2, ...o });
+    const read = await run(
+      legacyStore({
+        't-image': [
+          TODAY,
+          starting(1),
+          end(1, {}),
+          starting(2),
+          image({ image: '/r/v1', harnessVersion: '2.1.315' }),
+          image({ image: '/r/v2' }),
         ],
-      );
-      const error = await refusedRead([TODAY, starting(1), { kind: 'image', at: '2026-09-24T00:00:01Z', attempt: 1, image: 5 }]);
-      naming(error.message, 'entry 3', '`image`');
-    },
-  );
-
-  await t.test(
-    'the files an end names are read back as written, an empty list kept; a list of anything but paths fails the read',
-    async () => {
-      const read = await run(
-        legacyStore({ 't-files': [TODAY, end(1, { files: [] }), end(2, { files: ['apps/web/a.tsx'] })] }),
-        readOf('t-files'),
-      );
-      assert.deepEqual(
-        read.map((e) => (e.kind === 'ended' ? e.files : undefined)),
-        [undefined, [], ['apps/web/a.tsx']],
-      );
-      const error = await refusedRead([TODAY, end(1, { files: 'b.ts' })]);
-      naming(error.message, 'entry 2 is a `ended` event, and its `files` is "b.ts"');
-    },
-  );
-
-  await t.test(
-    'a harness argument of the wrong type is refused under config and beside it, where a journal from before config put it',
-    async () => {
-      const under = await refusedRead([{ ...TODAY, config: { tools: 'Read' } }]);
-      naming(under.message, 'entry 1 is a `filed` event, and its `', 'tools');
-      const beside = await refusedRead([{ ...LEGACY, worktree: 3 }]);
-      naming(beside.message, 'entry 1 is a `filed` event, and its `', 'worktree');
-    },
-  );
-
-  await t.test("a directory to extend Codex's trust from that is not a string fails the task's read, naming the field", async () => {
+      }),
+      readOf('t-image'),
+    );
+    assert.deepEqual(
+      fold('t-image', read).attempts.map((a) => [a.image, a.harnessVersion]),
+      [
+        [undefined, undefined],
+        ['/r/v2', '2.1.315'],
+      ],
+    );
+    const error = await refusedRead([TODAY, starting(1), { kind: 'image', at: '2026-09-24T00:00:01Z', attempt: 1, image: 5 }]);
+    naming(error.message, 'entry 3', '`image`');
+  });
+  test('the files an end names are read back as written, an empty list kept; a list of anything but paths fails the read', async () => {
+    const read = await run(
+      legacyStore({ 't-files': [TODAY, end(1, { files: [] }), end(2, { files: ['apps/web/a.tsx'] })] }),
+      readOf('t-files'),
+    );
+    assert.deepEqual(
+      read.map((e) => (e.kind === 'ended' ? e.files : undefined)),
+      [undefined, [], ['apps/web/a.tsx']],
+    );
+    const error = await refusedRead([TODAY, end(1, { files: 'b.ts' })]);
+    naming(error.message, 'entry 2 is a `ended` event, and its `files` is "b.ts"');
+  });
+  test('a harness argument of the wrong type is refused under config and beside it, where a journal from before config put it', async () => {
+    const under = await refusedRead([{ ...TODAY, config: { tools: 'Read' } }]);
+    naming(under.message, 'entry 1 is a `filed` event, and its `', 'tools');
+    const beside = await refusedRead([{ ...LEGACY, worktree: 3 }]);
+    naming(beside.message, 'entry 1 is a `filed` event, and its `', 'worktree');
+  });
+  test("a directory to extend Codex's trust from that is not a string fails the task's read, naming the field", async () => {
     const error = await refusedRead([{ ...TODAY, config: { codex: { trustFrom: 7 } } }]);
     naming(error.message, 'entry 1 is a `filed` event', '`config.codex.trustFrom` is 7,');
   });
-
-  await t.test("a line of a task's journal cut short fails that task's read, naming the entry and what it reads", async () => {
+  test("a line of a task's journal cut short fails that task's read, naming the entry and what it reads", async () => {
     const dir = legacyStore({ 't-cut': [TODAY] });
     fs.appendFileSync(path.join(dir, 'tasks', 't-cut.jsonl'), '{"kind":"start\n');
     const error = await failureOf(dir, readOf('t-cut'));
@@ -795,54 +723,45 @@ test('decode: an entry no runtime wrote fails its read, naming the task, the ent
       '"{\\"kind\\":\\"start"',
     );
   });
-
-  await t.test(
-    'a feed entry no runtime wrote is skipped and said, naming the file, the entry and the field, and the cursor is past it',
-    async () => {
-      const dir = legacyStore({ 't-ok': [TODAY] });
-      const feedFile = path.join(dir, 'feed.jsonl');
-      fs.appendFileSync(feedFile, JSON.stringify({ taskId: 3, event: STARTING }) + '\n');
-      fs.appendFileSync(feedFile, JSON.stringify({ taskId: 't-odd', event: { kind: 'nudged', at: 'x' } }) + '\n');
-      fs.appendFileSync(feedFile, '{"taskId":"t-cut","ev\n');
-      fs.appendFileSync(feedFile, JSON.stringify({ taskId: 't-ok', event: STARTING }) + '\n');
-      const read = await run(dir, feedFrom(0));
-      assert.deepEqual(
-        read.entries.map((e) => [e.taskId, e.event.kind]),
-        [
-          ['t-ok', 'filed'],
-          ['t-ok', 'starting'],
-        ],
-      );
-      assert.equal(read.cursor, fs.statSync(feedFile).size);
-      const [noTask, noKind, cut] = read.refused ?? [];
-      assert.equal(read.refused?.length, 3);
-      assert.equal(noTask?.taskId, undefined);
-      naming(noTask?.why, `the feed (${feedFile}), entry 2 read from cursor 0 is no feed entry`, '`taskId` is 3', 'writes string');
-      assert.equal(noKind?.taskId, 't-odd');
-      naming(noKind?.why, `the feed (${feedFile}), entry 3 read from cursor 0 is no event`, '"nudged"');
-      assert.equal(cut?.taskId, undefined);
-      naming(cut?.why, `the feed (${feedFile}), entry 4 read from cursor 0 is no JSON object`);
-      const again = await run(dir, feedFrom(read.cursor));
-      assert.deepEqual(again, { entries: [], cursor: read.cursor });
-    },
-  );
-
-  await t.test(
-    'the in-memory store is decoded the same: an event appended in no shape the runtime writes is refused when read',
-    async () => {
-      const error = await Effect.runPromise(
-        Effect.flatMap(Journal, (j) =>
-          j
-            .append(TaskId.read('t-mem'), { kind: 'filed', brief: 'b', cwd: '/r' } as never)
-            .pipe(Effect.andThen(j.read(TaskId.read('t-mem')))),
-        ).pipe(Effect.flip, Effect.provide(Journal.test())),
-      );
-      assert.deepEqual([error._tag, error.taskId], ['JournalError', 't-mem']);
-      naming(error.message, "t-mem's journal, entry 1 is a `filed` event", '`at` is missing');
-    },
-  );
-
-  await t.test("a consumer's own store is decoded too: an entry it holds in no shape the runtime writes is said, not folded", async () => {
+  test('a feed entry no runtime wrote is skipped and said, naming the file, the entry and the field, and the cursor is past it', async () => {
+    const dir = legacyStore({ 't-ok': [TODAY] });
+    const feedFile = path.join(dir, 'feed.jsonl');
+    fs.appendFileSync(feedFile, JSON.stringify({ taskId: 3, event: STARTING }) + '\n');
+    fs.appendFileSync(feedFile, JSON.stringify({ taskId: 't-odd', event: { kind: 'nudged', at: 'x' } }) + '\n');
+    fs.appendFileSync(feedFile, '{"taskId":"t-cut","ev\n');
+    fs.appendFileSync(feedFile, JSON.stringify({ taskId: 't-ok', event: STARTING }) + '\n');
+    const read = await run(dir, feedFrom(0));
+    assert.deepEqual(
+      read.entries.map((e) => [e.taskId, e.event.kind]),
+      [
+        ['t-ok', 'filed'],
+        ['t-ok', 'starting'],
+      ],
+    );
+    assert.equal(read.cursor, fs.statSync(feedFile).size);
+    const [noTask, noKind, cut] = read.refused ?? [];
+    assert.equal(read.refused?.length, 3);
+    assert.equal(noTask?.taskId, undefined);
+    naming(noTask?.why, `the feed (${feedFile}), entry 2 read from cursor 0 is no feed entry`, '`taskId` is 3', 'writes string');
+    assert.equal(noKind?.taskId, 't-odd');
+    naming(noKind?.why, `the feed (${feedFile}), entry 3 read from cursor 0 is no event`, '"nudged"');
+    assert.equal(cut?.taskId, undefined);
+    naming(cut?.why, `the feed (${feedFile}), entry 4 read from cursor 0 is no JSON object`);
+    const again = await run(dir, feedFrom(read.cursor));
+    assert.deepEqual(again, { entries: [], cursor: read.cursor });
+  });
+  test('the in-memory store is decoded the same: an event appended in no shape the runtime writes is refused when read', async () => {
+    const error = await Effect.runPromise(
+      Effect.flatMap(Journal, (j) =>
+        j
+          .append(TaskId.read('t-mem'), { kind: 'filed', brief: 'b', cwd: '/r' } as never)
+          .pipe(Effect.andThen(j.read(TaskId.read('t-mem')))),
+      ).pipe(Effect.flip, Effect.provide(Journal.test())),
+    );
+    assert.deepEqual([error._tag, error.taskId], ['JournalError', 't-mem']);
+    naming(error.message, "t-mem's journal, entry 1 is a `filed` event", '`at` is missing');
+  });
+  test("a consumer's own store is decoded too: an entry it holds in no shape the runtime writes is said, not folded", async () => {
     const { Engine } = await import('../../index.ts');
     const { builtEngine } = await import('../../../test/engine.ts');
     const events = [{ ...TODAY, kind: 'filled' } as unknown as Event];
@@ -894,8 +813,8 @@ const cursorStore = async () => {
   return { dir, ops, file, cost };
 };
 
-test('a journal changed under its reader other than by an append is read whole', async (t) => {
-  await t.test('a journal replaced by a rename over it is read whole', async () => {
+describe('a journal changed under its reader other than by an append is read whole', () => {
+  test('a journal replaced by a rename over it is read whole', async () => {
     const { dir, file, cost } = await cursorStore();
     const other = path.join(dir, 'tasks', 't1.next');
     fs.writeFileSync(other, fs.readFileSync(file, 'utf8') + JSON.stringify(ev('spawned', '2026-01-01T00:00:03Z')) + '\n');
@@ -904,8 +823,7 @@ test('a journal changed under its reader other than by an append is read whole',
     assert.equal(after.bytes, fs.statSync(file).size, 'the whole of the new file');
     assert.equal(after.entries.length, 4);
   });
-
-  await t.test('a journal cut shorter is read whole', async () => {
+  test('a journal cut shorter is read whole', async () => {
     const { file, cost } = await cursorStore();
     const lines = fs.readFileSync(file, 'utf8').split('\n');
     fs.writeFileSync(file, lines[0] + '\n');
@@ -913,8 +831,7 @@ test('a journal changed under its reader other than by an append is read whole',
     assert.equal(after.bytes, fs.statSync(file).size, 'the whole of what is left');
     assert.equal(after.entries.length, 1);
   });
-
-  await t.test('a journal rewritten in place to the same size, at another time, is read whole', async () => {
+  test('a journal rewritten in place to the same size, at another time, is read whole', async () => {
     const { file, cost } = await cursorStore();
     const { mtimeMs, ino } = fs.statSync(file);
     fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll('00:00:0', '11:11:1'));
@@ -927,8 +844,7 @@ test('a journal changed under its reader other than by an append is read whole',
       ['2026-01-01T11:11:10Z', '2026-01-01T11:11:11Z', '2026-01-01T11:11:12Z'],
     );
   });
-
-  await t.test('a journal gone reads as none, and one made again in its place is read whole', async () => {
+  test('a journal gone reads as none, and one made again in its place is read whole', async () => {
     const { file, cost } = await cursorStore();
     const text = fs.readFileSync(file, 'utf8');
     fs.rmSync(file);
@@ -939,8 +855,7 @@ test('a journal changed under its reader other than by an append is read whole',
     assert.equal(again.bytes, fs.statSync(file).size, 'the whole file');
     assert.equal(again.entries.length, 1);
   });
-
-  await t.test('a journal gone and made again as the same file, longer, is read whole', async () => {
+  test('a journal gone and made again as the same file, longer, is read whole', async () => {
     const { dir, file, cost } = await cursorStore();
     const aside = path.join(dir, 't1.aside');
     fs.linkSync(file, aside);
@@ -979,19 +894,23 @@ test('a last line cut short fails the read as it always has, and once completed 
   );
 });
 
-test("the files store refuses by itself, under the feed's lock, a second filing and an entry to a task with no journal, so two writers cannot both pass the door's check", async (t) => {
-  const board = root();
-  const ops = Journal.filesOps(board);
+describe("the files store refuses by itself, under the feed's lock, a second filing and an entry to a task with no journal, so two writers cannot both pass the door's check", () => {
+  let board!: string;
+  let ops!: import('./journal.ts').BodiedJournalOps;
+  beforeAll(() => {
+    board = root();
+    ops = Journal.filesOps(board);
+  });
   const appended = (taskId: string, event: Event) =>
     Effect.runPromise(Effect.result(ops.append(taskId, event))).then((r) => (r._tag === 'Failure' ? r.failure.reason : 'taken'));
-  await t.test('a filing to a task with no journal is taken', async () => {
+  test('a filing to a task with no journal is taken', async () => {
     assert.equal(await appended('a', filedAt('2026-01-01T00:00:00Z')), 'taken');
   });
-  await t.test('a second filing is refused filed-twice, and the journal keeps one line', async () => {
+  test('a second filing is refused filed-twice, and the journal keeps one line', async () => {
     assert.equal(await appended('a', filedAt('2026-01-01T00:00:01Z')), 'filed-twice');
     assert.equal((await Effect.runPromise(ops.read('a'))).length, 1);
   });
-  await t.test('an entry to a task with no journal is refused not-filed, and no journal is made', async () => {
+  test('an entry to a task with no journal is refused not-filed, and no journal is made', async () => {
     assert.equal(await appended('b', ev('starting', '2026-01-01T00:00:02Z')), 'not-filed');
     assert.equal(fs.existsSync(path.join(board, 'tasks', 'b.jsonl')), false);
   });

@@ -3,7 +3,7 @@
  * what the pause does, in the words the in-process watch printed of the same pause before it was deleted.
  */
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'vitest';
 import { pausedWords } from '../src/watch/lines.ts';
 
 const at = '2026-11-03T10:00:00.000Z';

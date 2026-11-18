@@ -11,7 +11,7 @@
  */
 import { settingsOf, StoreConfig, type Env } from '../src/config/config.store.ts';
 import type { Run } from '../src/run.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -275,8 +275,8 @@ const agree = (said: Record<string, Said>): void => {
   assert.deepEqual(apart, [], `the readers read the run apart:\n  ${apart.join('\n  ')}`);
 };
 
-test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the run object say the same of each run', async (t) => {
-  await t.test('an ending waits for the checkout another run holds: nothing of it is ready, for any reader', async () => {
+describe('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the run object say the same of each run', () => {
+  test('an ending waits for the checkout another run holds: nothing of it is ready, for any reader', async () => {
     const repo = aRepo();
     const workflow = folder({ implement: [], land: ['after: implement', 'workspace: base'] });
     const first = await started(workflow, repo);
@@ -287,8 +287,7 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     stage.board().settle(`${second}-implement`, 'succeeded', SIGNED);
     agree(await readers(second));
   });
-
-  await t.test('a try of an ending asked while another run holds the checkout: no reader says the try is filed now', async () => {
+  test('a try of an ending asked while another run holds the checkout: no reader says the try is filed now', async () => {
     const repo = aRepo();
     const workflow = folder({ implement: [], land: ['after: implement', 'workspace: base'] });
     const second = await started(workflow, repo);
@@ -303,44 +302,36 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     await stage.runWith(stage.board().e, retryRun(second, 'land', { mode: 'continue', message: 'this way' }));
     agree(await readers(second));
   });
-
-  await t.test(
-    'a finished run with no gated ending and its branch ahead of the base: the result is to decide, for every reader',
-    async () => {
-      const id = await started(folder({ implement: [], review: ['after: implement'] }));
-      const workspace = theRun(id).steps.implement.workspace!;
-      fs.writeFileSync(path.join(workspace, 'a.txt'), 'a\n');
-      stage.place().world.commit(workspace, 'the work');
-      stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
-      await tick(id);
-      stage.board().settle(`${id}-review`, 'succeeded', SIGNED);
-      await tick(id);
-      agree(await readers(id));
-    },
-  );
-
-  await t.test('a session its harness blocked, asked to try again: one try due, a session to stop first, for every reader', async () => {
+  test('a finished run with no gated ending and its branch ahead of the base: the result is to decide, for every reader', async () => {
+    const id = await started(folder({ implement: [], review: ['after: implement'] }));
+    const workspace = theRun(id).steps.implement.workspace!;
+    fs.writeFileSync(path.join(workspace, 'a.txt'), 'a\n');
+    stage.place().world.commit(workspace, 'the work');
+    stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
+    await tick(id);
+    stage.board().settle(`${id}-review`, 'succeeded', SIGNED);
+    await tick(id);
+    agree(await readers(id));
+  });
+  test('a session its harness blocked, asked to try again: one try due, a session to stop first, for every reader', async () => {
     const id = await started(folder({ implement: [], review: ['after: implement'] }));
     stage.board().settle(`${id}-implement`, 'needs-human');
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh' }, { stopBlocked: true }));
     agree(await readers(id));
   });
-
-  await t.test('a task the engine holds queued: the step runs, for every reader', async () => {
+  test('a task the engine holds queued: the step runs, for every reader', async () => {
     const id = await started(folder({ implement: [], review: ['after: implement'] }));
     stage.board().settle(`${id}-implement`, 'pending');
     agree(await readers(id));
   });
-
-  await t.test('a refused check its retries cover: one try due, by the check, for every reader', async () => {
+  test('a refused check its retries cover: one try due, by the check, for every reader', async () => {
     const id = await started(folder({ implement: ['check: npm test', 'retries: 1'], review: ['after: implement'] }));
     stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
     await tick(id);
     stage.board().settle(`${id}-implement-check`, 'failed', undefined, 1);
     agree(await readers(id));
   });
-
-  await t.test('a loop whose reviewer asks again: one round due, for every reader', async () => {
+  test('a loop whose reviewer asks again: one round due, for every reader', async () => {
     const workflow = folder({ implement: [], review: ['after: implement', 'loop: implement', 'rounds: 3', 'output: review.schema.json'] });
     const again = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
     fs.writeFileSync(path.join(workflow, 'review.schema.json'), JSON.stringify(again));
@@ -350,8 +341,7 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     stage.board().settle(`${id}-review`, 'succeeded', { ...SIGNED, again: true });
     agree(await readers(id));
   });
-
-  await t.test('a try asked while the store is paused: it waits on the pause, and no reader says it is filed now', async () => {
+  test('a try asked while the store is paused: it waits on the pause, and no reader says it is filed now', async () => {
     const id = await started(folder({ implement: [], review: ['after: implement'] }));
     stage.board().settle(`${id}-implement`, 'failed');
     await tick(id);
@@ -363,30 +353,26 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
       resumePause(ROOT);
     }
   });
-
-  await t.test('a step at its gate: the approval is to decide and the step waits on you, for every reader', async () => {
+  test('a step at its gate: the approval is to decide and the step waits on you, for every reader', async () => {
     const id = await started(folder({ plan: ['gate: true'], implement: ['after: plan'] }));
     stage.board().settle(`${id}-plan`, 'succeeded', SIGNED);
     await tick(id);
     agree(await readers(id));
   });
-
-  await t.test('a step that signed off blocked: it waits on you, and the run is not finished, for every reader', async () => {
+  test('a step that signed off blocked: it waits on you, and the run is not finished, for every reader', async () => {
     const id = await started(folder({ implement: [], review: ['after: implement'] }));
     stage.board().settle(`${id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'which flag?' });
     await tick(id);
     agree(await readers(id));
   });
-
-  await t.test('a run called off with a step blocked: nothing due and nobody waited on, for every reader', async () => {
+  test('a run called off with a step blocked: nothing due and nobody waited on, for every reader', async () => {
     const id = await started(folder({ implement: [], review: ['after: implement'] }));
     stage.board().settle(`${id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'which flag?' });
     await tick(id);
     await stage.runWith(stage.board().e, cancelRun(id));
     agree(await readers(id));
   });
-
-  await t.test('a held run with a try asked: nothing due and nobody waited on, for every reader', async () => {
+  test('a held run with a try asked: nothing due and nobody waited on, for every reader', async () => {
     const id = await started(folder({ implement: [], review: ['after: implement'] }));
     stage.board().settle(`${id}-implement`, 'failed');
     await tick(id);
@@ -394,34 +380,28 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     await stage.runWith(stage.board().e, hold(id, []));
     agree(await readers(id));
   });
-
-  await t.test('an ending at its gate whose work is sent back: the try is due and nobody is waited on, for every reader', async () => {
+  test('an ending at its gate whose work is sent back: the try is due and nobody is waited on, for every reader', async () => {
     const id = await started(folder({ implement: [], land: ['after: implement', 'workspace: base', 'gate: true'] }));
     stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
     await tick(id);
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'continue', message: 'not this way' }));
     agree(await readers(id));
   });
-
-  await t.test(
-    'F1: a finished run merged by hand since the last pass: the result is to decide for every reader until a pass reads it',
-    async () => {
-      const { id, repo, branch } = await worked(folder({ implement: [], review: ['after: implement'] }));
-      stage.board().settle(`${id}-review`, 'succeeded', SIGNED);
-      await tick(id);
-      await aPass();
-      mergedByHand(repo, branch);
-      const before = await readers(id, { pass: false });
-      agree(before);
-      assert.equal(before.decide?.toDecide, `result:${branch}`, 'every reader reads the last pass, which read the branch ahead');
-      const after = await readers(id);
-      agree(after);
-      assert.equal(after.decide?.landed, true, 'a pass reads the hand merge');
-      assert.equal(after.decide?.toDecide, null);
-    },
-  );
-
-  await t.test('F2: a finished run in a store no pass has read: nothing to decide and no branch read, for every reader', async () => {
+  test('F1: a finished run merged by hand since the last pass: the result is to decide for every reader until a pass reads it', async () => {
+    const { id, repo, branch } = await worked(folder({ implement: [], review: ['after: implement'] }));
+    stage.board().settle(`${id}-review`, 'succeeded', SIGNED);
+    await tick(id);
+    await aPass();
+    mergedByHand(repo, branch);
+    const before = await readers(id, { pass: false });
+    agree(before);
+    assert.equal(before.decide?.toDecide, `result:${branch}`, 'every reader reads the last pass, which read the branch ahead');
+    const after = await readers(id);
+    agree(after);
+    assert.equal(after.decide?.landed, true, 'a pass reads the hand merge');
+    assert.equal(after.decide?.toDecide, null);
+  });
+  test('F2: a finished run in a store no pass has read: nothing to decide and no branch read, for every reader', async () => {
     const { id, branch } = await worked(folder({ implement: [], review: ['after: implement'] }));
     stage.board().settle(`${id}-review`, 'succeeded', SIGNED);
     await tick(id);
@@ -436,8 +416,7 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
       'decide reads the branch unread, as nemia ls does',
     );
   });
-
-  await t.test('F3: a run after a parent merged by hand since the last pass: every reader waits on the parent', async () => {
+  test('F3: a run after a parent merged by hand since the last pass: every reader waits on the parent', async () => {
     const repo = aRepo();
     const parent = await worked(folder({ implement: [], review: ['after: implement'] }), repo);
     stage.board().settle(`${parent.id}-review`, 'succeeded', SIGNED);
@@ -450,33 +429,27 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     agree(said);
     assert.deepEqual(said.decide?.waitingOn, [parent.id], 'no reader reads the merge before a pass does');
   });
-
-  await t.test(
-    'F4: an ending waits for the checkout a run held at the last pass and has let go since: every reader names one holder',
-    async () => {
-      const repo = aRepo();
-      const workflow = folder({ implement: [], land: ['after: implement', 'workspace: base'] });
-      const first = await started(workflow, repo);
-      stage.board().settle(`${first}-implement`, 'succeeded', SIGNED);
-      await tick(first);
-      stage.board().settle(`${first}-land`, 'working');
-      const second = await started(workflow, repo);
-      stage.board().settle(`${second}-implement`, 'succeeded', SIGNED);
-      await aPass();
-      stage.board().settle(`${first}-land`, 'succeeded', SIGNED);
-      agree(await readers(second, { pass: false }));
-    },
-  );
-
-  await t.test('F5: a gated ending never filed whose result a person merged by hand: nothing to approve, for every reader', async () => {
+  test('F4: an ending waits for the checkout a run held at the last pass and has let go since: every reader names one holder', async () => {
+    const repo = aRepo();
+    const workflow = folder({ implement: [], land: ['after: implement', 'workspace: base'] });
+    const first = await started(workflow, repo);
+    stage.board().settle(`${first}-implement`, 'succeeded', SIGNED);
+    await tick(first);
+    stage.board().settle(`${first}-land`, 'working');
+    const second = await started(workflow, repo);
+    stage.board().settle(`${second}-implement`, 'succeeded', SIGNED);
+    await aPass();
+    stage.board().settle(`${first}-land`, 'succeeded', SIGNED);
+    agree(await readers(second, { pass: false }));
+  });
+  test('F5: a gated ending never filed whose result a person merged by hand: nothing to approve, for every reader', async () => {
     const { id, repo, branch } = await worked(folder({ implement: [], land: ['after: implement', 'workspace: base', 'gate: true'] }));
     mergedByHand(repo, branch);
     const said = await readers(id);
     agree(said);
     assert.equal(said.object?.toDecide, null, 'nothing is left for the ending to merge');
   });
-
-  await t.test('F8: a step tried twice: nemia decide and the run object name the same tries, in the same order', async () => {
+  test('F8: a step tried twice: nemia decide and the run object name the same tries, in the same order', async () => {
     const id = await started(folder({ implement: [], review: ['after: implement'] }));
     stage.board().settle(`${id}-implement`, 'failed');
     await tick(id);
@@ -488,8 +461,7 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     agree(said);
     assert.deepEqual(said.decide?.tries, ['implement:1', 'implement:2'], 'both tries of implement, and review not yet on the clock');
   });
-
-  await t.test("a step tried again by its refused check: nemia decide and the run object both time the first try's check", async () => {
+  test("a step tried again by its refused check: nemia decide and the run object both time the first try's check", async () => {
     const id = await started(folder({ implement: ['check: npm test', 'retries: 1'], review: ['after: implement'] }));
     stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
     await tick(id);

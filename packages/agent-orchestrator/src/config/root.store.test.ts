@@ -3,7 +3,7 @@
  * dies naming the service when it is run all the same; the layer answers what `WF_ROOT` names in the environment it is handed; and a
  * relative `WF_ROOT` is refused where the layer is built, in `wfRoot`'s own words, rather than read as the default.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';

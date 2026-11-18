@@ -1,9 +1,9 @@
 /** `retriesNamed`: the `nemia retry` commands a text names for one run, as `nemia decide` judges a blocked step's `needs`. */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { retriesNamed } from './named.ts';
 
-test('retriesNamed: each nemia retry of this run a text names, with how it asks', async (t) => {
+describe('retriesNamed: each nemia retry of this run a text names, with how it asks', () => {
   const rows: Array<[string, string, ReturnType<typeof retriesNamed>]> = [
     [
       'a recheck in a sentence',
@@ -24,5 +24,5 @@ test('retriesNamed: each nemia retry of this run a text names, with how it asks'
     ['another run is not this one', 'nemia retry r-2 implement --recheck', []],
     ['none', 'which flag name ships?', []],
   ];
-  for (const [name, text, named] of rows) await t.test(name, () => assert.deepEqual(retriesNamed(text, 'r-1'), named));
+  for (const [name, text, named] of rows) test(name, () => assert.deepEqual(retriesNamed(text, 'r-1'), named));
 });

@@ -6,7 +6,7 @@
  * Node runs a test's TypeScript as it is, and not a component's JSX: `./tsx.ts` registers the hooks that load one. Registered before
  * the components are imported, so every import of one below is dynamic.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Upgrade, UpgradesRead, VersionAnswer } from 'objects';
 import './tsx.ts';

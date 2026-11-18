@@ -3,7 +3,7 @@
  * records, the coverage flags put in a package's test script, and `compare.ts`'s exit codes through its `main`. Nothing here
  * spawns: `coverage.boundary.test.ts` runs `record.ts` on a fixture package.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -73,7 +73,7 @@ const pickRecord = (...processes: V8Script[][]): CoverageRecord =>
     () => PICK,
   );
 
-test('a record keeps the package’s own sources and drops its tests, its helpers, its fixtures and what lies outside it', async (t) => {
+describe('a record keeps the package’s own sources and drops its tests, its helpers, its fixtures and what lies outside it', () => {
   const rows: { name: string; lcov: string; files: Record<string, FileCoverage> }[] = [
     {
       name: 'a source is kept, its lines and branches read from DA, LF, LH, BRDA, BRF and BRH',
@@ -92,7 +92,7 @@ test('a record keeps the package’s own sources and drops its tests, its helper
     },
   ];
   for (const row of rows) {
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const record = recordOf(row.lcov, PKG, () => []);
       assert.equal(record.version, 2);
       assert.equal(record.package, 'p');
@@ -120,15 +120,18 @@ test('a comparison where every file hits what it did, or more, finds no fall', (
   assert.deepEqual(compared(before, recordWith({ 'src/a.ts': cover([1, 2, 3], 4, 2, 2) })), []);
 });
 
-test("a branch is judged by its arms, each taken when any test process took it, against a before whose checkout's longer path ran its script past the source", async (t) => {
-  const bothInOne = pickRecord(ran(2, { yes: 1, no: 1 }, 40));
+describe("a branch is judged by its arms, each taken when any test process took it, against a before whose checkout's longer path ran its script past the source", () => {
+  let bothInOne!: CoverageRecord;
+  beforeAll(() => {
+    bothInOne = pickRecord(ran(2, { yes: 1, no: 1 }, 40));
+  });
   const rows: [name: string, after: V8Script[][], lost: number[]][] = [
     ['two arms taken by two test files are nothing lost, each process leaving out its own', [ran(1, { no: 0 }), ran(1, { yes: 0 })], []],
     ['an arm no process reports is read as the range around it, here taken', [ran(1, {}), ran(1, { yes: 0 })], []],
     ['an arm no test takes any more is REFUSED, by its file and line', [ran(1, { no: 0 })], [5]],
   ];
   for (const [name, after, lost] of rows) {
-    await t.test(name, () => {
+    test(name, () => {
       const falls = compared(bothInOne, pickRecord(...after));
       assert.deepEqual(
         falls.map((fall) => [fall.file, fall.armsLost]),
@@ -138,7 +141,7 @@ test("a branch is judged by its arms, each taken when any test process took it, 
   }
 });
 
-test('records on either side tell a line or an arm the records disagree on, which varies, from one no test takes any more', async (t) => {
+describe('records on either side tell a line or an arm the records disagree on, which varies, from one no test takes any more', () => {
   const two = recordWith({ 'src/a.ts': cover([1, 2], 2) });
   const one = recordWith({ 'src/a.ts': cover([1], 2) });
   const arm = (taken: boolean): CoverageRecord => ({
@@ -184,7 +187,7 @@ test('records on either side tell a line or an arm the records disagree on, whic
     ],
   ];
   for (const [name, before, after, lost, varying] of rows) {
-    await t.test(name, () => {
+    test(name, () => {
       const found = judged(before, after);
       assert.deepEqual(
         found.falls.map((fall) => [fall.file, fall.linesLost, fall.armsLost]),

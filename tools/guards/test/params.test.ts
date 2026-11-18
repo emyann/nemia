@@ -7,7 +7,7 @@
  * count is refused, one the baseline does not name owes none, and a count above today's is refused too, so a change that documents a
  * function lowers its file's count in the same commit. Today's counts, as the baseline's text: `node tools/guards/test/params.ts`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

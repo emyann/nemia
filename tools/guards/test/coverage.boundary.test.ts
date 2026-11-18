@@ -6,7 +6,7 @@
  * Node's default coverage exclusion, its test-file globs, matches such a path whole and records nothing — which a checkout under a
  * dot-folder hides, since `**` does not cross one.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';

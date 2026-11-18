@@ -4,7 +4,7 @@
  * upgrade switches it); a store with no pointer, as a checkout's, gets none; a link already there is left, and a file of another kind
  * there is replaced.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

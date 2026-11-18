@@ -5,7 +5,7 @@
  * failure a run fails on, the earliest page's. No browser, so `npm test` runs it.
  */
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import {
   apart,
   FAILURES_NAMED,

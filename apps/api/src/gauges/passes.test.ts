@@ -5,7 +5,7 @@
  * (`root`), whose `tick-recent.json` is written here as the tick writes it.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -36,9 +36,9 @@ const passes = async (query = ''): Promise<{ status: number; body: unknown }> =>
   return { status: res.status, body: await res.json() };
 };
 
-test('The board reads the passes the tick kept and the api process metrics: none, then three, the last n, a last refused, and each request counted under its route', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('The board reads the passes the tick kept and the api process metrics: none, then three, the last n, a last refused, and each request counted under its route', () => {
+  const s = story(test);
+  s.test(
     'GET /api/passes answers the recent passes kept, oldest first, their histogram, parts and summary; ?last=n the last n',
     async () => {
       fs.rmSync(RECENT, { force: true });
@@ -65,19 +65,16 @@ test('The board reads the passes the tick kept and the api process metrics: none
       );
     },
   );
-  await s.test(
-    'REFUSED: GET /api/passes with a last that is not a whole number from 1, as Invalid: 422, naming what it takes',
-    async () => {
-      for (const last of ['0', 'x']) {
-        const { status, body } = await passes(`?last=${last}`);
-        assert.equal(status, 422);
-        const { error } = body as { error: string };
-        assert.ok(error.startsWith('--last takes'), error);
-        assert.ok(error.includes('a whole number from 1'), error);
-      }
-    },
-  );
-  await s.test("GET /api/metrics counts each request's reads under its route's pattern, never its path", async () => {
+  s.test('REFUSED: GET /api/passes with a last that is not a whole number from 1, as Invalid: 422, naming what it takes', async () => {
+    for (const last of ['0', 'x']) {
+      const { status, body } = await passes(`?last=${last}`);
+      assert.equal(status, 422);
+      const { error } = body as { error: string };
+      assert.ok(error.startsWith('--last takes'), error);
+      assert.ok(error.includes('a whole number from 1'), error);
+    }
+  });
+  s.test("GET /api/metrics counts each request's reads under its route's pattern, never its path", async () => {
     const pollsOf = async (route: string): Promise<number> => {
       const res = await app.request('/api/metrics');
       assert.equal(res.status, 200);

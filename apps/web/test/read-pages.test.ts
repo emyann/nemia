@@ -5,7 +5,7 @@
  * while the api says `more` (`readTranscript`); a step's tries are asked with every output field (`fields=*`) and each closeout's body
  * read on from its `bodyNext`; and a decision asks every diff whole (`diffs=*`). Each read on a stand-in `fetch` that answers by the query.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { BODY_PAGE, LIST_PAGE, TRANSCRIPT_PAGE } from 'objects';
 import { decisionQuery, type RunDecision } from '../src/lib/api/decision.ts';
@@ -16,7 +16,7 @@ import { listOfItems, workflow, workflowObject } from './library-fixtures.ts';
 import { decidable, step, transcript } from './run-fixtures.ts';
 
 /** Every request the test's `fetch` was asked, its url read against a stand-in origin, answered by `answer` as JSON. */
-function answering(t: { after: (fn: () => void) => void }, answer: (url: URL) => unknown): URL[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, answer: (url: URL) => unknown): URL[] {
   const asked: URL[] = [];
   const before = globalThis.fetch;
   globalThis.fetch = async (input) => {
@@ -24,7 +24,7 @@ function answering(t: { after: (fn: () => void) => void }, answer: (url: URL) =>
     asked.push(url);
     return new Response(JSON.stringify(answer(url)), { status: 200, headers: { 'content-type': 'application/json' } });
   };
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
   return asked;
@@ -130,7 +130,7 @@ test("a step's conversation read through its query is read once by the readers t
     await held;
     return new Response(JSON.stringify(transcript({ live: false })), { status: 200, headers: { 'content-type': 'application/json' } });
   };
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
   const client = new QueryClient();

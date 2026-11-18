@@ -4,7 +4,7 @@
  * that calls it at its head. A read (`view`, `list`, `logs`, `feed`, `output`) leaves no mark on the stand-in, and is not refused.
  */
 import assert from 'node:assert/strict';
-import { afterEach } from 'node:test';
+import { afterEach } from 'vitest';
 import type { TestEngine } from 'agent-runtime/testing';
 
 /** Throws where `engine` was asked to file, stop, say or forget anything. */

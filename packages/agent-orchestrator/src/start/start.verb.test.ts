@@ -3,7 +3,7 @@
  * over them, the typed `--label` edits over those; a key two runs disagree on left out and said by `nemia start`; a malformed or reserved
  * edit refused before any file is written; and no `.labels` file for a run started with none. On the files, with the test place.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -99,15 +99,18 @@ test('a run started with no labels writes no .labels file, and its start answers
   assert.deepEqual([facts.labels, facts.labelsLeftOut], [undefined, undefined], 'nor a key of them in what the api answers');
 });
 
-test('REFUSED before any file is written: a reserved key, a closed key and an edit that is neither key=value nor key-', async (t) => {
+describe('REFUSED before any file is written: a reserved key, a closed key and an edit that is neither key=value nor key-', () => {
+  let repo!: string;
+  beforeAll(() => {
+    repo = aRepo();
+  });
   const rows: Record<string, [edit: string, facts: string[]]> = {
     'a reserved key': ['reason=x', ['--label', 'reason']],
     'a closed key': ['workflow=x', ['--label', 'workflow']],
     'neither form': ['team', ['--label', '"team"', 'key=value']],
   };
-  const repo = aRepo();
   for (const [row, [edit, facts]] of Object.entries(rows))
-    await t.test(row, async () => {
+    test(row, async () => {
       const before = fs.existsSync(RUNS_DIR) ? fs.readdirSync(RUNS_DIR).sort() : [];
       await assert.rejects(
         runPlaced(startRun({ brief: 'refused', repo, workflowDir: folder(), labels: { edits: [edit] } })),

@@ -11,7 +11,8 @@
  * The place is the stand-in (`testPlace`): the subject is the ledger and the pin, not git, and the steps work in the checkout itself. Each
  * team is given a folder, an agent and a skill named for itself, so no test's edit of a kind moves another's number.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -133,9 +134,9 @@ const shippedByHand = (repo: string, branch: string): void => {
   stage.place().world.commit(repo, `merge ${branch}`);
 };
 
-test('a folder edited around a run: what it pins, what the ledger numbers, and what `nemia refresh` takes', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('a folder edited around a run: what it pins, what the ledger numbers, and what `nemia refresh` takes', () => {
+  const s = story(test);
+  s.test(
     'a run that has filed nothing resolves the folder afresh: an edit made while it waits `--after` reaches its first step',
     async () => {
       const repo = aRepo();
@@ -177,15 +178,14 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       );
     },
   );
-
-  await s.test(
+  s.test(
     "the factory's rules are a kind of their own: a run in a factory pins their revision, and an edit while it waits is numbered",
     async () => {
       const t = team();
       const repo = aRepo();
-      const factory = `factory-${t.name}`;
+      const factory = `factory-${t.task.name}`;
       addFactoryAt(ROOT, { name: factory, repos: [repo] });
-      attachWorkflowAt(ROOT, { factory, workflow: t.name });
+      attachWorkflowAt(ROOT, { factory, workflow: t.task.name });
       writeRules(ROOT, { name: factory }, 'Never push on a Friday.');
       const parent = await started(team().dir, repo, { isolate: true });
       const run = await started(t.dir, repo, { after: [parent.id], isolate: true, factory });
@@ -214,8 +214,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       assert.match(promptOf(run.id, 'build'), /nor on a Monday/, "and the new rules reach the prompt the step's session reads");
     },
   );
-
-  await s.test(
+  s.test(
     'a run that has filed keeps its pins: the folder edited after its first filing reaches neither the record nor the prompt',
     async () => {
       const t = team();
@@ -236,8 +235,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       );
     },
   );
-
-  await s.test(
+  s.test(
     'a run that has filed keeps the workflow it froze: the step after its first is filed from the freeze, never the folder edited since',
     async () => {
       const t = team();
@@ -257,15 +255,14 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       );
     },
   );
-
-  await s.test(
+  s.test(
     'a filed run in a factory that follows takes the folder edited after its first filing at its next try, and adds no step',
     async () => {
       const t = team();
       const repo = aRepo();
-      const factory = `follows-${t.name}`;
+      const factory = `follows-${t.task.name}`;
       addFactoryAt(ROOT, { name: factory, repos: [repo] });
-      attachWorkflowAt(ROOT, { factory, workflow: t.name });
+      attachWorkflowAt(ROOT, { factory, workflow: t.task.name });
       followed(ROOT, factory, 'follow');
       const run = await started(t.dir, repo, { factory });
       const b = board();
@@ -296,15 +293,14 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.refresh`)), false, 'and no refresh ask was written');
     },
   );
-
-  await s.test(
+  s.test(
     'a finished run in a factory that follows keeps its pins, its workflow and its prompts through a full pass after an edit',
     async () => {
       const t = team();
       const repo = aRepo();
-      const factory = `follows-done-${t.name}`;
+      const factory = `follows-done-${t.task.name}`;
       addFactoryAt(ROOT, { name: factory, repos: [repo] });
-      attachWorkflowAt(ROOT, { factory, workflow: t.name });
+      attachWorkflowAt(ROOT, { factory, workflow: t.task.name });
       followed(ROOT, factory, 'follow');
       const run = await started(t.dir, repo, { factory });
       const b = board();
@@ -324,8 +320,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       assert.equal(promptOf(run.id, 'build'), prompt, 'and so is the prompt its step was given');
     },
   );
-
-  await s.test('the ledger appends only where the digest moved, and a content it already holds keeps the number it was given', async () => {
+  s.test('the ledger appends only where the digest moved, and a content it already holds keeps the number it was given', async () => {
     const t = team();
     const run = await started(t.dir, aRepo());
     const b = board();
@@ -359,8 +354,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       'a run resolving it now is pinned at the number that content has',
     );
   });
-
-  await s.test('`nemia refresh` re-pins, and the next try is filed on the new revision with its prompt rendered again', async () => {
+  s.test('`nemia refresh` re-pins, and the next try is filed on the new revision with its prompt rendered again', async () => {
     const t = team();
     const run = await started(t.dir, aRepo());
     const b = board();
@@ -372,7 +366,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
     assert.deepEqual(
       drift.map((d) => [d.kind, d.name, d.pinned, d.now]),
       [
-        ['workflow', t.name, 1, 2],
+        ['workflow', t.task.name, 1, 2],
         ['agent', t.agent, 1, 2],
       ],
       'the verb answers with the drift it was asked on, per kind',
@@ -395,8 +389,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       'and the retry is filed on them',
     );
   });
-
-  await s.test('a script changed in the workflow folder once the run filed its first step does not reach the run in flight', async () => {
+  s.test('a script changed in the workflow folder once the run filed its first step does not reach the run in flight', async () => {
     const t = checked(team(), 'node "$WF_WORKFLOW_FILES/helper.ts"', 'first');
     const run = await started(t.dir, aRepo());
     const b = board();
@@ -407,8 +400,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
     assert.match(fs.readFileSync(path.join(env.WF_WORKFLOW_FILES, 'helper.ts'), 'utf8'), /first/, 'the script as it was at the start');
     assert.equal(env.WF_WORKFLOW_FILES, frozenOf(run.id), "the record's copy");
   });
-
-  await s.test('`nemia refresh` moves the check line and its scripts together, and leaves the old copy where it was', async () => {
+  s.test('`nemia refresh` moves the check line and its scripts together, and leaves the old copy where it was', async () => {
     const t = checked(team(), 'node "$WF_WORKFLOW_FILES/helper.ts"', 'first');
     const run = await started(t.dir, aRepo());
     const before = frozenOf(run.id);
@@ -427,53 +419,47 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
     assert.match(check.brief, /--again/, 'the new check line');
     assert.equal(check.config?.env?.WF_WORKFLOW_FILES, after, 'is told the new copy');
   });
-
-  await s.test(
-    'the carried folder beside the workflows is frozen at the start, told to the check, and frozen again by a refresh',
-    async () => {
-      const t = checked(team(), 'node "$WF_CARRIED_FILES/shared.ts"', 'unused');
-      const carried = path.join(path.dirname(t.dir), 'carried');
-      fs.mkdirSync(path.join(carried, 'deep'), { recursive: true });
-      fs.writeFileSync(path.join(carried, 'shared.ts'), helperSaying('first'));
-      fs.writeFileSync(path.join(carried, 'deep', 'more.ts'), helperSaying('deep'));
-      const run = await started(t.dir, aRepo());
-      const before = runRecord(ROOT, run.id).carriedFiles;
-      assert.equal(typeof before, 'string', 'the record names the copy');
-      const copy = path.join(ROOT, 'runs', run.id, 'carried', String(before));
-      assert.match(fs.readFileSync(path.join(copy, 'shared.ts'), 'utf8'), /first/);
-      assert.match(fs.readFileSync(path.join(copy, 'deep', 'more.ts'), 'utf8'), /deep/, 'at any depth');
-      const b = board();
-      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      const session = b.tasks.get(`${run.id}-build`)!.spec;
-      assert.equal(session.config?.env?.WF_CARRIED_FILES, copy, 'the session is told the copy');
-      assert.ok(
-        session.config?.mounts?.some((m) => m.path === copy && m.readOnly),
-        'mounted read-only',
-      );
-      assert.match(session.brief, /\$WF_CARRIED_FILES/, 'and its brief names it');
-      fs.writeFileSync(path.join(carried, 'shared.ts'), helperSaying('second'));
-      checked(t, 'node "$WF_CARRIED_FILES/shared.ts" --again', 'unused');
-      await runPlaced(refreshRun(run.id));
-      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      const after = runRecord(ROOT, run.id).carriedFiles;
-      assert.notEqual(after, before, 'the refresh froze the folder again');
-      const again = path.join(ROOT, 'runs', run.id, 'carried', String(after));
-      assert.match(fs.readFileSync(path.join(again, 'shared.ts'), 'utf8'), /second/);
-      b.settle(`${run.id}-build`, 'succeeded', { closeout: SIGNED });
-      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      assert.equal(b.tasks.get(`${run.id}-build-check`)!.spec.config?.env?.WF_CARRIED_FILES, again, 'the check is told the new copy');
-    },
-  );
-
-  await s.test('a run whose workflows hold no carried folder records none, and its check is told none', async () => {
+  s.test('the carried folder beside the workflows is frozen at the start, told to the check, and frozen again by a refresh', async () => {
+    const t = checked(team(), 'node "$WF_CARRIED_FILES/shared.ts"', 'unused');
+    const carried = path.join(path.dirname(t.dir), 'carried');
+    fs.mkdirSync(path.join(carried, 'deep'), { recursive: true });
+    fs.writeFileSync(path.join(carried, 'shared.ts'), helperSaying('first'));
+    fs.writeFileSync(path.join(carried, 'deep', 'more.ts'), helperSaying('deep'));
+    const run = await started(t.dir, aRepo());
+    const before = runRecord(ROOT, run.id).carriedFiles;
+    assert.equal(typeof before, 'string', 'the record names the copy');
+    const copy = path.join(ROOT, 'runs', run.id, 'carried', String(before));
+    assert.match(fs.readFileSync(path.join(copy, 'shared.ts'), 'utf8'), /first/);
+    assert.match(fs.readFileSync(path.join(copy, 'deep', 'more.ts'), 'utf8'), /deep/, 'at any depth');
+    const b = board();
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    const session = b.tasks.get(`${run.id}-build`)!.spec;
+    assert.equal(session.config?.env?.WF_CARRIED_FILES, copy, 'the session is told the copy');
+    assert.ok(
+      session.config?.mounts?.some((m) => m.path === copy && m.readOnly),
+      'mounted read-only',
+    );
+    assert.match(session.brief, /\$WF_CARRIED_FILES/, 'and its brief names it');
+    fs.writeFileSync(path.join(carried, 'shared.ts'), helperSaying('second'));
+    checked(t, 'node "$WF_CARRIED_FILES/shared.ts" --again', 'unused');
+    await runPlaced(refreshRun(run.id));
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    const after = runRecord(ROOT, run.id).carriedFiles;
+    assert.notEqual(after, before, 'the refresh froze the folder again');
+    const again = path.join(ROOT, 'runs', run.id, 'carried', String(after));
+    assert.match(fs.readFileSync(path.join(again, 'shared.ts'), 'utf8'), /second/);
+    b.settle(`${run.id}-build`, 'succeeded', { closeout: SIGNED });
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    assert.equal(b.tasks.get(`${run.id}-build-check`)!.spec.config?.env?.WF_CARRIED_FILES, again, 'the check is told the new copy');
+  });
+  s.test('a run whose workflows hold no carried folder records none, and its check is told none', async () => {
     const t = checked(team(), 'node "$WF_WORKFLOW_FILES/helper.ts"', 'first');
     const run = await started(t.dir, aRepo());
     assert.equal('carriedFiles' in runRecord(ROOT, run.id), false);
     const env = await checkEnvAfterBuild(board(), run.id);
     assert.equal('WF_CARRIED_FILES' in env, false);
   });
-
-  await s.test('a refresh can no longer give a run a check its base cannot run: the scripts ride with the line', async () => {
+  s.test('a refresh can no longer give a run a check its base cannot run: the scripts ride with the line', async () => {
     const t = team();
     const repo = aRepo();
     assert.equal(fs.existsSync(path.join(repo, 'workflows')), false, "the run's base holds no workflow folder");
@@ -492,8 +478,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
     assert.match(fs.readFileSync(read, 'utf8'), /ran/, 'the script its line reads is in the copy it is told, beside no checkout');
     assert.equal(path.relative(repo, read).startsWith('..'), true, 'outside the repository its base has');
   });
-
-  await s.test('a filing whose closeout schema has moved starts a fresh session; one whose schema has not resumes', async () => {
+  s.test('a filing whose closeout schema has moved starts a fresh session; one whose schema has not resumes', async () => {
     const schema = { type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false };
     const declared = (t: Team) => `---\nplace: git\nagent: ${t.agent}\noutput: build.schema.json\n---\nBuild it.\n`;
 
@@ -534,57 +519,60 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       'the schema moved, so try 2 is a fresh session rather than one asked in the wrong shape',
     );
   });
-
-  await s.test(
-    "`driftNow` is what the run's next filing would take against its pins, by digest, and writes nothing to the ledger",
-    async (c) => {
-      const b = board();
-      const filed = async (on: Team) => {
-        const run = await started(on.dir, aRepo());
-        await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-        return runRecord(ROOT, run.id);
-      };
-      const agentDrift = (run: Parameters<typeof driftNow>[0], name: string) =>
-        rooted(driftNow(run)).filter((d) => d.kind === 'agent' && d.name === name && d.step === undefined);
-
-      await c.test('an edit later reverted is no drift, though the ledger numbered the edit', async () => {
-        const on = team();
-        const run = await filed(on);
-        const first = fs.readFileSync(on.agentFile, 'utf8');
-        fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nAn edit someone took back.\n`);
-        await started(on.dir, aRepo());
-        assert.deepEqual(
-          ledgerOf(ROOT, 'agent', on.agent).map((r) => r.n),
-          [1, 2],
-          'another start numbered the edit',
-        );
-        fs.writeFileSync(on.agentFile, first);
-        assert.deepEqual(rooted(driftNow(run)), [], 'the files hold the bytes the run pins: nothing is behind');
-      });
-
-      await c.test('content reverted to an older revision is drift, its `now` that older number', async () => {
-        const on = team();
-        const first = fs.readFileSync(on.agentFile, 'utf8');
-        await started(on.dir, aRepo());
-        fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nThe second content.\n`);
-        const run = await filed(on);
-        assert.equal(pinOf(run.pinned, 'agent', on.agent)!.n, 2, 'the run pins the second content');
-        fs.writeFileSync(on.agentFile, first);
-        assert.deepEqual(agentDrift(run, on.agent), [{ kind: 'agent', name: on.agent, pinned: 2, now: 1 }]);
-      });
-
-      await c.test('content nobody resolved reads as the next number, and the ledger stays as it was', async () => {
-        const on = team();
-        const run = await filed(on);
-        fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nNever resolved.\n`);
-        const before = [ledgerOf(ROOT, 'agent', on.agent), ledgerOf(ROOT, 'workflow', on.name)];
-        assert.deepEqual(agentDrift(run, on.agent), [{ kind: 'agent', name: on.agent, pinned: 1, now: 2 }]);
-        assert.deepEqual([ledgerOf(ROOT, 'agent', on.agent), ledgerOf(ROOT, 'workflow', on.name)], before, 'nothing was appended');
-      });
-    },
-  );
-
-  await s.test(
+  describe("`driftNow` is what the run's next filing would take against its pins, by digest, and writes nothing to the ledger", () => {
+    let b!: {
+      e: import('agent-runtime').EngineShape;
+      tasks: Map<string, import('agent-runtime/testing').TestTask>;
+      settle: (
+        id: string,
+        phase: import('agent-runtime').TaskPhase,
+        end?: import('agent-runtime/testing').TestEnd,
+      ) => import('agent-runtime/testing').TestTask;
+    };
+    beforeAll(() => {
+      b = board();
+    });
+    const filed = async (on: Team) => {
+      const run = await started(on.dir, aRepo());
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+      return runRecord(ROOT, run.id);
+    };
+    const agentDrift = (run: Parameters<typeof driftNow>[0], name: string) =>
+      rooted(driftNow(run)).filter((d) => d.kind === 'agent' && d.name === name && d.step === undefined);
+    test('an edit later reverted is no drift, though the ledger numbered the edit', async () => {
+      const on = team();
+      const run = await filed(on);
+      const first = fs.readFileSync(on.agentFile, 'utf8');
+      fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nAn edit someone took back.\n`);
+      await started(on.dir, aRepo());
+      assert.deepEqual(
+        ledgerOf(ROOT, 'agent', on.agent).map((r) => r.n),
+        [1, 2],
+        'another start numbered the edit',
+      );
+      fs.writeFileSync(on.agentFile, first);
+      assert.deepEqual(rooted(driftNow(run)), [], 'the files hold the bytes the run pins: nothing is behind');
+    });
+    test('content reverted to an older revision is drift, its `now` that older number', async () => {
+      const on = team();
+      const first = fs.readFileSync(on.agentFile, 'utf8');
+      await started(on.dir, aRepo());
+      fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nThe second content.\n`);
+      const run = await filed(on);
+      assert.equal(pinOf(run.pinned, 'agent', on.agent)!.n, 2, 'the run pins the second content');
+      fs.writeFileSync(on.agentFile, first);
+      assert.deepEqual(agentDrift(run, on.agent), [{ kind: 'agent', name: on.agent, pinned: 2, now: 1 }]);
+    });
+    test('content nobody resolved reads as the next number, and the ledger stays as it was', async () => {
+      const on = team();
+      const run = await filed(on);
+      fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nNever resolved.\n`);
+      const before = [ledgerOf(ROOT, 'agent', on.agent), ledgerOf(ROOT, 'workflow', on.name)];
+      assert.deepEqual(agentDrift(run, on.agent), [{ kind: 'agent', name: on.agent, pinned: 1, now: 2 }]);
+      assert.deepEqual([ledgerOf(ROOT, 'agent', on.agent), ledgerOf(ROOT, 'workflow', on.name)], before, 'nothing was appended');
+    });
+  });
+  s.test(
     '`nemia refresh` refuses a run that has filed nothing, one already on the newest revision, and no such run — at shipped defaults',
     async () => {
       const t = team();
@@ -608,8 +596,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       );
     },
   );
-
-  await s.test("`nemia refresh` adds and removes no step, and a run that has filed nothing takes the folder's step set whole", async () => {
+  s.test("`nemia refresh` adds and removes no step, and a run that has filed nothing takes the folder's step set whole", async () => {
     const t = team();
     const repo = aRepo();
     const run = await started(t.dir, repo);
@@ -639,8 +626,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       'and the step the folder has since dropped goes with it: the step set is the one the folder holds now',
     );
   });
-
-  await s.test('`nemia refresh` keeps a step the folder has lost since the run filed, with its whole record', async () => {
+  s.test('`nemia refresh` keeps a step the folder has lost since the run filed, with its whole record', async () => {
     const t = team();
     fs.writeFileSync(path.join(t.dir, 'review.md'), `---\nplace: git\nafter: build\nagent: ${t.agent}\n---\nReview it.\n`);
     const run = await started(t.dir, aRepo());
@@ -860,31 +846,47 @@ test('a try a pass filed and died before writing down is adopted on what filing 
   assert.notDeepEqual(build?.pinned, first?.pinned, "nor try 1's pins");
 });
 
-test('a step that ended is judged by the fields it was filed with: a run that follows a schema gaining a field never unsigns it', async (t) => {
-  const s = story(t);
-  const team0 = team();
-  const agentSchema = path.join(path.dirname(team0.agentFile), `${team0.agent}.schema.json`);
-  fs.writeFileSync(team0.agentFile, `---\nskills: ${team0.skill}\noutput: ${team0.agent}.schema.json\n---\nYou build.\n`);
-  fs.writeFileSync(agentSchema, JSON.stringify(schemaOf('goal')));
-  fs.writeFileSync(team0.stepFile, `---\nplace: git\nagent: ${team0.agent}\ngate: true\n---\nBuild it.\n`);
-  fs.writeFileSync(path.join(team0.dir, 'review.md'), `---\nplace: git\nagent: ${team0.agent}\nafter: build\n---\nReview it.\n`);
-  const repo = aRepo();
-  const factory = `follows-filed-${team0.name}`;
-  addFactoryAt(ROOT, { name: factory, repos: [repo] });
-  attachWorkflowAt(ROOT, { factory, workflow: team0.name });
-  followed(ROOT, factory, 'follow');
-  const run = await started(team0.dir, repo, { factory });
-  const b = board();
-
-  await s.test('build is filed, signs off with the one field its schema asks, and is approved at its gate', async () => {
+describe('a step that ended is judged by the fields it was filed with: a run that follows a schema gaining a field never unsigns it', () => {
+  let team0!: Team;
+  let agentSchema!: string;
+  let repo!: string;
+  let factory!: string;
+  let run!: import('../src/start/start.verb.ts').StartedRun;
+  let b!: {
+    e: import('agent-runtime').EngineShape;
+    tasks: Map<string, import('agent-runtime/testing').TestTask>;
+    settle: (
+      id: string,
+      phase: import('agent-runtime').TaskPhase,
+      end?: import('agent-runtime/testing').TestEnd,
+    ) => import('agent-runtime/testing').TestTask;
+  };
+  beforeAll(async () => {
+    const t = teardowns();
+    team0 = team();
+    agentSchema = path.join(path.dirname(team0.agentFile), `${team0.agent}.schema.json`);
+    fs.writeFileSync(team0.agentFile, `---\nskills: ${team0.skill}\noutput: ${team0.agent}.schema.json\n---\nYou build.\n`);
+    fs.writeFileSync(agentSchema, JSON.stringify(schemaOf('goal')));
+    fs.writeFileSync(team0.stepFile, `---\nplace: git\nagent: ${team0.agent}\ngate: true\n---\nBuild it.\n`);
+    fs.writeFileSync(path.join(team0.dir, 'review.md'), `---\nplace: git\nagent: ${team0.agent}\nafter: build\n---\nReview it.\n`);
+    repo = aRepo();
+    factory = `follows-filed-${team0.name}`;
+    addFactoryAt(ROOT, { name: factory, repos: [repo] });
+    attachWorkflowAt(ROOT, { factory, workflow: team0.name });
+    followed(ROOT, factory, 'follow');
+    run = await started(team0.dir, repo, { factory });
+    b = board();
+    return t.end;
+  });
+  const s = story(test);
+  s.test('build is filed, signs off with the one field its schema asks, and is approved at its gate', async () => {
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     b.settle(`${run.id}-build`, 'succeeded', { closeout: { ...SIGNED, goal: 'a thing' } });
     const held = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.equal(held.status, 'awaiting approval', JSON.stringify(held.waiting));
     await runWith(b.e, approveRun(run.id, 'build'));
   });
-
-  await s.test('the agent schema gains a required field, and the next pass re-pins the run and files nothing', async () => {
+  s.test('the agent schema gains a required field, and the next pass re-pins the run and files nothing', async () => {
     fs.writeFileSync(
       agentSchema,
       JSON.stringify({
@@ -900,36 +902,29 @@ test('a step that ended is judged by the fields it was filed with: a run that fo
     const build = runRecord(ROOT, run.id).workflow?.find((w) => w.name === 'build');
     assert.deepEqual(Object.keys(build?.output?.schema.properties ?? {}), ['goal', 'why'], 'and its frozen build declares both');
   });
-
-  await s.test('on the pass after, build still reads signed and review is filed', async () => {
+  s.test('on the pass after, build still reads signed and review is filed', async () => {
     const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.doesNotMatch(pass.feed.steps.find((x) => x.name === 'build')?.word ?? '', /^unsigned/, JSON.stringify(pass.feed.steps));
     assert.ok(!pass.waiting.some((w) => JSON.stringify(w).includes('build')), JSON.stringify(pass.waiting));
     assert.ok(runRecord(ROOT, run.id).steps.review?.taskId, `review is filed: ${JSON.stringify(pass.feed.steps)}`);
   });
-
-  await s.test('each record keeps the fields its own try was filed with', () => {
+  s.test('each record keeps the fields its own try was filed with', () => {
     const { steps } = runRecord(ROOT, run.id);
     assert.deepEqual(steps.build?.declared, ['goal'], 'build was filed before the move');
     assert.deepEqual(steps.review?.declared, ['goal', 'why'], 'review after it');
   });
-
-  await s.test(
-    'a record written before the fields were kept reads them where its schema has not moved, and build still signed',
-    async () => {
-      const file = path.join(ROOT, 'runs', `${run.id}.json`);
-      const record = JSON.parse(fs.readFileSync(file, 'utf8'));
-      for (const name of ['build', 'review']) delete record.steps[name].declared;
-      fs.writeFileSync(file, JSON.stringify(record, null, 2));
-      const { steps } = runRecord(ROOT, run.id);
-      assert.equal(steps.build?.declared, undefined, 'build, filed on a schema that has moved since, is given none');
-      assert.deepEqual(steps.review?.declared, ['goal', 'why'], 'review, whose schema has not moved, is given what it declares');
-      const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      assert.doesNotMatch(pass.feed.steps.find((x) => x.name === 'build')?.word ?? '', /^unsigned/, JSON.stringify(pass.feed.steps));
-    },
-  );
-
-  await s.test('review, filed after the move, owes the new field', async () => {
+  s.test('a record written before the fields were kept reads them where its schema has not moved, and build still signed', async () => {
+    const file = path.join(ROOT, 'runs', `${run.id}.json`);
+    const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+    for (const name of ['build', 'review']) delete record.steps[name].declared;
+    fs.writeFileSync(file, JSON.stringify(record, null, 2));
+    const { steps } = runRecord(ROOT, run.id);
+    assert.equal(steps.build?.declared, undefined, 'build, filed on a schema that has moved since, is given none');
+    assert.deepEqual(steps.review?.declared, ['goal', 'why'], 'review, whose schema has not moved, is given what it declares');
+    const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    assert.doesNotMatch(pass.feed.steps.find((x) => x.name === 'build')?.word ?? '', /^unsigned/, JSON.stringify(pass.feed.steps));
+  });
+  s.test('review, filed after the move, owes the new field', async () => {
     b.settle(`${run.id}-review`, 'succeeded', { closeout: { ...SIGNED, goal: 'reviewed' } });
     const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.match(pass.feed.steps.find((x) => x.name === 'review')?.word ?? '', /^unsigned/, JSON.stringify(pass.feed.steps));

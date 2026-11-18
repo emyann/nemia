@@ -3,7 +3,7 @@
  * word, a step of the loop that stopped, and a round still at work. Pure: the merge itself, on disk and on real git, is told in
  * `ship.test.ts` and `merge-round-walk.boundary.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { mergeAsk, type MergeReads } from './merge.ts';
 import type { StepStatus } from '../record/record.ts';
@@ -28,11 +28,11 @@ const refusalOf = (given: MergeReads): string => {
   return answer.refusal;
 };
 
-test('`mergeAsk` refuses while the loop cannot take a merge as it stands, naming the verb that moves it', async (t) => {
-  await t.test('REFUSED: the loop goes round again on its own word: merge once it ends', () => {
+describe('`mergeAsk` refuses while the loop cannot take a merge as it stands, naming the verb that moves it', () => {
+  test('REFUSED: the loop goes round again on its own word: merge once it ends', () => {
     names(refusalOf(reads({ implement: 'verified', review: 'verified' }, true)), 'round 2', 'nemia refresh r-1 review --base');
   });
-  await t.test("REFUSED: the loop's target stopped in the round: try it again, or see why", () => {
+  test("REFUSED: the loop's target stopped in the round: try it again, or see why", () => {
     names(
       refusalOf(reads({ implement: 'blocked', review: 'blocked' })),
       'implement',
@@ -41,13 +41,13 @@ test('`mergeAsk` refuses while the loop cannot take a merge as it stands, naming
       'nemia decide r-1',
     );
   });
-  await t.test('REFUSED: the looping step itself stopped: try it again', () => {
+  test('REFUSED: the looping step itself stopped: try it again', () => {
     names(refusalOf(reads({ implement: 'verified', review: 'unsigned' })), 'review', 'unsigned', 'nemia retry r-1 review');
   });
-  await t.test('REFUSED: the round is still at work, and nothing in it stopped: wait for it', () => {
+  test('REFUSED: the round is still at work, and nothing in it stopped: wait for it', () => {
     names(refusalOf(reads({ implement: 'verified', review: 'running' })), 'running', 'nemia ls r-1');
   });
-  await t.test('a loop that is over holds no merge off: what refuses it is further on, here a target with no branch yet', () => {
+  test('a loop that is over holds no merge off: what refuses it is further on, here a target with no branch yet', () => {
     names(refusalOf(reads({ implement: 'verified', review: 'verified' })), 'implement', 'no branch', 'nemia ls r-1');
   });
 });

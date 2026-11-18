@@ -4,7 +4,7 @@
  * The pointer's switch, an install read back and a build's trial store are `upgrade.verb.test.ts`'s story. Each on a scratch
  * store of its own, passed as the root, so no test reads `WF_ROOT`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

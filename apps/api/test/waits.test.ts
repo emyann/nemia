@@ -7,7 +7,7 @@
  * (`deadlineBreaks`). A change that takes one out lowers its count in the same commit.
  */
 import './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,32 +15,31 @@ import { WAITED } from 'agent-runtime/testing';
 
 const TEST = import.meta.dirname;
 const PACKAGE = path.join(TEST, '..');
-/** The default timeout a `test` script gives every test (`--test-timeout=<ms>`, one word), or null for none. */
-const defaultTimeout = (script: string): number | null => {
-  const word = script.split(/\s+/).find((w) => /^--test-timeout=[1-9]\d*$/.test(w));
-  return word ? Number(word.slice('--test-timeout='.length)) : null;
+/** The default timeout a package's `vitest.config.ts` gives every test (`testTimeout: <ms>`), or null for none. */
+const defaultTimeout = (config: string): number | null => {
+  const m = /^\s*testTimeout:\s*([1-9][\d_]*),/m.exec(config);
+  return m ? Number(m[1]!.replaceAll('_', '')) : null;
 };
 
 /**
- * What leaves a wait unbounded in a test given no `WAITED`, as one that waits through a helper may be: a `test` script whose default
- * timeout is not `WAITED`'s, since node's is none.
+ * What leaves a wait unbounded in a test given no `WAITED`, as one that waits through a helper may be: a Vitest config whose default
+ * timeout is not `WAITED`'s, since Vitest's is 5 s.
  *
- * @param script the package's `test` script
+ * @param config the text of the package's `vitest.config.ts`
  * @returns one line per break, empty when every test is bounded at `WAITED`'s timeout
  */
-const timeoutBreaks = (script: string): string[] =>
-  defaultTimeout(script) === WAITED.timeout
+const timeoutBreaks = (config: string): string[] =>
+  defaultTimeout(config) === WAITED.timeout
     ? []
-    : [`the test script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
+    : [`the Vitest config gives no testTimeout: ${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
 
-test("the package's test script bounds every test at `WAITED`'s timeout, so a wait in a test given none still ends", () => {
-  const { scripts } = JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { scripts: { test: string } };
-  assert.deepEqual(timeoutBreaks(scripts.test), []);
+test("the package's Vitest config bounds every test at `WAITED`'s timeout, so a wait in a test given none still ends", () => {
+  assert.deepEqual(timeoutBreaks(fs.readFileSync(path.join(PACKAGE, 'vitest.config.ts'), 'utf8')), []);
 });
 
-test("REFUSED: a test script with no default timeout, or another than `WAITED`'s, leaves a test's wait unbounded", () => {
+test("REFUSED: a Vitest config with no default timeout, or another than `WAITED`'s, leaves a test's wait unbounded", () => {
   const refused = [
-    `the test script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`,
+    `the Vitest config gives no testTimeout: ${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`,
   ];
   assert.deepEqual(timeoutBreaks("node --test --test-concurrency=2 'test/*.test.ts'"), refused, 'none');
   assert.deepEqual(timeoutBreaks("node --test --test-concurrency=2 --test-timeout=600000 'test/*.test.ts'"), refused, 'a longer one');

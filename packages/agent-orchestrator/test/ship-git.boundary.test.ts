@@ -15,7 +15,7 @@
  * Its store is its own at `ROOT`, given as `ENV`.
  */
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

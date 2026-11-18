@@ -3,7 +3,7 @@
  * runtime's words, and an engine `engineOf` cannot build is refused in them, one table; a program it runs (`runWith`) says its warnings
  * and errors, and no Info line.
  */
-import { test } from 'node:test';
+import { describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Engine, EngineRefused, StopRefused } from 'agent-runtime';
@@ -21,8 +21,8 @@ const failure = async (run: () => unknown): Promise<Error & { exitCode?: number 
   return assert.fail('read as a success');
 };
 
-test("the runtime's failures as the client reads them: a refusal exit 2 led by its verb, any other failure as it was", async (t) => {
-  await t.test('REFUSED: a runtime refusal read through asked rejects with exit code 2, its message led by the verb', async () => {
+describe("the runtime's failures as the client reads them: a refusal exit 2 led by its verb, any other failure as it was", () => {
+  test('REFUSED: a runtime refusal read through asked rejects with exit code 2, its message led by the verb', async () => {
     const e = engineOf(testEngine().layer);
     const refused = Object.assign(e, { stop: () => Effect.fail(new StopRefused({ message: 'task t-1 has settled' })) });
     const err = await failure(() => runWith(refused, asked('stop', refused.stop('t-1'))));
@@ -30,7 +30,7 @@ test("the runtime's failures as the client reads them: a refusal exit 2 led by i
     assert.ok(err.message.startsWith('stop: '), err.message);
     assert.match(err.message, /task t-1 has settled/);
   });
-  await t.test('a failure of the runtime that is no refusal is thrown as it was, with no exit code and no verb', async () => {
+  test('a failure of the runtime that is no refusal is thrown as it was, with no exit code and no verb', async () => {
     const e = engineOf(testEngine().layer);
     const lost = new Error('the journal is gone');
     const broken = Object.assign(e, { stop: () => Effect.fail(lost as never) });
@@ -38,7 +38,7 @@ test("the runtime's failures as the client reads them: a refusal exit 2 led by i
     assert.equal(err.message, 'the journal is gone');
     assert.equal(err.exitCode, undefined);
   });
-  await t.test('REFUSED: an engine whose layer the runtime refuses is refused with exit code 2, its message led by engine', async () => {
+  test('REFUSED: an engine whose layer the runtime refuses is refused with exit code 2, its message led by engine', async () => {
     const refused = Layer.effect(Engine, Effect.fail(new EngineRefused({ message: '`maxConcurrent: 0` is not a ceiling' })));
     const err = await failure(() => engineOf(refused));
     assert.equal(err.exitCode, 2);
@@ -50,7 +50,7 @@ test("the runtime's failures as the client reads them: a refusal exit 2 led by i
 test('REFUSED: a program run through runWith says no Info line, and still says its warnings and errors on the console', async (t) => {
   const said: string[] = [];
   for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const)
-    t.mock.method(console, method, (...args: unknown[]) => void said.push(args.map(String).join(' ')));
+    vi.spyOn(console, method).mockImplementation((...args: unknown[]) => void said.push(args.map(String).join(' ')));
   await runWith(
     engineOf(testEngine().layer),
     Effect.gen(function* () {
@@ -59,7 +59,7 @@ test('REFUSED: a program run through runWith says no Info line, and still says i
       yield* Effect.logError('an error a command must not swallow');
     }),
   );
-  t.mock.restoreAll();
+  vi.restoreAllMocks();
   assert.equal(said.filter((s) => s.includes('a feed line')).length, 0, said.join('\n'));
   assert.equal(said.filter((s) => s.includes('a warning a command must not swallow')).length, 1, said.join('\n'));
   assert.equal(said.filter((s) => s.includes('an error a command must not swallow')).length, 1, said.join('\n'));

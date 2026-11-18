@@ -4,7 +4,7 @@
  * one sets it on top. Under a server's serving variables, the api a test serves listens on the loopback, and asks a token of its own
  * machine as every store does: the store's credential lets the test's `nemia` in, and with none it is refused.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -36,7 +36,7 @@ const seenBy = (env: NodeJS.ProcessEnv): unknown => {
 
 test("REFUSED under the daemon's environment: a child given `ambient()` reads none of its per-session variables, one given process.env does", (t) => {
   const was = Object.fromEntries(DROPPED.map((n) => [n, process.env[n]]));
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const [n, v] of Object.entries(was)) {
       if (v === undefined) delete process.env[n];
       else process.env[n] = v;
@@ -62,7 +62,7 @@ test(
   { timeout: 120_000 },
   async (t) => {
     const was = { NEMIA_BIND: process.env.NEMIA_BIND, WF_EXPOSED: process.env.WF_EXPOSED };
-    t.after(() => {
+    t.onTestFinished(() => {
       for (const [n, v] of Object.entries(was)) {
         if (v === undefined) delete process.env[n];
         else process.env[n] = v;
@@ -70,7 +70,7 @@ test(
     });
     Object.assign(process.env, { NEMIA_BIND: '100.126.244.0', WF_EXPOSED: '1' });
     const served = await servedStore('nemia-ambient-serving-', () => {});
-    t.after(served.stop);
+    t.onTestFinished(served.stop);
     assert.match(served.url, /^http:\/\/127\.0\.0\.1:\d+$/);
     const listed = await served.nemia(['ls']);
     assert.equal(listed.code, 0, `the store's credential is presented with nothing typed: ${listed.err}`);

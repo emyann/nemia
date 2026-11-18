@@ -3,7 +3,7 @@
  * forgets its place and answers false, its reason and what it cleared said (`feedUnread`); a defect is let through. A boundary test: the
  * stand-in engine models no feed that refuses or dies, which is this file's whole subject.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Exit } from 'effect';
 import type { Engine } from '../runtime-client.ts';

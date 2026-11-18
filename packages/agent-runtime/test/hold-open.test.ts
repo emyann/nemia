@@ -8,7 +8,8 @@
  *
  * `decide`'s half is in `decide.test.ts` (HELD OPEN); the words it journals are pinned in `journal-words.test.ts`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -249,11 +250,21 @@ const refuses = async (b: ReturnType<typeof board>, id: string, fn: () => Promis
   assert.equal(b.tasks.get(id)?.length ?? 0, before, 'nothing journalled');
 };
 
-test('over a store in memory, through the engine: signed, it waits; answered with no configuration, it resumes; signed again and stopped, it settles stopped while it waits', async (t) => {
-  const s = story(t);
-  const b = board();
+describe('over a store in memory, through the engine: signed, it waits; answered with no configuration, it resumes; signed again and stopped, it settles stopped while it waits', () => {
+  let b!: {
+    engine: import('../src/index.ts').EngineShape;
+    sessions: Map<string, Sighting>;
+    tasks: Map<string, Event[]>;
+    write: (id: string, events: Event[], filed?: Partial<Extract<Event, { kind: 'filed' }>>) => Map<string, Event[]>;
+  };
+  beforeAll(() => {
+    const t = teardowns();
+    b = board();
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
-  await s.test('signed, it waits, unsettled', async () => {
+  s.test('signed, it waits, unsettled', async () => {
     id = await Effect.runPromise(b.engine.file({ brief: 'draft', cwd: '/r', harness: 'fake', holdOpen: true }));
     await Effect.runPromise(b.engine.tick());
     signed(b.sessions, `ae/${id}/1`, 'drafted', (await Effect.runPromise(b.engine.view(id))).state.attempts[0].startedAt);
@@ -262,14 +273,14 @@ test('over a store in memory, through the engine: signed, it waits; answered wit
     assert.equal(v.phase, 'input-required');
     assert.equal(v.state.settled, null);
   });
-  await s.test('answered with no configuration, none is journalled, and the next pass resumes it', async () => {
+  s.test('answered with no configuration, none is journalled, and the next pass resumes it', async () => {
     const said = await Effect.runPromise(b.engine.answer(id, 'again'));
     assert.deepEqual(Object.keys(said), ['at', 'text'], 'no configuration given, none journalled');
     assert.deepEqual((await Effect.runPromise(b.engine.view(id))).state.inputs, [said]);
     await Effect.runPromise(b.engine.tick());
     assert.equal((await Effect.runPromise(b.engine.view(id))).phase, 'working');
   });
-  await s.test('signed again, a stop settles it stopped, waiting', async () => {
+  s.test('signed again, a stop settles it stopped, waiting', async () => {
     signed(b.sessions, `ae/${id}/2`, 'again', (await Effect.runPromise(b.engine.view(id))).state.attempts[1].startedAt);
     await Effect.runPromise(b.engine.tick());
     assert.equal((await Effect.runPromise(b.engine.view(id))).phase, 'input-required');
@@ -279,56 +290,51 @@ test('over a store in memory, through the engine: signed, it waits; answered wit
   });
 });
 
-test('answer and close: what each refuses — InputRefused, and nothing journalled — of a task that waits for no answer, and of an answer that is none', async (t) => {
-  await t.test(
-    "the engine over the Effect layers: a task not held open, one unknown, empty words, one not started, one whose harness recorded no session, a budget its harness would not keep, a turn's configuration other than its spend cap",
-    async () => {
-      const journal = Journal.test();
-      const layer = Layer.mergeAll(
-        journal,
-        Runner.layer({ ...testOps(), refuses: (t) => (t.config?.budgetUsd !== undefined ? 'keeps no cap' : undefined) }),
-      );
-      const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(Effect.result(e).pipe(Effect.provide(layer)));
-      const refusedWith = async (e: Effect.Effect<unknown, unknown, Journal | Runner>, pattern: RegExp) => {
-        const r = await run(e);
-        assert.equal(r._tag, 'Failure');
-        const err = (r as { failure: unknown }).failure;
-        assert.ok(err instanceof InputRefused, String(err));
-        assert.match(err.message, pattern);
-      };
-      const id = ((await run(file({ brief: 'b', cwd: '/r' }))) as { success: string }).success;
-      await refusedWith(answer(id, 'go on'), /^`t-.*` was not filed to be held open/);
-      await refusedWith(close(id), /^`t-.*` was not filed to be held open/);
-      await refusedWith(answer('t-nope', 'go on'), /^`t-nope` is not a task in this store/);
-      const held = ((await run(file({ brief: 'b', cwd: '/r', holdOpen: true }))) as { success: string }).success;
-      await refusedWith(answer(held, ' '), /^`text` is empty/);
-      await refusedWith(answer(held, 'go on'), /has not started an attempt yet/);
-      const count = async (task: string) =>
-        ((await run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(task))))) as { success: Event[] }).success.length;
-      assert.equal(await count(held), 1, 'nothing journalled');
-      const unrecorded = ((await run(file({ brief: 'b', cwd: '/r', holdOpen: true }))) as { success: string }).success;
-      await run(
-        Effect.flatMap(Journal, (j) =>
-          Effect.forEach(
-            signedJournal().map((e) => (e.kind === 'ended' ? { ...e, nativeId: undefined } : e)),
-            (e) => j.append(TaskId.read(unrecorded), e),
-          ),
+describe('answer and close: what each refuses — InputRefused, and nothing journalled — of a task that waits for no answer, and of an answer that is none', () => {
+  test("the engine over the Effect layers: a task not held open, one unknown, empty words, one not started, one whose harness recorded no session, a budget its harness would not keep, a turn's configuration other than its spend cap", async () => {
+    const journal = Journal.test();
+    const layer = Layer.mergeAll(
+      journal,
+      Runner.layer({ ...testOps(), refuses: (t) => (t.config?.budgetUsd !== undefined ? 'keeps no cap' : undefined) }),
+    );
+    const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(Effect.result(e).pipe(Effect.provide(layer)));
+    const refusedWith = async (e: Effect.Effect<unknown, unknown, Journal | Runner>, pattern: RegExp) => {
+      const r = await run(e);
+      assert.equal(r._tag, 'Failure');
+      const err = (r as { failure: unknown }).failure;
+      assert.ok(err instanceof InputRefused, String(err));
+      assert.match(err.message, pattern);
+    };
+    const id = ((await run(file({ brief: 'b', cwd: '/r' }))) as { success: string }).success;
+    await refusedWith(answer(id, 'go on'), /^`t-.*` was not filed to be held open/);
+    await refusedWith(close(id), /^`t-.*` was not filed to be held open/);
+    await refusedWith(answer('t-nope', 'go on'), /^`t-nope` is not a task in this store/);
+    const held = ((await run(file({ brief: 'b', cwd: '/r', holdOpen: true }))) as { success: string }).success;
+    await refusedWith(answer(held, ' '), /^`text` is empty/);
+    await refusedWith(answer(held, 'go on'), /has not started an attempt yet/);
+    const count = async (task: string) =>
+      ((await run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(task))))) as { success: Event[] }).success.length;
+    assert.equal(await count(held), 1, 'nothing journalled');
+    const unrecorded = ((await run(file({ brief: 'b', cwd: '/r', holdOpen: true }))) as { success: string }).success;
+    await run(
+      Effect.flatMap(Journal, (j) =>
+        Effect.forEach(
+          signedJournal().map((e) => (e.kind === 'ended' ? { ...e, nativeId: undefined } : e)),
+          (e) => j.append(TaskId.read(unrecorded), e),
         ),
-      );
-      await refusedWith(answer(unrecorded, 'go on'), /harness recorded no session for it/);
-      assert.equal(await count(unrecorded), 4, 'nothing journalled');
-      await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(TaskId.read(held), e))));
-      await refusedWith(answer(held, 'go on', { budgetUsd: 2 }), /^keeps no cap$/);
-      await refusedWith(answer(held, 'go on', { model: 'opus' }), /^`config\.model` cannot be given to one turn/);
-      await refusedWith(answer(held, 'go on', { budgetUsd: 0 }), /^`budgetUsd: 0` is not an amount of dollars/);
-      assert.equal(await count(held), 4);
-      assert.equal((await run(answer(held, 'go on')))._tag, 'Success');
-      assert.equal(await count(held), 5);
-    },
-  );
-
+      ),
+    );
+    await refusedWith(answer(unrecorded, 'go on'), /harness recorded no session for it/);
+    assert.equal(await count(unrecorded), 4, 'nothing journalled');
+    await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(TaskId.read(held), e))));
+    await refusedWith(answer(held, 'go on', { budgetUsd: 2 }), /^keeps no cap$/);
+    await refusedWith(answer(held, 'go on', { model: 'opus' }), /^`config\.model` cannot be given to one turn/);
+    await refusedWith(answer(held, 'go on', { budgetUsd: 0 }), /^`budgetUsd: 0` is not an amount of dollars/);
+    assert.equal(await count(held), 4);
+    assert.equal((await run(answer(held, 'go on')))._tag, 'Success');
+    assert.equal(await count(held), 5);
+  });
   const b = board();
-  b.write('t-w', signedJournal());
   const answering: Array<[string, () => Promise<unknown>, RegExp]> = [
     ['empty words', () => Effect.runPromise(b.engine.answer('t-w', '')), /^`text` is empty\. Give the words/],
     ['words that are only whitespace', () => Effect.runPromise(b.engine.answer('t-w', '  \n')), /^`text` is empty/],
@@ -353,8 +359,11 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
       /^`config: "cheap"` is not a turn's configuration/,
     ],
   ];
-  for (const [name, fn, pattern] of answering) await t.test(`answer refuses ${name}`, () => refuses(b, 't-w', fn, pattern));
-
+  for (const [name, fn, pattern] of answering)
+    test(`answer refuses ${name}`, () => {
+      b.write('t-w', signedJournal());
+      return refuses(b, 't-w', fn, pattern);
+    });
   const cases: Array<[string, Event[], Partial<Extract<Event, { kind: 'filed' }>>, RegExp, RegExp]> = [
     [
       't-plain',
@@ -419,36 +428,30 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
     ],
   ];
   for (const [id, events, filed, answeringIt, closing] of cases) {
-    await t.test(`answer and close refuse \`${id}\`, each saying what to do`, async () => {
+    test(`answer and close refuse \`${id}\`, each saying what to do`, async () => {
       b.write(id, events, filed);
       await refuses(b, id, () => Effect.runPromise(b.engine.answer(id, 'go')), new RegExp(`^\`${id}\`.*${answeringIt.source}`));
       await refuses(b, id, () => Effect.runPromise(b.engine.close(id)), new RegExp(`^\`${id}\`.*${closing.source}`));
     });
   }
-
-  await t.test(
-    'answer refuses a signed attempt whose harness recorded no session: no conversation to continue, and `close` closes it',
-    async () => {
-      const unrecorded = signedJournal().map((e) => (e.kind === 'ended' ? (({ nativeId: _, ...rest }) => rest)(e) : e)) as Event[];
-      b.write('t-unrecorded', unrecorded);
-      await refuses(
-        b,
-        't-unrecorded',
-        () => Effect.runPromise(b.engine.answer('t-unrecorded', 'go')),
-        /attempt 1 ended, .*recorded no session for it.*`close` it/,
-      );
-      assert.equal((await Effect.runPromise(b.engine.view('t-unrecorded'))).phase, 'input-required');
-      await Effect.runPromise(b.engine.close('t-unrecorded'));
-      assert.equal(b.tasks.get('t-unrecorded')!.at(-1)!.kind, 'closed');
-    },
-  );
-
-  await t.test('answer and close refuse a task not in this store', async () => {
+  test('answer refuses a signed attempt whose harness recorded no session: no conversation to continue, and `close` closes it', async () => {
+    const unrecorded = signedJournal().map((e) => (e.kind === 'ended' ? (({ nativeId: _, ...rest }) => rest)(e) : e)) as Event[];
+    b.write('t-unrecorded', unrecorded);
+    await refuses(
+      b,
+      't-unrecorded',
+      () => Effect.runPromise(b.engine.answer('t-unrecorded', 'go')),
+      /attempt 1 ended, .*recorded no session for it.*`close` it/,
+    );
+    assert.equal((await Effect.runPromise(b.engine.view('t-unrecorded'))).phase, 'input-required');
+    await Effect.runPromise(b.engine.close('t-unrecorded'));
+    assert.equal(b.tasks.get('t-unrecorded')!.at(-1)!.kind, 'closed');
+  });
+  test('answer and close refuse a task not in this store', async () => {
     await refuses(b, 't-nope', () => Effect.runPromise(b.engine.answer('t-nope', 'go')), /^`t-nope` is not a task in this store/);
     await refuses(b, 't-nope', () => Effect.runPromise(b.engine.close('t-nope')), /^`t-nope` is not a task in this store/);
   });
-
-  await t.test('the control: the same board closes a task that waits', async () => {
+  test('the control: the same board closes a task that waits', async () => {
     b.write('t-waits', signedJournal());
     await Effect.runPromise(b.engine.close('t-waits'));
     assert.equal(b.tasks.get('t-waits')!.at(-1)!.kind, 'closed', 'the control: the same board closes a task that waits');

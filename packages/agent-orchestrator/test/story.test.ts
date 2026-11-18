@@ -2,7 +2,7 @@
  * The story helper (`test/story.ts`): checkpoints run in order and share their state, and once one fails every later one is filed
  * skipped, naming it. Told over a fake context that records what it was given, so a failing checkpoint fails nothing here.
  */
-import { test } from 'node:test';
+import { afterAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { story, type Teller } from './story.ts';
 
@@ -69,14 +69,16 @@ test('REFUSED: after a checkpoint fails, the next is filed skipped with its name
   assert.equal(s.failed(), 'second');
 });
 
-test("a story told on node's own context files its checkpoints as subtests", async (t) => {
-  const s = story(t);
+describe("a story told on node's own context files its checkpoints as subtests", () => {
+  const s = story(test);
   let n = 0;
-  await s.test('one', () => {
+  s.test('one', () => {
     n += 1;
   });
-  await s.test('two', () => {
+  s.test('two', () => {
     n += 1;
   });
-  assert.equal(n, 2);
+  afterAll(() => {
+    assert.equal(n, 2);
+  });
 });

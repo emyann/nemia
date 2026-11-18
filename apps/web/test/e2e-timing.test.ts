@@ -6,7 +6,7 @@
  * (`slowest`, `rankLines`). No browser, so `npm test` runs it.
  */
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import {
   BOUND_WORKERS,
   E2E_BOUND_MS,

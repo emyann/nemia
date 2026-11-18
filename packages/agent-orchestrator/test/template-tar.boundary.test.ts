@@ -3,7 +3,7 @@
  * modes as `unpack` writes, and a named pipe `mkfifo` made in a folder is refused by name, never read. Both start a real process, so
  * they stand here and not beside the store. Its store is its own at `ROOT`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

@@ -4,7 +4,7 @@
  * `finishedAt` and the name of the last run a page answered, read back to them and refused `Invalid` where it is no such token, a
  * name-order token included and the other way round; and where a page starts when the run the token names is gone.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Invalid } from '../refusal/refusal.ts';
 import { continueToken, continuedAfter, pageOf } from '../object/page.ts';

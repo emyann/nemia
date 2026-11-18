@@ -4,7 +4,7 @@
  * resource said to list answering a GET of its collection.
  */
 import '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, APIResourceList, KINDS, RESOURCE_PLURALS } from 'objects';

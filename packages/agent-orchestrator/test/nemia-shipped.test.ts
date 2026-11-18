@@ -9,7 +9,7 @@
  * store's MCP port, read from the person's environment (`serverBreaks`). Its wording is judged by a person at the landing step; this
  * holds only what it names.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

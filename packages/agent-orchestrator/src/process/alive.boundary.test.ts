@@ -2,7 +2,7 @@
  * Whether a process is there (`alive`), asked of the real process table: this one is, and a child that has exited and been reaped is
  * not.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { alive } from './alive.store.ts';

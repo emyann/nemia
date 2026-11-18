@@ -3,7 +3,7 @@
  * claimed, each answering a person's token once, minted at the claim and named after its client. No file holds a code, a secret or a
  * token. The clock is seeded (`nowMs`), never waited on. Refusals are asserted by their kind and exit code, never by their sentence.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

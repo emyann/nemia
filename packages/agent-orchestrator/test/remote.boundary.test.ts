@@ -18,7 +18,8 @@
  * The store is the file's own, at `ROOT`, given as `ENV`. Each row leaves a step held at work on its agent, so the
  * file sets `WF_MAX_CONCURRENT` on it itself, since a check the run executes inherits the daemon's ceiling.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -190,7 +191,7 @@ async function following(t: TestContext, agent: string, url: string) {
       storeConfigLayer(ENV),
     ),
   );
-  t.after(() => rt.dispose());
+  t.onTestFinished(() => rt.dispose());
   const ticked = () => rt.runPromise(withProposalsPass(tickRun({ repo: ROOT })).pipe(Effect.provide(storeConfigLayer(ENV))));
   await until(
     t,
@@ -222,17 +223,20 @@ function gate(): { held: Promise<void>; go: () => void } {
   return { held, go };
 }
 
-test(
+describe(
   'a step on a remote agent: sent its brief and its secret, signed off by its Task, asked and answered, and followed',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    t.after(() => {
-      for (const dir of ['runs', 'engine']) fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
-      fs.rmSync(FILE, { force: true });
+  () => {
+    beforeAll(() => {
+      const t = teardowns();
+      t.onTestFinished(() => {
+        for (const dir of ['runs', 'engine']) fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
+        fs.rmSync(FILE, { force: true });
+      });
+      return t.end;
     });
-
-    await s.test(
+    const s = story(test);
+    s.test(
       'a step on a remote agent is sent its brief, with the secret its card asks for, and the Task it completes signs it off',
       async (c) => {
         const { server, id, e, decided, listed } = await remoteRun(c, 'reviewer', { text: 'It is right.' }, 's3cret');
@@ -272,24 +276,19 @@ test(
           );
       },
     );
-
-    await s.test(
-      'a data part on the Task the agent completes is its closeout: `blocked` there reads blocked, with what it needs',
-      async (c) => {
-        const { server, decided } = await remoteRun(
-          c,
-          'blocker',
-          { data: { outcome: 'blocked', summary: 'The note cites no source.', needs: 'a source for the tide tables', artifacts: [] } },
-          's3cret',
-        );
-        assert.equal(server.sent.length, 1);
-        const said = decided.closeouts.ask;
-        assert.ok(said && !('error' in said), JSON.stringify(said));
-        assert.deepEqual([said.outcome, said.needs], ['blocked', 'a source for the tide tables']);
-      },
-    );
-
-    await s.test(
+    s.test('a data part on the Task the agent completes is its closeout: `blocked` there reads blocked, with what it needs', async (c) => {
+      const { server, decided } = await remoteRun(
+        c,
+        'blocker',
+        { data: { outcome: 'blocked', summary: 'The note cites no source.', needs: 'a source for the tide tables', artifacts: [] } },
+        's3cret',
+      );
+      assert.equal(server.sent.length, 1);
+      const said = decided.closeouts.ask;
+      assert.ok(said && !('error' in said), JSON.stringify(said));
+      assert.deepEqual([said.outcome, said.needs], ['blocked', 'a source for the tide tables']);
+    });
+    s.test(
       'a secret not given sends nothing, the step fails naming the variable to set, and it is tried again as a new Task, never with --model or --budget',
       async (c) => {
         const { server, id, e, decided } = await remoteRun(c, 'critic', { text: 'never sent' }, undefined);
@@ -321,8 +320,7 @@ test(
         assert.equal(again.ask.try, 2, 'without them, the same try is asked for');
       },
     );
-
-    await s.test(
+    s.test(
       'a Task the agent leaves waiting on a question reads as waiting on you: nemia logs prints the question, and nemia say answers it',
       async (c) => {
         const server = await a2aServer({
@@ -372,13 +370,12 @@ test(
         }
       },
     );
-
-    await s.test(
+    s.test(
       "a step on an agent that streams is followed from the agent's own stream: each event in order, once, to the step's end",
       async (c) => {
         const { held, go } = gate();
         const server = await a2aServer({ streaming: true, held, answer: () => ({ text: 'It is right.' }) });
-        c.after(() => server.close());
+        c.onTestFinished(() => server.close());
         const { got, rung, ended, tick: ticked } = await following(c, 'streamer', server.url);
         await until(
           c,
@@ -415,13 +412,12 @@ test(
         ]);
       },
     );
-
-    await s.test(
+    s.test(
       "a step on an agent whose card does not say it streams is followed from the runtime's reads of its Task: each event once, to the step's end",
       async (c) => {
         const { held, go } = gate();
         const server = await a2aServer({ held, answer: () => ({ text: 'It is right.' }) });
-        c.after(() => {
+        c.onTestFinished(() => {
           go();
           return server.close();
         });
@@ -464,10 +460,10 @@ const LOCAL = team('local', 'claude', 'work', 'Write a note on tides.');
 const REMOTE = team('remote', 'a2a:reviewer', 'work');
 const ended = (task: string) => journal(task).filter((ev) => ev.kind === 'ended');
 
-test(
+describe(
   'a broken a2a-agents.json holds the remote steps that name it and refuses their start, and leaves local runs working',
   WAITED,
-  async (t) => {
+  () => {
     for (const [what, text, why] of [
       ['refused as it stands', '{ reviewer: ', /a2a-agents\.json: is not JSON/],
       [
@@ -477,99 +473,96 @@ test(
       ],
       ['with its entry removed', '{}', undefined],
     ] as const)
-      await t.test(
-        `a2a-agents.json ${what}: a remote step at work is held, not ended lost, a queued one is refused, neither is handed to Claude Code, and a local run goes on`,
-        async (row) => {
-          const server = await a2aServer({ answer: () => ({ asks: 'Which note?' }) });
-          const good = JSON.stringify({ reviewer: { url: server.url } });
-          const start = (dir: string) => startedBy((argv) => told(argv, engine(ENV), undefined, builtinGitPlace, ENV), dir, false);
-          try {
-            fs.writeFileSync(FILE, good);
-            const away = await start(REMOTE);
-            await until(
-              row,
-              async () => {
-                if (journal(`${away}-work`).some((ev) => ev.kind === 'spawned') && server.sent.length >= 1) return true;
-                await own(['tick']);
-                return false;
-              },
-              () =>
-                `${away} spawned and sent to the agent; ${server.sent.length} sent, its journal ${JSON.stringify(journal(`${away}-work`))}`,
-              { everyMs: 0 },
-            );
-            const queued = await start(REMOTE);
-            await own(['tick']);
-            assert.ok(
-              journal(`${queued}-work`).some((ev) => ev.kind === 'filed'),
-              'the second step is filed, queued, before the file changes',
-            );
-            assert.equal(ended(`${away}-work`).length, 0, 'the first is at work on the agent');
-
-            fs.writeFileSync(FILE, text);
-            fs.rmSync(CALLS, { force: true });
-            for (let i = 0; i < 4; i++) {
+      test(`a2a-agents.json ${what}: a remote step at work is held, not ended lost, a queued one is refused, neither is handed to Claude Code, and a local run goes on`, async (row) => {
+        const server = await a2aServer({ answer: () => ({ asks: 'Which note?' }) });
+        const good = JSON.stringify({ reviewer: { url: server.url } });
+        const start = (dir: string) => startedBy((argv) => told(argv, engine(ENV), undefined, builtinGitPlace, ENV), dir, false);
+        try {
+          fs.writeFileSync(FILE, good);
+          const away = await start(REMOTE);
+          await until(
+            row,
+            async () => {
+              if (journal(`${away}-work`).some((ev) => ev.kind === 'spawned') && server.sent.length >= 1) return true;
               await own(['tick']);
-              await own(['ls']);
-            }
-            assert.equal(
-              fs.existsSync(CALLS) ? fs.readFileSync(CALLS, 'utf8') : '',
-              '',
-              'Claude Code was asked nothing: no job spawned, and no listing looked in for a remote session',
-            );
-            assert.equal(
-              ended(`${away}-work`).length,
-              0,
-              `the step at work is held, neither there nor gone: ${JSON.stringify(journal(`${away}-work`))}`,
-            );
-            assert.equal(
-              journal(`${queued}-work`).some((ev) => ev.kind === 'spawned'),
-              false,
-              `the queued step was never spawned: ${JSON.stringify(journal(`${queued}-work`))}`,
-            );
-            const refused = ended(`${queued}-work`);
-            assert.equal(refused.length, 1, JSON.stringify(journal(`${queued}-work`)));
-            assert.equal(refused[0].reason, 'unstartable');
-            const error = String(refused[0].error);
-            assert.ok(error.startsWith('`harness: a2a:reviewer` is not a harness'), error);
-            assert.ok(error.includes('nothing was started'), error);
-            assert.ok(error.includes('Its harnesses are: '), error);
-            assert.equal(server.sent.length, 1, 'and nothing more was sent to the agent');
+              return false;
+            },
+            () =>
+              `${away} spawned and sent to the agent; ${server.sent.length} sent, its journal ${JSON.stringify(journal(`${away}-work`))}`,
+            { everyMs: 0 },
+          );
+          const queued = await start(REMOTE);
+          await own(['tick']);
+          assert.ok(
+            journal(`${queued}-work`).some((ev) => ev.kind === 'filed'),
+            'the second step is filed, queued, before the file changes',
+          );
+          assert.equal(ended(`${away}-work`).length, 0, 'the first is at work on the agent');
 
-            fs.rmSync(FILE, { force: true });
-            const local = await start(LOCAL);
-            fs.writeFileSync(FILE, text);
-            const made = await own(['ls']);
-            const listedIds = (made.answered as RunsListed).runs.map((r) => r.run.id);
-            assert.ok(listedIds.includes(local), listedIds.join(', '));
-            if (why !== undefined) {
-              assert.match(made.err, why, 'the engine says why it left the file or the entry out');
-              assert.ok(made.err.includes('until the file is fixed and this process restarts'), made.err);
-              assert.ok(made.err.includes('refused by `nemia start`'), made.err);
-            }
-            const ticked = await own(['tick']);
-            if (why !== undefined) assert.match(ticked.err, why);
-            assert.ok(runRecord(ROOT, local).steps.work, `the local step was filed: ${JSON.stringify(runRecord(ROOT, local).steps)}`);
-            const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
-            await assert.rejects(
-              start(REMOTE),
-              (err: Error & { exitCode?: number }) => err.exitCode === 2 && (why === undefined || why.test(err.message)),
-              "nemia start of a step on the agent is refused, in the file's words",
-            );
-            assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs, 'no run was written');
-
-            fs.writeFileSync(FILE, good);
+          fs.writeFileSync(FILE, text);
+          fs.rmSync(CALLS, { force: true });
+          for (let i = 0; i < 4; i++) {
             await own(['tick']);
-            assert.equal(
-              ended(`${away}-work`).length,
-              0,
-              `once the file is fixed, the step at work is followed again on the agent, not ended: ${JSON.stringify(journal(`${away}-work`))}`,
-            );
-            assert.ok(journal(`${away}-work`).every((ev) => ev.kind !== 'ended' || ev.observed !== 'lost'));
-          } finally {
-            fs.rmSync(FILE, { force: true });
-            await server.close();
+            await own(['ls']);
           }
-        },
-      );
+          assert.equal(
+            fs.existsSync(CALLS) ? fs.readFileSync(CALLS, 'utf8') : '',
+            '',
+            'Claude Code was asked nothing: no job spawned, and no listing looked in for a remote session',
+          );
+          assert.equal(
+            ended(`${away}-work`).length,
+            0,
+            `the step at work is held, neither there nor gone: ${JSON.stringify(journal(`${away}-work`))}`,
+          );
+          assert.equal(
+            journal(`${queued}-work`).some((ev) => ev.kind === 'spawned'),
+            false,
+            `the queued step was never spawned: ${JSON.stringify(journal(`${queued}-work`))}`,
+          );
+          const refused = ended(`${queued}-work`);
+          assert.equal(refused.length, 1, JSON.stringify(journal(`${queued}-work`)));
+          assert.equal(refused[0].reason, 'unstartable');
+          const error = String(refused[0].error);
+          assert.ok(error.startsWith('`harness: a2a:reviewer` is not a harness'), error);
+          assert.ok(error.includes('nothing was started'), error);
+          assert.ok(error.includes('Its harnesses are: '), error);
+          assert.equal(server.sent.length, 1, 'and nothing more was sent to the agent');
+
+          fs.rmSync(FILE, { force: true });
+          const local = await start(LOCAL);
+          fs.writeFileSync(FILE, text);
+          const made = await own(['ls']);
+          const listedIds = (made.answered as RunsListed).runs.map((r) => r.run.id);
+          assert.ok(listedIds.includes(local), listedIds.join(', '));
+          if (why !== undefined) {
+            assert.match(made.err, why, 'the engine says why it left the file or the entry out');
+            assert.ok(made.err.includes('until the file is fixed and this process restarts'), made.err);
+            assert.ok(made.err.includes('refused by `nemia start`'), made.err);
+          }
+          const ticked = await own(['tick']);
+          if (why !== undefined) assert.match(ticked.err, why);
+          assert.ok(runRecord(ROOT, local).steps.work, `the local step was filed: ${JSON.stringify(runRecord(ROOT, local).steps)}`);
+          const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
+          await assert.rejects(
+            start(REMOTE),
+            (err: Error & { exitCode?: number }) => err.exitCode === 2 && (why === undefined || why.test(err.message)),
+            "nemia start of a step on the agent is refused, in the file's words",
+          );
+          assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs, 'no run was written');
+
+          fs.writeFileSync(FILE, good);
+          await own(['tick']);
+          assert.equal(
+            ended(`${away}-work`).length,
+            0,
+            `once the file is fixed, the step at work is followed again on the agent, not ended: ${JSON.stringify(journal(`${away}-work`))}`,
+          );
+          assert.ok(journal(`${away}-work`).every((ev) => ev.kind !== 'ended' || ev.observed !== 'lost'));
+        } finally {
+          fs.rmSync(FILE, { force: true });
+          await server.close();
+        }
+      });
   },
 );

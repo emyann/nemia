@@ -2,7 +2,7 @@
  * A task's path through its lifecycle, replayed off hand-built journals: one step per entry, the state the journal says once the entry
  * is on it, the entry's kind and its `at`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { pathOf } from '../src/core/path.ts';
 import type { Event } from '../src/core/domain.ts';
@@ -11,12 +11,11 @@ import { at, ended, filed, S, signed, spawned, starting, TASK } from './lifecycl
 /** The path of `events` as `state <- event` words, to compare in one line. */
 const words = (events: Event[]) => pathOf(TASK, events).map((s) => `${s.state} <- ${s.event}`);
 
-test('pathOf: a journal replayed into its path through the lifecycle, one step per entry, its state, its kind and its time', async (t) => {
-  await t.test('an empty journal is an empty path', () => {
+describe('pathOf: a journal replayed into its path through the lifecycle, one step per entry, its state, its kind and its time', () => {
+  test('an empty journal is an empty path', () => {
     assert.deepEqual(pathOf(TASK, []), []);
   });
-
-  await t.test('a task run to its end: submitted, starting, working, ending, completed, each at its entry', () => {
+  test('a task run to its end: submitted, starting, working, ending, completed, each at its entry', () => {
     const events: Event[] = [
       filed(),
       starting(1, 0),
@@ -32,8 +31,7 @@ test('pathOf: a journal replayed into its path through the lifecycle, one step p
       { state: 'completed', event: 'settled', at: at(3 * S) },
     ]);
   });
-
-  await t.test('a measured entry keeps the state it finds', () => {
+  test('a measured entry keeps the state it finds', () => {
     const measured: Event = { kind: 'measured', at: at(S + 1), attempt: 1, usage: { responses: 2 } };
     assert.deepEqual(words([filed(), starting(1), spawned(1), measured]), [
       'submitted <- filed',
@@ -42,8 +40,7 @@ test('pathOf: a journal replayed into its path through the lifecycle, one step p
       'working <- measured',
     ]);
   });
-
-  await t.test("a person's stop moves a running task to stopping, and its settling to canceled", () => {
+  test("a person's stop moves a running task to stopping, and its settling to canceled", () => {
     const events: Event[] = [
       filed(),
       starting(1),
@@ -61,8 +58,7 @@ test('pathOf: a journal replayed into its path through the lifecycle, one step p
       'canceled <- settled',
     ]);
   });
-
-  await t.test('a task held open waits on a person, is answered into its next turn, and is closed to ending', () => {
+  test('a task held open waits on a person, is answered into its next turn, and is closed to ending', () => {
     const events: Event[] = [
       filed({ holdOpen: true, queued: true }),
       { kind: 'admitted', at: at(0) },
@@ -90,8 +86,7 @@ test('pathOf: a journal replayed into its path through the lifecycle, one step p
       'completed <- settled',
     ]);
   });
-
-  await t.test('a spawn that failed ends at ending, and settles failed', () => {
+  test('a spawn that failed ends at ending, and settles failed', () => {
     const events: Event[] = [
       filed(),
       starting(1),

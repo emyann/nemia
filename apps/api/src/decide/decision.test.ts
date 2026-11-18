@@ -5,7 +5,7 @@
  * the same of each step: what it consumed, that it was denied, an acceptance of a loop's try, a prune.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -150,9 +150,9 @@ writeRun({
   steps: { implement: { taskId: 't-d1-implement', branch }, review: { taskId: 't-d1-review', branch } },
 });
 
-test("a run's decision on the api, and the run object beside it: one reading of each step, a loop's acceptance, a denial, a prune, and no run", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("a run's decision on the api, and the run object beside it: one reading of each step, a loop's acceptance, a denial, a prune, and no run", () => {
+  const s = story(test);
+  s.test(
     "a finished run's decision is objects' `Decidable`, and the run object carries the same words of what each step consumed",
     async () => {
       const body = await decidable('r-d1');
@@ -183,7 +183,7 @@ test("a run's decision on the api, and the run object beside it: one reading of 
       assert.equal(detail.status.pruned, null, 'a run never pruned says so with a null, not a missing field');
     },
   );
-  await s.test("a decision answers each check-affecting file's path and counts, its lines asked with diffs, by path or `*`", async () => {
+  s.test("a decision answers each check-affecting file's path and counts, its lines asked with diffs, by path or `*`", async () => {
     const files = async (query: string) => {
       const res = await app.request(`/api/runs/r-d1/decision${query}`);
       assert.equal(res.status, 200);
@@ -209,7 +209,7 @@ test("a run's decision on the api, and the run object beside it: one reading of 
       'a file asked by its path is answered whole',
     );
   });
-  await s.test('a run still running is `running`, and a step of it not filed has consumed nothing on its object', async () => {
+  s.test('a run still running is `running`, and a step of it not filed has consumed nothing on its object', async () => {
     journal('t-d2-implement', [filed('t-d2-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
     writeRun({ id: 'r-d2', repo, baseRef: base, steps: { implement: { taskId: 't-d2-implement', branch }, review: { taskId: null } } });
     const detail = await detailOf('r-d2');
@@ -234,7 +234,7 @@ test("a run's decision on the api, and the run object beside it: one reading of 
     );
     assert.deepEqual(await decisionOf('r-d2'), { status: 200, body: { running: true } });
   });
-  await s.test(
+  s.test(
     "a loop out of rounds is offered its acceptance, and the run object says an acceptance of the looping step's current try alone",
     async () => {
       const looping = [
@@ -306,7 +306,7 @@ test("a run's decision on the api, and the run object beside it: one reading of 
       );
     },
   );
-  await s.test(
+  s.test(
     'a step `denials: fail` stopped reads `denied` on the object, waited on by a person, and the decision offers it afresh',
     async () => {
       const denying = [
@@ -347,7 +347,7 @@ test("a run's decision on the api, and the run object beside it: one reading of 
       );
     },
   );
-  await s.test(
+  s.test(
     'REFUSED once pruned: the decision offers no try, and the run object says the prune, waits on nobody and has no try coming',
     async () => {
       settledTask('t-d10-implement', blocked);
@@ -375,7 +375,7 @@ test("a run's decision on the api, and the run object beside it: one reading of 
       assert.equal(asked.status.moving, false, 'the board says nothing is on its way');
     },
   );
-  await s.test('a run called off is a 200 carrying `nothing` alone; an unknown run is a 404 that says where to look', async () => {
+  s.test('a run called off is a 200 carrying `nothing` alone; an unknown run is a 404 that says where to look', async () => {
     writeRun({ id: 'r-d4', repo, baseRef: base, steps: { implement: { taskId: 't-d1-implement', branch }, review: { taskId: null } } });
     fs.writeFileSync(path.join(root, 'runs', 'r-d4.cancelled'), '2026-09-13T01:00:00.000Z');
     const { status, body } = await decisionOf('r-d4');

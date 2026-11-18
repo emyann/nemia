@@ -5,7 +5,7 @@
  * and the orchestrator's do not reach into the board: the guards read both. A skill that teaches another form, or a board that reads
  * another, fails it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

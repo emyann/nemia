@@ -10,7 +10,7 @@
  * your library first: only the lookup does.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

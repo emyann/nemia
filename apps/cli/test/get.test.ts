@@ -3,7 +3,7 @@
  * read by its name, `-o yaml` read back by `nemia apply` as unchanged, and a word that names no resource refused exit 2 naming
  * `nemia explain`. The client's own verb: its help is its own, and `--local` is refused by the route, naming the command without it.
  */
-import { test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { servedStore, write } from './served.ts';
@@ -13,7 +13,7 @@ const store = await servedStore('nemia-cli-get-', (root) => {
   write(path.join(root, 'inbox', 'tidy-the-docs.md'), '---\nlabels:\n  team: docs\n---\nTidy the docs.\n');
   write(path.join(root, 'inbox', 'paint-the-harbour.md'), '---\nfactory: harbour\n---\nPaint the harbour.\n');
 });
-test.after(() => store.stop());
+afterAll(() => store.stop());
 
 test('`nemia get cards` lists every card of the default namespace as a table: NAME, STATE, AGE', async () => {
   const listed = await store.nemia(['get', 'cards']);

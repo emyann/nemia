@@ -15,7 +15,7 @@
  * The runtime is the bottom layer, and the objects (`packages/objects`) sit beside it: no file of its `src` or `bin` imports them, by
  * their name or by a path (`objectsBreaches`), since what a session runs carries no object of the layers above.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

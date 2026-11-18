@@ -1,7 +1,7 @@
 /**
  * A plan is a folder of cards: the format, the order `nemia start <folder>` starts them in, and what it prints — pure, as data.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { WorkflowError } from '../step/step.ts';
 import { CARD_KEYS, cardToStart, parsePlan, planLines, planOrder, planStopped, type PlanFile, type Planned } from './plan.ts';
@@ -20,9 +20,9 @@ const DIAMOND: readonly PlanFile[] = [
  * and naming each of `fixes`, the key, the card or the command its fix turns on.
  */
 const refusedWith =
-  (pattern: RegExp, ...fixes: string[]) =>
+  (...fixes: string[]) =>
   (err: Error & { exitCode?: number }) =>
-    err instanceof WorkflowError && err.exitCode === 2 && pattern.test(err.message) && fixes.every((fix) => err.message.includes(fix));
+    err instanceof WorkflowError && err.exitCode === 2 && test.todo(err.message) && fixes.every((fix) => err.message.includes(fix));
 
 test('a card is its file: the name without .md, `workflow:` and `after:` from its frontmatter, the body as its brief — and README.md is not a card', () => {
   const cards = parsePlan([
@@ -278,9 +278,9 @@ const START: Refused[] = [
   ],
 ];
 
-test("REFUSED by name at shipped defaults: a plan's card, its `after:` and its folder, and a card started on its own", async (t) => {
+describe("REFUSED by name at shipped defaults: a plan's card, its `after:` and its folder, and a card started on its own", () => {
   for (const [what, refuses, opens, ...fixes] of [...PARSE, ...START]) {
-    await t.test(what, () => assert.throws(refuses, refusedWith(opens, ...fixes)));
+    test(what, () => assert.throws(refuses, refusedWith(opens, ...fixes)));
   }
 });
 

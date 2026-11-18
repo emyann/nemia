@@ -6,7 +6,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, where `WF_KEEP_WORKTREES` is unset, so the rule is read at its shipped default.
  */
 import { configGiven } from './config-given.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

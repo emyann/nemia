@@ -4,7 +4,7 @@
  * now that the watcher was never sent is ADDED, every one sent at another version MODIFIED, every one sent that the list no longer holds
  * DELETED, and none said twice — over a table of named cases and over every pair of lists of three keys at two versions.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { type Versioned, type WatchChange, watchChanges } from './list-watch.ts';
 
@@ -23,7 +23,7 @@ const misses = (sent: readonly Versioned[], now: readonly Versioned[], changes: 
 
 const v = (key: string, version: string): Versioned => ({ key, version });
 
-test('the named cases: each new object ADDED, each moved MODIFIED, each gone DELETED, and one that stands not said', async (t) => {
+describe('the named cases: each new object ADDED, each moved MODIFIED, each gone DELETED, and one that stands not said', () => {
   const rows: [string, Versioned[], Versioned[], WatchChange[]][] = [
     [
       'a first read, nothing sent: every object ADDED',
@@ -50,7 +50,7 @@ test('the named cases: each new object ADDED, each moved MODIFIED, each gone DEL
     ],
   ];
   for (const [name, sent, now, expected] of rows)
-    await t.test(name, () => {
+    test(name, () => {
       const changes = watchChanges(sent, now);
       assert.deepEqual(
         [...changes].sort((x, y) => x.key.localeCompare(y.key)),

@@ -6,7 +6,7 @@
  * configuration
  * and a fixed identity, so a machine's hooks, default branch or signing change nothing here.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

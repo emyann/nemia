@@ -9,7 +9,8 @@
  * is walked on git in `prune-git.boundary.test.ts`. A file of its own, over its own store at `ROOT`, given as `ENV`; each story
  * reads its own runs, though a prune of every run reads the store's.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -160,14 +161,14 @@ const aFinished = async (
 const typed = async (t: TestContext, e: Engine, ...argv: string[]): Promise<Typed> => {
   if (argv[0] === 'rm' || argv[0] === 'prune') return forgetTyped((effect) => stage.runWith(e, effect), ROOT, argv);
   const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => void printed.push(a.join(' ')));
+  const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void printed.push(a.join(' ')));
   try {
     await stage.main(argv, e);
     return { printed, forgot: [], error: undefined };
   } catch (err) {
     return { printed, forgot: [], error: err as Error & { exitCode?: number; _tag?: string } };
   } finally {
-    log.mock.restore();
+    log.mockRestore();
   }
 };
 
@@ -242,10 +243,20 @@ const inPlaceRun = async (b: Board) => {
   return inPlace;
 };
 
-test('`nemia prune` of a run that landed: listed with its size until --yes, then its worktree removed and its files with --artifacts, its record, branch, asks and inputs kept, and a second prune with nothing to do', async (t) => {
-  const s = story(t);
-  const b = board();
-  await s.test('a dry prune lists its worktree with its size, asking the engine nothing: nothing touched', async () => {
+describe('`nemia prune` of a run that landed: listed with its size until --yes, then its worktree removed and its files with --artifacts, its record, branch, asks and inputs kept, and a second prune with nothing to do', () => {
+  let b!: {
+    e: import('agent-runtime').EngineShape;
+    filings: string[];
+    forgets: { taskIds: string[]; yes: boolean }[];
+    settle: (id: string, phase: EnginePhase, closeout?: unknown, usage?: object) => void;
+  };
+  beforeAll(() => {
+    const t = teardowns();
+    b = board();
+    return t.end;
+  });
+  const s = story(test);
+  s.test('a dry prune lists its worktree with its size, asking the engine nothing: nothing touched', async (t) => {
     const { run, wt } = await aFinished(b, { merged: true });
     const dry = await typed(t, b.e, 'prune', run.id);
     assert.equal(dry.error, undefined, 'a dry run with nobody at a terminal is no refusal');
@@ -260,10 +271,9 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
     assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`), 'a dry run touches nothing');
     assert.ok((await runWith(b.e, prune(run.id))).worktrees[0].bytes > 0, 'what the worktree holds is counted');
   });
-
-  await s.test(
+  s.test(
     'with --yes its worktree is removed, its record, closeout, branch, files and asks kept; `nemia ls` and `nemia decide`, once a pass has read where it stands, say it is pruned; a tick files nothing; a second prune has nothing to do; `nemia rm` still forgets it',
-    async () => {
+    async (t) => {
       const { run, repo, wt, branch } = await aFinished(b, { merged: true });
       fs.mkdirSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement'), { recursive: true });
       fs.writeFileSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement', 'report.md'), 'report\n');
@@ -311,10 +321,9 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       assert.ok(!under('runs', `${run.id}.pruned`), 'and the marker goes with it');
     },
   );
-
-  await s.test(
+  s.test(
     '`--artifacts`: its worktree and its files listed with their sizes until --yes, then removed — a link among them as a link — what freed said; its record, asks, inputs and prompts kept; `nemia decide`, once a pass has read where it stands, says the files went',
-    async () => {
+    async (t) => {
       const shotOf = (id: string) => path.join(ROOT, 'runs', id, 'artifacts', 'implement', 'shot.png');
       const run0 = await aFinished(b, { merged: true, closeout: (id) => ({ ...SIGNED, artifacts: [shotOf(id)] }) });
       const id = run0.run.id;
@@ -382,10 +391,9 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       });
     },
   );
-
-  await s.test(
+  s.test(
     "`--artifacts` of a run whose worktrees a plain prune removed takes its files alone, the worktrees' time kept; of a run that cut none, its files alone, which then reads pruned",
-    async () => {
+    async (t) => {
       const { run } = await aFinished(b, { merged: true });
       aShot(run.id);
       assert.equal((await runWith(b.e, prune(run.id, { yes: true }))).kind, 'pruned');
@@ -431,21 +439,20 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       names((await runWith(b.e, prune(inPlace.id, { artifacts: true }))).nothing, inPlace.repo!, marked.at, 'nemia prune --artifacts');
     },
   );
-
-  await s.test(
+  s.test(
     '`--artifacts` marks the run before its files go, and a prune that removed nothing takes the mark back — gone on a run never pruned, as it was on one that was',
     async (tt) => {
       const { run } = await aFinished(b, { merged: true });
       aShot(run.id);
       const rm = fs.rmSync;
       let seen: unknown;
-      const mocked = tt.mock.method(fs, 'rmSync', (at: fs.PathLike, opts?: fs.RmOptions) => {
+      const mocked = vi.spyOn(fs, 'rmSync').mockImplementation((at: fs.PathLike, opts?: fs.RmOptions) => {
         if (String(at).endsWith(path.join(run.id, 'artifacts')))
           seen = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.pruned`), 'utf8'));
         return rm(at, opts);
       });
       assert.equal((await runWith(b.e, prune(run.id, { artifacts: true, yes: true }))).kind, 'pruned');
-      mocked.mock.restore();
+      mocked.mockRestore();
       assert.ok(
         (seen as { artifacts?: unknown } | undefined)?.artifacts,
         `marked before the removal, as seen from inside it: ${JSON.stringify(seen)}`,
@@ -455,7 +462,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       const locked = (id: string) => {
         aShot(id);
         fs.chmodSync(path.join(ROOT, 'runs', id, 'artifacts', 'implement'), 0o555);
-        tt.after(() => fs.chmodSync(path.join(ROOT, 'runs', id, 'artifacts', 'implement'), 0o755));
+        tt.onTestFinished(() => fs.chmodSync(path.join(ROOT, 'runs', id, 'artifacts', 'implement'), 0o755));
       };
       const inPlace = await inPlaceRun(b);
       locked(inPlace.id);
@@ -484,10 +491,9 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       );
     },
   );
-
-  await s.test(
+  s.test(
     '`nemia prune` with no run reads the runs that are over: one not over and one with nothing to prune are not said, the rest listed with the total',
-    async () => {
+    async (t) => {
       const merged = await aFinished(b, { merged: true });
       const running = await runPlaced(startRun({ brief: 'running', repo: aRepo(), workflowDir: oneStep() }));
       await runWith(b.e, advanceRun(runRecord(ROOT, running.id)));
@@ -505,10 +511,20 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
   );
 });
 
-test('`nemia prune` refused, then let through: what holds it is named with the fix it names, nothing removed and no mark, and once that is dealt with, the run is pruned', async (t) => {
-  const s = story(t);
-  const b = board();
-  await s.test('REFUSED: a run not over is told to cancel first, exit 2', async () => {
+describe('`nemia prune` refused, then let through: what holds it is named with the fix it names, nothing removed and no mark, and once that is dealt with, the run is pruned', () => {
+  let b!: {
+    e: import('agent-runtime').EngineShape;
+    filings: string[];
+    forgets: { taskIds: string[]; yes: boolean }[];
+    settle: (id: string, phase: EnginePhase, closeout?: unknown, usage?: object) => void;
+  };
+  beforeAll(() => {
+    const t = teardowns();
+    b = board();
+    return t.end;
+  });
+  const s = story(test);
+  s.test('REFUSED: a run not over is told to cancel first, exit 2', async (t) => {
     const run = await runPlaced(startRun({ brief: 'still running', repo: aRepo(), workflowDir: oneStep() }));
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
@@ -518,8 +534,7 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
     assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`));
     b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   });
-
-  await s.test('REFUSED: a finished run not merged, unless --unmerged; with it, pruned, and the branch with its work kept', async () => {
+  s.test('REFUSED: a finished run not merged, unless --unmerged; with it, pruned, and the branch with its work kept', async () => {
     const { run, repo, wt, branch } = await aFinished(b);
     const refused = await runWith(b.e, prune(run.id, { yes: true }));
     assert.equal(refused.kind, 'refused');
@@ -530,23 +545,18 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
     assert.ok(!fs.existsSync(wt));
     assert.equal(world().changed(repo, branch).join('\n'), 'fix.ts', 'the work is on its branch');
   });
-
-  await s.test(
-    'REFUSED: a worktree with a change no commit has — untracked, or modified — named with its files, nothing removed',
-    async () => {
-      for (const change of ['untracked', 'modified'] as const) {
-        const { run, wt } = await aFinished(b, { merged: true });
-        if (change === 'untracked') fs.writeFileSync(path.join(wt, 'notes.md'), 'notes\n');
-        else fs.appendFileSync(path.join(wt, 'README.md'), 'more\n');
-        const refused = await runWith(b.e, prune(run.id, { yes: true }));
-        assert.equal(refused.kind, 'refused', change);
-        names(refused.refusal, wt, change === 'untracked' ? 'notes.md' : 'README.md', `nemia prune ${run.id}`);
-        assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`), change);
-      }
-    },
-  );
-
-  await s.test(
+  s.test('REFUSED: a worktree with a change no commit has — untracked, or modified — named with its files, nothing removed', async () => {
+    for (const change of ['untracked', 'modified'] as const) {
+      const { run, wt } = await aFinished(b, { merged: true });
+      if (change === 'untracked') fs.writeFileSync(path.join(wt, 'notes.md'), 'notes\n');
+      else fs.appendFileSync(path.join(wt, 'README.md'), 'more\n');
+      const refused = await runWith(b.e, prune(run.id, { yes: true }));
+      assert.equal(refused.kind, 'refused', change);
+      names(refused.refusal, wt, change === 'untracked' ? 'notes.md' : 'README.md', `nemia prune ${run.id}`);
+      assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`), change);
+    }
+  });
+  s.test(
     'REFUSED: a place whose inventory is not heard refuses as not read, never as nothing left — its worktree stays and the run is not marked',
     async () => {
       const { run, repo, wt } = await aFinished(b, { merged: true });
@@ -558,8 +568,7 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
       assert.equal((await runWith(b.e, prune(run.id, { yes: true }))).kind, 'pruned', 'the place reads it');
     },
   );
-
-  await s.test('REFUSED: a hand-off still owed — a step settled and no pass since — until a tick has handed it off', async () => {
+  s.test('REFUSED: a hand-off still owed — a step settled and no pass since — until a tick has handed it off', async () => {
     const run = await runPlaced(startRun({ brief: 'owed', repo: aRepo(), workflowDir: oneStep() }));
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
@@ -574,16 +583,14 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.equal((await runWith(b.e, prune(run.id, { yes: true, unmerged: true }))).kind, 'pruned');
   });
-
-  await s.test('REFUSED: a folder run — its folders are its work, kept until `nemia rm`', async () => {
+  s.test('REFUSED: a folder run — its folders are its work, kept until `nemia rm`', async () => {
     const run = await aFolderRun(b);
     const refused = await runWith(b.e, prune(run.id, { yes: true, unmerged: true }));
     assert.equal(refused.kind, 'refused');
     names(refused.refusal, 'a folder run', `nemia rm ${run.id}`);
     assert.ok(!under('runs', `${run.id}.pruned`));
   });
-
-  await s.test(
+  s.test(
     'REFUSED: whatever holds `nemia rm` — a step at its gate, named with its approval, and an ask no pass has spent on a run landed as a pass read it, with the file that takes it back — until each is answered',
     async (tt) => {
       const { run, wt } = await atItsGate(b);
@@ -623,10 +630,9 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
       );
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED under --artifacts: a run not over, a finished run not merged, a folder run, one at its gate and a worktree holding a change — its files and worktree kept, no mark; the prune each offers takes them',
-    async () => {
+    async (t) => {
       const kept = (id: string, shot: string) => assert.ok(fs.existsSync(shot) && !under('runs', `${id}.pruned`), id);
       const running = await runPlaced(startRun({ brief: 'still running', repo: aRepo(), workflowDir: oneStep() }));
       await runWith(b.e, advanceRun(runRecord(ROOT, running.id)));
@@ -686,10 +692,20 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
   );
 });
 
-test('after a prune: a retry, a round, an approval and an acceptance are refused — each would file work into a worktree that is gone — a step over its budget is offered no raise, and a pass files nothing on an ask written by hand', async (t) => {
-  const s = story(t);
-  const b = board();
-  await s.test(
+describe('after a prune: a retry, a round, an approval and an acceptance are refused — each would file work into a worktree that is gone — a step over its budget is offered no raise, and a pass files nothing on an ask written by hand', () => {
+  let b!: {
+    e: import('agent-runtime').EngineShape;
+    filings: string[];
+    forgets: { taskIds: string[]; yes: boolean }[];
+    settle: (id: string, phase: EnginePhase, closeout?: unknown, usage?: object) => void;
+  };
+  beforeAll(() => {
+    const t = teardowns();
+    b = board();
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     'REFUSED: the four verbs that would file work, each naming the prune; nothing offered; `nemia ls` waits on nobody; an ask written by hand files nothing',
     async () => {
       const { run } = await aFinished(b);
@@ -722,8 +738,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
       assert.deepEqual(coming, [], 'no try is coming of it');
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED: a step over its budget is offered no raise once pruned — `decide` and `nemia decide` say the run was pruned where they said it waits on you, as `nemia ls` does — and the whole screen says so, once a pass has read where its branch stands',
     async () => {
       const { run, repo } = await aFinished(b, { budget: 3, costUsd: 3.4, closeout: { ...SIGNED, outcome: 'blocked', needs: 'a word' } });
@@ -842,9 +857,17 @@ test('a script condition that answered a route no pass has copied yet: prune rea
   assert.ok('pruning' in judged && judged.pruning.kind === 'refused', 'kept, --unmerged or not');
 });
 
-test('REFUSED before anything is read: what `nemia prune` does not take, and an id that is not a name — and the lines `pruneLines` and `sizeOf` say', async (t) => {
-  const b = board();
-  await t.test('REFUSED: a flag it does not take, and one near a flag it does, exit 2, naming the flag', async () => {
+describe('REFUSED before anything is read: what `nemia prune` does not take, and an id that is not a name — and the lines `pruneLines` and `sizeOf` say', () => {
+  let b!: {
+    e: import('agent-runtime').EngineShape;
+    filings: string[];
+    forgets: { taskIds: string[]; yes: boolean }[];
+    settle: (id: string, phase: EnginePhase, closeout?: unknown, usage?: object) => void;
+  };
+  beforeAll(() => {
+    b = board();
+  });
+  test('REFUSED: a flag it does not take, and one near a flag it does, exit 2, naming the flag', async (t) => {
     const flag = await typed(t, b.e, 'prune', '--force');
     assert.equal(flag.error?.exitCode, 2);
     names(flag.error?.message, 'nemia prune does not take --force');
@@ -853,7 +876,7 @@ test('REFUSED before anything is read: what `nemia prune` does not take, and an 
     names(near.error?.message, '--artifact.', '--artifacts');
   });
   for (const id of ['../x', 'r-1.pruned'])
-    await t.test(`REFUSED: ${id}, an id that is not a name, exit 2, naming nemia prune`, async () => {
+    test(`REFUSED: ${id}, an id that is not a name, exit 2, naming nemia prune`, async () => {
       names(idRefusal(id, 'prune'), 'nemia prune');
       await assert.rejects(runWith(b.e, prune(id)), (err: Error & { exitCode?: number }) => {
         assert.equal(err.exitCode, 2);
@@ -861,11 +884,11 @@ test('REFUSED before anything is read: what `nemia prune` does not take, and an 
         return true;
       });
     });
-  await t.test('`sizeOf` says a size as a person reads it', () => {
+  test('`sizeOf` says a size as a person reads it', () => {
     assert.equal(sizeOf(3 * 1024 ** 3), '3.00 GB');
     assert.equal(sizeOf(1536 * 1024), '1.5 MB');
   });
-  await t.test('`pruneLines`: a run pruned, a worktree with its size, a worktree git would not remove with its fix', () => {
+  test('`pruneLines`: a run pruned, a worktree with its size, a worktree git would not remove with its fix', () => {
     const lines = pruneLines({
       id: 'r-1',
       kind: 'pruned',
@@ -877,7 +900,7 @@ test('REFUSED before anything is read: what `nemia prune` does not take, and an 
     assert.equal(lines[1], '   /w/a  2.0 KB');
     names(lines[2], '   kept /w/b', 'fatal: nope', 'git -C /w/b status');
   });
-  await t.test('`pruneLines`: files that would not go are offered the prune that removes them later, `--unmerged` given again', () => {
+  test('`pruneLines`: files that would not go are offered the prune that removes them later, `--unmerged` given again', () => {
     const files = { path: '/s/runs/r-1/artifacts', files: 'EACCES' } as const;
     const unmerged = pruneLines({ id: 'r-1', kind: 'pruned', worktrees: [], left: [files], unmerged: true }).at(-1);
     names(unmerged, '/s/runs/r-1/artifacts', 'EACCES', 'nemia prune r-1 --unmerged --artifacts');
@@ -1169,11 +1192,11 @@ test(
     );
     assert.ok('ready' in judged, 'ready to prune');
     const ready = await runWith(b.e, sized(judged.ready));
-    t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() });
     for (const ends of ['first', 'last'] as const) {
       const one = runWith(b.e, freeing([ready]));
       await until(t, () => held.waiting() >= 1, 'the first removal asked', { bell: held.bell });
-      t.mock.timers.tick(1000);
+      vi.advanceTimersByTime(1000);
       const other = runWith(b.e, freeing([ready]));
       await until(t, () => held.waiting() >= 2, 'the second removal asked', { bell: held.bell });
       assert.ok(under('runs', `${run.id}.pruned`), 'marked while its removals are asked');

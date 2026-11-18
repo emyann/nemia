@@ -5,7 +5,7 @@
  * fail`), and what a task held open reads of its current turn. Pure: each row hands them the engine's view of each task and reads what
  * they decide. The functions of a try alone are in `src/retry/retry.test.ts`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { TaskView } from 'agent-runtime';
 import {
@@ -156,78 +156,75 @@ const fullListing = (over: Partial<Parameters<typeof listing>[0]> & Pick<Paramet
     ...over,
   });
 
-test("assess and stepStatus of a step's check", async (t) => {
-  await t.test('a step without `check:` gets no check, and its follower is filed on its word — it reads unverified', () => {
+describe("assess and stepStatus of a step's check", () => {
+  test('a step without `check:` gets no check, and its follower is filed on its word — it reads unverified', () => {
     const p = phases({ t1: 'succeeded' });
     const a = assess(aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: p, signedOff: signedDone, asked }));
     assert.deepEqual(a.check, []);
     assert.deepEqual(a.ready, ['review']);
     assert.equal(stepStatus(STEPS[0], run({ implement: 't1' }), p, signedDone, asked), 'unverified');
   });
-  await t.test("a signed step with `check:` is due its check, and its follower is NOT filed on the engine's succeeded", () => {
+  test("a signed step with `check:` is due its check, and its follower is NOT filed on the engine's succeeded", () => {
     const a = assess(aRead(CHECKED, withCheck(null), { phaseOf: phases({ t1: 'succeeded' }), signedOff: signedDone, asked }));
     assert.deepEqual(a.check, ['implement']);
     assert.deepEqual(a.ready, [], 'succeeded is the session ending, not the work passing');
     assert.equal(a.status, 'running');
   });
   for (const c of ['pending', 'running', 'unknown'] as const)
-    await t.test(`a check already filed is checking, and is never due a second time: ${c}`, () => {
+    test(`a check already filed is checking, and is never due a second time: ${c}`, () => {
       const r = withCheck('c1');
       const p = phases({ t1: 'succeeded', c1: c });
       const a = assess(aRead(CHECKED, r, { phaseOf: p, signedOff: signedDone, asked }));
       assert.deepEqual([a.check, a.ready, a.status], [[], [], 'running']);
       assert.equal(stepStatus(CHECKED[0], r, p, signedDone, asked), 'checking');
     });
-  await t.test('a check that exits 0 verifies the step, and only then is its follower filed', () => {
+  test('a check that exits 0 verifies the step, and only then is its follower filed', () => {
     const p = phases({ t1: 'succeeded', c1: 'succeeded' });
     assert.deepEqual(assess(aRead(CHECKED, withCheck('c1'), { phaseOf: p, signedOff: signedDone, asked })).ready, ['review']);
     assert.equal(stepStatus(CHECKED[0], withCheck('c1'), p, signedDone, asked), 'verified');
   });
   for (const c of ['failed', 'stopped'] as const)
-    await t.test(`a check that does not exit 0 fails the step, whatever the agent said: ${c}`, () => {
+    test(`a check that does not exit 0 fails the step, whatever the agent said: ${c}`, () => {
       const p = phases({ t1: 'succeeded', c1: c });
       const a = assess(aRead(CHECKED, withCheck('c1'), { phaseOf: p, signedOff: signedDone, asked }));
       assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['review'], 'failed']);
       assert.equal(stepStatus(CHECKED[0], withCheck('c1'), p, signedDone, asked), 'failed (check)');
     });
-  await t.test(
-    'a check the machine killed, with `retries:` left: tried again as a recheck by retries; any other kill, or none, as before',
-    () => {
-      const steps = [{ ...CHECKED[0], retries: 1 }, ...CHECKED.slice(1)];
-      const read = (kill?: 'machine' | 'limit') =>
-        aRead(steps, withCheck('c1'), {
-          phaseOf: phases({ t1: 'succeeded', c1: 'failed' }),
-          signedOff: signedDone,
-          asked,
-          verdictOf: () => 1,
-          checkKillOf: (s) =>
-            s !== 'implement' || kill === undefined
-              ? undefined
-              : kill === 'machine'
-                ? { by: 'machine', kills: 1, limitBytes: 1, peakBytes: null }
-                : { by: 'limit', kills: 1, limitBytes: 1, peakBytes: null, raise: 'default' },
-        });
-      const machine = assess(read('machine'));
+  test('a check the machine killed, with `retries:` left: tried again as a recheck by retries; any other kill, or none, as before', () => {
+    const steps = [{ ...CHECKED[0], retries: 1 }, ...CHECKED.slice(1)];
+    const read = (kill?: 'machine' | 'limit') =>
+      aRead(steps, withCheck('c1'), {
+        phaseOf: phases({ t1: 'succeeded', c1: 'failed' }),
+        signedOff: signedDone,
+        asked,
+        verdictOf: () => 1,
+        checkKillOf: (s) =>
+          s !== 'implement' || kill === undefined
+            ? undefined
+            : kill === 'machine'
+              ? { by: 'machine', kills: 1, limitBytes: 1, peakBytes: null }
+              : { by: 'limit', kills: 1, limitBytes: 1, peakBytes: null, raise: 'default' },
+      });
+    const machine = assess(read('machine'));
+    assert.deepEqual(
+      machine.retry.map((r) => [r.mode, r.by]),
+      [['recheck', 'retries']],
+      'the filing runs a recheck as a check',
+    );
+    for (const kill of ['limit', undefined] as const) {
+      const a = assess(read(kill));
       assert.deepEqual(
-        machine.retry.map((r) => [r.mode, r.by]),
-        [['recheck', 'retries']],
-        'the filing runs a recheck as a check',
+        a.retry.map((r) => [r.mode, r.by]),
+        [['continue', 'retries']],
+        String(kill),
       );
-      for (const kill of ['limit', undefined] as const) {
-        const a = assess(read(kill));
-        assert.deepEqual(
-          a.retry.map((r) => [r.mode, r.by]),
-          [['continue', 'retries']],
-          String(kill),
-        );
-      }
-    },
-  );
-  await t.test('a cancelled run files no check, however due', () => {
+    }
+  });
+  test('a cancelled run files no check, however due', () => {
     const a = assess(aRead(CHECKED, withCheck(null, CANCELLED), { phaseOf: phases({ t1: 'succeeded' }), signedOff: signedDone, asked }));
     assert.deepEqual(a.check, []);
   });
-  await t.test('a task that was never asked for a closeout is not held to one — a run from before closeouts still flows', () => {
+  test('a task that was never asked for a closeout is not held to one — a run from before closeouts still flows', () => {
     const a = assess(
       aRead(STEPS, run({ implement: 't1', review: null }), {
         phaseOf: phases({ t1: 'succeeded' }),
@@ -239,14 +236,14 @@ test("assess and stepStatus of a step's check", async (t) => {
   });
 });
 
-test('cancelPlan and decision of a step with a check', async (t) => {
-  await t.test('cancelling stops a check in flight', () => {
+describe('cancelPlan and decision of a step with a check', () => {
+  test('cancelling stops a check in flight', () => {
     const live = cancelPlan(
       aRead(CHECKED, withCheck('c1'), { phaseOf: phases({ t1: 'succeeded', c1: 'running' }), signedOff: signedDone, asked }),
     );
     assert.deepEqual(live, { kind: 'cancel', stop: [{ name: 'implement (check)', taskId: 'c1' }] });
   });
-  await t.test('a run with a check still due is cancelled rather than called finished', () => {
+  test('a run with a check still due is cancelled rather than called finished', () => {
     const fan: StepSpec[] = [{ ...step('a'), check: 'npm test' }, step('b')];
     const r = run({}, { steps: { a: { taskId: 't1' }, b: { taskId: 't2' } } });
     assert.deepEqual(
@@ -255,7 +252,7 @@ test('cancelPlan and decision of a step with a check', async (t) => {
       "two roots, one failed: the run reads failed, and a tick would still file a's check",
     );
   });
-  await t.test('`nemia decide` names every step that did not earn a follower, each in its own word', () => {
+  test('`nemia decide` names every step that did not earn a follower, each in its own word', () => {
     const four: StepSpec[] = [{ ...step('a'), check: 'npm test' }, step('b'), step('c'), step('d')];
     const r = run(
       {},
@@ -289,7 +286,7 @@ test('cancelPlan and decision of a step with a check', async (t) => {
       'with no exit code to read, the same check did not finish, and the run is failed all the same',
     );
   });
-  await t.test('a run whose check is still running has nothing to decide yet, and names the step', () => {
+  test('a run whose check is still running has nothing to decide yet, and names the step', () => {
     const d = decision(
       aRead(CHECKED, withCheck('c1'), { phaseOf: phases({ t1: 'succeeded', c1: 'running' }), signedOff: signedDone, asked }),
       nothingShipped,
@@ -298,8 +295,8 @@ test('cancelPlan and decision of a step with a check', async (t) => {
   });
 });
 
-test("listing of a step's check: what the run established, not only what the engine settled", async (t) => {
-  await t.test('verified, checking, refused with its exit, unverified and unsigned; the refused and the unsigned wait on you', () => {
+describe("listing of a step's check: what the run established, not only what the engine settled", () => {
+  test('verified, checking, refused with its exit, unverified and unsigned; the refused and the unsigned wait on you', () => {
     const five: StepSpec[] = [...['a', 'b', 'c'].map((n) => ({ ...step(n), check: 'npm test' })), step('d'), step('e')];
     const r = run(
       {},
@@ -334,7 +331,7 @@ test("listing of a step's check: what the run established, not only what the eng
     assert.deepEqual(statuses(l), ['verified ✓', 'checking', 'failed ✗ check (exit 1)', 'unverified · done', 'unsigned']);
     assert.deepEqual(l.waitingOnYou, ['c', 'e'], 'the check that refused and the step that never signed');
   });
-  await t.test('a check stopped before it printed its exit code reads unfinished, never a number', () => {
+  test('a check stopped before it printed its exit code reads unfinished, never a number', () => {
     const l = listing({
       steps: CHECKED,
       run: withCheck('c1'),
@@ -346,8 +343,10 @@ test("listing of a step's check: what the run established, not only what the eng
   });
 });
 
-test('UNSIGNED: a step asked for a closeout that ended without one', async (t) => {
-  await t.test('satisfies nothing, and is not checked; without a check the same holds', () => {
+describe('UNSIGNED: a step asked for a closeout that ended without one', () => {
+  let r!: Run;
+  let failed!: (id: string) => TaskPhase;
+  test('satisfies nothing, and is not checked; without a check the same holds', () => {
     const p = phases({ t1: 'succeeded' });
     const none = () => undefined;
     const a = assess(aRead(CHECKED, withCheck(null), { phaseOf: p, signedOff: none, asked }));
@@ -359,11 +358,11 @@ test('UNSIGNED: a step asked for a closeout that ended without one', async (t) =
       'without a check the same holds: going quiet is not saying done',
     );
   });
-  const r = signedOffOnce(run({ implement: 't1', review: null }));
-  const failed = phases({ t1: 'failed' });
   const none = () => undefined;
   const quiet = () => 'unsigned' as const;
-  await t.test('settled `failed` and quiet, its nudge spent: unsigned; failed otherwise, stopped, running, or blocked as it signed', () => {
+  test('settled `failed` and quiet, its nudge spent: unsigned; failed otherwise, stopped, running, or blocked as it signed', () => {
+    r = signedOffOnce(run({ implement: 't1', review: null }));
+    failed = phases({ t1: 'failed' });
     assert.equal(stepStatus(STEPS[0], r, failed, none, quiet), 'unsigned');
     assert.equal(stepStatus(STEPS[0], r, failed, none, asked), 'failed', 'its attempt ended for another reason');
     assert.equal(stepStatus(STEPS[0], r, phases({ t1: 'stopped' }), none, quiet), 'stopped', 'a person stopped it');
@@ -381,7 +380,7 @@ test('UNSIGNED: a step asked for a closeout that ended without one', async (t) =
       resumed: true,
       status: stepStatus(STEPS[0], r, failed, none, askedCloseout),
     });
-  await t.test('gone quiet, it waits on you and blocks the run, and a nudge is told it gave none', () => {
+  test('gone quiet, it waits on you and blocks the run, and a nudge is told it gave none', () => {
     const quietly = decision(aRead(STEPS, r, { phaseOf: failed, signedOff: none, asked: quiet }), nothingShipped);
     assert.deepEqual(quietly.kind === 'awaiting' && [quietly.outcome, quietly.unsigned, quietly.failed], ['waiting', ['implement'], []]);
     assert.deepEqual(
@@ -390,7 +389,7 @@ test('UNSIGNED: a step asked for a closeout that ended without one', async (t) =
     );
     assert.match(brief(quiet), /The last try ended without the closeout the run asked for/);
   });
-  await t.test('failed for another reason, it reads failed, waits on nobody, and a nudge is told it failed', () => {
+  test('failed for another reason, it reads failed, waits on nobody, and a nudge is told it failed', () => {
     const broke = decision(aRead(STEPS, r, { phaseOf: failed, signedOff: none, asked }), nothingShipped);
     assert.deepEqual(broke.kind === 'awaiting' && [broke.outcome, broke.unsigned, broke.failed], ['failed', [], ['implement']]);
     assert.deepEqual(
@@ -436,13 +435,17 @@ const viewed = (settled: string, ends: Array<Record<string, unknown>>, closeout 
     ],
   ]);
 
-test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what the runtime reports", async (t) => {
-  const r = signedOffOnce(run({ implement: 't1', review: null }));
+describe("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what the runtime reports", () => {
+  let r!: Run;
+  let failed!: (id: string) => TaskPhase;
+  beforeAll(() => {
+    r = signedOffOnce(run({ implement: 't1', review: null }));
+    failed = phases({ t1: 'failed' });
+  });
   const none = () => undefined;
-  const failed = phases({ t1: 'failed' });
   const lsOf = (phase: ListedPhase, askedCloseout: (id: string) => boolean | 'unsigned') =>
     listing({ steps: STEPS, run: r, phaseOf: shown({ t1: phase }), closeoutOf: none, askedCloseout }).waitingOnYou;
-  await t.test('a journal from before stage 4a part 2: quiet then lost reads failed and is not waited on you', () => {
+  test('a journal from before stage 4a part 2: quiet then lost reads failed and is not waited on you', () => {
     const lostLast = closeoutAsked(viewed('failed', [formerUnsigned, { ended: 'failed', reason: 'lost' }]));
     assert.equal(lostLast('t1'), true, 'asked, and of two attempts in order, the last ended for another reason');
     assert.equal(stepStatus(STEPS[0], r, failed, none, lostLast), 'failed');
@@ -450,7 +453,7 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     assert.deepEqual(broke.kind === 'awaiting' && [broke.outcome, broke.unsigned, broke.failed], ['failed', [], ['implement']]);
     assert.deepEqual(lsOf('failed', lostLast), []);
   });
-  await t.test('the other way round, lost then quiet, it reads unsigned; quiet twice is quiet', () => {
+  test('the other way round, lost then quiet, it reads unsigned; quiet twice is quiet', () => {
     const quietLast = closeoutAsked(viewed('failed', [{ ended: 'failed', reason: 'lost' }, formerUnsigned]));
     assert.equal(quietLast('t1'), 'unsigned');
     assert.equal(stepStatus(STEPS[0], r, failed, none, quietLast), 'unsigned');
@@ -460,7 +463,7 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
   });
   const unstated = { ended: 'succeeded', reason: 'harness', closedOut: false };
   const endingsOf = (v: ReturnType<typeof viewed>) => v.get('t1')!.state.attempts.map((a) => endWords(v.get('t1')!.state, a));
-  await t.test('since stage 4a: `done` with `closedOut: false` reads unsigned, and `failed · unsigned` on endWords', () => {
+  test('since stage 4a: `done` with `closedOut: false` reads unsigned, and `failed · unsigned` on endWords', () => {
     const quiet = viewed('succeeded', [unstated]);
     assert.equal(closeoutAsked(quiet)('t1'), 'unsigned');
     assert.equal(stepStatus(STEPS[0], r, phases({ t1: 'succeeded' }), none, closeoutAsked(quiet)), 'unsigned');
@@ -468,15 +471,15 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     assert.equal(closeoutAsked(viewed('succeeded', [{ ended: 'failed', reason: 'lost' }, unstated]))('t1'), 'unsigned', 'the LAST');
     assert.deepEqual(endingsOf(quiet), [{ ended: 'failed', reason: 'unsigned' }]);
   });
-  await t.test("an old journal's `reason: 'unsigned'`, read back as `former: 'unsigned'`, reads the same words", () => {
+  test("an old journal's `reason: 'unsigned'`, read back as `former: 'unsigned'`, reads the same words", () => {
     const legacy = viewed('failed', [formerUnsigned]);
     assert.deepEqual([closeoutAsked(legacy)('t1'), endingsOf(legacy)], ['unsigned', [{ ended: 'failed', reason: 'unsigned' }]]);
   });
-  await t.test("a CRASH: `failed` with `closedOut: false` and no `former` is no missing statement, and its words are the runtime's", () => {
+  test("a CRASH: `failed` with `closedOut: false` and no `former` is no missing statement, and its words are the runtime's", () => {
     const crashed = viewed('failed', [{ ended: 'failed', reason: 'harness', closedOut: false }]);
     assert.deepEqual([closeoutAsked(crashed)('t1'), endingsOf(crashed)], [true, [{ ended: 'failed', reason: 'harness' }]]);
   });
-  await t.test('a `done` with no `closedOut` key, or with a statement, is neither; nor a task asked for no statement', () => {
+  test('a `done` with no `closedOut` key, or with a statement, is neither; nor a task asked for no statement', () => {
     const before = viewed('succeeded', [{ ended: 'succeeded', reason: 'harness' }]);
     assert.deepEqual([closeoutAsked(before)('t1'), endingsOf(before)], [true, [{ ended: 'succeeded', reason: 'harness' }]]);
     const signed = viewed('succeeded', [
@@ -491,7 +494,7 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     const unasked = viewed('succeeded', [unstated], false);
     assert.deepEqual([closeoutAsked(unasked)('t1'), endingsOf(unasked)], [false, [{ ended: 'succeeded', reason: 'harness' }]]);
   });
-  await t.test('a task the views hold no view of — one the engine could not read — was asked nothing, is not blocked, said nothing', () => {
+  test('a task the views hold no view of — one the engine could not read — was asked nothing, is not blocked, said nothing', () => {
     const none = new Map<string, TaskView>();
     assert.equal(closeoutAsked(none)('t1'), false, 'not held to a closeout it may never have been asked for');
     assert.equal(harnessBlocked(none)('t1'), false);
@@ -531,11 +534,14 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
       { ended: 'failed', reason: 'harness' },
     ],
   ];
-  for (const [name, end, words] of budgetRows) await t.test(name, () => assert.deepEqual(endWords(state, attempt(end)), words));
+  for (const [name, end, words] of budgetRows) test(name, () => assert.deepEqual(endWords(state, attempt(end)), words));
 });
 
-test('`retries:`: the tries the run files on its own when a check refuses', async (t) => {
-  const checkFailed = phases({ t1: 'succeeded', c1: 'failed' });
+describe('`retries:`: the tries the run files on its own when a check refuses', () => {
+  let checkFailed!: (id: string) => TaskPhase;
+  beforeAll(() => {
+    checkFailed = phases({ t1: 'succeeded', c1: 'failed' });
+  });
   const lsOf = (r: Run, phase: TaskPhase, verdict: Verdict | undefined) =>
     listing({
       steps: RETRIED,
@@ -545,7 +551,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
       askedCloseout: asked,
       verdictOf: () => verdict,
     });
-  await t.test("a check that checkFailed, with `retries:` left, is due another try on the run's word, waiting on nobody", () => {
+  test("a check that checkFailed, with `retries:` left, is due another try on the run's word, waiting on nobody", () => {
     const a = assess(aRead(RETRIED, onTry(), { phaseOf: checkFailed, signedOff: signedDone, asked, verdictOf: () => 1 }));
     assert.deepEqual(a.retry, [{ step: 'implement', try: 2, mode: 'continue', by: 'retries' }]);
     assert.deepEqual([a.ready, a.unreachable, a.status], [[], [], 'running'], 'what waits on it waits; nothing is final yet');
@@ -570,7 +576,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
       'a tick would still file',
     );
   });
-  await t.test('REFUSED past `retries:`: no try is due, and the step waits on you as it did before retries', () => {
+  test('REFUSED past `retries:`: no try is due, and the step waits on you as it did before retries', () => {
     const a = assess(aRead(RETRIED, onTry(SPENT), { phaseOf: checkFailed, signedOff: signedDone, asked, verdictOf: () => 1 }));
     assert.deepEqual([a.retry, a.unreachable, a.status], [[], ['review'], 'failed']);
     assert.deepEqual(lsOf(onTry(SPENT), 'failed', 1).waitingOnYou, ['implement']);
@@ -585,7 +591,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
       'a refused check with no try due waits on a person, so the run is not finished',
     );
   });
-  await t.test("a refusal its `checkFailurePolicy:` names a person's spends no try: the step waits on you, offered `--recheck`", () => {
+  test("a refusal its `checkFailurePolicy:` names a person's spends no try: the step waits on you, offered `--recheck`", () => {
     const policed: StepSpec[] = [
       {
         ...RETRIED[0],
@@ -617,7 +623,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
       'with no policy, exit 78 is counted as any other',
     );
   });
-  await t.test("a person's tries do not spend what the run may spend on its own", () => {
+  test("a person's tries do not spend what the run may spend on its own", () => {
     const yours: EarlierTry[] = [
       { ...SPENT[0], cause: 'continue' },
       { ...SPENT[1], cause: 'fresh' },
@@ -636,7 +642,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
     ['failed', 'unfinished', 'failed with no exit code: stopped at its deadline, or lost'],
   ];
   for (const [phase, verdict, why] of unfinished)
-    await t.test(`a check that did not finish is no refusal, spends no retry, and is offered --recheck: ${why}`, () => {
+    test(`a check that did not finish is no refusal, spends no retry, and is offered --recheck: ${why}`, () => {
       const p = phases({ t1: 'succeeded', c1: phase });
       const a = assess(aRead(RETRIED, onTry(), { phaseOf: p, signedOff: signedDone, asked, verdictOf: () => verdict }));
       assert.deepEqual([a.retry, a.unreachable, a.status], [[], ['review'], 'failed']);
@@ -647,7 +653,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
       assert.equal(lines.length, 1);
       names(lines[0], 'implement:', 'no retry was spent', 'nemia retry r-1 implement --recheck');
     });
-  await t.test('a check that did not finish on a step over its budget: --recheck offered, and a new session needs --budget', () => {
+  test('a check that did not finish on a step over its budget: --recheck offered, and a new session needs --budget', () => {
     const capped: StepSpec[] = [{ ...RETRIED[0], budget: 3 }, RETRIED[1]];
     const over: SpendOf = (id) => (id === 't1' ? { usd: 4, measured: 1, unmeasured: 0, budgetEnded: false } : undefined);
     const p = phases({ t1: 'succeeded', c1: 'stopped' });
@@ -683,7 +689,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
     assert.equal(refusal({ mode: 'recheck' }), null, 'its check again needs no --budget');
     names(refusal({ mode: 'continue' }), 'nemia retry r-1 implement --recheck', 'nemia retry r-1 implement --budget <amount>');
   });
-  await t.test('a caller that gives no verdict reads a check stopped at its deadline as the tick does', () => {
+  test('a caller that gives no verdict reads a check stopped at its deadline as the tick does', () => {
     const unread = assess(aRead(RETRIED, onTry(), { phaseOf: checkFailed, signedOff: signedDone, asked }));
     assert.deepEqual([unread.retry, unread.unreachable, unread.status], [[], ['review'], 'failed']);
     assert.deepEqual(
@@ -699,7 +705,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
     const told = decision(aRead(RETRIED, onTry(), { phaseOf: checkFailed, signedOff: signedDone, asked }), nothingShipped);
     assert.deepEqual(told.kind === 'awaiting' && [told.failedCheck, told.unfinishedCheck], [[], ['implement']]);
   });
-  await t.test('a refusal with no tries left is offered the other way', () => {
+  test('a refusal with no tries left is offered the other way', () => {
     const d = decision(
       aRead(RETRIED, onTry(SPENT), { phaseOf: checkFailed, signedOff: signedDone, asked, verdictOf: () => 1 }),
       nothingShipped,
@@ -710,7 +716,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
       /^implement: failed \(check\)\. Continue its session.*nemia retry r-1 implement .*retries: 2, 2 spent/,
     );
   });
-  await t.test("the current try decides the step: try 2 verified files what waits on it, and the step's line says which try", () => {
+  test("the current try decides the step: try 2 verified files what waits on it, and the step's line says which try", () => {
     const r = onTry([{ taskId: 't0', check: { taskId: 'c0' }, cause: 'retries' }], 'c1');
     const p = phases({ t0: 'succeeded', c0: 'failed', t1: 'succeeded', c1: 'succeeded' });
     assert.deepEqual(assess(aRead(RETRIED, r, { phaseOf: p, signedOff: signedDone, asked, verdictOf: () => 0 })).ready, ['review']);
@@ -735,11 +741,341 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
   });
 });
 
-test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before it waits on you', async (t) => {
-  const failed = phases({ t1: 'failed' });
+describe('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before it waits on you', () => {
+  let failed!: (id: string) => TaskPhase;
+  let r!: {
+    repo: string;
+    workspace: string;
+    branch: string;
+    baseRef: string;
+    isolate: boolean;
+    id: string;
+    brief: string;
+    workflowDir: string;
+    steps: Record<
+      string,
+      {
+        readonly taskId: string | null;
+        readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+        readonly route?: { readonly route: string; readonly try: number; readonly by: 'person' | 'table' | 'script' | 'judge' } | undefined;
+        readonly sent?: { readonly card: string; readonly at: string } | undefined;
+        readonly pinned?:
+          | readonly {
+              readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+              readonly name: string;
+              readonly n: number;
+              readonly hash: string;
+            }[]
+          | undefined;
+        readonly workspace?: string | undefined;
+        readonly branch?: string | undefined;
+        readonly tries?:
+          | readonly {
+              readonly taskId: string;
+              readonly cause: 'retries' | 'signoff' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'back';
+              readonly model?: string | undefined;
+              readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+              readonly paused?: true | undefined;
+              readonly retried?: true | undefined;
+              readonly budget?: number | undefined;
+            }[]
+          | undefined;
+        readonly handedOff?: string | undefined;
+        readonly landed?: import('../src/record/record.ts').LandingRecord | undefined;
+        readonly filesRead?: { readonly taskId: string; readonly lacked: { readonly [x: string]: string } } | undefined;
+        readonly closeoutHash?: string | undefined;
+        readonly declared?: readonly string[] | undefined;
+      }
+    >;
+    createdAt: string;
+    context?: readonly string[] | undefined;
+    workflow?: readonly StepSpec[] | undefined;
+    factory?: string | undefined;
+    pinned?:
+      | readonly {
+          readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+          readonly name: string;
+          readonly n: number;
+          readonly hash: string;
+        }[]
+      | undefined;
+    placeSkill?: { readonly skill: string; readonly version: string } | undefined;
+    stagedFile?: string | undefined;
+    place?: undefined;
+    after?: readonly string[] | undefined;
+    inputs?: readonly string[] | undefined;
+    cards?: readonly string[] | undefined;
+    workflowFiles?: string | undefined;
+    carriedFiles?: string | undefined;
+    from?: { readonly inbox: string } | undefined;
+    scheduled?: { readonly factory: string; readonly workflow: string; readonly due: string } | undefined;
+    gates?: readonly string[] | undefined;
+    models?: { readonly [x: string]: string } | undefined;
+    mounts?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    volumes?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    harnessSettings?: { readonly [x: string]: { readonly [x: string]: unknown } } | undefined;
+    costLine?: number | undefined;
+    tips?: { readonly [x: string]: string } | undefined;
+    cancelledAt?: string | undefined;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly run?: string | undefined;
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    labels?: { readonly [x: string]: string } | undefined;
+    saidBefore?: { readonly [x: string]: readonly { readonly at: string; readonly text: string }[] } | undefined;
+    slotHeldAt?: string | undefined;
+    gatesTimed?: readonly { readonly step: string; readonly try: number }[] | undefined;
+    deniedCounted?: readonly { readonly task: string; readonly attempts: number }[] | undefined;
+    settlesCounted?: readonly string[] | undefined;
+    runTimed?: boolean | undefined;
+    approvals?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message?: string | undefined;
+          readonly budgets?: { readonly [x: string]: number } | undefined;
+          readonly work?: { readonly [x: string]: number } | undefined;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    acceptances?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    pruned?:
+      | {
+          readonly at: string;
+          readonly worktrees: readonly { readonly path: string; readonly bytes: number }[];
+          readonly artifacts?: { readonly at: string; readonly bytes: number } | undefined;
+        }
+      | undefined;
+    hold?:
+      | {
+          readonly at: string;
+          readonly until: readonly string[];
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly by?: string | undefined;
+        }
+      | undefined;
+    unheld?:
+      | {
+          readonly since: string;
+          readonly actor: {
+            readonly kind: 'agent' | 'person';
+            readonly run?: string | undefined;
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly token?: string | undefined;
+          };
+        }
+      | undefined;
+    pause?:
+      | {
+          readonly at: string;
+          readonly by: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly timeoutMs?: number | undefined;
+        }
+      | undefined;
+  };
+  let nudged!: {
+    steps: { implement: import('../src/run.ts').StepRecord };
+    repo: string;
+    workspace: string;
+    branch: string;
+    baseRef: string;
+    isolate: boolean;
+    id: string;
+    brief: string;
+    workflowDir: string;
+    createdAt: string;
+    context?: readonly string[] | undefined;
+    workflow?: readonly StepSpec[] | undefined;
+    factory?: string | undefined;
+    pinned?:
+      | readonly {
+          readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+          readonly name: string;
+          readonly n: number;
+          readonly hash: string;
+        }[]
+      | undefined;
+    placeSkill?: { readonly skill: string; readonly version: string } | undefined;
+    stagedFile?: string | undefined;
+    place?: undefined;
+    after?: readonly string[] | undefined;
+    inputs?: readonly string[] | undefined;
+    cards?: readonly string[] | undefined;
+    workflowFiles?: string | undefined;
+    carriedFiles?: string | undefined;
+    from?: { readonly inbox: string } | undefined;
+    scheduled?: { readonly factory: string; readonly workflow: string; readonly due: string } | undefined;
+    gates?: readonly string[] | undefined;
+    models?: { readonly [x: string]: string } | undefined;
+    mounts?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    volumes?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    harnessSettings?: { readonly [x: string]: { readonly [x: string]: unknown } } | undefined;
+    costLine?: number | undefined;
+    tips?: { readonly [x: string]: string } | undefined;
+    cancelledAt?: string | undefined;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly run?: string | undefined;
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    labels?: { readonly [x: string]: string } | undefined;
+    saidBefore?: { readonly [x: string]: readonly { readonly at: string; readonly text: string }[] } | undefined;
+    slotHeldAt?: string | undefined;
+    gatesTimed?: readonly { readonly step: string; readonly try: number }[] | undefined;
+    deniedCounted?: readonly { readonly task: string; readonly attempts: number }[] | undefined;
+    settlesCounted?: readonly string[] | undefined;
+    runTimed?: boolean | undefined;
+    approvals?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message?: string | undefined;
+          readonly budgets?: { readonly [x: string]: number } | undefined;
+          readonly work?: { readonly [x: string]: number } | undefined;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    acceptances?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    pruned?:
+      | {
+          readonly at: string;
+          readonly worktrees: readonly { readonly path: string; readonly bytes: number }[];
+          readonly artifacts?: { readonly at: string; readonly bytes: number } | undefined;
+        }
+      | undefined;
+    hold?:
+      | {
+          readonly at: string;
+          readonly until: readonly string[];
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly by?: string | undefined;
+        }
+      | undefined;
+    unheld?:
+      | {
+          readonly since: string;
+          readonly actor: {
+            readonly kind: 'agent' | 'person';
+            readonly run?: string | undefined;
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly token?: string | undefined;
+          };
+        }
+      | undefined;
+    pause?:
+      | {
+          readonly at: string;
+          readonly by: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly timeoutMs?: number | undefined;
+        }
+      | undefined;
+  };
+  beforeAll(() => {
+    failed = phases({ t1: 'failed' });
+    r = run({ implement: 't1', review: null });
+    nudged = { ...r, steps: { ...r.steps, implement: nextTry(r.steps.implement, due(r)[0], 't2') } };
+  });
   const none = () => undefined;
   const unsignedEnd = () => 'unsigned' as const;
-  const r = run({ implement: 't1', review: null });
   const due = (
     x: Run,
     asks: Parameters<typeof retriesDue>[6] = [],
@@ -758,17 +1094,16 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
       () => false,
       spendOf,
     );
-  const nudged = { ...r, steps: { ...r.steps, implement: nextTry(r.steps.implement, due(r)[0], 't2') } };
   const lsOf = (x: Run, phase: Record<string, ListedPhase>) =>
     listing({ steps: STEPS, run: x, phaseOf: shown(phase), closeoutOf: none, askedCloseout: unsignedEnd });
-  await t.test('due on its own: the run is moving, waiting on nobody, and says the nudge is due', () => {
+  test('due on its own: the run is moving, waiting on nobody, and says the nudge is due', () => {
     assert.deepEqual(due(r), [{ step: 'implement', try: 2, mode: 'continue', by: 'signoff' }]);
     const a = assess(aRead(STEPS, r, { phaseOf: failed, signedOff: none, asked: unsignedEnd }));
     assert.deepEqual([a.retry.map((x) => x.by), a.status], [['signoff'], 'running']);
     assert.deepEqual(lsOf(r, { t1: 'failed' }).waitingOnYou, [], 'nor does nemia ls put it on you');
     assert.equal(dueNote(STEPS[0], r, due(r)[0]), 'try 2 due — an ask to sign off, once a round: its session ended without its closeout');
   });
-  await t.test('`nemia retry` is refused: the run nudges it itself', () => {
+  test('`nemia retry` is refused: the run nudges it itself', () => {
     names(
       retryRefusal(STEPS, r, 'implement', { mode: 'continue' }, failed, none, unsignedEnd),
       'the run continues implement itself',
@@ -776,12 +1111,12 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
       'nemia ls r-1',
     );
   });
-  await t.test('filed, the try is behind it as signoff, and the run says a nudge was tried', () => {
+  test('filed, the try is behind it as signoff, and the run says a nudge was tried', () => {
     assert.deepEqual(nudged.steps.implement.tries, [{ taskId: 't1', cause: 'signoff' }]);
     assert.equal(signoffsSpent(nudged.steps.implement), 1);
     assert.equal(tryNote(STEPS[0], nudged.steps.implement), 'try 2, asked to sign off by the run');
   });
-  await t.test('never twice in a round: the nudge ended unsigned too, and the step is yours', () => {
+  test('never twice in a round: the nudge ended unsigned too, and the step is yours', () => {
     assert.deepEqual(retriesDue(STEPS, nudged, phases({ t2: 'failed' }), none, unsignedEnd), []);
     assert.deepEqual(lsOf(nudged, { t2: 'failed' }).waitingOnYou, ['implement']);
     assert.equal(lsOf(nudged, { t2: 'failed' }).steps[0].note, 'try 2, asked to sign off by the run');
@@ -799,14 +1134,14 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
       review: { taskId: null },
     },
   });
-  await t.test("a person's try in between spends nothing, and does not free another; a round is new work", () => {
+  test("a person's try in between spends nothing, and does not free another; a round is new work", () => {
     assert.deepEqual(retriesDue(STEPS, after('continue'), phases({ t3: 'failed' }), none, unsignedEnd), []);
     assert.deepEqual(
       retriesDue(STEPS, after('round'), phases({ t3: 'failed' }), none, unsignedEnd).map((x) => [x.by, x.try]),
       [['signoff', 4]],
     );
   });
-  await t.test("a person's ask first; not when the engine did not end it unsigned; never over its budget, nor on a cancelled run", () => {
+  test("a person's ask first; not when the engine did not end it unsigned; never over its budget, nor on a cancelled run", () => {
     assert.deepEqual(
       due(r, [{ step: 'implement', try: 2, mode: 'fresh', at: 'now' }]).map((x) => [x.by, x.mode]),
       [['ask', 'fresh']],
@@ -828,8 +1163,8 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
   });
 });
 
-test("composeBrief of a step's check and of its tries", async (t) => {
-  await t.test('a step with `check:` is told the command before it is judged by it — resumed, merged or not — the closeout last', () => {
+describe("composeBrief of a step's check and of its tries", () => {
+  test('a step with `check:` is told the command before it is judged by it — resumed, merged or not — the closeout last', () => {
     const implement: StepSpec = { ...step('implement'), check: 'npm test && npm run typecheck' };
     const respond: StepSpec = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement', check: 'npm test' };
     const integrate: StepSpec = { name: 'integrate', after: ['a', 'b'], body: 'combine', check: 'npm run build' };
@@ -846,7 +1181,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
       assert.ok(brief.indexOf('## Before you sign off') < brief.indexOf('## When you are finished'), `${s.name}: the closeout is last`);
     }
   });
-  await t.test('a step without `check:` is told of no check — no command the run will not run', () => {
+  test('a step without `check:` is told of no check — no command the run will not run', () => {
     for (const s of [step('implement'), step('review', ['implement'])])
       assert.doesNotMatch(composeBrief(s, run({ implement: 't1', review: null }), STEPS), /Before you sign off|must exit 0/);
   });
@@ -857,7 +1192,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
     stdout: 'not ok 3 - parses a trailing comma',
     stderr: 'npm error Test failed.',
   };
-  await t.test('a try continued is told what became of the last, that and no more — and what the check said, as data', () => {
+  test('a try continued is told what became of the last, that and no more — and what the check said, as data', () => {
     const nudged = composeBrief(
       implement,
       run({ implement: 't1' }),
@@ -886,7 +1221,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
       'the contracts stay last',
     );
   });
-  await t.test('a new session is told the whole brief, even for a step that resumes another', () => {
+  test('a new session is told the whole brief, even for a step that resumes another', () => {
     const respond: StepSpec = { name: 'respond', after: ['implement'], resume: 'implement', body: 'answer the review', check: 'npm test' };
     const fresh = composeBrief(
       respond,
@@ -912,7 +1247,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
     assert.equal(dataIn(fresh).exit, 'unfinished');
     assert.ok(fresh.indexOf('## Try 2') < fresh.indexOf('## Before you sign off'));
   });
-  await t.test('a stopped step with no check is told it was stopped, and nothing a check said', () => {
+  test('a stopped step with no check is told it was stopped, and nothing a check said', () => {
     const stopped = composeBrief(step('implement'), run({ implement: 't1' }), STEPS, undefined, undefined, undefined, {
       try: 2,
       by: 'ask',
@@ -924,7 +1259,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
     assert.match(stopped, /`nemia retry --continue`/);
     assert.doesNotMatch(stopped, /What the check said/, 'no check, nothing it said');
   });
-  await t.test("the run's sign-off nudge is told in its owner's words, pinned; a new session is told who filed it", () => {
+  test("the run's sign-off nudge is told in its owner's words, pinned; a new session is told who filed it", () => {
     assert.equal(
       SIGNOFF,
       [
@@ -949,9 +1284,12 @@ test("composeBrief of a step's check and of its tries", async (t) => {
   });
 });
 
-test("a person's ask: due for the step's next try only, once", async (t) => {
-  const p = phases({ t1: 'succeeded', c1: 'stopped' });
-  await t.test('due by ask, and said beside the step while it waits', () => {
+describe("a person's ask: due for the step's next try only, once", () => {
+  let p!: (id: string) => TaskPhase;
+  beforeAll(() => {
+    p = phases({ t1: 'succeeded', c1: 'stopped' });
+  });
+  test('due by ask, and said beside the step while it waits', () => {
     assert.deepEqual(
       assess(
         aRead(RETRIED, onTry(), { phaseOf: p, signedOff: signedDone, asked, verdictOf: () => undefined, asks: [askFor(2, 'recheck')] }),
@@ -969,7 +1307,7 @@ test("a person's ask: due for the step's next try only, once", async (t) => {
     });
     assert.deepEqual([l.steps[0].note, l.waitingOnYou], ['try 2 asked (--model opus) — the next tick files it', []]);
   });
-  await t.test('an ask for a try the record holds is spent and files nothing (spentAsks)', () => {
+  test('an ask for a try the record holds is spent and files nothing (spentAsks)', () => {
     const honoured = onTry([{ taskId: 't1', check: { taskId: 'c1' }, cause: 'recheck' }], 'c2');
     const q = phases({ t1: 'succeeded', c1: 'stopped', c2: 'running' });
     assert.deepEqual(
@@ -980,7 +1318,7 @@ test("a person's ask: due for the step's next try only, once", async (t) => {
     );
     assert.deepEqual(spentAsks(honoured, [askFor(2, 'recheck'), askFor(3)]), [askFor(2, 'recheck')]);
   });
-  await t.test('nothing is due for another try than the next, a step with no check to recheck, or a cancelled run', () => {
+  test('nothing is due for another try than the next, a step with no check to recheck, or a cancelled run', () => {
     assert.deepEqual(
       assess(aRead(RETRIED, onTry(), { phaseOf: p, signedOff: signedDone, asked, verdictOf: () => undefined, asks: [askFor(3)] })).retry,
       [],
@@ -1012,9 +1350,192 @@ test("a person's ask: due for the step's next try only, once", async (t) => {
   });
 });
 
-test("a person's ask on a step whose session its harness blocked, or that works again", async (t) => {
-  const r = run({ implement: 't1', review: null });
-  const live = phases({ t1: 'running' });
+describe("a person's ask on a step whose session its harness blocked, or that works again", () => {
+  let r!: {
+    repo: string;
+    workspace: string;
+    branch: string;
+    baseRef: string;
+    isolate: boolean;
+    id: string;
+    brief: string;
+    workflowDir: string;
+    steps: Record<
+      string,
+      {
+        readonly taskId: string | null;
+        readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+        readonly route?: { readonly route: string; readonly try: number; readonly by: 'person' | 'table' | 'script' | 'judge' } | undefined;
+        readonly sent?: { readonly card: string; readonly at: string } | undefined;
+        readonly pinned?:
+          | readonly {
+              readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+              readonly name: string;
+              readonly n: number;
+              readonly hash: string;
+            }[]
+          | undefined;
+        readonly workspace?: string | undefined;
+        readonly branch?: string | undefined;
+        readonly tries?:
+          | readonly {
+              readonly taskId: string;
+              readonly cause: 'retries' | 'signoff' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'back';
+              readonly model?: string | undefined;
+              readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+              readonly paused?: true | undefined;
+              readonly retried?: true | undefined;
+              readonly budget?: number | undefined;
+            }[]
+          | undefined;
+        readonly handedOff?: string | undefined;
+        readonly landed?: import('../src/record/record.ts').LandingRecord | undefined;
+        readonly filesRead?: { readonly taskId: string; readonly lacked: { readonly [x: string]: string } } | undefined;
+        readonly closeoutHash?: string | undefined;
+        readonly declared?: readonly string[] | undefined;
+      }
+    >;
+    createdAt: string;
+    context?: readonly string[] | undefined;
+    workflow?: readonly StepSpec[] | undefined;
+    factory?: string | undefined;
+    pinned?:
+      | readonly {
+          readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+          readonly name: string;
+          readonly n: number;
+          readonly hash: string;
+        }[]
+      | undefined;
+    placeSkill?: { readonly skill: string; readonly version: string } | undefined;
+    stagedFile?: string | undefined;
+    place?: undefined;
+    after?: readonly string[] | undefined;
+    inputs?: readonly string[] | undefined;
+    cards?: readonly string[] | undefined;
+    workflowFiles?: string | undefined;
+    carriedFiles?: string | undefined;
+    from?: { readonly inbox: string } | undefined;
+    scheduled?: { readonly factory: string; readonly workflow: string; readonly due: string } | undefined;
+    gates?: readonly string[] | undefined;
+    models?: { readonly [x: string]: string } | undefined;
+    mounts?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    volumes?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    harnessSettings?: { readonly [x: string]: { readonly [x: string]: unknown } } | undefined;
+    costLine?: number | undefined;
+    tips?: { readonly [x: string]: string } | undefined;
+    cancelledAt?: string | undefined;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly run?: string | undefined;
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    labels?: { readonly [x: string]: string } | undefined;
+    saidBefore?: { readonly [x: string]: readonly { readonly at: string; readonly text: string }[] } | undefined;
+    slotHeldAt?: string | undefined;
+    gatesTimed?: readonly { readonly step: string; readonly try: number }[] | undefined;
+    deniedCounted?: readonly { readonly task: string; readonly attempts: number }[] | undefined;
+    settlesCounted?: readonly string[] | undefined;
+    runTimed?: boolean | undefined;
+    approvals?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message?: string | undefined;
+          readonly budgets?: { readonly [x: string]: number } | undefined;
+          readonly work?: { readonly [x: string]: number } | undefined;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    acceptances?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    pruned?:
+      | {
+          readonly at: string;
+          readonly worktrees: readonly { readonly path: string; readonly bytes: number }[];
+          readonly artifacts?: { readonly at: string; readonly bytes: number } | undefined;
+        }
+      | undefined;
+    hold?:
+      | {
+          readonly at: string;
+          readonly until: readonly string[];
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly by?: string | undefined;
+        }
+      | undefined;
+    unheld?:
+      | {
+          readonly since: string;
+          readonly actor: {
+            readonly kind: 'agent' | 'person';
+            readonly run?: string | undefined;
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly token?: string | undefined;
+          };
+        }
+      | undefined;
+    pause?:
+      | {
+          readonly at: string;
+          readonly by: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly timeoutMs?: number | undefined;
+        }
+      | undefined;
+  };
+  let live!: (id: string) => TaskPhase;
+  beforeAll(() => {
+    r = run({ implement: 't1', review: null });
+    live = phases({ t1: 'running' });
+  });
   const needsHuman = (id: string) => id === 't1';
   const refusal = (
     how: RetryHow,
@@ -1040,19 +1561,16 @@ test("a person's ask on a step whose session its harness blocked, or that works 
     runsOn: true,
     ...extra,
   });
-  await t.test(
-    "REFUSED before, now accepted: blocked with nothing signed, a nudge or a fresh session may be asked on the harness's word",
-    () => {
-      for (const how of [
-        { mode: 'continue' },
-        { mode: 'fresh' },
-        { mode: 'fresh', model: 'opus' },
-        { mode: 'continue', message: 'logged in again: carry on' },
-      ] as RetryHow[])
-        assert.equal(refusal(how), null, JSON.stringify(how));
-    },
-  );
-  await t.test('still refused: --recheck, a session still working, one that signed off, a caller with no word of the harness', () => {
+  test("REFUSED before, now accepted: blocked with nothing signed, a nudge or a fresh session may be asked on the harness's word", () => {
+    for (const how of [
+      { mode: 'continue' },
+      { mode: 'fresh' },
+      { mode: 'fresh', model: 'opus' },
+      { mode: 'continue', message: 'logged in again: carry on' },
+    ] as RetryHow[])
+      assert.equal(refusal(how), null, JSON.stringify(how));
+  });
+  test('still refused: --recheck, a session still working, one that signed off, a caller with no word of the harness', () => {
     names(
       refusal({ mode: 'recheck' }),
       '--recheck',
@@ -1078,7 +1596,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
         /^implement is still running, so there is nothing to try again until it ends/,
       );
   });
-  await t.test("the tick's reading: due, to stop the blocked session first, the run still going and waiting on nobody", () => {
+  test("the tick's reading: due, to stop the blocked session first, the run still going and waiting on nobody", () => {
     const a = assess(
       aRead(STEPS, r, {
         phaseOf: live,
@@ -1138,7 +1656,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
     );
     assert.equal(note, 'try 2 asked (--continue) — stopping its blocked session, then the tick files it');
   });
-  await t.test("REFUSED before, now honoured: without the harness's word, or once it works again, due as a session that runs on", () => {
+  test("REFUSED before, now honoured: without the harness's word, or once it works again, due as a session that runs on", () => {
     const a = assess(aRead(STEPS, r, { phaseOf: live, signedOff: nothingSigned, asked, verdictOf: () => undefined, asks: [askFor(2)] }));
     assert.deepEqual([a.retry, a.ready, a.unreachable, a.status], [[stale()], [], [], 'running']);
     assert.deepEqual(
@@ -1212,7 +1730,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
       'nemia ls says so, in words of its own beside a session that works',
     );
   });
-  await t.test('no ask is honoured on a task the engine has no record of, a recheck of a working step, or another try', () => {
+  test('no ask is honoured on a task the engine has no record of, a recheck of a working step, or another try', () => {
     assert.deepEqual(
       assess(aRead(STEPS, r, { phaseOf: phases({}), signedOff: nothingSigned, asked, verdictOf: () => undefined, asks: [askFor(2)] }))
         .retry,
@@ -1248,7 +1766,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
       'without asks, nothing is due of a working step',
     );
   });
-  await t.test("once the session has settled, the same ask is due as any stopped step's, and filed", () => {
+  test("once the session has settled, the same ask is due as any stopped step's, and filed", () => {
     const stopped = phases({ t1: 'stopped' });
     for (const blockedOf of [needsHuman, () => false])
       assert.deepEqual(
@@ -1267,7 +1785,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
       );
     assert.equal(noteOf('stopped').note, 'try 2 asked (--continue) — the next tick files it');
   });
-  await t.test('a refused check `retries:` covers is due with no stop', () => {
+  test('a refused check `retries:` covers is due with no stop', () => {
     const r1 = run({}, { steps: { implement: { taskId: 't1', check: { taskId: 'c1' } }, review: { taskId: null } } });
     assert.deepEqual(
       assess(aRead(RETRIED, r1, { phaseOf: phases({ t1: 'succeeded', c1: 'failed' }), signedOff: signedDone, asked, verdictOf: () => 1 }))
@@ -1277,22 +1795,204 @@ test("a person's ask on a step whose session its harness blocked, or that works 
   });
 });
 
-test("`nemia ls` of a blocked step's harness wait: beside the engine's word, never in it", async (t) => {
-  const r = run({ implement: 't1', review: null });
+describe("`nemia ls` of a blocked step's harness wait: beside the engine's word, never in it", () => {
+  let r!: {
+    repo: string;
+    workspace: string;
+    branch: string;
+    baseRef: string;
+    isolate: boolean;
+    id: string;
+    brief: string;
+    workflowDir: string;
+    steps: Record<
+      string,
+      {
+        readonly taskId: string | null;
+        readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+        readonly route?: { readonly route: string; readonly try: number; readonly by: 'person' | 'table' | 'script' | 'judge' } | undefined;
+        readonly sent?: { readonly card: string; readonly at: string } | undefined;
+        readonly pinned?:
+          | readonly {
+              readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+              readonly name: string;
+              readonly n: number;
+              readonly hash: string;
+            }[]
+          | undefined;
+        readonly workspace?: string | undefined;
+        readonly branch?: string | undefined;
+        readonly tries?:
+          | readonly {
+              readonly taskId: string;
+              readonly cause: 'retries' | 'signoff' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'back';
+              readonly model?: string | undefined;
+              readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+              readonly paused?: true | undefined;
+              readonly retried?: true | undefined;
+              readonly budget?: number | undefined;
+            }[]
+          | undefined;
+        readonly handedOff?: string | undefined;
+        readonly landed?: import('../src/record/record.ts').LandingRecord | undefined;
+        readonly filesRead?: { readonly taskId: string; readonly lacked: { readonly [x: string]: string } } | undefined;
+        readonly closeoutHash?: string | undefined;
+        readonly declared?: readonly string[] | undefined;
+      }
+    >;
+    createdAt: string;
+    context?: readonly string[] | undefined;
+    workflow?: readonly StepSpec[] | undefined;
+    factory?: string | undefined;
+    pinned?:
+      | readonly {
+          readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+          readonly name: string;
+          readonly n: number;
+          readonly hash: string;
+        }[]
+      | undefined;
+    placeSkill?: { readonly skill: string; readonly version: string } | undefined;
+    stagedFile?: string | undefined;
+    place?: undefined;
+    after?: readonly string[] | undefined;
+    inputs?: readonly string[] | undefined;
+    cards?: readonly string[] | undefined;
+    workflowFiles?: string | undefined;
+    carriedFiles?: string | undefined;
+    from?: { readonly inbox: string } | undefined;
+    scheduled?: { readonly factory: string; readonly workflow: string; readonly due: string } | undefined;
+    gates?: readonly string[] | undefined;
+    models?: { readonly [x: string]: string } | undefined;
+    mounts?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    volumes?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    harnessSettings?: { readonly [x: string]: { readonly [x: string]: unknown } } | undefined;
+    costLine?: number | undefined;
+    tips?: { readonly [x: string]: string } | undefined;
+    cancelledAt?: string | undefined;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly run?: string | undefined;
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    labels?: { readonly [x: string]: string } | undefined;
+    saidBefore?: { readonly [x: string]: readonly { readonly at: string; readonly text: string }[] } | undefined;
+    slotHeldAt?: string | undefined;
+    gatesTimed?: readonly { readonly step: string; readonly try: number }[] | undefined;
+    deniedCounted?: readonly { readonly task: string; readonly attempts: number }[] | undefined;
+    settlesCounted?: readonly string[] | undefined;
+    runTimed?: boolean | undefined;
+    approvals?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message?: string | undefined;
+          readonly budgets?: { readonly [x: string]: number } | undefined;
+          readonly work?: { readonly [x: string]: number } | undefined;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    acceptances?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    pruned?:
+      | {
+          readonly at: string;
+          readonly worktrees: readonly { readonly path: string; readonly bytes: number }[];
+          readonly artifacts?: { readonly at: string; readonly bytes: number } | undefined;
+        }
+      | undefined;
+    hold?:
+      | {
+          readonly at: string;
+          readonly until: readonly string[];
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly by?: string | undefined;
+        }
+      | undefined;
+    unheld?:
+      | {
+          readonly since: string;
+          readonly actor: {
+            readonly kind: 'agent' | 'person';
+            readonly run?: string | undefined;
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly token?: string | undefined;
+          };
+        }
+      | undefined;
+    pause?:
+      | {
+          readonly at: string;
+          readonly by: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly timeoutMs?: number | undefined;
+        }
+      | undefined;
+  };
+  beforeAll(() => {
+    r = run({ implement: 't1', review: null });
+  });
   const waiting = (id: string) => (id === 't1' ? 'permission prompt' : undefined);
   const lsWith = (phase: ListedPhase, waitingOf: (id: string) => string | undefined) =>
     fullListing({ steps: STEPS, run: r, phaseOf: shown({ t1: phase }), waitingOf }).steps[0];
-  await t.test('the status keeps the bare word, and `nemia ls` prints the wait beside it', () => {
+  test('the status keeps the bare word, and `nemia ls` prints the wait beside it', () => {
     const blocked = lsWith('needs-human', waiting);
     assert.deepEqual([blocked.message, blocked.waits], ['needs-human', 'waiting for a permission prompt']);
     assert.equal(shownStatus(blocked), 'needs-human: waiting for a permission prompt');
   });
-  await t.test('a newline the harness sent is one line in a padded column', () => {
+  test('a newline the harness sent is one line in a padded column', () => {
     const broken = shownStatus(lsWith('needs-human', () => 'permission prompt\nfor Bash(rm -rf /)'));
     assert.equal(broken, 'needs-human: waiting for a permission prompt for Bash(rm -rf /)');
     assert.doesNotMatch(broken, /\s\s|[\n\r\t]/);
   });
-  await t.test('a harness that says nothing, or a caller that asks nothing, reads as before', () => {
+  test('a harness that says nothing, or a caller that asks nothing, reads as before', () => {
     assert.deepEqual(
       lsWith('needs-human', () => undefined),
       { name: 'implement', message: 'needs-human', reason: 'AwaitingAnswer', via: 'session', phase: 'waiting', branch: null },
@@ -1302,7 +2002,7 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
       'needs-human',
     );
   });
-  await t.test('a phase that is not needs-human takes no word, nor a task that settled', () => {
+  test('a phase that is not needs-human takes no word, nor a task that settled', () => {
     assert.deepEqual(lsWith('working', waiting), {
       name: 'implement',
       message: 'working',
@@ -1318,7 +2018,7 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
       branch: null,
     });
   });
-  await t.test("the word disturbs nothing judged on it: the blocked step's try is still due, and still stops the session first", () => {
+  test("the word disturbs nothing judged on it: the blocked step's try is still due, and still stops the session first", () => {
     const l = fullListing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'needs-human' }), asks: [askFor(2)], waitingOf: waiting });
     const { note, ...row } = l.steps[0];
     assert.deepEqual(row, {
@@ -1334,10 +2034,193 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
   });
 });
 
-test("a person's answer (`--message`): on the ask, in the brief, and on `nemia ls`", async (t) => {
-  const p = phases({ t1: 'succeeded', c1: 'stopped' });
+describe("a person's answer (`--message`): on the ask, in the brief, and on `nemia ls`", () => {
+  let p!: (id: string) => TaskPhase;
+  let nudged!: {
+    repo: string;
+    workspace: string;
+    branch: string;
+    baseRef: string;
+    isolate: boolean;
+    id: string;
+    brief: string;
+    workflowDir: string;
+    steps: Record<
+      string,
+      {
+        readonly taskId: string | null;
+        readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+        readonly route?: { readonly route: string; readonly try: number; readonly by: 'person' | 'table' | 'script' | 'judge' } | undefined;
+        readonly sent?: { readonly card: string; readonly at: string } | undefined;
+        readonly pinned?:
+          | readonly {
+              readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+              readonly name: string;
+              readonly n: number;
+              readonly hash: string;
+            }[]
+          | undefined;
+        readonly workspace?: string | undefined;
+        readonly branch?: string | undefined;
+        readonly tries?:
+          | readonly {
+              readonly taskId: string;
+              readonly cause: 'retries' | 'signoff' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'back';
+              readonly model?: string | undefined;
+              readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+              readonly paused?: true | undefined;
+              readonly retried?: true | undefined;
+              readonly budget?: number | undefined;
+            }[]
+          | undefined;
+        readonly handedOff?: string | undefined;
+        readonly landed?: import('../src/record/record.ts').LandingRecord | undefined;
+        readonly filesRead?: { readonly taskId: string; readonly lacked: { readonly [x: string]: string } } | undefined;
+        readonly closeoutHash?: string | undefined;
+        readonly declared?: readonly string[] | undefined;
+      }
+    >;
+    createdAt: string;
+    context?: readonly string[] | undefined;
+    workflow?: readonly StepSpec[] | undefined;
+    factory?: string | undefined;
+    pinned?:
+      | readonly {
+          readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+          readonly name: string;
+          readonly n: number;
+          readonly hash: string;
+        }[]
+      | undefined;
+    placeSkill?: { readonly skill: string; readonly version: string } | undefined;
+    stagedFile?: string | undefined;
+    place?: undefined;
+    after?: readonly string[] | undefined;
+    inputs?: readonly string[] | undefined;
+    cards?: readonly string[] | undefined;
+    workflowFiles?: string | undefined;
+    carriedFiles?: string | undefined;
+    from?: { readonly inbox: string } | undefined;
+    scheduled?: { readonly factory: string; readonly workflow: string; readonly due: string } | undefined;
+    gates?: readonly string[] | undefined;
+    models?: { readonly [x: string]: string } | undefined;
+    mounts?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    volumes?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    harnessSettings?: { readonly [x: string]: { readonly [x: string]: unknown } } | undefined;
+    costLine?: number | undefined;
+    tips?: { readonly [x: string]: string } | undefined;
+    cancelledAt?: string | undefined;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly run?: string | undefined;
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    labels?: { readonly [x: string]: string } | undefined;
+    saidBefore?: { readonly [x: string]: readonly { readonly at: string; readonly text: string }[] } | undefined;
+    slotHeldAt?: string | undefined;
+    gatesTimed?: readonly { readonly step: string; readonly try: number }[] | undefined;
+    deniedCounted?: readonly { readonly task: string; readonly attempts: number }[] | undefined;
+    settlesCounted?: readonly string[] | undefined;
+    runTimed?: boolean | undefined;
+    approvals?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message?: string | undefined;
+          readonly budgets?: { readonly [x: string]: number } | undefined;
+          readonly work?: { readonly [x: string]: number } | undefined;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    acceptances?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    pruned?:
+      | {
+          readonly at: string;
+          readonly worktrees: readonly { readonly path: string; readonly bytes: number }[];
+          readonly artifacts?: { readonly at: string; readonly bytes: number } | undefined;
+        }
+      | undefined;
+    hold?:
+      | {
+          readonly at: string;
+          readonly until: readonly string[];
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly by?: string | undefined;
+        }
+      | undefined;
+    unheld?:
+      | {
+          readonly since: string;
+          readonly actor: {
+            readonly kind: 'agent' | 'person';
+            readonly run?: string | undefined;
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly token?: string | undefined;
+          };
+        }
+      | undefined;
+    pause?:
+      | {
+          readonly at: string;
+          readonly by: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly timeoutMs?: number | undefined;
+        }
+      | undefined;
+  };
+  beforeAll(() => {
+    p = phases({ t1: 'succeeded', c1: 'stopped' });
+  });
   const answered: RetryAsk = { ...askFor(2), message: 'the second reading' };
-  await t.test('rides on the ask to the try it files: due with it; no message, no key', () => {
+  test('rides on the ask to the try it files: due with it; no message, no key', () => {
     assert.deepEqual(
       assess(aRead(RETRIED, onTry(), { phaseOf: p, signedOff: signedDone, asked, verdictOf: () => undefined, asks: [answered] })).retry,
       [{ step: 'implement', try: 2, mode: 'continue', message: 'the second reading', by: 'ask' }],
@@ -1347,7 +2230,7 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
       [{ step: 'implement', try: 2, mode: 'continue', by: 'ask' }],
     );
   });
-  await t.test('said beside the step while it waits', () => {
+  test('said beside the step while it waits', () => {
     const l = listing({
       steps: RETRIED,
       run: onTry(),
@@ -1359,8 +2242,8 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
     });
     assert.equal(l.steps[0].note, 'try 2 asked (--continue, with your answer) — the next tick files it');
   });
-  const nudged = onTry([{ taskId: 't0', check: { taskId: 'c0' }, cause: 'continue' }], 'c1');
-  await t.test('a try a person answered says so on `nemia ls`, read off the ask, never the record', () => {
+  test('a try a person answered says so on `nemia ls`, read off the ask, never the record', () => {
+    nudged = onTry([{ taskId: 't0', check: { taskId: 'c0' }, cause: 'continue' }], 'c1');
     assert.equal(answerOf(nudged, 'implement', [askFor(3), answered]), answered);
     const listed = (answers: RetryAsk[] = []) =>
       fullListing({
@@ -1373,7 +2256,7 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
     assert.equal(listed([answered]), 'try 2, continued on your word, answered');
     assert.equal(listed(), 'try 2, continued on your word', 'no ask read, nothing said');
   });
-  await t.test('answerOf: only for the try it asked for, filed the way it asked', () => {
+  test('answerOf: only for the try it asked for, filed the way it asked', () => {
     assert.equal(answerOf(nudged, 'implement', [{ ...answered, try: 3 }]), undefined, 'not answered: the next try');
     assert.equal(answerOf(nudged, 'implement', [{ ...answered, mode: 'fresh' }]), undefined, 'asked fresh, and the record says nudge');
     assert.equal(answerOf(nudged, 'implement', [askFor(2)]), undefined, 'asked without a message');
@@ -1384,7 +2267,7 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
     const opus = Boolean(answerOf(onOpus, 'implement', [{ ...askFor(2, 'fresh', 'opus'), message: 'm' }]));
     assert.equal(tryNote(RETRIED[0], onOpus.steps.implement, RETRIED, opus), 'try 2, fresh on opus, on your word, answered');
   });
-  await t.test('answerLines: `nemia decide` gives a settled blocked step the `--message` that answers it, the offers as they were', () => {
+  test('answerLines: `nemia decide` gives a settled blocked step the `--message` that answers it, the offers as they were', () => {
     const blocked = () => said('blocked');
     const r = run({ implement: 't1', review: null });
     const settled = phases({ t1: 'succeeded' });
@@ -1396,7 +2279,7 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
       'implement: blocked. Continue its session, told what happened:  nemia retry r-1 implement  (--fresh, or --model <m>, for a new session)',
     ]);
   });
-  await t.test('REFUSED where it would not be honoured: none for a session not settled, a stopped step, a run still going', () => {
+  test('REFUSED where it would not be honoured: none for a session not settled, a stopped step, a run still going', () => {
     const blocked = () => said('blocked');
     const r = run({ implement: 't1', review: null });
     const live = phases({ t1: 'running' });
@@ -1427,7 +2310,7 @@ const headingsOf = (brief: string): string[] => {
   return seen;
 };
 
-test("composeBrief of an answer: `## Your answer`, the person's text untouched in a fence", async (t) => {
+describe("composeBrief of an answer: `## Your answer`, the person's text untouched in a fence", () => {
   const implement: StepSpec = { ...step('implement'), check: 'npm test' };
   const briefOf = (told: RetryBriefing, message?: string) =>
     composeBrief(implement, run({ implement: 't1' }), [implement], undefined, undefined, undefined, {
@@ -1442,7 +2325,7 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
     ['continue', true, 'blocked', undefined],
   ] as const;
   for (const [mode, resumed, status, refused] of tries)
-    await t.test(`inside \`## Try <n>\` after on whose word and before the check's refusal: ${mode}, ${status}`, () => {
+    test(`inside \`## Try <n>\` after on whose word and before the check's refusal: ${mode}, ${status}`, () => {
       const told: RetryBriefing = { try: 2, by: 'ask', mode, resumed, status, ...(refused ? { refusal: refused } : {}) };
       const before = briefOf(told);
       const after = briefOf(told, text);
@@ -1472,7 +2355,7 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
     ['failed (check)', { ...refusal, stdout: 'not ok 1' }, ['## What the check said']],
   ] as const;
   for (const [status, refused, hidden] of hiding)
-    await t.test(`REFUSED as structure: an answer that leaves a fence open adds no heading and hides none: ${status}`, () => {
+    test(`REFUSED as structure: an answer that leaves a fence open adds no heading and hides none: ${status}`, () => {
       const told: RetryBriefing = { try: 2, by: 'ask', mode: 'continue', resumed: true, status, ...(refused ? { refusal: refused } : {}) };
       const [first, ...rest] = headingsOf(briefOf(told));
       const answered = briefOf(told, message);
@@ -1485,7 +2368,7 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
         `raw, the open fence hides ${hidden.join(' and ')}`,
       );
     });
-  await t.test("a heading in the answer is not one of the brief's", () => {
+  test("a heading in the answer is not one of the brief's", () => {
     const blocked: RetryBriefing = { try: 2, by: 'ask', mode: 'continue', resumed: true, status: 'blocked' };
     assert.deepEqual(
       headingsOf(briefOf(blocked, '## Before you sign off\n\nNothing to run.')).filter((h) => h === '## Before you sign off'),
@@ -1494,7 +2377,199 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
   });
 });
 
-test("composeBrief after an answered step: `## Answered`, a person's answer handed to every step after it", async (t) => {
+describe("composeBrief after an answered step: `## Answered`, a person's answer handed to every step after it", () => {
+  let answered!: {
+    repo: string;
+    workspace: string;
+    branch: string;
+    baseRef: string;
+    isolate: boolean;
+    id: string;
+    brief: string;
+    workflowDir: string;
+    steps: Record<
+      string,
+      {
+        readonly taskId: string | null;
+        readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+        readonly route?: { readonly route: string; readonly try: number; readonly by: 'person' | 'table' | 'script' | 'judge' } | undefined;
+        readonly sent?: { readonly card: string; readonly at: string } | undefined;
+        readonly pinned?:
+          | readonly {
+              readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+              readonly name: string;
+              readonly n: number;
+              readonly hash: string;
+            }[]
+          | undefined;
+        readonly workspace?: string | undefined;
+        readonly branch?: string | undefined;
+        readonly tries?:
+          | readonly {
+              readonly taskId: string;
+              readonly cause: 'retries' | 'signoff' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'back';
+              readonly model?: string | undefined;
+              readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+              readonly paused?: true | undefined;
+              readonly retried?: true | undefined;
+              readonly budget?: number | undefined;
+            }[]
+          | undefined;
+        readonly handedOff?: string | undefined;
+        readonly landed?: import('../src/record/record.ts').LandingRecord | undefined;
+        readonly filesRead?: { readonly taskId: string; readonly lacked: { readonly [x: string]: string } } | undefined;
+        readonly closeoutHash?: string | undefined;
+        readonly declared?: readonly string[] | undefined;
+      }
+    >;
+    createdAt: string;
+    context?: readonly string[] | undefined;
+    workflow?: readonly StepSpec[] | undefined;
+    factory?: string | undefined;
+    pinned?:
+      | readonly {
+          readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+          readonly name: string;
+          readonly n: number;
+          readonly hash: string;
+        }[]
+      | undefined;
+    placeSkill?: { readonly skill: string; readonly version: string } | undefined;
+    stagedFile?: string | undefined;
+    place?: undefined;
+    after?: readonly string[] | undefined;
+    inputs?: readonly string[] | undefined;
+    cards?: readonly string[] | undefined;
+    workflowFiles?: string | undefined;
+    carriedFiles?: string | undefined;
+    from?: { readonly inbox: string } | undefined;
+    scheduled?: { readonly factory: string; readonly workflow: string; readonly due: string } | undefined;
+    gates?: readonly string[] | undefined;
+    models?: { readonly [x: string]: string } | undefined;
+    mounts?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    volumes?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    harnessSettings?: { readonly [x: string]: { readonly [x: string]: unknown } } | undefined;
+    costLine?: number | undefined;
+    tips?: { readonly [x: string]: string } | undefined;
+    cancelledAt?: string | undefined;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly run?: string | undefined;
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    labels?: { readonly [x: string]: string } | undefined;
+    saidBefore?: { readonly [x: string]: readonly { readonly at: string; readonly text: string }[] } | undefined;
+    slotHeldAt?: string | undefined;
+    gatesTimed?: readonly { readonly step: string; readonly try: number }[] | undefined;
+    deniedCounted?: readonly { readonly task: string; readonly attempts: number }[] | undefined;
+    settlesCounted?: readonly string[] | undefined;
+    runTimed?: boolean | undefined;
+    approvals?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message?: string | undefined;
+          readonly budgets?: { readonly [x: string]: number } | undefined;
+          readonly work?: { readonly [x: string]: number } | undefined;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    acceptances?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    pruned?:
+      | {
+          readonly at: string;
+          readonly worktrees: readonly { readonly path: string; readonly bytes: number }[];
+          readonly artifacts?: { readonly at: string; readonly bytes: number } | undefined;
+        }
+      | undefined;
+    hold?:
+      | {
+          readonly at: string;
+          readonly until: readonly string[];
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly by?: string | undefined;
+        }
+      | undefined;
+    unheld?:
+      | {
+          readonly since: string;
+          readonly actor: {
+            readonly kind: 'agent' | 'person';
+            readonly run?: string | undefined;
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly token?: string | undefined;
+          };
+        }
+      | undefined;
+    pause?:
+      | {
+          readonly at: string;
+          readonly by: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly timeoutMs?: number | undefined;
+        }
+      | undefined;
+  };
+  beforeAll(() => {
+    answered = run(
+      { plan: 't0', implement: 't2', review: null },
+      {
+        steps: {
+          plan: { taskId: 't0' },
+          implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue' }] },
+          review: { taskId: null },
+        },
+      },
+    );
+  });
   const steps: StepSpec[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
   const cut = 'Cut the board out of this build: it is a card of its own.';
   const answer = (n: number, message: string, at: string, mode: RetryMode = 'continue'): RetryAsk => ({
@@ -1504,16 +2579,6 @@ test("composeBrief after an answered step: `## Answered`, a person's answer hand
     message,
     at,
   });
-  const answered = run(
-    { plan: 't0', implement: 't2', review: null },
-    {
-      steps: {
-        plan: { taskId: 't0' },
-        implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue' }] },
-        review: { taskId: null },
-      },
-    },
-  );
   const briefHandedAnswers = (s: StepSpec, r: Run, answers: readonly RetryAsk[]) =>
     composeBrief(
       s,
@@ -1537,30 +2602,25 @@ test("composeBrief after an answered step: `## Answered`, a person's answer hand
     );
   const given = [answer(2, cut, '2026-11-06T03:10:00.000Z')];
   const said = `implement, try 2, answered at 2026-11-06T03:10:00.000Z:\n\n\`\`\`text\n${cut}\n\`\`\``;
-  await t.test('the step after the answered one, beside what was asked for and before where to look', () => {
+  test('the step after the answered one, beside what was asked for and before where to look', () => {
     const review = briefHandedAnswers(steps[2], answered, given);
     assert.ok(review.includes('\n## Answered\n'), review);
     assert.ok(review.includes(said), review);
     assert.ok(review.indexOf('## What was asked for') < review.indexOf('## Answered'));
     assert.ok(review.indexOf('## Answered') < review.indexOf('## Where to look'));
   });
-  await t.test('and on a remote agent after it', () =>
-    assert.ok(remoteBrief(steps[2], answered, steps, undefined, undefined, undefined, given).includes(said)),
-  );
-  await t.test('not a step before the answered one', () =>
-    assert.ok(!briefHandedAnswers(steps[0], answered, given).includes('## Answered')),
-  );
-  await t.test("not the answered step itself: its own answer is its try's `## Your answer`", () =>
-    assert.ok(!briefHandedAnswers(steps[1], answered, given).includes('## Answered')),
-  );
-  await t.test('nothing for a run where no step was answered', () =>
-    assert.equal(composeBrief(steps[2], answered, steps), briefHandedAnswers(steps[2], answered, [])),
-  );
-  await t.test('REFUSED an answer to a try never filed as it was asked: given to nobody, handed to nobody', () => {
+  test('and on a remote agent after it', () =>
+    assert.ok(remoteBrief(steps[2], answered, steps, undefined, undefined, undefined, given).includes(said)));
+  test('not a step before the answered one', () => assert.ok(!briefHandedAnswers(steps[0], answered, given).includes('## Answered')));
+  test("not the answered step itself: its own answer is its try's `## Your answer`", () =>
+    assert.ok(!briefHandedAnswers(steps[1], answered, given).includes('## Answered')));
+  test('nothing for a run where no step was answered', () =>
+    assert.equal(composeBrief(steps[2], answered, steps), briefHandedAnswers(steps[2], answered, [])));
+  test('REFUSED an answer to a try never filed as it was asked: given to nobody, handed to nobody', () => {
     const asked = [answer(2, cut, '2026-11-06T03:10:00.000Z', 'fresh'), answer(3, 'not yet filed', '2026-11-06T04:00:00.000Z')];
     assert.ok(!briefHandedAnswers(steps[2], answered, asked).includes('## Answered'));
   });
-  await t.test('two answers are each said, in the order given', () => {
+  test('two answers are each said, in the order given', () => {
     const twice = run(
       { plan: 't0', implement: 't3', review: null },
       {
@@ -1586,8 +2646,190 @@ test("composeBrief after an answered step: `## Answered`, a person's answer hand
   });
 });
 
-test("`nemia ls` says what a step's current try was denied after its note, never in its status nor the note it keeps", async (t) => {
-  const r = run({ implement: 't1', review: 't2' });
+describe("`nemia ls` says what a step's current try was denied after its note, never in its status nor the note it keeps", () => {
+  let r!: {
+    repo: string;
+    workspace: string;
+    branch: string;
+    baseRef: string;
+    isolate: boolean;
+    id: string;
+    brief: string;
+    workflowDir: string;
+    steps: Record<
+      string,
+      {
+        readonly taskId: string | null;
+        readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+        readonly route?: { readonly route: string; readonly try: number; readonly by: 'person' | 'table' | 'script' | 'judge' } | undefined;
+        readonly sent?: { readonly card: string; readonly at: string } | undefined;
+        readonly pinned?:
+          | readonly {
+              readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+              readonly name: string;
+              readonly n: number;
+              readonly hash: string;
+            }[]
+          | undefined;
+        readonly workspace?: string | undefined;
+        readonly branch?: string | undefined;
+        readonly tries?:
+          | readonly {
+              readonly taskId: string;
+              readonly cause: 'retries' | 'signoff' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'back';
+              readonly model?: string | undefined;
+              readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+              readonly paused?: true | undefined;
+              readonly retried?: true | undefined;
+              readonly budget?: number | undefined;
+            }[]
+          | undefined;
+        readonly handedOff?: string | undefined;
+        readonly landed?: import('../src/record/record.ts').LandingRecord | undefined;
+        readonly filesRead?: { readonly taskId: string; readonly lacked: { readonly [x: string]: string } } | undefined;
+        readonly closeoutHash?: string | undefined;
+        readonly declared?: readonly string[] | undefined;
+      }
+    >;
+    createdAt: string;
+    context?: readonly string[] | undefined;
+    workflow?: readonly StepSpec[] | undefined;
+    factory?: string | undefined;
+    pinned?:
+      | readonly {
+          readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+          readonly name: string;
+          readonly n: number;
+          readonly hash: string;
+        }[]
+      | undefined;
+    placeSkill?: { readonly skill: string; readonly version: string } | undefined;
+    stagedFile?: string | undefined;
+    place?: undefined;
+    after?: readonly string[] | undefined;
+    inputs?: readonly string[] | undefined;
+    cards?: readonly string[] | undefined;
+    workflowFiles?: string | undefined;
+    carriedFiles?: string | undefined;
+    from?: { readonly inbox: string } | undefined;
+    scheduled?: { readonly factory: string; readonly workflow: string; readonly due: string } | undefined;
+    gates?: readonly string[] | undefined;
+    models?: { readonly [x: string]: string } | undefined;
+    mounts?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    volumes?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    harnessSettings?: { readonly [x: string]: { readonly [x: string]: unknown } } | undefined;
+    costLine?: number | undefined;
+    tips?: { readonly [x: string]: string } | undefined;
+    cancelledAt?: string | undefined;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly run?: string | undefined;
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    labels?: { readonly [x: string]: string } | undefined;
+    saidBefore?: { readonly [x: string]: readonly { readonly at: string; readonly text: string }[] } | undefined;
+    slotHeldAt?: string | undefined;
+    gatesTimed?: readonly { readonly step: string; readonly try: number }[] | undefined;
+    deniedCounted?: readonly { readonly task: string; readonly attempts: number }[] | undefined;
+    settlesCounted?: readonly string[] | undefined;
+    runTimed?: boolean | undefined;
+    approvals?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message?: string | undefined;
+          readonly budgets?: { readonly [x: string]: number } | undefined;
+          readonly work?: { readonly [x: string]: number } | undefined;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    acceptances?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    pruned?:
+      | {
+          readonly at: string;
+          readonly worktrees: readonly { readonly path: string; readonly bytes: number }[];
+          readonly artifacts?: { readonly at: string; readonly bytes: number } | undefined;
+        }
+      | undefined;
+    hold?:
+      | {
+          readonly at: string;
+          readonly until: readonly string[];
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly by?: string | undefined;
+        }
+      | undefined;
+    unheld?:
+      | {
+          readonly since: string;
+          readonly actor: {
+            readonly kind: 'agent' | 'person';
+            readonly run?: string | undefined;
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly token?: string | undefined;
+          };
+        }
+      | undefined;
+    pause?:
+      | {
+          readonly at: string;
+          readonly by: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly timeoutMs?: number | undefined;
+        }
+      | undefined;
+  };
+  beforeAll(() => {
+    r = run({ implement: 't1', review: 't2' });
+  });
   const ls = (deniedOf?: (id: string) => readonly string[]) =>
     fullListing({
       steps: STEPS,
@@ -1596,7 +2838,7 @@ test("`nemia ls` says what a step's current try was denied after its note, never
       closeoutOf: signedOff({ implement: said('done') }),
       deniedOf,
     }).steps;
-  await t.test('the status every reader compares is as it was; `nemia ls` prints the denials in the note', () => {
+  test('the status every reader compares is as it was; `nemia ls` prints the denials in the note', () => {
     const [implement, review] = ls((id) => (id === 't1' ? ['Skill(look)', 'Bash(pytest)'] : []));
     assert.deepEqual(implement, {
       name: 'implement',
@@ -1609,14 +2851,14 @@ test("`nemia ls` says what a step's current try was denied after its note, never
     assert.equal(shownNote(implement), 'denied: Skill(look), Bash(pytest)');
     assert.deepEqual([review.note, review.denied], [undefined, undefined], 'a step denied nothing says nothing');
   });
-  await t.test('a caller that asks nothing reads as one told of none', () => {
+  test('a caller that asks nothing reads as one told of none', () => {
     assert.deepEqual(
       ls(),
       ls(() => []),
     );
     assert.deepEqual([ls()[0].note, ls()[0].denied], [undefined, undefined]);
   });
-  await t.test("the current try's task, not the try before it, after whatever else its note says", () => {
+  test("the current try's task, not the try before it, after whatever else its note says", () => {
     const tried = fullListing({
       steps: RETRIED,
       run: onTry([{ taskId: 't0', cause: 'continue' }], null),
@@ -1628,33 +2870,441 @@ test("`nemia ls` says what a step's current try was denied after its note, never
   });
 });
 
-test('`nemia ls` says what the session of a step at work runs on in its note, before its denials, never in its status', async (t) => {
-  const r = run({ implement: 't1', review: 't2' });
-  const listed = fullListing({
-    steps: STEPS,
-    run: r,
-    phaseOf: shown({ t1: 'succeeded', t2: 'working' }),
-    closeoutOf: signedOff({ implement: said('done') }),
-    deniedOf: (id) => (id === 't2' ? ['Bash(npm)'] : []),
-    ranOnOf: (id) => (id === 't2' ? 'on v1.2.0, claude 2.1.316' : undefined),
-  }).steps;
-  const [implement, review] = listed;
-  await t.test('the step at work carries it beside its word, and its note prints it before what it was denied', () => {
+describe('`nemia ls` says what the session of a step at work runs on in its note, before its denials, never in its status', () => {
+  let r!: {
+    repo: string;
+    workspace: string;
+    branch: string;
+    baseRef: string;
+    isolate: boolean;
+    id: string;
+    brief: string;
+    workflowDir: string;
+    steps: Record<
+      string,
+      {
+        readonly taskId: string | null;
+        readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+        readonly route?: { readonly route: string; readonly try: number; readonly by: 'person' | 'table' | 'script' | 'judge' } | undefined;
+        readonly sent?: { readonly card: string; readonly at: string } | undefined;
+        readonly pinned?:
+          | readonly {
+              readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+              readonly name: string;
+              readonly n: number;
+              readonly hash: string;
+            }[]
+          | undefined;
+        readonly workspace?: string | undefined;
+        readonly branch?: string | undefined;
+        readonly tries?:
+          | readonly {
+              readonly taskId: string;
+              readonly cause: 'retries' | 'signoff' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'back';
+              readonly model?: string | undefined;
+              readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+              readonly paused?: true | undefined;
+              readonly retried?: true | undefined;
+              readonly budget?: number | undefined;
+            }[]
+          | undefined;
+        readonly handedOff?: string | undefined;
+        readonly landed?: import('../src/record/record.ts').LandingRecord | undefined;
+        readonly filesRead?: { readonly taskId: string; readonly lacked: { readonly [x: string]: string } } | undefined;
+        readonly closeoutHash?: string | undefined;
+        readonly declared?: readonly string[] | undefined;
+      }
+    >;
+    createdAt: string;
+    context?: readonly string[] | undefined;
+    workflow?: readonly StepSpec[] | undefined;
+    factory?: string | undefined;
+    pinned?:
+      | readonly {
+          readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+          readonly name: string;
+          readonly n: number;
+          readonly hash: string;
+        }[]
+      | undefined;
+    placeSkill?: { readonly skill: string; readonly version: string } | undefined;
+    stagedFile?: string | undefined;
+    place?: undefined;
+    after?: readonly string[] | undefined;
+    inputs?: readonly string[] | undefined;
+    cards?: readonly string[] | undefined;
+    workflowFiles?: string | undefined;
+    carriedFiles?: string | undefined;
+    from?: { readonly inbox: string } | undefined;
+    scheduled?: { readonly factory: string; readonly workflow: string; readonly due: string } | undefined;
+    gates?: readonly string[] | undefined;
+    models?: { readonly [x: string]: string } | undefined;
+    mounts?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    volumes?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    harnessSettings?: { readonly [x: string]: { readonly [x: string]: unknown } } | undefined;
+    costLine?: number | undefined;
+    tips?: { readonly [x: string]: string } | undefined;
+    cancelledAt?: string | undefined;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly run?: string | undefined;
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    labels?: { readonly [x: string]: string } | undefined;
+    saidBefore?: { readonly [x: string]: readonly { readonly at: string; readonly text: string }[] } | undefined;
+    slotHeldAt?: string | undefined;
+    gatesTimed?: readonly { readonly step: string; readonly try: number }[] | undefined;
+    deniedCounted?: readonly { readonly task: string; readonly attempts: number }[] | undefined;
+    settlesCounted?: readonly string[] | undefined;
+    runTimed?: boolean | undefined;
+    approvals?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message?: string | undefined;
+          readonly budgets?: { readonly [x: string]: number } | undefined;
+          readonly work?: { readonly [x: string]: number } | undefined;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    acceptances?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    pruned?:
+      | {
+          readonly at: string;
+          readonly worktrees: readonly { readonly path: string; readonly bytes: number }[];
+          readonly artifacts?: { readonly at: string; readonly bytes: number } | undefined;
+        }
+      | undefined;
+    hold?:
+      | {
+          readonly at: string;
+          readonly until: readonly string[];
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly by?: string | undefined;
+        }
+      | undefined;
+    unheld?:
+      | {
+          readonly since: string;
+          readonly actor: {
+            readonly kind: 'agent' | 'person';
+            readonly run?: string | undefined;
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly token?: string | undefined;
+          };
+        }
+      | undefined;
+    pause?:
+      | {
+          readonly at: string;
+          readonly by: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly timeoutMs?: number | undefined;
+        }
+      | undefined;
+  };
+  let listed!: (import('../src/phase/phase.ts').CodedStep & {
+    name: string;
+    message: string;
+    verdict?: import('../src/runner.ts').CheckVerdict;
+    branch: string | null;
+    note?: string;
+    cost?: string;
+    waits?: string;
+    denied?: string;
+    ranOn?: string;
+    roundDue?: true;
+    asks?: number;
+    baseHeldBy?: import('../src/cap/cap.ts').CheckoutHold;
+  })[];
+  let implement!: import('../src/phase/phase.ts').CodedStep & {
+    name: string;
+    message: string;
+    verdict?: import('../src/runner.ts').CheckVerdict;
+    branch: string | null;
+    note?: string;
+    cost?: string;
+    waits?: string;
+    denied?: string;
+    ranOn?: string;
+    roundDue?: true;
+    asks?: number;
+    baseHeldBy?: import('../src/cap/cap.ts').CheckoutHold;
+  };
+  let review!: import('../src/phase/phase.ts').CodedStep & {
+    name: string;
+    message: string;
+    verdict?: import('../src/runner.ts').CheckVerdict;
+    branch: string | null;
+    note?: string;
+    cost?: string;
+    waits?: string;
+    denied?: string;
+    ranOn?: string;
+    roundDue?: true;
+    asks?: number;
+    baseHeldBy?: import('../src/cap/cap.ts').CheckoutHold;
+  };
+  beforeAll(() => {
+    r = run({ implement: 't1', review: 't2' });
+    listed = fullListing({
+      steps: STEPS,
+      run: r,
+      phaseOf: shown({ t1: 'succeeded', t2: 'working' }),
+      closeoutOf: signedOff({ implement: said('done') }),
+      deniedOf: (id) => (id === 't2' ? ['Bash(npm)'] : []),
+      ranOnOf: (id) => (id === 't2' ? 'on v1.2.0, claude 2.1.316' : undefined),
+    }).steps;
+    [implement, review] = listed;
+  });
+  test('the step at work carries it beside its word, and its note prints it before what it was denied', () => {
     assert.equal(review.ranOn, 'on v1.2.0, claude 2.1.316');
     assert.equal(review.message, 'working');
     assert.equal(shownNote(review), 'on v1.2.0, claude 2.1.316 · denied: Bash(npm)');
   });
-  await t.test('a step whose reader says nothing carries nothing', () => {
+  test('a step whose reader says nothing carries nothing', () => {
     assert.equal('ranOn' in implement, false);
   });
 });
 
-test('`denials: fail`: a step that signed off denied a call reads denied', async (t) => {
+describe('`denials: fail`: a step that signed off denied a call reads denied', () => {
+  let r!: {
+    repo: string;
+    workspace: string;
+    branch: string;
+    baseRef: string;
+    isolate: boolean;
+    id: string;
+    brief: string;
+    workflowDir: string;
+    steps: Record<
+      string,
+      {
+        readonly taskId: string | null;
+        readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+        readonly route?: { readonly route: string; readonly try: number; readonly by: 'person' | 'table' | 'script' | 'judge' } | undefined;
+        readonly sent?: { readonly card: string; readonly at: string } | undefined;
+        readonly pinned?:
+          | readonly {
+              readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+              readonly name: string;
+              readonly n: number;
+              readonly hash: string;
+            }[]
+          | undefined;
+        readonly workspace?: string | undefined;
+        readonly branch?: string | undefined;
+        readonly tries?:
+          | readonly {
+              readonly taskId: string;
+              readonly cause: 'retries' | 'signoff' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'back';
+              readonly model?: string | undefined;
+              readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+              readonly paused?: true | undefined;
+              readonly retried?: true | undefined;
+              readonly budget?: number | undefined;
+            }[]
+          | undefined;
+        readonly handedOff?: string | undefined;
+        readonly landed?: import('../src/record/record.ts').LandingRecord | undefined;
+        readonly filesRead?: { readonly taskId: string; readonly lacked: { readonly [x: string]: string } } | undefined;
+        readonly closeoutHash?: string | undefined;
+        readonly declared?: readonly string[] | undefined;
+      }
+    >;
+    createdAt: string;
+    context?: readonly string[] | undefined;
+    workflow?: readonly StepSpec[] | undefined;
+    factory?: string | undefined;
+    pinned?:
+      | readonly {
+          readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+          readonly name: string;
+          readonly n: number;
+          readonly hash: string;
+        }[]
+      | undefined;
+    placeSkill?: { readonly skill: string; readonly version: string } | undefined;
+    stagedFile?: string | undefined;
+    place?: undefined;
+    after?: readonly string[] | undefined;
+    inputs?: readonly string[] | undefined;
+    cards?: readonly string[] | undefined;
+    workflowFiles?: string | undefined;
+    carriedFiles?: string | undefined;
+    from?: { readonly inbox: string } | undefined;
+    scheduled?: { readonly factory: string; readonly workflow: string; readonly due: string } | undefined;
+    gates?: readonly string[] | undefined;
+    models?: { readonly [x: string]: string } | undefined;
+    mounts?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    volumes?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    harnessSettings?: { readonly [x: string]: { readonly [x: string]: unknown } } | undefined;
+    costLine?: number | undefined;
+    tips?: { readonly [x: string]: string } | undefined;
+    cancelledAt?: string | undefined;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly run?: string | undefined;
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    labels?: { readonly [x: string]: string } | undefined;
+    saidBefore?: { readonly [x: string]: readonly { readonly at: string; readonly text: string }[] } | undefined;
+    slotHeldAt?: string | undefined;
+    gatesTimed?: readonly { readonly step: string; readonly try: number }[] | undefined;
+    deniedCounted?: readonly { readonly task: string; readonly attempts: number }[] | undefined;
+    settlesCounted?: readonly string[] | undefined;
+    runTimed?: boolean | undefined;
+    approvals?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message?: string | undefined;
+          readonly budgets?: { readonly [x: string]: number } | undefined;
+          readonly work?: { readonly [x: string]: number } | undefined;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    acceptances?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    pruned?:
+      | {
+          readonly at: string;
+          readonly worktrees: readonly { readonly path: string; readonly bytes: number }[];
+          readonly artifacts?: { readonly at: string; readonly bytes: number } | undefined;
+        }
+      | undefined;
+    hold?:
+      | {
+          readonly at: string;
+          readonly until: readonly string[];
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly by?: string | undefined;
+        }
+      | undefined;
+    unheld?:
+      | {
+          readonly since: string;
+          readonly actor: {
+            readonly kind: 'agent' | 'person';
+            readonly run?: string | undefined;
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly token?: string | undefined;
+          };
+        }
+      | undefined;
+    pause?:
+      | {
+          readonly at: string;
+          readonly by: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly timeoutMs?: number | undefined;
+        }
+      | undefined;
+  };
+  let p!: (id: string) => TaskPhase;
+  let denied!: SpendOf;
+  beforeAll(() => {
+    r = run({ implement: 't1', review: null });
+    p = phases({ t1: 'succeeded' });
+    denied = deniedSpend({ t1: ['Write(/tmp/w/notes.md)', 'Bash(pytest)'] });
+  });
   const DENYING: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2, denials: 'fail' }, step('review', ['implement'])];
-  const r = run({ implement: 't1', review: null });
-  const p = phases({ t1: 'succeeded' });
-  const denied = deniedSpend({ t1: ['Write(/tmp/w/notes.md)', 'Bash(pytest)'] });
-  await t.test('stepStatus: denied; running, checking with no denial or no key, unsigned and blocked said first', () => {
+  test('stepStatus: denied; running, checking with no denial or no key, unsigned and blocked said first', () => {
     assert.equal(stepStatus(DENYING[0], r, p, signedDone, asked, DENYING, denied), 'denied');
     assert.equal(
       stepStatus(DENYING[0], r, phases({ t1: 'running' }), () => undefined, asked, DENYING, denied),
@@ -1673,7 +3323,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       'blocked',
     );
   });
-  await t.test('nothing after it filed, no check of it run, never tried by `retries:`, waited on by a person', () => {
+  test('nothing after it filed, no check of it run, never tried by `retries:`, waited on by a person', () => {
     const a = assess(
       aRead(DENYING, r, {
         phaseOf: p,
@@ -1728,7 +3378,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       ['denied', 'denied: Write(/tmp/w/notes.md), Bash(pytest)', 'denied: Write(/tmp/w/notes.md), Bash(pytest)', ['implement']],
     );
   });
-  await t.test('tried by a person a nudge or a fresh session, never --recheck; a gate holds nothing a denial stopped', () => {
+  test('tried by a person a nudge or a fresh session, never --recheck; a gate holds nothing a denial stopped', () => {
     assert.deepEqual(
       retryable(DENYING[0], r, p, signedDone, asked, DENYING, () => false, denied),
       {
@@ -1769,7 +3419,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       'nemia decide r-1',
     );
   });
-  await t.test('past its budget too: held there and named for both, the raise offered first', () => {
+  test('past its budget too: held there and named for both, the raise offered first', () => {
     const BUDGETED: StepSpec[] = [{ ...DENYING[0], budget: 3 }, DENYING[1]];
     const over: SpendOf = (id) =>
       id === 't1' ? { usd: 4, measured: 1, unmeasured: 0, budgetEnded: false, denied: ['Bash(pytest)'] } : undefined;
@@ -1795,16 +3445,199 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       /^implement: over budget \(denied\), \$4\.00 of \$3\. Raise its cap above \$4\.00/,
     );
   });
-  await t.test('a new try is read on its own task: denied nothing, it goes on to its check', () => {
+  test('a new try is read on its own task: denied nothing, it goes on to its check', () => {
     const again = run({ implement: 't2', review: null });
     assert.equal(stepStatus(DENYING[0], again, phases({ t2: 'succeeded' }), signedDone, asked, DENYING, denied), 'checking');
   });
 });
 
-test("retryLines of a denied step: a new session with the bare `--fresh`, and the rule a new run's `allowedTools:` needs", async (t) => {
+describe("retryLines of a denied step: a new session with the bare `--fresh`, and the rule a new run's `allowedTools:` needs", () => {
+  let r!: {
+    repo: string;
+    workspace: string;
+    branch: string;
+    baseRef: string;
+    isolate: boolean;
+    id: string;
+    brief: string;
+    workflowDir: string;
+    steps: Record<
+      string,
+      {
+        readonly taskId: string | null;
+        readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+        readonly route?: { readonly route: string; readonly try: number; readonly by: 'person' | 'table' | 'script' | 'judge' } | undefined;
+        readonly sent?: { readonly card: string; readonly at: string } | undefined;
+        readonly pinned?:
+          | readonly {
+              readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+              readonly name: string;
+              readonly n: number;
+              readonly hash: string;
+            }[]
+          | undefined;
+        readonly workspace?: string | undefined;
+        readonly branch?: string | undefined;
+        readonly tries?:
+          | readonly {
+              readonly taskId: string;
+              readonly cause: 'retries' | 'signoff' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'back';
+              readonly model?: string | undefined;
+              readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+              readonly paused?: true | undefined;
+              readonly retried?: true | undefined;
+              readonly budget?: number | undefined;
+            }[]
+          | undefined;
+        readonly handedOff?: string | undefined;
+        readonly landed?: import('../src/record/record.ts').LandingRecord | undefined;
+        readonly filesRead?: { readonly taskId: string; readonly lacked: { readonly [x: string]: string } } | undefined;
+        readonly closeoutHash?: string | undefined;
+        readonly declared?: readonly string[] | undefined;
+      }
+    >;
+    createdAt: string;
+    context?: readonly string[] | undefined;
+    workflow?: readonly StepSpec[] | undefined;
+    factory?: string | undefined;
+    pinned?:
+      | readonly {
+          readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+          readonly name: string;
+          readonly n: number;
+          readonly hash: string;
+        }[]
+      | undefined;
+    placeSkill?: { readonly skill: string; readonly version: string } | undefined;
+    stagedFile?: string | undefined;
+    place?: undefined;
+    after?: readonly string[] | undefined;
+    inputs?: readonly string[] | undefined;
+    cards?: readonly string[] | undefined;
+    workflowFiles?: string | undefined;
+    carriedFiles?: string | undefined;
+    from?: { readonly inbox: string } | undefined;
+    scheduled?: { readonly factory: string; readonly workflow: string; readonly due: string } | undefined;
+    gates?: readonly string[] | undefined;
+    models?: { readonly [x: string]: string } | undefined;
+    mounts?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    volumes?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    harnessSettings?: { readonly [x: string]: { readonly [x: string]: unknown } } | undefined;
+    costLine?: number | undefined;
+    tips?: { readonly [x: string]: string } | undefined;
+    cancelledAt?: string | undefined;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly run?: string | undefined;
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    labels?: { readonly [x: string]: string } | undefined;
+    saidBefore?: { readonly [x: string]: readonly { readonly at: string; readonly text: string }[] } | undefined;
+    slotHeldAt?: string | undefined;
+    gatesTimed?: readonly { readonly step: string; readonly try: number }[] | undefined;
+    deniedCounted?: readonly { readonly task: string; readonly attempts: number }[] | undefined;
+    settlesCounted?: readonly string[] | undefined;
+    runTimed?: boolean | undefined;
+    approvals?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message?: string | undefined;
+          readonly budgets?: { readonly [x: string]: number } | undefined;
+          readonly work?: { readonly [x: string]: number } | undefined;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    acceptances?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    pruned?:
+      | {
+          readonly at: string;
+          readonly worktrees: readonly { readonly path: string; readonly bytes: number }[];
+          readonly artifacts?: { readonly at: string; readonly bytes: number } | undefined;
+        }
+      | undefined;
+    hold?:
+      | {
+          readonly at: string;
+          readonly until: readonly string[];
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly by?: string | undefined;
+        }
+      | undefined;
+    unheld?:
+      | {
+          readonly since: string;
+          readonly actor: {
+            readonly kind: 'agent' | 'person';
+            readonly run?: string | undefined;
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly token?: string | undefined;
+          };
+        }
+      | undefined;
+    pause?:
+      | {
+          readonly at: string;
+          readonly by: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly timeoutMs?: number | undefined;
+        }
+      | undefined;
+  };
+  let p!: (id: string) => TaskPhase;
+  beforeAll(() => {
+    r = run({ implement: 't1', review: null });
+    p = phases({ t1: 'succeeded' });
+  });
   const DENYING: StepSpec[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
-  const r = run({ implement: 't1', review: null });
-  const p = phases({ t1: 'succeeded' });
   const offer = (steps: StepSpec[], x: Run, denied: SpendOf) => {
     const d = decision(
       aRead(steps, x, {
@@ -1821,7 +3654,7 @@ test("retryLines of a denied step: a new session with the bare `--fresh`, and th
     );
     return { d, lines: retryLines(steps, x, d, p, signedDone, asked, denied) };
   };
-  await t.test('a write as `Edit(//…)`, a command as `Bash(word:*)`, and the bare offer first; nothing on a pruned run', () => {
+  test('a write as `Edit(//…)`, a command as `Bash(word:*)`, and the bare offer first; nothing on a pruned run', () => {
     const denied = deniedSpend({ t1: ['Write(/tmp/w/notes.md)', 'MultiEdit(/tmp/w/notes.md)', 'Bash(pytest)'] });
     const { d, lines } = offer(DENYING, r, denied);
     assert.deepEqual(lines, [
@@ -1838,7 +3671,7 @@ test("retryLines of a denied step: a new session with the bare `--fresh`, and th
       'pruned',
     );
   });
-  await t.test("a path in its worktree is named from the worktree, never by this run's id", () => {
+  test("a path in its worktree is named from the worktree, never by this run's id", () => {
     const wt = '/home/me/.agent-workflows/worktrees/r-1/implement';
     const placed: Run = { ...r, steps: { ...r.steps, implement: { ...r.steps.implement, workspace: wt } } };
     const denied = deniedSpend({ t1: [`Write(${wt}/notes.md)`, 'Write(/home/me/.agent-workflows/runs/r-1/artifacts/implement/shot.png)'] });
@@ -1849,7 +3682,7 @@ test("retryLines of a denied step: a new session with the bare `--fresh`, and th
     );
     assert.doesNotMatch(line, /r-1\/implement\/notes|runs\/r-1\//, 'no rule names this run');
   });
-  await t.test('no allow rule for a call its own disallowedTools: may have denied, since a deny beats every allow', () => {
+  test('no allow rule for a call its own disallowedTools: may have denied, since a deny beats every allow', () => {
     const own: StepSpec[] = [
       { ...step('implement'), denials: 'fail', disallowedTools: ['Bash(npm run build)', 'SendMessage'] },
       step('review', ['implement']),
@@ -1860,7 +3693,13 @@ test("retryLines of a denied step: a new session with the bare `--fresh`, and th
   });
 });
 
-test("closeoutOf, deniedOf and closeoutAsked of a task held open: its current turn's, never the last turn's", async (t) => {
+describe("closeoutOf, deniedOf and closeoutAsked of a task held open: its current turn's, never the last turn's", () => {
+  let answered!: Map<string, TaskView>;
+  let waiting!: Map<string, TaskView>;
+  beforeAll(() => {
+    answered = new Map([['t', view([signed], 1)]]);
+    waiting = new Map([['t', view([signed], 0, 'input-required')]]);
+  });
   const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artifacts: [], needs: 'which flag: --dry-run or --force?' };
   const view = (attempts: object[], inputs: number, phase = 'working') =>
     ({
@@ -1889,28 +3728,27 @@ test("closeoutOf, deniedOf and closeoutAsked of a task held open: its current tu
   };
   const unsigned = { n: 1, ended: 'failed', reason: 'harness', closedOut: false, former: 'unsigned', nativeId: 'n' };
   const held = { id: 'r', steps: { plan: { taskId: 't' } } } as never;
-  const answered = new Map([['t', view([signed], 1)]]);
-  const waiting = new Map([['t', view([signed], 0, 'input-required')]]);
-  await t.test("an answered turn still running has not signed: the last turn's blocked closeout is not its", () =>
-    assert.equal(closeoutOf(answered, held, 'plan'), undefined),
-  );
-  await t.test('nor are its denials', () => assert.deepEqual(deniedOf(answered)('t'), []));
-  await t.test('the turn that signed is read while it waits', () => {
+  test("an answered turn still running has not signed: the last turn's blocked closeout is not its", () =>
+    assert.equal(closeoutOf(answered, held, 'plan'), undefined));
+  test('nor are its denials', () => assert.deepEqual(deniedOf(answered)('t'), []));
+  test('the turn that signed is read while it waits', () => {
     const read = closeoutOf(waiting, held, 'plan');
     assert.ok(read && !('error' in read), JSON.stringify(read));
     assert.equal(read.outcome, 'blocked');
   });
-  await t.test('and its denials', () => assert.deepEqual(deniedOf(waiting)('t'), ['Skill(look)']));
-  await t.test('waiting, it reads settled, as it signed', () => assert.equal(phaseOfView(waiting.get('t')), 'succeeded'));
-  await t.test("an unsigned attempt of the last turn is not this turn's", () =>
-    assert.equal(closeoutAsked(new Map([['t', view([unsigned], 1)]]))('t'), true),
-  );
-  await t.test('and of this turn, it is', () => assert.equal(closeoutAsked(new Map([['t', view([unsigned], 0)]]))('t'), 'unsigned'));
+  test('and its denials', () => assert.deepEqual(deniedOf(waiting)('t'), ['Skill(look)']));
+  test('waiting, it reads settled, as it signed', () => assert.equal(phaseOfView(waiting.get('t')), 'succeeded'));
+  test("an unsigned attempt of the last turn is not this turn's", () =>
+    assert.equal(closeoutAsked(new Map([['t', view([unsigned], 1)]]))('t'), true));
+  test('and of this turn, it is', () => assert.equal(closeoutAsked(new Map([['t', view([unsigned], 0)]]))('t'), 'unsigned'));
 });
 
-test("a blocked step's failed check run again (`blockedRecheck`): only on the commit it judged, as the same try, standing on its check", async (t) => {
+describe("a blocked step's failed check run again (`blockedRecheck`): only on the commit it judged, as the same try, standing on its check", () => {
+  let implement!: StepSpec;
+  beforeAll(() => {
+    [implement] = CHECKED;
+  });
   const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
-  const [implement] = CHECKED;
   const BRANCH = 'wf/r-1/implement';
   const blockedAfter = (o: { handedOff?: boolean; tip?: string | null; tries?: EarlierTry[] } = {}): RepositoryRun =>
     run(
@@ -1945,8 +3783,7 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
       undefined,
       at(tip ?? undefined),
     ).modes;
-
-  await t.test('the ways a blocked step is tried: --recheck beside a session only where nothing changed since the failed check', () => {
+  test('the ways a blocked step is tried: --recheck beside a session only where nothing changed since the failed check', () => {
     assert.deepEqual(modes(blockedAfter()), ['continue', 'fresh', 'recheck']);
     assert.deepEqual(modes(blockedAfter(), settled, 'beefcafe'), ['continue', 'fresh'], 'the branch moved');
     assert.deepEqual(modes(blockedAfter(), settled, null), ['continue', 'fresh'], 'the branch unread');
@@ -1955,21 +3792,16 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
     assert.deepEqual(modes(blockedAfter({ tip: null })), ['continue', 'fresh'], 'a check filed before its commit was kept');
     assert.deepEqual(modes(blockedAfter({ tries: [] })), ['continue', 'fresh'], 'no check behind it');
   });
-
-  await t.test(
-    "a person's ask is due as a recheck on the unchanged branch, never on a moved one, and retries: never rechecks a blocked step",
-    () => {
-      const due = (tip: string | undefined, asks: RetryAsk[]) =>
-        assess(aRead(CHECKED, blockedAfter(), { phaseOf: phases(settled), signedOff: blocked, asked: () => true, asks, tipOf: at(tip) }))
-          .retry;
-      const ask: RetryAsk = { step: 'implement', try: 3, mode: 'recheck', at: '2026-11-13T10:00:00.000Z' };
-      assert.deepEqual(due('c0ffee1', [ask]), [{ step: 'implement', try: 3, mode: 'recheck', by: 'ask' }]);
-      assert.deepEqual(due('beefcafe', [ask]), []);
-      assert.deepEqual(due('c0ffee1', []), []);
-    },
-  );
-
-  await t.test('nemia retry --recheck: taken on the unchanged branch; on a moved one refused, naming both commits and a session', () => {
+  test("a person's ask is due as a recheck on the unchanged branch, never on a moved one, and retries: never rechecks a blocked step", () => {
+    const due = (tip: string | undefined, asks: RetryAsk[]) =>
+      assess(aRead(CHECKED, blockedAfter(), { phaseOf: phases(settled), signedOff: blocked, asked: () => true, asks, tipOf: at(tip) }))
+        .retry;
+    const ask: RetryAsk = { step: 'implement', try: 3, mode: 'recheck', at: '2026-11-13T10:00:00.000Z' };
+    assert.deepEqual(due('c0ffee1', [ask]), [{ step: 'implement', try: 3, mode: 'recheck', by: 'ask' }]);
+    assert.deepEqual(due('beefcafe', [ask]), []);
+    assert.deepEqual(due('c0ffee1', []), []);
+  });
+  test('nemia retry --recheck: taken on the unchanged branch; on a moved one refused, naming both commits and a session', () => {
     const refusal = (tip: string | undefined, r: Run = blockedAfter(), p: Record<string, TaskPhase> = settled) =>
       retryRefusal(
         CHECKED,
@@ -1989,8 +3821,7 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
     assert.equal(refusal('c0ffee1'), null);
     names(refusal('beefcafe'), 'c0ffee1', 'beefcafe', 'nemia retry r-1 implement --message');
   });
-
-  await t.test('no refusal of a blocked step’s --recheck names a command that would itself be refused', () => {
+  test('no refusal of a blocked step’s --recheck names a command that would itself be refused', () => {
     const cases: Array<[string, Run, Record<string, TaskPhase>, string | undefined]> = [
       ['moved', blockedAfter(), settled, 'beefcafe'],
       ['unrecorded', blockedAfter({ tip: null }), settled, 'c0ffee1'],
@@ -2041,43 +3872,37 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
     );
     assert.ok(refusedItself, 'the old words: refused');
   });
-
-  await t.test('a session continued after its check refused is told that signing off again unchanged runs the check again', () => {
+  test('a session continued after its check refused is told that signing off again unchanged runs the check again', () => {
     const told = (status: RetryBriefing['status']) =>
       retrySection(implement, { try: 2, by: 'retries', mode: 'continue', resumed: true, status });
     assert.match(told('failed (check)'), /change nothing/);
     assert.match(told('failed (check)'), /files the check again/);
     assert.doesNotMatch(told('blocked'), /files the check again/);
   });
-
-  await t.test(
-    'rechecked, the blocked try stands on its check: checking, then verified or failed (check), and retries: continue it',
-    () => {
-      const rechecked = (check?: string): Run => {
-        const r = blockedAfter();
-        const record = nextTry(r.steps.implement, { step: 'implement', try: 3, mode: 'recheck', by: 'ask' });
-        return { ...r, steps: { ...r.steps, implement: { ...record, ...(check ? { check: { taskId: check } } : {}) } } };
-      };
-      const status = (r: Run, p: Record<string, TaskPhase>, closeout = blocked) =>
-        stepStatus(implement, r, phases(p), closeout, () => true, CHECKED);
-      assert.equal(status(blockedAfter(), settled), 'blocked', 'never rechecked, it stays blocked');
-      assert.equal(status(rechecked(), settled), 'checking', 'its check not yet filed');
-      assert.equal(status(rechecked('c3'), { ...settled, c3: 'running' }), 'checking');
-      assert.equal(status(rechecked('c3'), { ...settled, c3: 'succeeded' }), 'verified');
-      assert.equal(status(rechecked('c3'), { ...settled, c3: 'failed' }), 'failed (check)');
-      const due = assess(
-        aRead(CHECKED, rechecked('c3'), {
-          phaseOf: phases({ ...settled, c3: 'failed' }),
-          signedOff: blocked,
-          asked: () => true,
-          verdictOf: () => 1,
-        }),
-      ).retry;
-      assert.deepEqual(due, [{ step: 'implement', try: 4, mode: 'continue', by: 'retries' }]);
-    },
-  );
-
-  await t.test('nemia decide offers --recheck first on the unchanged branch, and says the refusal of the nemia retry a needs names', () => {
+  test('rechecked, the blocked try stands on its check: checking, then verified or failed (check), and retries: continue it', () => {
+    const rechecked = (check?: string): Run => {
+      const r = blockedAfter();
+      const record = nextTry(r.steps.implement, { step: 'implement', try: 3, mode: 'recheck', by: 'ask' });
+      return { ...r, steps: { ...r.steps, implement: { ...record, ...(check ? { check: { taskId: check } } : {}) } } };
+    };
+    const status = (r: Run, p: Record<string, TaskPhase>, closeout = blocked) =>
+      stepStatus(implement, r, phases(p), closeout, () => true, CHECKED);
+    assert.equal(status(blockedAfter(), settled), 'blocked', 'never rechecked, it stays blocked');
+    assert.equal(status(rechecked(), settled), 'checking', 'its check not yet filed');
+    assert.equal(status(rechecked('c3'), { ...settled, c3: 'running' }), 'checking');
+    assert.equal(status(rechecked('c3'), { ...settled, c3: 'succeeded' }), 'verified');
+    assert.equal(status(rechecked('c3'), { ...settled, c3: 'failed' }), 'failed (check)');
+    const due = assess(
+      aRead(CHECKED, rechecked('c3'), {
+        phaseOf: phases({ ...settled, c3: 'failed' }),
+        signedOff: blocked,
+        asked: () => true,
+        verdictOf: () => 1,
+      }),
+    ).retry;
+    assert.deepEqual(due, [{ step: 'implement', try: 4, mode: 'continue', by: 'retries' }]);
+  });
+  test('nemia decide offers --recheck first on the unchanged branch, and says the refusal of the nemia retry a needs names', () => {
     const read = (tip: string, signedOff = blocked) =>
       aRead(CHECKED, blockedAfter(), { phaseOf: phases(settled), signedOff, asked: () => true, tipOf: at(tip) });
     const d = decision(read('c0ffee1'), nothingShipped);

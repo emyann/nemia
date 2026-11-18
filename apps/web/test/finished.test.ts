@@ -2,7 +2,7 @@
  * The finished runs a page at a time (src/lib/finished.ts, `finishedRunsQuery` in src/lib/api/runs.ts): the RunList asked by state read
  * as a page, the trail of tokens kept in the address beside the factory, what Newer and Older lead to, and a token past the last said.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import { FINISHED_SIZE, finishedRunsQuery, type FinishedPage, UNDECIDED_SELECTOR, undecidedRunsQuery } from '../src/lib/api/runs.ts';
@@ -45,8 +45,8 @@ async function read(value: unknown, older: string[] = []): Promise<FinishedPage>
   }
 }
 
-test('finishedSearch, trailOf, newerOf, olderTrailOf, pageSaid and rowsSaid: the finished pager by its trail', async (t) => {
-  await t.test('the address round-trips: a trail in, the same out, the factory its path’s, and the first page is the bare address', () => {
+describe('finishedSearch, trailOf, newerOf, olderTrailOf, pageSaid and rowsSaid: the finished pager by its trail', () => {
+  test('the address round-trips: a trail in, the same out, the factory its path’s, and the first page is the bare address', () => {
     assert.equal(finishedSearch({ older: 'bogus' }).older, undefined, 'a trail that is no token reads as the first page');
     assert.equal(finishedSearch({ older: 'f.a~bogus' }).older, undefined, 'and so does one a piece of which is none');
     const at = { older: 'f.a~f.b' };
@@ -59,14 +59,14 @@ test('finishedSearch, trailOf, newerOf, olderTrailOf, pageSaid and rowsSaid: the
     assert.deepEqual(trailSearch({ factory: 'nemia', tab: 'x' }, ['f.a']), { factory: 'nemia', tab: 'x', older: 'f.a' }, 'every key kept');
     assert.deepEqual(trailOf(finishedSearch({})), []);
   });
-  await t.test('REFUSED: a trail that is no string of tokens, or holds an empty one, is no trail', () => {
+  test('REFUSED: a trail that is no string of tokens, or holds an empty one, is no trail', () => {
     for (const older of ['', '~', 'f.a~', '~f.a', 'f.a~~f.b', 3, null, undefined, ['f.a']]) {
       assert.deepEqual(finishedSearch({ older }), {}, JSON.stringify(older));
       assert.deepEqual(trailOf({ older }), [], `read unvalidated, ${JSON.stringify(older)} is the first page too`);
     }
     assert.deepEqual(trailOf({ older: 'bogus' }), [], 'a search that carries its parent’s raw `older` sends no token that is none');
   });
-  await t.test("Older puts the page's continue on the trail, Newer takes the last off: none at each end", () => {
+  test("Older puts the page's continue on the trail, Newer takes the last off: none at each end", () => {
     const first = { trail: [], next: 'f.a', count: 9 };
     assert.deepEqual([newerOf(first), olderTrailOf(first)], [null, ['f.a']]);
     const second = { trail: ['f.a'], next: 'f.b', count: 9 };
@@ -76,7 +76,7 @@ test('finishedSearch, trailOf, newerOf, olderTrailOf, pageSaid and rowsSaid: the
     const only = { trail: [], next: null, count: 3 };
     assert.deepEqual([newerOf(only), olderTrailOf(only)], [null, null]);
   });
-  await t.test('a token past the last gives a page of no row: said so, Newer pops it, and Older leads nowhere', () => {
+  test('a token past the last gives a page of no row: said so, Newer pops it, and Older leads nowhere', () => {
     const past = { trail: ['f.a', 'f.gone'], next: null, count: 0, total: 25, size: 9 };
     assert.equal(pastLast(past), true);
     assert.equal(pageSaid(past), 'Page 3 is past the last, 3.');
@@ -84,7 +84,7 @@ test('finishedSearch, trailOf, newerOf, olderTrailOf, pageSaid and rowsSaid: the
     assert.deepEqual([newerOf(past), olderTrailOf({ ...past, next: 'f.x' })], [['f.a'], null]);
     assert.equal(pastLast({ trail: [], count: 0 }), false, 'an empty store has one page, and the first is not past it');
   });
-  await t.test('the rows of a page and where it stands, from the total, the trail and its count', () => {
+  test('the rows of a page and where it stands, from the total, the trail and its count', () => {
     assert.equal(rowsSaid({ trail: ['f.a'], next: 'f.b', count: 9, total: 30, size: 9 }), 'Runs 10–18 of 30');
     assert.equal(rowsSaid({ trail: ['f.a', 'f.b', 'f.c'], next: null, count: 3, total: 30, size: 9 }), 'Runs 28–30 of 30');
     assert.equal(rowsSaid({ trail: [], next: null, count: 0, total: 0, size: 9 }), 'No finished runs');
@@ -93,8 +93,8 @@ test('finishedSearch, trailOf, newerOf, olderTrailOf, pageSaid and rowsSaid: the
   });
 });
 
-test('finishedRunsQuery: the RunList asked by state read as a page, nine at a time, from the last token of the trail', async (t) => {
-  await t.test("each row the run's with its finish, outcome and clock; the total the list's count, and its next token", async () => {
+describe('finishedRunsQuery: the RunList asked by state read as a page, nine at a time, from the last token of the trail', () => {
+  test("each row the run's with its finish, outcome and clock; the total the list's count, and its next token", async () => {
     const page = await read(answer());
     assert.equal(page.total, 634);
     assert.equal(page.continue, 'f.next');
@@ -109,12 +109,12 @@ test('finishedRunsQuery: the RunList asked by state read as a page, nine at a ti
     assert.deepEqual(page.runs[0].clock, CLOCK, 'a row carries the clock its cell breaks down');
     assert.equal((await read(answer(null))).continue, null, 'the last page has no next');
   });
-  await t.test('REFUSED: an outcome the board has no word for', async () => {
+  test('REFUSED: an outcome the board has no word for', async () => {
     const shelved = answer();
     (shelved.items[0].status as { outcome: string }).outcome = 'shelved';
     await assert.rejects(read(shelved), /outcome/);
   });
-  await t.test('the query asks the finished state nine a page, by factory and token, under a key of its factory and token', async (t) => {
+  test('the query asks the finished state nine a page, by factory and token, under a key of its factory and token', async (t) => {
     const asked: string[] = [];
     const before = globalThis.fetch;
     globalThis.fetch = async (input) => {
@@ -122,7 +122,7 @@ test('finishedRunsQuery: the RunList asked by state read as a page, nine at a ti
       return new Response(JSON.stringify(answer()), { status: 200, headers: { 'content-type': 'application/json' } });
     };
     const client = new QueryClient();
-    t.after(() => {
+    t.onTestFinished(() => {
       client.clear();
       globalThis.fetch = before;
     });
@@ -153,7 +153,7 @@ test('undecidedRunsQuery: the finished runs nobody decided, every page of them, 
     });
   };
   const client = new QueryClient();
-  t.after(() => {
+  t.onTestFinished(() => {
     client.clear();
     globalThis.fetch = before;
   });

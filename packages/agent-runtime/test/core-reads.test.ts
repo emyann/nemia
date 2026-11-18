@@ -17,7 +17,7 @@
  * an end reason, a comparison of a `limit` — is that judgement coming back, and none of the harness-argument checks sees one that
  * names no harness argument (`limit === 'budget'`).
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -152,8 +152,8 @@ const coreFiles = (dir = 'src/core'): string[] =>
     return e.isDirectory() ? coreFiles(file) : file.endsWith('.ts') && !file.endsWith('.test.ts') ? [file] : [];
   });
 
-test('the core imports from harness/ only the seam, its error, types, and the generic config helpers of args.ts', async (t) => {
-  await t.test('src/core/** as it is', () => {
+describe('the core imports from harness/ only the seam, its error, types, and the generic config helpers of args.ts', () => {
+  test('src/core/** as it is', () => {
     const files = coreFiles();
     assert.ok(files.includes('src/core/engine/engine.ts') && files.includes('src/core/domain.ts'), 'the core is read');
     assert.deepEqual(
@@ -161,7 +161,7 @@ test('the core imports from harness/ only the seam, its error, types, and the ge
       [],
     );
   });
-  await t.test('a planted read is refused: a harness vocabulary, a value of args.ts off the list, a whole module', () => {
+  test('a planted read is refused: a harness vocabulary, a value of args.ts off the list, a whole module', () => {
     const at = 'src/core/engine/engine.ts';
     for (const line of [
       "import { bridgeAsked } from '../../harness/claude/vocabulary.ts';",

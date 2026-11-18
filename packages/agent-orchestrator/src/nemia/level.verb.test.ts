@@ -3,7 +3,7 @@
  * where its bridge is up, why not where it was asked and is not, nothing more where it was not asked; and nothing at all once her task is
  * settled. Read through `bridgeOf`, which every task's view answers the same. On a store of its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import type { TaskView } from 'agent-runtime';
@@ -43,29 +43,31 @@ const engineWith = (bridge: TaskView['bridge'], settled: string | null = null) =
 /** `nemia level`, bare, over `engineWith(bridge, settled)`. */
 const levelOver = (bridge: TaskView['bridge'], settled: string | null = null) => runWith(engineWith(bridge, settled), LEVEL.handler({}));
 
-test("`nemia level`'s reach: the attach line, then her web link off her task's view, or why not, and nothing once she is settled", async (t) => {
-  writeLevel(ROOT, { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: TASK });
-  await t.test('her bridge up: the attach line first, then the link', async () => {
+describe("`nemia level`'s reach: the attach line, then her web link off her task's view, or why not, and nothing once she is settled", () => {
+  beforeAll(() => {
+    writeLevel(ROOT, { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: TASK });
+  });
+  test('her bridge up: the attach line first, then the link', async () => {
     const up = await levelOver({ url: LINK });
     assert.deepEqual(up.reach, [ATTACH, LINK], 'the attach line first, then the link');
     assert.deepEqual(up.bridge, { url: LINK, why: null });
   });
-  await t.test('her bridge asked and not up: why not, never a promise', async () => {
+  test('her bridge asked and not up: why not, never a promise', async () => {
     const down = await levelOver({ url: null, why: 'its bridge is not up yet.' });
     assert.deepEqual(down.reach, [ATTACH, 'her web link is not up: its bridge is not up yet.'], 'why not, never a promise');
     assert.deepEqual(down.bridge, { url: null, why: 'its bridge is not up yet.' });
   });
-  await t.test('no bridge asked: the attach line alone', async () => {
+  test('no bridge asked: the attach line alone', async () => {
     const unasked = await levelOver(undefined);
     assert.deepEqual(unasked.reach, [ATTACH], 'not asked: no web line at all');
     assert.equal(unasked.bridge, null);
   });
-  await t.test("a settled task's reach is nothing and its bridge null, whatever its view holds", async () => {
+  test("a settled task's reach is nothing and its bridge null, whatever its view holds", async () => {
     const ended = await levelOver({ url: LINK }, 'stopped');
     assert.deepEqual(ended.reach, []);
     assert.equal(ended.bridge, null);
   });
-  await t.test("`bridgeOf` answers a task's bridge in its own words, and null for a task not filed bridged or not viewed", () => {
+  test("`bridgeOf` answers a task's bridge in its own words, and null for a task not filed bridged or not viewed", () => {
     const views = new Map<string, TaskView>([
       ['up', { bridge: { url: LINK } } as unknown as TaskView],
       ['down', { bridge: { url: null, why: 'not yet.' } } as unknown as TaskView],

@@ -7,7 +7,7 @@
  * The test's store is its own, at `ROOT`, given to every program as `ENV`.
 
  */
-import { test } from 'node:test';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -292,7 +292,7 @@ test('REFUSED as findings on the screen, never silently: a path that climbs out 
     'readdirSync',
     'copyFileSync',
     'cpSync',
-  ].map((method) => t.mock.method(fs, method as 'statSync'));
+  ].map((method) => vi.spyOn(fs, method as 'statSync'));
   const looked = () =>
     spies
       .flatMap((spy) => spy.mock.calls.flatMap((call) => call.arguments.slice(0, 2).filter((a) => typeof a === 'string')))

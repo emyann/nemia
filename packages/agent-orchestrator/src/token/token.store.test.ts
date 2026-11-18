@@ -6,7 +6,7 @@
  * written 0600 holding a token the store keeps as the person's under `local`; a live one left as it is; and a new one minted where the
  * file's token was retired, is an agent's, or the file holds no token at all.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

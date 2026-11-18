@@ -3,7 +3,7 @@
  * levels picked among and the one a fresh session is asked at, a factory's level in words, her spend in words, and the mirror of what
  * the api answers of her, which decodes her level and memory and refuses an answer it does not read.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { retryUnlessGone } from '../src/lib/api/gone.ts';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
@@ -55,55 +55,46 @@ const up = nemiaLevel({
   bridge: { url: 'https://example.test/code/session_0123', why: null },
 });
 
-test("sessionOf: her session's state, judged from the orchestrator's facts", async (t) => {
-  await t.test(
-    'her session reads off with no task, not filed with no phase, starting while nothing reaches it, and up once something does',
-    () => {
-      assert.equal(sessionOf(nemiaLevel()).kind, 'off');
-      assert.equal(sessionOf(nemiaLevel({ level: 'semi-auto', task: 'nemia-1' })).kind, 'not-filed');
-      assert.equal(sessionOf({ ...up, reach: [], sessionId: null }).kind, 'starting');
-      assert.equal(sessionOf(up).kind, 'up');
-      assert.match(sessionOf(nemiaLevel({ level: 'semi-auto', task: 'nemia-1' })).words, /^Not filed yet: the keeper files her session/);
-    },
-  );
-  await t.test(
-    "her session not filed while the keeper's trust of her folder is refused reads untrusted, and off whatever the refusal",
-    () => {
-      const waiting = nemiaLevel({ level: 'semi-auto', task: 'nemia-1', untrusted: 'the file did not read: fix it' });
-      assert.equal(sessionOf(waiting).kind, 'untrusted');
-      assert.match(sessionOf(waiting).words, /^Not filed: the keeper could not trust her folder/);
-      assert.equal(sessionOf({ ...waiting, level: 'manual', task: null }).kind, 'off');
-      assert.equal(
-        sessionOf({ ...up, untrusted: 'the file did not read: fix it' }).kind,
-        'up',
-        'a phase read is a session filed, whatever the trust',
-      );
-    },
-  );
-  await t.test('Manual asked of a session still reached reads leaving, and off once nothing reaches it', () => {
+describe("sessionOf: her session's state, judged from the orchestrator's facts", () => {
+  test('her session reads off with no task, not filed with no phase, starting while nothing reaches it, and up once something does', () => {
+    assert.equal(sessionOf(nemiaLevel()).kind, 'off');
+    assert.equal(sessionOf(nemiaLevel({ level: 'semi-auto', task: 'nemia-1' })).kind, 'not-filed');
+    assert.equal(sessionOf({ ...up, reach: [], sessionId: null }).kind, 'starting');
+    assert.equal(sessionOf(up).kind, 'up');
+    assert.match(sessionOf(nemiaLevel({ level: 'semi-auto', task: 'nemia-1' })).words, /^Not filed yet: the keeper files her session/);
+  });
+  test("her session not filed while the keeper's trust of her folder is refused reads untrusted, and off whatever the refusal", () => {
+    const waiting = nemiaLevel({ level: 'semi-auto', task: 'nemia-1', untrusted: 'the file did not read: fix it' });
+    assert.equal(sessionOf(waiting).kind, 'untrusted');
+    assert.match(sessionOf(waiting).words, /^Not filed: the keeper could not trust her folder/);
+    assert.equal(sessionOf({ ...waiting, level: 'manual', task: null }).kind, 'off');
+    assert.equal(
+      sessionOf({ ...up, untrusted: 'the file did not read: fix it' }).kind,
+      'up',
+      'a phase read is a session filed, whatever the trust',
+    );
+  });
+  test('Manual asked of a session still reached reads leaving, and off once nothing reaches it', () => {
     assert.equal(sessionOf({ ...up, level: 'manual' }).kind, 'leaving');
     assert.equal(sessionOf({ ...up, level: 'manual', reach: [] }).kind, 'off');
   });
-  await t.test(
-    'REFUSED to read leaving: a factory raised above Manual keeps her session up with the store at Manual; its raise ended, leaving',
-    () => {
-      assert.equal(sessionOf({ ...up, level: 'manual', factories: [raised] }).kind, 'up');
-      const ended: FactoryLevel = { ...raised, level: 'manual', raise: null };
-      assert.equal(sessionOf({ ...up, level: 'manual', factories: [ended] }).kind, 'leaving');
-    },
-  );
-  await t.test('a session stopped from outside reads stopped, even while something still reaches it', () => {
+  test('REFUSED to read leaving: a factory raised above Manual keeps her session up with the store at Manual; its raise ended, leaving', () => {
+    assert.equal(sessionOf({ ...up, level: 'manual', factories: [raised] }).kind, 'up');
+    const ended: FactoryLevel = { ...raised, level: 'manual', raise: null };
+    assert.equal(sessionOf({ ...up, level: 'manual', factories: [ended] }).kind, 'leaving');
+  });
+  test('a session stopped from outside reads stopped, even while something still reaches it', () => {
     assert.equal(sessionOf({ ...up, stopped: true }).kind, 'stopped');
     assert.equal(sessionOf({ ...up, stopped: true, reach: [] }).kind, 'stopped');
     assert.match(sessionOf({ ...up, stopped: true }).words, /stopped from outside/i);
   });
-  await t.test('the phase is never read: any word there judges the same', () => {
+  test('the phase is never read: any word there judges the same', () => {
     for (const phase of ['working', 'idle', 'pending'] as const) assert.equal(sessionOf({ ...up, phase }).kind, 'up', phase);
   });
 });
 
-test("LEVELS, freshLevel, raisesOver, factoryWords, spendWords: her levels, a factory's raise, her spend and the prune words", async (t) => {
-  await t.test("a factory's words name a raise's end and the default after it, else whose default it is", () => {
+describe("LEVELS, freshLevel, raisesOver, factoryWords, spendWords: her levels, a factory's raise, her spend and the prune words", () => {
+  test("a factory's words name a raise's end and the default after it, else whose default it is", () => {
     const now = new Date('2026-10-05T12:00:00.000Z');
     assert.equal(
       factoryWords(raised, false, now),
@@ -118,21 +109,21 @@ test("LEVELS, freshLevel, raisesOver, factoryWords, spendWords: her levels, a fa
       "Manual by default (the store's level, for runs in no factory).",
     );
   });
-  await t.test('each stretch a raise is offered for is digits and a unit the api reads, up to a week', () => {
+  test('each stretch a raise is offered for is digits and a unit the api reads, up to a week', () => {
     for (const word of RAISE_STRETCHES) assert.match(word, /^([1-9]\d*[mh]|[1-7]d)$/, word);
   });
-  await t.test('the levels are picked among lowest first, and a fresh session keeps her level above Manual, Semi-auto from Manual', () => {
+  test('the levels are picked among lowest first, and a fresh session keeps her level above Manual, Semi-auto from Manual', () => {
     assert.deepEqual([...LEVELS], ['manual', 'semi-auto', 'auto']);
     assert.equal(freshLevel('auto'), 'auto', 'a fresh session at Auto stays at Auto');
     assert.equal(freshLevel('semi-auto'), 'semi-auto');
     assert.equal(freshLevel('manual'), 'semi-auto');
   });
-  await t.test('a factory is raised to each level over its default, lowest first, and to none over Auto', () => {
+  test('a factory is raised to each level over its default, lowest first, and to none over Auto', () => {
     assert.deepEqual([...raisesOver('manual')], ['semi-auto', 'auto']);
     assert.deepEqual([...raisesOver('semi-auto')], ['auto']);
     assert.equal(raisesOver('auto').length, 0);
   });
-  await t.test('her spend says one session or several, and names the unmeasured ones only when there are some', () => {
+  test('her spend says one session or several, and names the unmeasured ones only when there are some', () => {
     assert.equal(
       spendWords({ usd: 0.5, measured: 1, unmeasured: 0 }),
       'Spent $0.50 over 1 session ended; her open one counts once it ends.',
@@ -147,17 +138,17 @@ test("LEVELS, freshLevel, raisesOver, factoryWords, spendWords: her levels, a fa
       'a spend under a cent keeps three figures',
     );
   });
-  await t.test('the prune words send a person to her, and spell no command', () => {
+  test('the prune words send a person to her, and spell no command', () => {
     assert.match(PRUNE_WORDS, /ask her/);
     assert.doesNotMatch(PRUNE_WORDS, /\bnemia [a-z]+/);
   });
 });
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
-function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200) {
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
   const before = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
 }
@@ -166,27 +157,24 @@ const readLevel = levelQuery.queryFn as unknown as () => Promise<NemiaLevel>;
 const readMemory = nemiaMemoryQuery.queryFn as unknown as () => Promise<NemiaMemory>;
 const readFact = nemiaFactQuery('style').queryFn as unknown as () => Promise<NemiaMemory>;
 
-test('levelQuery, nemiaMemoryQuery, nemiaFactQuery: what the api answers of her, read back or refused', async (t) => {
-  await t.test('her level reads back what the api answered, a key it does not read dropped', async (t) => {
+describe('levelQuery, nemiaMemoryQuery, nemiaFactQuery: what the api answers of her, read back or refused', () => {
+  test('her level reads back what the api answered, a key it does not read dropped', async (t) => {
     answering(t, { ...up, spend: { usd: 1, measured: 1, unmeasured: 0 }, allows: ['Bash(ls)'], later: true });
     assert.deepEqual(await readLevel(), { ...up, spend: { usd: 1, measured: 1, unmeasured: 0 }, allows: ['Bash(ls)'] });
   });
-  await t.test(
-    "each factory's level reads back; REFUSED: a factory at a level the board has no word for, and a row with no raise",
-    async (t) => {
-      answering(t, { ...up, factories: [raised] });
-      assert.deepEqual((await readLevel()).factories, [raised]);
-      answering(t, { ...up, factories: [{ ...raised, level: 'on' }] });
-      await assert.rejects(readLevel(), (err: unknown) => err instanceof UnreadAnswer && /at factories\[0\]\.level/.test(err.message));
-      const { raise: _raise, ...noRaise } = raised;
-      answering(t, { ...up, factories: [noRaise] });
-      await assert.rejects(
-        readLevel(),
-        (err: unknown) => err instanceof UnreadAnswer && /at factories\[0\]\.raise, the value is missing/.test(err.message),
-      );
-    },
-  );
-  await t.test('why her folder could not be trusted reads back; REFUSED: an answer with no untrusted', async (t) => {
+  test("each factory's level reads back; REFUSED: a factory at a level the board has no word for, and a row with no raise", async (t) => {
+    answering(t, { ...up, factories: [raised] });
+    assert.deepEqual((await readLevel()).factories, [raised]);
+    answering(t, { ...up, factories: [{ ...raised, level: 'on' }] });
+    await assert.rejects(readLevel(), (err: unknown) => err instanceof UnreadAnswer && /at factories\[0\]\.level/.test(err.message));
+    const { raise: _raise, ...noRaise } = raised;
+    answering(t, { ...up, factories: [noRaise] });
+    await assert.rejects(
+      readLevel(),
+      (err: unknown) => err instanceof UnreadAnswer && /at factories\[0\]\.raise, the value is missing/.test(err.message),
+    );
+  });
+  test('why her folder could not be trusted reads back; REFUSED: an answer with no untrusted', async (t) => {
     answering(t, { ...up, untrusted: 'the file did not read: fix it' });
     assert.equal((await readLevel()).untrusted, 'the file did not read: fix it');
     const { untrusted: _untrusted, ...noUntrusted } = up;
@@ -196,20 +184,20 @@ test('levelQuery, nemiaMemoryQuery, nemiaFactQuery: what the api answers of her,
       (err: unknown) => err instanceof UnreadAnswer && /at untrusted, the value is missing/.test(err.message),
     );
   });
-  await t.test('REFUSED: a level the board has no word for, and an answer with no reach', async (t) => {
+  test('REFUSED: a level the board has no word for, and an answer with no reach', async (t) => {
     answering(t, { ...up, level: 'on' });
     await assert.rejects(readLevel(), (err: unknown) => err instanceof UnreadAnswer && /at level/.test(err.message));
     const { reach: _reach, ...noReach } = up;
     answering(t, noReach);
     await assert.rejects(readLevel(), (err: unknown) => err instanceof UnreadAnswer && /at reach, the value is missing/.test(err.message));
   });
-  await t.test('her memory reads with no fact asked, and one fact with its words', async (t) => {
+  test('her memory reads with no fact asked, and one fact with its words', async (t) => {
     answering(t, { dir: '/store/nemia/memory', facts: ['style', 'owner'], fact: null });
     assert.deepEqual(await readMemory(), { dir: '/store/nemia/memory', facts: ['style', 'owner'], fact: null });
     answering(t, { dir: '/store/nemia/memory', facts: ['style'], fact: { name: 'style', text: 'Short sentences.\n' } });
     assert.deepEqual((await readFact()).fact, { name: 'style', text: 'Short sentences.\n' });
   });
-  await t.test('a fact she no longer keeps is said at once, never tried again; any other failure is', () => {
+  test('a fact she no longer keeps is said at once, never tried again; any other failure is', () => {
     const retry = nemiaFactQuery('gone').retry as (failures: number, error: unknown) => boolean;
     assert.equal(retry(0, new ReadRefusal('no such fact', 404)), false);
     assert.equal(retry(0, new ReadRefusal('down', 500)), true);

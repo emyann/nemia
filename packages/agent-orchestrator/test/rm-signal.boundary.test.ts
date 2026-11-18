@@ -6,7 +6,7 @@
  * alone.
  * The run's store is the test's own, at `STORE`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -108,7 +108,7 @@ test("a SIGINT to nemia rm is not passed on to the git its place's remove runs: 
     );
   const rm = rmIn(env);
   let pgid = 0;
-  t.after(() => {
+  t.onTestFinished(() => {
     rm.child.kill('SIGKILL');
     if (pgid > 0) killGroup(pgid);
   });
@@ -125,7 +125,7 @@ test("a SIGINT to nemia rm is not passed on to the git its place's remove runs: 
   assert.ok(killGroup(pgid), "the group of remove's git is killed");
   await waitFor(() => groupOf(pgid).length === 0);
   const again = rmIn({ ...env, PATH: process.env.PATH });
-  t.after(() => again.child.kill('SIGKILL'));
+  t.onTestFinished(() => again.child.kill('SIGKILL'));
   const ended2 = await again.closed;
   assert.equal(ended2.code, 0, `nemia rm again forgets the run; it said: ${again.err()}`);
   assert.ok(!fs.existsSync(wt), 'its worktree is gone');

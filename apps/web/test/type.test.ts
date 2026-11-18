@@ -8,7 +8,7 @@
  * a label role and `uppercase` (`text-label-small uppercase`), with no weight or tracking written beside it; a heading is a title
  * role (`text-title-small` 14px, `text-title-medium` 16px, `text-title-large` 22px); mono text takes a body role whole.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

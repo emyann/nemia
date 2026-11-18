@@ -3,7 +3,7 @@
  * approved proposal (`proposalApply`'s actions) an edge of it, and the diagram drawing each edge once. That the README's
  * `diagram:proposal` block is what `proposalDiagram` prints is `tools/guards/test/diagrams.test.ts`'s.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { PROPOSAL_PHASES } from 'objects';
 import { PHASE_OF_ACTION, PROPOSAL_EDGES, PROPOSAL_INITIAL, PROPOSAL_STATES, proposalDiagram, proposalFinal } from './machine.ts';

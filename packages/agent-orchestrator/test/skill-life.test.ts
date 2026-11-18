@@ -8,7 +8,8 @@
  * refused are the Skill door's walks (`test/skill-walks.ts`); what a SKILL.md is rendered and switched to, line by line, is the table
  * beside its code (`src/skills/skills.test.ts`). Its store is its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -94,64 +95,62 @@ const read = (name: string): string => fs.readFileSync(path.join(LIBRARY, name, 
 const versions = (...agents: string[]): Record<string, string | null> =>
   Object.fromEntries(agents.map((name) => [name, agentVersion(AGENTS, name)]));
 
-test("a library skill's life: written as Nemia ships one, given, switched, mended, moving its agents, and copied in", async (t) => {
-  const s = story(t);
-  const dir = path.join(LIBRARY, 'tidy-notes');
-  const e = stage.board().e;
+describe("a library skill's life: written as Nemia ships one, given, switched, mended, moving its agents, and copied in", () => {
+  let dir!: string;
+  let e!: import('agent-runtime').EngineShape;
+  let copied!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    dir = path.join(LIBRARY, 'tidy-notes');
+    e = stage.board().e;
+    return t.end;
+  });
+  const s = story(test);
   let version = '';
-
-  await s.test(
-    "a skill written from the board's form is written as Nemia ships its own, and read back by the card reader and YAML",
-    async () => {
-      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'user', change: DRAFT }));
-      assert.ok('version' in made, JSON.stringify(made));
-      version = made.version;
-      const text = read('tidy-notes');
-      assert.equal(
-        text,
-        [
-          '---',
-          'name: tidy-notes',
-          'title: Tidy notes',
-          `description: 'Rewrites a folder of notes: "one fact a line".'`,
-          'tags: [ notes, writing ]',
-          'examples: [ tidy my notes, make these notes one fact a line ]',
-          '---',
-          '# Tidy notes',
-          '',
-          'Read each note, then write it again, one fact a line.',
-          '',
-        ].join('\n'),
-      );
-      const { block } = splitFrontmatter('SKILL.md', text);
-      const keys = { title: 'Tidy notes', description: DRAFT.description, tags: ['notes', 'writing'], examples: DRAFT.examples };
-      assert.deepEqual(yaml.load(block!), { name: 'tidy-notes', ...keys });
-      const { title: _, ...entry } = keys;
-      assert.deepEqual(skillEntryOf('SKILL.md', 'tidy-notes', text), { id: 'tidy-notes', name: 'Tidy notes', ...entry });
-      assert.deepEqual(skillDraftOf('SKILL.md', 'tidy-notes', text), { ...DRAFT, preload: false });
-    },
-  );
-
-  await s.test(
-    'it reads back for its page and in the list, at the version its write answered; a read given no root is refused',
-    async () => {
-      const page = await stage.runWith(e, SKILLS_READ.handler({ name: 'tidy-notes', dir }));
-      assert.equal(page.version, version);
-      assert.match(page.text, /one fact a line\./);
-      assert.equal(page.entry?.id, 'tidy-notes');
-      const listed = await stage.runWith(e, SKILLS_LIST.handler({ skills: [dir] }));
-      assert.deepEqual(Object.keys(listed), [dir]);
-      assert.equal(listed[dir]?.entry?.id, 'tidy-notes');
-      const unrooted = SKILLS_LIST.handler({ skills: [dir] }).pipe(
-        Effect.provide(stage.place().layer),
-        Effect.provide(StoreConfig.layer(settingsOf(ENV))),
-      );
-      // @ts-expect-error -- a read that asks the store root is given none
-      await assert.rejects(runEngine(e, unrooted), (err: { _tag?: string }) => err._tag === 'Invalid');
-    },
-  );
-
-  await s.test("an agent of the store is given it now, and a change of its words moves every agent that gives it, and no other's", () => {
+  s.test("a skill written from the board's form is written as Nemia ships its own, and read back by the card reader and YAML", async () => {
+    const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'user', change: DRAFT }));
+    assert.ok('version' in made, JSON.stringify(made));
+    version = made.version;
+    const text = read('tidy-notes');
+    assert.equal(
+      text,
+      [
+        '---',
+        'name: tidy-notes',
+        'title: Tidy notes',
+        `description: 'Rewrites a folder of notes: "one fact a line".'`,
+        'tags: [ notes, writing ]',
+        'examples: [ tidy my notes, make these notes one fact a line ]',
+        '---',
+        '# Tidy notes',
+        '',
+        'Read each note, then write it again, one fact a line.',
+        '',
+      ].join('\n'),
+    );
+    const { block } = splitFrontmatter('SKILL.md', text);
+    const keys = { title: 'Tidy notes', description: DRAFT.description, tags: ['notes', 'writing'], examples: DRAFT.examples };
+    assert.deepEqual(yaml.load(block!), { name: 'tidy-notes', ...keys });
+    const { title: _, ...entry } = keys;
+    assert.deepEqual(skillEntryOf('SKILL.md', 'tidy-notes', text), { id: 'tidy-notes', name: 'Tidy notes', ...entry });
+    assert.deepEqual(skillDraftOf('SKILL.md', 'tidy-notes', text), { ...DRAFT, preload: false });
+  });
+  s.test('it reads back for its page and in the list, at the version its write answered; a read given no root is refused', async () => {
+    const page = await stage.runWith(e, SKILLS_READ.handler({ name: 'tidy-notes', dir }));
+    assert.equal(page.version, version);
+    assert.match(page.text, /one fact a line\./);
+    assert.equal(page.entry?.id, 'tidy-notes');
+    const listed = await stage.runWith(e, SKILLS_LIST.handler({ skills: [dir] }));
+    assert.deepEqual(Object.keys(listed), [dir]);
+    assert.equal(listed[dir]?.entry?.id, 'tidy-notes');
+    const unrooted = SKILLS_LIST.handler({ skills: [dir] }).pipe(
+      Effect.provide(stage.place().layer),
+      Effect.provide(StoreConfig.layer(settingsOf(ENV))),
+    );
+    // @ts-expect-error -- a read that asks the store root is given none
+    await assert.rejects(runEngine(e, unrooted), (err: { _tag?: string }) => err._tag === 'Invalid');
+  });
+  s.test("an agent of the store is given it now, and a change of its words moves every agent that gives it, and no other's", () => {
     assert.equal(skillsFor(path.join(ROOT, 'workflows', '_'), { home: ROOT }).at.get('tidy-notes'), dir);
     fs.mkdirSync(AGENTS, { recursive: true });
     fs.writeFileSync(path.join(AGENTS, 'scribe.md'), '---\nskills: tidy-notes\n---\nYou write.\n');
@@ -166,8 +165,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
     assert.equal(after.porter, before.porter);
     version = writeSkill(ROOT, LIBRARY, DRAFT, { version }).version;
   });
-
-  await s.test('the preload switch writes that one line, the run reads it, and the agents that give it move with it', () => {
+  s.test('the preload switch writes that one line, the run reads it, and the agents that give it move with it', () => {
     assert.equal(preloads(dir), false);
     const before = versions('scribe');
     const on = writeSkill(ROOT, LIBRARY, { name: 'tidy-notes', preload: true }, { version });
@@ -178,14 +176,12 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
     assert.equal(preloads(dir), false);
     assert.equal(read('tidy-notes'), renderSkill(DRAFT));
   });
-
-  await s.test('REFUSED: a file added beside SKILL.md moves its version, so a change at the version read before it is a Conflict', () => {
+  s.test('REFUSED: a file added beside SKILL.md moves its version, so a change at the version read before it is a Conflict', () => {
     fs.writeFileSync(path.join(dir, 'reference.md'), 'more');
     refuses(() => writeSkill(ROOT, LIBRARY, { name: 'tidy-notes', preload: true }, { version }), 'Conflict', 'tidy-notes');
     version = skillVersion(dir)!;
   });
-
-  await s.test('a skill that no longer reads is mended by a write, its version read without reading it; none where no skill is', () => {
+  s.test('a skill that no longer reads is mended by a write, its version read without reading it; none where no skill is', () => {
     fs.mkdirSync(path.join(LIBRARY, 'broken'), { recursive: true });
     fs.writeFileSync(path.join(LIBRARY, 'broken', 'SKILL.md'), '---\nname: broken\n---\nNo description.\n');
     assert.throws(() => skillEntryOf('SKILL.md', 'broken', read('broken')), 'it does not read as a card');
@@ -195,26 +191,20 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
     assert.equal(skillEntryOf('SKILL.md', 'broken', read('broken')).description, DRAFT.description);
     assert.equal(skillVersion(path.join(LIBRARY, 'nothing-here')), null);
   });
-
-  const copied = fs.readdirSync(SHIPPED).sort()[0];
-
-  await s.test(
-    "a skill of another place is copied whole into the library, byte for byte, and the store's agents are given it",
-    async () => {
-      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'user', copy: copied, builtin: SHIPPED }));
-      assert.deepEqual(made, { dir: path.join(LIBRARY, copied), name: copied, written: ['SKILL.md'] });
-      assert.deepEqual(snapshot(path.join(LIBRARY, copied)), snapshot(path.join(SHIPPED, copied)), 'byte for byte');
-      assert.equal(skillsFor(path.join(ROOT, 'workflows', '_'), { home: ROOT }).at.get(copied), path.join(LIBRARY, copied));
-      const from = source({ notes: '---\ndescription: Two files.\n---\nBody.\n' });
-      fs.mkdirSync(path.join(from, 'notes', 'more'));
-      fs.writeFileSync(path.join(from, 'notes', 'more', 'ref.md'), 'Ref.\n');
-      const two = copySkill(ROOT, from, LIBRARY, 'notes');
-      assert.deepEqual(two.written, ['SKILL.md', path.join('more', 'ref.md')], 'every file under it');
-      assert.deepEqual(snapshot(two.dir), snapshot(path.join(from, 'notes')));
-    },
-  );
-
-  await s.test('REFUSED: a copy over a skill the library has, naming the folder, and nothing written', async () => {
+  s.test("a skill of another place is copied whole into the library, byte for byte, and the store's agents are given it", async () => {
+    copied = fs.readdirSync(SHIPPED).sort()[0];
+    const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'user', copy: copied, builtin: SHIPPED }));
+    assert.deepEqual(made, { dir: path.join(LIBRARY, copied), name: copied, written: ['SKILL.md'] });
+    assert.deepEqual(snapshot(path.join(LIBRARY, copied)), snapshot(path.join(SHIPPED, copied)), 'byte for byte');
+    assert.equal(skillsFor(path.join(ROOT, 'workflows', '_'), { home: ROOT }).at.get(copied), path.join(LIBRARY, copied));
+    const from = source({ notes: '---\ndescription: Two files.\n---\nBody.\n' });
+    fs.mkdirSync(path.join(from, 'notes', 'more'));
+    fs.writeFileSync(path.join(from, 'notes', 'more', 'ref.md'), 'Ref.\n');
+    const two = copySkill(ROOT, from, LIBRARY, 'notes');
+    assert.deepEqual(two.written, ['SKILL.md', path.join('more', 'ref.md')], 'every file under it');
+    assert.deepEqual(snapshot(two.dir), snapshot(path.join(from, 'notes')));
+  });
+  s.test('REFUSED: a copy over a skill the library has, naming the folder, and nothing written', async () => {
     const before = snapshot(LIBRARY);
     await assert.rejects(stage.runWith(e, SKILLS_WRITE.handler({ from: 'user', copy: copied, builtin: SHIPPED })), (err: unknown) => {
       assert.ok(isRefusal(err), String(err));
@@ -223,8 +213,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
     });
     assert.deepEqual(snapshot(LIBRARY), before);
   });
-
-  await s.test('REFUSED: a copy of a skill whose SKILL.md is no card entry, one holding a link, one that is a link', () => {
+  s.test('REFUSED: a copy of a skill whose SKILL.md is no card entry, one holding a link, one that is a link', () => {
     const from = source({
       bare: '# Bare\n\nNo frontmatter.\n',
       undescribed: '---\nname: undescribed\n---\nNothing said.\n',
@@ -241,8 +230,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
     fs.symlinkSync(path.join(outside, 'real'), path.join(from, 'linked'));
     refuses(() => copySkill(ROOT, from, LIBRARY, 'linked'), 'Invalid', 'linked is a link');
   });
-
-  await s.test("REFUSED: a copy of a checkout's skill linked inside the checkout, which a start is given: a copy follows no link", () => {
+  s.test("REFUSED: a copy of a checkout's skill linked inside the checkout, which a start is given: a copy follows no link", () => {
     const repo = scratch('wf-skill-life-checkout-');
     fs.mkdirSync(path.join(repo, 'skills', 'x'), { recursive: true });
     fs.writeFileSync(path.join(repo, 'skills', 'x', 'SKILL.md'), '---\ndescription: Linked inside.\n---\nBody.\n');
@@ -251,8 +239,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
     assert.equal(skillsFor(path.join(repo, 'workflows', 'dev'), { repo }).at.get('x'), path.join(repo, '.claude', 'skills', 'x'));
     refuses(() => copySkill(ROOT, path.join(repo, '.claude', 'skills'), LIBRARY, 'x'), 'Invalid', 'x is a link');
   });
-
-  await s.test('REFUSED: a write or a copy into a place that is no skills/ the board lists, or through a link; anywhere writes it', () => {
+  s.test('REFUSED: a write or a copy into a place that is no skills/ the board lists, or through a link; anywhere writes it', () => {
     refuses(() => writeSkill(ROOT, path.join(ROOT, 'workflows', 'elsewhere'), DRAFT, { version: null }), 'Invalid', 'elsewhere');
     const nowhere = path.join(scratch('wf-skill-life-nowhere-'), 'skills');
     refuses(() => writeSkill(ROOT, nowhere, DRAFT, { version: null }), 'Invalid', nowhere);
@@ -265,8 +252,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
     assert.deepEqual(fs.readdirSync(outside), []);
     assert.equal(copySkill(ROOT, SHIPPED, nowhere, copied, { anywhere: true }).dir, path.join(nowhere, copied), 'written with anywhere');
   });
-
-  await s.test("REFUSED: a skill written into the workflows/ of a checkout no factory names; written once a factory's repository", () => {
+  s.test("REFUSED: a skill written into the workflows/ of a checkout no factory names; written once a factory's repository", () => {
     const checkout = scratch('wf-skill-life-known-');
     fs.mkdirSync(path.join(checkout, '.git'));
     const library = path.join(checkout, 'workflows', 'skills');

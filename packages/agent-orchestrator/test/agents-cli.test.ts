@@ -5,7 +5,8 @@
  * (`apps/cli/test/definitions.test.ts`) holds the lines. And a table: each refusal of a handler at shipped defaults, by its exit code and
  * what it names. The test's store is its own, at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -83,36 +84,38 @@ const repoAt = (name: string) => {
   return repo;
 };
 
-test("nemia agents' handlers: both places read with what each agent can do, one card with its place, and the person's custom words written, read, listed and cleared", async (t) => {
-  const s = story(t);
-  const repo = repoAt('repo');
-  const theirs = path.join(repo, 'workflows', 'agents');
-  anAgent(theirs, 'scribe', 'Writes it down.');
-  const file = path.join(CUSTOM, 'scribe.md');
+describe("nemia agents' handlers: both places read with what each agent can do, one card with its place, and the person's custom words written, read, listed and cleared", () => {
+  let repo!: string;
+  let theirs!: string;
+  let file!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    repo = repoAt('repo');
+    theirs = path.join(repo, 'workflows', 'agents');
+    anAgent(theirs, 'scribe', 'Writes it down.');
+    file = path.join(CUSTOM, 'scribe.md');
+    return t.end;
+  });
+  const s = story(test);
   const one = (read: AgentsRead, name: string) => read.agents.find((a) => a.name === name);
-
-  await s.test(
-    'nemia agents reads both places, the repository first, each agent by what it is for and what it says it can do',
-    async () => {
-      anAgent(YOURS, 'archivist', 'Files it away.');
-      const read = await asked<AgentsRead>('agents', '--repo', repo);
-      assert.deepEqual(
-        read.agents.map(({ name, from, description }) => ({ name, from, description })),
-        [
-          { name: 'scribe', from: 'repo', description: 'Writes it down.' },
-          { name: 'archivist', from: 'user', description: 'Files it away.' },
-        ],
-        "the repository's place comes first, as it does on the board",
-      );
-      assert.deepEqual(
-        one(read, 'scribe')?.card?.map(({ id, name, description }) => ({ id, name, description })),
-        [{ id: 'read-a-thing', name: 'Read a thing', description: 'Reads it.' }],
-      );
-      fs.rmSync(path.join(YOURS, 'archivist.md'));
-    },
-  );
-
-  await s.test('nemia agents reads through the Agent door: an agent its memory holds is listed, though no disk has its file', async () => {
+  s.test('nemia agents reads both places, the repository first, each agent by what it is for and what it says it can do', async () => {
+    anAgent(YOURS, 'archivist', 'Files it away.');
+    const read = await asked<AgentsRead>('agents', '--repo', repo);
+    assert.deepEqual(
+      read.agents.map(({ name, from, description }) => ({ name, from, description })),
+      [
+        { name: 'scribe', from: 'repo', description: 'Writes it down.' },
+        { name: 'archivist', from: 'user', description: 'Files it away.' },
+      ],
+      "the repository's place comes first, as it does on the board",
+    );
+    assert.deepEqual(
+      one(read, 'scribe')?.card?.map(({ id, name, description }) => ({ id, name, description })),
+      [{ id: 'read-a-thing', name: 'Read a thing', description: 'Reads it.' }],
+    );
+    fs.rmSync(path.join(YOURS, 'archivist.md'));
+  });
+  s.test('nemia agents reads through the Agent door: an agent its memory holds is listed, though no disk has its file', async () => {
     const read = await Effect.runPromise(
       Effect.gen(function* () {
         const door = yield* AgentDoor;
@@ -126,8 +129,7 @@ test("nemia agents' handlers: both places read with what each agent can do, one 
     );
     assert.equal(fs.existsSync(path.join(MEMORY_AGENTS, 'courier.md')), false, 'read from the door, not from a file');
   });
-
-  await s.test(
+  s.test(
     'an agent with no skills is carded by the one thing its description says; one with no card says why; the servers an agent loads, and none for one naming none',
     async () => {
       fs.writeFileSync(path.join(theirs, 'plain.md'), '---\ndescription: Does one thing.\n---\nDo it.\n');
@@ -146,8 +148,7 @@ test("nemia agents' handlers: both places read with what each agent can do, one 
       for (const agent of ['plain', 'mute', 'scout']) fs.rmSync(path.join(theirs, `${agent}.md`));
     },
   );
-
-  await s.test("nemia agents card answers the card in A2A's shape, and the place it was found in", async () => {
+  s.test("nemia agents card answers the card in A2A's shape, and the place it was found in", async () => {
     const { card, from } = await asked<CardRead>('agents', 'card', 'scribe', '--repo', repo);
     assert.equal(from, 'repo');
     assert.equal(card.name, 'scribe');
@@ -158,13 +159,11 @@ test("nemia agents' handlers: both places read with what each agent can do, one 
     assert.deepEqual(card.capabilities, { streaming: false, pushNotifications: false, extendedAgentCard: false });
     assert.match(card.version, /^[0-9a-f]{16}$/);
   });
-
-  await s.test('nemia agents and nemia agents card take --repo joined as they take it apart', async () => {
+  s.test('nemia agents and nemia agents card take --repo joined as they take it apart', async () => {
     assert.deepEqual(await asked('agents', `--repo=${repo}`), await asked('agents', '--repo', repo));
     assert.deepEqual(await asked('agents', 'card', 'scribe', `--repo=${repo}`), await asked('agents', 'card', 'scribe', '--repo', repo));
   });
-
-  await s.test(
+  s.test(
     'nemia agents custom writes your words for an agent into your store, reads them bare, lists them, and removes them with --clear',
     async () => {
       assert.deepEqual(await asked('agents', 'custom', 'scribe', '--repo', repo), { name: 'scribe', file, words: null, error: null });
@@ -179,8 +178,7 @@ test("nemia agents' handlers: both places read with what each agent can do, one 
       assert.equal(one(await asked<AgentsRead>('agents', '--repo', repo), 'scribe')?.custom, null);
     },
   );
-
-  await s.test('a link at the file is replaced with the words, never written through', async () => {
+  s.test('a link at the file is replaced with the words, never written through', async () => {
     const outside = path.join(repo, 'outside.md');
     fs.writeFileSync(outside, 'Not yours to change.\n');
     fs.mkdirSync(CUSTOM, { recursive: true });
@@ -191,8 +189,7 @@ test("nemia agents' handlers: both places read with what each agent can do, one 
     assert.equal(fs.readFileSync(file, 'utf8'), 'Write it down in French.\n');
     fs.rmSync(file);
   });
-
-  await s.test(
+  s.test(
     'REFUSED: words written over a directory at the file, naming it and the clear, the directory left as it was; once cleared, written',
     () => {
       fs.mkdirSync(file, { recursive: true });
@@ -213,24 +210,21 @@ test("nemia agents' handlers: both places read with what each agent can do, one 
       fs.rmSync(file);
     },
   );
-
-  await s.test("an agent of the repository's .claude/agents is given words", async () => {
+  s.test("an agent of the repository's .claude/agents is given words", async () => {
     fs.mkdirSync(path.join(repo, '.claude', 'agents'), { recursive: true });
     fs.writeFileSync(path.join(repo, '.claude', 'agents', 'helper.md'), '---\ndescription: Helps.\n---\nHelp.\n');
     await custom({ name: 'helper', repo, words: 'Help in French.\n' });
     assert.equal(fs.readFileSync(path.join(CUSTOM, 'helper.md'), 'utf8'), 'Help in French.\n');
     fs.rmSync(path.join(CUSTOM, 'helper.md'));
   });
-
-  await s.test('nemia agents custom nemia is accepted, though no place names her: her words written and cleared', async () => {
+  s.test('nemia agents custom nemia is accepted, though no place names her: her words written and cleared', async () => {
     const nemia = path.join(CUSTOM, 'nemia.md');
     assert.equal((await custom({ name: 'nemia', repo, words: 'Answer in French.\n' })).file, nemia);
     assert.equal(fs.readFileSync(nemia, 'utf8'), 'Answer in French.\n');
     assert.deepEqual(await custom({ name: 'nemia', repo, clear: true }), { name: 'nemia', file: nemia, removed: true });
     assert.equal(fs.existsSync(nemia), false);
   });
-
-  await s.test('the words of nemia agents run say the dollars a try is capped at, the budget a try is started with', () => {
+  s.test('the words of nemia agents run say the dollars a try is capped at, the budget a try is started with', () => {
     assert.ok(
       AGENTS_RUN_WORDS.help.some((line) => line.includes(`$${TRY_BUDGET}`)),
       AGENTS_RUN_WORDS.help.join(' '),
@@ -238,29 +232,34 @@ test("nemia agents' handlers: both places read with what each agent can do, one 
   });
 });
 
-test('REFUSED at shipped defaults: nemia agents, its card and its custom words, each by its exit code and what it names, writing nothing', async (t) => {
-  const repo = repoAt('refused');
-  const theirs = path.join(repo, 'workflows', 'agents');
-  anAgent(theirs, 'twin', 'The repository’s.');
-  anAgent(theirs, 'scribe', 'Writes it down.');
+describe('REFUSED at shipped defaults: nemia agents, its card and its custom words, each by its exit code and what it names, writing nothing', () => {
+  let repo!: string;
+  let theirs!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    repo = repoAt('refused');
+    theirs = path.join(repo, 'workflows', 'agents');
+    anAgent(theirs, 'twin', 'The repository’s.');
+    anAgent(theirs, 'scribe', 'Writes it down.');
+    await row(
+      'a card for an agent in neither place',
+      ['agents', 'card', 'ghost', '--repo', repo],
+      undefined,
+      'no agent named ghost',
+      'Looked in',
+      'nemia agents lists them',
+    );
+    await row(
+      'a --from that is neither place',
+      ['agents', 'card', 'twin', '--repo', repo, '--from', 'elsewhere'],
+      undefined,
+      'nemia agents --from takes repo or user, not elsewhere',
+    );
+    return t.end;
+  });
   const row = (name: string, argv: string[], tag: string | undefined, ...facts: string[]) =>
     t.test(name, async () => void (await refusedBy(() => asked(...argv), tag, ...facts)));
-
-  await row(
-    'a card for an agent in neither place',
-    ['agents', 'card', 'ghost', '--repo', repo],
-    undefined,
-    'no agent named ghost',
-    'Looked in',
-    'nemia agents lists them',
-  );
-  await row(
-    'a --from that is neither place',
-    ['agents', 'card', 'twin', '--repo', repo, '--from', 'elsewhere'],
-    undefined,
-    'nemia agents --from takes repo or user, not elsewhere',
-  );
-  await t.test('a card for an agent in both places with nothing saying which; said which, each place answers for its own', async () => {
+  test('a card for an agent in both places with nothing saying which; said which, each place answers for its own', async () => {
     anAgent(YOURS, 'twin', 'Yours.');
     await refusedBy(
       () => asked('agents', 'card', 'twin', '--repo', repo),
@@ -272,7 +271,7 @@ test('REFUSED at shipped defaults: nemia agents, its card and its custom words, 
     assert.equal(mine.card.description, 'Yours.');
     fs.rmSync(path.join(YOURS, 'twin.md'));
   });
-  await t.test('a card for an agent whose skill says no description, naming the line to write', async () => {
+  test('a card for an agent whose skill says no description, naming the line to write', async () => {
     const broken = repoAt('broken');
     anAgent(path.join(broken, 'workflows', 'agents'), 'scribe', 'Writes it down.', '---\nname: read-a-thing\n---\nRead it.\n');
     await refusedBy(
@@ -282,7 +281,7 @@ test('REFUSED at shipped defaults: nemia agents, its card and its custom words, 
       '`description: <what it does, one line>`',
     );
   });
-  await t.test('a card for an agent whose skill no place has, naming the file to write', async () => {
+  test('a card for an agent whose skill no place has, naming the file to write', async () => {
     const lost = repoAt('lost');
     fs.writeFileSync(
       path.join(lost, 'workflows', 'agents', 'scribe.md'),
@@ -296,7 +295,7 @@ test('REFUSED at shipped defaults: nemia agents, its card and its custom words, 
       'write skills/gone-away/SKILL.md',
     );
   });
-  await t.test('custom words for no agent — written, read or cleared — in the same words', async () => {
+  test('custom words for no agent — written, read or cleared — in the same words', async () => {
     const ghost = await refusedBy(
       () => custom({ name: 'ghost', repo, words: 'Boo.\n' }),
       undefined,
@@ -311,16 +310,16 @@ test('REFUSED at shipped defaults: nemia agents, its card and its custom words, 
     );
     assert.equal(await refusedBy(() => custom({ name: 'ghost', repo, clear: true }), undefined), ghost, 'and clearing them');
   });
-  await row(
-    'custom words given --file and --clear both',
-    ['agents', 'custom', 'scribe', '--file', path.join(repo, 'both.md'), '--clear', '--repo', repo],
-    undefined,
-    'nemia agents custom takes --file or --clear, not both',
-  );
-  await t.test('custom words that are blank', async () => {
+  test('custom words that are blank', async () => {
+    await row(
+      'custom words given --file and --clear both',
+      ['agents', 'custom', 'scribe', '--file', path.join(repo, 'both.md'), '--clear', '--repo', repo],
+      undefined,
+      'nemia agents custom takes --file or --clear, not both',
+    );
     await refusedBy(() => custom({ name: 'scribe', repo, words: ' \n\n' }), undefined, 'the custom instructions for scribe are blank');
   });
-  await t.test('custom words with a frontmatter block', async () => {
+  test('custom words with a frontmatter block', async () => {
     await refusedBy(
       () => custom({ name: 'scribe', repo, words: '---\ntools: Bash\n---\nUse Bash.\n' }),
       undefined,
@@ -329,7 +328,7 @@ test('REFUSED at shipped defaults: nemia agents, its card and its custom words, 
       "Put a key in the agent's own file or on a step",
     );
   });
-  await t.test('and no custom words were written by any of them', () => {
+  test('and no custom words were written by any of them', () => {
     assert.equal(fs.existsSync(path.join(CUSTOM, 'scribe.md')), false);
     assert.equal(fs.existsSync(path.join(CUSTOM, 'ghost.md')), false);
   });

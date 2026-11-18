@@ -29,7 +29,7 @@
  * The test reads files outside this package, as `claude-md-cites.test.ts` does: after a change to a test anywhere, `npx turbo run
  * test --force`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

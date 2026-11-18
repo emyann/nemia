@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { loadPages, NAMES, namesIn, orderOf, PAGES_DIR, pageFiles, planOf, shardOf } from './e2e/pages.ts';
 import { scratch } from 'test-kit/scratch';
 

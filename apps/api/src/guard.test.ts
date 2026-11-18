@@ -7,7 +7,7 @@
  * The middleware that applies it to every write is held by `test/guarded.test.ts`, over every endpoint of the `Api`.
  */
 import '../test/harness.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { servedNamesOf } from 'agent-orchestrator';
 import { servedAt } from './address/address.ts';
@@ -26,114 +26,86 @@ const refused = (
   scripted = false,
 ) => writeRefused({ method: 'POST', host, site, contentType: type, bearer, cookie, served: false, scripted });
 
-test('writeRefused: which of its three headers refuses a write, and in what order', async (t) => {
-  await t.test(
-    'a write the board sends is refused on none of the three: JSON, same-origin, and this machine under any of its names and ports',
-    () => {
-      for (const host of [undefined, 'localhost', 'localhost:8787', '127.0.0.1', '127.0.0.1:8787', '[::1]', '[::1]:8787', ' localhost '])
-        assert.equal(refused(host, 'same-origin', 'application/json'), null, String(host));
-      for (const type of ['application/json', 'application/json; charset=utf-8', 'Application/JSON', ' application/json '])
-        assert.equal(refused('127.0.0.1:8787', 'same-origin', type), null, type);
-      assert.equal(refused('127.0.0.1:8787', undefined, 'application/json'), null, 'a client outside a browser sends no Sec-Fetch-Site');
-    },
-  );
-
-  await t.test(
-    'REFUSED 403: a name that is not this machine — another site, a site whose name points here, a port of one, and an address of this machine on the network',
-    () => {
-      for (const host of [
-        'evil.example',
-        'evil.example:8787',
-        'localhost.evil.example:8787',
-        '172.23.196.168:8787',
-        '127.0.0.1.evil.example',
-      ])
-        assert.equal(refused(host, 'same-origin', 'application/json'), 'host', host);
-    },
-  );
-
-  await t.test(
-    'REFUSED 403: a page on another site — anything the browser says but same-origin, another port on localhost included',
-    () => {
-      for (const site of ['cross-site', 'same-site', 'none', 'Same-Origin'])
-        assert.equal(refused('127.0.0.1:8787', site, 'application/json'), 'site', site);
-    },
-  );
-
-  await t.test(
-    "REFUSED 415: a body not sent as application/json — what a page's fetch sends, a form's, a multipart's, a near miss, and none at all",
-    () => {
-      for (const type of [
-        'text/plain;charset=UTF-8',
-        'application/x-www-form-urlencoded',
-        'multipart/form-data; boundary=x',
-        'application/jsonp',
-        'application/json+x',
-        undefined,
-        '',
-      ])
-        assert.equal(refused('127.0.0.1:8787', 'same-origin', type), 'media', String(type));
-    },
-  );
-
-  await t.test(
-    'the name is read before the site, and the site before the body: a request wrong in all three is refused on its name, and a read on none',
-    () => {
-      assert.equal(refused('evil.example', 'cross-site', 'text/plain'), 'host');
-      assert.equal(refused('127.0.0.1', 'cross-site', 'text/plain'), 'site');
-      for (const method of ['GET', 'HEAD'])
-        assert.equal(
-          writeRefused({
-            method,
-            host: 'evil.example',
-            site: 'cross-site',
-            contentType: undefined,
-            bearer: false,
-            cookie: false,
-            served: false,
-            scripted: false,
-          }),
-          null,
+describe('writeRefused: which of its three headers refuses a write, and in what order', () => {
+  test('a write the board sends is refused on none of the three: JSON, same-origin, and this machine under any of its names and ports', () => {
+    for (const host of [undefined, 'localhost', 'localhost:8787', '127.0.0.1', '127.0.0.1:8787', '[::1]', '[::1]:8787', ' localhost '])
+      assert.equal(refused(host, 'same-origin', 'application/json'), null, String(host));
+    for (const type of ['application/json', 'application/json; charset=utf-8', 'Application/JSON', ' application/json '])
+      assert.equal(refused('127.0.0.1:8787', 'same-origin', type), null, type);
+    assert.equal(refused('127.0.0.1:8787', undefined, 'application/json'), null, 'a client outside a browser sends no Sec-Fetch-Site');
+  });
+  test('REFUSED 403: a name that is not this machine — another site, a site whose name points here, a port of one, and an address of this machine on the network', () => {
+    for (const host of [
+      'evil.example',
+      'evil.example:8787',
+      'localhost.evil.example:8787',
+      '172.23.196.168:8787',
+      '127.0.0.1.evil.example',
+    ])
+      assert.equal(refused(host, 'same-origin', 'application/json'), 'host', host);
+  });
+  test('REFUSED 403: a page on another site — anything the browser says but same-origin, another port on localhost included', () => {
+    for (const site of ['cross-site', 'same-site', 'none', 'Same-Origin'])
+      assert.equal(refused('127.0.0.1:8787', site, 'application/json'), 'site', site);
+  });
+  test("REFUSED 415: a body not sent as application/json — what a page's fetch sends, a form's, a multipart's, a near miss, and none at all", () => {
+    for (const type of [
+      'text/plain;charset=UTF-8',
+      'application/x-www-form-urlencoded',
+      'multipart/form-data; boundary=x',
+      'application/jsonp',
+      'application/json+x',
+      undefined,
+      '',
+    ])
+      assert.equal(refused('127.0.0.1:8787', 'same-origin', type), 'media', String(type));
+  });
+  test('the name is read before the site, and the site before the body: a request wrong in all three is refused on its name, and a read on none', () => {
+    assert.equal(refused('evil.example', 'cross-site', 'text/plain'), 'host');
+    assert.equal(refused('127.0.0.1', 'cross-site', 'text/plain'), 'site');
+    for (const method of ['GET', 'HEAD'])
+      assert.equal(
+        writeRefused({
           method,
-        );
-    },
-  );
-
-  await t.test(
-    'a write that presents a bearer token passes the host, as one behind a proxy or a tunnel is addressed; REFUSED 403 without one',
-    () => {
-      assert.equal(refused('nemia.example.com', undefined, 'application/json', true), null);
-      assert.equal(refused('nemia.example.com', undefined, 'application/json'), 'host');
-    },
-  );
-
-  await t.test(
-    "a write by the board's cookie alone passes the host, as a board reached at a private network's address is addressed; REFUSED 403 from another site, same-site included",
-    () => {
-      assert.equal(refused('100.64.0.1:8787', 'same-origin', 'application/json', false, true), null);
-      assert.equal(refused('100.64.0.1:8787', undefined, 'application/json', false, true), null, 'no browser');
-      assert.equal(refused('100.64.0.1:8787', 'same-site', 'application/json', false, true), 'site');
-      assert.equal(refused('100.64.0.1:8787', 'cross-site', 'application/json', false, true), 'site');
-      assert.equal(refused('100.64.0.1:8787', 'same-origin', 'text/plain', false, true), 'media');
-    },
-  );
-
-  await t.test(
-    "a form of files by the board's cookie passes with the header a script sets, from the board's own page or no browser; REFUSED 403 from another site with it, 415 without it, and 415 with it but no token",
-    () => {
-      const form = 'multipart/form-data; boundary=x';
-      assert.equal(refused('100.64.0.1:8787', 'same-origin', form, false, true, true), null);
-      assert.equal(refused('127.0.0.1:8787', undefined, form, false, true, true), null, 'no browser');
-      assert.equal(refused('100.64.0.1:8787', 'same-site', form, false, true, true), 'site');
-      assert.equal(refused('100.64.0.1:8787', 'same-origin', form, false, true), 'media');
-      assert.equal(refused('127.0.0.1:8787', 'same-origin', form, false, false, true), 'media');
-    },
-  );
+          host: 'evil.example',
+          site: 'cross-site',
+          contentType: undefined,
+          bearer: false,
+          cookie: false,
+          served: false,
+          scripted: false,
+        }),
+        null,
+        method,
+      );
+  });
+  test('a write that presents a bearer token passes the host, as one behind a proxy or a tunnel is addressed; REFUSED 403 without one', () => {
+    assert.equal(refused('nemia.example.com', undefined, 'application/json', true), null);
+    assert.equal(refused('nemia.example.com', undefined, 'application/json'), 'host');
+  });
+  test("a write by the board's cookie alone passes the host, as a board reached at a private network's address is addressed; REFUSED 403 from another site, same-site included", () => {
+    assert.equal(refused('100.64.0.1:8787', 'same-origin', 'application/json', false, true), null);
+    assert.equal(refused('100.64.0.1:8787', undefined, 'application/json', false, true), null, 'no browser');
+    assert.equal(refused('100.64.0.1:8787', 'same-site', 'application/json', false, true), 'site');
+    assert.equal(refused('100.64.0.1:8787', 'cross-site', 'application/json', false, true), 'site');
+    assert.equal(refused('100.64.0.1:8787', 'same-origin', 'text/plain', false, true), 'media');
+  });
+  test("a form of files by the board's cookie passes with the header a script sets, from the board's own page or no browser; REFUSED 403 from another site with it, 415 without it, and 415 with it but no token", () => {
+    const form = 'multipart/form-data; boundary=x';
+    assert.equal(refused('100.64.0.1:8787', 'same-origin', form, false, true, true), null);
+    assert.equal(refused('127.0.0.1:8787', undefined, form, false, true, true), null, 'no browser');
+    assert.equal(refused('100.64.0.1:8787', 'same-site', form, false, true, true), 'site');
+    assert.equal(refused('100.64.0.1:8787', 'same-origin', form, false, true), 'media');
+    assert.equal(refused('127.0.0.1:8787', 'same-origin', form, false, false, true), 'media');
+  });
 });
 
-test('servedAt: which hosts name a name an exposed store is served at', async (t) => {
-  const names = servedNamesOf(true, '100.64.0.7', ['nemia.taile26745.ts.net']);
-  await t.test('a served name on any port, in any case, with a trailing dot or white space around it', () => {
+describe('servedAt: which hosts name a name an exposed store is served at', () => {
+  let names!: readonly string[];
+  beforeAll(() => {
+    names = servedNamesOf(true, '100.64.0.7', ['nemia.taile26745.ts.net']);
+  });
+  test('a served name on any port, in any case, with a trailing dot or white space around it', () => {
     for (const host of [
       'nemia.taile26745.ts.net:8787',
       'nemia.taile26745.ts.net',
@@ -144,7 +116,7 @@ test('servedAt: which hosts name a name an exposed store is served at', async (t
       assert.equal(servedAt(host, names), true, host);
     assert.equal(servedAt('[fd7a:115c::1]:8787', ['[fd7a:115c::1]']), true);
   });
-  await t.test('a name beside a served one is none: a subdomain, a suffix, a site that ends in it, another address, the empty host', () => {
+  test('a name beside a served one is none: a subdomain, a suffix, a site that ends in it, another address, the empty host', () => {
     for (const host of [
       'evil.nemia.taile26745.ts.net',
       'nemia.taile26745.ts.net.evil.example',

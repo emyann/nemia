@@ -3,7 +3,7 @@
  * the same two states drawn as one, an edge back to its own state written on its box, a route only a person's verb takes dashed, and
  * nothing laid over anything else.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import type { MachineEdge, MachineVerb } from '../src/lib/api/steps.ts';
@@ -114,20 +114,17 @@ const crossings = (drawing: Drawing): string[] =>
       .map((box) => `${route.id} through ${box.name}`),
   );
 
-test('drawMachine: every edge and verb written in one place, the pairs joined as one route, the ends marked, the boxes sized', async (t) => {
-  await t.test(
-    'every edge is written once, on its route or, back to its own state, on its box; every verb once on each route it takes',
-    () => {
-      const drawing = drawMachine(MACHINE);
-      const expected = [
-        ...MACHINE.edges.map((e) => `${e.from === e.to ? e.from : `${e.from}->${e.to}`} ${eventOf(e)} / ${e.action}`),
-        ...MACHINE.verbs.flatMap((v) => v.from.map((from) => `${from}->${v.to} ${verbOf(v)}`)),
-      ];
-      assert.deepEqual(written(drawing).sort(), expected.sort());
-      assert.equal(verbOf(MACHINE.verbs[0]), 'cancel [open]', 'a verb is written with its guard');
-    },
-  );
-  await t.test("a pair only a person's verb joins is one dashed route; a pair an edge joins too is one solid route listing both", () => {
+describe('drawMachine: every edge and verb written in one place, the pairs joined as one route, the ends marked, the boxes sized', () => {
+  test('every edge is written once, on its route or, back to its own state, on its box; every verb once on each route it takes', () => {
+    const drawing = drawMachine(MACHINE);
+    const expected = [
+      ...MACHINE.edges.map((e) => `${e.from === e.to ? e.from : `${e.from}->${e.to}`} ${eventOf(e)} / ${e.action}`),
+      ...MACHINE.verbs.flatMap((v) => v.from.map((from) => `${from}->${v.to} ${verbOf(v)}`)),
+    ];
+    assert.deepEqual(written(drawing).sort(), expected.sort());
+    assert.equal(verbOf(MACHINE.verbs[0]), 'cancel [open]', 'a verb is written with its guard');
+  });
+  test("a pair only a person's verb joins is one dashed route; a pair an edge joins too is one solid route listing both", () => {
     const drawing = drawMachine(MACHINE);
     const route = (id: string) => drawing.routes.find((r) => r.id === id) ?? assert.fail(`no route ${id}`);
     assert.deepEqual(
@@ -144,7 +141,7 @@ test('drawMachine: every edge and verb written in one place, the pairs joined as
       ['idle->failed'],
     );
   });
-  await t.test('the edges between the same two states are one route, listed by action; an edge back to its state is no route', () => {
+  test('the edges between the same two states are one route, listed by action; an edge back to its state is no route', () => {
     const drawing = drawMachine(MACHINE);
     assert.deepEqual(
       drawing.routes.map((r) => r.id),
@@ -159,7 +156,7 @@ test('drawMachine: every edge and verb written in one place, the pairs joined as
     ]);
     assert.deepEqual(drawing.states.find((s) => s.id === 'done')!.stays, []);
   });
-  await t.test('the first state and the final ones are marked, and only they', () => {
+  test('the first state and the final ones are marked, and only they', () => {
     const drawing = drawMachine(MACHINE);
     assert.deepEqual(
       drawing.states.filter((s) => s.initial).map((s) => s.id),
@@ -170,7 +167,7 @@ test('drawMachine: every edge and verb written in one place, the pairs joined as
       ['done', 'failed'],
     );
   });
-  await t.test('a state an edge or a verb names that the graph does not list is drawn, so no edge and no verb is lost', () => {
+  test('a state an edge or a verb names that the graph does not list is drawn, so no edge and no verb is lost', () => {
     const drawing = drawMachine({ ...MACHINE, states: ['idle'] });
     assert.deepEqual(drawing.states.map((s) => s.id).sort(), [...MACHINE.states].sort());
     assert.equal(written(drawing).length, MACHINE.edges.length + 2);
@@ -182,19 +179,16 @@ test('drawMachine: every edge and verb written in one place, the pairs joined as
     );
     assert.deepEqual(stopped.routes.find((r) => r.id === 'idle->gone')?.verbs, ['cancel [open]']);
   });
-  await t.test(
-    'a box and a label are sized for their lines: a line per event, one per action and one per verb, as wide as the longest',
-    () => {
-      assert.equal(stateSize([]).height, HEAD_HEIGHT);
-      assert.equal(stateSize(byAction(MACHINE.edges.slice(2, 4))).height, HEAD_HEIGHT + LINE_HEIGHT * 4 + PAD_Y, 'two events, two actions');
-      const wide = stateSize([{ action: 'x', events: ['A_VERY_LONG_EVENT_NAME [with_a_guard]'] }]);
-      assert.ok(wide.width > stateSize([]).width, 'a long event widens its box');
-      assert.equal(labelSize([], ['cancel [open]']).height, LINE_HEIGHT + PAD_Y, 'a verb alone is a line');
-      assert.equal(labelSize(byAction(MACHINE.edges.slice(6, 7)), ['cancel [open]']).height, LINE_HEIGHT * 3 + PAD_Y, 'an edge and a verb');
-      assert.ok(labelSize([], ['a_very_long_verb [with_a_guard]']).width > labelSize([], ['cancel [open]']).width, 'a long verb widens it');
-    },
-  );
-  await t.test('a route is drawn along its legs, straight along each and curving upright from one to the next, down or back up', () => {
+  test('a box and a label are sized for their lines: a line per event, one per action and one per verb, as wide as the longest', () => {
+    assert.equal(stateSize([]).height, HEAD_HEIGHT);
+    assert.equal(stateSize(byAction(MACHINE.edges.slice(2, 4))).height, HEAD_HEIGHT + LINE_HEIGHT * 4 + PAD_Y, 'two events, two actions');
+    const wide = stateSize([{ action: 'x', events: ['A_VERY_LONG_EVENT_NAME [with_a_guard]'] }]);
+    assert.ok(wide.width > stateSize([]).width, 'a long event widens its box');
+    assert.equal(labelSize([], ['cancel [open]']).height, LINE_HEIGHT + PAD_Y, 'a verb alone is a line');
+    assert.equal(labelSize(byAction(MACHINE.edges.slice(6, 7)), ['cancel [open]']).height, LINE_HEIGHT * 3 + PAD_Y, 'an edge and a verb');
+    assert.ok(labelSize([], ['a_very_long_verb [with_a_guard]']).width > labelSize([], ['cancel [open]']).width, 'a long verb widens it');
+  });
+  test('a route is drawn along its legs, straight along each and curving upright from one to the next, down or back up', () => {
     assert.equal(pathOf([]), '');
     assert.equal(pathOf([{ x: 5, enter: 0, leave: 10 }]), 'M 5 0 L 5 10');
     assert.equal(
@@ -215,8 +209,8 @@ test('drawMachine: every edge and verb written in one place, the pairs joined as
   });
 });
 
-test('drawMachine: nothing laid over anything, no route through a state, read top to bottom', async (t) => {
-  await t.test('nothing is laid over anything else: no two boxes meet, whether states or labels, and all lie inside the drawing', () => {
+describe('drawMachine: nothing laid over anything, no route through a state, read top to bottom', () => {
+  test('nothing is laid over anything else: no two boxes meet, whether states or labels, and all lie inside the drawing', () => {
     const drawing = drawMachine(MACHINE);
     const boxes = boxesOf(drawing);
     assert.equal(boxes.length, MACHINE.states.length + 7);
@@ -233,7 +227,7 @@ test('drawMachine: nothing laid over anything, no route through a state, read to
       'REFUSED: two boxes that meet',
     );
   });
-  await t.test("no route's line runs through a state or behind another route's label, on the machine the size of the lifecycle too", () => {
+  test("no route's line runs through a state or behind another route's label, on the machine the size of the lifecycle too", () => {
     assert.deepEqual(crossings(drawMachine(MACHINE)), []);
     assert.deepEqual(crossings(drawMachine(LIFECYCLE)), []);
     const drawing = drawMachine(MACHINE);
@@ -246,28 +240,24 @@ test('drawMachine: nothing laid over anything, no route through a state, read to
       'REFUSED: a line drawn straight across another label',
     );
   });
-  await t.test(
-    'read top to bottom: the first state above every other, and each route leaves its state and comes straight into the next',
-    () => {
-      for (const machine of [MACHINE, LIFECYCLE]) {
-        const drawing = drawMachine(machine);
-        const at = new Map(drawing.states.map((s) => [s.id, s]));
-        for (const state of drawing.states.filter((s) => s.id !== machine.initial))
-          assert.ok(at.get(machine.initial)!.y < state.y, state.id);
-        for (const route of drawing.routes) {
-          const line = along(route.path);
-          const [first, last, before] = [line[0], line[line.length - 1], line[line.length - 2]];
-          const [from, to] = [at.get(route.from)!, at.get(route.to)!];
-          const down = to.y > from.y;
-          const across = (x: number, box: typeof from) => x >= box.x + END_INSET && x <= box.x + box.width - END_INSET;
-          assert.ok(first.y === (down ? from.y + from.height : from.y) && across(first.x, from), `${route.id} leaves ${route.from}`);
-          assert.ok(last.y === (down ? to.y : to.y + to.height) && across(last.x, to), `${route.id} reaches ${route.to}`);
-          assert.ok(
-            down === before.y < last.y && Math.abs(before.x - last.x) < 0.5,
-            `${route.id} comes upright into ${route.to}, as its arrow points`,
-          );
-        }
+  test('read top to bottom: the first state above every other, and each route leaves its state and comes straight into the next', () => {
+    for (const machine of [MACHINE, LIFECYCLE]) {
+      const drawing = drawMachine(machine);
+      const at = new Map(drawing.states.map((s) => [s.id, s]));
+      for (const state of drawing.states.filter((s) => s.id !== machine.initial)) assert.ok(at.get(machine.initial)!.y < state.y, state.id);
+      for (const route of drawing.routes) {
+        const line = along(route.path);
+        const [first, last, before] = [line[0], line[line.length - 1], line[line.length - 2]];
+        const [from, to] = [at.get(route.from)!, at.get(route.to)!];
+        const down = to.y > from.y;
+        const across = (x: number, box: typeof from) => x >= box.x + END_INSET && x <= box.x + box.width - END_INSET;
+        assert.ok(first.y === (down ? from.y + from.height : from.y) && across(first.x, from), `${route.id} leaves ${route.from}`);
+        assert.ok(last.y === (down ? to.y : to.y + to.height) && across(last.x, to), `${route.id} reaches ${route.to}`);
+        assert.ok(
+          down === before.y < last.y && Math.abs(before.x - last.x) < 0.5,
+          `${route.id} comes upright into ${route.to}, as its arrow points`,
+        );
       }
-    },
-  );
+    }
+  });
 });

@@ -3,7 +3,7 @@
  * and one in which a step broke, and that no file of `src` compares a status to one of the run's words but those listed here
  * (`READERS`, `unlistedReaders`). `TryRun`, the one place that prints the word, is held by `components-agent.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -69,28 +69,25 @@ const GATE = stopped('awaiting approval', ['land']);
 const QUESTION = stopped('waiting', ['implement']);
 const BROKE = stopped('failed', ['implement']);
 
-test("a run's status, read by each reader: a gate, a question and a break are three stopped runs", async (t) => {
-  await t.test(
-    'the board reads a run at a gate alone, one waiting on an answer alone and one in which a step broke as three runs that stopped: each is offered a hold, a decision and a prune, none is in flight, and each says its own word',
-    () => {
-      const other = { ...stopped('running', []), id: 'r-other' };
-      for (const run of [GATE, QUESTION, BROKE]) {
-        assert.deepEqual(
-          {
-            holdable: holdable(run),
-            holdUntilOffered: holdCandidates(other, [run]).length,
-            decidable: decidableRun(run),
-            inFlight: inFlight(run),
-            prunable: Boolean(prunable(run)),
-            stamped: (JSON.parse(decisionStamp(run)) as unknown[])[0],
-          },
-          { holdable: true, holdUntilOffered: 1, decidable: true, inFlight: false, prunable: true, stamped: run.status },
-          run.status,
-        );
-      }
-    },
-  );
-  await t.test('REFUSED: a hold of a run that succeeded or was called off, whatever word a stopped one says', () => {
+describe("a run's status, read by each reader: a gate, a question and a break are three stopped runs", () => {
+  test('the board reads a run at a gate alone, one waiting on an answer alone and one in which a step broke as three runs that stopped: each is offered a hold, a decision and a prune, none is in flight, and each says its own word', () => {
+    const other = { ...stopped('running', []), id: 'r-other' };
+    for (const run of [GATE, QUESTION, BROKE]) {
+      assert.deepEqual(
+        {
+          holdable: holdable(run),
+          holdUntilOffered: holdCandidates(other, [run]).length,
+          decidable: decidableRun(run),
+          inFlight: inFlight(run),
+          prunable: Boolean(prunable(run)),
+          stamped: (JSON.parse(decisionStamp(run)) as unknown[])[0],
+        },
+        { holdable: true, holdUntilOffered: 1, decidable: true, inFlight: false, prunable: true, stamped: run.status },
+        run.status,
+      );
+    }
+  });
+  test('REFUSED: a hold of a run that succeeded or was called off, whatever word a stopped one says', () => {
     assert.deepEqual(
       WORDS.map((status) => [status, holdable(stopped(status, []))]),
       [
@@ -105,20 +102,17 @@ test("a run's status, read by each reader: a gate, a question and a break are th
   });
 });
 
-test("the readers of a run's status in src: every file that compares a status to a word is listed, and each listed still does", async (t) => {
-  await t.test(
-    "every file of src that compares a status to one of the run's words is a listed reader, and every listed reader still does",
-    () => {
-      const sources = sourcesOf(SRC);
-      assert.deepEqual(unlistedReaders(sources, Object.keys(READERS)), []);
-      assert.deepEqual(
-        Object.keys(READERS).filter((file) => !COMPARED.test(sources.get(file) ?? '')),
-        [],
-        'a reader that no longer compares leaves the list',
-      );
-    },
-  );
-  await t.test('REFUSED: a file not listed that compares a status to a word of the run, across a line break and either way round', () => {
+describe("the readers of a run's status in src: every file that compares a status to a word is listed, and each listed still does", () => {
+  test("every file of src that compares a status to one of the run's words is a listed reader, and every listed reader still does", () => {
+    const sources = sourcesOf(SRC);
+    assert.deepEqual(unlistedReaders(sources, Object.keys(READERS)), []);
+    assert.deepEqual(
+      Object.keys(READERS).filter((file) => !COMPARED.test(sources.get(file) ?? '')),
+      [],
+      'a reader that no longer compares leaves the list',
+    );
+  });
+  test('REFUSED: a file not listed that compares a status to a word of the run, across a line break and either way round', () => {
     const sources = new Map([
       ['lib/hold.ts', "run.status === 'failed'"],
       ['components/New.tsx', "run.status ===\n  'failed'"],

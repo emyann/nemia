@@ -5,7 +5,7 @@
  * names its factory under the key admission reads. The verb that reads a store for them (`nemia admit`) is told in
  * `test/auto-rules.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { admissionOf, type PolicyReads, type Scope } from './admission.ts';
 import { TABLE } from '../command/commands.verb.ts';
@@ -30,7 +30,7 @@ const answerOf = (command: string, tool = 'Bash') => admissionOf({ tool, input: 
 /** Admission's decision for a shell line, or undefined for none. */
 const decided = (command: string, tool = 'Bash') => answerOf(command, tool)?.decision;
 
-test('`admissionOf` with no floor and no rules: what answers the person is asked, the rest is hers, and the person reads why', async (t) => {
+describe('`admissionOf` with no floor and no rules: what answers the person is asked, the rest is hers, and the person reads why', () => {
   for (const line of [
     'nemia approve r gate',
     'nemia approve r check',
@@ -43,14 +43,14 @@ test('`admissionOf` with no floor and no rules: what answers the person is asked
     'nemia retry q check --recheck',
     'nemia retry r',
   ])
-    await t.test(`REFUSED to run unasked: ${line}`, () => {
+    test(`REFUSED to run unasked: ${line}`, () => {
       assert.equal(decided(line), 'ask', line);
     });
   for (const line of ['nemia retry r check --recheck', 'nemia retry r check && nemia tick', 'nemia show r', 'nemia hold r', 'ls'])
-    await t.test(`a retry of a step that waits on no one, a read and her own writes get no answer: ${line}`, () => {
+    test(`a retry of a step that waits on no one, a read and her own writes get no answer: ${line}`, () => {
       assert.equal(decided(line), undefined, line);
     });
-  await t.test('a call of another tool than the shell gets no answer', () => {
+  test('a call of another tool than the shell gets no answer', () => {
     assert.equal(decided('nemia approve r gate', 'Read'), undefined, 'no shell line');
   });
   for (const line of [
@@ -62,15 +62,15 @@ test('`admissionOf` with no floor and no rules: what answers the person is asked
     'echo $(nemia round r)',
     'WF_ROOT=/s nemia retry r gate',
   ])
-    await t.test(`REFUSED to pass unseen, wrapped, behind a path, an alias or another command: ${line}`, () => {
+    test(`REFUSED to pass unseen, wrapped, behind a path, an alias or another command: ${line}`, () => {
       assert.equal(decided(line), 'ask', line);
     });
-  await t.test('the person reads why: the line, and what it answers', () => {
+  test('the person reads why: the line, and what it answers', () => {
     names(answerOf('nemia retry r gate')?.message, 'nemia retry r gate', 'waits on you', 'gate of r is awaiting approval');
     names(answerOf('nemia approve r gate')?.message, 'nemia approve r gate', 'waits on you', 'yours to give');
     names(answerOf('nemia retry r check --budget 5')?.message, 'nemia retry r check --budget 5', "a step's cap", 'yours to raise');
   });
-  await t.test('the class decides, not the name: a table that classes approve as act lets it through', () => {
+  test('the class decides, not the name: a table that classes approve as act lets it through', () => {
     const table = TABLE.map((c) => (c.name === 'approve' ? { ...c, class: 'act' as const } : c));
     assert.equal(admissionOf({ tool: 'Bash', input: { command: 'nemia approve r gate' }, cwd: '/w' }, table, waitOf), undefined);
   });
@@ -85,10 +85,10 @@ test('`admissionOf` with no floor and no rules: what answers the person is asked
     'nemia factory adopt made --template /t --plan sha256:0a1b',
     "nemia factory resolve made 'workflows/dev/review.md#rounds' --theirs",
   ])
-    await t.test(`REFUSED: asked every time, with no list: ${line}`, () => {
+    test(`REFUSED: asked every time, with no list: ${line}`, () => {
       assert.equal(decided(line), 'ask', line);
     });
-  await t.test('a write of the rules says it is asked every time', () => {
+  test('a write of the rules says it is asked every time', () => {
     names(answerOf('nemia policy confirm nemia tries')?.message, 'nemia policy confirm nemia tries is yours', 'asked every time');
   });
 });
@@ -131,7 +131,7 @@ const decidedAt = (command: string, auto: PolicyReads | undefined) =>
 /** A rule the person confirmed: a try of any step, unasked, where all agree. */
 const TRIES: PolicyRule = { id: 'tries', answer: 'retry', when: ['recommends', 'checked', 'accepted', 'withinBudget', 'nothingOpen'] };
 
-test('`admissionOf` under her floor and at auto: below the floor denied, unread asked, and an answer the rules allow given unasked', async (t) => {
+describe('`admissionOf` under her floor and at auto: below the floor denied, unread asked, and an answer the rules allow given unasked', () => {
   for (const line of [
     'nemia approve r gate',
     'nemia show r',
@@ -147,14 +147,14 @@ test('`admissionOf` under her floor and at auto: below the floor denied, unread 
     'nemia policy reach nemia --factory acme',
     'nemia policy reach nemia --run r',
   ])
-    await t.test(`REFUSED: a call on a run or a factory below the floor is denied, whatever its class: ${line}`, () => {
+    test(`REFUSED: a call on a run or a factory below the floor is denied, whatever its class: ${line}`, () => {
       assert.equal(scopedAnswer(line)?.decision, 'deny', line);
     });
-  await t.test('a denial names the run, its factory and level, the floor, and the command that raises it', () => {
+  test('a denial names the run, its factory and level, the floor, and the command that raises it', () => {
     names(scopedAnswer('nemia hold r')?.message, 'nemia hold r', 'r of the factory pipao', 'at manual', 'below semi-auto');
     names(scopedAnswer('nemia hold r')?.message, 'nemia level semi-auto --factory pipao [--for <duration>]');
   });
-  await t.test('every factory at the floor or above: the scope answers as no scope does', () => {
+  test('every factory at the floor or above: the scope answers as no scope does', () => {
     const open: Scope = { atLeast: 'semi-auto', runOf: () => ({ factory: 'hkb', level: 'semi-auto' }), factoryOf: () => 'semi-auto' };
     for (const line of ['nemia approve r gate', 'nemia show r', 'nemia retry r check --recheck', 'nemia start x.md --factory hkb', 'ls'])
       assert.deepEqual(scopedAnswer(line, open), answerOf(line), line);
@@ -165,71 +165,62 @@ test('`admissionOf` under her floor and at auto: below the floor denied, unread 
       'what her rules reach in a factory at her floor',
     );
   });
-  await t.test('REFUSED to pass unread: a run that does not read, and a scoped command whose words do not parse, are asked', () => {
+  test('REFUSED to pass unread: a run that does not read, and a scoped command whose words do not parse, are asked', () => {
     names(scopedAnswer('nemia show gone')?.message, 'names gone', 'does not read');
     assert.equal(scopedAnswer('nemia show gone')?.decision, 'ask');
     assert.equal(scopedAnswer('nemia show t --frob')?.decision, 'ask');
   });
-  await t.test("at auto, an answer the confirmed list allows in the run's state is given unasked", () => {
+  test("at auto, an answer the confirmed list allows in the run's state is given unasked", () => {
     assert.equal(decidedAt('nemia approve r gate', atAuto(listInForce(undefined))), undefined);
     assert.equal(decidedAt('nemia retry r gate', atAuto([DEFAULT_POLICY, TRIES])), undefined);
     assert.equal(decidedAt('nemia approve r gate && nemia retry r gate', atAuto([DEFAULT_POLICY, TRIES])), undefined, 'each allowed');
   });
-  await t.test('REFUSED at semi-auto: the same state asks, and so does a session handed no list, at auto', () => {
+  test('REFUSED at semi-auto: the same state asks, and so does a session handed no list, at auto', () => {
     assert.equal(decidedAt('nemia approve r gate', atAuto(listInForce(undefined), 'semi-auto')), 'ask');
     assert.equal(decidedAt('nemia approve r gate', atAuto(listInForce(undefined), 'manual')), 'ask');
     assert.equal(decidedAt('nemia approve r gate', undefined), 'ask');
   });
-  await t.test('REFUSED: a rule nobody confirmed allows nothing; a list with the default dropped allows no approval', () => {
+  test('REFUSED: a rule nobody confirmed allows nothing; a list with the default dropped allows no approval', () => {
     assert.equal(decidedAt('nemia retry r gate', atAuto(listInForce(undefined))), 'ask', 'only the default is in force');
     assert.equal(decidedAt('nemia approve r gate', atAuto(listInForce([TRIES]))), 'ask');
     assert.equal(decidedAt('nemia approve r gate', atAuto(listInForce([]))), 'ask');
   });
-  await t.test(
-    'REFUSED at auto: a state where one condition fails, a run whose facts or level do not read, and an answer naming no step',
-    () => {
-      assert.equal(decidedAt('nemia approve r gate', atAuto([DEFAULT_POLICY], 'auto', { ...ALL_AGREE, checked: false })), 'ask');
-      assert.equal(decidedAt('nemia approve r gate', atAuto([DEFAULT_POLICY], 'auto', 'unread')), 'ask');
-      assert.equal(decidedAt('nemia approve q gate', atAuto([DEFAULT_POLICY])), 'ask');
-      assert.equal(decidedAt('nemia round r', atAuto([DEFAULT_POLICY])), 'ask', 'a round is no answer a rule gives');
-      assert.equal(decidedAt('nemia accept r review', atAuto([DEFAULT_POLICY], 'auto', ALL_AGREE, 'loop')), 'ask', 'nor a loop ended');
-    },
-  );
-  await t.test(
-    "REFUSED at auto: a round, and an approval that ends a loop out of rounds, are the person's whatever the rules allow",
-    () => {
-      const loose = [DEFAULT_POLICY, TRIES];
-      assert.equal(decidedAt('nemia retry r review --round', atAuto(loose)), 'ask');
-      assert.equal(decidedAt('nemia round r review', atAuto(loose)), 'ask', 'its former spelling, read as retry --round');
-      assert.equal(decidedAt('nemia approve r review --message x', atAuto(loose, 'auto', ALL_AGREE, 'loop')), 'ask');
-      assert.equal(decidedAt('nemia accept r review --message x', atAuto(loose, 'auto', ALL_AGREE, 'loop')), 'ask', 'its former spelling');
-      assert.equal(decidedAt('nemia approve r review --message x', atAuto(loose, 'auto', ALL_AGREE, 'unread')), 'ask', 'a yes not read');
-      assert.equal(decidedAt('nemia approve r review --message x', atAuto(loose)), undefined, 'at its gate, the rule gives it');
-    },
-  );
-  await t.test("REFUSED at auto: a try that raises a step's cap, whatever the rules allow", () => {
+  test('REFUSED at auto: a state where one condition fails, a run whose facts or level do not read, and an answer naming no step', () => {
+    assert.equal(decidedAt('nemia approve r gate', atAuto([DEFAULT_POLICY], 'auto', { ...ALL_AGREE, checked: false })), 'ask');
+    assert.equal(decidedAt('nemia approve r gate', atAuto([DEFAULT_POLICY], 'auto', 'unread')), 'ask');
+    assert.equal(decidedAt('nemia approve q gate', atAuto([DEFAULT_POLICY])), 'ask');
+    assert.equal(decidedAt('nemia round r', atAuto([DEFAULT_POLICY])), 'ask', 'a round is no answer a rule gives');
+    assert.equal(decidedAt('nemia accept r review', atAuto([DEFAULT_POLICY], 'auto', ALL_AGREE, 'loop')), 'ask', 'nor a loop ended');
+  });
+  test("REFUSED at auto: a round, and an approval that ends a loop out of rounds, are the person's whatever the rules allow", () => {
+    const loose = [DEFAULT_POLICY, TRIES];
+    assert.equal(decidedAt('nemia retry r review --round', atAuto(loose)), 'ask');
+    assert.equal(decidedAt('nemia round r review', atAuto(loose)), 'ask', 'its former spelling, read as retry --round');
+    assert.equal(decidedAt('nemia approve r review --message x', atAuto(loose, 'auto', ALL_AGREE, 'loop')), 'ask');
+    assert.equal(decidedAt('nemia accept r review --message x', atAuto(loose, 'auto', ALL_AGREE, 'loop')), 'ask', 'its former spelling');
+    assert.equal(decidedAt('nemia approve r review --message x', atAuto(loose, 'auto', ALL_AGREE, 'unread')), 'ask', 'a yes not read');
+    assert.equal(decidedAt('nemia approve r review --message x', atAuto(loose)), undefined, 'at its gate, the rule gives it');
+  });
+  test("REFUSED at auto: a try that raises a step's cap, whatever the rules allow", () => {
     assert.equal(decidedAt('nemia retry r gate --budget 5', atAuto([DEFAULT_POLICY, TRIES])), 'ask');
     assert.equal(decidedAt('nemia retry r gate --budget=5', atAuto([DEFAULT_POLICY, TRIES])), 'ask');
   });
-  await t.test(
-    "REFUSED at auto: a confirm or a drop of a rule, and a factory's apply, adopt, upgrade and resolve, are asked every time",
-    () => {
-      for (const line of [
-        'nemia policy confirm nemia tries',
-        "nemia policy confirm nemia tries --words 'Try implement again on its own once its check passed and it has cost under $20.'",
-        'nemia policy confirm nemia tries --words "Try implement again on its own."',
-        'nemia policy rm nemia default',
-        'nemia show r && nemia policy confirm nemia tries',
-        'nemia auto drop nemia default',
-        'nemia factory apply made --template /t --repo /r',
-        'nemia factory upgrade made --to 0.2.0',
-        'nemia factory adopt made --template /t --plan sha256:0a1b',
-        "nemia factory resolve made 'workflows/dev/review.md#rounds' --theirs",
-      ])
-        assert.equal(decidedAt(line, atAuto([DEFAULT_POLICY, TRIES])), 'ask', line);
-    },
-  );
-  await t.test("the rules' read and a factory's plan are no ask, at auto", () => {
+  test("REFUSED at auto: a confirm or a drop of a rule, and a factory's apply, adopt, upgrade and resolve, are asked every time", () => {
+    for (const line of [
+      'nemia policy confirm nemia tries',
+      "nemia policy confirm nemia tries --words 'Try implement again on its own once its check passed and it has cost under $20.'",
+      'nemia policy confirm nemia tries --words "Try implement again on its own."',
+      'nemia policy rm nemia default',
+      'nemia show r && nemia policy confirm nemia tries',
+      'nemia auto drop nemia default',
+      'nemia factory apply made --template /t --repo /r',
+      'nemia factory upgrade made --to 0.2.0',
+      'nemia factory adopt made --template /t --plan sha256:0a1b',
+      "nemia factory resolve made 'workflows/dev/review.md#rounds' --theirs",
+    ])
+      assert.equal(decidedAt(line, atAuto([DEFAULT_POLICY, TRIES])), 'ask', line);
+  });
+  test("the rules' read and a factory's plan are no ask, at auto", () => {
     assert.equal(decidedAt('nemia policy nemia', atAuto([DEFAULT_POLICY])), undefined, 'the read is no ask');
     assert.equal(decidedAt('nemia factory diff made --to 0.2.0', atAuto([DEFAULT_POLICY])), undefined, 'the plan is no ask');
     assert.equal(decidedAt('nemia factory diff made --template /t', atAuto([DEFAULT_POLICY])), undefined, "a takeover's plan is no ask");

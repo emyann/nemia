@@ -2,7 +2,7 @@
  * A test whose wait is handed a waiter with no signal to read: what `test/waits.test.ts` runs in a child, to see its process end on its
  * own once the wait has failed, holding no timer open.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { until, type Waiter } from '../../../src/waits/index.ts';
 

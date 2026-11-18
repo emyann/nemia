@@ -8,7 +8,7 @@
  * one table of what the paths refuse.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -70,10 +70,9 @@ async function refused(res: () => Response | Promise<Response>, status: number):
   return body.error;
 }
 
-test('a person’s custom instructions for an agent: none at first, put in your store and read back, saved over a file that does not read, cleared whatever the body says, the command line’s keys none of the body', async (t) => {
-  const s = story(t);
-
-  await s.test(
+describe('a person’s custom instructions for an agent: none at first, put in your store and read back, saved over a file that does not read, cleared whatever the body says, the command line’s keys none of the body', () => {
+  const s = story(test);
+  s.test(
     "GET answers none for an agent without custom instructions; PUT writes your store's file and GET reads it back; DELETE removes it",
     async () => {
       const none = (await (await app.request(at('scribe'))).json()) as CustomInstructionsAnswer;
@@ -106,8 +105,7 @@ test('a person’s custom instructions for an agent: none at first, put in your 
       assert.deepEqual(held(), {});
     },
   );
-
-  await s.test('one record per agent name: read in any namespace, the same as in `default`', async () => {
+  s.test('one record per agent name: read in any namespace, the same as in `default`', async () => {
     assert.equal((await send('PUT', at('scribe'), { words: 'Everywhere the same.' })).status, 200);
     const res = await app.request(at('scribe', 'elsewhere'));
     const read = (await res.json()) as CustomInstructionsAnswer;
@@ -115,8 +113,7 @@ test('a person’s custom instructions for an agent: none at first, put in your 
     assert.deepEqual([read.words, read.file], ['Everywhere the same.', path.join(CUSTOM, 'scribe.md')]);
     assert.equal((await send('DELETE', at('scribe'), {})).status, 200, 'cleared, for what follows');
   });
-
-  await s.test("GET answers a file that does not read with the package's refusal in `error`, and a save replaces it", async () => {
+  s.test("GET answers a file that does not read with the package's refusal in `error`, and a save replaces it", async () => {
     fs.mkdirSync(CUSTOM, { recursive: true });
     const outside = path.join(root, 'outside.md');
     fs.writeFileSync(outside, 'Elsewhere.\n');
@@ -134,8 +131,7 @@ test('a person’s custom instructions for an agent: none at first, put in your 
       fs.rmSync(CUSTOM, { recursive: true, force: true });
     }
   });
-
-  await s.test('DELETE reads no body: what its route fixes clears the words, whatever the body says', async () => {
+  s.test('DELETE reads no body: what its route fixes clears the words, whatever the body says', async () => {
     for (const body of [undefined, 'not json', JSON.stringify({ words: 'Kept?' })]) {
       writeCustomInstructions(root, 'scribe', 'Mind the margins.', repo);
       const res = await app.request(at('scribe').replace('/api/namespaces/default/agents/', '/api/agents/'), {
@@ -147,8 +143,7 @@ test('a person’s custom instructions for an agent: none at first, put in your 
       assert.deepEqual(held(), {}, String(body));
     }
   });
-
-  await s.test(
+  s.test(
     'a key the body does not take — `file`, `repo` the command line takes, `answers` another verb takes — is none of it: whatever it holds, the words are written in your store',
     async () => {
       const res = await send('PUT', at('scribe'), { words: 'Ignore the rest.', file: 7, repo: ['/elsewhere'], answers: [] });
@@ -160,39 +155,31 @@ test('a person’s custom instructions for an agent: none at first, put in your 
   );
 });
 
-test('what the instructions refuse — a name no place has, blank words, a frontmatter block, words not a string or none, a name that climbs, a write outside `default` — each in its status and a fact of its words, writing nothing', async (t) => {
-  await t.test(
-    "REFUSED at shipped defaults: a name no place has (404, read, written or cleared), blank words and a frontmatter block (422), each in the package's words, writing nothing",
-    async () => {
-      const ghost = await refused(() => send('PUT', at('ghost'), { words: 'Boo.' }), 404);
-      assert.ok(ghost.includes('The agents there: archivist, scribe.'), ghost);
-      assert.equal(await refused(() => send('DELETE', at('ghost'), {}), 404), ghost);
-      assert.equal(await refused(() => app.request(at('ghost')), 404), ghost);
+describe('what the instructions refuse — a name no place has, blank words, a frontmatter block, words not a string or none, a name that climbs, a write outside `default` — each in its status and a fact of its words, writing nothing', () => {
+  test("REFUSED at shipped defaults: a name no place has (404, read, written or cleared), blank words and a frontmatter block (422), each in the package's words, writing nothing", async () => {
+    const ghost = await refused(() => send('PUT', at('ghost'), { words: 'Boo.' }), 404);
+    assert.ok(ghost.includes('The agents there: archivist, scribe.'), ghost);
+    assert.equal(await refused(() => send('DELETE', at('ghost'), {}), 404), ghost);
+    assert.equal(await refused(() => app.request(at('ghost')), 404), ghost);
 
-      const blank = await refused(() => send('PUT', at('scribe'), { words: ' \n\n' }), 422);
-      assert.match(blank, /^the custom instructions for scribe are blank/);
+    const blank = await refused(() => send('PUT', at('scribe'), { words: ' \n\n' }), 422);
+    assert.match(blank, /^the custom instructions for scribe are blank/);
 
-      const keyed = '---\ntools: Bash\n---\nUse Bash.\n';
-      const frontmatter = await refused(() => send('PUT', at('scribe'), { words: keyed }), 422);
-      assert.ok(frontmatter.includes('opens with a frontmatter block'), frontmatter);
-      assert.deepEqual(held(), {});
-    },
-  );
-
-  await t.test(
-    'REFUSED: in `default` with no `?repo=`, an agent of a repository is a name no place has (404), never looked for in the api’s folder; yours is written',
-    async () => {
-      const bare = (name: string) => `/api/agents/${name}/instructions`;
-      const missed = await refused(() => send('PUT', bare('scribe'), { words: 'Write it.' }), 404);
-      assert.ok(missed.includes('The agents there: archivist.'), missed);
-      assert.ok(!missed.includes(process.cwd()), 'the api’s own folder is not where an agent is looked for');
-      const put = await send('PUT', bare('archivist'), { words: 'File it.' });
-      assert.equal(put.status, 200);
-      assert.equal((await send('DELETE', bare('archivist'), {})).status, 200);
-    },
-  );
-
-  await t.test('REFUSED: words that are not a string, or none (400 naming `payload.words`), and a name that climbs (400)', async () => {
+    const keyed = '---\ntools: Bash\n---\nUse Bash.\n';
+    const frontmatter = await refused(() => send('PUT', at('scribe'), { words: keyed }), 422);
+    assert.ok(frontmatter.includes('opens with a frontmatter block'), frontmatter);
+    assert.deepEqual(held(), {});
+  });
+  test('REFUSED: in `default` with no `?repo=`, an agent of a repository is a name no place has (404), never looked for in the api’s folder; yours is written', async () => {
+    const bare = (name: string) => `/api/agents/${name}/instructions`;
+    const missed = await refused(() => send('PUT', bare('scribe'), { words: 'Write it.' }), 404);
+    assert.ok(missed.includes('The agents there: archivist.'), missed);
+    assert.ok(!missed.includes(process.cwd()), 'the api’s own folder is not where an agent is looked for');
+    const put = await send('PUT', bare('archivist'), { words: 'File it.' });
+    assert.equal(put.status, 200);
+    assert.equal((await send('DELETE', bare('archivist'), {})).status, 200);
+  });
+  test('REFUSED: words that are not a string, or none (400 naming `payload.words`), and a name that climbs (400)', async () => {
     for (const body of [{ words: 7 }, {}]) {
       const before = held();
       const res = await send('PUT', at('scribe'), body);
@@ -207,8 +194,7 @@ test('what the instructions refuse — a name no place has, blank words, a front
     assert.ok(read.startsWith('GET /api/namespaces/default/agents/../x/instructions:'), read);
     assert.equal(fs.existsSync(path.join(root, 'x.md')), false);
   });
-
-  await t.test('REFUSED: a write or a clear in a namespace is no route: the instructions are written at the library alone', async () => {
+  test('REFUSED: a write or a clear in a namespace is no route: the instructions are written at the library alone', async () => {
     for (const method of ['PUT', 'DELETE']) {
       const res = await app.request(at('scribe', 'elsewhere'), { method, headers: json, body: JSON.stringify({ words: 'Here.' }) });
       assert.equal(res.status, 404, `${method} in a namespace`);

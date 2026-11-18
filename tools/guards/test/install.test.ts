@@ -19,7 +19,7 @@
  *
  * `install.sh` is POSIX sh: each test parses it with `sh -n` first, so a bashism the host's sh refuses fails here.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -94,11 +94,8 @@ test('install.sh parses as POSIX sh', () => {
   assert.equal(ran.status, 0, ran.stderr);
 });
 
-test(
+test.skipIf(HOST === undefined && `no release is built for ${process.platform}-${process.arch}`)(
   'install.sh lays down the latest release from a file:// base, points current at it and links nemia to its launcher',
-  {
-    skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}`,
-  },
   () => {
     const base = fs.realpathSync(scratch('install-base-'));
     publish(base, 'v1.2.3', HOST as Platform);
@@ -135,11 +132,8 @@ test(
   },
 );
 
-test(
+test.skipIf(HOST === undefined && `no release is built for ${process.platform}-${process.arch}`)(
   'REFUSED: a release whose SHA256SUMS names another sum exits 1 and leaves current, the releases and the link as they were',
-  {
-    skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}`,
-  },
   () => {
     const base = fs.realpathSync(scratch('install-base-'));
     publish(base, 'v1.2.3', HOST as Platform);
@@ -457,11 +451,8 @@ const mirror = (tag: string) => {
   return { dir, log };
 };
 
-test(
+test.skipIf(HOST === undefined && `no release is built for ${process.platform}-${process.arch}`)(
   'REFUSED: a release tag that is not v and three dotted numbers, a pre-release too, exits 1 before anything is downloaded or deleted, by --version or latest.json',
-  {
-    skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}`,
-  },
   () => {
     for (const tag of ['v1.0.0/../..', 'v1.0.0 ', 'v1.2.3-rc.1', 'v1.2.3.4', 'v1.2.3.']) {
       for (const by of ['latest.json', '--version']) {
@@ -495,11 +486,8 @@ test(
   },
 );
 
-test(
+test.skipIf(HOST === undefined && `no release is built for ${process.platform}-${process.arch}`)(
   'a release tag of v and three dotted numbers is taken, by --version and by latest.json: its archive is the next thing downloaded',
-  {
-    skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}`,
-  },
   () => {
     for (const by of ['latest.json', '--version']) {
       const { dir, log } = mirror('v1.20.3');

@@ -4,7 +4,7 @@
  * written whole and read back: one table, each row on a
  * folder of its own.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,8 +36,8 @@ const refused = (read: () => unknown, at: string) =>
     return true;
   });
 
-test("the chat's files: read back in order, a last line still being written left out, and a line that does not decode refused", async (t) => {
-  await t.test('no file reads as empty, and what is appended reads back in order', () => {
+describe("the chat's files: read back in order, a last line still being written left out, and a line that does not decode refused", () => {
+  test('no file reads as empty, and what is appended reads back in order', () => {
     const dir = scratch('wf-chat-store-');
     assert.deepEqual([readOutbox(dir), readDelivered(dir), readStops(dir), readReadMark(dir)], [[], [], [], undefined]);
     appendOutbox(dir, { id: 'o1', at: '2026-10-15T12:00:00.000Z', text: 'one' });
@@ -58,7 +58,7 @@ test("the chat's files: read back in order, a last line still being written left
       { at: '2026-10-15T12:00:06.000Z', attempt: 2 },
     ]);
   });
-  await t.test("an agent's entry reads back with who wrote it, and a line written with none reads as before, the person's", () => {
+  test("an agent's entry reads back with who wrote it, and a line written with none reads as before, the person's", () => {
     const dir = scratch('wf-chat-store-');
     fs.mkdirSync(path.dirname(outboxFile(dir)), { recursive: true });
     fs.appendFileSync(outboxFile(dir), `${JSON.stringify({ id: 'o1', at: '2026-10-15T12:00:00.000Z', text: 'mine' })}\n`);
@@ -68,7 +68,7 @@ test("the chat's files: read back in order, a last line still being written left
       { id: 'o2', at: '2026-10-15T12:00:01.000Z', text: 'theirs', from: { kind: 'agent', name: 'operator' } },
     ]);
   });
-  await t.test('a last line not yet ended is left out, as an append still being written', () => {
+  test('a last line not yet ended is left out, as an append still being written', () => {
     const dir = scratch('wf-chat-store-');
     appendOutbox(dir, { id: 'o1', at: '2026-10-15T12:00:00.000Z', text: 'one' });
     fs.appendFileSync(outboxFile(dir), '{"id":"o2","at":"2026-10');
@@ -77,25 +77,25 @@ test("the chat's files: read back in order, a last line still being written left
       ['o1'],
     );
   });
-  await t.test('REFUSED: a stop line that does not decode, naming the file and the line — never read as saying nothing', () => {
+  test('REFUSED: a stop line that does not decode, naming the file and the line — never read as saying nothing', () => {
     const dir = scratch('wf-chat-store-');
     appendStop(dir, { at: '2026-10-15T12:00:05.000Z', attempt: 1 });
     fs.appendFileSync(stopsFile(dir), '{"at":"2026-10-15T12:00:07.000Z"}\n');
     refused(() => readStops(dir), `${stopsFile(dir)}:2 is not a line`);
   });
-  await t.test('REFUSED: a delivered line that does not decode, naming the file and the line', () => {
+  test('REFUSED: a delivered line that does not decode, naming the file and the line', () => {
     const dir = scratch('wf-chat-store-');
     appendDelivered(dir, { id: 'o1', said: '2026-10-15T12:00:02.000Z', attempt: 1 });
     fs.appendFileSync(deliveredFile(dir), '{"id":"o2"}\n');
     refused(() => readDelivered(dir), `${deliveredFile(dir)}:2 is not a line`);
   });
-  await t.test('REFUSED: a read mark that is none, naming the file', () => {
+  test('REFUSED: a read mark that is none, naming the file', () => {
     const dir = scratch('wf-chat-store-');
     fs.mkdirSync(path.dirname(readMarkFile(dir)), { recursive: true });
     fs.writeFileSync(readMarkFile(dir), 'not json');
     refused(() => readReadMark(dir), `${readMarkFile(dir)} is not a line`);
   });
-  await t.test('an ask line that says no kind reads as a question, and a permission reads back with its facts', () => {
+  test('an ask line that says no kind reads as a question, and a permission reads back with its facts', () => {
     const dir = scratch('wf-chat-store-');
     const question = {
       question: 'Which?',
@@ -112,7 +112,7 @@ test("the chat's files: read back in order, a last line still being written left
       { id: 'toolu-1', at: '2026-10-15T12:00:01.000Z', kind: 'permission', questions: [question], permission },
     ]);
   });
-  await t.test('REFUSED: an ask line of a kind the chat has no word for, naming the file and the line', () => {
+  test('REFUSED: an ask line of a kind the chat has no word for, naming the file and the line', () => {
     const dir = scratch('wf-chat-store-');
     fs.mkdirSync(path.dirname(asksFile(dir)), { recursive: true });
     fs.appendFileSync(asksFile(dir), `${JSON.stringify({ id: 'call-1', at: '2026-10-15T12:00:00.000Z', kind: 'plan', questions: [] })}\n`);

@@ -5,7 +5,7 @@
  * the rules as they were.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -60,30 +60,30 @@ function packageSays(call: () => unknown): string {
 
 const NONE = { name: 'mill', file: FILE, words: null, error: null };
 
-test("a person writes a factory's rules, rewrites them and removes them", async (t) => {
-  const s = story(t);
-  await s.test('GET reads no rules, and writes nothing', async () => {
+describe("a person writes a factory's rules, rewrites them and removes them", () => {
+  const s = story(test);
+  s.test('GET reads no rules, and writes nothing', async () => {
     assert.deepEqual(await answered(app.request(URL)), NONE);
     assert.equal(fs.existsSync(FILE), false, 'a read writes nothing');
   });
-  await s.test('PUT writes them in the store, trimmed, and GET reads them back', async () => {
+  s.test('PUT writes them in the store, trimmed, and GET reads them back', async () => {
     const written = await answered(send('PUT', URL, { words: '\n  Never push on a Friday.\n\n' }));
     assert.deepEqual(written, { ...NONE, words: 'Never push on a Friday.' });
     assert.equal(fs.readFileSync(FILE, 'utf8'), 'Never push on a Friday.\n');
     assert.deepEqual(await answered(app.request(URL)), written);
   });
-  await s.test('a second PUT replaces them', async () => {
+  s.test('a second PUT replaces them', async () => {
     const again = await answered(send('PUT', URL, { words: 'Write the test first.' }));
     assert.equal(again.words, 'Write the test first.');
     assert.equal(fs.readFileSync(FILE, 'utf8'), 'Write the test first.\n');
   });
-  await s.test('DELETE removes them, and again removes nothing', async () => {
+  s.test('DELETE removes them, and again removes nothing', async () => {
     assert.deepEqual(await answered(send('DELETE', URL, {})), { ...NONE, removed: true });
     assert.equal(fs.existsSync(FILE), false);
     assert.deepEqual(await answered(send('DELETE', URL, {})), { ...NONE, removed: false });
     assert.deepEqual(await answered(app.request(URL)), NONE);
   });
-  await s.test(
+  s.test(
     'rules a hand wrote with a frontmatter block are read with why they cannot be told, never refused, and a write replaces them',
     async () => {
       fs.mkdirSync(STORE, { recursive: true });
@@ -97,8 +97,8 @@ test("a person writes a factory's rules, rewrites them and removes them", async 
   );
 });
 
-test('the rules routes: what a read or a write refuses, writing nothing', async (t) => {
-  await t.test("a factory the store does not have is a 404 in the package's words, and no folder is made for it", async () => {
+describe('the rules routes: what a read or a write refuses, writing nothing', () => {
+  test("a factory the store does not have is a 404 in the package's words, and no folder is made for it", async () => {
     const ghost = await refused(() => app.request('/api/factories/ghost/rules'), 404);
     assert.equal(
       ghost,
@@ -108,7 +108,7 @@ test('the rules routes: what a read or a write refuses, writing nothing', async 
     assert.match(await refused(() => send('PUT', '/api/factories/ghost/rules', { words: 'x' }), 404), /Nothing was written\.$/);
     assert.equal(fs.existsSync(path.join(root, 'factories', 'ghost')), false, 'no folder is made for a factory that is not there');
   });
-  await t.test("the default factory is a 409 in the package's words, to read, write and remove", async () => {
+  test("the default factory is a 409 in the package's words, to read, write and remove", async () => {
     const fallback = await refused(() => app.request('/api/factories/default/rules'), 409);
     assert.equal(
       fallback,
@@ -119,7 +119,7 @@ test('the rules routes: what a read or a write refuses, writing nothing', async 
     await refused(() => send('DELETE', '/api/factories/default/rules', {}), 409);
     assert.equal(fs.existsSync(path.join(root, 'factories', 'default')), false);
   });
-  await t.test('words that open with a frontmatter block, or are blank, are a 422, and the rules there are kept', async () => {
+  test('words that open with a frontmatter block, or are blank, are a 422, and the rules there are kept', async () => {
     await answered(send('PUT', URL, { words: 'Kept.' }));
     const fenced = await refused(() => send('PUT', URL, { words: '---\nallowedTools: Bash\n---\nUse Bash.' }), 422);
     assert.match(fenced, /RULES\.md opens with a frontmatter block/);
@@ -130,18 +130,15 @@ test('the rules routes: what a read or a write refuses, writing nothing', async 
     assert.equal(held(), 'Kept.\n');
     await answered(send('DELETE', URL, {}));
   });
-  await t.test(
-    'words left out, words that are no string, and a body that is not JSON are a 400 naming the route, the key refused, and the document',
-    async () => {
-      for (const body of [{}, { words: 7 }, 'not json']) {
-        const said = await refused(() => send('PUT', URL, body), 400);
-        assert.ok(said.startsWith('PUT /api/factories/mill/rules'), said);
-        assert.ok(said.includes('GET /openapi/v3/nemia/v1'), said);
-        if (typeof body === 'object') assert.ok(said.includes('`payload.words`'), said);
-      }
-    },
-  );
-  await t.test("a name that is no factory's is a 422 in the package's words, to read and to write", async () => {
+  test('words left out, words that are no string, and a body that is not JSON are a 400 naming the route, the key refused, and the document', async () => {
+    for (const body of [{}, { words: 7 }, 'not json']) {
+      const said = await refused(() => send('PUT', URL, body), 400);
+      assert.ok(said.startsWith('PUT /api/factories/mill/rules'), said);
+      assert.ok(said.includes('GET /openapi/v3/nemia/v1'), said);
+      if (typeof body === 'object') assert.ok(said.includes('`payload.words`'), said);
+    }
+  });
+  test("a name that is no factory's is a 422 in the package's words, to read and to write", async () => {
     await refused(() => app.request('/api/factories/Not%20One/rules'), 422);
     await refused(() => app.request('/api/factories/..%2Fmill/rules'), 422);
     await refused(() => send('PUT', '/api/factories/Not%20One/rules', { words: 'x' }), 422);

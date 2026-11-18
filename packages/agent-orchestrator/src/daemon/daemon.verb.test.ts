@@ -2,7 +2,7 @@
  * `nemia daemon`: the store's daemon as its lease stands — its pid, its url and its state — printed in words or as JSON; and, on a store
  * no daemon ticks, the start asked of the host `main` is handed (`ensureDaemon`), once, before it answers, as every command that ticks.
  */
-import { test, type TestContext } from 'node:test';
+import { test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
@@ -50,12 +50,12 @@ function hostOf(): { host: () => DemandHost; spawns: string[] } {
 /** What `nemia <argv>` prints on stdout, over `host`. */
 async function printed(t: TestContext, argv: string[], host: () => DemandHost): Promise<string> {
   const lines: string[] = [];
-  t.mock.method(console, 'log', (line: unknown) => void lines.push(String(line)));
-  t.mock.method(console, 'error', () => undefined);
+  vi.spyOn(console, 'log').mockImplementation((line: unknown) => void lines.push(String(line)));
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
   try {
     await main(argv, engineOf(engine().layer), host);
   } finally {
-    t.mock.restoreAll();
+    vi.restoreAllMocks();
   }
   return lines.join('\n');
 }
@@ -68,7 +68,7 @@ test('nemia daemon is served on the command line alone and starts the daemon as 
 
 test('nemia daemon --json, on a store whose lease holds a url, prints the url and the pid, and starts nothing', async (t) => {
   const { held } = takeStore(ROOT, { every: 4000, cwd: ROOT, by: 'api' });
-  t.after(() => releaseStore(ROOT, held));
+  t.onTestFinished(() => releaseStore(ROOT, held));
   assert.equal(heldUrl(ROOT, 'http://127.0.0.1:65530'), true);
   const { host, spawns } = hostOf();
   const answer: unknown = JSON.parse(await printed(t, ['daemon', '--json'], host));

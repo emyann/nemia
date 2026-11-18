@@ -6,7 +6,7 @@
  * the test place.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -48,9 +48,9 @@ fs.writeFileSync(STEP, '---\nworkspace: folder\nagent: layered\nskills: alpha, g
 /** What the step `write` of the run `id` was told (`…/steps/write/told`): `toldOf` throws unless it answers 200. */
 const toldWrite = (id: string) => toldOf(app(), id, 'write');
 
-test('what a step was told reads, layer by layer, as the run froze it: no later edit of the agent, custom instructions, step or rules reaches it, and a record that froze none answers none', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('what a step was told reads, layer by layer, as the run froze it: no later edit of the agent, custom instructions, step or rules reaches it, and a record that froze none answers none', () => {
+  const s = story(test);
+  s.test(
     'each layer is answered as the run froze it: an edit of the agent, its custom instructions or the step since reaches none',
     async () => {
       const run = await runWith(engine(), startRun({ brief: 'Write a note.', repo: '', workflowDir: TEAM }));
@@ -79,7 +79,7 @@ test('what a step was told reads, layer by layer, as the run froze it: no later 
       );
     },
   );
-  await s.test(
+  s.test(
     'a run started in a factory with rules answers them as a layer of their own, as it froze them: an edit or a removal since reaches none',
     async () => {
       fs.writeFileSync(STEP, '---\nworkspace: folder\nagent: layered\n---\nWrite the note.\n');
@@ -106,7 +106,7 @@ test('what a step was told reads, layer by layer, as the run froze it: no later 
       assert.equal(after.layers?.factory, null, 'a run started once they are removed is told none');
     },
   );
-  await s.test('a record that froze no workflow answers no layers, and still what it was told', async () => {
+  s.test('a record that froze no workflow answers no layers, and still what it was told', async () => {
     const id = 'layers-unfrozen';
     fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
     fs.writeFileSync(

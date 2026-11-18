@@ -8,7 +8,7 @@
  * and reading the agent files the store knows — then one table of what a copy refuses.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -67,10 +67,9 @@ async function refused(body: unknown, status: number, pattern: RegExp): Promise<
   assert.deepEqual(held(), before, 'nothing written');
 }
 
-test('a person copies an agent into theirs with its skill, reads where it came from as its source changes and goes, copies another of that name under another, and reads the agent files the store knows', async (t) => {
-  const s = story(t);
-
-  await s.test(
+describe('a person copies an agent into theirs with its skill, reads where it came from as its source changes and goes, copies another of that name under another, and reads the agent files the store knows', () => {
+  const s = story(test);
+  s.test(
     "an agent copied on the route is written into yours with its skill, and the Agents list where it came from, the source's change and its going",
     async () => {
       const file = source('scout', ['description: Scouts the ground.', 'skills: scouting', 'model: sonnet']);
@@ -96,8 +95,7 @@ test('a person copies an agent into theirs with its skill, reads where it came f
       assert.deepEqual(await copiedOf(), { ...first, now: 'gone' }, 'the source gone');
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED at shipped defaults: an agent of yours of the same name, otherwise — a 409 naming `--as`, nothing written; under another name, copied',
     async () => {
       const file = source('scout', ['description: Another scout.', 'skills: scouting'], 'Scout elsewhere.');
@@ -107,8 +105,7 @@ test('a person copies an agent into theirs with its skill, reads where it came f
       assert.equal(fs.readFileSync(path.join(AGENTS, 'outrider.md'), 'utf8').includes('Scout elsewhere.'), true);
     },
   );
-
-  await s.test(
+  s.test(
     'the agent files the store knows are read on GET /api/agent-sources: yours, then the folder `path` names; a folder not there is a 404',
     async () => {
       fs.mkdirSync(AGENTS, { recursive: true });
@@ -134,31 +131,24 @@ test('a person copies an agent into theirs with its skill, reads where it came f
   );
 });
 
-test('a copy the store refuses — a key another harness writes, a file not there, a body it does not take — its status and the fact it names, and nothing written', async (t) => {
-  await t.test(
-    "REFUSED at shipped defaults: a key the store refuses in another harness's agent file — a 422 naming it and the copy to edit, nothing written",
-    async () => {
-      const file = source('counted', ['description: Counts.', 'maxTurns: 5']);
-      await refused({ file }, 422, /maxTurns[\s\S]*delete that line there, and copy from that path/);
-    },
-  );
-
-  await t.test(
-    'REFUSED at shipped defaults: a file that is not there is a 404 naming `nemia agents sources`; a `keep` that is no list a 400 naming `payload.keep`; a copy in a namespace no route',
-    async () => {
-      await refused({ file: path.join(from, 'agents', 'nobody.md') }, 404, /nemia agents sources lists the agents the store knows/);
-      const before = held();
-      const res = await copy({ file: source('scout', ['description: x']), keep: 'scouting' });
-      assert.equal(res.status, 400);
-      assert.equal(((await res.json()) as { field?: string }).field, 'payload.keep');
-      assert.deepEqual(held(), before, 'nothing written');
-      const elsewhere = await app.request('/api/namespaces/elsewhere/agents/copy', {
-        method: 'POST',
-        headers: json,
-        body: JSON.stringify({ file: source('scout', ['description: x']) }),
-      });
-      assert.equal(elsewhere.status, 404, 'a copy is made at the library alone: a namespace has no copy');
-      assert.deepEqual(held(), before, 'nothing written');
-    },
-  );
+describe('a copy the store refuses — a key another harness writes, a file not there, a body it does not take — its status and the fact it names, and nothing written', () => {
+  test("REFUSED at shipped defaults: a key the store refuses in another harness's agent file — a 422 naming it and the copy to edit, nothing written", async () => {
+    const file = source('counted', ['description: Counts.', 'maxTurns: 5']);
+    await refused({ file }, 422, /maxTurns[\s\S]*delete that line there, and copy from that path/);
+  });
+  test('REFUSED at shipped defaults: a file that is not there is a 404 naming `nemia agents sources`; a `keep` that is no list a 400 naming `payload.keep`; a copy in a namespace no route', async () => {
+    await refused({ file: path.join(from, 'agents', 'nobody.md') }, 404, /nemia agents sources lists the agents the store knows/);
+    const before = held();
+    const res = await copy({ file: source('scout', ['description: x']), keep: 'scouting' });
+    assert.equal(res.status, 400);
+    assert.equal(((await res.json()) as { field?: string }).field, 'payload.keep');
+    assert.deepEqual(held(), before, 'nothing written');
+    const elsewhere = await app.request('/api/namespaces/elsewhere/agents/copy', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ file: source('scout', ['description: x']) }),
+    });
+    assert.equal(elsewhere.status, 404, 'a copy is made at the library alone: a namespace has no copy');
+    assert.deepEqual(held(), before, 'nothing written');
+  });
 });

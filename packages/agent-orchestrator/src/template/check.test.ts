@@ -4,7 +4,7 @@
  * by a fixture, and the refusal names where.
  */
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { describe, test } from 'vitest';
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { checkTemplate } from './check.ts';
 import { sharedLinesOf } from './template.store.ts';
@@ -142,12 +142,11 @@ const LISTED = Object.keys(HARNESS_KNOBS).find((h) => HARNESS_KNOBS[h].fence.lis
 const WORDED = Object.keys(HARNESS_KNOBS).find((h) => HARNESS_KNOBS[h].fence.lists.length === 0)!;
 const AGENT = 'agents/implementer/agent.yaml';
 
-test('the check of a template folder: the whole folder passes, and each rule broken is refused at its file and key', async (t) => {
-  await t.test("draft 3's software-team, carried whole in its folder, passes", () => {
+describe('the check of a template folder: the whole folder passes, and each rule broken is refused at its file and key', () => {
+  test("draft 3's software-team, carried whole in its folder, passes", () => {
     assert.deepEqual(refusalsOf(), []);
   });
-
-  await t.test('a file outside the layout is refused by name, and so is a folder without its file', () => {
+  test('a file outside the layout is refused by name, and so is a folder without its file', () => {
     const refusals = refusalsOf(undefined, (others) => [...others, 'agents/implementer/extra.yaml', 'notes.txt', 'agents/designer.md']);
     for (const file of ['agents/implementer/extra.yaml', 'notes.txt', 'agents/designer.md'])
       assertRefused(refusals, file, [], 'outside the template');
@@ -164,26 +163,21 @@ test('the check of a template folder: the whole folder passes, and each rule bro
       'has no nemia.yaml',
     );
   });
-
-  await t.test(
-    "RULES.md at the root is a file of the layout, the factory's rules; another .md there, or RULES.md further down, is outside it",
-    () => {
-      assert.deepEqual(
-        refusalsOf(undefined, (others) => [...others, 'RULES.md']),
-        [],
-      );
-      const refusals = refusalsOf(undefined, (others) => [...others, 'POLICY.md', 'agents/RULES.md']);
-      assertRefused(refusals, 'POLICY.md', [], 'A template holds nemia.yaml, NEMIA.md, RULES.md and nemia.lock.yaml at its root');
-      assertRefused(refusals, 'agents/RULES.md', [], 'outside the template');
-      assert.deepEqual(
-        refusalsOf((docs) => (docs['nemia.yaml'].spec.rules = 'Never push on a Friday.')),
-        [],
-        'the manifest may hold them instead',
-      );
-    },
-  );
-
-  await t.test("a workflow's needs: each declared once, and a need that fills one fills a need a shipped place declares", () => {
+  test("RULES.md at the root is a file of the layout, the factory's rules; another .md there, or RULES.md further down, is outside it", () => {
+    assert.deepEqual(
+      refusalsOf(undefined, (others) => [...others, 'RULES.md']),
+      [],
+    );
+    const refusals = refusalsOf(undefined, (others) => [...others, 'POLICY.md', 'agents/RULES.md']);
+    assertRefused(refusals, 'POLICY.md', [], 'A template holds nemia.yaml, NEMIA.md, RULES.md and nemia.lock.yaml at its root');
+    assertRefused(refusals, 'agents/RULES.md', [], 'outside the template');
+    assert.deepEqual(
+      refusalsOf((docs) => (docs['nemia.yaml'].spec.rules = 'Never push on a Friday.')),
+      [],
+      'the manifest may hold them instead',
+    );
+  });
+  test("a workflow's needs: each declared once, and a need that fills one fills a need a shipped place declares", () => {
     const workflow = 'workflows/dev/workflow.yaml';
     const tool = { name: 'tool', message: 'the tool', check: 'command -v tool' };
     const filling = { name: 'from-host', message: 'from the host', check: 'true', fills: 'git-identity' };
@@ -194,8 +188,7 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     assertRefused(refusalsOf(withNeeds([filling])), workflow, ['spec', 'needs', 0, 'fills'], 'git-identity');
     assert.ok(refusalsOf(withNeeds([{ name: 'tool' }])).some((r) => r.file === workflow && r.at[1] === 'needs'));
   });
-
-  await t.test("a workflow's README and its files that are no .md or .yaml are carried, and a .md that names no step is refused", () => {
+  test("a workflow's README and its files that are no .md or .yaml are carried, and a .md that names no step is refused", () => {
     assert.deepEqual(
       refusalsOf(undefined, (others) => [...others, 'workflows/dev/README.md', 'workflows/dev/coverage.ts']),
       [],
@@ -213,8 +206,7 @@ test('the check of a template folder: the whole folder passes, and each rule bro
       'outside',
     );
   });
-
-  await t.test("a document's apiVersion, kind and name are refused when wrong, and a key it has no place for", () => {
+  test("a document's apiVersion, kind and name are refused when wrong, and a key it has no place for", () => {
     assertRefused(
       refusalsOf((d) => (d[AGENT].apiVersion = 'nemia.dev/v1')),
       AGENT,
@@ -271,8 +263,7 @@ test('the check of a template folder: the whole folder passes, and each rule bro
       'no `role`',
     );
   });
-
-  await t.test("a condition's routes, its route of each eval and its ends, a node's when and a workflow node have their places", () => {
+  test("a condition's routes, its route of each eval and its ends, a node's when and a workflow node have their places", () => {
     const workflow = 'workflows/dev/workflow.yaml';
     for (const route of ['judge', { script: 'routes/pick.ts' }, { from: 'design.surface', table: { web: 'web', docs: 'docs' } }]) {
       const routed = (d: Record<string, any>) =>
@@ -296,8 +287,7 @@ test('the check of a template folder: the whole folder passes, and each rule bro
       'a list of strings',
     );
   });
-
-  await t.test("an agent's overridable words are what a step may override: one that is none is refused at its place", () => {
+  test("an agent's overridable words are what a step may override: one that is none is refused at its place", () => {
     assert.deepEqual(
       refusalsOf((d) => (d[AGENT].spec.overridable = ['fence', 'skills'])),
       [],
@@ -309,15 +299,13 @@ test('the check of a template folder: the whole folder passes, and each rule bro
       'wiring',
     );
   });
-
-  await t.test('a hire naming no workflow, no step or no agent is refused', () => {
+  test('a hire naming no workflow, no step or no agent is refused', () => {
     const hire = (key: string, agent: string) => refusalsOf((d) => (d['nemia.yaml'].spec.hires[key] = agent));
     assertRefused(hire('dev/nope', 'implementer'), 'nemia.yaml', ['spec', 'hires', 'dev/nope'], 'names no step of dev');
     assertRefused(hire('nope/design', 'implementer'), 'nemia.yaml', ['spec', 'hires', 'nope/design'], 'names no workflow');
     assertRefused(hire('dev/design', 'nobody'), 'nemia.yaml', ['spec', 'hires', 'dev/design'], 'no agent of agents/');
   });
-
-  await t.test("a skill the folder lacks is refused, an agent's or a step's, and a place skill nemia ships is present", () => {
+  test("a skill the folder lacks is refused, an agent's or a step's, and a place skill nemia ships is present", () => {
     assertRefused(
       refusalsOf((d) => d[AGENT].spec.skills.push('nope')),
       AGENT,
@@ -364,8 +352,7 @@ test('the check of a template folder: the whole folder passes, and each rule bro
       'skill git',
     );
   });
-
-  await t.test('after:, input: and loop: naming no sibling step are refused, and a step named twice', () => {
+  test('after:, input: and loop: naming no sibling step are refused, and a step named twice', () => {
     const workflow = 'workflows/dev/workflow.yaml';
     const step = (edit: (s: any) => void) => refusalsOf((d) => edit(d[workflow].spec.steps[2]));
     assertRefused(
@@ -399,8 +386,7 @@ test('the check of a template folder: the whole folder passes, and each rule bro
       'named twice',
     );
   });
-
-  await t.test("a step's place, workspace, reads and tally are today's words", () => {
+  test("a step's place, workspace, reads and tally are today's words", () => {
     const workflow = 'workflows/dev/workflow.yaml';
     const step = (edit: (s: any) => void) => refusalsOf((d) => edit(d[workflow].spec.steps[0]));
     assert.deepEqual(
@@ -432,21 +418,16 @@ test('the check of a template folder: the whole folder passes, and each rule bro
       'place is one of',
     );
   });
-
-  await t.test(
-    "a step's own closeout schema is a {path:} to a file of its workflow's folder, refused anywhere else and as a bare file name",
-    () => {
-      const workflow = 'workflows/dev/workflow.yaml';
-      const at = ['spec', 'steps', 1, 'output', 'path'];
-      const output = (value: unknown) => refusalsOf((d) => (d[workflow].spec.steps[1].output = value));
-      assertRefused(output({ path: 'workflows/dev/missing.schema.json' }), workflow, at.slice(0, -1), 'is not in the template');
-      assertRefused(output({ path: 'agents/implementer/output.schema.json' }), workflow, at, 'workflows/dev/');
-      assertRefused(output({ path: 'workflows/dev/implement.md' }), workflow, at, 'workflows/dev/');
-      assertRefused(output('implement.schema.json'), workflow, ['spec', 'steps', 1, 'output'], 'is a map');
-    },
-  );
-
-  await t.test('a {param:} nemia.yaml does not declare is refused, a budget or a check, and a declared one passes', () => {
+  test("a step's own closeout schema is a {path:} to a file of its workflow's folder, refused anywhere else and as a bare file name", () => {
+    const workflow = 'workflows/dev/workflow.yaml';
+    const at = ['spec', 'steps', 1, 'output', 'path'];
+    const output = (value: unknown) => refusalsOf((d) => (d[workflow].spec.steps[1].output = value));
+    assertRefused(output({ path: 'workflows/dev/missing.schema.json' }), workflow, at.slice(0, -1), 'is not in the template');
+    assertRefused(output({ path: 'agents/implementer/output.schema.json' }), workflow, at, 'workflows/dev/');
+    assertRefused(output({ path: 'workflows/dev/implement.md' }), workflow, at, 'workflows/dev/');
+    assertRefused(output('implement.schema.json'), workflow, ['spec', 'steps', 1, 'output'], 'is a map');
+  });
+  test('a {param:} nemia.yaml does not declare is refused, a budget or a check, and a declared one passes', () => {
     const workflow = 'workflows/dev/workflow.yaml';
     const at = (i: number, key: string) => ['spec', 'steps', i, key];
     assertRefused(
@@ -467,36 +448,31 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     };
     assert.deepEqual(refusalsOf(declared), []);
   });
-
-  await t.test(
-    'a ${{ parameters.<name> }} nemia.yaml does not declare is refused, in a check at its key and in a text the render writes at its file, and a declared one passes',
-    () => {
-      const workflow = 'workflows/dev/workflow.yaml';
-      const named = (d: Record<string, any>) => (d[workflow].spec.steps[1].check = 'go --check ${{ parameters.nope }}');
-      assertRefused(refusalsOf(named), workflow, ['spec', 'steps', 1, 'check'], 'nope');
-      const texts = {
-        'RULES.md': 'A card says what it is.\nIts areas: ${{parameters.nope}}.\n',
-        'workflows/dev/review.md': 'Wait on ${{ parameters.nope }}.',
-        'agents/reviewer/instructions.md': 'Read ${{ parameters.nope }}.',
-        'NEMIA.md': 'Operate ${{ parameters.nope }}.',
-      };
-      const withRules = (others: string[]) => [...others, 'RULES.md'];
-      const inTexts = refusalsOf(undefined, withRules, ['git'], texts);
-      for (const file of Object.keys(texts)) assertRefused(inTexts, file, [], 'nope');
-      assert.deepEqual([inTexts.find((r) => r.file === 'RULES.md')?.line, inTexts.find((r) => r.file === 'RULES.md')?.col], [2, 12]);
-      const carried = refusalsOf(undefined, withRules, ['git'], {
-        'skills/implement-a-change/scripts/coverage.ts': '${{ parameters.nope }}',
-      });
-      assert.deepEqual(carried, [], 'a carried file is copied as it is, and the check reads none of it');
-      const declared = (d: Record<string, any>) => {
-        named(d);
-        d['nemia.yaml'].spec.parameters.nope = { type: 'string', description: 'Declared now.', default: 'ci' };
-      };
-      assert.deepEqual(refusalsOf(declared, withRules, ['git'], texts), []);
-    },
-  );
-
-  await t.test("an effort, a fence key or word, a context and an option the harness lacks are refused, through the runtime's knobs", () => {
+  test('a ${{ parameters.<name> }} nemia.yaml does not declare is refused, in a check at its key and in a text the render writes at its file, and a declared one passes', () => {
+    const workflow = 'workflows/dev/workflow.yaml';
+    const named = (d: Record<string, any>) => (d[workflow].spec.steps[1].check = 'go --check ${{ parameters.nope }}');
+    assertRefused(refusalsOf(named), workflow, ['spec', 'steps', 1, 'check'], 'nope');
+    const texts = {
+      'RULES.md': 'A card says what it is.\nIts areas: ${{parameters.nope}}.\n',
+      'workflows/dev/review.md': 'Wait on ${{ parameters.nope }}.',
+      'agents/reviewer/instructions.md': 'Read ${{ parameters.nope }}.',
+      'NEMIA.md': 'Operate ${{ parameters.nope }}.',
+    };
+    const withRules = (others: string[]) => [...others, 'RULES.md'];
+    const inTexts = refusalsOf(undefined, withRules, ['git'], texts);
+    for (const file of Object.keys(texts)) assertRefused(inTexts, file, [], 'nope');
+    assert.deepEqual([inTexts.find((r) => r.file === 'RULES.md')?.line, inTexts.find((r) => r.file === 'RULES.md')?.col], [2, 12]);
+    const carried = refusalsOf(undefined, withRules, ['git'], {
+      'skills/implement-a-change/scripts/coverage.ts': '${{ parameters.nope }}',
+    });
+    assert.deepEqual(carried, [], 'a carried file is copied as it is, and the check reads none of it');
+    const declared = (d: Record<string, any>) => {
+      named(d);
+      d['nemia.yaml'].spec.parameters.nope = { type: 'string', description: 'Declared now.', default: 'ci' };
+    };
+    assert.deepEqual(refusalsOf(declared, withRules, ['git'], texts), []);
+  });
+  test("an effort, a fence key or word, a context and an option the harness lacks are refused, through the runtime's knobs", () => {
     const block = (harness: string, profile: Record<string, unknown>) => refusalsOf((d) => (d[AGENT].spec[harness] = profile));
     const at = (harness: string, ...rest: string[]) => ['spec', harness, ...rest];
     assertRefused(block(LISTED, { effort: 'enormous' }), AGENT, at(LISTED, 'effort'), `no effort ${LISTED} knows`);
@@ -520,27 +496,22 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     assertRefused(block(contextless, { context: '200k' }), AGENT, at(contextless, 'context'), 'takes no context window');
     assert.deepEqual(block(LISTED, { context: '200k', effort: HARNESS_KNOBS[LISTED].effort[0] }), []);
   });
-
-  await t.test(
-    'an option that is a fence key, a key of the block, a flag the runtime owns, or one an `only` harness does not read is refused',
-    () => {
-      const options = (harness: string, opts: Record<string, unknown>) => refusalsOf((d) => (d[AGENT].spec[harness] = { options: opts }));
-      const at = (harness: string, key: string) => ['spec', harness, 'options', key];
-      const listedKey = HARNESS_KNOBS[LISTED].fence.key;
-      assertRefused(options(LISTED, { [listedKey]: 'x' }), AGENT, at(LISTED, listedKey), 'is a fence key');
-      assertRefused(options(LISTED, { model: 'x' }), AGENT, at(LISTED, 'model'), 'a key of the block');
-      const flags = HARNESS_KNOBS[LISTED].flags;
-      const owned = 'owned' in flags ? flags.owned.find((f) => f === 'print')! : 'print';
-      assertRefused(options(LISTED, { [owned]: true }), AGENT, at(LISTED, owned), 'the runtime sets itself');
-      assert.deepEqual(options(LISTED, { maxTurns: 60 }), []);
-      const only = Object.keys(HARNESS_KNOBS).find((h) => 'only' in HARNESS_KNOBS[h].flags)!;
-      const read = HARNESS_KNOBS[only].flags as { only: readonly string[] };
-      assertRefused(options(only, { maxTurns: 60 }), AGENT, at(only, 'maxTurns'), `reads only ${read.only.join(', ')}`);
-      assert.deepEqual(options(only, { [read.only[0]]: '/repo' }), []);
-    },
-  );
-
-  await t.test('a block named for no harness is refused, and so is a harness that is none', () => {
+  test('an option that is a fence key, a key of the block, a flag the runtime owns, or one an `only` harness does not read is refused', () => {
+    const options = (harness: string, opts: Record<string, unknown>) => refusalsOf((d) => (d[AGENT].spec[harness] = { options: opts }));
+    const at = (harness: string, key: string) => ['spec', harness, 'options', key];
+    const listedKey = HARNESS_KNOBS[LISTED].fence.key;
+    assertRefused(options(LISTED, { [listedKey]: 'x' }), AGENT, at(LISTED, listedKey), 'is a fence key');
+    assertRefused(options(LISTED, { model: 'x' }), AGENT, at(LISTED, 'model'), 'a key of the block');
+    const flags = HARNESS_KNOBS[LISTED].flags;
+    const owned = 'owned' in flags ? flags.owned.find((f) => f === 'print')! : 'print';
+    assertRefused(options(LISTED, { [owned]: true }), AGENT, at(LISTED, owned), 'the runtime sets itself');
+    assert.deepEqual(options(LISTED, { maxTurns: 60 }), []);
+    const only = Object.keys(HARNESS_KNOBS).find((h) => 'only' in HARNESS_KNOBS[h].flags)!;
+    const read = HARNESS_KNOBS[only].flags as { only: readonly string[] };
+    assertRefused(options(only, { maxTurns: 60 }), AGENT, at(only, 'maxTurns'), `reads only ${read.only.join(', ')}`);
+    assert.deepEqual(options(only, { [read.only[0]]: '/repo' }), []);
+  });
+  test('a block named for no harness is refused, and so is a harness that is none', () => {
     assertRefused(
       refusalsOf((d) => (d[AGENT].spec.gemini = { model: 'x' })),
       AGENT,
@@ -554,8 +525,7 @@ test('the check of a template folder: the whole folder passes, and each rule bro
       'is no harness',
     );
   });
-
-  await t.test('an a2a: agent carrying a block is refused, and a step overriding onto one with a block', () => {
+  test('an a2a: agent carrying a block is refused, and a step overriding onto one with a block', () => {
     const remote = refusalsOf((d) => (d[AGENT].spec.harness = 'a2a:remote'));
     assertRefused(remote, AGENT, ['spec', LISTED], 'a remote agent picks its own model');
     const bare = refusalsOf((d) => {
@@ -567,8 +537,7 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     const step = refusalsOf((d) => (d[workflow].spec.steps[2].overrides = { harness: 'a2a:remote', [LISTED]: { model: 'x' } }));
     assertRefused(step, workflow, ['spec', 'steps', 2, 'overrides', LISTED], 'a remote agent picks its own model');
   });
-
-  await t.test('a git or url source is refused as not yet, wherever it stands', () => {
+  test('a git or url source is refused as not yet, wherever it stands', () => {
     const at = (...keys: Array<string | number>) => keys;
     const manifest = (edit: (spec: any) => void) => refusalsOf((d) => edit(d['nemia.yaml'].spec));
     assertRefused(
@@ -593,8 +562,7 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     assertRefused(lock([{ kind: 'Agent', name: 'x' }]), 'nemia.lock.yaml', at('resolved', 0), 'not yet');
     assert.deepEqual(lock([]), []);
   });
-
-  await t.test('a {path:} passes when the folder holds the file, and is refused when it does not, or leaves the folder', () => {
+  test('a {path:} passes when the folder holds the file, and is refused when it does not, or leaves the folder', () => {
     const instructions = (path: string, files: (f: string[]) => string[] = (f) => f) =>
       refusalsOf((d) => (d[AGENT].spec.instructions = { path }), files);
     assert.deepEqual(
@@ -604,8 +572,7 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     assertRefused(instructions('agents/implementer/notes.md'), AGENT, ['spec', 'instructions'], 'is not in the template');
     assertRefused(instructions('../secrets.md'), AGENT, ['spec', 'instructions'], 'never through ..');
   });
-
-  await t.test('carried/ holds any file at any depth, and a folder the layout does not know is outside it', () => {
+  test('carried/ holds any file at any depth, and a folder the layout does not know is outside it', () => {
     assert.deepEqual(
       refusalsOf(undefined, (others) => [...others, 'carried/a/b.ts', 'carried/notes.md', 'carried/x.yaml']),
       [],
@@ -617,40 +584,35 @@ test('the check of a template folder: the whole folder passes, and each rule bro
       'outside the template',
     );
   });
-
-  await t.test(
-    "a { path } item of an agent's fence list passes for a YAML list of strings, and is refused missing, outside, or not a list",
-    () => {
-      const FENCES = 'fences/read.yaml';
-      const fenced = (path: string, text: string | undefined, files: (f: string[]) => string[] = (f) => [...f, FENCES]) =>
-        refusalsOf(
-          (d) => (d[AGENT].spec.claude.fence.disallowedTools = ['Bash(git push:*)', { path }]),
-          files,
-          ['git'],
-          text === undefined ? {} : { [path]: text },
-        );
-      const at = ['spec', 'claude', 'fence', 'disallowedTools', 1];
-      assert.deepEqual(fenced(FENCES, '# Each line is a rule.\n- Bash(rm:*)  # why it is refused\n- Edit\n'), []);
-      assertRefused(
-        fenced(FENCES, undefined, (f) => f),
-        AGENT,
-        at,
-        'is not in the template',
+  test("a { path } item of an agent's fence list passes for a YAML list of strings, and is refused missing, outside, or not a list", () => {
+    const FENCES = 'fences/read.yaml';
+    const fenced = (path: string, text: string | undefined, files: (f: string[]) => string[] = (f) => [...f, FENCES]) =>
+      refusalsOf(
+        (d) => (d[AGENT].spec.claude.fence.disallowedTools = ['Bash(git push:*)', { path }]),
+        files,
+        ['git'],
+        text === undefined ? {} : { [path]: text },
       );
-      assertRefused(fenced('../fences.yaml', '- Edit\n'), AGENT, at, 'never through ..');
-      assertRefused(fenced(FENCES, 'Edit: refused\n'), FENCES, [], 'a YAML list of strings');
-      assertRefused(fenced(FENCES, '- Edit\n- { a: 1 }\n'), FENCES, [], 'a YAML list of strings');
-      assertRefused(fenced(FENCES, '- [unclosed\n'), FENCES, [], 'a YAML list of strings');
-      assertRefused(
-        refusalsOf((d) => (d[AGENT].spec.claude.fence.disallowedTools = ['Edit', { file: FENCES }])),
-        AGENT,
-        at.slice(0, -1),
-        'a list of strings',
-      );
-    },
-  );
-
-  await t.test('every refusal comes back at once, sorted by file', () => {
+    const at = ['spec', 'claude', 'fence', 'disallowedTools', 1];
+    assert.deepEqual(fenced(FENCES, '# Each line is a rule.\n- Bash(rm:*)  # why it is refused\n- Edit\n'), []);
+    assertRefused(
+      fenced(FENCES, undefined, (f) => f),
+      AGENT,
+      at,
+      'is not in the template',
+    );
+    assertRefused(fenced('../fences.yaml', '- Edit\n'), AGENT, at, 'never through ..');
+    assertRefused(fenced(FENCES, 'Edit: refused\n'), FENCES, [], 'a YAML list of strings');
+    assertRefused(fenced(FENCES, '- Edit\n- { a: 1 }\n'), FENCES, [], 'a YAML list of strings');
+    assertRefused(fenced(FENCES, '- [unclosed\n'), FENCES, [], 'a YAML list of strings');
+    assertRefused(
+      refusalsOf((d) => (d[AGENT].spec.claude.fence.disallowedTools = ['Edit', { file: FENCES }])),
+      AGENT,
+      at.slice(0, -1),
+      'a list of strings',
+    );
+  });
+  test('every refusal comes back at once, sorted by file', () => {
     const refusals = refusalsOf((d) => {
       d['workflows/dev/workflow.yaml'].spec.steps[3].after = ['nope'];
       d[AGENT].apiVersion = 'v0';

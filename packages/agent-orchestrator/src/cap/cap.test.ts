@@ -4,7 +4,7 @@
  * is said in (`slotWord`, `ceilingLines`, and `listing` handed a slot). One table per function. The cap over a whole store, as the tick
  * and `nemia ls` judge it, is the story of `test/queue-store.test.ts`; `slotsOf` reading the engine once is `test/slots.test.ts`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Run, TaskPhase } from '../record/record.ts';
 import type { RepositoryRun } from '../run.ts';
@@ -35,7 +35,7 @@ const need = (r: Run, p: Record<string, TaskPhase>, o: { landed?: boolean; steps
     o.steps,
   );
 
-test('`slotNeed`: in flight while a task is filed and not settled, or a started run files something; wants a slot with nothing filed and a root ready', async (t) => {
+describe('`slotNeed`: in flight while a task is filed and not settled, or a started run files something; wants a slot with nothing filed and a root ready', () => {
   const fresh = run({ implement: null, review: null });
   const running = run({ implement: 't1', review: null });
   const waits = run({ implement: null, review: null }, { after: ['a-1x2y'] });
@@ -80,10 +80,10 @@ test('`slotNeed`: in flight while a task is filed and not settled, or a started 
       { inFlight: true, wants: false },
     ],
   ];
-  for (const [name, got, want] of rows) await t.test(name, () => assert.deepEqual(got(), want));
+  for (const [name, got, want] of rows) test(name, () => assert.deepEqual(got(), want));
 });
 
-test('`runAdmitted`: the roots of a run with nothing filed only while fewer runs are in flight than the cap — never a run that has started', async (t) => {
+describe('`runAdmitted`: the roots of a run with nothing filed only while fewer runs are in flight than the cap — never a run that has started', () => {
   const fresh = run({ implement: null, review: null });
   const rows: Array<[string, () => boolean, boolean]> = [
     ['REFUSED: 2 of 2 in flight, held', () => runAdmitted(fresh, { inFlight: 2, cap: 2 }), false],
@@ -106,7 +106,7 @@ test('`runAdmitted`: the roots of a run with nothing filed only while fewer runs
     ],
     ['`slot: none`: its roots are filed at a full cap', () => runAdmitted(fresh, { inFlight: 2, cap: 2 }, WATCHING), true],
   ];
-  for (const [name, got, want] of rows) await t.test(name, () => assert.equal(got(), want));
+  for (const [name, got, want] of rows) test(name, () => assert.equal(got(), want));
 });
 
 test('`admissionOrder`: by createdAt, then id', () => {
@@ -125,7 +125,7 @@ test('`admissionOrder`: by createdAt, then id', () => {
   );
 });
 
-test('`heldRuns`: every run in flight counted, then each that wants a slot admitted oldest first and counted for the next, the rest held at the count', async (t) => {
+describe('`heldRuns`: every run in flight counted, then each that wants a slot admitted oldest first and counted for the next, the rest held at the count', () => {
   const at = (h: number) => `2026-09-16T0${h}:00:00.000Z`;
   const runs = [
     { id: 'c-young', createdAt: at(5), inFlight: false, wants: true },
@@ -164,34 +164,32 @@ test('`heldRuns`: every run in flight counted, then each that wants a slot admit
       [['work', { inFlight: 1, cap: 1 }]],
     ],
   ];
-  for (const [name, got, want] of rows) await t.test(name, () => assert.deepEqual([...got()], want));
+  for (const [name, got, want] of rows) test(name, () => assert.deepEqual([...got()], want));
 });
 
 test('`slotWord`: a run the cap holds, with the count in flight', () => {
   assert.equal(slotWord({ inFlight: 2, cap: 2 }), 'waiting for a run slot (2 of 2 in flight)');
 });
 
-test('`ceilingLines`: sessions at work per pool, and runs in flight — `no cap` when none', async (t) => {
-  await t.test('no cap on runs', () =>
+describe('`ceilingLines`: sessions at work per pool, and runs in flight — `no cap` when none', () => {
+  test('no cap on runs', () =>
     assert.deepEqual(ceilingLines({ sessions: 4, runs: 0 }), [
       'sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)',
       'runs in flight: no cap (WF_MAX_RUNS)',
-    ]),
-  );
-  await t.test('a cap of 2', () =>
+    ]));
+  test('a cap of 2', () =>
     assert.equal(
       ceilingLines({ sessions: 2, runs: 2 })[1],
       'runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)',
-    ),
-  );
-  await t.test('a memory limit, said on a line of its own, its slice beside it; none, and no line', () => {
+    ));
+  test('a memory limit, said on a line of its own, its slice beside it; none, and no line', () => {
     const lines = ceilingLines({ sessions: 2, runs: 0, memory: '8Gi', cgroupParent: 'agents.slice' });
     assert.equal(lines.length, 3);
     assert.match(lines[2], /\b8Gi\b.*agents\.slice.*\(WF_MEMORY_LIMIT, WF_CGROUP_PARENT\)$/);
     assert.match(ceilingLines({ sessions: 2, runs: 0, memory: '8Gi' })[2], /\b8Gi\b.*\(WF_MEMORY_LIMIT\)$/);
     assert.equal(ceilingLines({ sessions: 2, runs: 0 }).length, 2);
   });
-  await t.test('admission by memory, said on a line of its own where a floor is given: the request and the floor', () => {
+  test('admission by memory, said on a line of its own where a floor is given: the request and the floor', () => {
     const line = ceilingLines({ sessions: 2, runs: 0, memory: '8Gi', request: '2560Mi', reserved: '2048Mi' }).at(-1) ?? '';
     for (const fact of ['2560Mi', '2048Mi', 'WF_MEMORY_REQUEST', 'WF_MEMORY_RESERVED']) assert.ok(line.includes(fact), fact);
     const asksItsLimit = ceilingLines({ sessions: 2, runs: 0, memory: '8Gi', reserved: '1024Mi' });
@@ -201,7 +199,190 @@ test('`ceilingLines`: sessions at work per pool, and runs in flight — `no cap`
   });
 });
 
-test('`listing` handed a run slot: the roots of a held run say `waiting for a run slot` where `waiting` would be — never a run that started, was called off or waits on a run', async (t) => {
+describe('`listing` handed a run slot: the roots of a held run say `waiting for a run slot` where `waiting` would be — never a run that started, was called off or waits on a run', () => {
+  let fresh!: {
+    repo: string;
+    workspace: string;
+    branch: string;
+    baseRef: string;
+    isolate: boolean;
+    id: string;
+    brief: string;
+    workflowDir: string;
+    steps: Record<
+      string,
+      {
+        readonly taskId: string | null;
+        readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+        readonly route?: { readonly route: string; readonly try: number; readonly by: 'person' | 'table' | 'script' | 'judge' } | undefined;
+        readonly sent?: { readonly card: string; readonly at: string } | undefined;
+        readonly pinned?:
+          | readonly {
+              readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+              readonly name: string;
+              readonly n: number;
+              readonly hash: string;
+            }[]
+          | undefined;
+        readonly workspace?: string | undefined;
+        readonly branch?: string | undefined;
+        readonly tries?:
+          | readonly {
+              readonly taskId: string;
+              readonly cause: 'retries' | 'signoff' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'back';
+              readonly model?: string | undefined;
+              readonly check?: { readonly taskId: string; readonly tip?: string | undefined } | undefined;
+              readonly paused?: true | undefined;
+              readonly retried?: true | undefined;
+              readonly budget?: number | undefined;
+            }[]
+          | undefined;
+        readonly handedOff?: string | undefined;
+        readonly landed?: import('../record/record.ts').LandingRecord | undefined;
+        readonly filesRead?: { readonly taskId: string; readonly lacked: { readonly [x: string]: string } } | undefined;
+        readonly closeoutHash?: string | undefined;
+        readonly declared?: readonly string[] | undefined;
+      }
+    >;
+    createdAt: string;
+    context?: readonly string[] | undefined;
+    workflow?: readonly StepSpec[] | undefined;
+    factory?: string | undefined;
+    pinned?:
+      | readonly {
+          readonly kind: 'workflow' | 'agent' | 'skill' | 'rules';
+          readonly name: string;
+          readonly n: number;
+          readonly hash: string;
+        }[]
+      | undefined;
+    placeSkill?: { readonly skill: string; readonly version: string } | undefined;
+    stagedFile?: string | undefined;
+    place?: undefined;
+    after?: readonly string[] | undefined;
+    inputs?: readonly string[] | undefined;
+    cards?: readonly string[] | undefined;
+    workflowFiles?: string | undefined;
+    carriedFiles?: string | undefined;
+    from?: { readonly inbox: string } | undefined;
+    scheduled?: { readonly factory: string; readonly workflow: string; readonly due: string } | undefined;
+    gates?: readonly string[] | undefined;
+    models?: { readonly [x: string]: string } | undefined;
+    mounts?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    volumes?: readonly { readonly path: string; readonly readOnly: boolean }[] | undefined;
+    harnessSettings?: { readonly [x: string]: { readonly [x: string]: unknown } } | undefined;
+    costLine?: number | undefined;
+    tips?: { readonly [x: string]: string } | undefined;
+    cancelledAt?: string | undefined;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly run?: string | undefined;
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    labels?: { readonly [x: string]: string } | undefined;
+    saidBefore?: { readonly [x: string]: readonly { readonly at: string; readonly text: string }[] } | undefined;
+    slotHeldAt?: string | undefined;
+    gatesTimed?: readonly { readonly step: string; readonly try: number }[] | undefined;
+    deniedCounted?: readonly { readonly task: string; readonly attempts: number }[] | undefined;
+    settlesCounted?: readonly string[] | undefined;
+    runTimed?: boolean | undefined;
+    approvals?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message?: string | undefined;
+          readonly budgets?: { readonly [x: string]: number } | undefined;
+          readonly work?: { readonly [x: string]: number } | undefined;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    acceptances?:
+      | readonly {
+          readonly step: string;
+          readonly at: string;
+          readonly try: number;
+          readonly message: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        }[]
+      | undefined;
+    pruned?:
+      | {
+          readonly at: string;
+          readonly worktrees: readonly { readonly path: string; readonly bytes: number }[];
+          readonly artifacts?: { readonly at: string; readonly bytes: number } | undefined;
+        }
+      | undefined;
+    hold?:
+      | {
+          readonly at: string;
+          readonly until: readonly string[];
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly by?: string | undefined;
+        }
+      | undefined;
+    unheld?:
+      | {
+          readonly since: string;
+          readonly actor: {
+            readonly kind: 'agent' | 'person';
+            readonly run?: string | undefined;
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly token?: string | undefined;
+          };
+        }
+      | undefined;
+    pause?:
+      | {
+          readonly at: string;
+          readonly by: string;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly run?: string | undefined;
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+          readonly why?: string | undefined;
+          readonly timeoutMs?: number | undefined;
+        }
+      | undefined;
+  };
+  beforeAll(() => {
+    fresh = run({ implement: null, review: null });
+  });
   const slot = { inFlight: 2, cap: 2 };
   const shown =
     (m: Record<string, ListedPhase>) =>
@@ -229,28 +410,27 @@ test('`listing` handed a run slot: the roots of a held run say `waiting for a ru
           : {}),
       }),
     );
-  const fresh = run({ implement: null, review: null });
-  await t.test('held: its root waits for a slot, what waits on the root still says waiting', () => {
+  test('held: its root waits for a slot, what waits on the root still says waiting', () => {
     const held = listed(fresh, {});
     assert.deepEqual(
       [held.steps.map((s) => s.message), held.slot, held.waitingOnYou],
       [['waiting for a run slot (2 of 2 in flight)', 'pending'], slot, []],
     );
   });
-  await t.test('no slot handed, no key', () => {
+  test('no slot handed, no key', () => {
     const plain = listed(fresh, {}, [], false);
     assert.equal(Object.hasOwn(plain.steps[0], 'slot'), false);
     assert.equal(Object.hasOwn(plain, 'slot'), false);
   });
-  await t.test('a run that started', () => {
+  test('a run that started', () => {
     const started = listed(run({ implement: 't1', review: null }), { t1: 'running' });
     assert.deepEqual([started.steps[0].message, started.slot], ['running', undefined]);
   });
-  await t.test('a run called off', () => {
+  test('a run called off', () => {
     const cancelled = listed(run({ implement: null, review: null }, CANCELLED), {});
     assert.deepEqual([cancelled.steps[0].message, cancelled.slot], ['pending', undefined]);
   });
-  await t.test('a run waiting on a run', () => {
+  test('a run waiting on a run', () => {
     const waits = listed(run({ implement: null, review: null }, { after: ['a-1x2y'] }), {}, [{ run: 'a-1x2y' }]);
     assert.deepEqual([waits.steps[0].message, waits.slot], ['waiting on a-1x2y', undefined]);
   });

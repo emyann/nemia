@@ -7,7 +7,7 @@
  * arguments and runs elsewhere, and still has the root on its PATH, or in an AE_ROOT it inherited. Until it has exec'd, its
  * environment is its parent's, so the test waits for it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';

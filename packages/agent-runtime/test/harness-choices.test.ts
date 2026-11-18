@@ -4,7 +4,7 @@
  * never both and never neither; `HARNESS_KNOBS` says the same harnesses the same words, and the knobs their fence takes. Each rule is
  * made to refuse with a planted table.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { HARNESS_CHOICES, fenceReach } from '../src/vocabulary.ts';
 import { HARNESS_KNOBS } from '../src/harness/choices.ts';
@@ -48,47 +48,41 @@ function choicesBreaks(table: Choices): string[] {
   return out;
 }
 
-test('HARNESS_CHOICES ⊆ what configRefusal takes, each harness offered the fence words fenceReach sets it by, and HARNESS_KNOBS its mirror', async (t) => {
-  await t.test('every word HARNESS_CHOICES offers a harness is one configRefusal takes of it', () => {
+describe('HARNESS_CHOICES ⊆ what configRefusal takes, each harness offered the fence words fenceReach sets it by, and HARNESS_KNOBS its mirror', () => {
+  test('every word HARNESS_CHOICES offers a harness is one configRefusal takes of it', () => {
     assert.deepEqual(refusedWords(HARNESS_CHOICES), []);
   });
-  await t.test('each harness HARNESS_CHOICES names is a default harness, offered the list its fence is set by and not the other', () => {
+  test('each harness HARNESS_CHOICES names is a default harness, offered the list its fence is set by and not the other', () => {
     assert.deepEqual(choicesBreaks(HARNESS_CHOICES), []);
   });
-  await t.test(
-    'HARNESS_KNOBS names the harnesses HARNESS_CHOICES does, fenced by the key HARNESS_CHOICES offers it, each word one configRefusal takes',
-    () => {
-      assert.deepEqual(Object.keys(HARNESS_KNOBS).sort(), Object.keys(HARNESS_CHOICES.effort).sort());
-      for (const [harness, knobs] of Object.entries(HARNESS_KNOBS)) {
-        assert.equal(knobs.fence.key, Object.hasOwn(HARNESS_CHOICES.permissionMode, harness) ? 'permissionMode' : 'sandbox', harness);
-        for (const word of knobs.effort) assert.equal(configRefusal(harness, { effort: word }), undefined, `${harness} effort ${word}`);
-        for (const word of knobs.fence.words)
-          assert.equal(configRefusal(harness, { permissionMode: word }), undefined, `${harness} ${knobs.fence.key} ${word}`);
-      }
-    },
-  );
-  await t.test(
-    'a harness fenced by its permission mode takes tool lists, a context window and its own flags but those owned; one fenced by sandbox none',
-    () => {
-      for (const [harness, knobs] of Object.entries(HARNESS_KNOBS)) {
-        const moded = knobs.fence.key === 'permissionMode';
-        assert.equal(knobs.fence.lists.length > 0, moded, harness);
-        assert.equal(knobs.context, moded, harness);
-        assert.equal('owned' in knobs.flags, moded, harness);
-      }
-    },
-  );
+  test('HARNESS_KNOBS names the harnesses HARNESS_CHOICES does, fenced by the key HARNESS_CHOICES offers it, each word one configRefusal takes', () => {
+    assert.deepEqual(Object.keys(HARNESS_KNOBS).sort(), Object.keys(HARNESS_CHOICES.effort).sort());
+    for (const [harness, knobs] of Object.entries(HARNESS_KNOBS)) {
+      assert.equal(knobs.fence.key, Object.hasOwn(HARNESS_CHOICES.permissionMode, harness) ? 'permissionMode' : 'sandbox', harness);
+      for (const word of knobs.effort) assert.equal(configRefusal(harness, { effort: word }), undefined, `${harness} effort ${word}`);
+      for (const word of knobs.fence.words)
+        assert.equal(configRefusal(harness, { permissionMode: word }), undefined, `${harness} ${knobs.fence.key} ${word}`);
+    }
+  });
+  test('a harness fenced by its permission mode takes tool lists, a context window and its own flags but those owned; one fenced by sandbox none', () => {
+    for (const [harness, knobs] of Object.entries(HARNESS_KNOBS)) {
+      const moded = knobs.fence.key === 'permissionMode';
+      assert.equal(knobs.fence.lists.length > 0, moded, harness);
+      assert.equal(knobs.context, moded, harness);
+      assert.equal('owned' in knobs.flags, moded, harness);
+    }
+  });
 });
 
-test('REFUSED: the checks over HARNESS_CHOICES, each made to refuse by a planted table', async (t) => {
-  await t.test('a word HARNESS_CHOICES would offer that configRefusal refuses', () => {
+describe('REFUSED: the checks over HARNESS_CHOICES, each made to refuse by a planted table', () => {
+  test('a word HARNESS_CHOICES would offer that configRefusal refuses', () => {
     for (const key of Object.keys(HARNESS_CHOICES) as (keyof Choices)[])
       for (const harness of Object.keys(HARNESS_CHOICES[key])) {
         const planted = { ...HARNESS_CHOICES, [key]: { ...HARNESS_CHOICES[key], [harness]: ['nope'] } };
         assert.equal(refusedWords(planted).length, 1, `${key} on ${harness}`);
       }
   });
-  await t.test('codex offered a permissionMode list, Claude Code a sandbox list, or a harness the runtime has not', () => {
+  test('codex offered a permissionMode list, Claude Code a sandbox list, or a harness the runtime has not', () => {
     const codexModes = { ...HARNESS_CHOICES, permissionMode: { ...HARNESS_CHOICES.permissionMode, codex: ['read-only'] } };
     assert.deepEqual(choicesBreaks(codexModes), ['codex is fenced by sandbox, and is offered a permissionMode list']);
     const claudeSandbox = { ...HARNESS_CHOICES, sandbox: { ...HARNESS_CHOICES.sandbox, claude: ['read-only'] } };

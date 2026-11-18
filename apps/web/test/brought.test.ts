@@ -3,7 +3,7 @@
  * it waits at its gate, why the run's page offers it an answer, and whether a try of it is asked already, each off the run's own record.
  * Which part those facts draw is `broughtPart`'s, proved by `contracts/brought.contract.ts`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { broughtFacts } from '../src/lib/brought.ts';
 import type { RunDetail } from '../src/lib/runView.ts';

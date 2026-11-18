@@ -4,7 +4,7 @@
  * reads back as it was; the decoded type and `StepSpec` are each the other;
  * and a key of `STEP_KEYS` the schema has no field for fails the typecheck.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

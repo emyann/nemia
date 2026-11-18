@@ -9,7 +9,7 @@
  * file holds that every write is behind it.
  */
 import { NO_TOKEN, PERSON_TOKEN } from './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Api, SCRIPTED_HEADER, TOKEN_COOKIE } from 'objects';
 import { app } from '../src/app.ts';

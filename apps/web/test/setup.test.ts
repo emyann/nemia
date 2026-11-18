@@ -3,7 +3,7 @@
  * a fix is started with, the name a browser pairs under, the pieces grouped by area, the first-visit link taken off an address, the
  * harnesses the first visit offers, and the fixes a piece shows by its state.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { READINESS_AREAS } from 'objects';
 import type { ReadinessFix, ReadinessPiece } from 'objects';
@@ -20,8 +20,8 @@ import {
   withoutLink,
 } from '../src/lib/setup.ts';
 
-test('linkedParts: every URL of the output a link, the sentence around it text, and the whole said back', async (t) => {
-  await t.test('a device sign-in: the URL is a link, the full stop after it text', () => {
+describe('linkedParts: every URL of the output a link, the sentence around it text, and the whole said back', () => {
+  test('a device sign-in: the URL is a link, the full stop after it text', () => {
     const output = 'Open https://example.com/login/device. Then type the code.\n';
     const parts = linkedParts(output);
     assert.deepEqual(
@@ -30,7 +30,7 @@ test('linkedParts: every URL of the output a link, the sentence around it text, 
     );
     assert.equal(parts.map((p) => p.text).join(''), output, 'joined, the parts are the output whole');
   });
-  await t.test('two URLs, one in brackets, one with a query, and http alike', () => {
+  test('two URLs, one in brackets, one with a query, and http alike', () => {
     const output = 'see (https://a.dev/x?y=1&z=2) or http://127.0.0.1:8787/?link=abc';
     assert.deepEqual(
       linkedParts(output)
@@ -45,7 +45,7 @@ test('linkedParts: every URL of the output a link, the sentence around it text, 
       output,
     );
   });
-  await t.test('no URL, or a scheme alone, is text alone', () => {
+  test('no URL, or a scheme alone, is text alone', () => {
     assert.equal(linkedParts('nothing here').length, 1);
     assert.equal(
       linkedParts('https://').every((p) => p.kind === 'text'),
@@ -55,16 +55,16 @@ test('linkedParts: every URL of the output a link, the sentence around it text, 
   });
 });
 
-test("codeIn: the code the output shows by its need's pattern, the last one, its group where it has one", async (t) => {
+describe("codeIn: the code the output shows by its need's pattern, the last one, its group where it has one", () => {
   const pattern = '[A-Z0-9]{4}-[A-Z0-9]{4}';
-  await t.test('found, and the last of two', () => {
+  test('found, and the last of two', () => {
     assert.equal(codeIn('code: K7QM-3XRP\n', pattern), 'K7QM-3XRP');
     assert.equal(codeIn('code: AAAA-BBBB\nexpired, new code: CCCC-DDDD\n', pattern), 'CCCC-DDDD');
   });
-  await t.test("a pattern's first group is the code", () => {
+  test("a pattern's first group is the code", () => {
     assert.equal(codeIn('one-time code: 1234-5678 (valid 15 minutes)', 'code: (\\d{4}-\\d{4})'), '1234-5678');
   });
-  await t.test('none: no pattern, an empty one, one that is no expression, or nothing matching yet', () => {
+  test('none: no pattern, an empty one, one that is no expression, or nothing matching yet', () => {
     assert.equal(codeIn('K7QM-3XRP', undefined), undefined);
     assert.equal(codeIn('K7QM-3XRP', ''), undefined);
     assert.equal(codeIn('K7QM-3XRP', '(['), undefined);
@@ -123,7 +123,7 @@ test('linkSecretOf and withoutLink: the secret a first-visit link carries, and t
   assert.equal(linkSecretOf('http://10.0.0.2:8787/runs'), undefined);
 });
 
-test("harnessChoices: one row per harness the read names, in the read's order, its install and sign-in pieces", async (t) => {
+describe("harnessChoices: one row per harness the read names, in the read's order, its install and sign-in pieces", () => {
   type P = { id: string; harness?: { name: string; part: 'install' | 'sign-in' } };
   const rows: Array<{ why: string; pieces: P[]; want: Array<[string, string, string | undefined]> }> = [
     {
@@ -161,7 +161,7 @@ test("harnessChoices: one row per harness the read names, in the read's order, i
     { why: 'no harness at all: no row', pieces: [{ id: 'svc' }], want: [] },
   ];
   for (const row of rows)
-    await t.test(row.why, () => {
+    test(row.why, () => {
       assert.deepEqual(
         harnessChoices(row.pieces).map((c) => [c.name, c.install.id, c.signIn?.id]),
         row.want,
@@ -169,7 +169,7 @@ test("harnessChoices: one row per harness the read names, in the read's order, i
     });
 });
 
-test('shownFixes: a piece in place shows only what takes it away, any other every fix but that, each with its index', async (t) => {
+describe('shownFixes: a piece in place shows only what takes it away, any other every fix but that, each with its index', () => {
   const puts: ReadinessFix = { message: 'install it', command: 'x', startable: true, index: 0 };
   const removes: ReadinessFix = { message: 'deactivate it', command: 'y', startable: true, index: 1, kind: 'removes' };
   const typed: ReadinessFix = { message: 'type it', command: 'z', startable: false, kind: 'typed' };
@@ -187,7 +187,7 @@ test('shownFixes: a piece in place shows only what takes it away, any other ever
     { why: 'in place with nothing to take it away: none', piece: piece('met', [puts]), want: [] },
   ];
   for (const row of rows)
-    await t.test(row.why, () => {
+    test(row.why, () => {
       assert.deepEqual(
         shownFixes(row.piece).map(({ fix, i }) => [fix.message, i]),
         row.want,

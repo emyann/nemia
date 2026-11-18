@@ -4,7 +4,7 @@
  * board's answer or refused (`numberedAnswers`), each refusal row breaking one rule and asserted by the facts it names. The questions
  * as data are in `question.test.ts`; a run's questions answered at the terminal in `test/retry.test.ts` and `test/closeouts.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { answerForm, letterOf, numberedAnswers, questionLines } from './numbered.ts';
 import type { Asked, Question } from './question.ts';
@@ -46,14 +46,14 @@ const unresolved = (typed: string[]): string => {
   return read.error;
 };
 
-test('letterOf', async (t) => {
-  await t.test('letters options a to z, then aa, ab', () => {
+describe('letterOf', () => {
+  test('letters options a to z, then aa, ab', () => {
     assert.deepEqual([0, 1, 25, 26, 27, 51, 52].map(letterOf), ['a', 'b', 'z', 'aa', 'ab', 'az', 'ba']);
   });
 });
 
-test('questionLines', async (t) => {
-  await t.test('numbers the questions on across the fields, letters each option on its own line and marks the recommended one', () => {
+describe('questionLines', () => {
+  test('numbers the questions on across the fields, letters each option on its own line and marks the recommended one', () => {
     assert.deepEqual(questionLines(asked), [
       'open:',
       '  1. How is the card cut?',
@@ -75,14 +75,14 @@ test('questionLines', async (t) => {
     ]);
     assert.ok(!questionLines([{ field: 'later', questions: [when] }]).some((l) => l.includes('(recommended)')));
   });
-  await t.test('marks each option a question that takes several recommends as a list', () => {
+  test('marks each option a question that takes several recommends as a list', () => {
     const lines = questionLines([{ field: 'open', questions: [{ ...where, recommended: ['retry', 'gate'] }] }]);
     assert.deepEqual(
       lines.filter((l) => l.includes('(recommended)')),
       ['     a  retry — Into the next try.  (recommended)', '     b  gate — With the approval.  (recommended)'],
     );
   });
-  await t.test('letters a twenty-seventh option aa', () => {
+  test('letters a twenty-seventh option aa', () => {
     const many: Question = {
       ...when,
       options: Array.from({ length: 27 }, (_, i) => ({ label: `o${i}`, meaning: '' })),
@@ -91,14 +91,14 @@ test('questionLines', async (t) => {
   });
 });
 
-test('answerForm', async (t) => {
-  await t.test('offers one --answer for each question asked', () => {
+describe('answerForm', () => {
+  test('offers one --answer for each question asked', () => {
     assert.equal(answerForm(2), '--answer 1=<letter> --answer 2=<letter>');
   });
 });
 
-test('numberedAnswers', async (t) => {
-  await t.test('resolves each form to the question’s title, the labels its letters name and the person’s own words', () => {
+describe('numberedAnswers', () => {
+  test('resolves each form to the question’s title, the labels its letters name and the person’s own words', () => {
     assert.deepEqual(numberedAnswers(questions, ['1=b', '2=A, b', '3=a: keep it', '3: only words']), [
       { question: cut.title, chose: ['two cards'] },
       { question: where.title, chose: ['retry', 'gate'] },
@@ -106,11 +106,11 @@ test('numberedAnswers', async (t) => {
       { question: when.title, chose: [], own: 'only words' },
     ]);
   });
-  await t.test('resolves nothing for a step that asks none, which answerRefusal refuses itself', () => {
+  test('resolves nothing for a step that asks none, which answerRefusal refuses itself', () => {
     assert.deepEqual(numberedAnswers([], ['1=a']), []);
   });
   for (const value of ['x', '1=', '=a', '1a', '1', '1:', '1=a b', '1=2'])
-    await t.test(`REFUSED: an --answer in no form, naming the forms it takes: ${value}`, () => {
+    test(`REFUSED: an --answer in no form, naming the forms it takes: ${value}`, () => {
       const said = unresolved([value]);
       assert.ok(said.startsWith(`--answer ${value} `), said);
       namesFor(value, said, 'not an answer', '`n=a`', '`n=a,c`');
@@ -129,5 +129,5 @@ test('numberedAnswers', async (t) => {
     ],
     ['REFUSED: a letter past those of a question of several', ['2=a,c'], ['"Where do the answers go?"', 'no c', 'a (retry), b (gate).']],
   ];
-  for (const [name, typed, facts] of rows) await t.test(name, () => namesFor(name, unresolved(typed), ...facts));
+  for (const [name, typed, facts] of rows) test(name, () => namesFor(name, unresolved(typed), ...facts));
 });

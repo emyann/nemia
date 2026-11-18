@@ -8,7 +8,7 @@
  * (src-a-filter-s-result-is-pro-p25m, in the tsverify factory). Each refusal row breaks one rule and is asserted by its kind and the
  * facts it names.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { looseAt, type Closeout } from '../closeout/closeout.ts';
 import { closeoutRefusals, expandShapes } from '../question/question.ts';
@@ -56,11 +56,11 @@ const decodeFails = (value: unknown): string => {
   return read.error;
 };
 
-test('expandShapes and budgetFields: the `budgets` shape of a step’s `output:`', async (t) => {
-  await t.test('BUDGETS_SCHEMA is strict, as every schema handed to a harness is', () => {
+describe('expandShapes and budgetFields: the `budgets` shape of a step’s `output:`', () => {
+  test('BUDGETS_SCHEMA is strict, as every schema handed to a harness is', () => {
     assert.equal(looseAt(BUDGETS_SCHEMA, ''), undefined);
   });
-  await t.test('the loader expands a marked field to the strict schema, its description kept, and knows it by its schema', () => {
+  test('the loader expands a marked field to the strict schema, its description kept, and knows it by its schema', () => {
     assert.deepEqual(design.output?.schema.properties.budgets, { ...BUDGETS_SCHEMA, description: 'd' });
     assert.deepEqual(expandShapes({ caps: { 'x-shape': 'budgets' } }), {
       properties: { caps: BUDGETS_SCHEMA },
@@ -68,7 +68,7 @@ test('expandShapes and budgetFields: the `budgets` shape of a step’s `output:`
     });
     assert.deepEqual(budgetFields(design), ['budgets']);
   });
-  await t.test('REFUSED: a shape it does not know still, naming the shapes there are', () => {
+  test('REFUSED: a shape it does not know still, naming the shapes there are', () => {
     const read = expandShapes({ open: { 'x-shape': 'poll' } });
     assert.ok('error' in read);
     names(read.error, '`open`', '"poll"', '`questions`', '`budgets`', '`link`', '`commit`');
@@ -82,24 +82,21 @@ test('expandShapes and budgetFields: the `budgets` shape of a step’s `output:`
   });
 });
 
-test('budgetsOf: a field read as budgets, strictly', async (t) => {
-  await t.test('reads a list of budgets as it is, an empty one too', () => {
+describe('budgetsOf: a field read as budgets, strictly', () => {
+  test('reads a list of budgets as it is, an empty one too', () => {
     const row = { step: 'implement', usd: 7, why: 'p90 of implement' };
     assert.deepEqual(budgetsOf([row]), [row]);
     assert.deepEqual(budgetsOf([]), []);
   });
-  await t.test('REFUSED: a value that is no list', () => names(decodeFails({ step: 'implement' }), 'not a list'));
-  await t.test('REFUSED: a budget without `why`', () => names(decodeFails([{ step: 'implement', usd: 7 }]), 'budget 1', 'step, usd, why'));
-  await t.test('REFUSED: a budget with a key beside its three', () =>
-    names(decodeFails([{ step: 'implement', usd: 7, why: 'w', note: 'n' }]), 'budget 1', 'note'),
-  );
-  await t.test('REFUSED: a `usd` that is no number', () =>
-    names(decodeFails([{ step: 'implement', usd: '7', why: 'w' }]), 'budget 1', '`usd`'),
-  );
+  test('REFUSED: a value that is no list', () => names(decodeFails({ step: 'implement' }), 'not a list'));
+  test('REFUSED: a budget without `why`', () => names(decodeFails([{ step: 'implement', usd: 7 }]), 'budget 1', 'step, usd, why'));
+  test('REFUSED: a budget with a key beside its three', () =>
+    names(decodeFails([{ step: 'implement', usd: 7, why: 'w', note: 'n' }]), 'budget 1', 'note'));
+  test('REFUSED: a `usd` that is no number', () => names(decodeFails([{ step: 'implement', usd: '7', why: 'w' }]), 'budget 1', '`usd`'));
 });
 
-test('budgetRefusals and closeoutRefusals: budgets a gate cannot set refuse the closeout back to its session', async (t) => {
-  await t.test('the steps after the gate are those that wait on it, directly or through another', () => {
+describe('budgetRefusals and closeoutRefusals: budgets a gate cannot set refuse the closeout back to its session', () => {
+  test('the steps after the gate are those that wait on it, directly or through another', () => {
     assert.deepEqual(laterSteps(STEPS, 'design'), ['implement', 'review']);
   });
   const refused = (budgets: unknown, ...facts: string[]) => {
@@ -110,13 +107,13 @@ test('budgetRefusals and closeoutRefusals: budgets a gate cannot set refuse the 
     assert.deepEqual(closeoutRefusals(DESIGN, said, STEPS).slice(-1), why, 'closeoutRefusals carries them');
   };
   const row = (step: string, usd: number) => ({ step, usd, why: 'w' });
-  await t.test('REFUSED: a budget for the gated step itself', () => refused([row('design', 5)], '"design"', 'implement, review'));
-  await t.test('REFUSED: a budget for an earlier step', () => refused([row('intake', 5)], '"intake"'));
-  await t.test('REFUSED: a budget for a step the workflow does not have', () => refused([row('nosuch', 5)], '"nosuch"'));
-  await t.test('REFUSED: a budget of no dollars', () => refused([row('implement', 0)], 'implement', 'not an amount'));
-  await t.test('REFUSED: two budgets for one step', () => refused([row('implement', 5), row('implement', 6)], 'implement', 'two'));
-  await t.test('REFUSED: a field that does not decode', () => refused('seven', '`budgets`', 'not a list'));
-  await t.test('budgets each naming a later step once, each an amount, are taken', () => {
+  test('REFUSED: a budget for the gated step itself', () => refused([row('design', 5)], '"design"', 'implement, review'));
+  test('REFUSED: a budget for an earlier step', () => refused([row('intake', 5)], '"intake"'));
+  test('REFUSED: a budget for a step the workflow does not have', () => refused([row('nosuch', 5)], '"nosuch"'));
+  test('REFUSED: a budget of no dollars', () => refused([row('implement', 0)], 'implement', 'not an amount'));
+  test('REFUSED: two budgets for one step', () => refused([row('implement', 5), row('implement', 6)], 'implement', 'two'));
+  test('REFUSED: a field that does not decode', () => refused('seven', '`budgets`', 'not a list'));
+  test('budgets each naming a later step once, each an amount, are taken', () => {
     const said = proposing([row('implement', 7), row('review', 3)]);
     assert.deepEqual(budgetRefusals(DESIGN, STEPS, said), []);
     assert.deepEqual(
@@ -169,7 +166,7 @@ test('approvedCaps: each budget the step proposed that the person did not change
   assert.equal(cases, 64, 'every proposal against every set of amounts given');
 });
 
-test('budgetOf: the cap in force, read from the record and the approvals in force on every pass', async (t) => {
+describe('budgetOf: the cap in force, read from the record and the approvals in force on every pass', () => {
   const onTry = (approvals: Run['approvals'], tries?: Run['steps'][string]['tries']): Run =>
     run(
       { design: 'd1', implement: 'm1' },
@@ -184,29 +181,28 @@ test('budgetOf: the cap in force, read from the record and the approvals in forc
     at: `2026-01-01T00:00:0${n}Z`,
     budgets,
   });
-  await t.test("no approval: the step's own budget", () => assert.equal(budgetOf(IMPLEMENT, onTry(undefined)), 40));
-  await t.test('an approval of the try its step is on: its cap for the step', () =>
-    assert.equal(budgetOf(IMPLEMENT, onTry([at(1, { implement: 7 })])), 7),
-  );
-  await t.test('two approvals capping one step: the last given, whatever order the files are read in', () =>
-    assert.equal(budgetOf(IMPLEMENT, onTry([at(2, { implement: 9 }, 1), { ...at(1, { implement: 7 }), step: 'intake' }])), 9),
-  );
-  await t.test('an approval a later try of its step spent sets nothing: the step falls back to its own budget', () =>
-    assert.equal(budgetOf(IMPLEMENT, onTry([at(1, { implement: 7 }, 0)])), 40),
-  );
-  await t.test("a person's raise on the step's own try wins over the approval", () =>
-    assert.equal(budgetOf(IMPLEMENT, onTry([at(1, { implement: 7 })], [{ taskId: 'm0', cause: 'continue', budget: 9 }])), 9),
-  );
+  test("no approval: the step's own budget", () => assert.equal(budgetOf(IMPLEMENT, onTry(undefined)), 40));
+  test('an approval of the try its step is on: its cap for the step', () =>
+    assert.equal(budgetOf(IMPLEMENT, onTry([at(1, { implement: 7 })])), 7));
+  test('two approvals capping one step: the last given, whatever order the files are read in', () =>
+    assert.equal(budgetOf(IMPLEMENT, onTry([at(2, { implement: 9 }, 1), { ...at(1, { implement: 7 }), step: 'intake' }])), 9));
+  test('an approval a later try of its step spent sets nothing: the step falls back to its own budget', () =>
+    assert.equal(budgetOf(IMPLEMENT, onTry([at(1, { implement: 7 }, 0)])), 40));
+  test("a person's raise on the step's own try wins over the approval", () =>
+    assert.equal(budgetOf(IMPLEMENT, onTry([at(1, { implement: 7 })], [{ taskId: 'm0', cause: 'continue', budget: 9 }])), 9));
 });
 
-test("gateBudgets: a gate's budgets, proposed before its approval and approved after, each against its step's own budget", async (t) => {
-  const said = proposing([
-    { step: 'implement', usd: 60, why: 'two wide runs' },
-    { step: 'review', usd: 3, why: 'p90' },
-  ]);
+describe("gateBudgets: a gate's budgets, proposed before its approval and approved after, each against its step's own budget", () => {
+  let said!: Closeout;
+  beforeAll(() => {
+    said = proposing([
+      { step: 'implement', usd: 60, why: 'two wide runs' },
+      { step: 'review', usd: 3, why: 'p90' },
+    ]);
+  });
   const gated = (approvals?: Run['approvals']) => run({ intake: 'i1', design: 'd1', implement: null, review: null }, { approvals });
   const spent = () => ({ usd: 1.5, measured: 1, unmeasured: 0, budgetEnded: false });
-  await t.test('before the approval: the proposal, a cap above its step’s own budget said above, and the run line', () => {
+  test('before the approval: the proposal, a cap above its step’s own budget said above, and the run line', () => {
     const at = gateBudgets(gated(), DESIGN, STEPS, said, spent);
     assert.equal(at?.from, 'proposed');
     assert.deepEqual(
@@ -218,7 +214,7 @@ test("gateBudgets: a gate's budgets, proposed before its approval and approved a
     );
     names(at?.said, 'the run has spent $3.00', 'at most', 'intake', 'no cap');
   });
-  await t.test('after it: the caps it set, the why of an amount the person changed gone', () => {
+  test('after it: the caps it set, the why of an amount the person changed gone', () => {
     const approved = gated([{ step: 'design', try: 1, at: '2026-01-01T00:00:00Z', budgets: { implement: 60, review: 4 } }]);
     const at = gateBudgets(approved, DESIGN, STEPS, said, spent);
     assert.equal(at?.from, 'approved');
@@ -230,13 +226,13 @@ test("gateBudgets: a gate's budgets, proposed before its approval and approved a
       ],
     );
   });
-  await t.test('none for a step with no gate, or a closeout whose budgets the run refuses', () => {
+  test('none for a step with no gate, or a closeout whose budgets the run refuses', () => {
     assert.equal(gateBudgets(gated(), IMPLEMENT, STEPS, said, spent), undefined);
     assert.equal(gateBudgets(gated(), DESIGN, STEPS, proposing([{ step: 'design', usd: 5, why: 'w' }]), spent), undefined);
   });
 });
 
-test("gateBudgets: a gate whose caps pass the run's cost line says so, with the most, the line, the factory and the workflow", async (t) => {
+describe("gateBudgets: a gate whose caps pass the run's cost line says so, with the most, the line, the factory and the workflow", () => {
   const spent = () => ({ usd: 1.5, measured: 1, unmeasured: 0, budgetEnded: false });
   const capping = (implement: number) =>
     proposing([
@@ -248,21 +244,15 @@ test("gateBudgets: a gate whose caps pass the run's cost line says so, with the 
       { intake: 'i1', design: 'd1', implement: null, review: null },
       { factory: 'mill', workflowDir: '/wf/build', ...(costLine === undefined ? {} : { costLine }) },
     );
-  await t.test(
-    'caps totalling $95 (intake $1.50 spent, design $12, implement $80, review $1.50) against a line of $80: the gate carries the line, its sentence naming both',
-    () => {
-      const line = gateBudgets(lined(80), DESIGN, STEPS, capping(80), spent)?.line;
-      assert.equal(line?.usd, 80);
-      names(line?.said, '$95.00', '$80.00', 'mill', 'build');
-    },
-  );
-  await t.test('caps totalling $70 against the same line: no line said', () =>
-    assert.equal(gateBudgets(lined(80), DESIGN, STEPS, capping(55), spent)?.line, undefined),
-  );
-  await t.test('caps at the line exactly: not past it', () =>
-    assert.equal(gateBudgets(lined(80), DESIGN, STEPS, capping(65), spent)?.line, undefined),
-  );
-  await t.test('a run with no cost line: no line said, whatever its caps', () =>
-    assert.equal(gateBudgets(lined(), DESIGN, STEPS, capping(80), spent)?.line, undefined),
-  );
+  test('caps totalling $95 (intake $1.50 spent, design $12, implement $80, review $1.50) against a line of $80: the gate carries the line, its sentence naming both', () => {
+    const line = gateBudgets(lined(80), DESIGN, STEPS, capping(80), spent)?.line;
+    assert.equal(line?.usd, 80);
+    names(line?.said, '$95.00', '$80.00', 'mill', 'build');
+  });
+  test('caps totalling $70 against the same line: no line said', () =>
+    assert.equal(gateBudgets(lined(80), DESIGN, STEPS, capping(55), spent)?.line, undefined));
+  test('caps at the line exactly: not past it', () =>
+    assert.equal(gateBudgets(lined(80), DESIGN, STEPS, capping(65), spent)?.line, undefined));
+  test('a run with no cost line: no line said, whatever its caps', () =>
+    assert.equal(gateBudgets(lined(), DESIGN, STEPS, capping(80), spent)?.line, undefined));
 });

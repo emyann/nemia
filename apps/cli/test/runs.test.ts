@@ -5,7 +5,7 @@
  * `resume` and `pause-timeout`, and `wait`; and `start` and `hold` under a remote context pointed at an exposed store. Each asserts its
  * exit code and what the store holds after it; a refusal, its exit code and the command or flag it names, never its sentence.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -51,7 +51,7 @@ const store = await servedStore(
   },
   { HKB_REPO: REPO },
 );
-after(store.stop);
+afterAll(store.stop);
 const DRAFTS = scratch('nemia-runs-drafts-');
 
 /** The run a start printed first on its first line. */
@@ -289,7 +289,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, cwd?: string): P
 test('under a remote context, nemia start and nemia hold land on the remote store, nothing made on this machine', async () => {
   const repo = repoMade('nemia-runs-remote-repo-');
   const exposed = await servedStore('nemia-runs-remote-', acmeIn(repo), { WF_EXPOSED: '1', HKB_REPO: repo });
-  after(exposed.stop);
+  afterAll(exposed.stop);
   const minted = await nemia(['token', 'add', 'laptop'], exposed.env);
   assert.equal(minted.code, 0, minted.err);
   const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1] ?? assert.fail(minted.out);

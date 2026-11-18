@@ -4,7 +4,7 @@
  * api's engine runs is the harness's.
  */
 import { askEnded, asks, away, bin, engineRoot, recorded, realHome, root, scriptUnharnessed, unharnessed, usageAnswer } from './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -209,7 +209,7 @@ test("REFUSED, whatever the daemon's: a test that leaves WF_MAX_RUNS to the harn
 
 test("REFUSED, whatever the daemon's: a test that ticks with WF_MAX_CONCURRENT left to the harness is refused, naming the variable to set", async (t) => {
   const runs = process.env.WF_MAX_RUNS;
-  t.after(() => {
+  t.onTestFinished(() => {
     if (runs === undefined) delete process.env.WF_MAX_RUNS;
     else process.env.WF_MAX_RUNS = runs;
   });

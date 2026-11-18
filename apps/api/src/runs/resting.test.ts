@@ -11,7 +11,7 @@
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test, vi } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
@@ -255,9 +255,9 @@ branchOff('wf/r-moving/implement');
 writeRun('r-moving', 'Still going');
 await aPass();
 
-test('a polled list keeps a run at rest and judges it afresh the moment anything it was judged on moves: its record, a file beside it, its feed, a branch tip, its removal', async (t) => {
-  const s = story(t);
-  await s.test("a finished run is kept and a moving one is not, and a poll then reads the moving run's journal alone", async () => {
+describe('a polled list keeps a run at rest and judges it afresh the moment anything it was judged on moves: its record, a file beside it, its feed, a branch tip, its removal', () => {
+  const s = story(test);
+  s.test("a finished run is kept and a moving one is not, and a poll then reads the moving run's journal alone", async () => {
     await list();
     const first = await list();
     assert.equal(first.find((r) => r.id === 'r-rest')?.status, 'succeeded');
@@ -286,13 +286,13 @@ test('a polled list keeps a run at rest and judges it afresh the moment anything
     assert.deepEqual(board.value, ['r-moving', 'r-rest'], 'every run, once, between the two');
     assert.equal(board.asked, 2, "the board's two lists by state, off the informer: the moving run's one journal, once for each");
   });
-  await s.test('a record rewritten is judged afresh', async () => {
+  s.test('a record rewritten is judged afresh', async () => {
     await list();
     assert.ok(resting.runs.has('r-rest'));
     writeRun('r-rest', 'Decide it again');
     assert.equal((await unverified(() => listed('r-rest')))?.brief, 'Decide it again');
   });
-  await s.test('a file a person writes beside the run is judged afresh: a retry asked of a blocked run', async () => {
+  s.test('a file a person writes beside the run is judged afresh: a retry asked of a blocked run', async () => {
     aFinishedRun('r-ask');
     await aPass();
     blocked('r-ask-implement');
@@ -305,7 +305,7 @@ test('a polled list keeps a run at rest and judges it afresh the moment anything
     assert.notDeepEqual(after, before, 'the ask moved the answer');
     assert.deepEqual(after, await listed('r-ask'), 'and the answer is the fresh one');
   });
-  await s.test("a line on the engine's feed for a task of the run is judged afresh: its journal changed", async () => {
+  s.test("a line on the engine's feed for a task of the run is judged afresh: its journal changed", async () => {
     aFinishedRun('r-fed');
     await aPass();
     await list();
@@ -314,7 +314,7 @@ test('a polled list keeps a run at rest and judges it afresh the moment anything
     fed('r-fed-implement');
     assert.equal((await unverified(() => listed('r-fed')))?.status, 'waiting');
   });
-  await s.test("a branch tip that moves is judged afresh once a pass reads it: the base branch taking the run's work", async () => {
+  s.test("a branch tip that moves is judged afresh once a pass reads it: the base branch taking the run's work", async () => {
     aFinishedRun('r-merged');
     await aPass();
     await list();
@@ -334,19 +334,16 @@ test('a polled list keeps a run at rest and judges it afresh the moment anything
       'on the base now, as the next pass read it: nothing to decide',
     );
   });
-  await s.test(
-    'REFUSED: a finished run whose branches no pass has read is not kept, and is one to decide once a pass reads them',
-    async () => {
-      aFinishedRun('r-unread');
-      await list();
-      assert.ok(!resting.runs.has('r-unread'), 'where its branch stands is unread: nothing to keep it against');
-      assert.equal((await unverified(() => listed('r-unread')))?.toDecide ?? null, null, 'unread decides nothing');
-      await aPass();
-      assert.equal((await unverified(() => listed('r-unread')))?.toDecide?.kind, 'result', 'read by the pass: ahead of the base');
-      assert.ok(resting.runs.has('r-unread'), 'and kept, against the tips the pass read');
-    },
-  );
-  await s.test('a run removed from the store leaves the memo', async () => {
+  s.test('REFUSED: a finished run whose branches no pass has read is not kept, and is one to decide once a pass reads them', async () => {
+    aFinishedRun('r-unread');
+    await list();
+    assert.ok(!resting.runs.has('r-unread'), 'where its branch stands is unread: nothing to keep it against');
+    assert.equal((await unverified(() => listed('r-unread')))?.toDecide ?? null, null, 'unread decides nothing');
+    await aPass();
+    assert.equal((await unverified(() => listed('r-unread')))?.toDecide?.kind, 'result', 'read by the pass: ahead of the base');
+    assert.ok(resting.runs.has('r-unread'), 'and kept, against the tips the pass read');
+  });
+  s.test('a run removed from the store leaves the memo', async () => {
     aFinishedRun('r-gone');
     await aPass();
     await list();
@@ -504,24 +501,21 @@ test('a gated run read by the list at every event from being filed to being appr
   assert.deepEqual(await unverified(() => listed(id)), approved, 'and the memo answers it as the fresh read did');
 });
 
-test("WF_VERIFY_REST: the memo's check fails a request it answered wrong, and a value neither 1 nor 0 is refused", async (t) => {
-  await t.test(
-    "a journal changed with no line on the feed is not seen: the feed is what the memo watches, as the tick's does",
-    async () => {
-      aFinishedRun('r-unfed');
-      await aPass();
-      await list();
-      const was = resting.runs.get('r-unfed');
-      assert.ok(was);
-      write(journal('r-unfed-implement'), jsonl([...started(), { kind: 'settled', at, outcome: 'failed' }]));
-      assert.equal((await unverified(() => listed('r-unfed')))?.status, 'succeeded', 'from memory');
-      const res = await app.request('/api/runs');
-      assert.equal(res.status, 500, 'and the check says the memo answered wrong');
-      fed('r-unfed-implement');
-      assert.equal((await listed('r-unfed'))?.status, 'failed');
-    },
-  );
-  await t.test('REFUSED: an answer kept wrong fails the request under WF_VERIFY_REST, and is served without it', async () => {
+describe("WF_VERIFY_REST: the memo's check fails a request it answered wrong, and a value neither 1 nor 0 is refused", () => {
+  test("a journal changed with no line on the feed is not seen: the feed is what the memo watches, as the tick's does", async () => {
+    aFinishedRun('r-unfed');
+    await aPass();
+    await list();
+    const was = resting.runs.get('r-unfed');
+    assert.ok(was);
+    write(journal('r-unfed-implement'), jsonl([...started(), { kind: 'settled', at, outcome: 'failed' }]));
+    assert.equal((await unverified(() => listed('r-unfed')))?.status, 'succeeded', 'from memory');
+    const res = await app.request('/api/runs');
+    assert.equal(res.status, 500, 'and the check says the memo answered wrong');
+    fed('r-unfed-implement');
+    assert.equal((await listed('r-unfed'))?.status, 'failed');
+  });
+  test('REFUSED: an answer kept wrong fails the request under WF_VERIFY_REST, and is served without it', async () => {
     aFinishedRun('r-poisoned');
     await aPass();
     await list();
@@ -540,32 +534,29 @@ test("WF_VERIFY_REST: the memo's check fails a request it answered wrong, and a 
     resting.runs.delete('r-poisoned');
     assert.equal((await listed('r-poisoned'))?.brief, 'Decide it');
   });
-  await t.test(
-    'REFUSED at shipped defaults: a WF_VERIFY_REST that is neither 1 nor 0 is refused by name, exit 2, and fails the list, never read as off',
-    async (t) => {
-      t.after(() => {
-        process.env.WF_VERIFY_REST = '1';
-      });
-      process.env.WF_VERIFY_REST = 'true';
-      let said = '';
-      assert.throws(
-        () => verifiesRest(process.env),
-        (err: Error & { exitCode?: number }) => {
-          said = err.message;
-          return err.exitCode === 2;
-        },
-      );
-      names(said, 'WF_VERIFY_REST=true', 'WF_VERIFY_REST=1');
-      const res = await app.request('/api/runs');
-      assert.equal(res.status, 422, 'an Invalid, as every route answers one');
-      assert.equal(((await res.json()) as { error: string }).error, said, "read off the app's environment");
-    },
-  );
+  test('REFUSED at shipped defaults: a WF_VERIFY_REST that is neither 1 nor 0 is refused by name, exit 2, and fails the list, never read as off', async (t) => {
+    t.onTestFinished(() => {
+      process.env.WF_VERIFY_REST = '1';
+    });
+    process.env.WF_VERIFY_REST = 'true';
+    let said = '';
+    assert.throws(
+      () => verifiesRest(process.env),
+      (err: Error & { exitCode?: number }) => {
+        said = err.message;
+        return err.exitCode === 2;
+      },
+    );
+    names(said, 'WF_VERIFY_REST=true', 'WF_VERIFY_REST=1');
+    const res = await app.request('/api/runs');
+    assert.equal(res.status, 422, 'an Invalid, as every route answers one');
+    assert.equal(((await res.json()) as { error: string }).error, said, "read off the app's environment");
+  });
 });
 
-test('what a poll costs: the journals of the runs still moving, and no more, on the plain list and on a list asked by state', async (t) => {
-  const s = story(t);
-  await s.test("a poll's reads are counted into api.poll.reads under /api/runs as the engine counts them, every file it read", async () => {
+describe('what a poll costs: the journals of the runs still moving, and no more, on the plain list and on a list asked by state', () => {
+  const s = story(test);
+  s.test("a poll's reads are counted into api.poll.reads under /api/runs as the engine counts them, every file it read", async () => {
     const readsOf = async (): Promise<{ count: number; sum: number }> => {
       const res = await app.request('/api/metrics');
       assert.equal(res.status, 200);
@@ -582,7 +573,7 @@ test('what a poll costs: the journals of the runs still moving, and no more, on 
     assert.ok(read > 0, "the line appended to the moving run's journal was read");
     assert.deepEqual(after, { count: before.count + 1, sum: before.sum + read }, "the poll's reads, the engine's own count");
   });
-  await s.test("runs waiting on the same run read its journals once between them, off the request's one list", async () => {
+  s.test("runs waiting on the same run read its journals once between them, off the request's one list", async () => {
     aFinishedRun('r-parent');
     git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', 'wf/r-parent/implement');
     await aPass();
@@ -620,7 +611,7 @@ test('what a poll costs: the journals of the runs still moving, and no more, on 
       "the board's poll: a second run waiting on the parent reads no journal more, the parent's tasks among the request's views (the RunList judges each run on its own)",
     );
   });
-  await s.test(
+  s.test(
     "a poll's reads: a run at rest, a moving one and one whose check refused it cost the journals of the moving one alone, and judged afresh their own journals and no more",
     async () => {
       await list();
@@ -638,23 +629,23 @@ test('what a poll costs: the journals of the runs still moving, and no more, on 
       assert.ok(resting.runs.has('r-count-refused'), 'a refused run is at rest');
     },
   );
-  await s.test(
+  s.test(
     "a refused check's verdict on a poll is its exit; the RunList reads its output and logs once, for the step's check, and a warm poll neither, once a pass has read where its branch stands",
     async (t) => {
       aRefusedRun('r-verdict');
       await aPass();
-      const output = t.mock.method(e, 'output');
-      const logs = t.mock.method(e, 'logs');
+      const output = vi.spyOn(e, 'output');
+      const logs = vi.spyOn(e, 'logs');
       const run = await unverified(() => listed('r-verdict'));
       assert.equal(run?.steps.find((s) => s.name === 'implement')?.message, 'failed ✗ check (exit 1)');
       assert.ok(run?.steps.find((s) => s.name === 'implement')?.check?.refused, "a list's Run carries the refused check whole");
-      const cold = [output.mock.callCount(), logs.mock.callCount()];
+      const cold = [output.mock.calls.length, logs.mock.calls.length];
       assert.ok(resting.runs.get('r-verdict')?.object, 'kept, with its listed object');
       await unverified(() => listed('r-verdict'));
-      assert.deepEqual([output.mock.callCount(), logs.mock.callCount()], cold, 'warm: neither its output nor its logs read again');
+      assert.deepEqual([output.mock.calls.length, logs.mock.calls.length], cold, 'warm: neither its output nor its logs read again');
     },
   );
-  await s.test(
+  s.test(
     "a held run's decision reads what holds it and none of its own tasks: a session in flight is not viewed to say `holding`",
     async () => {
       running('r-held-implement');
@@ -676,7 +667,7 @@ test('what a poll costs: the journals of the runs still moving, and no more, on 
       }
     },
   );
-  await s.test(
+  s.test(
     'a list asked by state, read warm, costs what the plain poll costs whatever its limit, off the same informer, each row with its clock read',
     async () => {
       aFinishedRun('r-paged');

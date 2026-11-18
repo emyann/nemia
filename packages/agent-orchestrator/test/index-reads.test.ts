@@ -9,7 +9,7 @@
  * The test reads files outside this package. `turbo.json` makes `.oxlintrc.json`, the runtime's files and the apps' tsconfigs inputs of
  * this package's tests; after a change anywhere else, `npx turbo run test --force`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

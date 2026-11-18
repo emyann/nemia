@@ -9,7 +9,7 @@
  *
  * Every child is bounded (`timeout`) and killed when its test is done; every wait is on what it counts, never on a length of time.
  */
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
@@ -100,7 +100,7 @@ function child(t: TestContext, proc: ChildProcess) {
     proc.on('exit', (code, signal) => resolve(code ?? 128 + (signal ? os.constants.signals[signal] : 0))),
   );
   void ended.then(() => ((done = true), w.tell()));
-  t.after(() => void proc.kill('SIGKILL'));
+  t.onTestFinished(() => void proc.kill('SIGKILL'));
   const said = <T>(holds: (out: string, err: string) => T | undefined | false) => w.until(() => holds(out, err));
   return { proc, ended, said, out: () => out, err: () => err };
 }
@@ -174,7 +174,7 @@ async function channel(t: TestContext, root: string, args: readonly string[], en
   };
   void c.ended.then(w.tell);
   await client.connect(piped(c.proc));
-  t.after(() => client.close().catch(() => undefined));
+  t.onTestFinished(() => client.close().catch(() => undefined));
   const got = <T>(holds: (all: readonly Notice[]) => T | undefined | false): Promise<T> =>
     Promise.race([w.until(() => holds(notices)), c.ended.then(() => holds(notices) || Promise.reject(new Error(`ended: ${c.err()}`)))]);
   return { ...c, client, notices, got };

@@ -8,7 +8,7 @@
  * Over the stand-ins (`appOver`), the builtin folder and the folder of renders given to the app's layer.
  */
 import '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -3,7 +3,7 @@
  * whole in the rest, and refused in words that name the first wrong field. Pure, so each rule is a card here; a card served
  * or configured on a real engine is `test/remote-agent.test.ts`'s.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { AgentCard } from '@a2a-js/sdk';
 import { cardOfJson } from './card.ts';
@@ -32,8 +32,8 @@ const wrong = (json: unknown): string => {
   return read.wrong;
 };
 
-test('cardOfJson: a card is taken with what it declares, kept whole beyond the fields the runtime reads, and refused naming its first wrong field', async (t) => {
-  await t.test('a card in A2A 1.0 JSON is read with its schemes and requirements as it declares them', () => {
+describe('cardOfJson: a card is taken with what it declares, kept whole beyond the fields the runtime reads, and refused naming its first wrong field', () => {
+  test('a card in A2A 1.0 JSON is read with its schemes and requirements as it declares them', () => {
     const card = taken(WIRE);
     assert.equal(card.name, 'reviewer');
     assert.deepEqual(card.supportedInterfaces, [{ ...INTERFACE, tenant: '' }]);
@@ -44,8 +44,7 @@ test('cardOfJson: a card is taken with what it declares, kept whole beyond the f
       [['bearer'], ['key']],
     );
   });
-
-  await t.test("a card served as the SDK's own objects keeps its schemes whole", () => {
+  test("a card served as the SDK's own objects keeps its schemes whole", () => {
     const sdk = JSON.parse(JSON.stringify(AgentCard.fromJSON(WIRE))) as Record<string, unknown>;
     const card = taken(sdk);
     assert.deepEqual(card.securitySchemes.bearer?.scheme, {
@@ -54,25 +53,19 @@ test('cardOfJson: a card is taken with what it declares, kept whole beyond the f
     });
     assert.equal(card.securitySchemes.key?.scheme?.$case, 'apiKeySecurityScheme');
   });
-
-  await t.test(
-    'a card with nothing but an interface is taken, whatever else A2A asks of it, and a key the runtime does not read is kept',
-    () => {
-      assert.deepEqual(taken({ supportedInterfaces: [INTERFACE] }).supportedInterfaces, [{ ...INTERFACE, tenant: '' }]);
-      const card = taken({ supportedInterfaces: [INTERFACE], 'x-vendor': { a: 1 }, name: 'kept' });
-      assert.equal(card.name, 'kept');
-    },
-  );
-
-  await t.test('a scheme of a kind A2A 1.0 does not define is kept, in either form, as a scheme of no kind the runtime sends', () => {
+  test('a card with nothing but an interface is taken, whatever else A2A asks of it, and a key the runtime does not read is kept', () => {
+    assert.deepEqual(taken({ supportedInterfaces: [INTERFACE] }).supportedInterfaces, [{ ...INTERFACE, tenant: '' }]);
+    const card = taken({ supportedInterfaces: [INTERFACE], 'x-vendor': { a: 1 }, name: 'kept' });
+    assert.equal(card.name, 'kept');
+  });
+  test('a scheme of a kind A2A 1.0 does not define is kept, in either form, as a scheme of no kind the runtime sends', () => {
     const wire = taken({ ...WIRE, securitySchemes: { future: { futureScheme: { flow: 'x' } } } });
     assert.ok('future' in wire.securitySchemes);
     assert.equal(wire.securitySchemes.future?.scheme, undefined);
     const sdk = taken({ ...WIRE, securitySchemes: { future: { scheme: { $case: 'futureScheme', value: {} } } } });
     assert.equal((sdk.securitySchemes.future?.scheme as { $case: string } | undefined)?.$case, 'futureScheme');
   });
-
-  await t.test('a card the runtime cannot read is refused, naming its first wrong field and what is there instead', () => {
+  test('a card the runtime cannot read is refused, naming its first wrong field and what is there instead', () => {
     const card = (fields: Record<string, unknown>) => ({ supportedInterfaces: [INTERFACE], ...fields });
     const cases: Array<[unknown, RegExp]> = [
       [{ name: 'no interface' }, /^its `supportedInterfaces` is missing$/],
@@ -110,14 +103,12 @@ test('cardOfJson: a card is taken with what it declares, kept whole beyond the f
     ];
     for (const [json, said] of cases) assert.match(wrong(json), said, JSON.stringify(json));
   });
-
-  await t.test('a card that names a key of 10,000 characters is refused in words that quote it, not in all of it', () => {
+  test('a card that names a key of 10,000 characters is refused in words that quote it, not in all of it', () => {
     const name = 'k'.repeat(10_000);
     const said = wrong({ supportedInterfaces: [INTERFACE], securitySchemes: { [name]: { httpAuthSecurityScheme: { scheme: 5 } } } });
     assert.ok(said.length < 1_000, `${said.length} characters`);
   });
-
-  await t.test('a field the runtime reads, spelled in snake_case, is refused, naming the camelCase key to write', () => {
+  test('a field the runtime reads, spelled in snake_case, is refused, naming the camelCase key to write', () => {
     const cases: Array<[unknown, RegExp]> = [
       [
         { supported_interfaces: [INTERFACE] },

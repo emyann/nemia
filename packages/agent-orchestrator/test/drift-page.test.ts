@@ -2,7 +2,7 @@
  * The folder's drift the run page shows: how the workflow folder has moved away from the steps the run started with (`driftOf`). The
  * kinds a run is behind the files on are the orchestrator's (`driftNow`), held in its own `test/revisions.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Run } from '../src/run.ts';
 import type { StepSpec } from '../src/workflow.ts';
@@ -19,15 +19,15 @@ const runWith = (): Run => ({
   steps: { build: { taskId: 'r-1-build' } },
 });
 
-test('driftOf: the folder’s own drift is a name-level warning, and none where the names agree', async (t) => {
+describe('driftOf: the folder’s own drift is a name-level warning, and none where the names agree', () => {
   const steps = (...names: string[]): StepSpec[] => names.map((name) => ({ name, after: [], body: '' }));
-  await t.test('the same names: no warning', () => {
+  test('the same names: no warning', () => {
     assert.equal(driftOf(runWith(), steps('build')), null);
   });
-  await t.test('a step the folder gained is named', () => {
+  test('a step the folder gained is named', () => {
     assert.match(driftOf(runWith(), steps('build', 'review'))!, /it has review, which the run did not start with/);
   });
-  await t.test('a step the folder lost is named', () => {
+  test('a step the folder lost is named', () => {
     assert.match(driftOf(runWith(), steps('review'))!, /it no longer has build/);
   });
 });

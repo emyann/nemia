@@ -6,7 +6,7 @@
  *
  * The store is the process's own (`WF_ROOT`, set by `test/ambient.ts` before any import), which the run records are read at.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

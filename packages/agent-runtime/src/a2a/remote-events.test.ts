@@ -3,7 +3,7 @@
  * each order, each id given once and each cursor is one case here, with no agent behind it. The agent itself is
  * `test/remote-follow.test.ts`'s.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Role, TaskState, type Artifact, type Message, type Part, type StreamResponse, type Task } from '@a2a-js/sdk';
 import { followedOfRemote, relayOf, relayOver, remoteCursorOf, transcriptOfTask } from './remote-events.ts';
@@ -209,6 +209,6 @@ const ROWS: Array<{ name: string; run: () => void }> = [
   },
 ];
 
-test('transcriptOfTask and followedOfRemote: a Task read whole or followed gives each message and whole artifact once, in order, from its cursor', async (t) => {
-  for (const row of ROWS) await t.test(row.name, () => row.run());
+describe('transcriptOfTask and followedOfRemote: a Task read whole or followed gives each message and whole artifact once, in order, from its cursor', () => {
+  for (const row of ROWS) test(row.name, () => row.run());
 });

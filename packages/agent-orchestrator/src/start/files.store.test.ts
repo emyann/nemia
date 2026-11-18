@@ -3,7 +3,7 @@
  * go of on its way; a namespace the store keeps none under and an id that is none found nothing; and every file let go of a day after it
  * was last written, by the next upload's pruning, a younger one kept.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

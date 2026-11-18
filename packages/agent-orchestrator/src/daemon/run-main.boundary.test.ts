@@ -4,7 +4,7 @@
  * without yielding, as a daemon taking the store does, lets go of what it held. A signal's exit code on a real `nemia up` is
  * daemon.store.test.ts's.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

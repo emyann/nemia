@@ -3,7 +3,7 @@
  * the delay histogram (`EVENT_LOOP_DELAY`) and in the one warning the stall is logged with, which names that step as the span running
  * when the loop came back; and the delays read off Node's percentiles (`delaysOf`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Logger, Metric, References } from 'effect';
 import { delaysOf, EVENT_LOOP_DELAY, eventLoopWatched } from './event-loop.store.ts';

@@ -3,7 +3,7 @@
  * factory page lists them in (`proposalsInOrder`), the resources a delegation may grant (`DELEGABLE`) and a word for every phase
  * (`PROPOSAL_WORDS`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { PROPOSABLE_KINDS, PROPOSAL_PHASES, RESOURCE_PLURALS, type Proposal, type ProposalPhase } from 'objects';
 import { proposalLinkOf } from '../src/lib/proposalLink.ts';

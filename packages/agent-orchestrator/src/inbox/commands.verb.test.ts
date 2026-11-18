@@ -1,7 +1,7 @@
 /**
  * `nemia inbox` (`INBOX`): the cards in play by default, every card with `--all`, each started card in its run's phase.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

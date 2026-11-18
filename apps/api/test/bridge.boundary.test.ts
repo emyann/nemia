@@ -8,7 +8,7 @@
  * as a long-lived session — and its session's run file written as its holder writes it, held by a process of this machine.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

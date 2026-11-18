@@ -8,7 +8,7 @@
  * scrolls is marked while it scrolls. Each is refused for a fault put back.
  * `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it needs Chromium.
  */
-import { after, before, test } from 'node:test';
+import { afterAll, beforeAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright';
@@ -22,12 +22,12 @@ import { launch, type Bars } from './visit.ts';
 const built = scratch('nemia-bars-');
 const browsers = {} as Record<Bars, Browser>;
 let served: { at: string; close: () => void };
-before(async () => {
+beforeAll(async () => {
   served = await serveBuilt(await storybookFor(scratch('nemia-bars-storybook-')));
   browsers.classic = await launch('classic');
   browsers.overlay = await launch('overlay');
 }, WAITED);
-after(async () => {
+afterAll(async () => {
   await browsers.classic?.close();
   await browsers.overlay?.close();
   served?.close();

@@ -1,5 +1,5 @@
 import '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { TABLE_ACCEPT } from 'objects';
 import { acceptsTable } from './table.ts';

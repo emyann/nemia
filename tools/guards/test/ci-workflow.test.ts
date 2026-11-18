@@ -22,7 +22,7 @@
  * `guards#test` task's inputs, or turbo replays a pass from its cache after an edit to the workflow, and `due.ts` reads the same
  * inputs to decide when CI runs this suite at all.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

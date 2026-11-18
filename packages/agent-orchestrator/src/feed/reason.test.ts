@@ -8,7 +8,7 @@
  * (`Record<Assessment['status'], …>`, `Record<StepStatus, …>`), so a status added anywhere fails this file's typecheck rather than
  * falling silently to `Unknown`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   codesOf,
@@ -240,8 +240,8 @@ const lineOf = (c: Case): FeedLine =>
 const takenByConverted = (wake: readonly string[], line: FeedLine): boolean =>
   selects(parseSelectors(selectorsOfWake(wake).selectors), line);
 
-test('reasonOf names a reason for every word the package writes, only of a kind the table gives it, and every entry is one some word reaches', async (t) => {
-  await t.test('every word the package writes maps to a reason, and what qualifies it', () => {
+describe('reasonOf names a reason for every word the package writes, only of a kind the table gives it, and every entry is one some word reaches', () => {
+  test('every word the package writes maps to a reason, and what qualifies it', () => {
     for (const c of CASES) {
       const said = { word: c.word, ...(c.note !== undefined ? { note: c.note } : {}) };
       const codes = { reason: c.reason, ...(c.on ? { on: c.on } : {}), ...(c.via ? { via: c.via } : {}) };
@@ -249,14 +249,14 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
       assert.equal(reasonOf(said, c.kind), c.reason);
     }
   });
-  await t.test("a factory's word no rule names is Unknown, never another kind's code", () => {
+  test("a factory's word no rule names is Unknown, never another kind's code", () => {
     assert.equal(reasonOf({ word: 'level changed' }, 'Factory'), 'Unknown');
     assert.equal(reasonOf({ word: 'conflicts reworded' }, 'Factory'), 'Unknown');
   });
-  await t.test('a reason is only named of a kind the table gives it', () => {
+  test('a reason is only named of a kind the table gives it', () => {
     for (const c of CASES) assert.ok(kindsOf(c.reason).includes(c.kind), `${c.reason} is not a reason of a ${c.kind}`);
   });
-  await t.test("every entry of the table is one some word reaches, or a run's first waiting step's reason (`runCodes`)", () => {
+  test("every entry of the table is one some word reaches, or a run's first waiting step's reason (`runCodes`)", () => {
     const reached = new Set(
       CASES.map((c) => `${reasonOf({ word: c.word, ...(c.note !== undefined ? { note: c.note } : {}) }, c.kind)}/${c.kind}`),
     );
@@ -293,16 +293,16 @@ const PERSON = [
 const wokenByNoteAlone = (line: FeedLine): boolean =>
   wokenByFormerWake(line, FORMER_DEFAULT_WAKE) && !wokenByFormerWake({ ...line, note: undefined }, FORMER_DEFAULT_WAKE);
 
-test('waitsOf: the lines that wait on a person are those of the Awaiting reasons, the stops beside them and a step broke, never a note', async (t) => {
-  await t.test('waits is true of exactly the reasons of phase waiting, and Failed and CheckFailed', () => {
+describe('waitsOf: the lines that wait on a person are those of the Awaiting reasons, the stops beside them and a step broke, never a note', () => {
+  test('waits is true of exactly the reasons of phase waiting, and Failed and CheckFailed', () => {
     assert.deepEqual(REASON_CODES.filter(waitsOf).sort(), [...PERSON].sort());
   });
-  await t.test('a note that says a person is waited on makes no line wait: only its reason does', () => {
+  test('a note that says a person is waited on makes no line wait: only its reason does', () => {
     const line = upgraded({ at: '2026-10-16T04:00:00.000Z', run: 'r-1', step: 'plan', word: 'running', note: 'waiting on you: plan' });
     assert.equal(line.reason, 'Running');
     assert.equal(line.waits, undefined);
   });
-  await t.test('every former code is gone from the table, and each converts through FORMER_REASONS', () => {
+  test('every former code is gone from the table, and each converts through FORMER_REASONS', () => {
     const former = [
       'NeedsHuman',
       'Blocked',
@@ -318,7 +318,7 @@ test('waitsOf: the lines that wait on a person are those of the Awaiting reasons
       assert.ok(Object.hasOwn(FORMER_REASONS, code), `${code} is read through FORMER_REASONS`);
     }
   });
-  await t.test("Nemia's former wake list converts to selectors that take the waiting lines and a tool denial, and no other line", () => {
+  test("Nemia's former wake list converts to selectors that take the waiting lines and a tool denial, and no other line", () => {
     for (const c of CASES) {
       const hers = waitsOf(c.reason) || c.reason === 'ToolDenied';
       assert.equal(takenByConverted(FORMER_NEMIA_WAKE, lineOf(c)), hers, `${c.reason}: ${JSON.stringify(c.word)}`);
@@ -328,34 +328,31 @@ test('waitsOf: the lines that wait on a person are those of the Awaiting reasons
       'a denial is among the fixtures, or the line above proves nothing',
     );
   });
-  await t.test(
-    'every one of the 256 stored wake lists converts to selectors that take every line it woke on but by a note alone, and more',
-    () => {
-      const lines = CASES.map(lineOf);
-      const subsets = Array.from({ length: 1 << FORMER_NEMIA_WAKE.length }, (_, mask) =>
-        FORMER_NEMIA_WAKE.filter((_word, i) => (mask & (1 << i)) !== 0),
-      );
-      assert.equal(subsets.length, 256);
-      assert.deepEqual(
-        lines.filter((line) => wokenByNoteAlone(line) && !waitsOf(line.reason!)).map((line) => [line.reason, line.note]),
-        [['Running', 'waiting on you: approve plan']],
-        'the one line a note alone woke on and no reason waits for: a run still at work beside a step that waits, whose own line wakes',
-      );
-      let wider = 0;
-      for (const wake of subsets)
-        for (const [i, line] of lines.entries()) {
-          const woken = wokenByFormerWake(line, wake) && !(wokenByNoteAlone(line) && !waitsOf(line.reason!));
-          const taken = takenByConverted(wake, line);
-          if (woken) assert.ok(taken, `${JSON.stringify(wake)} woke on ${JSON.stringify(CASES[i].word)} and its selectors do not take it`);
-          if (taken && !woken) wider++;
-        }
-      assert.ok(wider > 0, 'waits=person takes the stops the wake words never named: a strict superset, never a narrower one');
-    },
-  );
+  test('every one of the 256 stored wake lists converts to selectors that take every line it woke on but by a note alone, and more', () => {
+    const lines = CASES.map(lineOf);
+    const subsets = Array.from({ length: 1 << FORMER_NEMIA_WAKE.length }, (_, mask) =>
+      FORMER_NEMIA_WAKE.filter((_word, i) => (mask & (1 << i)) !== 0),
+    );
+    assert.equal(subsets.length, 256);
+    assert.deepEqual(
+      lines.filter((line) => wokenByNoteAlone(line) && !waitsOf(line.reason!)).map((line) => [line.reason, line.note]),
+      [['Running', 'waiting on you: approve plan']],
+      'the one line a note alone woke on and no reason waits for: a run still at work beside a step that waits, whose own line wakes',
+    );
+    let wider = 0;
+    for (const wake of subsets)
+      for (const [i, line] of lines.entries()) {
+        const woken = wokenByFormerWake(line, wake) && !(wokenByNoteAlone(line) && !waitsOf(line.reason!));
+        const taken = takenByConverted(wake, line);
+        if (woken) assert.ok(taken, `${JSON.stringify(wake)} woke on ${JSON.stringify(CASES[i].word)} and its selectors do not take it`);
+        if (taken && !woken) wider++;
+      }
+    assert.ok(wider > 0, 'waits=person takes the stops the wake words never named: a strict superset, never a narrower one');
+  });
 });
 
-test('typeOf, messageOf and sourceOf: how serious a line is, what a person reads of it, and whose deed it is', async (t) => {
-  await t.test('a type is the table its reason comes from, and a message is the word and its note', () => {
+describe('typeOf, messageOf and sourceOf: how serious a line is, what a person reads of it, and whose deed it is', () => {
+  test('a type is the table its reason comes from, and a message is the word and its note', () => {
     assert.equal(typeOf('Failed'), 'Warning');
     assert.equal(typeOf('Running'), 'Normal');
     assert.equal(typeOf('SpawnFailed'), 'Warning', 'a runtime fault is something gone wrong');
@@ -372,7 +369,7 @@ test('typeOf, messageOf and sourceOf: how serious a line is, what a person reads
       "the owner's wording for a denial",
     );
   });
-  await t.test("a line's source is the table's, and every source is one some word reaches", () => {
+  test("a line's source is the table's, and every source is one some word reaches", () => {
     const reached = new Set(CASES.map((c) => sourceOf(reasonOf({ word: c.word, note: c.note }, c.kind))));
     assert.deepEqual(
       LINE_SOURCES.filter((source) => !reached.has(source)),
@@ -380,7 +377,7 @@ test('typeOf, messageOf and sourceOf: how serious a line is, what a person reads
       'a source no fixture reaches is one nothing writes',
     );
   });
-  await t.test("a person's act is the person's deed and a runtime fault the runtime's — never the tick's", () => {
+  test("a person's act is the person's deed and a runtime fault the runtime's — never the tick's", () => {
     assert.deepEqual(
       ACT_WORDS.map((c) => sourceOf(c.reason)),
       ['person', 'person', 'person', 'person', 'runtime', 'runtime'],

@@ -3,7 +3,7 @@
  * them (`approvalBody`, `budgetsGiven`) — only the amounts the person changed, and no `budgets` at all where they changed none — and how
  * the rows are drawn, before the approval with a field each and after it read only.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import './tsx.ts';
 

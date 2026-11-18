@@ -13,7 +13,8 @@
  * one that reports nothing, so a pass reads each task off the stand-in as a person settled it.
  */
 import { settingsOf } from '../src/config/config.store.ts';
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -186,13 +187,13 @@ const runsWritten = () => fs.readdirSync(RUNS).filter((f) => f.endsWith('.json')
 /** What `nemia argv` printed, line by line, over `e` (the stage's engine when none is named). */
 const printedBy = async (t: TestContext, argv: string[], e?: Engine): Promise<string[]> => {
   const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
     printed.push(args.join(' '));
   });
   try {
     await stage.main(argv, e);
   } finally {
-    log.mock.restore();
+    log.mockRestore();
   }
   return printed.join('\n').split('\n');
 };
@@ -250,10 +251,10 @@ const aSoloFactory = (attached: readonly string[]): string => {
 };
 
 /** Unfactored starts as shipped, for one test: the switch the tests' ambient sets is taken off, and put back after. */
-const asShipped = (t: { after: (f: () => void) => void }): void => {
+const asShipped = (t: { onTestFinished: (f: () => void) => void }): void => {
   const was = ENV.WF_DEFAULT_FACTORY_STARTS;
   ENV.WF_DEFAULT_FACTORY_STARTS = undefined;
-  t.after(() => {
+  t.onTestFinished(() => {
     if (was !== undefined) ENV.WF_DEFAULT_FACTORY_STARTS = was;
   });
 };
@@ -263,17 +264,24 @@ const WATCHER = folderOf({
   supervise: 'workspace: base\nslot: none\nharness: claude\ncontext: 200k\nremote: true\npermissionMode: dontAsk',
 });
 
-test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` and `nemia decide` say; the run created first takes a slot a finished or called-off run frees; a watcher and a run waiting on another are not counted; with no cap, nothing waits', async (t) => {
-  const s = story(t);
-  emptyStore('2');
-  t.after(() => emptyStore(undefined));
-  const b = ticking();
+describe('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` and `nemia decide` say; the run created first takes a slot a finished or called-off run frees; a watcher and a run waiting on another are not counted; with no cap, nothing waits', () => {
+  let b!: import('./story.ts').Board;
+  let one!: Run;
+  let two!: Run;
+  let younger!: Run;
+  let older!: Run;
+  beforeAll(() => {
+    const t = teardowns();
+    emptyStore('2');
+    t.onTestFinished(() => emptyStore(undefined));
+    b = ticking();
+    return t.end;
+  });
+  const s = story(test);
   const task = (r: Run) => `${r.id}-implement`;
-  let one: Run, two: Run, younger: Run, older: Run;
   const HELD = 'waiting for a run slot (2 of 2 in flight)';
   const heldDecided = { running: true, held: { inFlight: 2, cap: 2 } };
-
-  await s.test(
+  s.test(
     'at a cap of 2, two runs are filed and the others wait: `nemia tick`, `nemia ls` and `nemia decide` say 2 of 2 in flight, and each record says when the cap first held it',
     async (c) => {
       one = await started('first', at(1));
@@ -306,28 +314,23 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       assert.equal((await runWith(b.e, decideRun(one.id))).held, undefined);
     },
   );
-
-  await s.test(
-    'the next pass holds them again, files nothing, and writes nothing: the time stands, and the note is said once',
-    async () => {
-      const heldAt = runRecord(ROOT, older.id).slotHeldAt;
-      const { runs: again } = await runWith(b.e, tickRun());
-      assert.deepEqual([b.filings.length, runRecord(ROOT, older.id).slotHeldAt], [2, heldAt]);
-      assert.deepEqual(again.find((a) => a.run.id === older.id)!.notes, []);
-      assert.deepEqual(
-        [
-          again.find((a) => a.run.id === older.id)!.held,
-          again
-            .filter((a) => a.inFlight)
-            .map((a) => a.run.id)
-            .sort(),
-        ],
-        [{ inFlight: 2, cap: 2 }, [one.id, two.id].sort()],
-      );
-    },
-  );
-
-  await s.test(
+  s.test('the next pass holds them again, files nothing, and writes nothing: the time stands, and the note is said once', async () => {
+    const heldAt = runRecord(ROOT, older.id).slotHeldAt;
+    const { runs: again } = await runWith(b.e, tickRun());
+    assert.deepEqual([b.filings.length, runRecord(ROOT, older.id).slotHeldAt], [2, heldAt]);
+    assert.deepEqual(again.find((a) => a.run.id === older.id)!.notes, []);
+    assert.deepEqual(
+      [
+        again.find((a) => a.run.id === older.id)!.held,
+        again
+          .filter((a) => a.inFlight)
+          .map((a) => a.run.id)
+          .sort(),
+      ],
+      [{ inFlight: 2, cap: 2 }, [one.id, two.id].sort()],
+    );
+  });
+  s.test(
     "`nemia ls` and `nemia decide` judge by the cap the last pass ran with, not their own shell's: whatever WF_MAX_RUNS a shell sets",
     async () => {
       const seen = async () => ({
@@ -351,14 +354,12 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       }
     },
   );
-
-  await s.test('the whole decision of a run the cap holds', async () => {
+  s.test('the whole decision of a run the cap holds', async () => {
     const read = await decisionOn(stage, older.id);
     assert.deepEqual(read.decision, heldDecided);
     assert.deepEqual(read.decided?.held, { inFlight: 2, cap: 2 }, "the package's reading of it, which `nemia ls` says");
   });
-
-  await s.test(
+  s.test(
     "a watcher's run (`slot: none`) files its step at a full cap, counts against nothing and holds no other run — nor while its session runs on an answer",
     async () => {
       const watcher = await runPlaced(startRun({ brief: 'supervise this repository', repo: aRepo(), workflowDir: WATCHER }));
@@ -394,8 +395,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       assert.deepEqual(await held(), [younger.id, older.id]);
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED at `nemia start`, with nothing written: `slot: none` on a step of a workflow that has another — a slot is a run's",
     async () => {
       const before = runsWritten();
@@ -413,8 +413,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       assert.equal(runsWritten(), before, 'nothing written');
     },
   );
-
-  await s.test(
+  s.test(
     'a run that finishes frees its slot on the next pass, and the run created first takes it — not the one first by id, nor by the order the store lists it in',
     async () => {
       b.settle(task(one), 'succeeded', SIGNED);
@@ -427,8 +426,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       );
     },
   );
-
-  await s.test('a run called off while it runs frees its slot once the engine has stopped it, and the run held next takes it', async () => {
+  s.test('a run called off while it runs frees its slot once the engine has stopped it, and the run held next takes it', async () => {
     b.settle(task(two), 'working');
     await runWith(b.e, cancelRun(two.id));
     assert.ok(b.stopped.includes(task(two)), 'its task asked to stop');
@@ -436,8 +434,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
     await runWith(b.e, tickRun());
     assert.deepEqual(b.filings.slice(-1), [task(younger)]);
   });
-
-  await s.test("the timeline counts the wait for a slot as the run's queue, on the decision's reading too", async () => {
+  s.test("the timeline counts the wait for a slot as the run's queue, on the decision's reading too", async () => {
     b.tasks.get(task(younger))!.filedAt = '2026-09-16T10:15:00.000Z';
     b.settle(task(younger), 'succeeded', SIGNED);
     const slot = { from: at(4), filedAt: '2026-09-16T10:15:00.000Z', ms: 71 * 60_000, queued: '1h11m' };
@@ -445,8 +442,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
     assert.deepEqual(timeline.slot, slot, 'created at 09:04 and filed at 10:15: that wait is its queue');
     assert.deepEqual((await decidedOn(stage, younger.id)).timeline.slot, slot, 'the read the api serves says the same');
   });
-
-  await s.test(
+  s.test(
     'a run waiting on `--after` counts only once filed: with one run in flight, a run started after it is filed — and the one after that is held at 2 of 2',
     async () => {
       const child = await started('child', at(5), { after: [older.id], isolate: true, repo: older.repo });
@@ -466,8 +462,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       assert.deepEqual(slotHeld(listed), [[later.id, 'implement', HELD]], `only ${later.id}`);
     },
   );
-
-  await s.test(
+  s.test(
     "with no cap — WF_MAX_RUNS unset, or 0 — a pass files every run and writes nothing of a slot; before any pass, a shell's own cap, and none the daemon does not run with",
     async () => {
       const recorded = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'tick.json'), 'utf8')) as { sessions: number; runs: number };
@@ -525,11 +520,16 @@ const LOOPING = {
 };
 const FOUND = [{ file: 'src/flag.ts', line: 12, what: 'the flag is read before it is parsed' }];
 
-test('a run keeps its momentum: its first steps are filed with none, and everything after them — a step after another, a check, a round, a try `retries:` files and one `nemia retry` asks for — with 1', async (t) => {
-  const s = story(t);
-  emptyStore(undefined);
-  t.after(() => emptyStore(undefined));
-  const b = stage.board();
+describe('a run keeps its momentum: its first steps are filed with none, and everything after them — a step after another, a check, a round, a try `retries:` files and one `nemia retry` asks for — with 1', () => {
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    const t = teardowns();
+    emptyStore(undefined);
+    t.onTestFinished(() => emptyStore(undefined));
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const priorityByStep = (id: string) =>
     Object.fromEntries(
       b.filings
@@ -537,8 +537,7 @@ test('a run keeps its momentum: its first steps are filed with none, and everyth
         .map((task) => [task.slice(id.length + 1), b.tasks.get(task)!.spec.priority ?? 'none']),
     );
   const advanced = async (id: string) => runWith(b.e, advanceRun(runRecord(ROOT, id)));
-
-  await s.test('every step that waits on nothing has no momentum, and the step that joins them has 1', async () => {
+  s.test('every step that waits on nothing has no momentum, and the step that joins them has 1', async () => {
     const dir = folderOf({ left: '', right: '', join: 'after: left, right' });
     const run = await runPlaced(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir }));
     assert.deepEqual((await advanced(run.id)).filed.sort(), ['left', 'right']);
@@ -547,8 +546,7 @@ test('a run keeps its momentum: its first steps are filed with none, and everyth
     assert.deepEqual((await advanced(run.id)).filed, ['join']);
     assert.deepEqual(priorityByStep(run.id), { left: 0, right: 0, join: 1 });
   });
-
-  await s.test(
+  s.test(
     "implement, its check, review looping back: round 2's implement, continued, its check, and a new session of review — each with 1",
     async () => {
       const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
@@ -585,8 +583,7 @@ test('a run keeps its momentum: its first steps are filed with none, and everyth
       });
     },
   );
-
-  await s.test('a try `retries:` files, its check, and a try `nemia retry` asks for — each with 1', async () => {
+  s.test('a try `retries:` files, its check, and a try `nemia retry` asks for — each with 1', async () => {
     const run = await runPlaced(
       startRun({
         brief: 'add a flag',
@@ -615,23 +612,28 @@ test('a run keeps its momentum: its first steps are filed with none, and everyth
   });
 });
 
-test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read them: said in words before the first pass — REFUSED by name, exit 2, a value that does not read, before the store is taken or the engine asked", async (t) => {
-  emptyStore(undefined);
-  t.after(() => {
+describe("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read them: said in words before the first pass — REFUSED by name, exit 2, a value that does not read, before the store is taken or the engine asked", () => {
+  let stop!: Error & { exitCode: number };
+  let daemon!: string;
+  beforeAll(() => {
+    const t = teardowns();
     emptyStore(undefined);
-    ENV.WF_VERIFY_REST = '1';
-    ENV.WF_MAX_CONCURRENT = undefined;
+    t.onTestFinished(() => {
+      emptyStore(undefined);
+      ENV.WF_VERIFY_REST = '1';
+      ENV.WF_MAX_CONCURRENT = undefined;
+    });
+    stop = Object.assign(new Error('the engine was asked to tick'), { exitCode: 9 });
+    daemon = path.join(ROOT, 'daemon.json');
+    return t.end;
   });
-  const stop = Object.assign(new Error('the engine was asked to tick'), { exitCode: 9 });
-  const daemon = path.join(ROOT, 'daemon.json');
   const daemonFile = () => (fs.existsSync(daemon) ? fs.readFileSync(daemon, 'utf8') : undefined);
-
-  await t.test('`nemia up` says both ceilings in words before its first pass, and the store it takes, once per start', async (c) => {
+  test('`nemia up` says both ceilings in words before its first pass, and the store it takes, once per start', async (c) => {
     const { e } = stoppedBy(stop);
     ENV.WF_MAX_CONCURRENT = '4';
     ENV.WF_MEMORY_RESERVED = '2Gi';
     const printed: string[] = [];
-    const log = c.mock.method(console, 'log', (...args: unknown[]) => {
+    const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
       printed.push(args.join(' '));
     });
     try {
@@ -639,7 +641,7 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
       ENV.WF_MAX_RUNS = '2';
       await assert.rejects(stage.main(['up', '1000'], e), (err) => err === stop);
     } finally {
-      log.mock.restore();
+      log.mockRestore();
       ENV.WF_MAX_CONCURRENT = undefined;
       ENV.WF_MAX_RUNS = undefined;
       ENV.WF_MEMORY_RESERVED = undefined;
@@ -673,8 +675,6 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
       'the store taken is said once per start; daemon.store.test.ts has the rest of it',
     );
   });
-
-  await started('first', at(1));
   const rows: Array<[name: string, env: Record<string, string>, argv: string[] | 'pass', facts: string[], engineAskedFirst: boolean]> = [
     ['WF_MAX_RUNS=two, by `nemia up`', { WF_MAX_RUNS: 'two' }, ['up'], ['WF_MAX_RUNS=two', 'WF_MAX_RUNS=2'], false],
     ['WF_MAX_RUNS=two, by `nemia tick`', { WF_MAX_RUNS: 'two' }, ['tick'], ['WF_MAX_RUNS=two', 'WF_MAX_RUNS=2'], true],
@@ -686,12 +686,13 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
     ['WF_VERIFY_REST=true, by a pass', { WF_VERIFY_REST: 'true' }, 'pass', ['WF_VERIFY_REST=true', 'WF_VERIFY_REST=1'], false],
   ];
   for (const [name, env, argv, facts, engineAskedFirst] of rows)
-    await t.test(`REFUSED: ${name}`, async (c) => {
+    test(`REFUSED: ${name}`, async (c) => {
+      await started('first', at(1));
       const held = daemonFile();
       const { e, own } = stoppedBy(stop);
       if (engineAskedFirst) Object.assign(e, { tick: () => Effect.succeed(QUIET) });
       Object.assign(ENV, env);
-      c.mock.method(console, 'log', () => {});
+      vi.spyOn(console, 'log').mockImplementation(() => {});
       try {
         await assert.rejects(argv === 'pass' ? runWith(e, tickRun()) : stage.main(argv, e), (err: Error & { exitCode?: number }) => {
           assert.equal(err.exitCode, 2, err.message);
@@ -701,7 +702,7 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
       } finally {
         for (const key of Object.keys(env)) delete ENV[key];
         ENV.WF_VERIFY_REST = '1';
-        c.mock.restoreAll();
+        vi.restoreAllMocks();
       }
       assert.deepEqual(
         own.filings,
@@ -712,20 +713,25 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
     });
 });
 
-test('a card becomes a run: filed with its factory and its gate, queued, it waits at a cap of 1 while a run is in flight, and starts when a slot frees, the oldest queued first, one a pass — removed, its run naming it, as `nemia tick`, `nemia decide` and `nemia up` say', async (t) => {
-  const s = story(t);
-  emptyStore('1');
-  t.after(() => emptyStore(undefined));
-  const b = ticking();
-  const solo = aSoloFactory(['dev', 'one']);
-  fs.mkdirSync(path.join(solo, 'workflows', 'one'));
-  fs.writeFileSync(path.join(solo, 'workflows', 'one', 'implement.md'), '---\nplace: git\nagent: implementer\n---\nimplement it\n');
+describe('a card becomes a run: filed with its factory and its gate, queued, it waits at a cap of 1 while a run is in flight, and starts when a slot frees, the oldest queued first, one a pass — removed, its run naming it, as `nemia tick`, `nemia decide` and `nemia up` say', () => {
+  let b!: import('./story.ts').Board;
+  let solo!: string;
+  let busy!: Run;
+  let run!: Run;
+  beforeAll(() => {
+    const t = teardowns();
+    emptyStore('1');
+    t.onTestFinished(() => emptyStore(undefined));
+    b = ticking();
+    solo = aSoloFactory(['dev', 'one']);
+    fs.mkdirSync(path.join(solo, 'workflows', 'one'));
+    fs.writeFileSync(path.join(solo, 'workflows', 'one', 'implement.md'), '---\nplace: git\nagent: implementer\n---\nimplement it\n');
+    return t.end;
+  });
+  const s = story(test);
   let name = '';
   let file = '';
-  let busy: Run;
-  let run: Run;
-
-  await s.test('`nemia inbox add <file> --factory` files a card whose gate is in its file, and `nemia inbox` lists both', async () => {
+  s.test('`nemia inbox add <file> --factory` files a card whose gate is in its file, and `nemia inbox` lists both', async () => {
     const idea = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
     fs.writeFileSync(idea, '---\nworkflow: dev\ngate: review\n---\nCache the views between passes\n');
     ({ name } = (await added({ idea: fs.readFileSync(idea, 'utf8'), factory: 'solo' })).card);
@@ -734,8 +740,7 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
     const [listed] = (await listedLines()).filter((l) => l.startsWith(name));
     assert.ok(listed.includes('gate: review') && listed.includes('factory: solo'), listed);
   });
-
-  await s.test(
+  s.test(
     "`nemia inbox queue` marks it, says its place and that it starts on its factory's repository for its workflow, and keeps the card file's time — a queue is no edit of the idea, and `--off` takes it back as old still",
     async () => {
       const filed = new Date('2026-09-16T08:00:00.000Z');
@@ -765,8 +770,7 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
       fs.rmSync(fresh.file);
     },
   );
-
-  await s.test('at a cap of 1, with a run in flight, the queued cards wait, pass after pass', async () => {
+  s.test('at a cap of 1, with a run in flight, the queued cards wait, pass after pass', async () => {
     busy = await started('busy', at(1));
     aCard('z-old-c3d4', { workflow: 'one', queued: '2026-09-16T09:00:00.000Z', factory: 'solo' }, 'Old');
     aCard('m-parked-e5f6', { workflow: 'dev', factory: 'solo' }, 'Parked, not queued');
@@ -775,8 +779,7 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
     assert.deepEqual((await runWith(b.e, tickRun())).queue, undefined, 'and on every pass the run is in flight');
     assert.ok(fs.existsSync(path.join(INBOX, 'z-old-c3d4.md')) && fs.existsSync(file));
   });
-
-  await s.test(
+  s.test(
     'the pass that sees that run finish starts the card queued first — by when it was queued, not by its name — and only it',
     async () => {
       b.settle(`${busy.id}-implement`, 'succeeded', SIGNED);
@@ -786,17 +789,12 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
       assert.deepEqual([fs.existsSync(file), fromCard(name)], [true, []], 'one card a pass');
     },
   );
-
-  await s.test(
-    "the card's run is counted before any other card: the next pass files its roots, and the next card waits behind it",
-    async () => {
-      const [old] = fromCard('z-old-c3d4');
-      const counted = await runWith(b.e, tickRun());
-      assert.deepEqual([counted.queue, b.filings, fromCard(name)], [undefined, [`${busy.id}-implement`, `${old.id}-implement`], []]);
-    },
-  );
-
-  await s.test(
+  s.test("the card's run is counted before any other card: the next pass files its roots, and the next card waits behind it", async () => {
+    const [old] = fromCard('z-old-c3d4');
+    const counted = await runWith(b.e, tickRun());
+    assert.deepEqual([counted.queue, b.filings, fromCard(name)], [undefined, [`${busy.id}-implement`, `${old.id}-implement`], []]);
+  });
+  s.test(
     "once its slot frees, the factory's card starts in its factory, on its one repository: `nemia tick` says `started <card> as <run>`, the card is kept, listed as started, its run records where it came from and its gate, and its roots are filed on the pass after",
     async (c) => {
       const [old] = fromCard('z-old-c3d4');
@@ -822,12 +820,10 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
       );
     },
   );
-
-  await s.test("the run's decision names the card the run came from, as its lines say it", async () => {
+  s.test("the run's decision names the card the run came from, as its lines say it", async () => {
     assert.equal(runLines((await decisionOn(stage, run.id)).run).fromNote, `from inbox card ${name}`);
   });
-
-  await s.test(
+  s.test(
     '`--off` and `nemia inbox rm` take a card back, and a free slot starts nothing — nor a card never queued; `--workflow` writes both',
     async () => {
       await runWith(b.e, cancelRun(run.id));
@@ -854,23 +850,18 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
       assert.ok(fs.existsSync(path.join(INBOX, 'm-parked-e5f6.md')), 'a card not queued is never started');
     },
   );
-
-  await s.test(
-    'REFUSED: `nemia inbox queue --workflow` given a path, a card naming its workflow by its name; the card unchanged',
-    async () => {
-      const card = addToInbox({ text: 'Queued on a folder', factory: 'solo' });
-      const before = fs.readFileSync(card.file, 'utf8');
-      const folder = path.join(solo, 'workflows', 'dev');
-      await assert.rejects(
-        queuedBy(card.card.name, '--workflow', folder),
-        refusedAs('Invalid', `--workflow ${folder}`, 'Nothing was queued.'),
-      );
-      assert.equal(fs.readFileSync(card.file, 'utf8'), before);
-      await verb(['inbox', 'rm', card.card.name]);
-    },
-  );
-
-  await s.test('a queued card that names no factory starts on the repository the daemon runs in, as `nemia start` takes `.`', async () => {
+  s.test('REFUSED: `nemia inbox queue --workflow` given a path, a card naming its workflow by its name; the card unchanged', async () => {
+    const card = addToInbox({ text: 'Queued on a folder', factory: 'solo' });
+    const before = fs.readFileSync(card.file, 'utf8');
+    const folder = path.join(solo, 'workflows', 'dev');
+    await assert.rejects(
+      queuedBy(card.card.name, '--workflow', folder),
+      refusedAs('Invalid', `--workflow ${folder}`, 'Nothing was queued.'),
+    );
+    assert.equal(fs.readFileSync(card.file, 'utf8'), before);
+    await verb(['inbox', 'rm', card.card.name]);
+  });
+  s.test('a queued card that names no factory starts on the repository the daemon runs in, as `nemia start` takes `.`', async () => {
     const daemons = aRepoWith('dev');
     const { card } = addToInbox({ text: 'Anywhere the daemon is', workflow: 'dev' });
     await queuedBy(card.name);
@@ -882,20 +873,19 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
     );
     await runWith(b.e, cancelRun(started.id));
   });
-
-  await s.test('`nemia up` logs a card it starts as `nemia tick` does, a time before it', async (c) => {
+  s.test('`nemia up` logs a card it starts as `nemia tick` does, a time before it', async (c) => {
     aCard('up-card-a1b2', { workflow: 'dev', queued: at(30), factory: 'solo' }, 'Show the flag');
     let passes = 0;
     const stop = new Error('the test stops the daemon');
     Object.assign(b.e, { tick: () => (++passes > 1 ? Effect.die(stop) : Effect.succeed(QUIET)) });
     const printed: string[] = [];
-    const log = c.mock.method(console, 'log', (...args: unknown[]) => {
+    const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
       printed.push(args.join(' '));
     });
     try {
       await assert.rejects(stage.main(['up', '1']), (err) => err === stop);
     } finally {
-      log.mock.restore();
+      log.mockRestore();
       Object.assign(b.e, { tick: () => Effect.succeed(QUIET) });
     }
     const [upRun] = fromCard('up-card-a1b2');
@@ -906,12 +896,16 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
   });
 });
 
-test("the queue's failures: a card whose start is refused — its workflow gone, its factory naming no repository for it, refused on the daemon's repository or its factory's — is left as it is, said once and passed over while it reads the same, and the card behind it has its turn", async (t) => {
-  const s = story(t);
-  t.after(() => emptyStore(undefined));
-  const b = ticking();
-
-  await s.test(
+describe("the queue's failures: a card whose start is refused — its workflow gone, its factory naming no repository for it, refused on the daemon's repository or its factory's — is left as it is, said once and passed over while it reads the same, and the card behind it has its turn", () => {
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    const t = teardowns();
+    t.onTestFinished(() => emptyStore(undefined));
+    b = ticking();
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     'REFUSED: a card whose workflow is gone is left queued as it is, named on `nemia tick` and in `nemia inbox`, the card behind it starts on the next pass, and queued again with its workflow back it starts',
     async (c) => {
       emptyStore(undefined);
@@ -957,8 +951,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       assert.deepEqual(fs.readdirSync(path.join(ROOT, 'queue')), [], 'its refusal removed once the card no longer read as refused');
     },
   );
-
-  await s.test(
+  s.test(
     "an old card whose `repo:` names elsewhere — a folder deleted since — still reads and keeps its place, and is started on its factory's repository, its repo: said as not read",
     async (c) => {
       emptyStore(undefined);
@@ -974,8 +967,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       names(ticked[0], `started gone-a1b2 as ${run.id}`, `repo: ${doomed}`, 'retired');
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED in a factory of two repositories that names none for its workflow: tried on none, remembered on none and passed over, and tried again once the attach names one',
     async () => {
       emptyStore(undefined);
@@ -1002,8 +994,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       await runWith(b.e, cancelRun(run.id));
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED on the repository it was tried on: a card that names no repository, refused on the daemon's, is passed over by every pass there, and started by a pass in a repository that has its workflow",
     async () => {
       emptyStore(undefined);
@@ -1030,8 +1021,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       assert.deepEqual([started.queue, run?.repo], [{ card: card.name, run: run.id }, dev]);
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED on its factory's repository: a card of a workflow its factory has not attached is tried there, and passed over by every pass after, from a daemon anywhere",
     async () => {
       emptyStore(undefined);
@@ -1055,8 +1045,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       assert.doesNotMatch(line, /run nemia up/);
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED as shipped: a card that names no factory is refused from a daemon in a repository one factory alone holds, said with no start's flag, and not tried again; with `factory:` written it starts in it; one that names default is refused",
     async (c) => {
       asShipped(c);
@@ -1095,138 +1084,147 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
   );
 });
 
-test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no card, with no name, of a card with no workflow, of one already queued and of one a run was started from — and as shipped, of one that names no factory or default — writing nothing and starting nothing', async (t) => {
-  emptyStore(undefined);
-  t.after(() => emptyStore(undefined));
-  aSoloFactory(['dev']);
-  const repo = aRepoWith('dev');
-  const bare = addToInbox({ text: 'No workflow yet', factory: 'solo' });
-  aCard('queued-a1b2', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z', factory: 'solo' }, 'Queued already');
-  aCard('kept-a1b2', { workflow: 'dev', factory: 'solo' }, 'Started already');
-  aCard('loose', { workflow: 'dev' }, 'Build it, somewhere.');
-  aCard('history', { workflow: 'dev', factory: 'default' }, 'Build it in the history.');
-  const x = await started('x', at(1));
-  fs.writeFileSync(
-    path.join(RUNS, 'started-already-zz99.json'),
-    JSON.stringify({ ...runRecord(ROOT, x.id), id: 'started-already-zz99', from: { inbox: 'kept-a1b2' } }),
-  );
-  const cards = () => Object.fromEntries(fs.readdirSync(INBOX).map((f) => [f, fs.readFileSync(path.join(INBOX, f), 'utf8')]));
-  const before = cards();
-  const runs = listRuns(ROOT).length;
-  const queue = (...argv: string[]) => queuedBy(...argv);
-  const rows: Array<[string, () => Promise<unknown>, 'Missing' | 'Conflict' | 'Invalid', string[], shipped?: boolean]> = [
-    [
-      'a name with no card',
-      () => queue('no-such-card'),
-      'Missing',
-      ['no card no-such-card in the inbox', bare.card.name, 'nemia inbox queue <name>', 'nemia inbox add "<idea>"'],
-    ],
-    ['no name', () => queue(), 'Invalid', ['the name of the card', 'nemia inbox queue <name> [--workflow <name>] [--off]']],
-    ['a name that leaves the inbox', () => queue('../runs/x'), 'Invalid', ["`../runs/x` is not a card's name"]],
-    [
-      'a card with no workflow',
-      () => queue(bare.card.name),
-      'Invalid',
-      [`${bare.card.name}.md: no workflow`, `nemia inbox queue ${bare.card.name} --workflow <w>`],
-    ],
-    [
-      '--off and --workflow at once',
-      () => queue(bare.card.name, '--off', '--workflow', 'dev'),
-      'Invalid',
-      ['--off', '--workflow', 'give one of them'],
-    ],
-    [
-      '--workflow with no value',
-      () => queue(bare.card.name, '--workflow'),
-      'Invalid',
-      ['--workflow takes the workflow the card starts on'],
-    ],
-    ['a second name', () => queue(bare.card.name, 'another'), 'Invalid', ['nemia inbox queue queues one card', 'another is a second']],
-    [
-      '--workflow given as a path',
-      () => queue(bare.card.name, '--workflow', './flows/dev'),
-      'Invalid',
-      ['./flows/dev', 'Nothing was queued.'],
-    ],
-    [
-      'a workflow its factory does not attach, naming the attach',
-      () => queue(bare.card.name, '--workflow', 'triage'),
-      'Invalid',
-      ['nemia factory attach solo triage', 'Nothing was queued.'],
-    ],
-    [
-      'a card already queued',
-      () => queue('queued-a1b2'),
-      'Conflict',
-      ['queued-a1b2.md: already queued', '1 in the queue', 'nemia inbox queue queued-a1b2 --off'],
-    ],
-    [
-      "a card a run's record names as started",
-      () => queue('kept-a1b2'),
-      'Conflict',
-      ['kept-a1b2.md: this card was started as started-already-zz99', 'nemia inbox add'],
-    ],
-    [
-      'and its start, of the same kind',
-      async () => await runPlaced(startFromInbox({ name: 'kept-a1b2', callerRepo: repo })),
-      'Conflict',
-      ['kept-a1b2.md: this card was started as started-already-zz99'],
-    ],
-    [
-      'a start of a card not there',
-      async () => await runPlaced(startFromInbox({ name: 'no-such-card', callerRepo: repo })),
-      'Missing',
-      ['no card no-such-card in the inbox', 'nemia start '],
-    ],
-    [
-      'as shipped, a card that names no factory',
-      () => queue('loose'),
-      'Invalid',
+describe('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no card, with no name, of a card with no workflow, of one already queued and of one a run was started from — and as shipped, of one that names no factory or default — writing nothing and starting nothing', () => {
+  let repo!: string;
+  let bare!: {
+    card: import('../src/inbox/inbox.ts').InboxCard;
+    file: string;
+    labelsLeftOut?: readonly import('../src/labels/labels.ts').LeftOut[];
+  };
+  let x!: Run;
+  let before!: { [k: string]: string };
+  let runs!: number;
+  let rows!: Array<[string, () => Promise<unknown>, 'Missing' | 'Conflict' | 'Invalid', string[], shipped?: boolean]>;
+  beforeAll(async () => {
+    const t = teardowns();
+    emptyStore(undefined);
+    t.onTestFinished(() => emptyStore(undefined));
+    aSoloFactory(['dev']);
+    repo = aRepoWith('dev');
+    bare = addToInbox({ text: 'No workflow yet', factory: 'solo' });
+    aCard('queued-a1b2', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z', factory: 'solo' }, 'Queued already');
+    aCard('kept-a1b2', { workflow: 'dev', factory: 'solo' }, 'Started already');
+    aCard('loose', { workflow: 'dev' }, 'Build it, somewhere.');
+    aCard('history', { workflow: 'dev', factory: 'default' }, 'Build it in the history.');
+    x = await started('x', at(1));
+    fs.writeFileSync(
+      path.join(RUNS, 'started-already-zz99.json'),
+      JSON.stringify({ ...runRecord(ROOT, x.id), id: 'started-already-zz99', from: { inbox: 'kept-a1b2' } }),
+    );
+    before = cards();
+    runs = listRuns(ROOT).length;
+    rows = [
       [
-        '/inbox/loose.md: this card names no factory',
-        '`factory: <name>`',
-        'one of solo',
-        'nemia inbox queue loose.',
-        'Nothing was queued.',
+        'a name with no card',
+        () => queue('no-such-card'),
+        'Missing',
+        ['no card no-such-card in the inbox', bare.card.name, 'nemia inbox queue <name>', 'nemia inbox add "<idea>"'],
       ],
-      true,
-    ],
-    [
-      'as shipped, a card that names default',
-      () => queue('history'),
-      'Invalid',
-      ['`default` is the default factory', '`factory: <name>` in ', '/inbox/history.md, one of solo.', 'Nothing was queued.'],
-      true,
-    ],
-  ];
+      ['no name', () => queue(), 'Invalid', ['the name of the card', 'nemia inbox queue <name> [--workflow <name>] [--off]']],
+      ['a name that leaves the inbox', () => queue('../runs/x'), 'Invalid', ["`../runs/x` is not a card's name"]],
+      [
+        'a card with no workflow',
+        () => queue(bare.card.name),
+        'Invalid',
+        [`${bare.card.name}.md: no workflow`, `nemia inbox queue ${bare.card.name} --workflow <w>`],
+      ],
+      [
+        '--off and --workflow at once',
+        () => queue(bare.card.name, '--off', '--workflow', 'dev'),
+        'Invalid',
+        ['--off', '--workflow', 'give one of them'],
+      ],
+      [
+        '--workflow with no value',
+        () => queue(bare.card.name, '--workflow'),
+        'Invalid',
+        ['--workflow takes the workflow the card starts on'],
+      ],
+      ['a second name', () => queue(bare.card.name, 'another'), 'Invalid', ['nemia inbox queue queues one card', 'another is a second']],
+      [
+        '--workflow given as a path',
+        () => queue(bare.card.name, '--workflow', './flows/dev'),
+        'Invalid',
+        ['./flows/dev', 'Nothing was queued.'],
+      ],
+      [
+        'a workflow its factory does not attach, naming the attach',
+        () => queue(bare.card.name, '--workflow', 'triage'),
+        'Invalid',
+        ['nemia factory attach solo triage', 'Nothing was queued.'],
+      ],
+      [
+        'a card already queued',
+        () => queue('queued-a1b2'),
+        'Conflict',
+        ['queued-a1b2.md: already queued', '1 in the queue', 'nemia inbox queue queued-a1b2 --off'],
+      ],
+      [
+        "a card a run's record names as started",
+        () => queue('kept-a1b2'),
+        'Conflict',
+        ['kept-a1b2.md: this card was started as started-already-zz99', 'nemia inbox add'],
+      ],
+      [
+        'and its start, of the same kind',
+        async () => await runPlaced(startFromInbox({ name: 'kept-a1b2', callerRepo: repo })),
+        'Conflict',
+        ['kept-a1b2.md: this card was started as started-already-zz99'],
+      ],
+      [
+        'a start of a card not there',
+        async () => await runPlaced(startFromInbox({ name: 'no-such-card', callerRepo: repo })),
+        'Missing',
+        ['no card no-such-card in the inbox', 'nemia start '],
+      ],
+      [
+        'as shipped, a card that names no factory',
+        () => queue('loose'),
+        'Invalid',
+        [
+          '/inbox/loose.md: this card names no factory',
+          '`factory: <name>`',
+          'one of solo',
+          'nemia inbox queue loose.',
+          'Nothing was queued.',
+        ],
+        true,
+      ],
+      [
+        'as shipped, a card that names default',
+        () => queue('history'),
+        'Invalid',
+        ['`default` is the default factory', '`factory: <name>` in ', '/inbox/history.md, one of solo.', 'Nothing was queued.'],
+        true,
+      ],
+    ];
+    return t.end;
+  });
+  const cards = () => Object.fromEntries(fs.readdirSync(INBOX).map((f) => [f, fs.readFileSync(path.join(INBOX, f), 'utf8')]));
+  const queue = (...argv: string[]) => queuedBy(...argv);
   for (const [name, refused, tag, facts, shipped] of rows)
-    await t.test(name, async (c) => {
+    test(name, async (c) => {
       if (shipped) asShipped(c);
       await assert.rejects(refused, refusedAs(tag, ...facts));
       assert.deepEqual(cards(), before, 'nothing written');
       assert.equal(listRuns(ROOT).length, runs, 'nothing started');
     });
-
-  await t.test(
-    'as shipped, `--off` still takes back a card queued by hand that names no factory, and a card of a factory queues',
-    async (c) => {
-      asShipped(c);
-      const older = aCard('older', { workflow: 'dev', queued: at(1) }, 'Queued before the rule.');
-      await queuedBy('older', '--off');
-      assert.doesNotMatch(fs.readFileSync(older, 'utf8'), /queued:/);
-      const placed = aCard('placed', { workflow: 'dev', factory: 'solo' }, 'Build it in solo.');
-      await queuedBy('placed');
-      assert.match(fs.readFileSync(placed, 'utf8'), /^queued: \S+$/m);
-    },
-  );
+  test('as shipped, `--off` still takes back a card queued by hand that names no factory, and a card of a factory queues', async (c) => {
+    asShipped(c);
+    const older = aCard('older', { workflow: 'dev', queued: at(1) }, 'Queued before the rule.');
+    await queuedBy('older', '--off');
+    assert.doesNotMatch(fs.readFileSync(older, 'utf8'), /queued:/);
+    const placed = aCard('placed', { workflow: 'dev', factory: 'solo' }, 'Build it in solo.');
+    await queuedBy('placed');
+    assert.match(fs.readFileSync(placed, 'utf8'), /^queued: \S+$/m);
+  });
 });
 
-test(
+test.skipIf(process.getuid?.() === 0 && 'root removes a file from a folder it may not write')(
   'a card queued, then started by hand, is not started twice — nor once its run is forgotten, its queued: line gone — nor, when that line could not be taken off, by any pass after',
-  { skip: process.getuid?.() === 0 && 'root removes a file from a folder it may not write' },
   async (t) => {
     emptyStore(undefined);
-    t.after(() => emptyStore(undefined));
+    t.onTestFinished(() => emptyStore(undefined));
     const b = ticking();
     aSoloFactory(['dev']);
     const removed = addToInbox({ text: 'Started by hand', workflow: 'dev', factory: 'solo' });
@@ -1273,13 +1271,13 @@ test(
 
 test('a record that does not read as a run stops no other run: the pass files the rest, and says once, on stderr, which record it left out and why', async (t) => {
   emptyStore(undefined);
-  t.after(() => emptyStore(undefined));
+  t.onTestFinished(() => emptyStore(undefined));
   const b = ticking();
   const run = await started('a run beside a broken one', at(1));
   const broken = path.join(RUNS, 'r-broken.json');
   fs.writeFileSync(broken, JSON.stringify({ id: 'r-broken', brief: 'written by hand' }));
   const errs: string[] = [];
-  const err = t.mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
+  const err = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: string | Uint8Array) => {
     errs.push(String(chunk));
     return true;
   });
@@ -1294,7 +1292,7 @@ test('a record that does not read as a run stops no other run: the pass files th
     );
     await runWith(b.e, tickRun());
   } finally {
-    err.mock.restore();
+    err.mockRestore();
     fs.rmSync(broken);
   }
   const leftOut = errs.filter((l) => l.startsWith('left out: run r-broken: its record, '));

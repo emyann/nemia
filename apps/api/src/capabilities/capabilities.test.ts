@@ -3,7 +3,7 @@
  * factory filed on it (`?factory=`), and what each step of its workflows gets of them; and `repoOf`, the folder the daemon's pass ticks in.
  */
 import '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import fs from 'node:fs';
@@ -345,7 +345,7 @@ test('each server is asked once while an app runs: requests after the first, and
   const { app: own } = appOf(Layer.merge(liveOf(), ApiConfig.layer(process.env)));
   const factory = 'caps-asked-once';
   addFactory({ name: factory, repos: [repo] });
-  t.after(() => removeFactory(factory));
+  t.onTestFinished(() => removeFactory(factory));
   const capabilitiesOf = async (): Promise<CapabilitiesWithSteps> => {
     const res = await own.request(`/api/capabilities?factory=${factory}`);
     assert.equal(res.status, 200);

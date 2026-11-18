@@ -3,7 +3,7 @@
  * but `nemia version` and a help, unless `NEMIA_ON_INSTALLED=1`; on a store with no pointer, a trial store, it runs as ever. Each store a
  * scratch one, with the engine's beside it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

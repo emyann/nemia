@@ -3,7 +3,7 @@
  * land it and drop it, read it or forget it by the run's place — none on a run that awaits nobody. And who gave a person's word, said
  * after its line (`saidBy`).
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { choicesOf, type Decision, type Offer } from './decide.ts';
 import { saidBy } from './decide.verb.ts';
@@ -50,8 +50,8 @@ const awaiting = (more: Partial<Extract<Decision, { kind: 'awaiting' }>> = {}): 
 
 const offer = (command: string): Offer => ({ step: 'implement', command, said: `implement: it says so:  ${command}  (--fresh)` });
 
-test('choicesOf', async (t) => {
-  await t.test('each offer is its own bare command, labelled by its verb, with the sentence it ends on', () => {
+describe('choicesOf', () => {
+  test('each offer is its own bare command, labelled by its verb, with the sentence it ends on', () => {
     const offers = [
       'nemia retry r-1 implement',
       'nemia retry r-1 implement --recheck',
@@ -71,36 +71,30 @@ test('choicesOf', async (t) => {
       ],
     );
   });
-
-  await t.test(
-    'a step waiting at its gate is offered its approval and a send-back, in the order of the steps; an unrun one sends back to what it waits on',
-    () => {
-      const unrun = { ...RUN, steps: { ...RUN.steps, implement: { taskId: null } } } as unknown as Run;
-      assert.deepEqual(choicesOf(STEPS, unrun, awaiting({ awaitingApproval: ['implement', 'plan'] }), []).slice(0, 4), [
-        {
-          label: 'approve',
-          command: 'nemia approve r-1 plan',
-          said: 'plan waits at its gate — with words: nemia approve r-1 plan --message "<words>"',
-          step: 'plan',
-        },
-        { label: 'send back', command: 'nemia retry r-1 plan --message "<objection>"', said: null, step: 'plan' },
-        {
-          label: 'approve',
-          command: 'nemia approve r-1 implement',
-          said: 'implement waits at its gate — with words: nemia approve r-1 implement --message "<words>"',
-          step: 'implement',
-        },
-        { label: 'send back', command: 'nemia retry r-1 plan --message "<objection>"', said: null, step: 'plan' },
-      ]);
-    },
-  );
-
-  await t.test('a workflow whose step merges is offered no land it nor drop it', () => {
+  test('a step waiting at its gate is offered its approval and a send-back, in the order of the steps; an unrun one sends back to what it waits on', () => {
+    const unrun = { ...RUN, steps: { ...RUN.steps, implement: { taskId: null } } } as unknown as Run;
+    assert.deepEqual(choicesOf(STEPS, unrun, awaiting({ awaitingApproval: ['implement', 'plan'] }), []).slice(0, 4), [
+      {
+        label: 'approve',
+        command: 'nemia approve r-1 plan',
+        said: 'plan waits at its gate — with words: nemia approve r-1 plan --message "<words>"',
+        step: 'plan',
+      },
+      { label: 'send back', command: 'nemia retry r-1 plan --message "<objection>"', said: null, step: 'plan' },
+      {
+        label: 'approve',
+        command: 'nemia approve r-1 implement',
+        said: 'implement waits at its gate — with words: nemia approve r-1 implement --message "<words>"',
+        step: 'implement',
+      },
+      { label: 'send back', command: 'nemia retry r-1 plan --message "<objection>"', said: null, step: 'plan' },
+    ]);
+  });
+  test('a workflow whose step merges is offered no land it nor drop it', () => {
     const merging = [...STEPS, { name: 'ship', after: ['implement'], body: 'Land it.', workspace: 'base' }] as StepSpec[];
     assert.deepEqual(choicesOf(merging, RUN, awaiting(), []), []);
   });
-
-  await t.test('a direct run is offered to read it', () => {
+  test('a direct run is offered to read it', () => {
     assert.deepEqual(choicesOf(STEPS, RUN, awaiting({ direct: true }), []), [
       {
         label: 'read it',
@@ -110,19 +104,17 @@ test('choicesOf', async (t) => {
       },
     ]);
   });
-
-  await t.test('a folder run is offered to forget it', () => {
+  test('a folder run is offered to forget it', () => {
     const folder = { ...RUN, place: { kind: 'folder' }, repo: undefined, baseRef: undefined, branch: undefined } as unknown as Run;
     assert.deepEqual(choicesOf(STEPS, folder, awaiting(), []), [
       { label: 'forget it', command: 'nemia rm r-1', said: 'forgets the run with its folders and files', step: null },
     ]);
   });
-
   for (const [row, decided] of [
     ['a running run is offered nothing', { kind: 'running', waiting: ['implement'] }],
     ['a landed run is offered nothing', { kind: 'landed', branches: ['wf/r-1/implement'] }],
   ] as Array<[string, Decision]>) {
-    await t.test(row, () => {
+    test(row, () => {
       assert.deepEqual(choicesOf(STEPS, RUN, decided, [offer('nemia retry r-1 implement')]), []);
     });
   }

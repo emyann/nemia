@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { after, test, type TestContext } from 'node:test';
+import { afterAll, test, vi, type TestContext } from 'vitest';
 import { fed } from './e2e/board.ts';
 import { API, setStore } from './e2e/world.ts';
 import { scratch } from 'test-kit/scratch';
@@ -15,7 +15,7 @@ import { scratch } from 'test-kit/scratch';
 type Line = { at: string; run: string; step?: string; word: string; note?: string };
 
 const dir = scratch('e2e-feed-');
-after(() => setStore(undefined));
+afterAll(() => setStore(undefined));
 
 /**
  * A token of the person's kept in `store` as the store keeps one, its record under `person-tokens/` named by its sha-256 digest: every
@@ -44,7 +44,7 @@ async function apiFeed(t: TestContext, store: string): Promise<{ said: string[];
   });
   let printed = '';
   const ended = new Promise<void>((resolve) => child.on('close', () => resolve()));
-  t.after(async () => {
+  t.onTestFinished(async () => {
     child.kill();
     await ended;
   });
@@ -74,10 +74,10 @@ test('fed appends a line the package reads back, with a step and without', async
   fs.writeFileSync(file, `${JSON.stringify(before)}\n`);
   setStore(dir);
   const now = Date.parse('2026-10-02T21:30:00.123Z');
-  t.mock.timers.enable({ apis: ['Date'], now });
+  vi.useFakeTimers({ toFake: ['Date'], now });
   fed('r-1', 'implement', 'blocked');
   fed('r-1', 'awaiting approval');
-  t.mock.timers.reset();
+  vi.useRealTimers();
   const { said, cursor } = await apiFeed(t, dir);
   assert.equal(cursor, fs.statSync(file).size, 'every line is whole');
   assert.deepEqual(said, ['r-0  —  running', 'r-1  implement  blocked', 'r-1  —  awaiting approval']);

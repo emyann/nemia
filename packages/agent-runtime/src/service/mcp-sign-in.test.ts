@@ -7,7 +7,8 @@
  * nothing; and an address pasted back is handed to the waiting session only when it is that sign-in's redirect with a code and a state,
  * never quoted in a refusal.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect, Exit } from 'effect';
 import { story } from 'test-kit/checkpoints';
@@ -67,13 +68,33 @@ const refusalOf = <A>(effect: Effect.Effect<A, McpSignInRefused>): Promise<McpSi
 const OTHER: RemoteMcpServer = { ...GITHUB, url: 'https://other.example/mcp' };
 const LINEAR: RemoteMcpServer = { ...GITHUB, url: 'https://mcp.linear.app/mcp' };
 
-test('a person signs in with a secret, the server connects, and they sign out again', async (t) => {
-  const st = story(t);
-  const root = scratch('ae-sign-in-');
-  const s = seams();
-  const v = mcpSignInVerbsOf(CLAUDE, root, undefined, { cli: s.run, ask: s.ask });
-
-  await st.test('a sign-in stores the secret, answers the address at once and waits', async () => {
+describe('a person signs in with a secret, the server connects, and they sign out again', () => {
+  let root!: string;
+  let s!: {
+    cli: (readonly string[])[];
+    sessions: { name: string; cwd: string; redirectUri: string; ended: boolean; submitted: string[]; settle: (s: SignInSettled) => void }[];
+    run: McpCli;
+    ask: McpSignInAsk;
+  };
+  let v!: {
+    mcpSignIn: (
+      name: string,
+      server: RemoteMcpServer,
+      clientSecret?: string | undefined,
+    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused, never>;
+    mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
+    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused, never>;
+    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused, never>;
+  };
+  beforeAll(() => {
+    const t = teardowns();
+    root = scratch('ae-sign-in-');
+    s = seams();
+    v = mcpSignInVerbsOf(CLAUDE, root, undefined, { cli: s.run, ask: s.ask });
+    return t.end;
+  });
+  const st = story(test);
+  st.test('a sign-in stores the secret, answers the address at once and waits', async () => {
     const started = await Effect.runPromise(v.mcpSignIn('github', GITHUB, 'secret'));
     assert.equal(started.authUrl, 'https://github.com/login/oauth/authorize?state=1');
     assert.deepEqual(
@@ -84,14 +105,12 @@ test('a person signs in with a secret, the server connects, and they sign out ag
     assert.equal(s.sessions[0].cwd, `${root}/${SIGN_IN_FOLDER}`, 'the folder the local-scope add filed the server in');
     assert.equal((await Effect.runPromise(v.mcpSignInState('github'))).state, 'waiting');
   });
-
-  await st.test('it reads connected once the server connects, and its session ends', async () => {
+  st.test('it reads connected once the server connects, and its session ends', async () => {
     s.sessions[0].settle({ connected: true });
     await until(() => s.sessions[0].ended);
     assert.deepEqual(await Effect.runPromise(v.mcpSignInState('github')), { state: 'connected' });
   });
-
-  await st.test('a sign-out adds the server with no secret, then removes it at local scope, and forgets the state', async () => {
+  st.test('a sign-out adds the server with no secret, then removes it at local scope, and forgets the state', async () => {
     s.cli.length = 0;
     assert.deepEqual(await Effect.runPromise(v.mcpSignOut('github', GITHUB)), { signedOut: true });
     assert.deepEqual(
@@ -104,24 +123,41 @@ test('a person signs in with a secret, the server connects, and they sign out ag
   });
 });
 
-test('a server signed in with no secret runs no CLI, connects, and is signed out by an add then a remove', async (t) => {
-  const st = story(t);
-  const s = seams();
-  const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
-
-  await st.test('a sign-in handed no secret runs no CLI: the secret of a foreign client is the person’s to store', async () => {
+describe('a server signed in with no secret runs no CLI, connects, and is signed out by an add then a remove', () => {
+  let s!: {
+    cli: (readonly string[])[];
+    sessions: { name: string; cwd: string; redirectUri: string; ended: boolean; submitted: string[]; settle: (s: SignInSettled) => void }[];
+    run: McpCli;
+    ask: McpSignInAsk;
+  };
+  let v!: {
+    mcpSignIn: (
+      name: string,
+      server: RemoteMcpServer,
+      clientSecret?: string | undefined,
+    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused, never>;
+    mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
+    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused, never>;
+    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused, never>;
+  };
+  beforeAll(() => {
+    const t = teardowns();
+    s = seams();
+    v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
+    return t.end;
+  });
+  const st = story(test);
+  st.test('a sign-in handed no secret runs no CLI: the secret of a foreign client is the person’s to store', async () => {
     await Effect.runPromise(v.mcpSignIn('linear', LINEAR));
     assert.deepEqual(s.cli, []);
   });
-
-  await st.test('it connects, and the sign-in filed nothing under the name', async () => {
+  st.test('it connects, and the sign-in filed nothing under the name', async () => {
     s.sessions[0].settle({ connected: true });
     await until(() => s.sessions[0].ended);
     assert.deepEqual(await Effect.runPromise(v.mcpSignInState('linear')), { state: 'connected' });
     assert.equal(s.cli.length, 0, 'the sign-in filed nothing under the name');
   });
-
-  await st.test('a server signed in with no secret, whose sign-in ran no CLI, is signed out by an add then a remove', async () => {
+  st.test('a server signed in with no secret, whose sign-in ran no CLI, is signed out by an add then a remove', async () => {
     assert.deepEqual(await Effect.runPromise(v.mcpSignOut('linear', LINEAR)), { signedOut: true });
     assert.deepEqual(
       s.cli.map((a) => [a[1], a.at(-1)]),
@@ -133,33 +169,49 @@ test('a server signed in with no secret runs no CLI, connects, and is signed out
   });
 });
 
-test('a second sign-in on a port a first one holds is refused until the first settles', async (t) => {
-  const st = story(t);
-  const s = seams();
-  const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
-  await Effect.runPromise(v.mcpSignIn('github', GITHUB, 'secret'));
-
-  await st.test('REFUSED: a second sign-in on a held port, naming the one that waits and its port', async () => {
+describe('a second sign-in on a port a first one holds is refused until the first settles', () => {
+  let s!: {
+    cli: (readonly string[])[];
+    sessions: { name: string; cwd: string; redirectUri: string; ended: boolean; submitted: string[]; settle: (s: SignInSettled) => void }[];
+    run: McpCli;
+    ask: McpSignInAsk;
+  };
+  let v!: {
+    mcpSignIn: (
+      name: string,
+      server: RemoteMcpServer,
+      clientSecret?: string | undefined,
+    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused, never>;
+    mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
+    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused, never>;
+    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused, never>;
+  };
+  beforeAll(async () => {
+    const t = teardowns();
+    s = seams();
+    v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
+    await Effect.runPromise(v.mcpSignIn('github', GITHUB, 'secret'));
+    return t.end;
+  });
+  const st = story(test);
+  st.test('REFUSED: a second sign-in on a held port, naming the one that waits and its port', async () => {
     const err = await refusalOf(v.mcpSignIn('other', OTHER, 'secret'));
     assert.deepEqual([err._tag, err.held], ['McpSignInRefused', true]);
     assert.ok(err.message.includes('`github`'), err.message);
     assert.ok(err.message.includes('port 8791'), err.message);
     assert.equal(s.sessions.length, 1, 'no second session was opened');
   });
-
-  await st.test('REFUSED: a sign-out of a server whose sign-in waits: nothing to sign out of yet', async () => {
+  st.test('REFUSED: a sign-out of a server whose sign-in waits: nothing to sign out of yet', async () => {
     const err = await refusalOf(v.mcpSignOut('github', GITHUB));
     assert.deepEqual([err._tag, err.held], ['McpSignInRefused', true]);
     assert.ok(err.message.includes('`github`'), err.message);
   });
-
-  await st.test('the first sign-in fails, in the words its session gave, and its session ends', async () => {
+  st.test('the first sign-in fails, in the words its session gave, and its session ends', async () => {
     s.sessions[0].settle({ connected: false, why: 'refused by the server' });
     await until(() => s.sessions[0].ended);
     assert.deepEqual(await Effect.runPromise(v.mcpSignInState('github')), { state: 'failed', why: 'refused by the server' });
   });
-
-  await st.test('the port is free once the first settled', async () => {
+  st.test('the port is free once the first settled', async () => {
     await Effect.runPromise(v.mcpSignIn('other', OTHER, 'secret'));
     assert.equal(s.sessions.length, 2);
   });
@@ -196,8 +248,8 @@ test('REFUSED: two sign-ins asked at once on one port, the first not yet answere
   await until(() => s.sessions[0].ended);
 });
 
-test('mcpSignInVerbsOf: what is refused, and what a refusal leaves behind', async (t) => {
-  await t.test('a sign-in whose secret is not stored lets its port go', async () => {
+describe('mcpSignInVerbsOf: what is refused, and what a refusal leaves behind', () => {
+  test('a sign-in whose secret is not stored lets its port go', async () => {
     const s = seams();
     const refusing: McpCli = async (args) => (args[1] === 'add' ? { code: 1, out: 'bad' } : { code: 0, out: '' });
     const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: refusing, ask: s.ask });
@@ -208,36 +260,50 @@ test('mcpSignInVerbsOf: what is refused, and what a refusal leaves behind', asyn
       'the port was let go, so a sign-in with no secret starts',
     );
   });
-
-  await t.test(
-    'REFUSED: an engine with no Claude Code harness signs in and out of nothing, naming its harnesses, and spawns nothing',
-    async () => {
-      const s = seams();
-      const v = mcpSignInVerbsOf({ coder: codex }, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
-      for (const verb of [v.mcpSignIn('github', GITHUB, 'secret'), v.mcpSignOut('github', GITHUB)]) {
-        const err = await refusalOf<unknown>(verb);
-        assert.deepEqual([err._tag, err.held], ['McpSignInRefused', false]);
-        assert.ok(err.message.includes('no Claude Code harness'), err.message);
-        assert.ok(err.message.includes('coder'), err.message);
-      }
-      assert.deepEqual([s.cli, s.sessions.length], [[], 0]);
-    },
-  );
+  test('REFUSED: an engine with no Claude Code harness signs in and out of nothing, naming its harnesses, and spawns nothing', async () => {
+    const s = seams();
+    const v = mcpSignInVerbsOf({ coder: codex }, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
+    for (const verb of [v.mcpSignIn('github', GITHUB, 'secret'), v.mcpSignOut('github', GITHUB)]) {
+      const err = await refusalOf<unknown>(verb);
+      assert.deepEqual([err._tag, err.held], ['McpSignInRefused', false]);
+      assert.ok(err.message.includes('no Claude Code harness'), err.message);
+      assert.ok(err.message.includes('coder'), err.message);
+    }
+    assert.deepEqual([s.cli, s.sessions.length], [[], 0]);
+  });
 });
 
-test('a person whose browser runs elsewhere pastes back the address it landed on, and the sign-in completes', async (t) => {
-  const st = story(t);
-  const s = seams();
-  const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
+describe('a person whose browser runs elsewhere pastes back the address it landed on, and the sign-in completes', () => {
+  let s!: {
+    cli: (readonly string[])[];
+    sessions: { name: string; cwd: string; redirectUri: string; ended: boolean; submitted: string[]; settle: (s: SignInSettled) => void }[];
+    run: McpCli;
+    ask: McpSignInAsk;
+  };
+  let v!: {
+    mcpSignIn: (
+      name: string,
+      server: RemoteMcpServer,
+      clientSecret?: string | undefined,
+    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused, never>;
+    mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
+    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused, never>;
+    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused, never>;
+  };
+  beforeAll(() => {
+    const t = teardowns();
+    s = seams();
+    v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
+    return t.end;
+  });
+  const st = story(test);
   const PASTED = 'http://localhost:8791/callback?code=a-code-of-the-sign-in&state=a-state-of-the-sign-in';
-
-  await st.test('REFUSED: a callback with no sign-in waiting for the server, nothing handed on', async () => {
+  st.test('REFUSED: a callback with no sign-in waiting for the server, nothing handed on', async () => {
     const err = await refusalOf(v.mcpSignInCallback('github', PASTED));
     assert.deepEqual([err._tag, err.held, err.callback], ['McpSignInRefused', false, 'none-waiting']);
     assert.equal(err.message.includes('a-code-of-the-sign-in'), false, 'the pasted address is in no refusal');
   });
-
-  await st.test('REFUSED: each address that is not the redirect with a code and a state, nothing handed on, none quoted', async () => {
+  st.test('REFUSED: each address that is not the redirect with a code and a state, nothing handed on, none quoted', async () => {
     await Effect.runPromise(v.mcpSignIn('github', GITHUB, 'secret'));
     const wrong: Array<[string, string]> = [
       ['not an address a-code-of-the-sign-in', 'unreadable'],
@@ -255,23 +321,17 @@ test('a person whose browser runs elsewhere pastes back the address it landed on
     assert.deepEqual(s.sessions[0].submitted, [], 'nothing was handed to the harness');
     assert.equal((await Effect.runPromise(v.mcpSignInState('github'))).state, 'waiting', 'and the sign-in still waits');
   });
-
-  await st.test(
-    "the sign-in's own redirect with a code and a state is handed to its session, and the state still reads waiting",
-    async () => {
-      const state = await Effect.runPromise(v.mcpSignInCallback('github', PASTED));
-      assert.deepEqual(s.sessions[0].submitted, [PASTED]);
-      assert.equal(state.state, 'waiting');
-    },
-  );
-
-  await st.test('the session reads connected once the harness took it, as a browser reaching the port would', async () => {
+  st.test("the sign-in's own redirect with a code and a state is handed to its session, and the state still reads waiting", async () => {
+    const state = await Effect.runPromise(v.mcpSignInCallback('github', PASTED));
+    assert.deepEqual(s.sessions[0].submitted, [PASTED]);
+    assert.equal(state.state, 'waiting');
+  });
+  st.test('the session reads connected once the harness took it, as a browser reaching the port would', async () => {
     s.sessions[0].settle({ connected: true });
     await until(() => s.sessions[0].ended);
     assert.deepEqual(await Effect.runPromise(v.mcpSignInState('github')), { state: 'connected' });
   });
-
-  await st.test('REFUSED: a second paste once it settled: none waits any more', async () => {
+  st.test('REFUSED: a second paste once it settled: none waits any more', async () => {
     const err = await refusalOf(v.mcpSignInCallback('github', PASTED));
     assert.equal(err.callback, 'none-waiting');
     assert.deepEqual(s.sessions[0].submitted, [PASTED], 'handed on once');

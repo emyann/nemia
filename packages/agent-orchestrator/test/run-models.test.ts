@@ -3,7 +3,8 @@
  * (`models`) and on the step it names, which the tick files on it, while the run's other steps and every other run keep their agents'; a
  * revision the run takes keeps it; and a model the step cannot run on is refused before a run is written.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -97,12 +98,18 @@ const refusedWith =
   };
 const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
 
-test("a step's model named at start, from `nemia start --model` to the step filed on it", async (t) => {
-  const s = story(t);
-  const repo = aRepo();
-  const dir = planned();
+describe("a step's model named at start, from `nemia start --model` to the step filed on it", () => {
+  let repo!: string;
+  let dir!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    repo = aRepo();
+    dir = planned();
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
-  await s.test('`nemia start --model implement=fable` freezes it on the record and on implement alone, and says so', async () => {
+  s.test('`nemia start --model implement=fable` freezes it on the record and on implement alone, and says so', async () => {
     const started = await startedBy([
       'start',
       'plan the flag',
@@ -119,12 +126,12 @@ test("a step's model named at start, from `nemia start --model` to the step file
     assert.deepEqual(frozenModels(id), { plan: 'opus', implement: 'fable', review: 'opus' });
     assert.deepEqual(started.facts.models, { implement: 'fable' }, 'the start says the model it named, for implement alone');
   });
-  await s.test('another run of the same folder keeps its agents’ models, and its record has no `models`', async () => {
+  s.test('another run of the same folder keeps its agents’ models, and its record has no `models`', async () => {
     const other = await runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: dir, isolate: false }));
     assert.deepEqual(frozenModels(other.id), { plan: 'opus', implement: 'opus', review: 'opus' });
     assert.equal(Object.hasOwn(runRecord(ROOT, other.id), 'models'), false);
   });
-  await s.test('the tick files plan on its own model and implement on the run’s', async () => {
+  s.test('the tick files plan on its own model and implement on the run’s', async () => {
     const b = stage.board();
     const tick = (e: Engine) => stage.runWith(e, advanceRun(runRecord(ROOT, id)));
     assert.deepEqual((await tick(b.e)).filed, ['plan']);
@@ -133,7 +140,7 @@ test("a step's model named at start, from `nemia start --model` to the step file
     assert.deepEqual((await tick(b.e)).filed, ['implement']);
     assert.equal(b.tasks.get(`${id}-implement`)?.spec.config?.model, 'fable');
   });
-  await s.test('a revision the run takes of its folder keeps the model it was started with', async () => {
+  s.test('a revision the run takes of its folder keeps the model it was started with', async () => {
     const resolved = await runPlaced(resolvedNow(runRecord(ROOT, id), '2026-11-12T00:00:00.000Z'));
     const steps = resolved !== undefined && 'steps' in resolved ? (resolved.steps ?? []) : [];
     assert.deepEqual(Object.fromEntries(steps.map((st) => [st.name, st.model])), {
@@ -144,17 +151,21 @@ test("a step's model named at start, from `nemia start --model` to the step file
   });
 });
 
-test("a card's `model:` runs its run's step on it, and a start's `--model` for the same step over it", async (t) => {
-  const repo = aRepo();
-  const dir = planned();
-  await t.test("the card's alone", async () => {
+describe("a card's `model:` runs its run's step on it, and a start's `--model` for the same step over it", () => {
+  let repo!: string;
+  let dir!: string;
+  beforeAll(() => {
+    repo = aRepo();
+    dir = planned();
+  });
+  test("the card's alone", async () => {
     const { run } = await runPlaced(
       startFromInbox({ name: card('plan-the-flag-m1a1', dir, 'review=fable', repo), callerRepo: repo, isolate: false }),
     );
     assert.deepEqual(runRecord(ROOT, run.id).models, { review: 'fable' });
     assert.deepEqual(frozenModels(run.id), { plan: 'opus', implement: 'opus', review: 'fable' });
   });
-  await t.test('with a --model for the same step and another', async () => {
+  test('with a --model for the same step and another', async () => {
     const { run } = await runPlaced(
       startFromInbox({
         name: card('plan-the-flag-m2b2', dir, 'review=fable', repo),
@@ -168,7 +179,7 @@ test("a card's `model:` runs its run's step on it, and a start's `--model` for t
   });
 });
 
-test('a step’s model at start, REFUSED before a run is written', async (t) => {
+describe('a step’s model at start, REFUSED before a run is written', () => {
   const repo = aRepo();
   const dir = planned();
   const typed = (...flags: string[]) =>
@@ -198,13 +209,13 @@ test('a step’s model at start, REFUSED before a run is written', async (t) => 
       ['plan-the-flag-m3c3.md: `model: review=claude-sonnet-4-5`'],
     ],
   ] as Array<[string, () => Promise<unknown>, string[]]>) {
-    await t.test(`REFUSED ${row}, no run written`, async () => {
+    test(`REFUSED ${row}, no run written`, async () => {
       const before = runsWritten();
       await assert.rejects(refusing(), refusedWith(...facts));
       assert.equal(runsWritten(), before);
     });
   }
-  await t.test('taken: a model that drops `auto`, on a step that names a mode the model keeps', async () => {
+  test('taken: a model that drops `auto`, on a step that names a mode the model keeps', async () => {
     const run = await starting({ implement: 'claude-haiku-4-5' }, planned({ implement: 'model: opus\npermissionMode: acceptEdits' }));
     assert.deepEqual(frozenModels(run.id).implement, 'claude-haiku-4-5');
   });

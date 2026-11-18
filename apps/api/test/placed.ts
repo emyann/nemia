@@ -11,7 +11,7 @@
  * `<what>.boundary.test.ts`. `eachTest` is a copy of the orchestrator's (`packages/agent-orchestrator/test/placed.ts`), not an import
  * of it: a package's test reaches into no other package's files.
  */
-import { afterEach, beforeEach } from 'node:test';
+import { afterEach, beforeEach } from 'vitest';
 import { Effect, Layer } from 'effect';
 import {
   engineOf,

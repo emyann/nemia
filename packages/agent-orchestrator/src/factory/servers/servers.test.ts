@@ -8,7 +8,7 @@
  * The store takes its root as a required `home: string`, so every call here names this file's own scratch root and nothing reads the
  * person's: that is what `test/root-given.test.ts` holds for the whole package, and this file is the fixture that shows it.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -179,8 +179,11 @@ test('the split gives the factory precedence: a name it records leaves projectMc
   assert.deepEqual(splitServers(undefined, record), { checkout: [] }, 'an agent frozen before it named any still loads the whole file');
 });
 
-test("a server's headers are served masked, and a mask sent back keeps the value the record holds", async (t) => {
-  const root = scratch('wf-servers-mask-');
+describe("a server's headers are served masked, and a mask sent back keeps the value the record holds", () => {
+  let root!: string;
+  beforeAll(() => {
+    root = scratch('wf-servers-mask-');
+  });
   const add = async (server: string, ...headers: string[]) => {
     const sent = Object.fromEntries(headers.map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
     const program = storeGiven(
@@ -195,7 +198,7 @@ test("a server's headers are served masked, and a mask sent back keeps the value
     );
   };
   const stored = () => factoryServers(root, DEFAULT_NAMESPACE);
-  await t.test('a read masks every value', () => {
+  test('a read masks every value', () => {
     assert.deepEqual(
       listedOf('docs', { type: 'http', url: 'https://docs.example/mcp', headers: { 'X-Key': 'secret' } }, undefined).headers,
       {
@@ -203,16 +206,16 @@ test("a server's headers are served masked, and a mask sent back keeps the value
       },
     );
   });
-  await t.test('an add answers the server masked, and writes the values sent', async () => {
+  test('an add answers the server masked, and writes the values sent', async () => {
     const answer = await add('docs', 'X-Key=secret', 'X-Toolsets=repos');
     assert.deepEqual('server' in answer && answer.server.headers, { 'X-Key': HEADER_MASK, 'X-Toolsets': HEADER_MASK });
     assert.deepEqual(stored().docs?.headers, { 'X-Key': 'secret', 'X-Toolsets': 'repos' });
   });
-  await t.test('a mask sent for a stored header keeps the stored value on disk, beside a value sent anew', async () => {
+  test('a mask sent for a stored header keeps the stored value on disk, beside a value sent anew', async () => {
     await add('docs', `X-Key=${HEADER_MASK}`, 'X-Toolsets=actions');
     assert.deepEqual(stored().docs?.headers, { 'X-Key': 'secret', 'X-Toolsets': 'actions' });
   });
-  await t.test('REFUSED Invalid: a mask sent for a header the server holds no value of, and nothing is written', async () => {
+  test('REFUSED Invalid: a mask sent for a header the server holds no value of, and nothing is written', async () => {
     const before = fs.readFileSync(factoryServersFile(root, DEFAULT_NAMESPACE), 'utf8');
     assert.deepEqual(await add('docs', 'X-Key=fresh', `X-New=${HEADER_MASK}`), { refused: 'Invalid' });
     assert.deepEqual(await add('other', `X-Key=${HEADER_MASK}`), { refused: 'Invalid' });

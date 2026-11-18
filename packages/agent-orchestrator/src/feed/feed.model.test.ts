@@ -3,7 +3,7 @@
  * `nemia subscribe` is given, a subscription decodes as its store reads one, a delivery as the deliverer writes one, and each kind of line
  * decodes as the feed's writers write it.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Option, Schema } from 'effect';
 import {
@@ -33,30 +33,30 @@ const NEMIA = {
   scope: { atLeast: 'semi-auto' },
 };
 
-test("a feed's cursor is a whole byte from 0, checked on create and read as any number", async (t) => {
-  await t.test('REFUSED: below 0, or not whole', () => {
+describe("a feed's cursor is a whole byte from 0, checked on create and read as any number", () => {
+  test('REFUSED: below 0, or not whole', () => {
     for (const n of [-1, 1.5, Number.NaN]) assert.equal(Option.isNone(FeedCursor.create.option(n)), true, String(n));
   });
-  await t.test('takes the start and a byte a read handed out', () => {
+  test('takes the start and a byte a read handed out', () => {
     for (const n of [0, 120]) assert.equal(Schema.is(FeedCursor.OnCreate)(n), true, String(n));
   });
-  await t.test('reads one written before the check', () => assert.equal(Schema.is(FeedCursor.OnRead)(-1), true));
+  test('reads one written before the check', () => assert.equal(Schema.is(FeedCursor.OnRead)(-1), true));
 });
 
-test("a subscription's name is checked on create by subscriptionNameRefusal's rule and read as any string", async (t) => {
-  await t.test('refuses what subscriptionNameRefusal refuses', () => {
+describe("a subscription's name is checked on create by subscriptionNameRefusal's rule and read as any string", () => {
+  test('refuses what subscriptionNameRefusal refuses', () => {
     for (const name of ['', '../x', 'a b', 'x.state', '-x'])
       assert.equal(Option.isNone(SubscriptionName.create.option(name)), true, JSON.stringify(name));
   });
-  await t.test('takes what nemia subscribe is given', () => {
+  test('takes what nemia subscribe is given', () => {
     for (const name of ['nemia', 'watch', 'a_b-2']) assert.equal(Schema.is(SubscriptionName.OnCreate)(name), true, name);
   });
-  await t.test('reads a name written before the check', () => assert.equal(Schema.is(SubscriptionName.OnRead)('a b'), true));
+  test('reads a name written before the check', () => assert.equal(Schema.is(SubscriptionName.OnRead)('a b'), true));
 });
 
-test('a subscription decodes as its store lists one, and one its writer would refuse is refused', async (t) => {
-  await t.test('scoped', () => assert.equal(Schema.decodeUnknownResult(Subscription)(NEMIA)._tag, 'Success'));
-  await t.test('unscoped', () => {
+describe('a subscription decodes as its store lists one, and one its writer would refuse is refused', () => {
+  test('scoped', () => assert.equal(Schema.decodeUnknownResult(Subscription)(NEMIA)._tag, 'Success'));
+  test('unscoped', () => {
     const { scope: _, ...unscoped } = NEMIA;
     assert.equal(Schema.is(Subscription)(unscoped), true);
   });
@@ -65,10 +65,10 @@ test('a subscription decodes as its store lists one, and one its writer would re
     'a digest not above zero minutes': { ...NEMIA, digestEvery: 0 },
     'a floor that is no level': { ...NEMIA, scope: { atLeast: 'never' } },
   };
-  for (const [row, sub] of Object.entries(rows)) await t.test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Subscription)(sub), false));
+  for (const [row, sub] of Object.entries(rows)) test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Subscription)(sub), false));
 });
 
-test('a delivery decodes as the deliverer writes one, a stored one read as it is, and one the deliverer would not write is refused', async (t) => {
+describe('a delivery decodes as the deliverer writes one, a stored one read as it is, and one the deliverer would not write is refused', () => {
   const kept = {
     name: 'nemia',
     of: { task: 'nemia-1', from: 120 },
@@ -76,23 +76,19 @@ test('a delivery decodes as the deliverer writes one, a stored one read as it is
     digest: [upgraded({ at: AT, run: 'r-1', word: 'running' }), startedLine(5151, { kind: 'none' }, AT, 0)],
     since: { at: 1_000, mono: { boot: 'b', ms: 5 } },
   };
-  await t.test('with a digest and its time', () => assert.equal(Schema.decodeUnknownResult(Delivery)(kept)._tag, 'Success'));
-  await t.test('as a file of today holds one, a cursor cut back to 0 under its from, an empty digest and no time', () =>
-    assert.equal(Schema.is(Delivery)({ name: 'nemia', of: { task: 'nemia-1', from: 120 }, cursor: 0, digest: [] }), true),
-  );
-  await t.test('nominal on read: a cursor written before the check', () =>
-    assert.equal(Schema.is(Delivery)({ ...kept, cursor: -1 }), true),
-  );
+  test('with a digest and its time', () => assert.equal(Schema.decodeUnknownResult(Delivery)(kept)._tag, 'Success'));
+  test('as a file of today holds one, a cursor cut back to 0 under its from, an empty digest and no time', () =>
+    assert.equal(Schema.is(Delivery)({ name: 'nemia', of: { task: 'nemia-1', from: 120 }, cursor: 0, digest: [] }), true));
+  test('nominal on read: a cursor written before the check', () => assert.equal(Schema.is(Delivery)({ ...kept, cursor: -1 }), true));
   const rows: Record<string, object> = {
     'no subscription it was written for': { ...kept, of: undefined },
     'a digest of what is no line': { ...kept, digest: [{ word: 'running' }] },
     'a time that is no instant': { ...kept, since: { at: 'now' } },
   };
-  for (const [row, delivery] of Object.entries(rows))
-    await t.test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Delivery)(delivery), false));
+  for (const [row, delivery] of Object.entries(rows)) test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Delivery)(delivery), false));
 });
 
-test('each kind of line decodes as the feed’s writers write it, and as a line of the feed', async (t) => {
+describe('each kind of line decodes as the feed’s writers write it, and as a line of the feed', () => {
   const rows: Record<string, [Schema.Constraint, unknown]> = {
     "a run's": [RunLine, upgraded({ at: AT, run: 'r-1', word: 'running' })],
     "a step's, with its try": [RunLine, { ...upgraded({ at: AT, run: 'r-1', step: 'review', word: 'blocked', note: 'x' }), try: 1 }],
@@ -101,17 +97,17 @@ test('each kind of line decodes as the feed’s writers write it, and as a line 
     "a factory's": [FactoryLine, upgraded({ at: AT, factory: 'acme', word: 'conflicts pending', labels: { factory: 'acme' } })],
   };
   for (const [row, [schema, line]] of Object.entries(rows))
-    await t.test(row, () => {
+    test(row, () => {
       assert.equal(Schema.is(schema)(line), true);
       assert.equal(Schema.is(FeedLine)(line), true);
     });
-  await t.test("a run's line keeps the labels a person put on the run beside the closed five, and refuses one that is no string", () => {
+  test("a run's line keeps the labels a person put on the run beside the closed five, and refuses one that is no string", () => {
     const line = { ...upgraded({ at: AT, run: 'r-1', word: 'running' }), labels: { run: 'r-1', workflow: 'build', team: 'core' } };
     const read = Schema.decodeUnknownSync(RunLine)(line);
     assert.deepEqual(read.labels, { run: 'r-1', workflow: 'build', team: 'core' });
     assert.equal(Schema.is(RunLine)({ ...line, labels: { run: 'r-1', team: 3 } }), false);
   });
-  await t.test("a person's act keeps who acted, a run's line and the store's alike; a line written before actors reads with none", () => {
+  test("a person's act keeps who acted, a run's line and the store's alike; a line written before actors reads with none", () => {
     const actor = { kind: 'person', token: 'laptop' } as const;
     const approved = { ...upgraded({ at: AT, run: 'r-1', step: 'plan', word: 'approved', note: `try 1 · at ${AT}` }), actor };
     const paused = { ...upgraded({ at: AT, store: STORE, word: 'store paused', note: `since ${AT}`, by: 'ann' }), actor };
@@ -120,10 +116,9 @@ test('each kind of line decodes as the feed’s writers write it, and as a line 
     assert.equal('actor' in Schema.decodeUnknownSync(RunLine)(upgraded({ at: AT, run: 'r-1', word: 'cancel asked' })), false);
     assert.equal(Schema.is(RunLine)({ ...approved, actor: { kind: 'robot' } }), false, 'an actor of no kind is refused');
   });
-  await t.test('REFUSED: a daemon line of another word', () =>
-    assert.equal(Schema.is(DaemonLine)({ at: AT, daemon: 1, word: `not ${DAEMON_STARTED}` }), false),
-  );
-  await t.test('the model', () => {
+  test('REFUSED: a daemon line of another word', () =>
+    assert.equal(Schema.is(DaemonLine)({ at: AT, daemon: 1, word: `not ${DAEMON_STARTED}` }), false));
+  test('the model', () => {
     assert.deepEqual(feedModel.ids, { SubscriptionName: 'Subscription' });
     assert.deepEqual(feedModel.entities, [Subscription, Delivery, RunLine, DaemonLine, StoreLine, FactoryLine]);
   });

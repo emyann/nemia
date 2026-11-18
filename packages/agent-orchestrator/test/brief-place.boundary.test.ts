@@ -3,7 +3,7 @@
  * words, equal what they said before the words moved, line for line (`fixtures/briefs/`); a planted place's words replace every one; with
  * none the briefs send the step to its place's skill and print no command; and a folder run's briefs say no git at all.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

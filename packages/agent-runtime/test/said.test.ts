@@ -5,7 +5,8 @@
  * never trusted. What the shipped readers read is pinned (`SAID_DIGEST`), so a reader that reads otherwise is refused here
  * until the digest is recorded again beside a `SAID_VERSION` gone up with it.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { Effect } from 'effect';
@@ -72,77 +73,68 @@ const withKept = async (write: (files: { log: string; kept: string }) => void) =
   return { payload: seen?.closeout?.payload, reads: reads.n, ...(seen?.skills ? { skills: seen.skills } : {}) };
 };
 
-test("a kept output beside a finished run's log: taken for it while its key is the log's and it decodes, read again from the log otherwise, never trusted", async (t) => {
-  await t.test('a kept output with the log’s own key is taken for it, and the log is not read', async () => {
+describe("a kept output beside a finished run's log: taken for it while its key is the log's and it decodes, read again from the log otherwise, never trusted", () => {
+  test('a kept output with the log’s own key is taken for it, and the log is not read', async () => {
     assert.deepEqual(await withKept(({ log, kept }) => keep(kept, log, {})), { payload: 'kept', reads: 0 });
   });
-  await t.test('a kept output whose size is not the log’s is read again from the log, never trusted', async () => {
+  test('a kept output whose size is not the log’s is read again from the log, never trusted', async () => {
     const kept = await withKept(({ log, kept }) => keep(kept, log, { size: fs.statSync(log).size + 1 }));
     assert.deepEqual(kept, { payload: 'logged', reads: 1 });
   });
-  await t.test('a kept output whose mtime is not the log’s is read again from the log, never trusted', async () => {
+  test('a kept output whose mtime is not the log’s is read again from the log, never trusted', async () => {
     const kept = await withKept(({ log, kept }) => keep(kept, log, { mtimeMs: fs.statSync(log).mtimeMs - 1 }));
     assert.deepEqual(kept, { payload: 'logged', reads: 1 });
   });
-  await t.test('a kept output of another version is read again from the log, never trusted', async () => {
+  test('a kept output of another version is read again from the log, never trusted', async () => {
     for (const version of [SAID_VERSION + 1, 0]) {
       assert.equal(SAID_EXTENDED.includes(version), false);
       const kept = await withKept(({ log, kept }) => keep(kept, log, { version }));
       assert.deepEqual(kept, { payload: 'logged', reads: 1 }, `version ${version}`);
     }
   });
-  await t.test(
-    'a kept output of every former version is read again from the log: each says no denials where the readers now say `[]`',
-    async () => {
-      assert.deepEqual(SAID_EXTENDED, []);
-      for (const version of [1, 2, 3, 4, 6, 10]) {
-        const kept = await withKept(({ log, kept }) => keep(kept, log, { version }));
-        assert.deepEqual(kept, { payload: 'logged', reads: 1 }, `version ${version}: kept before an empty list of denials was said`);
-      }
-    },
-  );
-  await t.test('a kept output whose skills are not a list of names is read again from the log, never trusted', async () => {
+  test('a kept output of every former version is read again from the log: each says no denials where the readers now say `[]`', async () => {
+    assert.deepEqual(SAID_EXTENDED, []);
+    for (const version of [1, 2, 3, 4, 6, 10]) {
+      const kept = await withKept(({ log, kept }) => keep(kept, log, { version }));
+      assert.deepEqual(kept, { payload: 'logged', reads: 1 }, `version ${version}: kept before an empty list of denials was said`);
+    }
+  });
+  test('a kept output whose skills are not a list of names is read again from the log, never trusted', async () => {
     const kept = await withKept(({ log, kept }) => keep(kept, log, { read: { closeout: { payload: 'kept' }, skills: 'look' } }));
     assert.deepEqual(kept, { payload: 'logged', reads: 1 });
   });
-  await t.test(
-    'a session that loaded no skills keeps saying so: an empty list is on its sighting, kept, and taken by a fresh runner',
-    async () => {
-      const dir = scratch('ae-said-');
-      const { spec, reads } = counted();
-      runOf(dir, 'ae/s7/1', [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), resultLine({}), ''].join('\n'));
-      assert.deepEqual((await observe(spec, dir)).get('ae/s7/1')?.skills, []);
-      assert.deepEqual((await observe(spec, dir)).get('ae/s7/1')?.skills, [], 'taken from what was kept');
-      assert.equal(reads.n, 1);
-    },
-  );
-  await t.test('a kept output whose files are not a list of paths is read again from the log, never trusted', async () => {
+  test('a session that loaded no skills keeps saying so: an empty list is on its sighting, kept, and taken by a fresh runner', async () => {
+    const dir = scratch('ae-said-');
+    const { spec, reads } = counted();
+    runOf(dir, 'ae/s7/1', [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), resultLine({}), ''].join('\n'));
+    assert.deepEqual((await observe(spec, dir)).get('ae/s7/1')?.skills, []);
+    assert.deepEqual((await observe(spec, dir)).get('ae/s7/1')?.skills, [], 'taken from what was kept');
+    assert.equal(reads.n, 1);
+  });
+  test('a kept output whose files are not a list of paths is read again from the log, never trusted', async () => {
     const kept = await withKept(({ log, kept }) => keep(kept, log, { read: { closeout: { payload: 'kept' }, files: 'a.ts' } }));
     assert.deepEqual(kept, { payload: 'logged', reads: 1 });
   });
-  await t.test(
-    'the files a session touched are on its sighting, kept, and taken by a fresh runner; none touched is an empty list',
-    async () => {
-      const dir = scratch('ae-said-');
-      const { spec, reads } = counted();
-      const none = [FILES_STREAM.split('\n')[0], resultLine({}), ''].join('\n');
-      runOf(dir, 'ae/s8/1', `${FILES_STREAM}\n`);
-      runOf(dir, 'ae/s8/2', none);
-      for (const said of ['read from the log', 'taken from what was kept']) {
-        const seen = await observe(spec, dir);
-        assert.deepEqual(seen.get('ae/s8/1')?.files, ['apps/web/a.tsx', 'b.ts', 'n.ipynb'], said);
-        assert.deepEqual(seen.get('ae/s8/2')?.files, [], said);
-      }
-      assert.equal(reads.n, 2, 'each log read once');
-    },
-  );
-  await t.test('a kept output in no shape a reader reads is read again from the log, never trusted', async () => {
+  test('the files a session touched are on its sighting, kept, and taken by a fresh runner; none touched is an empty list', async () => {
+    const dir = scratch('ae-said-');
+    const { spec, reads } = counted();
+    const none = [FILES_STREAM.split('\n')[0], resultLine({}), ''].join('\n');
+    runOf(dir, 'ae/s8/1', `${FILES_STREAM}\n`);
+    runOf(dir, 'ae/s8/2', none);
+    for (const said of ['read from the log', 'taken from what was kept']) {
+      const seen = await observe(spec, dir);
+      assert.deepEqual(seen.get('ae/s8/1')?.files, ['apps/web/a.tsx', 'b.ts', 'n.ipynb'], said);
+      assert.deepEqual(seen.get('ae/s8/2')?.files, [], said);
+    }
+    assert.equal(reads.n, 2, 'each log read once');
+  });
+  test('a kept output in no shape a reader reads is read again from the log, never trusted', async () => {
     const wrong = await withKept(({ log, kept }) => keep(kept, log, { read: { closeout: { payload: 'kept' }, usage: { costUsd: 'x' } } }));
     assert.deepEqual(wrong, { payload: 'logged', reads: 1 }, 'a usage that does not decode');
     const text = await withKept(({ kept }) => fs.writeFileSync(kept, '{"version":'));
     assert.deepEqual(text, { payload: 'logged', reads: 1 }, 'text that is not JSON');
   });
-  await t.test('a kept output that cannot be written is no failure: the run is seen, and its log read again next time', async (t) => {
+  test('a kept output that cannot be written is no failure: the run is seen, and its log read again next time', async (t) => {
     if (process.getuid?.() === 0) return t.skip('run as root, who writes into any folder');
     const dir = scratch('ae-said-');
     const { spec, reads } = counted();
@@ -160,18 +152,26 @@ test("a kept output beside a finished run's log: taken for it while its key is t
   });
 });
 
-test("a finished run's output is parsed once across processes: nothing kept while it works, kept once over and taken by a fresh runner, read again when its log grows, and removed by a re-spawn", async (t) => {
-  const s = story(t);
-  const dir = scratch('ae-said-');
-  const { spec, reads } = counted();
-  let files = runOf(dir, 'ae/s1/1', longCapture('so far'), 'working');
-  let first: unknown;
-  await s.test('a run still working keeps nothing beside its log', async () => {
+describe("a finished run's output is parsed once across processes: nothing kept while it works, kept once over and taken by a fresh runner, read again when its log grows, and removed by a re-spawn", () => {
+  let dir!: string;
+  let spec!: HarnessSpec;
+  let reads!: { n: number };
+  let files!: { log: string; kept: string };
+  let first!: unknown;
+  beforeAll(() => {
+    const t = teardowns();
+    dir = scratch('ae-said-');
+    ({ spec, reads } = counted());
+    files = runOf(dir, 'ae/s1/1', longCapture('so far'), 'working');
+    return t.end;
+  });
+  const s = story(test);
+  s.test('a run still working keeps nothing beside its log', async () => {
     assert.deepEqual((await observe(spec, dir)).get('ae/s1/1')?.closeout?.payload, { outcome: 'so far' });
     assert.equal(fs.existsSync(files.kept), false, 'its log may still grow');
     assert.equal(reads.n, 1);
   });
-  await s.test('once over, what it said is read and kept beside its log, which is never read as a run', async () => {
+  s.test('once over, what it said is read and kept beside its log, which is never read as a run', async () => {
     files = runOf(dir, 'ae/s1/1', longCapture('done'));
     const size = fs.statSync(files.log).size;
     assert.ok(size > 1_500_000, `a large log: ${size} bytes`);
@@ -185,7 +185,7 @@ test("a finished run's output is parsed once across processes: nothing kept whil
     assert.deepEqual(read?.denials, [{ tool: 'Bash', what: 'echo' }]);
     assert.deepEqual([...seen.keys()], ['ae/s1/1']);
   });
-  await s.test('a fresh runner takes what the first kept beside its log, and does not read the log again', async () => {
+  s.test('a fresh runner takes what the first kept beside its log, and does not read the log again', async () => {
     const size = fs.statSync(files.log).size;
     const before = ioCounts().bytesRead;
     const again = await observe(spec, dir);
@@ -194,7 +194,7 @@ test("a finished run's output is parsed once across processes: nothing kept whil
     assert.deepEqual(again.get('ae/s1/1'), first, 'the same sighting, stamped with the same moment');
     assert.deepEqual([...again.keys()], ['ae/s1/1'], 'the kept file is never read as a run');
   });
-  await s.test('a log that grows after its output was kept is read again, and says what it says now', async () => {
+  s.test('a log that grows after its output was kept is read again, and says what it says now', async () => {
     fs.appendFileSync(files.log, `${resultLine({ structured_output: { outcome: 'again' } })}\n`);
     const seen = (await observe(spec, dir)).get('ae/s1/1');
     assert.equal(reads.n, 3, 'its size and mtime moved: read again');
@@ -202,7 +202,7 @@ test("a finished run's output is parsed once across processes: nothing kept whil
     await observe(spec, dir);
     assert.equal(reads.n, 3, 'and kept again');
   });
-  await s.test('a re-spawn of the same attempt removes what was kept of the last one’s output', async () => {
+  s.test('a re-spawn of the same attempt removes what was kept of the last one’s output', async () => {
     assert.ok(fs.existsSync(files.kept), 'kept before the re-spawn');
     const quiet: HarnessSpec = { ...spec, command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) };
     await Effect.runPromise(detachedOps(quiet, dir).spawn({ name: 'ae/s1/1', brief: 'x', cwd: dir }));
@@ -274,30 +274,27 @@ const conversationIn = (capture: string): string[] => {
   });
 };
 
-test('claudeStreamKept and the shipped readers over the corpus: what they read is pinned beside SAID_VERSION, and a kept capture reads as its whole stream', async (t) => {
-  await t.test(
-    'what the shipped readers read is pinned beside SAID_VERSION: a reader that reads otherwise is refused until both are recorded',
-    () => {
-      assert.equal(
-        digestOfReaders(),
-        SAID_DIGEST,
-        'a reader reads otherwise: a kept output of the old reading would be taken for the new. Raise SAID_VERSION in ' +
-          '`harness/detached/said.ts`, and record this digest as SAID_DIGEST beside it',
-      );
-    },
-  );
-  await t.test('a capture kept to what the readers read reads the same as the whole one, over every stream of the corpus', () => {
+describe('claudeStreamKept and the shipped readers over the corpus: what they read is pinned beside SAID_VERSION, and a kept capture reads as its whole stream', () => {
+  test('what the shipped readers read is pinned beside SAID_VERSION: a reader that reads otherwise is refused until both are recorded', () => {
+    assert.equal(
+      digestOfReaders(),
+      SAID_DIGEST,
+      'a reader reads otherwise: a kept output of the old reading would be taken for the new. Raise SAID_VERSION in ' +
+        '`harness/detached/said.ts`, and record this digest as SAID_DIGEST beside it',
+    );
+  });
+  test('a capture kept to what the readers read reads the same as the whole one, over every stream of the corpus', () => {
     assert.equal(digestOfReaders(keptOrWhole), SAID_DIGEST, 'a kept capture reads otherwise than its whole stream');
     const refused = READER_STREAMS.claudeStreamOutput.filter((text) => keptOrWhole('claudeStreamOutput', text) === text);
     assert.ok(refused.length < READER_STREAMS.claudeStreamOutput.length, 'some streams were cut');
   });
-  await t.test('a capture kept once is kept the same again', () => {
+  test('a capture kept once is kept the same again', () => {
     for (const text of [...READER_STREAMS.claudeStreamOutput.map((t) => keptOrWhole('claudeStreamOutput', t)), CONVERSATION_STREAM]) {
       const once = keptOrWhole('claudeStreamOutput', text);
       assert.equal(keptOrWhole('claudeStreamOutput', once), once);
     }
   });
-  await t.test('a session killed before its result still reads, kept, what it was denied, the call named whole', () => {
+  test('a session killed before its result still reads, kept, what it was denied, the call named whole', () => {
     const killed = CONVERSATION_STREAM.split('\n').slice(0, -2).join('\n');
     const kept = claudeStreamKept(killed);
     assert.deepEqual(claudeStreamOutput(kept), claudeStreamOutput(killed));
@@ -310,7 +307,7 @@ test('claudeStreamKept and the shipped readers over the corpus: what they read i
       'the keep keeps what the `init` line says to a reader, so the model the session really started on and its mode survive it',
     );
   });
-  await t.test('a kept capture holds nothing of the conversation no reader reads; a capture that does is named', () => {
+  test('a kept capture holds nothing of the conversation no reader reads; a capture that does is named', () => {
     assert.deepEqual(conversationIn(claudeStreamKept(CONVERSATION_STREAM)), []);
     for (const text of READER_STREAMS.claudeStreamOutput) assert.deepEqual(conversationIn(keptOrWhole('claudeStreamOutput', text)), []);
     assert.deepEqual(conversationIn(CONVERSATION_STREAM), [
@@ -335,22 +332,19 @@ test('claudeStreamKept and the shipped readers over the corpus: what they read i
     const written = stream.calls(['toolu_w', 'Write', { file_path: '/w/a.ts', content: 'all of it' }]);
     assert.deepEqual(conversationIn(written), ["line 1: Write's content"]);
   });
-  await t.test(
-    'a kept capture says what its whole stream says, keeps stderr as printed, and the init, the denial and the result as read',
-    () => {
-      const kept = claudeStreamKept(CONVERSATION_STREAM);
-      assert.deepEqual(claudeStreamOutput(kept), claudeStreamOutput(CONVERSATION_STREAM));
-      assert.deepEqual(claudeStreamOutput(kept).files, ['a.ts', 'b.ts']);
-      const whole = CONVERSATION_STREAM.split('\n');
-      for (const at of [10, 12]) assert.ok(kept.split('\n').includes(whole[at]), `line ${at + 1} kept as printed`);
-      const keys = (line: string | undefined) => Object.keys(JSON.parse(line ?? '{}'));
-      const lines = kept.split('\n');
-      assert.deepEqual(keys(lines.find((l) => l.includes('"init"'))), ['type', 'subtype', 'cwd', 'model', 'permissionMode']);
-      assert.deepEqual(keys(lines.find((l) => l.includes('"permission_denied"'))), ['type', 'subtype', 'tool_name', 'tool_use_id']);
-      assert.deepEqual(keys(lines.find((l) => l.includes('"result"'))), ['type', 'subtype', 'structured_output', 'total_cost_usd']);
-      assert.ok(kept.length < CONVERSATION_STREAM.length, `${kept.length} of ${CONVERSATION_STREAM.length} characters`);
-    },
-  );
+  test('a kept capture says what its whole stream says, keeps stderr as printed, and the init, the denial and the result as read', () => {
+    const kept = claudeStreamKept(CONVERSATION_STREAM);
+    assert.deepEqual(claudeStreamOutput(kept), claudeStreamOutput(CONVERSATION_STREAM));
+    assert.deepEqual(claudeStreamOutput(kept).files, ['a.ts', 'b.ts']);
+    const whole = CONVERSATION_STREAM.split('\n');
+    for (const at of [10, 12]) assert.ok(kept.split('\n').includes(whole[at]), `line ${at + 1} kept as printed`);
+    const keys = (line: string | undefined) => Object.keys(JSON.parse(line ?? '{}'));
+    const lines = kept.split('\n');
+    assert.deepEqual(keys(lines.find((l) => l.includes('"init"'))), ['type', 'subtype', 'cwd', 'model', 'permissionMode']);
+    assert.deepEqual(keys(lines.find((l) => l.includes('"permission_denied"'))), ['type', 'subtype', 'tool_name', 'tool_use_id']);
+    assert.deepEqual(keys(lines.find((l) => l.includes('"result"'))), ['type', 'subtype', 'structured_output', 'total_cost_usd']);
+    assert.ok(kept.length < CONVERSATION_STREAM.length, `${kept.length} of ${CONVERSATION_STREAM.length} characters`);
+  });
 });
 
 /** A spec of `claude -p`'s stream that keeps its streams apart and keeps of an ended capture what `keep` keeps, its reads counted. */
@@ -371,29 +365,26 @@ const conversationRun = (dir: string, name: string, state = 'done', heartbeatAt?
   return { ...files, stdout, stderr, long };
 };
 
-test("an ended job's capture on a look: rewritten to what its readers read, or left whole and why", async (t) => {
-  await t.test(
-    "an ended job's capture and its stdout are rewritten to what its readers read, their times kept, and read as before",
-    async () => {
-      const dir = scratch('ae-said-');
-      const { spec, reads } = keeping();
-      const { log, kept, stdout, stderr, long } = conversationRun(dir, 'ae/k1/1');
-      const whole = claudeStreamOutput(CONVERSATION_STREAM);
-      const seen = (await observe(spec, dir)).get('ae/k1/1');
-      assert.equal(fs.readFileSync(log, 'utf8'), claudeStreamKept(CONVERSATION_STREAM));
-      assert.equal(fs.readFileSync(stdout, 'utf8'), claudeStreamKept(CONVERSATION_STREAM));
-      assert.equal(fs.readFileSync(stderr, 'utf8'), 'a warning on stderr\n', 'stderr is no stream the readers read: left');
-      for (const file of [log, stdout]) assert.equal(fs.statSync(file).mtimeMs, long.getTime(), `${path.basename(file)} keeps its time`);
-      assert.equal(JSON.parse(fs.readFileSync(kept, 'utf8')).size, fs.statSync(log).size, 'what was read is kept under the kept key');
-      assert.deepEqual(seen?.closeout?.payload, whole.closeout?.payload);
-      assert.deepEqual([seen?.usage, seen?.denials, seen?.skills, seen?.files], [whole.usage, whole.denials, whole.skills, whole.files]);
-      const read = reads.n;
-      const again = (await observe(spec, dir)).get('ae/k1/1');
-      assert.deepEqual(again, seen, 'a fresh runner takes what was kept');
-      assert.equal(reads.n, read, 'and reads no capture');
-    },
-  );
-  await t.test('a capture is left whole while its worker has not written its end, a lease gone included', async () => {
+describe("an ended job's capture on a look: rewritten to what its readers read, or left whole and why", () => {
+  test("an ended job's capture and its stdout are rewritten to what its readers read, their times kept, and read as before", async () => {
+    const dir = scratch('ae-said-');
+    const { spec, reads } = keeping();
+    const { log, kept, stdout, stderr, long } = conversationRun(dir, 'ae/k1/1');
+    const whole = claudeStreamOutput(CONVERSATION_STREAM);
+    const seen = (await observe(spec, dir)).get('ae/k1/1');
+    assert.equal(fs.readFileSync(log, 'utf8'), claudeStreamKept(CONVERSATION_STREAM));
+    assert.equal(fs.readFileSync(stdout, 'utf8'), claudeStreamKept(CONVERSATION_STREAM));
+    assert.equal(fs.readFileSync(stderr, 'utf8'), 'a warning on stderr\n', 'stderr is no stream the readers read: left');
+    for (const file of [log, stdout]) assert.equal(fs.statSync(file).mtimeMs, long.getTime(), `${path.basename(file)} keeps its time`);
+    assert.equal(JSON.parse(fs.readFileSync(kept, 'utf8')).size, fs.statSync(log).size, 'what was read is kept under the kept key');
+    assert.deepEqual(seen?.closeout?.payload, whole.closeout?.payload);
+    assert.deepEqual([seen?.usage, seen?.denials, seen?.skills, seen?.files], [whole.usage, whole.denials, whole.skills, whole.files]);
+    const read = reads.n;
+    const again = (await observe(spec, dir)).get('ae/k1/1');
+    assert.deepEqual(again, seen, 'a fresh runner takes what was kept');
+    assert.equal(reads.n, read, 'and reads no capture');
+  });
+  test('a capture is left whole while its worker has not written its end, a lease gone included', async () => {
     const dir = scratch('ae-said-');
     const { spec } = keeping();
     const stale = conversationRun(dir, 'ae/k2/1', 'working', new Date(Date.now() - 600_000).toISOString());
@@ -404,7 +395,7 @@ test("an ended job's capture on a look: rewritten to what its readers read, or l
     assert.ok(fs.existsSync(stale.kept), 'a run whose lease is gone keeps what was read, as before');
     assert.equal(fs.existsSync(fresh.kept), false);
   });
-  await t.test('a capture its reader refuses is left whole, its run failed', async () => {
+  test('a capture its reader refuses is left whole, its run failed', async () => {
     const dir = scratch('ae-said-');
     const { spec } = keeping();
     const refused = [stream.init, JSON.stringify({ ...JSON.parse(stream.denied('toolu_b', 'Bash')), tool_use_id: 7 }), resultLine({}), ''];
@@ -414,7 +405,7 @@ test("an ended job's capture on a look: rewritten to what its readers read, or l
     assert.equal(fs.readFileSync(log, 'utf8'), text);
     assert.equal(fs.existsSync(kept), false);
   });
-  await t.test('a capture whose kept text reads otherwise is left whole, and what was read is kept under its own key', async () => {
+  test('a capture whose kept text reads otherwise is left whole, and what was read is kept under its own key', async () => {
     const dir = scratch('ae-said-');
     const dropsResult = (output: string) => claudeStreamKept(output).replace(/\n[^\n]*"type":"result"[^\n]*/, '');
     const { spec } = keeping(dropsResult);

@@ -14,6 +14,8 @@
  * Every workspace's tests take it from here, `test-kit/checkpoints`.
  */
 
+import type { TestAPI, TestContext } from 'vitest';
+
 /** What a checkpoint's body is handed: the test's own context. */
 type Body<T> = (t: T) => unknown;
 
@@ -37,6 +39,8 @@ export type Story<T> = {
  *
  * @param test the runner's call that files each checkpoint as a test: Vitest's `test`.
  */
+export function story(test: TestAPI): Story<TestContext>;
+export function story<T extends Skips>(test: Teller<T>): Story<T>;
 export function story<T extends Skips>(test: Teller<T>): Story<T> {
   let failed: string | undefined;
   return {
@@ -70,7 +74,7 @@ export type Held = {
  * A holder for what a `describe`'s setup tears down: a test whose subtests became a `describe` filed its teardowns on its own
  * context, which a `beforeAll` has not; it files them here, and returns `end`, which Vitest runs after the describe's last test.
  */
-export function held(): Held {
+export function teardowns(): Held {
   const fns: (() => unknown)[] = [];
   return {
     onTestFinished: (fn) => {

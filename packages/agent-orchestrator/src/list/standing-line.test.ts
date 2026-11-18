@@ -3,7 +3,7 @@
  * verdict on a branch; its age where it is older than a ticking daemon's stale bound, or where nothing ticks; and nothing while the
  * daemon ticks and its reading is fresh.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { staleAfterMs, type DaemonStanding, type Standing } from '../daemon/daemon.ts';
 import { standingLine } from './list.ts';

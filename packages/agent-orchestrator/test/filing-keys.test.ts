@@ -8,7 +8,8 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in repositories no factory holds.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -158,23 +159,27 @@ const NONE = {
   remoteControl: undefined,
 };
 
-test('every key a step sets reaches the runtime, on every filing — and a check, and a step that sets none, is filed with none', async (t) => {
-  const s = story(t);
-  const repo = aRepo();
-  const dir = looped(
-    path.join(repo, 'workflows', 'keys'),
-    'tools: Read, Grep, Glob, Bash\ndisallowedTools: Bash(npm run build)\neffort: max\n',
-    'tools: Read, Edit, Write, Bash\neffort: low\ncontext: 200k\ndisallowedTools: Bash(npm run build), SendMessage\nallowedTools: Edit(**), Bash(npm test)\nremote: true\n',
-  );
+describe('every key a step sets reaches the runtime, on every filing — and a check, and a step that sets none, is filed with none', () => {
+  let repo!: string;
+  let dir!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    repo = aRepo();
+    dir = looped(
+      path.join(repo, 'workflows', 'keys'),
+      'tools: Read, Grep, Glob, Bash\ndisallowedTools: Bash(npm run build)\neffort: max\n',
+      'tools: Read, Edit, Write, Bash\neffort: low\ncontext: 200k\ndisallowedTools: Bash(npm run build), SendMessage\nallowedTools: Edit(**), Bash(npm test)\nremote: true\n',
+    );
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
-
-  await s.test("`nemia start --workflows <name>` starts the repository's workflow of that name", async () => {
+  s.test("`nemia start --workflows <name>` starts the repository's workflow of that name", async () => {
     const workflows = workflowFolder('keys', process.cwd(), repo);
     id = ((await stage.main(['start', 'add a flag', '--workflows', workflows, '--repo', repo])) as { id: string }).id;
     assert.equal(runRecord(ROOT, id).workflowDir, dir);
   });
-
-  await s.test('REFUSED: a name the repository does not have, naming both places and the workflows it has', async () => {
+  s.test('REFUSED: a name the repository does not have, naming both places and the workflows it has', async () => {
     const before = fs.readdirSync(path.join(ROOT, 'runs')).length;
     await assert.rejects(
       Promise.resolve().then(() => workflowFolder('kyes', process.cwd(), repo)),
@@ -191,28 +196,24 @@ test('every key a step sets reaches the runtime, on every filing — and a check
     );
     assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, before, 'no run is written');
   });
-
-  await s.test('the first filing carries every key implement sets, and a job files no background session', async () => {
+  s.test('the first filing carries every key implement sets, and a job files no background session', async () => {
     assert.deepEqual((await tick(id)).filed, ['implement']);
     assert.deepEqual(keysOf(`${id}-implement`), IMPLEMENT);
     assert.equal('background' in (specOf(`${id}-implement`).config ?? {}), false);
   });
-
-  await s.test("the check is the run's own, filed with none of them", async () => {
+  s.test("the check is the run's own, filed with none of them", async () => {
     stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
     assert.deepEqual((await tick(id)).checked, ['implement']);
     assert.equal(specOf(`${id}-implement-check`).harness, 'check');
     assert.deepEqual(keysOf(`${id}-implement-check`), NONE);
   });
-
-  await s.test('a try `retries:` files continues the session, with every key', async () => {
+  s.test('a try `retries:` files continues the session, with every key', async () => {
     stage.board().settle(`${id}-implement-check`, 'failed', undefined, 1);
     assert.deepEqual((await tick(id)).tried, ['implement']);
     assert.deepEqual(keysOf(`${id}-implement-try2`), IMPLEMENT);
     assert.equal(specOf(`${id}-implement-try2`).resumeFrom, `native-${id}-implement`);
   });
-
-  await s.test('a try `nemia retry` asks for is a new session on the model asked for, with every key', async () => {
+  s.test('a try `nemia retry` asks for is a new session on the model asked for, with every key', async () => {
     stage.board().settle(`${id}-implement-try2`, 'succeeded', SIGNED);
     assert.deepEqual((await tick(id)).checked, ['implement']);
     stage.board().settle(`${id}-implement-try2-check`, 'failed', undefined, 1);
@@ -221,8 +222,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
     assert.deepEqual(keysOf(`${id}-implement-try3`), IMPLEMENT);
     assert.deepEqual([specOf(`${id}-implement-try3`).config?.model, specOf(`${id}-implement-try3`).resumeFrom], ['opus', undefined]);
   });
-
-  await s.test('a round files its target with its keys, and the looping step — a new session each round — with its own', async () => {
+  s.test('a round files its target with its keys, and the looping step — a new session each round — with its own', async () => {
     stage.board().settle(`${id}-implement-try3`, 'succeeded', SIGNED);
     assert.deepEqual((await tick(id)).checked, ['implement']);
     stage.board().settle(`${id}-implement-try3-check`, 'succeeded', undefined, 0);
@@ -239,8 +239,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
     assert.deepEqual(keysOf(`${id}-review-try2`), REVIEW);
     assert.equal(specOf(`${id}-review-try2`).resumeFrom, undefined);
   });
-
-  await s.test("a codex step of a repository run trusts its repository's real path, on its first filing, a try and a round", async () => {
+  s.test("a codex step of a repository run trusts its repository's real path, on its first filing, a try and a round", async () => {
     const real = aRepo();
     const link = path.join(scratch('wf-linked-'), 'repo');
     fs.symlinkSync(real, link);
@@ -263,8 +262,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
     assert.deepEqual(specOf(`${run.id}-implement-try3`).config?.codex, trusted, 'the round');
     assert.equal(specOf(`${run.id}-review`).config?.codex, undefined, 'a Claude Code step names no trust');
   });
-
-  await s.test('a codex step of a folder run, and a codex try whose repository is gone, trust nothing', async () => {
+  s.test('a codex step of a folder run, and a codex try whose repository is gone, trust nothing', async () => {
     const team = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\nharness: codex\n---\nwrite the note\n');
     const inFolders = await stage.runPlaced(startRun({ brief: 'a note', repo: scratch('wf-not-a-repo-'), workflowDir: team }));
@@ -282,8 +280,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
     assert.deepEqual((await tick(gone.id)).tried, ['implement'], 'filed, rather than thrown out of the pass');
     assert.equal(specOf(`${gone.id}-implement-try2`).config?.codex, undefined);
   });
-
-  await s.test("a codex step's `sandbox:` is filed as the engine's `permissionMode`, and a Claude Code step's mode as itself", async () => {
+  s.test("a codex step's `sandbox:` is filed as the engine's `permissionMode`, and a Claude Code step's mode as itself", async () => {
     const codex = await started(folder('harness: codex\nsandbox: read-only'));
     const claude = await started(folder('permissionMode: dontAsk'));
     await tick(codex.id);
@@ -291,8 +288,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
     assert.equal(specOf(`${codex.id}-implement`).config?.permissionMode, 'read-only');
     assert.equal(specOf(`${claude.id}-implement`).config?.permissionMode, 'dontAsk');
   });
-
-  await s.test("a record holds each step's lists and a codex sandbox under today's names, at `nemia start` and after a pass", async () => {
+  s.test("a record holds each step's lists and a codex sandbox under today's names, at `nemia start` and after a pass", async () => {
     const lists = await started(folder('disallowedTools: SendMessage\nallowedTools: Edit(**), Bash(npm test)'));
     const codex = await started(folder('harness: codex\nsandbox: read-only'));
     const held = () => {
@@ -310,8 +306,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
     await tick(codex.id);
     assert.deepEqual(held(), TODAY, 'and the tick writes them back the same way');
   });
-
-  await s.test(
+  s.test(
     'a run frozen under `disallow` and `allow` loads, files its rules under the names they have now, and is written back so',
     async () => {
       const run = await started(folder('disallowedTools: SendMessage\nallowedTools: Edit(**), Bash(npm test)'));
@@ -339,8 +334,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
       assert.equal(Object.hasOwn(written, 'disallow') || Object.hasOwn(written, 'allow'), false, 'written back under the new names alone');
     },
   );
-
-  await s.test('a codex run frozen while its sandbox was `permissionMode` files that sandbox as it was frozen', async () => {
+  s.test('a codex run frozen while its sandbox was `permissionMode` files that sandbox as it was frozen', async () => {
     for (const [sandbox, word] of [
       ['read-only', 'read-only'],
       ['danger-full-access', 'bypassPermissions'],
@@ -359,8 +353,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
       assert.equal(specOf(`${run.id}-implement`).config?.permissionMode, word, "not Codex's default");
     }
   });
-
-  await s.test("a step continuing another's session inherits its window, and so does its retry", async () => {
+  s.test("a step continuing another's session inherits its window, and so does its retry", async () => {
     const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncontext: 200k\n---\nimplement it\n');
     fs.writeFileSync(path.join(dir, 'respond.md'), '---\nresume: implement\nplace: git\ncheck: npm test\n---\nanswer it\n');
@@ -379,8 +372,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
     assert.deepEqual((await tick(run.id)).tried, ['respond']);
     assert.equal(specOf(`${run.id}-respond-try2`).config?.contextTokens, 200_000, 'its nudge, continuing the same chain');
   });
-
-  await s.test(
+  s.test(
     "at shipped defaults a step names none, and is filed with none: the harness's own tools, window and effort, unbridged",
     async () => {
       const run = await started(folder());

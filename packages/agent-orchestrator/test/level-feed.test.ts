@@ -10,7 +10,8 @@
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test, vi } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -53,19 +54,23 @@ const levelSaid = () =>
 
 const STORE = { kind: 'Store', name: 'store' };
 
-test("a factory's level said on the feed: each change of the level in force is one line of the store, labelled with its factory, and nothing else is", async (t) => {
-  const s = story(t);
-  t.mock.timers.enable({ apis: ['Date'], now: Date.parse(NOW) });
-  const b = stage.board();
-  Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
+describe("a factory's level said on the feed: each change of the level in force is one line of the store, labelled with its factory, and nothing else is", () => {
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    const t = teardowns();
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(NOW) });
+    b = stage.board();
+    Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
+    for (const name of ['acme', 'quiet']) addFactoryAt(ROOT, { name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
+    return t.end;
+  });
+  const s = story(test);
   const pass = () => stage.runWith(b.e, tickRun());
-  for (const name of ['acme', 'quiet']) addFactoryAt(ROOT, { name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
-
-  await s.test('every factory at manual: a pass says no level', async () => {
+  s.test('every factory at manual: a pass says no level', async () => {
     await pass();
     assert.deepEqual(levelSaid(), []);
   });
-  await s.test('nemia level auto --factory acme, then a pass, is one LevelChanged line labelled acme, a person’s deed', async () => {
+  s.test('nemia level auto --factory acme, then a pass, is one LevelChanged line labelled acme, a person’s deed', async () => {
     await typed('level', 'auto', '--factory', 'acme');
     await pass();
     assert.deepEqual(levelSaid(), [['acme', STORE, 'person', 'acme is at auto']]);
@@ -73,35 +78,32 @@ test("a factory's level said on the feed: each change of the level in force is o
     assert.ok(line !== undefined && line.message?.includes('acme is at auto'), line?.message);
     assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), line), true, 'her selectors wake her on it');
   });
-  await s.test('a second pass, the level the same, writes no level line', async () => {
+  s.test('a second pass, the level the same, writes no level line', async () => {
     await pass();
     await pass();
     assert.equal(levelSaid().length, 1);
   });
-  await s.test(
-    'a default set lower, then a raise for an hour: each is a line, the raise with its end and what it falls back to',
-    async () => {
-      await typed('level', 'semi-auto', '--factory', 'acme');
-      await pass();
-      await typed('level', 'auto', '--factory', 'acme', '--for', '1h');
-      await pass();
-      const until = new Date(Date.parse(NOW) + HOUR).toISOString();
-      assert.deepEqual(levelSaid().slice(1), [
-        ['acme', STORE, 'person', 'acme is at semi-auto'],
-        ['acme', STORE, 'person', `acme is at auto until ${until}, then semi-auto`],
-      ]);
-    },
-  );
-  await s.test('the hour passes, nobody writing: the next pass says acme fell back to semi-auto, and the one after nothing', async () => {
-    t.mock.timers.tick(HOUR - 1);
+  s.test('a default set lower, then a raise for an hour: each is a line, the raise with its end and what it falls back to', async () => {
+    await typed('level', 'semi-auto', '--factory', 'acme');
+    await pass();
+    await typed('level', 'auto', '--factory', 'acme', '--for', '1h');
+    await pass();
+    const until = new Date(Date.parse(NOW) + HOUR).toISOString();
+    assert.deepEqual(levelSaid().slice(1), [
+      ['acme', STORE, 'person', 'acme is at semi-auto'],
+      ['acme', STORE, 'person', `acme is at auto until ${until}, then semi-auto`],
+    ]);
+  });
+  s.test('the hour passes, nobody writing: the next pass says acme fell back to semi-auto, and the one after nothing', async (t) => {
+    vi.advanceTimersByTime(HOUR - 1);
     await pass();
     assert.equal(levelSaid().length, 3, 'a millisecond short of its end, the raise stands');
-    t.mock.timers.tick(1);
+    vi.advanceTimersByTime(1);
     await pass();
     await pass();
     assert.deepEqual(levelSaid().slice(3), [['acme', STORE, 'person', 'acme is at semi-auto']]);
   });
-  await s.test('a raise ended by --end is a line of its own', async () => {
+  s.test('a raise ended by --end is a line of its own', async () => {
     await typed('level', 'auto', '--factory', 'acme', '--for', '2h');
     const raisedAt = Date.now();
     await pass();
@@ -114,11 +116,11 @@ test("a factory's level said on the feed: each change of the level in force is o
       [`acme is at auto until ${new Date(raisedAt + 2 * HOUR).toISOString()}, then semi-auto`, 'acme is at semi-auto'],
     );
   });
-  await s.test('a daemon restarted, with no fold of its own, writes no level line again', async () => {
+  s.test('a daemon restarted, with no fold of its own, writes no level line again', async () => {
     const levels = await stage.runPlaced(levelsNow());
     assert.deepEqual(recordFeed(ROOT, new Map(), { memo: freshFeedMemo(), pause: readPause(ROOT), levels }).lines, []);
   });
-  await s.test('a factory left at manual, and the default factory, are never said', async () => {
+  s.test('a factory left at manual, and the default factory, are never said', async () => {
     assert.deepEqual([...new Set(levelSaid().map((l) => l[0]))], ['acme']);
   });
 });

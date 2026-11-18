@@ -11,7 +11,8 @@
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -176,7 +177,7 @@ const aStarted = (repo: string, brief: string, workflowDir = oneStep(), more: Pa
 /** `nemia <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
 const typed = async (t: TestContext, ...argv: string[]) => {
   const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => {
+  const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => {
     printed.push(a.join(' '));
   });
   try {
@@ -185,7 +186,7 @@ const typed = async (t: TestContext, ...argv: string[]) => {
   } catch (err) {
     return { printed: printed.join('\n'), error: err as Error & { exitCode?: number; _tag?: string } };
   } finally {
-    log.mock.restore();
+    log.mockRestore();
   }
 };
 /** What `nemia hold` answers, as the client prints it: the run, whether its hold was lifted, and the hold. */
@@ -258,17 +259,25 @@ const atItsGate = async (b: Board, repo: string, brief: string) => {
   return run;
 };
 
-test('a run held until another lands: said by every screen with why and who, nothing filed nor asked while it stands, and lifted by the tick when it lands', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  const repo = aRepo();
-  const target = await aRunning(b, repo);
-  const user = os.userInfo().username;
+describe('a run held until another lands: said by every screen with why and who, nothing filed nor asked while it stands, and lifted by the tick when it lands', () => {
+  let b!: Board;
+  let repo!: string;
+  let target!: import('../src/start/start.verb.ts').StartedRun;
+  let user!: string;
+  let words!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    b = stage.board();
+    repo = aRepo();
+    target = await aRunning(b, repo);
+    user = os.userInfo().username;
+    words = `held until ${target.id} lands (why: merge conflicts in five files; by operator)`;
+    return t.end;
+  });
+  const s = story(test);
   const why = ['--why', 'merge conflicts in five files', '--by', 'operator'];
-  const words = `held until ${target.id} lands (why: merge conflicts in five files; by operator)`;
   let run = { id: '' } as Run;
-
-  await s.test('`nemia hold <run> --until <run>` answers the hold, put by the OS user, and writes no why', async () => {
+  s.test('`nemia hold <run> --until <run>` answers the hold, put by the OS user, and writes no why', async () => {
     run = await aStarted(repo, 'waits for the target');
     const put = await holdTyped(run.id, '--until', target.id);
     assert.deepEqual([put.id, put.lifted, put.hold.until, put.hold.by, put.hold.why], [run.id, false, [target.id], user, undefined]);
@@ -276,7 +285,7 @@ test('a run held until another lands: said by every screen with why and who, not
     assert.deepEqual(Object.keys(file), ['at', 'until', 'by'], 'a hold put with no --why writes no why');
     assert.equal(file.by, user, 'nor --by: it is put by the OS user');
   });
-  await s.test("`--why` and `--by` write the person's why, one line, and who they are into the file, and say them back", async (sub) => {
+  s.test("`--why` and `--by` write the person's why, one line, and who they are into the file, and say them back", async (sub) => {
     const withWords = await aStarted(repo, 'held with words');
     const put = await holdTyped(withWords.id, '--until', target.id, '--why', '  two\n words ', '--by', 'operator');
     assert.deepEqual(
@@ -298,15 +307,15 @@ test('a run held until another lands: said by every screen with why and who, not
       'held again with no --why after a lift: no why of the lifted hold survives',
     );
     const nameless = await aStarted(repo, 'held by a user the system cannot name');
-    sub.mock.method(os, 'userInfo', () => {
+    vi.spyOn(os, 'userInfo').mockImplementation(() => {
       throw new Error('ENOENT: no such file or directory, uv_os_get_passwd');
     });
     await said(sub, 'hold', nameless.id, '--until', target.id, '--why', 'w');
     assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(holdFileOf(nameless.id), 'utf8')) as object), ['at', 'until', 'why']);
   });
-  await s.test(
+  s.test(
     'a held run files nothing, and the feed says the hold — its words where it has them — and not that the run waits on you',
-    async () => {
+    async (t) => {
       asOlder(run.id);
       await tick(b, run.id);
       const quiet = await tick(b, run.id);
@@ -317,7 +326,7 @@ test('a run held until another lands: said by every screen with why and who, not
       assert.equal((await tick(b, worded.id)).feed.run.note, words, "the feed's note says the words");
     },
   );
-  await s.test('`nemia ls` and the decision say the hold and how to lift it', async () => {
+  s.test('`nemia ls` and the decision say the hold and how to lift it', async () => {
     await aPass(b.e);
     const ls = await listed(run.id);
     assert.deepEqual(ls.listing.holding, [{ run: target.id }], 'held until the target, which may still land');
@@ -332,14 +341,14 @@ test('a run held until another lands: said by every screen with why and who, not
       held.holding.advice,
     );
   });
-  await s.test('a hold written between the read and the filing holds: the pass checks the file at the filing', async () => {
+  s.test('a hold written between the read and the filing holds: the pass checks the file at the filing', async () => {
     const other = await aStarted(repo, 'read before its hold');
     const stale = runRecord(ROOT, other.id);
     fs.writeFileSync(holdFileOf(other.id), JSON.stringify({ at: 'by hand', until: [target.id] }));
     await tick(b, stale);
     assert.ok(!b.filings.includes(`${other.id}-implement`), 'a run read before the hold was put is not filed on that read');
   });
-  await s.test(
+  s.test(
     'REFUSED while held: an approval and a retry — `nemia ls` and the decision offer neither, but say the hold, with its words; the gate is asked again once it lifts',
     async (sub) => {
       const atGate = await atItsGate(b, repo, 'at its gate');
@@ -397,7 +406,7 @@ test('a run held until another lands: said by every screen with why and who, not
       assert.match(await decisionText(atGate.id), new RegExp(`nemia approve ${atGate.id} implement`));
     },
   );
-  await s.test(
+  s.test(
     'REFUSED while held: a loop out of rounds is offered neither once more nor enough, and both are refused; asked again on the lift',
     async (sub) => {
       const loop = await outOfRounds(b, repo);
@@ -418,7 +427,7 @@ test('a run held until another lands: said by every screen with why and who, not
       assert.deepEqual(await exhaustedOf(loop.id), ['review'], 'asked again on the lift');
     },
   );
-  await s.test(
+  s.test(
     "a blocked step's question stays on its record while the run is held, asked of nobody, and is asked again once the hold lifts",
     async () => {
       const asking = await aStarted(repo, 'asks a question', twoSteps());
@@ -454,37 +463,34 @@ test('a run held until another lands: said by every screen with why and who, not
       assert.deepEqual((await decidedOn(stage, asking.id)).decision.kind, 'awaiting', "its question is the person's again");
     },
   );
-  await s.test(
-    'REFUSED while held or pruned: nemia say to a step that has settled offers no nemia retry, which either refuses',
-    async () => {
-      const done = await aDone(b, repo);
-      const blocked = await aRunning(b, repo);
-      b.settle(`${blocked.id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'a word' });
-      await tick(b, blocked.id);
-      await assert.rejects(
-        stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello', { caller: PERSON })),
-        (err: Error) => /: nemia retry /.test(err.message),
-        'offered before the hold on a step that signed off blocked: settled, and the run not finished, so it may be held',
-      );
-      await stage.runWith(b.e, hold(blocked.id, [target.id]));
-      await assert.rejects(
-        stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello', { caller: PERSON })),
-        (err: Error & { exitCode?: number }) => {
-          assert.equal(err.exitCode, 2);
-          names(err.message, `no try is filed while ${blocked.id} is held until ${target.id} lands`, `nemia hold ${blocked.id} --off`);
-          assert.doesNotMatch(err.message, VERBS);
-          return true;
-        },
-      );
-      await stage.runWith(b.e, unhold(blocked.id));
-      assert.equal((await stage.runWith(b.e, prune(done.id, { yes: true, unmerged: true }))).kind, 'pruned');
-      await assert.rejects(
-        stage.runWith(b.e, sayRun(done.id, 'implement', 'hello', { caller: PERSON })),
-        (err: Error) => /Nor is it tried again: .* was pruned at /.test(err.message) && !VERBS.test(err.message),
-      );
-    },
-  );
-  await s.test(
+  s.test('REFUSED while held or pruned: nemia say to a step that has settled offers no nemia retry, which either refuses', async () => {
+    const done = await aDone(b, repo);
+    const blocked = await aRunning(b, repo);
+    b.settle(`${blocked.id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'a word' });
+    await tick(b, blocked.id);
+    await assert.rejects(
+      stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello', { caller: PERSON })),
+      (err: Error) => /: nemia retry /.test(err.message),
+      'offered before the hold on a step that signed off blocked: settled, and the run not finished, so it may be held',
+    );
+    await stage.runWith(b.e, hold(blocked.id, [target.id]));
+    await assert.rejects(
+      stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello', { caller: PERSON })),
+      (err: Error & { exitCode?: number }) => {
+        assert.equal(err.exitCode, 2);
+        names(err.message, `no try is filed while ${blocked.id} is held until ${target.id} lands`, `nemia hold ${blocked.id} --off`);
+        assert.doesNotMatch(err.message, VERBS);
+        return true;
+      },
+    );
+    await stage.runWith(b.e, unhold(blocked.id));
+    assert.equal((await stage.runWith(b.e, prune(done.id, { yes: true, unmerged: true }))).kind, 'pruned');
+    await assert.rejects(
+      stage.runWith(b.e, sayRun(done.id, 'implement', 'hello', { caller: PERSON })),
+      (err: Error) => /Nor is it tried again: .* was pruned at /.test(err.message) && !VERBS.test(err.message),
+    );
+  });
+  s.test(
     'the whole decision of a run held while its step runs, once a pass has read where the run it names stands, of one waiting --after another, alone and with a hold beside, and of one held until a run that was cancelled',
     async (sub) => {
       const parent = await aRunning(b, repo);
@@ -539,7 +545,7 @@ test('a run held until another lands: said by every screen with why and who, not
       assert.deepEqual(await decision(cancelled.id), { nothing: `cancelled at ${at} — nothing to decide` });
     },
   );
-  await s.test('the tick lifts the hold on the pass that reads the run it names landed, and the run goes on on that pass', async () => {
+  s.test('the tick lifts the hold on the pass that reads the run it names landed, and the run goes on on that pass', async () => {
     const wt = runRecord(ROOT, target.id).steps.implement.workspace!;
     committed(wt, 'target.ts');
     b.settle(`${target.id}-implement`, 'succeeded', SIGNED);
@@ -553,7 +559,7 @@ test('a run held until another lands: said by every screen with why and who, not
     assert.ok(b.filings.includes(`${run.id}-implement`), 'and the run went on on the same pass');
     assert.equal(runRecord(ROOT, run.id).hold, undefined);
   });
-  await s.test(
+  s.test(
     'REFUSED: nemia rm of a run another holds on names the hold to lift; nemia rm of a held run takes its hold with it',
     async (sub) => {
       const other = await aRunning(b, repo);
@@ -604,13 +610,21 @@ const CUT = {
   multiple: false,
 };
 
-test('a run held until a person lifts it: no run named, nothing asked nor filed while it stands, a restart keeps it, and only --off puts its questions back', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  const repo = aRepo();
-  const user = os.userInfo().username;
+describe('a run held until a person lifts it: no run named, nothing asked nor filed while it stands, a restart keeps it, and only --off puts its questions back', () => {
+  let b!: Board;
+  let repo!: string;
+  let user!: string;
+  let words!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    repo = aRepo();
+    user = os.userInfo().username;
+    words = `held until a person lifts it (why: ${why}; by ${user})`;
+    return t.end;
+  });
+  const s = story(test);
   const why = 'folded into the microVM intake (hotz)';
-  const words = `held until a person lifts it (why: ${why}; by ${user})`;
   const summaryOf = async (id: string) => {
     const all = await stage.runWith(b.e, RUNS.handler({}));
     const found = all.find((r) => r.id === id);
@@ -618,8 +632,7 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
     return found;
   };
   let id = '';
-
-  await s.test("a run blocked at its step's questions waits on you", async () => {
+  s.test("a run blocked at its step's questions waits on you", async () => {
     id = (await aStarted(repo, 'plan the flag', planned())).id;
     await tick(b, id);
     b.settle(`${id}-plan`, 'succeeded', { outcome: 'blocked', summary: 'Half.', artifacts: [], needs: 'One question.', open: [CUT] });
@@ -628,12 +641,12 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
     assert.deepEqual((await listed(id)).listing.waitingOnYou, ['plan']);
     assert.deepEqual((await summaryOf(id)).waitingOnYou, ['plan']);
   });
-  await s.test('`nemia hold <run> --why` with no --until holds it, and writes a hold that names no run', async () => {
+  s.test('`nemia hold <run> --why` with no --until holds it, and writes a hold that names no run', async () => {
     const put = await holdTyped(id, '--why', why);
     assert.deepEqual([put.hold.until, put.hold.why], [[], why], 'held until a person lifts it, and why');
     assert.deepEqual((JSON.parse(fs.readFileSync(holdFileOf(id), 'utf8')) as { until: unknown }).until, []);
   });
-  await s.test('the decision, `nemia ls` and the summary say it is held and why, and ask nothing', async () => {
+  s.test('the decision, `nemia ls` and the summary say it is held and why, and ask nothing', async () => {
     await aPass(b.e);
     const held = await decision(id);
     const screen = JSON.stringify(held);
@@ -652,7 +665,7 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
     assert.deepEqual(summary.waitingOnYou, []);
     assert.equal(summary.moving, false, 'a hold no tick lifts does not move');
   });
-  await s.test('ticks file nothing, and no tick lifts it: the run read afresh, as a restarted daemon reads it, is still held', async () => {
+  s.test('ticks file nothing, and no tick lifts it: the run read afresh, as a restarted daemon reads it, is still held', async () => {
     const filed = b.filings.length;
     for (let i = 0; i < 5; i++) await tick(b, id);
     assert.equal(b.filings.length, filed, 'nothing filed while held');
@@ -660,7 +673,7 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
     assert.deepEqual(runRecord(ROOT, id).hold?.until, []);
     assert.equal(runRecord(ROOT, id).hold?.why, why);
   });
-  await s.test("`nemia hold <run> --off` lifts it, and its questions are the person's again", async (sub) => {
+  s.test("`nemia hold <run> --off` lifts it, and its questions are the person's again", async (sub) => {
     await said(sub, 'hold', id, '--off');
     await tick(b, id);
     await aPass(b.e);
@@ -673,7 +686,7 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
     assert.match(JSON.stringify(lifted.closeouts.plan), /How is the card cut\?/, 'its question is on the step it asks of');
     assert.deepEqual((await summaryOf(id)).waitingOnYou, ['plan']);
   });
-  await s.test('a folder run takes a hold that names no run, and --off lifts it', async (sub) => {
+  s.test('a folder run takes a hold that names no run, and --off lifts it', async (sub) => {
     const dir = folderOf('folder-', { 'implement.md': '---\nplace: folder\n---\nimplement it\n' });
     const folder = await stage.runPlaced(
       startRun({ brief: 'in a folder', repo: fs.mkdtempSync(path.join(ROOT, 'plain-')), workflowDir: dir }),
@@ -688,7 +701,51 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
   });
 });
 
-test('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arguments, the runs it names, the run it holds, its words — exit 2, and no hold written', async (t) => {
+describe('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arguments, the runs it names, the run it holds, its words — exit 2, and no hold written', () => {
+  let heldBefore!: string[];
+  let b!: Board;
+  let repo!: string;
+  let target!: import('../src/start/start.verb.ts').StartedRun;
+  let run!: import('../src/start/start.verb.ts').StartedRun;
+  let other!: import('../src/start/start.verb.ts').StartedRun;
+  let landed!: import('../src/start/start.verb.ts').StartedRun;
+  let done!: import('../src/start/start.verb.ts').StartedRun;
+  let called!: import('../src/start/start.verb.ts').StartedRun;
+  let elsewhere!: import('../src/start/start.verb.ts').StartedRun;
+  let already!: import('../src/start/start.verb.ts').StartedRun;
+  let worded!: import('../src/start/start.verb.ts').StartedRun;
+  let folder!: import('../src/start/start.verb.ts').StartedRun;
+  let before!: string;
+  let held!: string[];
+  beforeAll(async () => {
+    const t = teardowns();
+    heldBefore = holdFiles();
+    b = stage.board();
+    repo = aRepo();
+    target = await aRunning(b, repo);
+    run = await aRunning(b, repo);
+    other = await aRunning(b, repo);
+    landed = await aDone(b, repo, { merged: true });
+    done = await aDone(b, repo);
+    called = await aRunning(b, repo);
+    assert.equal((await typed(t, 'cancel', called.id)).error, undefined);
+    elsewhere = await aRunning(b, aRepo());
+    already = await aRunning(b, repo);
+    assert.equal((await typed(t, 'hold', already.id, '--until', target.id)).error, undefined);
+    worded = await aRunning(b, repo);
+    assert.equal((await typed(t, 'hold', worded.id, '--until', target.id, '--why', "it's blocked", '--by', 'operator')).error, undefined);
+    folder = await stage.runPlaced(
+      startRun({
+        brief: 'in a folder',
+        repo: fs.mkdtempSync(path.join(ROOT, 'plain-')),
+        workflowDir: folderOf('folder-', { 'implement.md': '---\nplace: folder\n---\ndo it\n' }),
+      }),
+    );
+    before = fs.readFileSync(holdFileOf(already.id), 'utf8');
+    held = [...heldBefore, `${already.id}.hold`, `${worded.id}.hold`].sort();
+    assert.deepEqual(holdFiles(), held, 'the two runs held on purpose are the hold files this story adds');
+    return t.end;
+  });
   const holdFiles = (): string[] =>
     fs.existsSync(path.join(ROOT, 'runs'))
       ? fs
@@ -696,29 +753,7 @@ test('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arg
           .filter((f) => f.includes('.hold'))
           .sort()
       : [];
-  const heldBefore = holdFiles();
-  const b = stage.board();
-  const repo = aRepo();
-  const target = await aRunning(b, repo);
-  const run = await aRunning(b, repo);
   const id = run.id;
-  const other = await aRunning(b, repo);
-  const landed = await aDone(b, repo, { merged: true });
-  const done = await aDone(b, repo);
-  const called = await aRunning(b, repo);
-  assert.equal((await typed(t, 'cancel', called.id)).error, undefined);
-  const elsewhere = await aRunning(b, aRepo());
-  const already = await aRunning(b, repo);
-  assert.equal((await typed(t, 'hold', already.id, '--until', target.id)).error, undefined);
-  const worded = await aRunning(b, repo);
-  assert.equal((await typed(t, 'hold', worded.id, '--until', target.id, '--why', "it's blocked", '--by', 'operator')).error, undefined);
-  const folder = await stage.runPlaced(
-    startRun({
-      brief: 'in a folder',
-      repo: fs.mkdtempSync(path.join(ROOT, 'plain-')),
-      workflowDir: folderOf('folder-', { 'implement.md': '---\nplace: folder\n---\ndo it\n' }),
-    }),
-  );
   const u = ['hold', id, '--until', target.id];
   const rows: Array<[string, string[], string, string[]]> = [
     ['both', ['hold', 'r-x', '--until', 'a', '--off'], 'Invalid', ['nemia hold takes --until or --off, not both']],
@@ -827,21 +862,18 @@ test('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arg
       [`--by takes at most ${BY_CAP} characters`, `given ${BY_CAP + 1}`],
     ],
   ];
-  const before = fs.readFileSync(holdFileOf(already.id), 'utf8');
-  const held = [...heldBefore, `${already.id}.hold`, `${worded.id}.hold`].sort();
-  assert.deepEqual(holdFiles(), held, 'the two runs held on purpose are the hold files this story adds');
   for (const [what, argv, tag, facts] of rows) {
-    await t.test(what, async () => {
+    test(what, async (t) => {
       const { error } = await typed(t, ...argv);
       assert.ok(error, `nemia ${argv.join(' ')} was not refused`);
       refusedNaming(tag, ...facts)(error);
     });
   }
-  await t.test('nothing written: no hold on a run refused, and the first hold stands as it was', () => {
+  test('nothing written: no hold on a run refused, and the first hold stands as it was', () => {
     assert.deepEqual(holdFiles(), held, 'no hold file under runs/ but those held on purpose');
     assert.equal(fs.readFileSync(holdFileOf(already.id), 'utf8'), before);
   });
-  await t.test('allowed: what is left holds — the one run that may still land, and words at their caps', async () => {
+  test('allowed: what is left holds — the one run that may still land, and words at their caps', async (t) => {
     assert.equal((await typed(t, 'hold', id, '--until', other.id)).error, undefined);
     assert.deepEqual(runRecord(ROOT, id).hold?.until, [other.id]);
     const capped = await aRunning(b, repo);
@@ -901,7 +933,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   const holdFile = holdFileOf(id);
   const file = b.e.file.bind(b.e);
   let held = false;
-  t.mock.method(b.e, 'file', (spec: Parameters<Engine['file']>[0]) => {
+  vi.spyOn(b.e, 'file').mockImplementation((spec: Parameters<Engine['file']>[0]) => {
     if (!held && spec.id?.endsWith('-check')) {
       held = true;
       fs.writeFileSync(holdFile, JSON.stringify({ at: 'by hand', until: [other.id] }));
@@ -910,7 +942,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   });
   const exists = fs.existsSync;
   let lifted = false;
-  t.mock.method(fs, 'existsSync', (p: fs.PathLike) => {
+  vi.spyOn(fs, 'existsSync').mockImplementation((p: fs.PathLike) => {
     const there = exists(p);
     if (p === holdFile && there && !lifted) {
       lifted = true;
@@ -919,7 +951,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
     return there;
   });
   await tick(b, id);
-  t.mock.restoreAll();
+  vi.restoreAllMocks();
 
   const checks = [`${id}-a-check`, `${id}-b-check`];
   assert.ok(held && lifted, 'the pass filed a check, then read the hold, which was lifted as it was read');
@@ -965,7 +997,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   const put = { at: '2099-01-01T00:00:00.000Z', until: [other.id] };
   const read = fs.readFileSync;
   let reads = 0;
-  t.mock.method(fs, 'readFileSync', function (this: unknown, ...args: Parameters<typeof fs.readFileSync>) {
+  vi.spyOn(fs, 'readFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.readFileSync>) {
     if (args[0] === holdFileOf(run.id) && ++reads === 2) fs.writeFileSync(holdFileOf(run.id), JSON.stringify(put));
     return read.apply(this, args);
   });
@@ -973,7 +1005,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
     stage.runWith(b.e, unhold(run.id)),
     refusedNaming('Conflict', `${run.id}'s hold changed as it was lifted`, `nemia ls ${run.id}`, `nemia hold ${run.id} --off`),
   );
-  t.mock.restoreAll();
+  vi.restoreAllMocks();
   assert.deepEqual(
     JSON.parse(fs.readFileSync(holdFileOf(run.id), 'utf8')),
     put,
@@ -983,7 +1015,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   const race = await aRunning(b, repo);
   const first = { at: '2099-01-02T00:00:00.000Z', until: [other.id] };
   const write = fs.writeFileSync;
-  t.mock.method(fs, 'writeFileSync', function (this: unknown, ...args: Parameters<typeof fs.writeFileSync>) {
+  vi.spyOn(fs, 'writeFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.writeFileSync>) {
     if (args[0] === holdFileOf(race.id) && !fs.existsSync(holdFileOf(race.id))) write.call(fs, holdFileOf(race.id), JSON.stringify(first));
     return write.apply(this, args);
   });
@@ -991,7 +1023,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
     stage.runWith(b.e, hold(race.id, [other.id])),
     refusedNaming('Conflict', `${race.id} is already held until ${other.id} lands`, first.at, 'A hold is put once, whole'),
   );
-  t.mock.restoreAll();
+  vi.restoreAllMocks();
   assert.deepEqual(
     JSON.parse(fs.readFileSync(holdFileOf(race.id), 'utf8')),
     first,
@@ -1117,24 +1149,27 @@ test('the whole decision of a loop a person accepted as it stands, once a pass h
   );
 });
 
-test("a hold's file written by hand is read as it is: a why or a by that is no words is left out, and a long why is one line within its cap", async (t) => {
-  const run = await aStarted(aRepo(), 'held by hand');
+describe("a hold's file written by hand is read as it is: a why or a by that is no words is left out, and a long why is one line within its cap", () => {
+  let run!: import('../src/start/start.verb.ts').StartedRun;
+  beforeAll(async () => {
+    run = await aStarted(aRepo(), 'held by hand');
+  });
   for (const bad of [7, null, '', ' \n\t ', ['x'], { a: 1 }]) {
-    await t.test(`why and by of ${JSON.stringify(bad)} read as none`, () => {
+    test(`why and by of ${JSON.stringify(bad)} read as none`, () => {
       fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'], why: bad, by: bad }));
       const read = runRecord(ROOT, run.id).hold!;
       assert.ok(!('why' in read) && !('by' in read), JSON.stringify(read));
       assert.equal(holdWord([{ run: 'a-1' }], read), 'held until a-1 lands');
     });
   }
-  await t.test('a long why and by read as one line, each within its cap', () => {
+  test('a long why and by read as one line, each within its cap', () => {
     const long = `${'many words\n'.repeat(30)}end`;
     fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'], why: long, by: `  op\nerator ${'x'.repeat(100)}` }));
     const read = runRecord(ROOT, run.id).hold!;
     assert.ok(read.why!.length <= WHY_CAP && read.why!.endsWith('…') && !/\s\s|\n/.test(read.why!), read.why);
     assert.ok(read.by!.length <= BY_CAP && read.by!.startsWith('op erator x') && read.by!.endsWith('…'), read.by);
   });
-  await t.test('a file with no why and no by, as older code wrote it', () => {
+  test('a file with no why and no by, as older code wrote it', () => {
     fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'] }));
     assert.deepEqual(runRecord(ROOT, run.id).hold, { at: 't', until: ['a-1'] });
     fs.rmSync(holdFileOf(run.id));
@@ -1212,12 +1247,12 @@ test('a defect is no refusal: `hold` and `unhold` die of what the engine or the 
   await stage.runWith(b.e, hold(run.id, [target.id]));
   const denied = Object.assign(new Error(`EACCES: permission denied, unlink '${holdFileOf(run.id)}'`), { code: 'EACCES' });
   const rm = fs.rmSync;
-  t.mock.method(fs, 'rmSync', function (this: unknown, ...args: Parameters<typeof fs.rmSync>) {
+  vi.spyOn(fs, 'rmSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.rmSync>) {
     if (args[0] === holdFileOf(run.id)) throw denied;
     return rm.apply(this, args);
   });
   await assert.rejects(Effect.runPromise(storeGiven(ROOT, ENV)(caught(unhold(run.id)))), (err) => err === denied);
   await assert.rejects(stage.runWith(b.e, unhold(run.id)), (err) => err === denied);
-  t.mock.restoreAll();
+  vi.restoreAllMocks();
   assert.ok(fs.existsSync(holdFileOf(run.id)), 'the hold stands');
 });

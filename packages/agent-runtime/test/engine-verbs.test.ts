@@ -5,7 +5,8 @@
  * layer and `tick` refuse, each a tagged error. What `file` refuses and takes is `test/refusal.test.ts`'s.
  */
 import { Effect } from 'effect';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -71,61 +72,67 @@ const complete = (sessions: Map<string, Sighting>) => {
   for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
 };
 
-test('a consumer runs a task through its whole life in plain async/await, and builds a workflow on the feed, with no Effect anywhere', async (t) => {
-  const s = story(t);
-  const sessions = new Map<string, Sighting>();
-  const engine = engineOver(fakeHarness(sessions));
+describe('a consumer runs a task through its whole life in plain async/await, and builds a workflow on the feed, with no Effect anywhere', () => {
+  let sessions!: Map<string, Sighting>;
+  let engine!: import('../src/index.ts').EngineShape;
+  let delivered!: import('../src/testing.ts').Bell;
+  let watcher!: { stop: () => void };
+  beforeAll(async () => {
+    const t = teardowns();
+    sessions = new Map<string, Sighting>();
+    engine = engineOver(fakeHarness(sessions));
+    delivered = bell();
+    watcher = Effect.runSync(
+      engine.watch({
+        onEntry: (e) => {
+          live.push(e.event.kind);
+          delivered.ring();
+        },
+        intervalMs: 20,
+      }),
+    );
+    try {
+      await s.test('filed, the task is pending', async () => {
+        id = await Effect.runPromise(engine.file({ brief: 'do the thing', cwd: '/repo' }));
+        assert.equal((await Effect.runPromise(engine.view(id))).phase, 'pending');
+      });
+
+      await s.test('a pass starts it: running, one session', async () => {
+        await Effect.runPromise(engine.tick());
+        assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working');
+        assert.equal(sessions.size, 1);
+      });
+
+      await s.test('the harness finishing it settles it succeeded: the engine found out by asking', async () => {
+        complete(sessions);
+        await Effect.runPromise(engine.tick());
+        assert.equal(
+          (await Effect.runPromise(engine.view(id))).phase,
+          'succeeded',
+          'the harness finished the work, and the engine found out by asking',
+        );
+      });
+
+      await s.test('a watcher started before the filing delivered every event, in order, once', async (sub) => {
+        await until(
+          sub,
+          () => live.length >= 5,
+          () => `five entries; saw ${live.join(', ') || 'none'}`,
+          { bell: delivered },
+        );
+        await new Promise((r) => setTimeout(r, 100));
+        assert.deepEqual(live, ['filed', 'starting', 'spawned', 'ended', 'settled'], 'in order, no repeats');
+      });
+    } finally {
+      watcher.stop();
+    }
+    return t.end;
+  });
+  const s = story(test);
   const live: string[] = [];
-  const delivered = bell();
-  const watcher = Effect.runSync(
-    engine.watch({
-      onEntry: (e) => {
-        live.push(e.event.kind);
-        delivered.ring();
-      },
-      intervalMs: 20,
-    }),
-  );
   let id = '';
-
-  try {
-    await s.test('filed, the task is pending', async () => {
-      id = await Effect.runPromise(engine.file({ brief: 'do the thing', cwd: '/repo' }));
-      assert.equal((await Effect.runPromise(engine.view(id))).phase, 'pending');
-    });
-
-    await s.test('a pass starts it: running, one session', async () => {
-      await Effect.runPromise(engine.tick());
-      assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working');
-      assert.equal(sessions.size, 1);
-    });
-
-    await s.test('the harness finishing it settles it succeeded: the engine found out by asking', async () => {
-      complete(sessions);
-      await Effect.runPromise(engine.tick());
-      assert.equal(
-        (await Effect.runPromise(engine.view(id))).phase,
-        'succeeded',
-        'the harness finished the work, and the engine found out by asking',
-      );
-    });
-
-    await s.test('a watcher started before the filing delivered every event, in order, once', async (sub) => {
-      await until(
-        sub,
-        () => live.length >= 5,
-        () => `five entries; saw ${live.join(', ') || 'none'}`,
-        { bell: delivered },
-      );
-      await new Promise((r) => setTimeout(r, 100));
-      assert.deepEqual(live, ['filed', 'starting', 'spawned', 'ended', 'settled'], 'in order, no repeats');
-    });
-  } finally {
-    watcher.stop();
-  }
-
   const filed: string[] = [];
-  await s.test('the settled event in the feed drives a follow-up task', async () => {
+  s.test('the settled event in the feed drives a follow-up task', async () => {
     const { entries } = await Effect.runPromise(engine.feed(0));
     for (const { taskId, event } of entries) {
       if (event.kind === 'settled' && event.outcome === 'succeeded') {
@@ -135,8 +142,7 @@ test('a consumer runs a task through its whole life in plain async/await, and bu
     assert.equal(filed.length, 1, 'the settled event drove a follow-up task');
     assert.notEqual(filed[0], id);
   });
-
-  await s.test('a watcher starting at 0 replays the history — the cursor never expires — and stop() stops it', async (sub) => {
+  s.test('a watcher starting at 0 replays the history — the cursor never expires — and stop() stops it', async (sub) => {
     const seen: string[] = [];
     const heard = bell();
     const w = Effect.runSync(
@@ -186,30 +192,34 @@ test('every task given starts, with no ceiling, counted under the harness it res
   assert.equal(sessions.get(nameFor('a-0', 1))!.state, 'canceled');
 });
 
-test('the file-backed default needs no configuration: a journal and a feed on disk, a board a second engine reads, and a measure written once its value arrives', async (t) => {
-  const s = story(t);
-  const root = scratch('ae-verbs-');
-  const sessions = new Map<string, Sighting>();
-  const engine = builtEngine(EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }));
+describe('the file-backed default needs no configuration: a journal and a feed on disk, a board a second engine reads, and a measure written once its value arrives', () => {
+  let root!: string;
+  let sessions!: Map<string, Sighting>;
+  let engine!: import('../src/index.ts').EngineShape;
+  beforeAll(() => {
+    const t = teardowns();
+    root = scratch('ae-verbs-');
+    sessions = new Map<string, Sighting>();
+    engine = builtEngine(EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }));
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
   const measured = async () =>
     (await Effect.runPromise(engine.feed(0))).entries.filter((e) => e.taskId === id && e.event.kind === 'measured').map((e) => e.event);
-
-  await s.test('filed and ticked, it wrote a journal and a feed', async () => {
+  s.test('filed and ticked, it wrote a journal and a feed', async () => {
     id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
     await Effect.runPromise(engine.tick());
     assert.ok(fs.existsSync(path.join(root, 'tasks', `${id}.jsonl`)), 'it wrote a journal');
     assert.ok(fs.existsSync(path.join(root, 'feed.jsonl')), 'and a feed');
   });
-
-  await s.test('a second engine over the same root sees the same board: the state is on disk, not in memory', async () => {
+  s.test('a second engine over the same root sees the same board: the state is on disk, not in memory', async () => {
     const reopened = builtEngine(
       EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }),
     );
     assert.equal((await Effect.runPromise(reopened.view(id))).state.brief, 'b');
   });
-
-  await s.test(
+  s.test(
     'a usage whose key has no value — `{ costUsd: undefined }`, which the files journal writes without the key — is nothing new to write down, on any pass',
     async () => {
       for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed', usage: { responses: 3, costUsd: undefined } });
@@ -218,8 +228,7 @@ test('the file-backed default needs no configuration: a journal and a feed on di
       assert.deepEqual(await measured(), [], 'the end already says turns, and nothing says a cost: nothing to write, on any pass');
     },
   );
-
-  await s.test('a cost that arrives is written once, not on every pass', async () => {
+  s.test('a cost that arrives is written once, not on every pass', async () => {
     for (const [k, v] of sessions) sessions.set(k, { ...v, usage: { responses: 3, costUsd: 0.5 } });
     for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
     assert.equal((await measured()).length, 1, 'a cost that arrives is written once');
@@ -291,58 +300,50 @@ const slowEngine = async () => {
   return { engine, seen, begun, errors, onError: (e: unknown) => void errors.push(e) };
 };
 
-test(
-  'up(): it ticks on a timer and never overlaps, and stop() lets the pass under way finish, report and be the last',
-  WAITED,
-  async (t) => {
-    await t.test('it ticks on a timer and never overlaps', async (row) => {
-      const { engine, seen, errors, onError } = await slowEngine();
-      const ticks = ticksUntil(3);
-      const loop = Effect.runSync(engine.up({ intervalMs: 20, onTick: ticks.onTick, onError }));
-      try {
-        await ticks.wait(row, errors);
-      } finally {
-        loop.stop();
-      }
+describe('up(): it ticks on a timer and never overlaps, and stop() lets the pass under way finish, report and be the last', WAITED, () => {
+  test('it ticks on a timer and never overlaps', async (row) => {
+    const { engine, seen, errors, onError } = await slowEngine();
+    const ticks = ticksUntil(3);
+    const loop = Effect.runSync(engine.up({ intervalMs: 20, onTick: ticks.onTick, onError }));
+    try {
+      await ticks.wait(row, errors);
+    } finally {
+      loop.stop();
+    }
 
-      assert.equal(ticks.count(), 3, 'three ticks, and nobody called tick()');
-      assert.equal(seen.most, 1, 'two ticks ran at once');
-      assert.equal(seen.passes, 3, 'every pass that began, reported');
-      assert.equal(
-        seen.inFlight,
-        0,
-        "no pass under way: stop() ran in the same turn as the third tick's report, before any timer could fire",
-      );
-
-      await new Promise((r) => setTimeout(r, 100));
-      assert.equal(seen.passes, 3, 'stop() means stopped: no pass began after it');
-      assert.equal(ticks.count(), 3, 'and none was reported');
-      assert.deepEqual(errors, []);
-    });
-
-    await t.test(
-      'a tick under way when stop() is called — its sessions spawned, its events journalled, not to be taken back — finishes, and reports, and is the last',
-      async (row) => {
-        const { engine, seen, begun, errors, onError } = await slowEngine();
-        const ticks = ticksUntil(1);
-        const loop = Effect.runSync(engine.up({ intervalMs: 20, onTick: ticks.onTick, onError }));
-        try {
-          await until(row, () => seen.inFlight > 0, 'a pass under way', { bell: begun });
-        } finally {
-          loop.stop();
-        }
-        assert.equal(seen.inFlight, 1, 'a pass was under way at stop()');
-        assert.equal(ticks.count(), 0, 'and it has not reported yet');
-
-        await ticks.wait(row, errors);
-        await new Promise((r) => setTimeout(r, 100));
-        assert.equal(ticks.count(), 1, 'the pass under way reported once');
-        assert.equal(seen.passes, 1, 'and no other began');
-        assert.deepEqual(errors, []);
-      },
+    assert.equal(ticks.count(), 3, 'three ticks, and nobody called tick()');
+    assert.equal(seen.most, 1, 'two ticks ran at once');
+    assert.equal(seen.passes, 3, 'every pass that began, reported');
+    assert.equal(
+      seen.inFlight,
+      0,
+      "no pass under way: stop() ran in the same turn as the third tick's report, before any timer could fire",
     );
-  },
-);
+
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal(seen.passes, 3, 'stop() means stopped: no pass began after it');
+    assert.equal(ticks.count(), 3, 'and none was reported');
+    assert.deepEqual(errors, []);
+  });
+  test('a tick under way when stop() is called — its sessions spawned, its events journalled, not to be taken back — finishes, and reports, and is the last', async (row) => {
+    const { engine, seen, begun, errors, onError } = await slowEngine();
+    const ticks = ticksUntil(1);
+    const loop = Effect.runSync(engine.up({ intervalMs: 20, onTick: ticks.onTick, onError }));
+    try {
+      await until(row, () => seen.inFlight > 0, 'a pass under way', { bell: begun });
+    } finally {
+      loop.stop();
+    }
+    assert.equal(seen.inFlight, 1, 'a pass was under way at stop()');
+    assert.equal(ticks.count(), 0, 'and it has not reported yet');
+
+    await ticks.wait(row, errors);
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal(ticks.count(), 1, 'the pass under way reported once');
+    assert.equal(seen.passes, 1, 'and no other began');
+    assert.deepEqual(errors, []);
+  });
+});
 
 /** A `measured` line whose usage no runtime wrote, as a person's or another program's edit leaves one. */
 const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { responses: 'three' } }) + '\n';
@@ -437,8 +438,8 @@ test(
   },
 );
 
-test("watch(): a store that pushes wakes a watcher, which hears a write it did not poll for — the file store's, and a brought store's subscribe", async (t) => {
-  await t.test('the file store pushes', async () => {
+describe("watch(): a store that pushes wakes a watcher, which hears a write it did not poll for — the file store's, and a brought store's subscribe", () => {
+  test('the file store pushes', async () => {
     const root = scratch('ae-watch-');
     const sessions = new Map<string, Sighting>();
     const engine = builtEngine(EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }));
@@ -460,8 +461,7 @@ test("watch(): a store that pushes wakes a watcher, which hears a write it did n
 
     assert.deepEqual(seen, ['filed'], 'delivered without waiting for the interval');
   });
-
-  await t.test("a brought store's subscribe wakes it, and stop() unsubscribes", async () => {
+  test("a brought store's subscribe wakes it, and stop() unsubscribes", async () => {
     const listeners = new Set<() => void>();
     const plain = asyncStore(memoryJournal());
     const store = {
@@ -552,19 +552,23 @@ const survives = (body: string) =>
     }, 1_200);
   });
 
-test('up() and watch() keep their host process alive — a loop that lets you exit is not a loop', async (t) => {
-  const started = survives('Effect.runSync(engine.up({ intervalMs: 200 }));');
-  const watching = survives(`
+describe('up() and watch() keep their host process alive — a loop that lets you exit is not a loop', () => {
+  let started!: Promise<boolean>;
+  let watching!: Promise<boolean>;
+  beforeAll(() => {
+    started = survives('Effect.runSync(engine.up({ intervalMs: 200 }));');
+    watching = survives(`
     const store = {
       append: () => Effect.void, read: () => Effect.succeed([]), list: Effect.succeed([]),
       feed: () => Effect.succeed({ entries: [], cursor: 0 }),
     };
     Effect.runSync(builtEngine(Engine.layer({ root, journal: store })).watch({ onEntry: () => {} }));
   `);
-  await t.test('up() keeps its host process alive', async () => {
+  });
+  test('up() keeps its host process alive', async () => {
     assert.equal(await started, true);
   });
-  await t.test('watch() keeps its host process alive, even with a store that cannot push', async () => {
+  test('watch() keeps its host process alive, even with a store that cannot push', async () => {
     assert.equal(
       await watching,
       true,
@@ -573,9 +577,9 @@ test('up() and watch() keep their host process alive — a loop that lets you ex
   });
 });
 
-test('the engine refuses what it cannot be built from — a `maxConcurrent` that is no whole number from 1, a `pool` that is no name — and a pass handed any argument: EngineRefused and TickRefused, nothing started', async (t) => {
+describe('the engine refuses what it cannot be built from — a `maxConcurrent` that is no whole number from 1, a `pool` that is no name — and a pass handed any argument: EngineRefused and TickRefused, nothing started', () => {
   for (const maxConcurrent of [0, -1, 1.5, '2', Infinity, null]) {
-    await t.test(`maxConcurrent: ${String(maxConcurrent)} is refused`, () => {
+    test(`maxConcurrent: ${String(maxConcurrent)} is refused`, () => {
       assert.throws(
         () => builtEngine(EngineService.layer({ journal: asyncStore(memoryJournal()), maxConcurrent } as unknown as EngineOptions)),
         (e: Error & { _tag?: string }) => {
@@ -615,7 +619,7 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
     ['a cgroup parent that is a path', { cgroupParent: '/user.slice/nemia.slice' }, /is not a systemd slice/],
   ];
   for (const [name, options, says] of BAD_LIMITS) {
-    await t.test(`${name} is refused`, () => {
+    test(`${name} is refused`, () => {
       assert.throws(
         () =>
           builtEngine(EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), ...options })),
@@ -627,32 +631,28 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
       );
     });
   }
-  await t.test(
-    'a default limit and request a quantity reads, the request not above the limit, a reserve, a machine to read, and a slice to make scopes in, are taken',
-    () => {
-      assert.doesNotThrow(() =>
-        builtEngine(
-          EngineService.layer({
-            root: scratch('ae-engine-verbs-root-'),
-            journal: asyncStore(memoryJournal()),
-            defaultLimits: { memory: '6Gi' },
-            defaultRequests: { memory: '6Gi' },
-            reserved: { memory: '1Gi' },
-            machine: () => undefined,
-            cgroupParent: 'sessions.slice',
-          }),
-        ),
-      );
-    },
-  );
-  await t.test('a whole number from 1, or none, is taken', () => {
+  test('a default limit and request a quantity reads, the request not above the limit, a reserve, a machine to read, and a slice to make scopes in, are taken', () => {
+    assert.doesNotThrow(() =>
+      builtEngine(
+        EngineService.layer({
+          root: scratch('ae-engine-verbs-root-'),
+          journal: asyncStore(memoryJournal()),
+          defaultLimits: { memory: '6Gi' },
+          defaultRequests: { memory: '6Gi' },
+          reserved: { memory: '1Gi' },
+          machine: () => undefined,
+          cgroupParent: 'sessions.slice',
+        }),
+      ),
+    );
+  });
+  test('a whole number from 1, or none, is taken', () => {
     for (const maxConcurrent of [1, 3, undefined]) {
       assert.doesNotThrow(() =>
         builtEngine(EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), maxConcurrent })),
       );
     }
   });
-
   const sessions = new Map<string, Sighting>();
   const badPool = [
     ['codex-pooled', { ...codex, pool: '' }],
@@ -661,7 +661,7 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
     ['remote', { url: 'https://agent.example', pool: ' ' }],
   ] as const;
   for (const [name, harness] of badPool) {
-    await t.test(`a pool that is not a name, on the \`${name}\` harness, is refused naming the harness`, () => {
+    test(`a pool that is not a name, on the \`${name}\` harness, is refused naming the harness`, () => {
       assert.throws(
         () =>
           builtEngine(
@@ -684,7 +684,7 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
     ['no harness at all', { harnesses: {} }],
   ] as const;
   for (const [name, given] of homeless) {
-    await t.test(`an engine with ${name}, where a task that names no harness would run, is refused`, () => {
+    test(`an engine with ${name}, where a task that names no harness would run, is refused`, () => {
       assert.throws(
         () => builtEngine(EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), ...given })),
         (e: Error & { _tag?: string }) => {
@@ -700,7 +700,7 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
     ['a harness configured by any other word', { harnesses: { bg: 'claude-job' } }, ['`bg`']],
   ] as const;
   for (const [name, given, names] of taken) {
-    await t.test(`REFUSED: ${name}, naming it and what to do instead, before anything is built`, () => {
+    test(`REFUSED: ${name}, naming it and what to do instead, before anything is built`, () => {
       assert.throws(
         () =>
           builtEngine(
@@ -714,7 +714,7 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
       );
     });
   }
-  await t.test('a pool on a spec, a runner and a remote agent is taken', () => {
+  test('a pool on a spec, a runner and a remote agent is taken', () => {
     assert.doesNotThrow(
       () =>
         builtEngine(
@@ -731,8 +731,7 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
       'a pool on a spec, a runner and a remote agent is taken',
     );
   });
-
-  await t.test('the pass refuses any argument, TickRefused and nothing started — a ceiling handed to it is not dropped', async () => {
+  test('the pass refuses any argument, TickRefused and nothing started — a ceiling handed to it is not dropped', async () => {
     const started = new Map<string, Sighting>();
     const engine = engineOver(fakeHarness(started));
     await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', id: 'waits' }));
@@ -752,8 +751,8 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
   });
 });
 
-test('a runner brought as an AsyncRunner, at the pass: handed claude.remoteControl on the spawn, asked nothing of it; and a spawn that rejects is not taken to have started nothing — unless it says so', async (t) => {
-  await t.test('it is asked nothing of claude.remoteControl, and is handed it on the spawn', async () => {
+describe('a runner brought as an AsyncRunner, at the pass: handed claude.remoteControl on the spawn, asked nothing of it; and a spawn that rejects is not taken to have started nothing — unless it says so', () => {
+  test('it is asked nothing of claude.remoteControl, and is handed it on the spawn', async () => {
     const sessions = new Map<string, Sighting>();
     const asked: boolean[] = [];
     const runner = fakeHarness(sessions);
@@ -768,29 +767,25 @@ test('a runner brought as an AsyncRunner, at the pass: handed claude.remoteContr
     await Effect.runPromise(engine.tick());
     assert.deepEqual(asked, [true], 'its to honour');
   });
+  test('a spawn that rejects saying nothing started fails the task unstartable; one that says nothing leaves it to be adopted', async () => {
+    const sessions = new Map<string, Sighting>();
+    const engine = engineOver({
+      ...fakeHarness(sessions),
+      async spawn(r) {
+        if (r.brief === 'refuse') throw Object.assign(new Error('quota: no sessions today'), { refused: true });
+        sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
+        throw new Error('launcher: lost the acknowledgement');
+      },
+    });
+    const maybe = await Effect.runPromise(engine.file({ brief: 'start', cwd: '/r' }));
+    const no = await Effect.runPromise(engine.file({ brief: 'refuse', cwd: '/r' }));
 
-  await t.test(
-    'a spawn that rejects saying nothing started fails the task unstartable; one that says nothing leaves it to be adopted',
-    async () => {
-      const sessions = new Map<string, Sighting>();
-      const engine = engineOver({
-        ...fakeHarness(sessions),
-        async spawn(r) {
-          if (r.brief === 'refuse') throw Object.assign(new Error('quota: no sessions today'), { refused: true });
-          sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
-          throw new Error('launcher: lost the acknowledgement');
-        },
-      });
-      const maybe = await Effect.runPromise(engine.file({ brief: 'start', cwd: '/r' }));
-      const no = await Effect.runPromise(engine.file({ brief: 'refuse', cwd: '/r' }));
+    await Effect.runPromise(engine.tick());
+    assert.equal((await Effect.runPromise(engine.view(no))).state.settled, 'failed', 'said nothing started: unstartable');
+    assert.equal((await Effect.runPromise(engine.view(no))).state.attempts[0]?.reason, 'unstartable');
+    assert.equal((await Effect.runPromise(engine.view(maybe))).state.settled, null, 'said nothing: not failed');
 
-      await Effect.runPromise(engine.tick());
-      assert.equal((await Effect.runPromise(engine.view(no))).state.settled, 'failed', 'said nothing started: unstartable');
-      assert.equal((await Effect.runPromise(engine.view(no))).state.attempts[0]?.reason, 'unstartable');
-      assert.equal((await Effect.runPromise(engine.view(maybe))).state.settled, null, 'said nothing: not failed');
-
-      await Effect.runPromise(engine.tick());
-      assert.equal((await Effect.runPromise(engine.view(maybe))).phase, 'working', 'and its session is adopted');
-    },
-  );
+    await Effect.runPromise(engine.tick());
+    assert.equal((await Effect.runPromise(engine.view(maybe))).phase, 'working', 'and its session is adopted');
+  });
 });

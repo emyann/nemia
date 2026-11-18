@@ -12,7 +12,7 @@
  * and the daemon give it, is imported when a program first runs.
  */
 import { createRequire } from 'node:module';
-import { afterEach, beforeEach } from 'node:test';
+import { afterEach, beforeEach } from 'vitest';
 import { Effect, type Layer } from 'effect';
 import type { Engine, EngineService } from '../src/runtime-client.ts';
 import type { PlaceService } from '../src/place/place.store.ts';

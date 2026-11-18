@@ -2,7 +2,7 @@
  * `nemia ls` and `nemia stats` and a run's labels, on their handlers: `-l` keeps the runs a selector takes, and `stats -l` sums the facts
  * of the runs it takes alone. The labels `nemia ls` prints beside each run are the client's to print (`apps/cli/test/reads.test.ts`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

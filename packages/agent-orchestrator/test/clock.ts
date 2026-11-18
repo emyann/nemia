@@ -1,5 +1,5 @@
 /** Stepping this process's wall clock in a test, as a machine's clock is stepped under load. */
-import type { TestContext } from 'node:test';
+import type { TestContext } from 'vitest';
 
 /**
  * Step this process's wall clock forward by `ms` at every reading until the test ends: each `Date.now()` and argless `new Date()` reads
@@ -19,7 +19,7 @@ export const steppingClock = (t: TestContext, ms: number): void => {
       return read();
     }
   } as DateConstructor;
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.Date = Real;
   });
 };

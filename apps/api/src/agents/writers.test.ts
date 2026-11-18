@@ -8,7 +8,7 @@
  * route refuses it before its handler.
  */
 import { root } from '../../test/harness.ts';
-import { test, type TestContext } from 'node:test';
+import { test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,14 +46,14 @@ async function watched(
   const command = COMMANDS.find((c) => c.name === name)!;
   const handler = command.handler.bind(command);
   const handed: Args[] = [];
-  const watch = t.mock.method(command, 'handler', (args: Args, kept?: never) => {
+  const watch = vi.spyOn(command, 'handler').mockImplementation((args: Args, kept?: never) => {
     handed.push(args);
     return handler(args, kept);
   });
   try {
     return { res: await request(), handed };
   } finally {
-    watch.mock.restore();
+    watch.mockRestore();
   }
 }
 

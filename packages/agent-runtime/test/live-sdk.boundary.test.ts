@@ -43,7 +43,7 @@
  * `OPUS_TODAY` in `sdk-pin.ts` is what this asserts, and the one constant of the three a bump cannot infer: an alias can move under a
  * version that did not.
  */
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -66,9 +66,9 @@ const handOver = (file: string, what: string): void => {
   if (dir) fs.writeFileSync(path.join(dir, file), what);
 };
 
-test(
+test.skipIf(skip)(
   'a job asking for the model alias `opus` starts on the model the bundled Claude Code resolves it to',
-  { ...WAITED, skip, timeout: 10 * 60_000 },
+  { ...WAITED, timeout: 10 * 60_000 },
   async (t: TestContext) => {
     const root = scratch('ae-live-sdk-root-');
     const cwd = scratch('ae-live-sdk-cwd-');
@@ -163,9 +163,9 @@ const jobRun = async (name: string, config: object): Promise<{ stdout: string; c
 
 const initOf = (stdout: string): Line | undefined => linesOf(stdout).find((line) => line.type === 'system' && line.subtype === 'init');
 
-test(
+test.skipIf(skip)(
   "a step's job process, asked for `opus`, says on its `init` line the model and the Claude Code it started on, and its reader records that model",
-  { skip, timeout: 10 * 60_000 },
+  { timeout: 10 * 60_000 },
   async () => {
     const { stdout, code, err } = await jobRun('ae/live/init', { model: 'opus', effort: 'low', tools: [] });
 
@@ -186,9 +186,9 @@ test(
  */
 const AUTO_MEASURED: readonly string[] = [...CLAUDE_AUTO_DROPPED, 'haiku', 'sonnet', 'opus', 'fable'];
 
-test(
+test.skipIf(skip)(
   'each model, filed in `auto`, runs in `auto`, or in `default` exactly where `CLAUDE_AUTO_DROPPED` lists it',
-  { skip, timeout: 10 * 60_000 },
+  { timeout: 10 * 60_000 },
   async () => {
     const runs = await Promise.all(
       AUTO_MEASURED.map(async (model) => ({

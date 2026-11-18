@@ -2,7 +2,7 @@
  * A task's mounts, refused before they are journalled: their shape by the check every harness shares (`mountsRefusalOf`, asked by
  * the core `file`, so at both doors), and their mode by the engine, which has harnesses to ask whether they hold it.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Engine, type Event, type Sighting } from '../index.ts';
@@ -142,20 +142,24 @@ const ROWS: Row[] = [
   })),
 ];
 
-test('mounts: what a task may be given beyond its cwd — refused before it is journalled, its shape at both doors, its mode by the harness that cannot hold it — and what Codex is given for one', async (t) => {
-  const core = coreDoor();
-  const journal = memoryStore();
-  const engine = builtEngine(
-    Engine.layer({
-      root: scratch('ae-mounts-'),
-      journal: asyncStore(journal),
-      harnesses: { claude: 'claude', codex, command: commandHarness, remote: { url: 'https://agent.example' } },
-    }),
-  );
+describe('mounts: what a task may be given beyond its cwd — refused before it is journalled, its shape at both doors, its mode by the harness that cannot hold it — and what Codex is given for one', () => {
+  let core!: { run: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Promise<A>; listed: () => Promise<number> };
+  let journal!: AsyncJournal;
+  let engine!: import('../index.ts').EngineShape;
+  beforeAll(() => {
+    core = coreDoor();
+    journal = memoryStore();
+    engine = builtEngine(
+      Engine.layer({
+        root: scratch('ae-mounts-'),
+        journal: asyncStore(journal),
+        harnesses: { claude: 'claude', codex, command: commandHarness, remote: { url: 'https://agent.example' } },
+      }),
+    );
+  });
   const journalled = async () => (await journal.list()).length;
-
   for (const row of ROWS) {
-    await t.test(row.name, async () => {
+    test(row.name, async () => {
       const spec = { brief: 'b', cwd: '/r', harness: row.harness ?? 'claude', config: row.config } as never;
       const [inEngine, inCore] = [await journalled(), await core.listed()];
       if (!row.says) {
@@ -179,13 +183,11 @@ test('mounts: what a task may be given beyond its cwd — refused before it is j
       }
     });
   }
-
-  await t.test('a read-only mount changes nothing Codex is given: its sandbox holds it', () => {
+  test('a read-only mount changes nothing Codex is given: its sandbox holds it', () => {
     const request = { name: 'ae/t/1', brief: 'b', cwd: '/r', config: { permissionMode: 'workspace-write' } };
     assert.deepEqual(codex.command({ ...request, config: { ...request.config, ...one(true) } }).args, codex.command(request).args);
   });
-
-  await t.test("a writable mount, at Codex's own refusal, for a door that has no other harness to name", () => {
+  test("a writable mount, at Codex's own refusal, for a door that has no other harness to name", () => {
     const said = codex.refuses!({ brief: 'b', cwd: '/r', config: one(false) });
     assert.ok(said !== undefined, 'refused');
     for (const says of [/^`mounts` gives the session \/srv\/a writable/, /`--add-dir`/, /Mount the folder read-only/])

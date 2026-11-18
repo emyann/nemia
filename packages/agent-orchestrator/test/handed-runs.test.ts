@@ -7,7 +7,8 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -74,54 +75,59 @@ const filedStep = (id: string, name: string) => {
   return { config: spec.config as Filed, brief: spec.brief };
 };
 
-test('a run started --from an earlier run reads its artifacts and inputs on every step, and is told once they are gone', async (t) => {
-  const s = story(t);
-  const repo = aRepo();
-  const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'rows-C.md');
-  fs.writeFileSync(given, 'the rows\n');
-  const earlier = await startedBy(['start', 'design it', '--workflows', folderOf({ design: '' }), '--repo', repo, '--input', given]);
-  const design = artifactsDir(ROOT, runRecord(ROOT, earlier), 'design');
-  fs.mkdirSync(design, { recursive: true });
-  fs.writeFileSync(path.join(design, 'closeout.json'), '{"outcome":"done","summary":"designed, not built"}\n');
-  const artifacts = path.dirname(design);
-  const inputs = inputsDir(ROOT, runRecord(ROOT, earlier));
+describe('a run started --from an earlier run reads its artifacts and inputs on every step, and is told once they are gone', () => {
+  let repo!: string;
+  let given!: string;
+  let earlier!: string;
+  let design!: string;
+  let artifacts!: string;
+  let inputs!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    repo = aRepo();
+    given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'rows-C.md');
+    fs.writeFileSync(given, 'the rows\n');
+    earlier = await startedBy(['start', 'design it', '--workflows', folderOf({ design: '' }), '--repo', repo, '--input', given]);
+    design = artifactsDir(ROOT, runRecord(ROOT, earlier), 'design');
+    fs.mkdirSync(design, { recursive: true });
+    fs.writeFileSync(path.join(design, 'closeout.json'), '{"outcome":"done","summary":"designed, not built"}\n');
+    artifacts = path.dirname(design);
+    inputs = inputsDir(ROOT, runRecord(ROOT, earlier));
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
-
-  await s.test(
-    "every step's first filing reads the earlier run's design closeout and its input, writes neither, and is told where",
-    async () => {
-      const started = await answeredBy([
-        'start',
-        'build what it designed',
-        '--workflows',
-        folderOf({ implement: '', review: 'after: implement\n' }),
-        '--repo',
-        repo,
-        '--no-worktree',
-        '--from',
-        earlier,
-      ]);
-      id = started.id;
-      assert.deepEqual(runRecord(ROOT, id).context, [earlier]);
-      assert.deepEqual(
-        [started.facts.context, started.landed ?? []],
-        [[earlier], []],
-        'the start says the run it reads as context, still in flight, not landed',
-      );
-      assert.deepEqual((await pass(id)).filed, ['implement']);
-      stage.board().settle(`${id}-implement`, 'succeeded', { outcome: 'done', summary: 'built', artifacts: [], needs: null });
-      assert.deepEqual((await pass(id)).filed, ['review']);
-      for (const name of ['implement', 'review']) {
-        const { config, brief } = filedStep(id, name);
-        assert.ok(readsAt(config, path.join(design, 'closeout.json')), `${name} reads the design closeout`);
-        assert.ok(readsAt(config, path.join(inputs, 'rows-C.md')), `${name} reads the earlier run's input`);
-        assert.ok(!writesAt(config, path.join(design, 'closeout.json')), `${name} writes nothing of the earlier run`);
-        assert.ok(brief.includes(`\`${artifacts}/**\``), `${name}'s brief says to search under the mounted path`);
-      }
-    },
-  );
-
-  await s.test('a run handed one whose folders are gone since is filed with no mount of them, and told so', async () => {
+  s.test("every step's first filing reads the earlier run's design closeout and its input, writes neither, and is told where", async () => {
+    const started = await answeredBy([
+      'start',
+      'build what it designed',
+      '--workflows',
+      folderOf({ implement: '', review: 'after: implement\n' }),
+      '--repo',
+      repo,
+      '--no-worktree',
+      '--from',
+      earlier,
+    ]);
+    id = started.id;
+    assert.deepEqual(runRecord(ROOT, id).context, [earlier]);
+    assert.deepEqual(
+      [started.facts.context, started.landed ?? []],
+      [[earlier], []],
+      'the start says the run it reads as context, still in flight, not landed',
+    );
+    assert.deepEqual((await pass(id)).filed, ['implement']);
+    stage.board().settle(`${id}-implement`, 'succeeded', { outcome: 'done', summary: 'built', artifacts: [], needs: null });
+    assert.deepEqual((await pass(id)).filed, ['review']);
+    for (const name of ['implement', 'review']) {
+      const { config, brief } = filedStep(id, name);
+      assert.ok(readsAt(config, path.join(design, 'closeout.json')), `${name} reads the design closeout`);
+      assert.ok(readsAt(config, path.join(inputs, 'rows-C.md')), `${name} reads the earlier run's input`);
+      assert.ok(!writesAt(config, path.join(design, 'closeout.json')), `${name} writes nothing of the earlier run`);
+      assert.ok(brief.includes(`\`${artifacts}/**\``), `${name}'s brief says to search under the mounted path`);
+    }
+  });
+  s.test('a run handed one whose folders are gone since is filed with no mount of them, and told so', async () => {
     const after = await startedBy([
       'start',
       'check it',

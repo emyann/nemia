@@ -14,7 +14,7 @@
  * starts on the runtime's next pass, so a freed slot is taken one pass after it is admitted into: each checkpoint ticks once to admit and
  * once to start.
  */
-import { test, type TestContext } from 'node:test';
+import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -101,14 +101,14 @@ const file = (id: string, harness: string) =>
  * priority, and it stamps a filing with the clock, which a step back between two filings would turn round.
  */
 const fileInOrder = async (t: TestContext, tasks: ReadonlyArray<readonly [string, string]>) => {
-  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.now() });
   try {
     for (const [id, harness] of tasks) {
       await Effect.runPromise(file(id, harness));
-      t.mock.timers.tick(1);
+      vi.advanceTimersByTime(1);
     }
   } finally {
-    t.mock.timers.reset();
+    vi.useRealTimers();
   }
 };
 
@@ -143,12 +143,12 @@ const drain = async (t: Waiter) => {
   );
 };
 
-test(
+describe(
   'pools by subscription, at shipped defaults: each harness fills a pool of its own, a pass admits without asking `claude agents`, and a ceiling that does not read admits nothing',
   WAITED,
-  async (top) => {
-    const s = story(top);
-    await s.test(
+  () => {
+    const s = story(test);
+    s.test(
       "REFUSED at shipped defaults: two claude sessions fill claude's pool, the third claude task waits, and codex keeps its own",
       async (t) => {
         try {
@@ -199,37 +199,32 @@ test(
         }
       },
     );
+    s.test('REFUSED at shipped defaults: a check keeps its own pool beside a full Claude Code one, and a third check waits', async (t) => {
+      try {
+        await fileInOrder(t, [
+          ['p1', 'claude'],
+          ['p2', 'claude'],
+        ]);
+        await runWith(e, tickRun());
+        await runWith(e, tickRun());
+        await reached(t, ['p1', 'p2'], 'working');
 
-    await s.test(
-      'REFUSED at shipped defaults: a check keeps its own pool beside a full Claude Code one, and a third check waits',
-      async (t) => {
-        try {
-          await fileInOrder(t, [
-            ['p1', 'claude'],
-            ['p2', 'claude'],
-          ]);
-          await runWith(e, tickRun());
-          await runWith(e, tickRun());
-          await reached(t, ['p1', 'p2'], 'working');
-
-          await fileInOrder(t, [
-            ['q1', 'claude'],
-            ['d1', 'check'],
-            ['d2', 'check'],
-            ['d3', 'check'],
-          ]);
-          await runWith(e, tickRun());
-          await runWith(e, tickRun());
-          assert.equal(await attempts('q1'), 0, 'the Claude Code pool is full');
-          assert.equal((await attempts('d1')) + (await attempts('d2')), 2, 'a check is not counted in it');
-          assert.equal(await attempts('d3'), 0, 'and has a ceiling of its own');
-        } finally {
-          await drain(t);
-        }
-      },
-    );
-
-    await s.test(
+        await fileInOrder(t, [
+          ['q1', 'claude'],
+          ['d1', 'check'],
+          ['d2', 'check'],
+          ['d3', 'check'],
+        ]);
+        await runWith(e, tickRun());
+        await runWith(e, tickRun());
+        assert.equal(await attempts('q1'), 0, 'the Claude Code pool is full');
+        assert.equal((await attempts('d1')) + (await attempts('d2')), 2, 'a check is not counted in it');
+        assert.equal(await attempts('d3'), 0, 'and has a ceiling of its own');
+      } finally {
+        await drain(t);
+      }
+    });
+    s.test(
       "one pass — the runtime's tick, which admits — asks `claude agents` nothing, with claude jobs at work and waiting",
       async (t) => {
         try {
@@ -275,8 +270,7 @@ test(
         }
       },
     );
-
-    await s.test(
+    s.test(
       'REFUSED: `WF_MAX_CONCURRENT=abc` refuses the pass, and the engine `engine(ENV)` builds under it has no ceiling, so it admits nothing',
       async (t) => {
         const abc: Env = { ...ENV, WF_MAX_CONCURRENT: 'abc' };

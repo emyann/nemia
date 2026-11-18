@@ -5,7 +5,7 @@
  * sets up together. Over a store and repositories of its own, with git for real. The rest of `nemia hold` is told on the stage, in
  * `hold.test.ts`, and its pure refusals in `src/wait/wait.test.ts`.
  */
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

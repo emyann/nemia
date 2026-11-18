@@ -12,7 +12,7 @@
  * Each rule is first made to refuse on the skill with one break planted; then the skill as the repository holds it is read, for a name
  * it must hold, so a file moved or emptied cannot make the guard pass by reading nothing.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

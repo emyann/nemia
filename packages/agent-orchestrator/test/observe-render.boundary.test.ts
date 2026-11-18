@@ -8,7 +8,7 @@
  * No container is ever started here: `docker` is a stub first on the `PATH`, which records each call it is given, and the lock is a
  * file of this test's own (`NEMIA_RENDER_LOCK`). The real stack, seed and browser are run by hand, as `tools/observe/README.md` says.
  */
-import { test } from 'node:test';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
@@ -208,7 +208,7 @@ test('REFUSED: a lock placed while a live one is being put back stays, and the b
   const third: Lock = { pid: process.ppid, name: 'nemia-render-2-third0' };
   fs.writeFileSync(lockFile(), JSON.stringify(live));
   const link = fs.linkSync;
-  t.mock.method(fs, 'linkSync', (from: fs.PathLike, to: fs.PathLike) => {
+  vi.spyOn(fs, 'linkSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     if (String(from).endsWith(`.stale-${process.pid}`) && String(to) === lockFile()) fs.writeFileSync(lockFile(), JSON.stringify(third));
     link(from, to);
   });
@@ -235,13 +235,13 @@ test('REFUSED: a lock this user cannot move, at the bound, naming its holder and
   const dead: Lock = { pid: deadPid(), name: 'nemia-render-9-dead00' };
   fs.writeFileSync(lockFile(), JSON.stringify(dead));
   const rename = fs.renameSync;
-  t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => {
+  vi.spyOn(fs, 'renameSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     if (String(from) !== lockFile()) return rename(from, to);
     throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
   });
   const write = fs.writeFileSync;
   let tries = 0;
-  t.mock.method(fs, 'writeFileSync', (file: fs.PathOrFileDescriptor, data: string) => {
+  vi.spyOn(fs, 'writeFileSync').mockImplementation((file: fs.PathOrFileDescriptor, data: string) => {
     if (String(file).startsWith(`${lockFile()}.own-`) && ++tries > 3) throw new Error('take looped');
     write(file, data);
   });

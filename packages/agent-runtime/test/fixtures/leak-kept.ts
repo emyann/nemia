@@ -2,7 +2,7 @@
  * Run by `leaks.test.ts` alone, under a TMPDIR of its own: a test that passes and leaves a root `scratch` cannot remove —
  * a folder in it that its owner may not write, with a file inside. The file must fail, saying what it left.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';

@@ -4,7 +4,7 @@
  * a whole `EventList`, its oldest events out.
  */
 import '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema, SchemaAST } from 'effect';
 import { Api, type Event, EventList } from 'objects';

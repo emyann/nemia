@@ -8,7 +8,7 @@
  * On a store of its own at `ROOT`, given as `ENV`, with `WF_VERIFY_REST=1`, as every test that ticks a store, and a read that counts
  * what it judged turns it off for itself (`unverified`), since a verified read judges each answer afresh.
  */
-import { beforeEach, test } from 'node:test';
+import { beforeEach, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

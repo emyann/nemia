@@ -3,11 +3,11 @@
  * And a volume's name: what its folder gives it (`volumeBase`), and the names a factory's volumes are served under (`volumesNamed`,
  * `withVolume`) — what `volumeNameAmong`'s laws (contracts/volume-name.contract.ts) leave to them: the order they are named in.
  */
-import { test } from 'node:test';
+import { afterAll, beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { volumeBase, volumeOf, volumeRefusal, volumesNamed, withVolume } from './volume.ts';
 
-test('a volume is read as compose spells it, and its mark is required', async (t) => {
+describe('a volume is read as compose spells it, and its mark is required', () => {
   const rows: { name: string; spelled: string; want: { path: string; readOnly: boolean } | 'refused' }[] = [
     { name: ':ro is read-only', spelled: '/a:ro', want: { path: '/a', readOnly: true } },
     { name: ':rw is writable', spelled: '/a:rw', want: { path: '/a', readOnly: false } },
@@ -19,25 +19,19 @@ test('a volume is read as compose spells it, and its mark is required', async (t
     { name: 'no path is refused', spelled: ':ro', want: 'refused' },
   ];
   for (const row of rows)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const read = volumeOf(row.spelled, '/here');
       if (row.want === 'refused') assert.equal(typeof read, 'string');
       else assert.deepEqual(read, row.want);
     });
 });
 
-test('a volume that is no directory, a repository, or reaches the store is refused', async (t) => {
+describe('a volume that is no directory, a repository, or reaches the store is refused', () => {
+  let dirs!: Set<string>;
+  beforeAll(() => {
+    dirs = new Set(['/p', '/p/app', '/r', '/r/sub', '/home/me', '/home/me/.agent-workflows', '/home/me/.agent-workflows/runs', '/notes']);
+  });
   const factory = { name: 'f', repos: ['/r', '/p/app'] };
-  const dirs = new Set([
-    '/p',
-    '/p/app',
-    '/r',
-    '/r/sub',
-    '/home/me',
-    '/home/me/.agent-workflows',
-    '/home/me/.agent-workflows/runs',
-    '/notes',
-  ]);
   const store = '/home/me/.agent-workflows';
   const rows: { name: string; path: string; readOnly: boolean; refused: boolean }[] = [
     { name: 'a folder of this machine is taken', path: '/notes', readOnly: false, refused: false },
@@ -53,7 +47,7 @@ test('a volume that is no directory, a repository, or reaches the store is refus
     { name: 'a read-only folder holding the store is taken', path: '/home/me', readOnly: true, refused: false },
   ];
   for (const row of rows)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const why = volumeRefusal(factory, { path: row.path, readOnly: row.readOnly }, store, (at) => dirs.has(at));
       assert.equal(why !== undefined, row.refused, why);
     });
@@ -65,7 +59,7 @@ test('a volume added again replaces the one of its path, keeping its name, and s
   assert.deepEqual(withVolume({}, { path: '/a', readOnly: true }), { volumes: [{ path: '/a', readOnly: true, name: 'a' }], was: null });
 });
 
-test("a volume is named by its folder's name, a suffix telling two apart, and a name once stored is kept", async (t) => {
+describe("a volume is named by its folder's name, a suffix telling two apart, and a name once stored is kept", () => {
   const rows: { name: string; volumes: { path: string; readOnly: boolean; name?: string }[]; want: string[] }[] = [
     { name: 'its folder, as a slug', volumes: [{ path: '/home/me/My Notes', readOnly: true }], want: ['my-notes'] },
     { name: 'the root, whose folder gives nothing', volumes: [{ path: '/', readOnly: true }], want: ['volume'] },
@@ -87,13 +81,13 @@ test("a volume is named by its folder's name, a suffix telling two apart, and a 
     },
   ];
   for (const row of rows)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       assert.deepEqual(
         volumesNamed(row.volumes).map((v) => v.name),
         row.want,
       );
     });
-  await t.test('a stored name survives a volume added before it in path order', () => {
+  test('a stored name survives a volume added before it in path order', () => {
     const first = withVolume({}, { path: '/b/data', readOnly: true });
     const second = withVolume({ volumes: first.volumes }, { path: '/a/data', readOnly: true });
     assert.deepEqual(
@@ -104,11 +98,13 @@ test("a volume is named by its folder's name, a suffix telling two apart, and a 
       ],
     );
   });
-  await t.test('a volume an older file stores no name of keeps the one it is named on read when another is added', () => {
+  test('a volume an older file stores no name of keeps the one it is named on read when another is added', () => {
     const old = [{ path: '/b/data', readOnly: true }];
     const read = volumesNamed(old).map((v) => v.name);
     const added = withVolume({ volumes: old }, { path: '/a/data', readOnly: true });
     assert.deepEqual(added.volumes.find((v) => v.path === '/b/data')?.name, read[0]);
   });
-  assert.equal(volumeBase('/srv/Data_Sets/'), 'data-sets');
+  afterAll(() => {
+    assert.equal(volumeBase('/srv/Data_Sets/'), 'data-sets');
+  });
 });

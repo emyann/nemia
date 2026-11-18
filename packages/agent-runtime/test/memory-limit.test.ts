@@ -4,7 +4,8 @@
  * no limit spawns as it always did, the program never asked. The program here is `false`, which refuses every probe, so the story holds
  * on any host; `memory-limit.boundary.test.ts` holds the limit on a real cgroup.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -60,35 +61,47 @@ const olderJournal = (taskId: string, cwd: string): AsyncJournal => {
   };
 };
 
-test(
+describe(
   'a host that makes no scope: a limited task, its own limit or the default, ends unstartable with no run file; an unlimited one runs',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const root = scratch('ae-memory-limit-');
-    const cwd = scratch('ae-memory-limit-cwd-');
-    const command = detachedOps(commandHarness, root, { scopeProgram: 'false' });
-    const engine = builtEngine(EngineService.layer({ root, harnesses: { command } }));
-    const defaulted = builtEngine(
-      EngineService.layer({ root: scratch('ae-memory-default-'), harnesses: { command }, defaultLimits: { memory: '64Mi' } }),
-    );
+  () => {
+    let root!: string;
+    let cwd!: string;
+    let command!: import('../src/index.ts').RunnerOps;
+    let engine!: import('../src/index.ts').EngineShape;
+    let defaulted!: import('../src/index.ts').EngineShape;
+    let ids!: { limited: string; plain: string };
+    let fromDefault!: string;
+    let olderRoot!: string;
+    let older!: import('../src/index.ts').EngineShape;
+    beforeAll(async () => {
+      const t = teardowns();
+      root = scratch('ae-memory-limit-');
+      cwd = scratch('ae-memory-limit-cwd-');
+      command = detachedOps(commandHarness, root, { scopeProgram: 'false' });
+      engine = builtEngine(EngineService.layer({ root, harnesses: { command } }));
+      defaulted = builtEngine(
+        EngineService.layer({ root: scratch('ae-memory-default-'), harnesses: { command }, defaultLimits: { memory: '64Mi' } }),
+      );
+      ids = { limited: await file(engine, { limits: { memory: '64Mi' } }), plain: await file(engine) };
+      fromDefault = await file(defaulted);
+      olderRoot = scratch('ae-memory-older-');
+      older = builtEngine(
+        EngineService.layer({
+          root: olderRoot,
+          journal: asyncStore(olderJournal('t-older', cwd)),
+          harnesses: { command: detachedOps(commandHarness, olderRoot, { scopeProgram: 'false' }) },
+        }),
+      );
+      return t.end;
+    });
+    const s = story(test);
     const file = (on: typeof engine, resources?: { limits: { memory: string } }) =>
       Effect.runPromise(
         on.file({ brief: 'run it', cwd, harness: 'command', config: { command: ['true'] }, ...(resources ? { resources } : {}) }),
       );
-    const ids = { limited: await file(engine, { limits: { memory: '64Mi' } }), plain: await file(engine) };
-    const fromDefault = await file(defaulted);
-    const olderRoot = scratch('ae-memory-older-');
-    const older = builtEngine(
-      EngineService.layer({
-        root: olderRoot,
-        journal: asyncStore(olderJournal('t-older', cwd)),
-        harnesses: { command: detachedOps(commandHarness, olderRoot, { scopeProgram: 'false' }) },
-      }),
-    );
     const state = async (on: typeof engine, id: string) => (await Effect.runPromise(on.view(id))).state;
-
-    await s.test('every task settles', async (sub) => {
+    s.test('every task settles', async (sub) => {
       await until(
         sub,
         async () => {
@@ -106,8 +119,7 @@ test(
         { everyMs: 50 },
       );
     });
-
-    await s.test("a task with a limit of its own ends unstartable, the probe's refusal its error, and no run file is written", async () => {
+    s.test("a task with a limit of its own ends unstartable, the probe's refusal its error, and no run file is written", async () => {
       const limited = await state(engine, ids.limited);
       assert.deepEqual([limited.settled, limited.attempts[0]?.reason], ['failed', 'unstartable']);
       assert.ok(limited.attempts[0]?.error, 'the refusal is on the attempt');
@@ -118,15 +130,13 @@ test(
         'nothing of the limited run is on disk',
       );
     });
-
-    await s.test('a task filed with none on an engine with a default takes the default, and ends unstartable the same', async () => {
+    s.test('a task filed with none on an engine with a default takes the default, and ends unstartable the same', async () => {
       const limited = await state(defaulted, fromDefault);
       assert.equal(limited.resources, undefined, 'none written on its filing');
       assert.deepEqual(limited.attempts[0]?.resources, { limits: { memory: '64Mi' } }, 'the default its attempt started under');
       assert.deepEqual([limited.settled, limited.attempts[0]?.reason], ['failed', 'unstartable']);
     });
-
-    await s.test(
+    s.test(
       'an attempt an older runtime started, its `starting` entry with no resources, spawns under the limit it was filed with',
       async () => {
         const upgraded = await state(older, 't-older');
@@ -140,8 +150,7 @@ test(
         assert.ok(upgraded.attempts[0]?.error, 'the refusal is on the attempt');
       },
     );
-
-    await s.test('a task with no limit spawns plainly and succeeds, carrying no memory', async () => {
+    s.test('a task with no limit spawns plainly and succeeds, carrying no memory', async () => {
       const plain = await state(engine, ids.plain);
       assert.deepEqual([plain.settled, plain.attempts[0]?.exitCode], ['succeeded', 0]);
       assert.equal(plain.attempts[0]?.memory, undefined);

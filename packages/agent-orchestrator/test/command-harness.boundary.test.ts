@@ -4,7 +4,7 @@
  * end — the fix's output read back as it succeeded, the condition's answer taken as its route. An engine whose harnesses had no
  * `command` refused both at their filing, and every fix on a daemon with it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

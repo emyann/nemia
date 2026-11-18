@@ -4,7 +4,8 @@
  * file, refused by its reader, or read otherwise once kept, is left whole and named. Whether a worker is there is asked of `alive`,
  * so no process is started.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -69,12 +70,18 @@ const alive = (pid: number) => pid === LIVE;
 const whole = Buffer.byteLength(CONVERSATION_STREAM);
 const kept = Buffer.byteLength(claudeStreamKept(CONVERSATION_STREAM));
 
-test('compactRuns over a folder of runs: a keep that reads otherwise rewrites nothing, a count writes nothing, the rewrite keeps what the count said, then a second pass finds nothing', async (t) => {
-  const s = story(t);
-  const dir = runsIn();
-  const before = filesIn(dir);
-  let done: ReturnType<typeof compactRuns>;
-  await s.test('a capture whose kept text reads otherwise is left whole, and named', () => {
+describe('compactRuns over a folder of runs: a keep that reads otherwise rewrites nothing, a count writes nothing, the rewrite keeps what the count said, then a second pass finds nothing', () => {
+  let dir!: string;
+  let before!: { [k: string]: (string | number)[] };
+  let done!: ReturnType<typeof compactRuns>;
+  beforeAll(() => {
+    const t = teardowns();
+    dir = runsIn();
+    before = filesIn(dir);
+    return t.end;
+  });
+  const s = story(test);
+  s.test('a capture whose kept text reads otherwise is left whole, and named', () => {
     const dropsResult = (output: string) => claudeStreamKept(output).replace(/\n[^\n]*"type":"result"[^\n]*/, '');
     const report = compactRuns({ ...spec, keepOutput: dropsResult }, dir, { dry: false, alive });
     assert.equal(report.compacted, 0);
@@ -87,7 +94,7 @@ test('compactRuns over a folder of runs: a keep that reads otherwise rewrites no
     );
     assert.deepEqual(filesIn(dir), before);
   });
-  await s.test('a count writes nothing, and says what the rewrite then does', () => {
+  s.test('a count writes nothing, and says what the rewrite then does', () => {
     const counted = compactRuns(spec, dir, { dry: true, alive });
     assert.deepEqual(filesIn(dir), before, 'nothing written');
     done = compactRuns(spec, dir, { dry: false, alive });
@@ -97,7 +104,7 @@ test('compactRuns over a folder of runs: a keep that reads otherwise rewrites no
     assert.equal(done.before, 6 * whole + Buffer.byteLength(REFUSED) + kept);
     assert.equal(done.after, 3 * whole + Buffer.byteLength(REFUSED) + 4 * kept);
   });
-  await s.test('each capture left is named with why, and kept whole', () => {
+  s.test('each capture left is named with why, and kept whole', () => {
     const { left } = done;
     assert.deepEqual(
       left.map(({ name, why }) => [name, why.replace(/: .*/s, ': …')]),
@@ -114,7 +121,7 @@ test('compactRuns over a folder of runs: a keep that reads otherwise rewrites no
     assert.deepEqual(after['ended.stderr'], before['ended.stderr'], 'stderr is left');
     assert.deepEqual(after['compact.log'], before['compact.log'], 'a capture already kept is left as it is');
   });
-  await s.test('a rewritten capture keeps its time, reads as before, and what was read is kept under its new key', () => {
+  s.test('a rewritten capture keeps its time, reads as before, and what was read is kept under its new key', () => {
     for (const name of ['ended.log', 'ended.stdout', 'orphan.log']) {
       const file = path.join(dir, name);
       assert.equal(fs.readFileSync(file, 'utf8'), claudeStreamKept(CONVERSATION_STREAM), name);
@@ -128,12 +135,12 @@ test('compactRuns over a folder of runs: a keep that reads otherwise rewrites no
       'nothing left half written',
     );
   });
-  await s.test('a second pass rewrites nothing more', () => {
+  s.test('a second pass rewrites nothing more', () => {
     const again = compactRuns(spec, dir, { dry: false, alive });
     assert.equal(again.compacted, 0);
     assert.equal(again.before, again.after);
   });
-  await s.test('a spec that keeps every capture whole finds none', () => {
+  s.test('a spec that keeps every capture whole finds none', () => {
     const { keepOutput: _, ...whole } = spec;
     assert.deepEqual(compactRuns(whole, dir, { dry: false, alive }), { captures: 0, compacted: 0, before: 0, after: 0, left: [] });
   });
@@ -202,7 +209,7 @@ const keptInit = (version: string, permissionMode = 'default') =>
     permissionMode,
   });
 
-test('claudeStreamKept keeps no line twice, and each line it keeps as its reader reads it', async (t) => {
+describe('claudeStreamKept keeps no line twice, and each line it keeps as its reader reads it', () => {
   const turns = (n: number, version: string) =>
     Array.from({ length: n }, () => [initOf(version), stream.calls([`toolu_${n}`, 'Read', { file_path: '/w/a.ts' }])]).flat();
   const rows: [string, string, (kept: string) => void][] = [
@@ -264,13 +271,13 @@ test('claudeStreamKept keeps no line twice, and each line it keeps as its reader
     ],
   ];
   for (const [name, whole, says] of rows)
-    await t.test(name, () => {
+    test(name, () => {
       const kept = claudeStreamKept(whole);
       says(kept);
       assert.equal(claudeStreamKept(kept), kept, 'kept again, the same');
       assert.deepEqual(claudeStreamOutput(kept), claudeStreamOutput(whole), 'it reads as the whole');
     });
-  await t.test('the conversation kept twice is kept the same, and reads as the whole', () => {
+  test('the conversation kept twice is kept the same, and reads as the whole', () => {
     const kept = claudeStreamKept(CONVERSATION_STREAM);
     assert.equal(claudeStreamKept(kept), kept);
     assert.deepEqual(claudeStreamOutput(kept), claudeStreamOutput(CONVERSATION_STREAM));

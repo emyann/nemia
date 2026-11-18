@@ -9,7 +9,7 @@
  * On a store of its own at `ROOT`, given as `ENV`; each test empties the store's runs first, and a test that compares two answers, or
  * orders runs by time, seeds `Date`.
  */
-import { beforeEach, test, type TestContext } from 'node:test';
+import { beforeEach, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -163,7 +163,7 @@ const unframed = (item: RunList['items'][number]) => {
   return { ...item, status };
 };
 
-const seeded = (t: TestContext, now = T0) => t.mock.timers.enable({ apis: ['Date'], now });
+const seeded = (t: TestContext, now = T0) => vi.useFakeTimers({ toFake: ['Date'], now });
 
 test('each selector takes exactly the runs kindOf puts in its state; the counts ignore the selector and the limit', async (t) => {
   seeded(t);
@@ -213,9 +213,9 @@ test('each selector takes exactly the runs kindOf puts in its state; the counts 
 test('an outcome selector takes the finished runs that ended so, or every other run; newest first, the counts the namespace\u2019s', async (t) => {
   seeded(t);
   const merged = await aFinished();
-  t.mock.timers.tick(MIN);
+  vi.advanceTimersByTime(MIN);
   const undecided = [await anUndecided()];
-  t.mock.timers.tick(MIN);
+  vi.advanceTimersByTime(MIN);
   undecided.unshift(await anUndecided());
   const waiting = await aWaiting();
   const inFlight = await anInFlight();
@@ -310,7 +310,7 @@ test('REFUSED Invalid, before any record is read: a field that is no state or ou
 test('a waiting run and a run in flight each carry a clock whose parts add up to its wall time; the costs and the wait are the waiting row\u2019s alone', async (t) => {
   seeded(t);
   const id = await started({ plan: null, build: 'plan' }, ['plan']);
-  t.mock.timers.setTime(T0 + 10 * MIN);
+  vi.setSystemTime(T0 + 10 * MIN);
   engine().settle(`${id}-plan`, 'succeeded', {
     closeout: SIGNED,
     startedAt: new Date(T0).toISOString(),
@@ -318,7 +318,7 @@ test('a waiting run and a run in flight each carry a clock whose parts add up to
   });
   await advanced(id);
   await anInFlight();
-  t.mock.timers.setTime(T0 + 60 * MIN);
+  vi.setSystemTime(T0 + 60 * MIN);
 
   const light = await open();
   const [row] = light.waiting;
@@ -353,14 +353,14 @@ test('a waiting run and a run in flight each carry a clock whose parts add up to
 test("a finished row carries a clock frozen where its work stopped, whose parts add up to the row's own wall time", async (t) => {
   seeded(t);
   const id = await started({ work: null });
-  t.mock.timers.setTime(T0 + 10 * MIN);
+  vi.setSystemTime(T0 + 10 * MIN);
   engine().settle(`${id}-work`, 'succeeded', {
     closeout: SIGNED,
     startedAt: new Date(T0).toISOString(),
     spawnedAt: new Date(T0).toISOString(),
   });
   await advanced(id);
-  t.mock.timers.setTime(T0 + 90 * MIN);
+  vi.setSystemTime(T0 + 90 * MIN);
 
   const [row] = await finishedPage();
   assert.equal(row.wallMs, 10 * MIN, 'created at 10:00, its work stopped at 10:10');
@@ -378,16 +378,16 @@ test('a run at its second gate has waited since that gate was reached, while its
   seeded(t);
   const stamp = (min: number) => new Date(T0 + min * MIN).toISOString();
   const id = await started({ plan: null, build: 'plan' }, ['plan', 'build']);
-  t.mock.timers.setTime(T0 + 10 * MIN);
+  vi.setSystemTime(T0 + 10 * MIN);
   engine().settle(`${id}-plan`, 'succeeded', { closeout: SIGNED, startedAt: stamp(0), spawnedAt: stamp(0) });
   await advanced(id);
-  t.mock.timers.setTime(T0 + 30 * MIN);
+  vi.setSystemTime(T0 + 30 * MIN);
   await runWith(e(), approveRun(id, 'plan'));
   await advanced(id);
-  t.mock.timers.setTime(T0 + 35 * MIN);
+  vi.setSystemTime(T0 + 35 * MIN);
   engine().settle(`${id}-build`, 'succeeded', { closeout: SIGNED, startedAt: stamp(30), spawnedAt: stamp(30) });
   await advanced(id);
-  t.mock.timers.setTime(T0 + 60 * MIN);
+  vi.setSystemTime(T0 + 60 * MIN);
 
   const light = await open();
   const [row] = light.waiting;
@@ -402,7 +402,7 @@ test('a run held until a person lifts the hold waits on nobody: it is not among 
   const id = await started({ work: null });
   const placed = new Date(T0 + 5 * MIN).toISOString();
   fs.writeFileSync(path.join(RUNS_DIR, `${id}.hold`), `${JSON.stringify({ at: placed, until: [] })}\n`);
-  t.mock.timers.setTime(T0 + 20 * MIN);
+  vi.setSystemTime(T0 + 20 * MIN);
 
   const page = await open();
   assert.ok(!page.waiting.some((run) => run.id === id), 'the hold is the person’s word already given, and asks them nothing');
@@ -424,7 +424,7 @@ test('a run that waits on a run which never lands, held until one that will, wai
     path.join(RUNS_DIR, `${child.id}.hold`),
     `${JSON.stringify({ at: new Date(T0 + 5 * MIN).toISOString(), until: [lands] })}\n`,
   );
-  t.mock.timers.setTime(T0 + 20 * MIN);
+  vi.setSystemTime(T0 + 20 * MIN);
 
   const row = (await open()).waiting.find((run) => run.id === child.id);
   assert.ok(row, 'it waits on a person: the run it waits on was called off');
@@ -436,21 +436,21 @@ test('a run that waits on a run which never lands, held until one that will, wai
 test('the finished runs page by when their work stopped, not by when they were created: a late cancellation is the last stop', async (t) => {
   seeded(t);
   const a = await started({ work: null });
-  t.mock.timers.setTime(T0 + MIN);
+  vi.setSystemTime(T0 + MIN);
   const b = await started({ work: null });
-  t.mock.timers.setTime(T0 + 2 * MIN);
+  vi.setSystemTime(T0 + 2 * MIN);
   engine().settle(`${b}-work`, 'succeeded', { closeout: SIGNED });
   await advanced(b);
-  t.mock.timers.setTime(T0 + 3 * MIN);
+  vi.setSystemTime(T0 + 3 * MIN);
   const c = await started({ work: null });
-  t.mock.timers.setTime(T0 + 4 * MIN);
+  vi.setSystemTime(T0 + 4 * MIN);
   engine().settle(`${c}-work`, 'succeeded', { closeout: SIGNED });
   await advanced(c);
-  t.mock.timers.setTime(T0 + 5 * MIN);
+  vi.setSystemTime(T0 + 5 * MIN);
   engine().settle(`${a}-work`, 'succeeded', { closeout: SIGNED });
   await advanced(a);
   cancelled(c, T0 + 10 * MIN);
-  t.mock.timers.setTime(T0 + 20 * MIN);
+  vi.setSystemTime(T0 + 20 * MIN);
 
   const page = await finishedPage();
   const stamp = (min: number) => new Date(T0 + min * MIN).toISOString();
@@ -517,7 +517,7 @@ test('a run held until a run that never lands waits on a person since the hold w
   cancelled(parent, T0 + MIN);
   const placed = new Date(T0 + 5 * MIN).toISOString();
   fs.writeFileSync(path.join(RUNS_DIR, `${id}.hold`), `${JSON.stringify({ at: placed, until: [parent] })}\n`);
-  t.mock.timers.setTime(T0 + 20 * MIN);
+  vi.setSystemTime(T0 + 20 * MIN);
 
   const row = (await open()).waiting.find((run) => run.id === id);
   assert.ok(row, 'its hold is only a person’s to lift: the run it names was called off');

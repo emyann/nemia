@@ -3,7 +3,7 @@
  * upgrade restarts the daemon, the entry a service runs from an install, the lease's record of a release, and what `nemia version` says.
  * The folders on disk are `release.store.test.ts`'s; the upgrade itself is `upgrade.verb.test.ts`'s.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { DaemonStanding } from '../daemon/daemon.ts';
 import {
@@ -52,7 +52,7 @@ const lease = (kind: 'ticking' | 'stopped' | 'gone', pid = 4242, release?: Runni
   identity: 'same',
 });
 
-test('REFUSED: a tag that climbs out of releases/, hides as a dot folder, holds a space or is the pointer; a plain tag passes', async (t) => {
+describe('REFUSED: a tag that climbs out of releases/, hides as a dot folder, holds a space or is the pointer; a plain tag passes', () => {
   const rows: readonly (readonly [string, string, RegExp | null])[] = [
     ['a tag that climbs out', '../x', /is not a tag a release folder/],
     ['a tag with a slash', 'a/b', /is not a tag a release folder/],
@@ -67,7 +67,7 @@ test('REFUSED: a tag that climbs out of releases/, hides as a dot folder, holds 
     ['underscores and dashes', 'release_3-rc.1', null],
   ];
   for (const [name, tag, refused] of rows)
-    await t.test(name, () => {
+    test(name, () => {
       if (refused === null) assert.equal(tagRefusal(tag), null);
       else assert.match(tagRefusal(tag) ?? '', refused);
     });
@@ -170,7 +170,7 @@ test("nemia version says this nemia's release, the store's pointer and the daemo
 
 const RELEASES = '/home/me/.agent-workflows/releases';
 
-test('sessionRelease: an image under the store’s releases/<tag> is that install; anywhere else, a checkout at the image', async (t) => {
+describe('sessionRelease: an image under the store’s releases/<tag> is that install; anywhere else, a checkout at the image', () => {
   const rows: Array<[string, string, ReturnType<typeof sessionRelease>]> = [
     ['a tag’s runtime', `${RELEASES}/v1.2.0/packages/agent-runtime`, { kind: 'install', tag: 'v1.2.0' }],
     [
@@ -191,7 +191,7 @@ test('sessionRelease: an image under the store’s releases/<tag> is that instal
     ],
     ['a checkout', '/home/me/nemia/packages/agent-runtime', { kind: 'checkout', root: '/home/me/nemia/packages/agent-runtime' }],
   ];
-  for (const [name, image, want] of rows) await t.test(name, () => assert.deepEqual(sessionRelease(image, RELEASES), want));
+  for (const [name, image, want] of rows) test(name, () => assert.deepEqual(sessionRelease(image, RELEASES), want));
 });
 
 test('a session’s release and harness in words: the tag or checkout, then the harness and its version; nothing where neither was recorded', () => {

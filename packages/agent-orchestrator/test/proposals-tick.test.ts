@@ -4,7 +4,8 @@
  * judges it succeeded — and `nemia tick`, a person's one pass, applies it as the daemon's loop does. The deciders and each rule are
  * `proposals.test.ts`'s; this file holds the wiring alone.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -78,15 +79,22 @@ async function approvedAtRunEnd(factoryName: string): Promise<{ run: string; pro
   return { run: started.id, proposal: p.metadata.name };
 }
 
-test('nemia tick applies an approved proposal whose run succeeded, as the daemon does: every tick acts on proposals', async (t) => {
-  const s = story(t);
-  const tree = factory('typed');
-  const { run: id, proposal } = await approvedAtRunEnd('typed');
-  await s.test('its run at work, nemia tick leaves the proposal approved', async () => {
+describe('nemia tick applies an approved proposal whose run succeeded, as the daemon does: every tick acts on proposals', () => {
+  let tree!: string;
+  let id!: string;
+  let proposal!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    tree = factory('typed');
+    ({ run: id, proposal } = await approvedAtRunEnd('typed'));
+    return t.end;
+  });
+  const s = story(test);
+  s.test('its run at work, nemia tick leaves the proposal approved', async () => {
     await stage.main(['tick'], quiet());
     assert.equal((await run(proposalGet('typed', proposal))).status.phase, 'approved');
   });
-  await s.test('its run succeeded, nemia tick applies it, and the workflow says what it proposed', async () => {
+  s.test('its run succeeded, nemia tick applies it, and the workflow says what it proposed', async () => {
     stage.board().settle(`${id}-plan`, 'succeeded', SIGNED);
     await stage.main(['tick'], quiet());
     await stage.main(['tick'], quiet());

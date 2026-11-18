@@ -6,7 +6,7 @@
  * folder's names and paired with their stories, a target naming no story refused. A picture's key moves with what its story is drawn
  * from and nothing else; the cache copies what it holds byte for byte, and a pass it holds whole builds no Storybook. Each case a row.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';

@@ -7,7 +7,7 @@
  * through (a link, a directory, a frontmatter block), shared with the instruction's, in `../instruction.store.test.ts`; the
  * folder gone with its factory, in `test/factory-start.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,7 +29,7 @@ const refused =
 const PIPAO = { name: 'pipao' };
 const FILE = path.join(ROOT, 'factories', 'pipao', 'RULES.md');
 
-test('REFUSED: a write of the rules, nothing written', async (t) => {
+describe('REFUSED: a write of the rules, nothing written', () => {
   const tree = path.join(ROOT, 'factories', 'made', 'tree');
   const rows: Array<[string, () => unknown, 'Conflict' | 'Invalid', string[]]> = [
     ['blank rules, naming the clear', () => writeRules(ROOT, PIPAO, ' \n '), 'Invalid', ['pipao', 'nemia factory rules pipao --clear']],
@@ -48,11 +48,11 @@ test('REFUSED: a write of the rules, nothing written', async (t) => {
     ],
   ];
   for (const [row, act, tag, facts] of rows)
-    await t.test(row, () => {
+    test(row, () => {
       assert.throws(act, refused(tag, ...facts));
       assert.deepEqual([fs.existsSync(FILE), fs.existsSync(tree)], [false, false]);
     });
-  await t.test('once the tree is rendered, the rules are written in it', () => {
+  test('once the tree is rendered, the rules are written in it', () => {
     fs.mkdirSync(tree, { recursive: true });
     assert.equal(writeRules(ROOT, { name: 'made', tree }, 'Be kind.'), path.join(tree, 'RULES.md'));
     assert.deepEqual(readRules(rulesAt(ROOT, { name: 'made', tree })), { words: 'Be kind.', error: null });

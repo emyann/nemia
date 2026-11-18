@@ -3,7 +3,7 @@
  * they stop it — one on a harness that reads its stdin for ever, and one on a harness that ignores SIGTERM, which only the
  * last resort ends, after a stop grace shorter than the shipped one. `scratch` must leave nothing behind.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

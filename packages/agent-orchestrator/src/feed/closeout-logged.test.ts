@@ -7,7 +7,7 @@
  * A file of its own, since the feed is the store's one file and a run another test file's passes do not name would be said `removed`
  * there.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -64,21 +64,21 @@ const judged: ReadonlyMap<string, FeedWords> = new Map([
 /** The records of `logs` a `closed out` line was logged as. */
 const closedOut = (logs: readonly Kept[]) => logs.filter((l) => l.annotations.reason === 'ClosedOut');
 
-test('each closeout a pass reads is one log record, its message the closeout as JSON, annotated with its step, try and outcome, and logged once', async (t) => {
+describe('each closeout a pass reads is one log record, its message the closeout as JSON, annotated with its step, try and outcome, and logged once', () => {
   let first: Kept[] = [];
-  await t.test('one record per try’s closeout, and no second record of the same line', async () => {
+  test('one record per try’s closeout, and no second record of the same line', async () => {
     first = await logsOf(emitFeed(judged));
     assert.equal(closedOut(first).length, 3);
     assert.equal(first.filter((l) => l.annotations.word === 'closed out').length, 3, 'the closeout’s record is its line’s one record');
   });
-  await t.test('its message parses back to the closeout as the run read it', () => {
+  test('its message parses back to the closeout as the run read it', () => {
     const [done, blocked] = closedOut(first);
     assert.equal(typeof done.message, 'string');
     assert.deepEqual(JSON.parse(done.message as string), JSON.parse(JSON.stringify(closeouts[0].read)));
     assert.deepEqual(JSON.parse(blocked.message as string), JSON.parse(JSON.stringify(closeouts[1].read)));
     assert.equal(JSON.parse(done.message as string).output.plan, 'a plan', 'a declared output field rides with it');
   });
-  await t.test('its annotations name the step’s labels, its try and its outcome', () => {
+  test('its annotations name the step’s labels, its try and its outcome', () => {
     const [done, blocked] = closedOut(first);
     assert.deepEqual(
       { ...done.annotations },
@@ -95,7 +95,7 @@ test('each closeout a pass reads is one log record, its message the closeout as 
     );
     assert.deepEqual([blocked.annotations.step, blocked.annotations.try, blocked.annotations.outcome], ['review', 1, 'blocked']);
   });
-  await t.test('Info for done, Warn for blocked and for a closeout the run cannot read', () => {
+  test('Info for done, Warn for blocked and for a closeout the run cannot read', () => {
     assert.deepEqual(
       closedOut(first).map((l) => [l.annotations.step, l.level]),
       [
@@ -105,22 +105,22 @@ test('each closeout a pass reads is one log record, its message the closeout as 
       ],
     );
   });
-  await t.test('one the run cannot read says what came back, and why it was refused', () => {
+  test('one the run cannot read says what came back, and why it was refused', () => {
     const unread = closedOut(first)[2];
     const parsed = JSON.parse(unread.message as string);
     assert.equal(parsed.said, SAID_UNREAD);
     assert.equal(parsed.error, (closeouts[2].read as { error: string }).error);
     assert.equal(unread.annotations.outcome, undefined, 'it gave no outcome the run could read');
   });
-  await t.test('REFUSED: the feed’s file holds the line alone, never the closeout', () => {
+  test('REFUSED: the feed’s file holds the line alone, never the closeout', () => {
     const feed = fs.readFileSync(path.join(ROOT, 'feed.jsonl'), 'utf8');
     assert.equal(feed.includes('the long body'), false);
     assert.equal(feed.includes(SAID_UNREAD), false);
   });
-  await t.test('REFUSED: a second pass logs no closeout again', async () => {
+  test('REFUSED: a second pass logs no closeout again', async () => {
     assert.deepEqual(closedOut(await logsOf(emitFeed(judged))), []);
   });
-  await t.test('REFUSED: nor does a fold of the feed made afresh, as a restarted daemon makes one', async () => {
+  test('REFUSED: nor does a fold of the feed made afresh, as a restarted daemon makes one', async () => {
     assert.deepEqual(closedOut(await logsOf(emitFeed(judged, { memo: freshFeedMemo() }))), []);
   });
 });

@@ -6,14 +6,14 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { scratch } from 'test-kit/scratch';
 import { apiEnvOf } from './e2e/served.ts';
 
 test("REFUSED under the shell's OTEL_EXPORTER_OTLP_ENDPOINT: the api a board is served with is given no collector", (t) => {
   const found = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
-  t.after(() => {
+  t.onTestFinished(() => {
     if (found === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
     else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = found;
   });
@@ -25,7 +25,7 @@ test("REFUSED under the shell's OTEL_EXPORTER_OTLP_ENDPOINT: the api a board is 
 
 test("REFUSED a folder of the shell's PATH that holds a claude: the api a board is served with finds no harness installed", (t) => {
   const found = process.env.PATH;
-  t.after(() => {
+  t.onTestFinished(() => {
     process.env.PATH = found;
   });
   const root = scratch('served-env-');
@@ -46,7 +46,7 @@ test("REFUSED a folder of the shell's PATH that holds a claude: the api a board 
 
 test("REFUSED under the unit's NEMIA_BIND and WF_EXPOSED: the api a board is served with listens on the loopback, not exposed", (t) => {
   const found = { NEMIA_BIND: process.env.NEMIA_BIND, WF_EXPOSED: process.env.WF_EXPOSED };
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const [name, value] of Object.entries(found)) {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;

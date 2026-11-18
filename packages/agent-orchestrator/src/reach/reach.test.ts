@@ -7,7 +7,7 @@
  * laws of what can and cannot hold are the contract's (`contracts/reach.contract.ts`).
  */
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { describe, test } from 'vitest';
 import { proposalOf } from '../auto/auto.verb.ts';
 import {
   CONDITION_WORDS,
@@ -37,8 +37,8 @@ const readsAsCode = (words: string): boolean => {
   return CONDITIONS.some((c) => new RegExp(`\\b${c}\\b`).test(prose)) || /[{}]/.test(words) || /\w\/\w|\.(ts|md|json|ya?ml)\b/.test(words);
 };
 
-test('`gateRows`: what each rule in force reaches, why it misses, and the rule that would reach a gate', async (t) => {
-  await t.test('REFUSED: the default misses an ending approved before it runs, on the agent recommending it', () => {
+describe('`gateRows`: what each rule in force reaches, why it misses, and the rule that would reach a gate', () => {
+  test('REFUSED: the default misses an ending approved before it runs, on the agent recommending it', () => {
     const { rows } = gateRows([DEFAULT_POLICY], [], [ENDING]);
     const row = rows.at(0);
     assert.deepEqual(row?.reachedBy, []);
@@ -50,8 +50,7 @@ test('`gateRows`: what each rule in force reaches, why it misses, and the rule t
     assert.match(row?.misses.at(0)?.words ?? '', new RegExp(CONDITION_WORDS.recommends));
     assert.match(row?.misses.at(0)?.words ?? '', new RegExp(NEVER_WORDS['approved-before-it-runs']));
   });
-
-  await t.test('REFUSED: the default misses a step with no check, on its check', () => {
+  test('REFUSED: the default misses a step with no check, on its check', () => {
     const miss = gateRows([DEFAULT_POLICY], [], [NO_CHECK]).rows.at(0)?.misses.at(0);
     assert.deepEqual(
       { ...miss, words: undefined },
@@ -60,8 +59,7 @@ test('`gateRows`: what each rule in force reaches, why it misses, and the rule t
     assert.match(miss?.words ?? '', new RegExp(CONDITION_WORDS.checked));
     assert.match(miss?.words ?? '', new RegExp(NEVER_WORDS['no-check']));
   });
-
-  await t.test('REFUSED: a rule for other steps covers other steps, and a rule that tries again approves none', () => {
+  test('REFUSED: a rule for other steps covers other steps, and a rule that tries again approves none', () => {
     const other: PolicyRule = { id: 'elsewhere', answer: 'approve', steps: ['other'], when: [] };
     const retry: PolicyRule = { id: 'again', answer: 'retry', when: [] };
     const misses = gateRows([other, retry], [], [CHECKED]).rows.at(0)?.misses;
@@ -75,8 +73,7 @@ test('`gateRows`: what each rule in force reaches, why it misses, and the rule t
     assert.match(missWords({ rule: 'again', why: 'answers-retry' }), /tries a step again/);
     assert.match(missWords({ rule: 'elsewhere', why: 'other-steps' }), /covers other steps/);
   });
-
-  await t.test('the rule suggested for each miss reaches it, is a rule, and is proposed as it is', () => {
+  test('the rule suggested for each miss reaches it, is a rule, and is proposed as it is', () => {
     const { suggested } = gateRows([DEFAULT_POLICY], [], [ENDING, NO_CHECK]);
     assert.equal(suggested.length, 2);
     for (const [rule, site] of [
@@ -88,8 +85,7 @@ test('`gateRows`: what each rule in force reaches, why it misses, and the rule t
       assert.deepEqual(proposalOf(JSON.stringify({ rules: [rule] })).rules, [rule]);
     }
   });
-
-  await t.test('no word a person reads holds a condition id, a brace, or a file', () => {
+  test('no word a person reads holds a condition id, a brace, or a file', () => {
     const rules: PolicyRule[] = [
       DEFAULT_POLICY,
       { id: 'elsewhere', answer: 'approve', steps: ['other'], when: [] },
@@ -105,8 +101,7 @@ test('`gateRows`: what each rule in force reaches, why it misses, and the rule t
     assert.ok(words.length > 8);
     for (const w of words) assert.ok(w.trim() !== '' && !readsAsCode(w), w);
   });
-
-  await t.test('one step gated at two sites, one with a check and one without: one suggestion, asking no check, reaching both', () => {
+  test('one step gated at two sites, one with a check and one without: one suggestion, asking no check, reaching both', () => {
     const twin: GateSite = { ...NO_CHECK, workflow: 'other', hasCheck: true };
     const { suggested } = gateRows([DEFAULT_POLICY], [], [NO_CHECK, twin]);
     assert.equal(suggested.length, 1);
@@ -114,16 +109,14 @@ test('`gateRows`: what each rule in force reaches, why it misses, and the rule t
     assert.ok(rule && !rule.when.includes('checked'));
     assert.ok(rule && ruleReaches(rule, NO_CHECK) && ruleReaches(rule, twin));
   });
-
-  await t.test('the reach of a list: none, some, all', () => {
+  test('the reach of a list: none, some, all', () => {
     assert.equal(gateRows([DEFAULT_POLICY], [], [ENDING, NO_CHECK]).reach, 'none');
     assert.equal(gateRows([DEFAULT_POLICY], [], [ENDING, CHECKED]).reach, 'some');
     assert.equal(gateRows([DEFAULT_POLICY], [], [CHECKED]).reach, 'all');
     assert.equal(gateRows([DEFAULT_POLICY], [], []).reach, 'all', 'no gate is missed');
     assert.deepEqual(gateRows([DEFAULT_POLICY], [], [CHECKED]).suggested, [], 'nothing to suggest');
   });
-
-  await t.test("what keeps a rule from a gate now names its dollar line and the run's cost", () => {
+  test("what keeps a rule from a gate now names its dollar line and the run's cost", () => {
     const capped: PolicyRule = { id: 'capped', answer: 'approve', when: ['accepted'], under: 10 };
     const facts: Facts = { ...NO_FACTS, accepted: true, spend: 12 };
     const now = gateRows([capped], [], [CHECKED], () => facts).rows.at(0)?.now;
@@ -137,8 +130,7 @@ test('`gateRows`: what each rule in force reaches, why it misses, and the rule t
     assert.deepEqual(allHold, [], 'nothing keeps it');
     assert.equal(gateRows([capped], [], [CHECKED]).rows.at(0)?.now, undefined, 'no facts given');
   });
-
-  await t.test('a proposed rule that would reach a gate is named, and one already in force is not', () => {
+  test('a proposed rule that would reach a gate is named, and one already in force is not', () => {
     const proposed: PolicyRule = { id: 'approve-merge', answer: 'approve', steps: ['merge'], when: ['accepted'] };
     const inForce: PolicyRule = { id: 'approve-merge', answer: 'approve', steps: ['merge'], when: ['accepted'] };
     assert.deepEqual(gateRows([DEFAULT_POLICY], [proposed], [ENDING]).rows.at(0)?.proposedBy, ['approve-merge']);

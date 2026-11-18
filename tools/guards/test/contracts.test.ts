@@ -5,7 +5,7 @@
  * verdict cache, none cancelled by another — while `npm run contracts` still proves them all. `prove.ts` ends a failed run on the
  * contracts not proved, on a planted report; its commands are proved by running it: CI's job does on every push.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

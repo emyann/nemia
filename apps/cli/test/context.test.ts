@@ -5,7 +5,7 @@
  * get-contexts`. Under a remote context a moved read asks that daemon with the context's token, and nothing reads this machine's store
  * or starts a daemon: the client's own store root is never made. The laws of `contextOf` are its contract's (`context.contract.ts`).
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -127,7 +127,7 @@ test('NEMIA_CONTEXT naming a context the file does not hold refuses the command,
 
 test('under a remote context `nemia ls` asks that daemon with its token, reading no store here and starting no daemon', async (t) => {
   const vps = await servedStore('nemia-context-vps-', () => {}, { WF_EXPOSED: '1' });
-  t.after(vps.stop);
+  t.onTestFinished(vps.stop);
   const minted = await nemia(['token', 'add', 'laptop'], vps.env);
   assert.equal(minted.code, 0, minted.err);
   const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1];
@@ -166,7 +166,7 @@ function anOrigin(): { dir: string; url: string } {
 
 test('under a remote context `nemia factory add --repo <url>` files the factory on the server, cloned there; a URL with a password is refused, exit 2, nothing filed', async (t) => {
   const vps = await servedStore('nemia-context-clone-', () => {}, { WF_EXPOSED: '1' });
-  t.after(vps.stop);
+  t.onTestFinished(vps.stop);
   const minted = await nemia(['token', 'add', 'laptop'], vps.env);
   assert.equal(minted.code, 0, minted.err);
   const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1];
@@ -187,19 +187,26 @@ test('under a remote context `nemia factory add --repo <url>` files the factory 
   assert.equal(fs.existsSync(root), false, 'no store read or made on this machine');
 });
 
-test('`nemia factory add --template` is refused naming `nemia factory apply`, exit 2, under a remote context and on this machine alike', async (t) => {
-  const { env, root, folder } = aLaptop('nemia-context-add-template-');
-  const server = `http://127.0.0.1:${await freePort()}`;
-  const set = await nemia(['config', 'set-context', 'vps', '--server', server, '--token-file', tokenFile(folder, 'tok')], env);
-  assert.equal(set.code, 0, set.err);
+describe('`nemia factory add --template` is refused naming `nemia factory apply`, exit 2, under a remote context and on this machine alike', () => {
+  let env!: NodeJS.ProcessEnv;
+  let root!: string;
+  let folder!: string;
+  let server!: string;
+  let set!: Said;
+  beforeAll(async () => {
+    ({ env, root, folder } = aLaptop('nemia-context-add-template-'));
+    server = `http://127.0.0.1:${await freePort()}`;
+    set = await nemia(['config', 'set-context', 'vps', '--server', server, '--token-file', tokenFile(folder, 'tok')], env);
+    assert.equal(set.code, 0, set.err);
+  });
   const typed = ['factory', 'add', 'mill', '--template', 'mill', '--repo', 'https://github.com/o/r'];
-  await t.test('under the remote context, before its server is asked', async () => {
+  test('under the remote context, before its server is asked', async () => {
     const said = await nemia(typed, { ...env, NEMIA_CONTEXT: 'vps' });
     assert.equal(said.code, 2, said.err);
     assert.match(said.err, /nemia factory apply <name> --template/);
     assert.equal(fs.existsSync(root), false, 'no store read or made on this machine');
   });
-  await t.test('on this machine', async () => {
+  test('on this machine', async () => {
     const said = await nemia(typed, env);
     assert.equal(said.code, 2, said.err);
     assert.match(said.err, /nemia factory apply <name> --template/);
@@ -221,7 +228,7 @@ test('under a remote context that takes no connection, a read is refused naming 
 
 test("on the store's own machine, the person's `nemia` presents the store's credential with nothing typed and reaches a store verb", async (t) => {
   const server = await servedStore('nemia-context-seat-', () => {});
-  t.after(server.stop);
+  t.onTestFinished(server.stop);
   const env = { ...server.env, XDG_CONFIG_HOME: scratch('nemia-context-seat-config-') };
   const added = await nemia(['inbox', 'add', 'a card from this machine'], env);
   assert.equal(added.code, 0, `the credential is presented, no token typed: ${added.err}`);
@@ -245,7 +252,7 @@ test("on the store's own machine, the person's `nemia` presents the store's cred
 
 test("on the store's own machine, a token kept for `local` is presented over the store's credential, and its store verbs still run", async (t) => {
   const server = await servedStore('nemia-context-own-', () => {});
-  t.after(server.stop);
+  t.onTestFinished(server.stop);
   const env = { ...server.env, XDG_CONFIG_HOME: scratch('nemia-context-own-config-') };
   const minted = await nemia(['token', 'add', 'here'], env);
   const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1];

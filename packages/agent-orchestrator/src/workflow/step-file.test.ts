@@ -4,7 +4,7 @@
  * `renderStep` writes and refuses; and the frontmatter's own syntax. A refusal is a `WorkflowError` with exit 2, opening on the step
  * it is about and naming the line and its fix; its sentence is the code's to word. Reading a folder from disk is `test/workflow.test.ts`.
  */
-import { test, type TestContext } from 'node:test';
+import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import {
@@ -58,9 +58,9 @@ const readLooping = (file: string) => (file === 'review.schema.json' ? JSON.stri
 type Row = { row: string; run: () => unknown; naming?: [at: string, ...named: string[]] };
 
 /** Each row of `rows` as a subtest of `t`: a refusal read as a `WorkflowError` with exit 2 naming what it says; any other, run. */
-async function table(t: TestContext, rows: readonly Row[]): Promise<void> {
+async function table(rows: readonly Row[]): Promise<void> {
   for (const { row, run, naming } of rows)
-    await t.test(row, () => {
+    test(row, () => {
       if (!naming) return void run();
       const [at, ...named] = naming;
       assert.throws(run, (e: unknown) => {
@@ -89,8 +89,8 @@ const refuses = (row: string, name: string, lines: string, ...named: string[]): 
   naming: [`${name}: `, ...named],
 });
 
-test('each key a step has: read as written, and refused blank, twice or with a word it does not take', async (t) => {
-  await table(t, [
+describe('each key a step has: read as written, and refused blank, twice or with a word it does not take', () => {
+  table([
     reads('frontmatter and prose: the keys, and the body whole', 'review', 'harness: codex\nafter: implement', {
       harness: 'codex',
       after: ['implement'],
@@ -453,8 +453,8 @@ test('each key a step has: read as written, and refused blank, twice or with a w
   ]);
 });
 
-test('the list entries of `tools:`, `disallowedTools:` and `allowedTools:`: one name or rule an entry, trimmed', async (t) => {
-  await table(t, [
+describe('the list entries of `tools:`, `disallowedTools:` and `allowedTools:`: one name or rule an entry, trimmed', () => {
+  table([
     reads('tools: an MCP tool', 'look', 'tools: mcp__playwright__browser_take_screenshot', {
       tools: ['mcp__playwright__browser_take_screenshot'],
     }),
@@ -664,9 +664,9 @@ test('the list entries of `tools:`, `disallowedTools:` and `allowedTools:`: one 
   ]);
 });
 
-test('the former names a file may still say: read under the names they have now, never written, and refused beside them', async (t) => {
+describe('the former names a file may still say: read under the names they have now, never written, and refused beside them', () => {
   const writer = (text: string) => new Map([['writer', parseAgent('writer', text)]]);
-  await table(t, [
+  table([
     {
       row: 'disallow and allow: read as the new names, field for field',
       run: () => {
@@ -941,14 +941,14 @@ const EVERY: Record<
   rounds: '2',
 };
 
-test('`renderStep`: the parser run backwards, in one canonical form, and refusing what a file cannot hold', async (t) => {
+describe('`renderStep`: the parser run backwards, in one canonical form, and refusing what a file cannot hold', () => {
   const roundTrip = (name: string, text: string, read?: (file: string) => string | undefined) => {
     const step = parseWorkflow(name, text, read);
     const rendered = renderStep(step);
     assert.deepEqual(parseWorkflow(name, rendered, read), step, 'and it reads back as the step');
     return rendered;
   };
-  await table(t, [
+  table([
     ...(
       [
         ['150000', '150k'],
@@ -1258,8 +1258,8 @@ test('`renderStep`: the parser run backwards, in one canonical form, and refusin
   ]);
 });
 
-test("the frontmatter's syntax: closed, `key: value` a line, comments and blank lines no keys, a Windows file read as any", async (t) => {
-  await table(t, [
+describe("the frontmatter's syntax: closed, `key: value` a line, comments and blank lines no keys, a Windows file read as any", () => {
+  table([
     {
       row: 'REFUSED: frontmatter that never closes',
       run: () => parseWorkflow('review', '---\nplace: git\nharness: codex\nafter: implement\nReview it.'),

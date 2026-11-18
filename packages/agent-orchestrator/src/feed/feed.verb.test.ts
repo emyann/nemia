@@ -7,7 +7,7 @@
  * the feed's end, so no test reads another's lines. The live tests run on a runtime with a hub
  * (`feedHubLayer`) and no logger; a line another process writes is emitted with no hub, as `nemia tick` by hand writes one.
  */
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,7 +43,7 @@ const judged = (word: string, step?: string): ReadonlyMap<string, FeedWords> =>
 /** A runtime with a hub of `capacity` lines and no logger, the process a reader and a writer share: let go once the test `t` ends. */
 function hubbed(t: TestContext, capacity?: number) {
   const rt = ManagedRuntime.make(Layer.mergeAll(feedHubLayer(capacity), Logger.layer([]), rooted));
-  t.after(() => rt.dispose());
+  t.onTestFinished(() => rt.dispose());
   return rt;
 }
 
@@ -75,7 +75,7 @@ async function following(t: TestContext, rt: ReturnType<typeof hubbed>, beat: Du
       }),
     ),
   );
-  t.after(async () => {
+  t.onTestFinished(async () => {
     await Effect.runPromise(Fiber.interrupt(fiber));
     assert.equal(followers(), was, 'no longer counted once interrupted');
   });
@@ -271,7 +271,7 @@ test('REFUSED: the lines of one emission reach a reader as one chunk, a run and 
       }),
     ),
   );
-  t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+  t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(fiber)));
   await read(t, () => followers() === was + 1, 'the reader counted');
   await rt.runPromise(emitFeed(judged('awaiting approval', 'land')));
   await until(t, () => chunks.flat().length >= 2, 'both lines handed', { bell: pushed });

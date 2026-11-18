@@ -11,7 +11,7 @@
  * Node runs a test's TypeScript as it is, and not a component's JSX: `./tsx.ts` registers the hooks that load one. Registered before
  * the components are imported, so every import of one below is dynamic. `npm run e2e` looks at the same components on the pages.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import './tsx.ts';
 import { routedWith } from './markup-fixtures.ts';
@@ -107,26 +107,23 @@ async function bannerOver(pieces: ReturnType<typeof pieceOf>[], ran: boolean): P
 /** The banner's words, its markup's tags taken out. */
 const wordsOf = (html: string): string => html.replace(/<[^>]*>/g, '');
 
-test('the setup banner is raised by a missing piece a run waits on alone, says what the missing pieces cost, and "first run" only where no run was ever started', async (t) => {
-  await t.test(
-    'REFUSED: a server whose factories have run, missing only linger, which no run waits on: no banner, so no "first run" nor "not ready"',
-    async () => {
-      const html = await bannerOver([pieceOf('claude-token', 'run', 'met'), pieceOf('linger', 'server', 'missing')], true);
-      assert.equal(html, '', 'a piece advised is listed on Setup and raises no banner');
-    },
-  );
-  await t.test('a server where no run was ever started, missing a piece a run waits on: before its first run', async () => {
+describe('the setup banner is raised by a missing piece a run waits on alone, says what the missing pieces cost, and "first run" only where no run was ever started', () => {
+  test('REFUSED: a server whose factories have run, missing only linger, which no run waits on: no banner, so no "first run" nor "not ready"', async () => {
+    const html = await bannerOver([pieceOf('claude-token', 'run', 'met'), pieceOf('linger', 'server', 'missing')], true);
+    assert.equal(html, '', 'a piece advised is listed on Setup and raises no banner');
+  });
+  test('a server where no run was ever started, missing a piece a run waits on: before its first run', async () => {
     const said = wordsOf(await bannerOver([pieceOf('claude-token', 'run', 'missing'), pieceOf('linger', 'server', 'met')], false));
     assert.match(said, /first run/);
     assert.doesNotMatch(said, /no run waits on/);
   });
-  await t.test('a server whose factories have run, missing a piece a run waits on and one that keeps it up: each said apart', async () => {
+  test('a server whose factories have run, missing a piece a run waits on and one that keeps it up: each said apart', async () => {
     const said = wordsOf(await bannerOver([pieceOf('claude-token', 'run', 'missing'), pieceOf('linger', 'server', 'missing')], true));
     assert.match(said, /a piece a run waits on/);
     assert.match(said, /keeps the server up or open/);
     assert.doesNotMatch(said, /first run|not ready/);
   });
-  await t.test('REFUSED: a read with nothing missing draws no banner', async () => {
+  test('REFUSED: a read with nothing missing draws no banner', async () => {
     assert.equal(await bannerOver([pieceOf('linger', 'server', 'met')], true), '');
   });
 });

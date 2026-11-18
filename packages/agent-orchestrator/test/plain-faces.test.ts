@@ -4,7 +4,7 @@
  * answers a plain value, as it may; a controller is an Effect program its caller runs with `runWith`. Read by the TypeScript checker,
  * over the entries `package.json` names.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

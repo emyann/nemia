@@ -5,7 +5,7 @@
  * entries, the former names and `renderStep` are tables beside the parser (`src/workflow/step-file.test.ts`); the structure of a
  * workflow is `src/workflow/validate.test.ts`; a step's name and `parseFolder`, `src/folder/folder.test.ts`.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -393,9 +393,9 @@ const outputFolder = (files: Record<string, string | object | null> = {}) => {
 type Row = { row: string; run: () => unknown; naming?: [at: string, ...named: string[]] };
 
 /** Each row of `rows` as a subtest of `t`: a refusal read as a `WorkflowError` with exit 2 naming what it says; any other, run. */
-async function table(t: TestContext, rows: readonly Row[]): Promise<void> {
+async function table(rows: readonly Row[]): Promise<void> {
   for (const { row, run, naming } of rows)
-    await t.test(row, () => {
+    test(row, () => {
       if (!naming) return void run();
       assert.throws(run, refusedNaming(...naming));
     });
@@ -408,12 +408,14 @@ const atLoad = (row: string, files: Record<string, string | object | null>, ...n
   naming: ['review: ', ...named],
 });
 
-test('`output:` schema files are read at load, beside the steps: the file as the step names it, strict, inside the folder', async (t) => {
+describe('`output:` schema files are read at load, beside the steps: the file as the step names it, strict, inside the folder', () => {
+  beforeAll(() => {
+    fs.writeFileSync(outside, JSON.stringify(FINDINGS));
+  });
   const items = FINDINGS.properties.findings.items;
   const withItems = (changed: object) => ({ ...FINDINGS, properties: { findings: { type: 'array', items: { ...items, ...changed } } } });
   const { additionalProperties: _, ...open } = FINDINGS;
   const outside = path.join(scratch('wf-outside-'), 'review.schema.json');
-  fs.writeFileSync(outside, JSON.stringify(FINDINGS));
   const naming = (file: string) => ({ 'review.md': `---\nafter: implement\nplace: git\noutput: ${file}\n---\nreview it\n` });
   const up = path.relative(outputFolder(), outside);
   const loose = { type: 'object', properties: { optional: { type: 'string' } } };
@@ -439,7 +441,7 @@ test('`output:` schema files are read at load, beside the steps: the file as the
     [{ ...closed, unevaluatedProperties: loose }, 'product.unevaluatedProperties'],
     [{ ...closed, propertyNames: loose }, 'product.propertyNames'],
   ];
-  await table(t, [
+  table([
     {
       row: 'the file and the schema it held, and a .json beside the steps is no step',
       run: () => {
@@ -597,7 +599,7 @@ const withWorkflows = (): { repo: string; workflows: string; plans: string } => 
   return { repo, workflows, plans };
 };
 
-test("`workflowFolder`: a path from where it is written first, then a name under the repository's workflows/ — and a refusal naming where it looked", async (t) => {
+describe("`workflowFolder`: a path from where it is written first, then a name under the repository's workflows/ — and a refusal naming where it looked", () => {
   const { repo, workflows, plans } = withWorkflows();
   const relative = path.relative(process.cwd(), repo);
   const bare = scratch('wf-bare-');
@@ -644,12 +646,12 @@ test("`workflowFolder`: a path from where it is written first, then a name under
     ['an agents folder', './agents', plans, repo, []],
   ];
   for (const [row, given, from, root, dir] of found)
-    await t.test(row, () => {
+    test(row, () => {
       assert.equal(workflowFolder(given, from, root), dir);
       assert.equal(Schema.is(WorkflowDir.OnCreate)(workflowFolder(given, from, root)), true, "minted as the Workflow door's id");
     });
   for (const [row, given, from, root, named] of refused)
-    await t.test(`REFUSED: ${row}`, () => {
+    test(`REFUSED: ${row}`, () => {
       assert.throws(
         () => workflowFolder(given, from, root),
         (e: unknown) => {
@@ -662,7 +664,7 @@ test("`workflowFolder`: a path from where it is written first, then a name under
     });
 });
 
-test('a folder whose step or agent is in the former line form does not load: refused naming the file and its line', async (t) => {
+describe('a folder whose step or agent is in the former line form does not load: refused naming the file and its line', () => {
   for (const [row, files, file, line] of [
     ['a step', { 'team/write.md': '---\nplace: git\ncheck: { npm test; npm run lint: x; }\n---\nWrite.\n' }, 'write', 3],
     [
@@ -675,7 +677,7 @@ test('a folder whose step or agent is in the former line form does not load: ref
       3,
     ],
   ] as const)
-    await t.test(row, () => {
+    test(row, () => {
       const root = folder(files);
       assert.throws(
         () => loadWorkflows(path.join(root, 'team')),
@@ -684,7 +686,7 @@ test('a folder whose step or agent is in the former line form does not load: ref
     });
 });
 
-test('`nemia start` is told which files of a folder still say a former line, which reads as it did — and nothing of one on the new', async (t) => {
+describe('`nemia start` is told which files of a folder still say a former line, which reads as it did — and nothing of one on the new', () => {
   const rows: Array<[row: string, files: Record<string, string>, dir: string, lines: (root: string, dir: string) => string[]]> = [
     [
       'disallow and allow: the steps, then the agents they name',
@@ -769,13 +771,13 @@ test('`nemia start` is told which files of a folder still say a former line, whi
     ['workspace: base', { 'ship.md': '---\nplace: git\nworkspace: base\n---\nShip.\n' }, '', () => []],
   ];
   for (const [row, files, sub, lines] of rows)
-    await t.test(row, () => {
+    test(row, () => {
       const root = folder(files);
       const dir = path.join(root, sub);
       assert.doesNotThrow(() => loadWorkflows(dir), 'the folder starts: the former lines stop nothing');
       assert.deepEqual(formerKeyLines(dir), lines(root, dir));
     });
-  await t.test('the files a line is about, and what it names', () => {
+  test('the files a line is about, and what it names', () => {
     assert.deepEqual(formerKeysIn('---\nallow: Edit(**)\n# disallow: Bash\ndisallow : SendMessage\n---\nallow: is in the body\n'), [
       'allow',
       'disallow',

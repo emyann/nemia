@@ -2,7 +2,7 @@
  * The store's root listed for a sweep (`storeRoots`) and the room on its file system (`storeFree`), on a store of scratch. One table,
  * its rows in order: the first finds no store.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,15 +17,14 @@ const file = (...at: string[]): void => {
   fs.writeFileSync(path.join(ROOT, ...at), 'x');
 };
 
-test("`storeRoots` and `storeFree`: the roots a sweep walks, and the room on the store's file system", async (t) => {
-  await t.test('REFUSED: a store whose root does not list has no roots, and says so', () => {
+describe("`storeRoots` and `storeFree`: the roots a sweep walks, and the room on the store's file system", () => {
+  test('REFUSED: a store whose root does not list has no roots, and says so', () => {
     assert.throws(
       () => storeRoots(ROOT),
       (err: Error) => err.message.includes('ENOENT') && err.message.includes(ROOT),
     );
   });
-
-  await t.test('the roots are the store itself alone, each name under it by its part, and each name under a part kept by run', () => {
+  test('the roots are the store itself alone, each name under it by its part, and each name under a part kept by run', () => {
     file('runs', 'a', 'artifacts', 'p.png');
     file('runs', 'a.json');
     file('runs', 'a.asks', 'approve-land-1');
@@ -53,8 +52,7 @@ test("`storeRoots` and `storeFree`: the roots a sweep walks, and the room on the
       { part: 'worktrees', kind: 'checkout', name: 'a', path: 'worktrees/a' },
     ]);
   });
-
-  await t.test('a part kept by run that does not list is one root whole, for the walk to say unread', () => {
+  test('a part kept by run that does not list is one root whole, for the walk to say unread', () => {
     fs.rmSync(path.join(ROOT, 'worktrees'), { recursive: true });
     fs.writeFileSync(path.join(ROOT, 'worktrees'), 'no folder');
     assert.deepEqual(
@@ -62,8 +60,7 @@ test("`storeRoots` and `storeFree`: the roots a sweep walks, and the room on the
       [{ part: 'worktrees', kind: 'checkout', path: path.join(ROOT, 'worktrees') }],
     );
   });
-
-  await t.test('the room on the store’s file system is no more than its size', () => {
+  test('the room on the store’s file system is no more than its size', () => {
     const { free, size } = storeFree(ROOT);
     assert.ok(Number.isSafeInteger(free) && Number.isSafeInteger(size), `${free} of ${size}`);
     assert.ok(free >= 0 && size > 0 && free <= size, `${free} of ${size}`);

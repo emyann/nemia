@@ -3,7 +3,7 @@
  * who fills each and where its model came from; a step its file and a hire both fill refused; and two steps whose names join to one,
  * both listed with an error and neither got by it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

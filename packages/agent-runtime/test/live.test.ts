@@ -40,7 +40,7 @@
  *
  *   AE_LIVE=1 node --test test/live.test.ts
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -140,12 +140,9 @@ const CLOSEOUT = {
   additionalProperties: false,
 };
 
-test(
+test.skipIf(skip)(
   'a job with tools: Read, Grep, Glob cannot write a file; the same brief without them does',
-  {
-    skip,
-    timeout: 12 * 60_000,
-  },
+  { timeout: 12 * 60_000 },
   async () => {
     const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
     const fenced = tmp('fenced');
@@ -200,12 +197,9 @@ const allowingCheckout = (label: string) => {
   return dir;
 };
 
-test(
+test.skipIf(skip)(
   'a job in dontAsk, in a checkout whose settings allow npm run build and npm run e2e, runs neither when disallowedTools names both; the same session without it runs both',
-  {
-    skip,
-    timeout: 12 * 60_000,
-  },
+  { timeout: 12 * 60_000 },
   async () => {
     const engine = builtEngine(EngineService.layer({ root: tmp('deny-board') }));
     const fenced = allowingCheckout('deny-fenced');
@@ -288,12 +282,9 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
 });
 `;
 
-test(
+test.skipIf(skip)(
   "a job filed with no mcp, in an empty directory, has no MCP tools — not the operator's; one given a server has its tool",
-  {
-    skip,
-    timeout: 12 * 60_000,
-  },
+  { timeout: 12 * 60_000 },
   async () => {
     const engine = builtEngine(EngineService.layer({ root: tmp('mcp-board') }));
     const server = path.join(tmp('mcp-server'), 'server.mjs');
@@ -452,12 +443,9 @@ const notesIn = (label: string) => {
  */
 const BELOW_ONE_RESPONSE = 0.00001;
 
-test(
+test.skipIf(skip)(
   'a job given a budget below what one response costs stops at it: the attempt ends failed at the limit `budget`, with what it cost — and its task settles failed, with no attempt 2',
-  {
-    skip,
-    timeout: 12 * 60_000,
-  },
+  { timeout: 12 * 60_000 },
   async (t) => {
     const engine = builtEngine(EngineService.layer({ root: tmp('budget-board') }));
     const ids = {
@@ -476,7 +464,7 @@ test(
       ids,
       (views) => {
         const { state } = views.capped;
-        t.diagnostic(
+        console.log(
           `settled ${state.settled}: ${JSON.stringify(state.attempts.map((a) => ({ n: a.n, ended: a.ended, reason: a.reason, exitCode: a.exitCode, usage: a.usage, resumeFrom: a.resumeFrom })))}`,
         );
         assert.equal(state.settled, 'failed', `settled: ${views.capped?.phase}`);
@@ -517,12 +505,9 @@ const FINISHED_CLOSEOUT = {
   additionalProperties: false,
 };
 
-test(
+test.skipIf(skip)(
   'M1 under the engine: a job on claude in `default` settles on its own and its attempt carries what it was denied; a job at shipped defaults asked for nothing it may not do carries no denials',
-  {
-    skip,
-    timeout: 15 * 60_000,
-  },
+  { timeout: 15 * 60_000 },
   async (t) => {
     const engine = builtEngine(EngineService.layer({ root: tmp('m1-board') }));
     const probe = tmp('m1-engine');
@@ -552,7 +537,7 @@ test(
       (views) => {
         const [denied] = views.denied.state.attempts;
         const [control] = views.control.state.attempts;
-        t.diagnostic(
+        console.log(
           `denied: ${views.denied.state.settled}, ${JSON.stringify(denied?.denials)}; control: ${views.control.state.settled}, ${JSON.stringify(control?.denials)}`,
         );
         assert.equal(views.denied.state.settled, 'succeeded', `the denied job finished its work: ${views.denied.phase}`);
@@ -578,14 +563,11 @@ const M14_BRIEF = [
   '3) Then give your closing statement, with finished set to true.',
 ].join(' ');
 
-test(
+test.skipIf(skip)(
   'M14: a job denied a call says so before its result — its capture holds the permission_denied line while it works, and the engine journals the denial on the attempt in flight',
-  {
-    skip,
-    timeout: 15 * 60_000,
-  },
+  { timeout: 15 * 60_000 },
   async (t) => {
-    t.diagnostic(`claude --version: ${execFileSync(CLAUDE, ['--version'], { encoding: 'utf8' }).trim()}`);
+    console.log(`claude --version: ${execFileSync(CLAUDE, ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m14-board');
     const engine = builtEngine(EngineService.layer({ root }));
     const id = await Effect.runPromise(
@@ -613,7 +595,7 @@ test(
       engine,
       { denied: id },
       (views) => {
-        t.diagnostic(`in flight: ${JSON.stringify(inFlight)}; at the end: ${JSON.stringify(views.denied.state.attempts[0]?.denials)}`);
+        console.log(`in flight: ${JSON.stringify(inFlight)}; at the end: ${JSON.stringify(views.denied.state.attempts[0]?.denials)}`);
         assert.ok(inFlight, 'the engine saw the attempt in flight carry a denial before it ended');
         assert.equal(inFlight.resulted, false, 'and the capture held no result line yet: the stream said it as it happened');
         assert.deepEqual(inFlight.denials, [{ tool: 'Bash', what: 'curl' }], 'the attempt in flight says the denied call');
@@ -640,12 +622,9 @@ test(
   },
 );
 
-test(
+test.skipIf(skip)(
   "M3, M5: a job resumed from a job remembers it and is charged its own spend, not its parent's again; a budget on a resume caps its own spend",
-  {
-    skip,
-    timeout: 40 * 60_000,
-  },
+  { timeout: 40 * 60_000 },
   async (t) => {
     const engine = builtEngine(EngineService.layer({ root: tmp('m2-board') }));
     const cwd = tmp('m2');
@@ -672,7 +651,7 @@ test(
       await Effect.runPromise(engine.file({ ...common, config: { model: 'haiku' }, resumeFrom: last(first)!.nativeId!, brief: ask })),
     );
     const [one, two] = [last(first)?.usage?.costUsd, last(second)?.usage?.costUsd];
-    t.diagnostic(`costs: first job ${one}, the job resumed from it ${two}`);
+    console.log(`costs: first job ${one}, the job resumed from it ${two}`);
     assert.deepEqual(last(second)?.closeout, { word }, 'a job resumed from a job remembers');
     assert.ok(one !== undefined && one > 0 && two !== undefined && two > 0, 'and both were charged something');
     assert.ok(
@@ -686,19 +665,16 @@ test(
         engine.file({ ...common, config: { model: 'haiku', budgetUsd: cap }, resumeFrom: last(second)!.nativeId!, brief: ask }),
       ),
     );
-    t.diagnostic(
+    console.log(
       `a resume capped at $${cap}, under its session's $${(one + two).toFixed(4)}: ${capped.state.settled}, ${last(capped)?.reason}, cost ${last(capped)?.usage?.costUsd}`,
     );
     assert.equal(capped.state.settled, 'succeeded', `a resume under a cap below its session's whole cost finished: ${capped.phase}`);
   },
 );
 
-test(
+test.skipIf(skip)(
   "M7: a job resumed from a job that was denied is not charged its parent's denials — the result of a resume says only what the resume was denied, unlike its cost",
-  {
-    skip,
-    timeout: 20 * 60_000,
-  },
+  { timeout: 20 * 60_000 },
   async (t) => {
     const engine = builtEngine(EngineService.layer({ root: tmp('m7-board') }));
     const probe = tmp('m7');
@@ -730,7 +706,7 @@ test(
       ),
     );
     const child = resumed.state.attempts.at(-1);
-    t.diagnostic(
+    console.log(
       `parent denied ${JSON.stringify(parent?.denials)}; the resume: ${resumed.state.settled}, denied ${JSON.stringify(child?.denials)}, cost ${child?.usage?.costUsd}`,
     );
     assert.equal(resumed.state.settled, 'succeeded', `the resume settled: ${resumed.phase}`);
@@ -772,18 +748,15 @@ const oneAllowedCheckout = (label: string) => {
   return dir;
 };
 
-test(
+test.skipIf(skip)(
   "M11: a job in dontAsk honours the checkout's settings — the allowed command runs, the unlisted one is denied, and the job records the denial",
-  {
-    skip,
-    timeout: 15 * 60_000,
-  },
+  { timeout: 15 * 60_000 },
   async (t) => {
     const version = execFileSync(CLAUDE, ['--version'], { encoding: 'utf8' }).trim();
-    t.diagnostic(`claude --version: ${version}`);
+    console.log(`claude --version: ${version}`);
     const engine = builtEngine(EngineService.layer({ root: tmp('m11-board') }));
     const job = oneAllowedCheckout('m11-job');
-    t.diagnostic(`allowed: npm run ${M11_ALLOWED}; unlisted: npm run ${M11_UNLISTED}`);
+    console.log(`allowed: npm run ${M11_ALLOWED}; unlisted: npm run ${M11_UNLISTED}`);
     const common = {
       brief: M11_BRIEF,
       closeoutSchema: DENY_CLOSEOUT,
@@ -799,7 +772,7 @@ test(
         ids,
         (views) => {
           const last = (k: string) => views[k]?.state.attempts.at(-1);
-          t.diagnostic(
+          console.log(
             `job: ${views.job?.state.settled}, exit ${last('job')?.exitCode}, said ${JSON.stringify(last('job')?.closeout)}, denied ${JSON.stringify(last('job')?.denials)}, wrote ${M11_WRITTEN.filter((f) => fs.existsSync(path.join(job, f)))}`,
           );
           assert.equal(views.job?.state.settled, 'succeeded', `the job settled: ${views.job?.phase}`);
@@ -826,14 +799,11 @@ test(
 
 const M12_CLOSEOUT = { type: 'object', properties: { word: { type: 'string' } }, required: ['word'], additionalProperties: false };
 
-test(
+test.skipIf(skip)(
   'M12: a job held open signs and waits with no process, an answer resumes its session under its own cap and it remembers, a close settles it',
-  {
-    skip,
-    timeout: 15 * 60_000,
-  },
+  { timeout: 15 * 60_000 },
   async (t) => {
-    t.diagnostic(`claude --version: ${execFileSync(CLAUDE, ['--version'], { encoding: 'utf8' }).trim()}`);
+    console.log(`claude --version: ${execFileSync(CLAUDE, ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m12-board');
     const engine = builtEngine(EngineService.layer({ root }));
     const secret = `m12-${randomUUID().slice(0, 8)}`;
@@ -859,7 +829,7 @@ test(
     };
     await Effect.runPromise(engine.tick());
     const waiting = await until('input-required');
-    t.diagnostic(`turn 0: ${waiting.phase}, ${JSON.stringify(waiting.state.attempts.map((a) => [a.ended, a.closeout, a.nativeId]))}`);
+    console.log(`turn 0: ${waiting.phase}, ${JSON.stringify(waiting.state.attempts.map((a) => [a.ended, a.closeout, a.nativeId]))}`);
     assert.equal(waiting.phase, 'input-required');
     assert.deepEqual(waiting.state.attempts[0]?.closeout, { word: 'ready' });
     assert.equal(
@@ -878,7 +848,7 @@ test(
     await Effect.runPromise(engine.tick());
     const answered = await until('input-required');
     const [first, second] = answered.state.attempts;
-    t.diagnostic(
+    console.log(
       `turn 1: ${answered.phase}, ${JSON.stringify([second?.ended, second?.closeout, second?.resumeFrom, second?.nativeId, second?.usage?.cacheReadTokens])}`,
     );
     assert.equal(answered.phase, 'input-required', 'signed again, it waits again');
@@ -908,14 +878,11 @@ const hasCodex = (() => {
   }
 })();
 
-test(
+test.skipIf(live ? (hasCodex ? false : 'no `codex` on PATH') : 'set AE_LIVE=1 to run against Codex (spends from its subscription)')(
   'M13: a Codex task held open signs and waits with no process; its answer resumes the thread that signed — whether under the same thread id, and in the same rollout, is what it records',
-  {
-    skip: live ? (hasCodex ? false : 'no `codex` on PATH') : 'set AE_LIVE=1 to run against Codex (spends from its subscription)',
-    timeout: 15 * 60_000,
-  },
+  { timeout: 15 * 60_000 },
   async (t) => {
-    t.diagnostic(`codex --version: ${execFileSync('codex', ['--version'], { encoding: 'utf8' }).trim()}`);
+    console.log(`codex --version: ${execFileSync('codex', ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m13-board');
     const engine = builtEngine(EngineService.layer({ root, harnesses: { codex } }));
     const client = clientOf('codex', detachedOps(codex, root), (taskId) =>
@@ -950,7 +917,7 @@ test(
     await Effect.runPromise(engine.tick());
     const waiting = await until('input-required');
     const first = waiting.state.attempts[0];
-    t.diagnostic(`turn 0: ${waiting.phase}, ${JSON.stringify([first?.ended, first?.closeout, first?.nativeId])}`);
+    console.log(`turn 0: ${waiting.phase}, ${JSON.stringify([first?.ended, first?.closeout, first?.nativeId])}`);
     assert.equal(waiting.phase, 'input-required');
     assert.deepEqual(first?.closeout, { word: 'ready' });
     assert.ok(first?.nativeId, 'the worker read a thread id off what Codex printed');
@@ -978,8 +945,8 @@ test(
     const answered = await until('input-required');
     const second = answered.state.attempts[1];
     const rollouts = [first.nativeId, second?.nativeId].map((n) => (n ? codexRolloutFile(n) : undefined));
-    t.diagnostic(`turn 1: ${answered.phase}, ${JSON.stringify([second?.ended, second?.closeout, second?.resumeFrom, second?.nativeId])}`);
-    t.diagnostic(`same thread id: ${second?.nativeId === first.nativeId}; rollouts: ${JSON.stringify(rollouts)}`);
+    console.log(`turn 1: ${answered.phase}, ${JSON.stringify([second?.ended, second?.closeout, second?.resumeFrom, second?.nativeId])}`);
+    console.log(`same thread id: ${second?.nativeId === first.nativeId}; rollouts: ${JSON.stringify(rollouts)}`);
     assert.equal(answered.phase, 'input-required', 'signed again, it waits again');
     assert.equal(second?.resumeFrom, first.nativeId, 'the turn resumed the thread that signed');
     assert.deepEqual(second?.closeout, { word: secret }, 'and it remembered what only that thread was told');
@@ -1024,9 +991,9 @@ const ATTACHED_CLOSEOUT = {
   additionalProperties: false,
 };
 
-test(
+test.skipIf(skip)(
   'an attached session is given its servers, Claude Code’s own prompt with the agent’s after it, and writes no MEMORY.md',
-  { skip, timeout: 12 * 60_000 },
+  { timeout: 12 * 60_000 },
   async (t) => {
     const root = tmp('session-options');
     const cwd = tmp('attached-cwd');
@@ -1069,7 +1036,7 @@ test(
         { everyMs: 5_000 },
       );
       const closeout = (said().closeout?.payload ?? {}) as Record<string, unknown>;
-      t.diagnostic(`${state}: ${JSON.stringify(closeout)}`);
+      console.log(`${state}: ${JSON.stringify(closeout)}`);
       assert.equal(state, 'completed', `the session ran to its end; it was ${state}`);
       assert.deepEqual(closeout.mcpServers, ['aeprobe'], 'the servers `Options.mcpServers` gave it, and no other');
       assert.equal(closeout.word, 'zarquon', 'the agent’s own prompt reached it, as `systemPrompt`’s `append` and not a file’s path');
@@ -1077,7 +1044,7 @@ test(
       assert.equal(closeout.order, 'before', 'and those come first: the agent’s prompt is appended after them');
       assert.equal(fs.existsSync(path.join(cwd, 'MEMORY.md')), false, 'auto-memory is off in the one settings object: no MEMORY.md');
       const given = JSON.parse(fs.readFileSync(argv, 'utf8')) as string[];
-      t.diagnostic(`the server's own arguments: ${JSON.stringify(given)}`);
+      console.log(`the server's own arguments: ${JSON.stringify(given)}`);
       assert.deepEqual(
         given,
         ['expanded', 'defaulted'],
@@ -1123,9 +1090,9 @@ const skillListing = (id: string | undefined): { count?: number; names: string[]
   return { names: [] };
 };
 
-test(
+test.skipIf(skip)(
   'an attached session given a closed list of skills is listed those alone; its control, on the default, lists the built-in ones too',
-  { skip, timeout: 12 * 60_000 },
+  { timeout: 12 * 60_000 },
   async (t) => {
     const plugin = path.join(tmp('skills-plugin'), 'nemia-aeprobe');
     fs.mkdirSync(path.join(plugin, '.claude-plugin'), { recursive: true });
@@ -1169,8 +1136,8 @@ test(
       );
       const closed = skillListing(ids.closed);
       const control = skillListing(ids.control);
-      t.diagnostic(`closed: ${JSON.stringify(closed)}`);
-      t.diagnostic(`control: ${JSON.stringify(control)}`);
+      console.log(`closed: ${JSON.stringify(closed)}`);
+      console.log(`control: ${JSON.stringify(control)}`);
       assert.deepEqual(closed?.names, [PLUGIN_SKILL], 'the closed session is listed the one skill on its list, and no built-in one');
       assert.ok(control?.names.includes(PLUGIN_SKILL), 'the control is listed the plugin skill too');
       assert.ok((control?.names.length ?? 0) > 1, 'and others besides it: what the closed list hides is there to hide');
@@ -1223,9 +1190,9 @@ const firstRequest = (id: string | undefined): { tools: { name: string; deferred
   return { tools: tools ?? [], nested };
 };
 
-test(
+test.skipIf(skip)(
   'an attached session on a closed tool list, in dontAsk, is sent its server’s tool deferred and still calls it, and no dependency’s CLAUDE.md',
-  { skip, timeout: 12 * 60_000 },
+  { timeout: 12 * 60_000 },
   async (t) => {
     const root = tmp('light-root');
     const cwd = tmp('light-cwd');
@@ -1277,9 +1244,9 @@ test(
         words?: string[];
       };
       const sent = firstRequest(id);
-      t.diagnostic(`${state}, session ${id}: ${JSON.stringify(closeout)}`);
-      t.diagnostic(`first request: ${JSON.stringify(sent?.tools)}`);
-      t.diagnostic(`nested CLAUDE.md: ${JSON.stringify(sent?.nested)}`);
+      console.log(`${state}, session ${id}: ${JSON.stringify(closeout)}`);
+      console.log(`first request: ${JSON.stringify(sent?.tools)}`);
+      console.log(`nested CLAUDE.md: ${JSON.stringify(sent?.nested)}`);
       assert.equal(state, 'completed', `the session ran to its end; it was ${state}`);
       assert.ok(
         sent?.tools.some((tool) => tool.name === 'ToolSearch'),
@@ -1347,9 +1314,9 @@ const CUT_BRIEF =
   'First say hello in one word. Then run the shell command `sleep 120` with your Bash tool and wait for it to end. Then say done.';
 const BACK_CLOSEOUT = { type: 'object', properties: { word: { type: 'string' } }, required: ['word'], additionalProperties: false };
 
-test(
+test.skipIf(skip)(
   "an attached session's cost: a resumed query carries on the total its parent saved, and a session cut by a let-go saves its own",
-  { skip, timeout: 10 * 60_000 },
+  { timeout: 10 * 60_000 },
   async (t) => {
     const root = tmp('attached-cost');
     const cwd = tmp('attached-cost-cwd');
@@ -1388,7 +1355,7 @@ test(
       assert.equal(await ended('ae/live-cost/2'), 'completed');
       const [parentTotal] = totalsOf(root, 'ae/live-cost/1');
       const [resumedTotal] = totalsOf(root, 'ae/live-cost/2');
-      t.diagnostic(
+      console.log(
         `(a) parent printed ${parentTotal}, saved ${JSON.stringify(savedTotals(parentId))}; its resume's first result printed ` +
           `${resumedTotal}`,
       );
@@ -1410,7 +1377,7 @@ test(
       if (cut?.sessionId) ids.push(cut.sessionId);
       const cutTotals = totalsOf(root, name);
       const cutSaved = savedTotals(cut?.sessionId);
-      t.diagnostic(`(b) cut: ${cut?.state}, printed ${JSON.stringify(cutTotals)}, saved ${JSON.stringify(cutSaved)}, let-go ${letGoMs} ms`);
+      console.log(`(b) cut: ${cut?.state}, printed ${JSON.stringify(cutTotals)}, saved ${JSON.stringify(cutSaved)}, let-go ${letGoMs} ms`);
       assert.equal(cut?.state, 'parked');
       assert.equal(cutTotals.length, 1, 'the cut process printed the turn it was cut in as a result');
       assert.equal(cutSaved.length, 1, 'and saved its running total as it exited');
@@ -1431,7 +1398,7 @@ test(
         await Effect.runPromise(Scope.close(nextScope, Exit.void));
       }
       const all = totalsOf(root, name);
-      t.diagnostic(`(b) resumed: printed ${JSON.stringify(all)}, saved ${JSON.stringify(savedTotals(cut?.sessionId))}`);
+      console.log(`(b) resumed: printed ${JSON.stringify(all)}, saved ${JSON.stringify(savedTotals(cut?.sessionId))}`);
       assert.ok((all.at(-1) ?? 0) >= (cutTotals[0] ?? Infinity), "the resume's total carries the cut process's spend on");
     } finally {
       for (const id of ids)

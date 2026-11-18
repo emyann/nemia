@@ -3,7 +3,7 @@
  * parts cut out, and the mark of what scrolls (`markScrolls`), on a stand-in for the document and a scheduler stepped by hand. What
  * a browser draws from them is read in `e2e/bars.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -125,27 +125,24 @@ function world() {
   };
 }
 
-test('markScrolls: what scrolled shown, and at rest once its linger has passed', async (t) => {
-  await t.test(
-    'a scroll marks what scrolled shown, and at rest once the linger has passed with no other; the mark is written only as it changes',
-    () => {
-      const { source, later, calls, scroll, waits, step } = world();
-      markScrolls(source, later);
-      assert.deepEqual(calls, ['add scroll {"capture":true,"passive":true}'], 'one listener, on the way down, that cannot stop a scroll');
-      const box = stand();
-      scroll(box);
-      assert.deepEqual(box.written, [`${BAR}=shown`], 'a scroll marks the element shown');
-      assert.deepEqual(waits(), [LINGER_MS], 'and its rest is due after the linger');
-      scroll(box);
-      assert.deepEqual(box.written, [`${BAR}=shown`], 'a second scroll writes nothing: it is shown already');
-      assert.deepEqual(waits(), [LINGER_MS], 'and puts its rest off: the first is taken back');
-      step();
-      assert.deepEqual(box.written, [`${BAR}=shown`, `${BAR}=rest`], 'the linger passed, it is at rest');
-      scroll(box);
-      assert.deepEqual(box.written.at(-1), `${BAR}=shown`, 'and a scroll after its rest shows it again');
-    },
-  );
-  await t.test("REFUSED: the first scroll's rest does not fire while a second is still to linger", () => {
+describe('markScrolls: what scrolled shown, and at rest once its linger has passed', () => {
+  test('a scroll marks what scrolled shown, and at rest once the linger has passed with no other; the mark is written only as it changes', () => {
+    const { source, later, calls, scroll, waits, step } = world();
+    markScrolls(source, later);
+    assert.deepEqual(calls, ['add scroll {"capture":true,"passive":true}'], 'one listener, on the way down, that cannot stop a scroll');
+    const box = stand();
+    scroll(box);
+    assert.deepEqual(box.written, [`${BAR}=shown`], 'a scroll marks the element shown');
+    assert.deepEqual(waits(), [LINGER_MS], 'and its rest is due after the linger');
+    scroll(box);
+    assert.deepEqual(box.written, [`${BAR}=shown`], 'a second scroll writes nothing: it is shown already');
+    assert.deepEqual(waits(), [LINGER_MS], 'and puts its rest off: the first is taken back');
+    step();
+    assert.deepEqual(box.written, [`${BAR}=shown`, `${BAR}=rest`], 'the linger passed, it is at rest');
+    scroll(box);
+    assert.deepEqual(box.written.at(-1), `${BAR}=shown`, 'and a scroll after its rest shows it again');
+  });
+  test("REFUSED: the first scroll's rest does not fire while a second is still to linger", () => {
     const { source, later, scroll, step } = world();
     markScrolls(source, later);
     const box = stand();
@@ -154,7 +151,7 @@ test('markScrolls: what scrolled shown, and at rest once its linger has passed',
     step();
     assert.deepEqual(box.written, [`${BAR}=shown`, `${BAR}=rest`], 'stepped once, one rest is written: the rest put off never ran');
   });
-  await t.test("the page's own scroll marks the document's root, and each thing that scrolls has its own rest", () => {
+  test("the page's own scroll marks the document's root, and each thing that scrolls has its own rest", () => {
     const { source, later, scroll, step } = world();
     markScrolls(source, later);
     const [root, box] = [stand(), stand()];
@@ -166,7 +163,7 @@ test('markScrolls: what scrolled shown, and at rest once its linger has passed',
     step();
     assert.deepEqual([root.written.at(-1), box.written.at(-1)], [`${BAR}=rest`, `${BAR}=rest`]);
   });
-  await t.test('undone, nothing listens, and what was shown is at rest with no rest left due', () => {
+  test('undone, nothing listens, and what was shown is at rest with no rest left due', () => {
     const { source, later, calls, listening, scroll, waits } = world();
     const undo = markScrolls(source, later);
     const box = stand();
@@ -187,8 +184,8 @@ function sliceOf(file: string, from: string, to: string): string {
   return text.slice(start, end);
 }
 
-test("the scroll bar in the board's source: the rule in its styles, and the frame that marks what scrolls", async (t) => {
-  await t.test("REFUSED: the look's scroll bar rule is in the board's styles; with a block cut out, what it said is named", () => {
+describe("the scroll bar in the board's source: the rule in its styles, and the frame that marks what scrolls", () => {
+  test("REFUSED: the look's scroll bar rule is in the board's styles; with a block cut out, what it said is named", () => {
     assert.deepEqual(unsaid(STYLES), [], 'the rule is whole');
     const [parts, others, ink] = [STYLES.indexOf(PARTS), STYLES.indexOf(OTHERS), STYLES.indexOf(INK)];
     assert.ok(parts >= 0 && others > parts && ink > others, 'the three names the slices end on are there, in order');
@@ -209,7 +206,7 @@ test("the scroll bar in the board's source: the rule in its styles, and the fram
       'the thumb in outline while it scrolls',
     ]);
   });
-  await t.test('the frame marks what scrolls once, in its root', () => {
+  test('the frame marks what scrolls once, in its root', () => {
     assert.match(sliceOf('routes/__root.tsx', 'function Root()', 'return ('), /\n\s*useScrollMark\(\);/, 'Root calls the hook');
   });
 });

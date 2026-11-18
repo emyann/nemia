@@ -2,7 +2,7 @@
  * What the daemon's quota ask traces (`askedQuota`), over the runtime itself: every harness is asked, and one that reports no quota is
  * refused without a word on a trace — no span of the runtime's ends in error — while the ask of one that reports a quota is its span.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Engine } from 'agent-runtime';
 import { Effect, Exit, Tracer } from 'effect';

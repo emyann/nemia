@@ -3,7 +3,7 @@
  * file in a scratch store: the default factory listed first and got, a stray file listed with its error, the generation and the status
  * read, and the commands a person types for it. Their page and selection are `src/object/listed.verb.test.ts`'s.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

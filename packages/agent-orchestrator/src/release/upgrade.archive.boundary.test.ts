@@ -5,7 +5,7 @@
  * whose API (`/api/v3`, as a host other than github.com is read) answers one release published with no archive yet. No daemon ticks the
  * store, so nothing is restarted; the store is the test's own at `ROOT`, named by `ENV`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -131,33 +131,28 @@ async function refusalOf(args: Args): Promise<{ tag: string; message: string }> 
 /** What is left under `releases/` beside the releases and the logs: no build folder, no hidden link. */
 const leftovers = (): string[] => fs.readdirSync(releasesDir(ROOT)).filter((f) => f.startsWith('.') && f !== '.logs');
 
-test('an archive install upgraded from its download base: the newest by default, refused a damaged archive, and refused going back past its floor', async (t) => {
-  const s = story(t);
-
-  await s.test(
-    'with no tag, the newest published is downloaded, checked, smoke-run, written release.json last and pointed at',
-    async () => {
-      published('v1.1.0', { latest: true });
-      const done = await run({});
-      assert.equal(done.built, true);
-      assert.equal(done.release.tag, 'v1.1.0');
-      assert.equal(fs.readlinkSync(path.join(releasesDir(ROOT), 'current')), 'v1.1.0', 'a relative link');
-      const file = releaseFileOf(releaseDir('v1.1.0', ROOT));
-      assert.equal(file?.from, 'archive');
-      assert.equal(file?.platform, PLATFORM);
-      assert.equal(file?.source, SOURCE, 'the download base, for the next upgrade');
-      assert.equal(file?.commit, 'c0ffeev110', "the archive's own commit");
-      assert.ok(fs.existsSync(path.join(releaseDir('v1.1.0', ROOT), 'bin', 'nemia')), 'unpacked at the root');
-      assert.equal(
-        fs.realpathSync(toolsNemia(ROOT)),
-        fs.realpathSync(path.join(releaseDir('v1.1.0', ROOT), 'bin', 'nemia')),
-        "the tools folder's nemia resolves to the new release's",
-      );
-      assert.deepEqual(leftovers(), [], 'the build folder is taken away');
-    },
-  );
-
-  await s.test('REFUSED: an archive that does not match its SHA256SUMS: exit 2, and releases/current stays where it was', async () => {
+describe('an archive install upgraded from its download base: the newest by default, refused a damaged archive, and refused going back past its floor', () => {
+  const s = story(test);
+  s.test('with no tag, the newest published is downloaded, checked, smoke-run, written release.json last and pointed at', async () => {
+    published('v1.1.0', { latest: true });
+    const done = await run({});
+    assert.equal(done.built, true);
+    assert.equal(done.release.tag, 'v1.1.0');
+    assert.equal(fs.readlinkSync(path.join(releasesDir(ROOT), 'current')), 'v1.1.0', 'a relative link');
+    const file = releaseFileOf(releaseDir('v1.1.0', ROOT));
+    assert.equal(file?.from, 'archive');
+    assert.equal(file?.platform, PLATFORM);
+    assert.equal(file?.source, SOURCE, 'the download base, for the next upgrade');
+    assert.equal(file?.commit, 'c0ffeev110', "the archive's own commit");
+    assert.ok(fs.existsSync(path.join(releaseDir('v1.1.0', ROOT), 'bin', 'nemia')), 'unpacked at the root');
+    assert.equal(
+      fs.realpathSync(toolsNemia(ROOT)),
+      fs.realpathSync(path.join(releaseDir('v1.1.0', ROOT), 'bin', 'nemia')),
+      "the tools folder's nemia resolves to the new release's",
+    );
+    assert.deepEqual(leftovers(), [], 'the build folder is taken away');
+  });
+  s.test('REFUSED: an archive that does not match its SHA256SUMS: exit 2, and releases/current stays where it was', async () => {
     published('v1.2.0', { damaged: true });
     const { tag } = await refusalOf({ tag: 'v1.2.0' });
     assert.equal(tag, 'Invalid');
@@ -165,8 +160,7 @@ test('an archive install upgraded from its download base: the newest by default,
     assert.equal(fs.existsSync(releaseDir('v1.2.0', ROOT)), false);
     assert.deepEqual(leftovers(), []);
   });
-
-  await s.test('REFUSED: an archive whose nemia version fails is never pointed at', async () => {
+  s.test('REFUSED: an archive whose nemia version fails is never pointed at', async () => {
     published('v1.2.1', { exit: 1 });
     const { tag, message } = await refusalOf({ tag: 'v1.2.1' });
     assert.equal(tag, 'Invalid');
@@ -174,8 +168,7 @@ test('an archive install upgraded from its download base: the newest by default,
     assert.equal(currentRelease(ROOT)?.tag, 'v1.1.0');
     assert.equal(fs.existsSync(releaseDir('v1.2.1', ROOT)), false);
   });
-
-  await s.test('REFUSED: v0.9.0 on a store whose floor is v1.2.0 exits 2 naming v1.2.0, before anything is fetched', async () => {
+  s.test('REFUSED: v0.9.0 on a store whose floor is v1.2.0 exits 2 naming v1.2.0, before anything is fetched', async () => {
     published('v0.9.0');
     writeStoreFloor(ROOT, parseVersion('v1.2.0') ?? assert.fail());
     const { tag, message } = await refusalOf({ tag: 'v0.9.0' });
@@ -185,15 +178,13 @@ test('an archive install upgraded from its download base: the newest by default,
     assert.equal(currentRelease(ROOT)?.tag, 'v1.1.0');
     assert.equal(fs.existsSync(path.join(releasesDir(ROOT), '.logs', 'v0.9.0')), false);
   });
-
-  await s.test('REFUSED: a tag no release is published under is Missing, naming its URL', async () => {
+  s.test('REFUSED: a tag no release is published under is Missing, naming its URL', async () => {
     const { tag, message } = await refusalOf({ tag: 'v9.9.9' });
     assert.equal(tag, 'Missing');
     assert.ok(message.includes(`${SOURCE}/download/v9.9.9/`), message);
     assert.equal(currentRelease(ROOT)?.tag, 'v1.1.0');
   });
-
-  await s.test(
+  s.test(
     'REFUSED: a tag that is not v and three dotted numbers, named or read from latest.json, is Invalid before anything is fetched, as install.sh refuses it',
     async () => {
       const before = fs.readdirSync(releasesDir(ROOT)).sort();
@@ -233,7 +224,7 @@ async function stubGitHub(published: Record<string, readonly string[]>): Promise
 
 test('an archive that answers 404: Conflict where its release is published without it yet, Missing where no release has the tag', async (t) => {
   const github = await stubGitHub({ 'v1.5.0': ['SHA256SUMS', 'install.sh'] });
-  t.after(github.close);
+  t.onTestFinished(github.close);
   const install = { ...FIRST, source: github.source };
   const kindOf = async (tag: string): Promise<string> => {
     const err = await runWith(engineOf(engine().layer), upgrade({ tag }, idle, ENV, install)).then(
@@ -252,7 +243,7 @@ test('an archive that answers 404: Conflict where its release is published witho
   assert.deepEqual(leftovers(), []);
 });
 
-test("a download base's release is read from github.com's API, another host's /api/v3, and from no API for a base of another shape", async (t) => {
+describe("a download base's release is read from github.com's API, another host's /api/v3, and from no API for a base of another shape", () => {
   const rows: [string, string | undefined][] = [
     ['https://github.com/o/r/releases', 'https://api.github.com/repos/o/r/releases/tags/v1.5.0'],
     ['https://github.com/o/r/releases/', 'https://api.github.com/repos/o/r/releases/tags/v1.5.0'],
@@ -260,5 +251,5 @@ test("a download base's release is read from github.com's API, another host's /a
     [SOURCE, undefined],
     ['https://example.com/downloads', undefined],
   ];
-  for (const [source, api] of rows) await t.test(source, () => assert.equal(releaseApiUrl(source, 'v1.5.0'), api));
+  for (const [source, api] of rows) test(source, () => assert.equal(releaseApiUrl(source, 'v1.5.0'), api));
 });

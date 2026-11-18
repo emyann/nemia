@@ -3,7 +3,7 @@
  * looks at the real pages, so a check that cannot fail never gets to pass them. It needs Chromium (`npx playwright install chromium`),
  * which is why it is not part of `npm test`.
  */
-import { after, before, test } from 'node:test';
+import { afterAll, beforeAll, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import http from 'node:http';
@@ -43,7 +43,7 @@ let browser: Browser;
 let server: http.Server;
 let origin: string;
 const served = new Map<string, string>();
-before(async () => {
+beforeAll(async () => {
   browser = await chromium.launch();
   server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://here');
@@ -69,7 +69,7 @@ before(async () => {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
-after(async () => {
+afterAll(async () => {
   await browser?.close();
   server?.closeAllConnections();
   server?.close();
@@ -434,7 +434,7 @@ test('idle counts its quiet on a clock that does not step: the wall clock steppe
   const wall = Date.now.bind(Date);
   const from = performance.now();
   const waited = idle(page, 3_000);
-  t.mock.method(Date, 'now', () => wall() + 60_000);
+  vi.spyOn(Date, 'now').mockImplementation(() => wall() + 60_000);
   await waited;
   assert.ok(
     performance.now() - from >= QUIET_MS,

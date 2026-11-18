@@ -1,5 +1,5 @@
 /** `skillSpecOf`: a skill's SKILL.md and its other text files read as the spec a Skill carries. */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { skillSpecOf } from './skill-spec.ts';
 

@@ -5,7 +5,7 @@
  * when the step moves and with nothing else.
  */
 import type * as RunObject from 'objects';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import type { RunLines } from '../src/lib/api/run.ts';
@@ -224,13 +224,13 @@ const view = () =>
     { implement: told, review: null },
   );
 
-test('runDetailOf: the run object, its sub-resources and its lines, as the run page reads them', async (t) => {
-  await t.test("a step's closeout is the closeout of its current try, not of the first", () => {
+describe('runDetailOf: the run object, its sub-resources and its lines, as the run page reads them', () => {
+  test("a step's closeout is the closeout of its current try, not of the first", () => {
     const [implement] = view().steps;
     assert.equal(implement?.closeout?.summary, 'the current try');
     assert.equal(implement?.tries.length, 2, 'every try is kept, the current one last');
   });
-  await t.test("a step's spec is the frozen step of its name, with its fence; null for a name not frozen", () => {
+  test("a step's spec is the frozen step of its name, with its fence; null for a name not frozen", () => {
     const [implement, review] = view().steps;
     assert.equal(implement?.spec?.model, 'implement-model');
     assert.equal(review?.spec?.model, 'review-model');
@@ -245,7 +245,7 @@ test('runDetailOf: the run object, its sub-resources and its lines, as the run p
     );
     assert.equal(ran.steps[1]?.spec, null, 'a step the run froze none of has no spec');
   });
-  await t.test("a step's lines and the run's are the api's lines, never composed on the board", () => {
+  test("a step's lines and the run's are the api's lines, never composed on the board", () => {
     const v = view();
     assert.deepEqual(v.steps[0]?.commands, lines().steps.implement);
     assert.deepEqual(v.steps[1]?.commands, lines().steps.review);
@@ -253,17 +253,17 @@ test('runDetailOf: the run object, its sub-resources and its lines, as the run p
     assert.equal(v.refresh, 'nemia refresh r-1');
     assert.deepEqual(v.workflowPage, lines().workflowPage);
   });
-  await t.test('the graph holds no `input` edge: the page draws what a step waits on and its loops', () => {
+  test('the graph holds no `input` edge: the page draws what a step waits on and its loops', () => {
     assert.deepEqual(view().graph.edges, [{ from: 'implement', to: 'review', kind: 'after' }]);
   });
-  await t.test('what a step was told is read off its told, and a step with none read is told nothing, without a throw', () => {
+  test('what a step was told is read off its told, and a step with none read is told nothing, without a throw', () => {
     const [implement, review] = view().steps;
     assert.equal(implement?.body, 'Implement it.');
     assert.equal(implement?.told, 'the whole brief');
     assert.equal(review?.told, null);
     assert.equal(review?.closeout, null);
   });
-  await t.test('the run reads as its object says it: its id, brief, and where it came from only when it came from a card', () => {
+  test('the run reads as its object says it: its id, brief, and where it came from only when it came from a card', () => {
     const v = view();
     assert.equal(v.id, 'r-1');
     assert.equal(v.createdAt, '2026-11-02T10:00:00.000Z');
@@ -280,16 +280,342 @@ test('runDetailOf: the run object, its sub-resources and its lines, as the run p
   });
 });
 
-test("stepStamp: a step's tries and told are read again when it moves, and with nothing else", async (t) => {
-  const step = object().status.steps[0];
-  const stamp = stepStamp(step);
-  await t.test('its current try ending, and a try more, each move the stamp', () => {
+describe("stepStamp: a step's tries and told are read again when it moves, and with nothing else", () => {
+  let step!: {
+    readonly name: string;
+    readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+    readonly lastLine: string | null;
+    readonly workspace: string | null;
+    readonly branch: string | null;
+    readonly said: {
+      readonly text: string;
+      readonly at: string;
+      readonly attempt: number;
+      readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+      readonly words?: string | undefined;
+      readonly after?:
+        | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+        | null
+        | undefined;
+    }[];
+    readonly approve: string | null;
+    readonly filed: {
+      readonly model: string | null;
+      readonly askedModel: string | null;
+      readonly effort: string | null;
+      readonly contextTokens: number | null;
+      readonly fence: string | null;
+      readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+      readonly remote: { readonly name: string; readonly address: string | null } | null;
+      readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+      readonly tools: string[] | null;
+      readonly deadlineSeconds: number | null;
+    } | null;
+    readonly denied: { readonly words: string; readonly calls: string[] } | null;
+    readonly taskId: string | null;
+    readonly attempts: {
+      readonly count: number;
+      readonly latest: {
+        readonly startedAt: string;
+        readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+        readonly endedAt: string | null;
+        readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+        readonly release: { readonly kind: 'install'; readonly tag: string } | { readonly kind: 'checkout'; readonly root: string } | null;
+        readonly harness: { readonly name: string; readonly version: string } | null;
+      } | null;
+    };
+    readonly used: {
+      readonly usage: {
+        readonly responses?: number | undefined;
+        readonly toolCalls?: number | undefined;
+        readonly inputTokens?: number | undefined;
+        readonly outputTokens?: number | undefined;
+        readonly costUsd?: number | undefined;
+        readonly apiMs?: number | undefined;
+        readonly toolMs?: number | undefined;
+        readonly cacheReadTokens?: number | undefined;
+        readonly cacheWriteTokens?: number | undefined;
+        readonly uncachedTokens?: number | undefined;
+        readonly peakContextTokens?: number | undefined;
+        readonly firstContextTokens?: number | undefined;
+        readonly firstCacheWriteTokens?: number | undefined;
+        readonly compactions?: number | undefined;
+        readonly rebuiltCaches?: number | undefined;
+      } | null;
+      readonly used: string;
+      readonly cost: string;
+      readonly costUsd: number | null;
+      readonly apiMs: number | null;
+      readonly toolMs: number | null;
+      readonly read: string | null;
+      readonly peak: 'cap' | 'large' | null;
+      readonly rebuilt: number;
+    } | null;
+    readonly asked: {
+      readonly try: number;
+      readonly mode: 'continue' | 'fresh' | 'recheck';
+      readonly model: string | null;
+      readonly message: string | null;
+      readonly stopFirst: boolean;
+    } | null;
+    readonly check: {
+      readonly command: string;
+      readonly taskId: string | null;
+      readonly verdict: {
+        readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+        readonly exit: number | null;
+      } | null;
+      readonly refused: {
+        readonly exit: string;
+        readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+        readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+        readonly unreadable: string | null;
+      } | null;
+    } | null;
+    readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+    readonly reason:
+      | 'Unknown'
+      | 'Running'
+      | 'Waiting'
+      | 'Succeeded'
+      | 'Failed'
+      | 'AwaitingApproval'
+      | 'AwaitingAnswer'
+      | 'AwaitingRound'
+      | 'OverBudget'
+      | 'BudgetExhausted'
+      | 'Unsigned'
+      | 'Denied'
+      | 'Pending'
+      | 'Checking'
+      | 'Paused'
+      | 'CheckPassed'
+      | 'CheckFailed'
+      | 'UnreadableCloseout'
+      | 'Stopped'
+      | 'Skipped'
+      | 'Sent';
+    readonly verdict: { readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown'; readonly exit: number | null } | null;
+    readonly message: string;
+    readonly files: (
+      | {
+          readonly name: string;
+          readonly path: string;
+          readonly kind: 'image' | 'text' | 'other';
+          readonly url: string;
+          readonly size: number;
+          readonly relativePath?: string | undefined;
+        }
+      | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+      | { readonly path: string; readonly relativePath?: string | undefined }
+    )[];
+    readonly status:
+      | 'running'
+      | 'failed'
+      | 'awaiting approval'
+      | 'pending'
+      | 'stopped'
+      | 'blocked'
+      | 'unsigned'
+      | 'checking'
+      | 'verified'
+      | 'unverified'
+      | 'exhausted'
+      | 'over budget'
+      | 'budget exhausted'
+      | 'denied'
+      | 'failed (check)'
+      | 'skipped'
+      | 'sent';
+    readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+    readonly via: 'session' | 'closeout' | null;
+    readonly raise: {
+      readonly by: 'round' | 'retry';
+      readonly above: number;
+      readonly said: string;
+      readonly modes: ('continue' | 'fresh' | 'recheck')[];
+      readonly own:
+        | 'running'
+        | 'failed'
+        | 'awaiting approval'
+        | 'pending'
+        | 'stopped'
+        | 'blocked'
+        | 'unsigned'
+        | 'checking'
+        | 'verified'
+        | 'unverified'
+        | 'exhausted'
+        | 'over budget'
+        | 'budget exhausted'
+        | 'denied'
+        | 'failed (check)'
+        | 'skipped'
+        | 'sent'
+        | null;
+    } | null;
+    readonly timeline: {
+      readonly round: number;
+      readonly try: number;
+      readonly session: {
+        readonly taskId: string;
+        readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+        readonly filedAt: string | null;
+        readonly spawnedAt: string | null;
+        readonly endedAt: string | null;
+        readonly attempts: number;
+        readonly queuedMs: number | null;
+        readonly ranMs: number | null;
+        readonly queued: string;
+        readonly ran: string;
+      } | null;
+      readonly used: {
+        readonly usage: {
+          readonly responses?: number | undefined;
+          readonly toolCalls?: number | undefined;
+          readonly inputTokens?: number | undefined;
+          readonly outputTokens?: number | undefined;
+          readonly costUsd?: number | undefined;
+          readonly apiMs?: number | undefined;
+          readonly toolMs?: number | undefined;
+          readonly cacheReadTokens?: number | undefined;
+          readonly cacheWriteTokens?: number | undefined;
+          readonly uncachedTokens?: number | undefined;
+          readonly peakContextTokens?: number | undefined;
+          readonly firstContextTokens?: number | undefined;
+          readonly firstCacheWriteTokens?: number | undefined;
+          readonly compactions?: number | undefined;
+          readonly rebuiltCaches?: number | undefined;
+        } | null;
+        readonly used: string;
+        readonly cost: string;
+        readonly costUsd: number | null;
+        readonly apiMs: number | null;
+        readonly toolMs: number | null;
+        readonly read: string | null;
+        readonly peak: 'cap' | 'large' | null;
+        readonly rebuilt: number;
+      } | null;
+      readonly sessionOf: number | null;
+      readonly check: {
+        readonly taskId: string;
+        readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+        readonly filedAt: string | null;
+        readonly spawnedAt: string | null;
+        readonly endedAt: string | null;
+        readonly attempts: number;
+        readonly queuedMs: number | null;
+        readonly ranMs: number | null;
+        readonly queued: string;
+        readonly ran: string;
+      } | null;
+      readonly turn?:
+        | { readonly asked: boolean; readonly heldFrom: string | null; readonly spawnedAt: string | null; readonly endedAt: string | null }
+        | undefined;
+    }[];
+    readonly current: {
+      readonly try: number;
+      readonly round: number;
+      readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+      readonly reason:
+        | 'Unknown'
+        | 'Running'
+        | 'Waiting'
+        | 'Succeeded'
+        | 'Failed'
+        | 'AwaitingApproval'
+        | 'AwaitingAnswer'
+        | 'AwaitingRound'
+        | 'OverBudget'
+        | 'BudgetExhausted'
+        | 'Unsigned'
+        | 'Denied'
+        | 'Pending'
+        | 'Checking'
+        | 'Paused'
+        | 'CheckPassed'
+        | 'CheckFailed'
+        | 'UnreadableCloseout'
+        | 'Stopped'
+        | 'Skipped'
+        | 'Sent';
+      readonly outcome: 'blocked' | 'done' | null;
+      readonly verdict: {
+        readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+        readonly exit: number | null;
+      } | null;
+    } | null;
+    readonly filesError: string | null;
+    readonly note: string | null;
+    readonly roundDue: boolean;
+    readonly needs: string | null;
+    readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+    readonly sessionUnread: string | null;
+    readonly gate: {
+      readonly awaiting: boolean;
+      readonly approval: {
+        readonly at: string;
+        readonly try: number;
+        readonly message: string | null;
+        readonly actor?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+      } | null;
+      readonly budgets?:
+        | {
+            readonly from: 'proposed' | 'approved';
+            readonly steps: {
+              readonly step: string;
+              readonly usd: number;
+              readonly said: string;
+              readonly why: string | null;
+              readonly workflow: number | null;
+              readonly above: boolean;
+            }[];
+            readonly said: string;
+            readonly line?: { readonly usd: number; readonly said: string } | undefined;
+          }
+        | undefined;
+    } | null;
+    readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+    readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+    readonly asks?: number | undefined;
+    readonly artifactsFolder?:
+      | {
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly error: string | null;
+        }
+      | undefined;
+  };
+  let stamp!: string;
+  beforeAll(() => {
+    step = object().status.steps[0];
+    stamp = stepStamp(step);
+  });
+  test('its current try ending, and a try more, each move the stamp', () => {
     assert.notEqual(stepStamp({ ...step, current: { ...step.current!, outcome: 'done' } }), stamp, 'the current try signed off');
     assert.notEqual(stepStamp({ ...step, attempts: { ...step.attempts, count: 2 } }), stamp, 'an attempt more');
     assert.notEqual(stepStamp({ ...step, taskId: 'r-1-implement-3' }), stamp, 'another task');
     assert.notEqual(stepStamp({ ...step, current: null }), stamp, 'no try');
   });
-  await t.test('REFUSED: what it cost, and what a person said to it, move no stamp', () => {
+  test('REFUSED: what it cost, and what a person said to it, move no stamp', () => {
     assert.equal(stepStamp({ ...step, spent: { usd: 1, measured: 1, unmeasured: 0, said: '$1.00' } }), stamp);
     assert.equal(stepStamp({ ...step, said: [{ at: '2026-11-02T10:01:00.000Z', attempt: 1, text: 'hello' }] }), stamp);
   });

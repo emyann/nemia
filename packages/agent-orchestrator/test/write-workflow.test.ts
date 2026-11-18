@@ -7,7 +7,7 @@
  * Its store is its own at `ROOT`. The tests' team's agents and skills are copied
  * beside the store's workflows, as beside its own: dev's steps name them.
  */
-import { test } from 'node:test';
+import { afterAll, beforeAll, describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -216,11 +216,14 @@ const linked = (dir: string, file: string): void => {
   linkedTo.set(to, fs.readFileSync(to, 'utf8'));
 };
 
-test('REFUSED at shipped defaults, with the folder as it was, before a byte is written: a write a folder could not take', async (t) => {
+describe('REFUSED at shipped defaults, with the folder as it was, before a byte is written: a write a folder could not take', () => {
+  beforeAll(() => {
+    fs.writeFileSync(path.join(outside, 'old.md'), 'a step nobody meant to remove\n');
+    fs.mkdirSync(path.join(unknown, '.git'));
+    fs.writeFileSync(file, 'not a folder\n');
+  });
   const outside = scratch('wf-write-outside-');
-  fs.writeFileSync(path.join(outside, 'old.md'), 'a step nobody meant to remove\n');
   const unknown = scratch('wf-write-unknown-');
-  fs.mkdirSync(path.join(unknown, '.git'));
   const nowhere = [
     "is not a workflow in the store's workflows/",
     '<repo>/workflows/<name>',
@@ -228,7 +231,6 @@ test('REFUSED at shipped defaults, with the folder as it was, before a byte is w
     '{ anywhere: true }',
   ];
   const file = path.join(STORE, 'a-file');
-  fs.writeFileSync(file, 'not a folder\n');
   const theirs = path.join(devIn('theirs'), 'review.schema.json');
   const tally = 'review: `tally: findings, nope` in review.md';
   const rows: Refused[] = [
@@ -389,7 +391,7 @@ test('REFUSED at shipped defaults, with the folder as it was, before a byte is w
     },
   ];
   for (const { row, dir, write, naming, asLoaded } of rows)
-    await t.test(row, () => {
+    test(row, () => {
       const at = dir();
       const said = refusal(at, () => write(at));
       const [opens, ...named] = naming;
@@ -397,8 +399,10 @@ test('REFUSED at shipped defaults, with the folder as it was, before a byte is w
       for (const name of named) assert.ok(said.includes(name), `names ${name}: ${said}`);
       if (asLoaded) assert.equal(said, asLoaded(at), 'the words a folder on disk is refused with');
     });
-  assert.equal(fs.readFileSync(file, 'utf8'), 'not a folder\n', 'the file a folder was asked of is untouched');
-  for (const [to, was] of linkedTo) assert.equal(fs.readFileSync(to, 'utf8'), was, `${to}, what a link points at, is untouched`);
+  afterAll(() => {
+    assert.equal(fs.readFileSync(file, 'utf8'), 'not a folder\n', 'the file a folder was asked of is untouched');
+    for (const [to, was] of linkedTo) assert.equal(fs.readFileSync(to, 'utf8'), was, `${to}, what a link points at, is untouched`);
+  });
 });
 
 test("a schema given with a step is not what is written or read: the folder's file is", () => {
@@ -444,23 +448,21 @@ test('the files of the steps the folder no longer has go before a byte of the ne
   const [implement, review] = loadWorkflows(dir) as [StepSpec, StepSpec];
   const order: string[] = [];
   const { rmSync, writeFileSync } = fs;
-  const removals = t.mock.method(fs, 'rmSync', (at: fs.PathLike, opts?: fs.RmOptions) => {
+  const removals = vi.spyOn(fs, 'rmSync').mockImplementation((at: fs.PathLike, opts?: fs.RmOptions) => {
     order.push(`removed ${path.basename(String(at))}`);
     return rmSync(at, opts);
   });
-  const writes = t.mock.method(
-    fs,
-    'writeFileSync',
-    (at: fs.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, opts?: fs.WriteFileOptions) => {
+  const writes = vi
+    .spyOn(fs, 'writeFileSync')
+    .mockImplementation((at: fs.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, opts?: fs.WriteFileOptions) => {
       order.push(`wrote ${path.basename(String(at))}`);
       return writeFileSync(at, data, opts);
-    },
-  );
+    });
   try {
     writeWorkflow(ROOT, dir, [implement, { ...review, name: 'REVIEW', rounds: 2 }]);
   } finally {
-    removals.mock.restore();
-    writes.mock.restore();
+    removals.mockRestore();
+    writes.mockRestore();
   }
   const wrote = order.indexOf('wrote REVIEW.md');
   assert.ok(wrote >= 0, order.join(', '));
@@ -473,9 +475,8 @@ test('the files of the steps the folder no longer has go before a byte of the ne
   assert.deepEqual(order.slice(wrote), ['wrote REVIEW.md'], 'and nothing is removed after it — implement.md is left as it is');
 });
 
-test(
+test.skipIf(caseSensitive && 'this filesystem tells implement.md from Implement.md apart, where a rename by case is an ordinary rename')(
   'a step renamed by case keeps its file where the filesystem does not tell case apart',
-  { skip: caseSensitive && 'this filesystem tells implement.md from Implement.md apart, where a rename by case is an ordinary rename' },
   () => {
     const dir = devIn('case');
     const [implement] = loadWorkflows(dir) as [StepSpec];

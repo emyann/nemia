@@ -17,7 +17,7 @@
 import { root, SEATED } from '../../test/harness.ts';
 import { actorWords, type DecideCommand, type Decidable } from 'objects';
 import { closeoutOf, listedOf, objectOf, stepOf } from '../../test/run-reads.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -222,8 +222,8 @@ const refusedWith = async (res: Response, status: number, said: string): Promise
   return ((await res.json()) as { error: string }).error;
 };
 
-test('POST …/approve: what it refuses — a body, a run or step not there, empty words, a step the package will not approve, answers that do not fit — and nothing written', async (t) => {
-  await t.test('a body `RunApprove` does not read is a 400, naming the key it refused', async () => {
+describe('POST …/approve: what it refuses — a body, a run or step not there, empty words, a step the package will not approve, answers that do not fit — and nothing written', () => {
+  test('a body `RunApprove` does not read is a 400, naming the key it refused', async () => {
     const bodies: Array<[unknown, string]> = [
       ['not json', 'payload'],
       [['Ship it.'], 'payload'],
@@ -239,91 +239,79 @@ test('POST …/approve: what it refuses — a body, a run or step not there, emp
     }
     nothingWritten('a body that is not an approval');
   });
-
-  await t.test('a run or a step that does not exist is a 404, naming it', async () => {
+  test('a run or a step that does not exist is a 404, naming it', async () => {
     assert.match(await refusedWith(await approveOver('plan', {}, BOARD, 'r-nope'), 404, 'no run'), /^No run 'r-nope'/);
     assert.match(await refusedWith(await approveOver('deploy', {}), 404, 'no step'), new RegExp(`^Run '${R}' has no step 'deploy'`));
     nothingWritten('a run or a step not there');
   });
-
-  await t.test('empty words are a 422, naming --message', async () => {
+  test('empty words are a 422, naming --message', async () => {
     for (const message of ['', '  \n ']) {
       const error = await refusedWith(await approveOver('plan', { message }), 422, JSON.stringify(message));
       assert.match(error, /^--message is empty/);
     }
     nothingWritten('empty words');
   });
+  test("REFUSED at shipped defaults: a step not gated, a gated step not signed off yet, and a step of a run called off are 409s in `approvalRefusal`'s words", async () => {
+    const cases: Array<[string, string, RegExp[]]> = [
+      [R, 'tokens', [/^tokens has no gate/, /is gated at plan, sketch\./]],
+      [R, 'implement', [/^implement has no gate: /]],
+      [R, 'sketch', [/^sketch has not signed off yet/, /has not been filed/]],
+      [CANCELLED, 'plan', [new RegExp(`^${CANCELLED} was cancelled at ${at(20).replace(/\./g, '\\.')}`), /files nothing/]],
+    ];
+    for (const [run, step, facts] of cases) {
+      const error = await refusedWith(await approveOver(step, { message: 'Ship it.' }, BOARD, run), 409, `${run} ${step}`);
+      assert.equal(error, await approveRefuses(step, 'Ship it.', run));
+      for (const fact of facts) assert.match(error, fact, `${run} ${step}`);
+    }
+    nothingWritten('a step the package will not approve');
+    nothingWritten('a step of a run called off', CANCELLED);
+  });
+  test("REFUSED at shipped defaults: an approval's answers that do not fit the questions the gated step asks now, and answers to a step that asks none, are 422s in `answerRefusal`'s words, answers that are no list a 400 — and no approval is written", async () => {
+    const id = 'r-gate-asks-refused';
+    askingRun(id);
+    const misfit = [
+      { question: cut.title, chose: ['c'] },
+      { question: where.title, chose: ['gate'] },
+    ];
+    const misfitSaid = await refused422(await approveOver('design', { answers: misfit }, BOARD, id), id);
+    assert.match(misfitSaid, /^"How is the card cut\?" offers no "c"/, 'the question that misfits, by its title');
+    assert.match(misfitSaid, /its options are "a", "b"/);
+    assert.match(
+      await refused422(await approveOver('design', { answers: [{ question: cut.title, chose: ['a'] }] }, BOARD, id), id),
+      /^"Where do the answers go\?" is not answered/,
+    );
+    assert.ok(!fs.existsSync(approvalFile(root, id, 'design', 1)), 'no approval file');
+    const noList = await approveOver('design', { answers: 'a' }, BOARD, id);
+    assert.equal(noList.status, 400, 'answers that are no list `RunApprove` reads');
+    assert.ok(((await noList.json()) as { field?: string }).field?.startsWith('payload.answers'));
+    assert.deepEqual(asked(id), [], 'nothing written');
 
-  await t.test(
-    "REFUSED at shipped defaults: a step not gated, a gated step not signed off yet, and a step of a run called off are 409s in `approvalRefusal`'s words",
-    async () => {
-      const cases: Array<[string, string, RegExp[]]> = [
-        [R, 'tokens', [/^tokens has no gate/, /is gated at plan, sketch\./]],
-        [R, 'implement', [/^implement has no gate: /]],
-        [R, 'sketch', [/^sketch has not signed off yet/, /has not been filed/]],
-        [CANCELLED, 'plan', [new RegExp(`^${CANCELLED} was cancelled at ${at(20).replace(/\./g, '\\.')}`), /files nothing/]],
-      ];
-      for (const [run, step, facts] of cases) {
-        const error = await refusedWith(await approveOver(step, { message: 'Ship it.' }, BOARD, run), 409, `${run} ${step}`);
-        assert.equal(error, await approveRefuses(step, 'Ship it.', run));
-        for (const fact of facts) assert.match(error, fact, `${run} ${step}`);
-      }
-      nothingWritten('a step the package will not approve');
-      nothingWritten('a step of a run called off', CANCELLED);
-    },
-  );
-
-  await t.test(
-    "REFUSED at shipped defaults: an approval's answers that do not fit the questions the gated step asks now, and answers to a step that asks none, are 422s in `answerRefusal`'s words, answers that are no list a 400 — and no approval is written",
-    async () => {
-      const id = 'r-gate-asks-refused';
-      askingRun(id);
-      const misfit = [
-        { question: cut.title, chose: ['c'] },
-        { question: where.title, chose: ['gate'] },
-      ];
-      const misfitSaid = await refused422(await approveOver('design', { answers: misfit }, BOARD, id), id);
-      assert.match(misfitSaid, /^"How is the card cut\?" offers no "c"/, 'the question that misfits, by its title');
-      assert.match(misfitSaid, /its options are "a", "b"/);
+    const none = 'r-gate-asks-none';
+    gatedRun(none);
+    for (const answers of [[], [{ question: cut.title, chose: ['a'] }]]) {
       assert.match(
-        await refused422(await approveOver('design', { answers: [{ question: cut.title, chose: ['a'] }] }, BOARD, id), id),
-        /^"Where do the answers go\?" is not answered/,
+        await refused422(await approveOver('plan', { message: 'Go.', answers }, BOARD, none), none),
+        /^The step asks no questions now/,
+        JSON.stringify(answers),
       );
-      assert.ok(!fs.existsSync(approvalFile(root, id, 'design', 1)), 'no approval file');
-      const noList = await approveOver('design', { answers: 'a' }, BOARD, id);
-      assert.equal(noList.status, 400, 'answers that are no list `RunApprove` reads');
-      assert.ok(((await noList.json()) as { field?: string }).field?.startsWith('payload.answers'));
-      assert.deepEqual(asked(id), [], 'nothing written');
-
-      const none = 'r-gate-asks-none';
-      gatedRun(none);
-      for (const answers of [[], [{ question: cut.title, chose: ['a'] }]]) {
-        assert.match(
-          await refused422(await approveOver('plan', { message: 'Go.', answers }, BOARD, none), none),
-          /^The step asks no questions now/,
-          JSON.stringify(answers),
-        );
-      }
-      assert.ok(!fs.existsSync(approvalFile(root, none, 'plan', 1)), 'no approval file');
-    },
-  );
+    }
+    assert.ok(!fs.existsSync(approvalFile(root, none, 'plan', 1)), 'no approval file');
+  });
 });
 
-test('POST …/approve with `budgets`: the caps a person gives the later steps written into the approval and shown at the gate; REFUSED: budgets that do not read, or name no later step, and nothing written', async (t) => {
-  await t.test('a body whose `budgets` do not read is a 400 naming the key', async () => {
+describe('POST …/approve with `budgets`: the caps a person gives the later steps written into the approval and shown at the gate; REFUSED: budgets that do not read, or name no later step, and nothing written', () => {
+  test('a body whose `budgets` do not read is a 400 naming the key', async () => {
     for (const budgets of ['x', [{ step: 'review' }], [{ step: 'review', usd: '4' }]]) {
       assert.match(await refusedWith(await approveOver('plan', { budgets }), 400, JSON.stringify(budgets)), /budgets/);
     }
     nothingWritten('budgets that do not read');
   });
-
-  await t.test("a budget for a step that does not come after the gate is the command's refusal", async () => {
+  test("a budget for a step that does not come after the gate is the command's refusal", async () => {
     const res = await approveOver('plan', { budgets: [{ step: 'tokens', usd: 4 }] });
     assert.ok(res.status >= 400 && res.status < 500, `refused, answered ${String(res.status)}`);
     nothingWritten('a budget for tokens, which does not come after plan');
   });
-
-  await t.test('the caps given are written into the approval, and the gate shows them approved', async () => {
+  test('the caps given are written into the approval, and the gate shows them approved', async () => {
     const id = 'r-gate-budgets';
     gatedRun(id);
     const res = await approveOver('plan', { budgets: [{ step: 'review', usd: 4 }] }, BOARD, id);
@@ -339,11 +327,10 @@ test('POST …/approve with `budgets`: the caps a person gives the later steps w
   });
 });
 
-test('a person approves a gate on the board: the need on the list and the detail, the approval written as `nemia approve` writes it, then the step waits on nobody', async (t) => {
-  const s = story(t);
-  let took: Approved | undefined;
-
-  await s.test(
+describe('a person approves a gate on the board: the need on the list and the detail, the approval written as `nemia approve` writes it, then the step waits on nobody', () => {
+  let took!: Approved | undefined;
+  const s = story(test);
+  s.test(
     "a run's detail carries its gates and each gated step's gate — awaiting approval, or not signed off yet — and the list and the detail carry the need `approve plan`, in `nemia ls`'s words",
     async () => {
       const run = await object();
@@ -411,8 +398,7 @@ test('a person approves a gate on the board: the need on the list and the detail
       );
     },
   );
-
-  await s.test(
+  s.test(
     "an approval as the board sends it is the package's: 202 with the step, the try, when, the words and its file — the file as `nemia approve` writes it, the record untouched",
     async () => {
       const res = await approveOver('plan', { message: 'Ship the second reading.' });
@@ -445,8 +431,7 @@ test('a person approves a gate on the board: the need on the list and the detail
       assert.equal(standIn().stopped.length, 0, 'and stopped nothing');
     },
   );
-
-  await s.test(
+  s.test(
     'the detail reads the approval under the step, with who gave it (the person, on the token the request presented), which waits on nobody, as `nemia ls` has it',
     async () => {
       assert.ok(took);
@@ -467,16 +452,14 @@ test('a person approves a gate on the board: the need on the list and the detail
       assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou, 'and nobody waited on, as `nemia ls` has it');
     },
   );
-
-  await s.test('a second approval is refused (409), naming the try approved and when, and nothing more is written', async () => {
+  s.test('a second approval is refused (409), naming the try approved and when, and nothing more is written', async () => {
     assert.ok(took);
     const error = await refusedWith(await approveOver('plan', { message: 'Ship the first reading.' }), 409, 'approved once');
     assert.ok(error.startsWith(`try 1 of plan is already approved, at ${took.at}`), error);
     assert.equal(error, await approveRefuses('plan', 'Ship the first reading.'));
     assert.deepEqual(asked(), ['approve-plan-1']);
   });
-
-  await s.test('an approval with no words is written with none, and the detail reads its words as null', async () => {
+  s.test('an approval with no words is written with none, and the detail reads its words as null', async () => {
     const id = 'r-gate-wordless';
     gatedRun(id);
     const res = await approveOver('plan', {}, BOARD, id);
@@ -490,8 +473,7 @@ test('a person approves a gate on the board: the need on the list and the detail
       approval: { try: 1, at: wordless.at, message: null, actor: SEATED },
     });
   });
-
-  await s.test(
+  s.test(
     "an approval's answers that fit are its words, in the package's words for the steps after the gate, the words beside them their note, ending with who answered",
     async () => {
       const id = 'r-gate-asks';
@@ -517,11 +499,10 @@ test('a person approves a gate on the board: the need on the list and the detail
   );
 });
 
-test('a person sends a step back from its gate: refused without words, asked with them — then its approval is refused — and answers carried as the try’s message', async (t) => {
-  const s = story(t);
+describe('a person sends a step back from its gate: refused without words, asked with them — then its approval is refused — and answers carried as the try’s message', () => {
+  const s = story(test);
   const id = 'r-gate-back';
-
-  await s.test(
+  s.test(
     "REFUSED at shipped defaults: sending a step back from its gate without words is a 409 in `retryRefusal`'s words, and nothing is written",
     async () => {
       gatedRun(id);
@@ -537,8 +518,7 @@ test('a person sends a step back from its gate: refused without words, asked wit
       assert.deepEqual(asked(id), [], 'nothing written on a send-back with no words');
     },
   );
-
-  await s.test(
+  s.test(
     "with words it is the answer box's ask: 202, the step still at its gate until the tick files the try, and the run waits on nobody",
     async () => {
       const back = await ask('plan', { mode: 'continue', message: 'Store the flag before you parse it.' }, id);
@@ -565,15 +545,13 @@ test('a person sends a step back from its gate: refused without words, asked wit
       );
     },
   );
-
-  await s.test('its approval is refused while the send-back is asked for (409), and nothing more is written', async () => {
+  s.test('its approval is refused while the send-back is asked for (409), and nothing more is written', async () => {
     const error = await refusedWith(await approveOver('plan', { message: 'Ship it.' }, BOARD, id), 409, 'asked for');
     assert.ok(error.startsWith('try 2 of plan is already asked for (--continue, at '), error);
     assert.equal(error, await approveRefuses('plan', 'Ship it.', id));
     assert.deepEqual(asked(id), ['retry-plan-2']);
   });
-
-  await s.test(
+  s.test(
     "a send-back from a gate that asks carries the answers as its try's message, in `answerText`'s words, its objection their note; answers that do not fit are a 422 and nothing is written",
     async () => {
       const asks = 'r-gate-asks-back';

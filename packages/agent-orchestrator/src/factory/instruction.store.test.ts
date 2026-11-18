@@ -8,7 +8,7 @@
  * `test/factory-rules.test.ts`; their removal with the factory, in `test/factory-start.test.ts`. Its store is at `ROOT`, given as
  * `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -62,7 +62,7 @@ function filed(extra: Record<string, unknown> = {}): string {
   return repo;
 }
 
-test('REFUSED: `nemia factory instruction`, the record unchanged', async (t) => {
+describe('REFUSED: `nemia factory instruction`, the record unchanged', () => {
   const rows: Array<[string, () => unknown, 'Missing' | 'Conflict' | 'Invalid', string[]]> = [
     [
       'the default factory',
@@ -88,56 +88,55 @@ test('REFUSED: `nemia factory instruction`, the record unchanged', async (t) => 
     ],
   ];
   for (const [row, act, tag, facts] of rows)
-    await t.test(row, async () => {
+    test(row, async () => {
       filed();
       fs.writeFileSync(recordOf('torn'), '{ not json');
       const before = [fs.readFileSync(recordOf('pipao')), fs.readFileSync(recordOf('torn'))];
       await assert.rejects(async () => await act(), refused(tag, ...facts));
       assert.deepEqual([fs.readFileSync(recordOf('pipao')), fs.readFileSync(recordOf('torn'))], before);
     });
-  await t.test('a put that names no place, by the check', () =>
-    assert.notEqual(FACTORY_INSTRUCTION.check!({ factory: 'pipao', clear: false }), null),
-  );
+  test('a put that names no place, by the check', () =>
+    assert.notEqual(FACTORY_INSTRUCTION.check!({ factory: 'pipao', clear: false }), null));
 });
 
-test('REFUSED: `nemia factory instruct`, nothing written', async (t) => {
-  await t.test('the default factory', async () => {
+describe('REFUSED: `nemia factory instruct`, nothing written', () => {
+  test('the default factory', async () => {
     await assert.rejects(
       runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'default', words: 'x', clear: false })),
       refused('Conflict', 'nemia factory instruct'),
     );
     assert.ok(!fs.existsSync(storeFolder('default')));
   });
-  await t.test(
-    "words for an instruction kept in the factory's folder: a Conflict naming the file and the --store, no store folder made",
-    async () => {
-      const repo = filed();
-      await assert.rejects(
-        runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'pipao', words: 'x', clear: false })),
-        refused('Conflict', path.join(repo, 'NEMIA.md'), 'nemia factory instruction pipao --store'),
-      );
-      assert.ok(!fs.existsSync(storeFolder('pipao')), 'no store folder');
-    },
-  );
-  await t.test('blank words', () => {
+  test("words for an instruction kept in the factory's folder: a Conflict naming the file and the --store, no store folder made", async () => {
+    const repo = filed();
+    await assert.rejects(
+      runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'pipao', words: 'x', clear: false })),
+      refused('Conflict', path.join(repo, 'NEMIA.md'), 'nemia factory instruction pipao --store'),
+    );
+    assert.ok(!fs.existsSync(storeFolder('pipao')), 'no store folder');
+  });
+  test('blank words', () => {
     filed({ instruction: { store: true } });
     assert.throws(() => writeInstructionText(ROOT, 'pipao', ' \n'), refused('Invalid', 'pipao'));
     assert.ok(!fs.existsSync(path.join(storeFolder('pipao'), 'NEMIA.md')));
   });
 });
 
-test('a rules or instruction file that cannot be told is read with why, and never written through', async (t) => {
-  const RULES = path.join(storeFolder('pipao'), 'RULES.md');
-  const outside = path.join(ROOT, 'elsewhere.md');
-  fs.writeFileSync(outside, 'Words from elsewhere.\n');
-
-  await t.test('rules: a blank file reads as no rules', () => {
+describe('a rules or instruction file that cannot be told is read with why, and never written through', () => {
+  let RULES!: string;
+  let outside!: string;
+  beforeAll(() => {
+    RULES = path.join(storeFolder('pipao'), 'RULES.md');
+    outside = path.join(ROOT, 'elsewhere.md');
+    fs.writeFileSync(outside, 'Words from elsewhere.\n');
+  });
+  test('rules: a blank file reads as no rules', () => {
     filed();
     fs.mkdirSync(storeFolder('pipao'), { recursive: true });
     fs.writeFileSync(RULES, '  \n\n');
     assert.deepEqual(readRules(RULES), { words: null, error: null });
   });
-  await t.test('rules: a frontmatter block reads with why, the words given beside it to be mended', () => {
+  test('rules: a frontmatter block reads with why, the words given beside it to be mended', () => {
     filed();
     fs.mkdirSync(storeFolder('pipao'), { recursive: true });
     fs.writeFileSync(RULES, '---\nmodel: opus\n---\nBe kind.\n');
@@ -145,7 +144,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     names(read.error, 'RULES.md', 'frontmatter');
     assert.equal(read.words, '---\nmodel: opus\n---\nBe kind.');
   });
-  await t.test('rules: a link is not read, and a write replaces it without touching what it pointed at', () => {
+  test('rules: a link is not read, and a write replaces it without touching what it pointed at', () => {
     filed();
     fs.mkdirSync(storeFolder('pipao'), { recursive: true });
     fs.symlinkSync(outside, RULES);
@@ -157,14 +156,14 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     assert.equal(fs.readFileSync(outside, 'utf8'), 'Words from elsewhere.\n', 'never written through');
     assert.deepEqual(readRules(RULES), { words: 'Our own words.', error: null });
   });
-  await t.test('rules: a directory reads with why, and a clear removes whatever is there', () => {
+  test('rules: a directory reads with why, and a clear removes whatever is there', () => {
     filed();
     fs.mkdirSync(RULES, { recursive: true });
     names(readRules(RULES).error, 'RULES.md', 'not a file');
     assert.equal(clearRules(ROOT, { name: 'pipao' }), true);
     assert.equal(fs.existsSync(RULES), false);
   });
-  await t.test('instruction in the store: a link is read with why, and a write replaces it without touching what it pointed at', () => {
+  test('instruction in the store: a link is read with why, and a write replaces it without touching what it pointed at', () => {
     filed({ instruction: { store: true } });
     fs.mkdirSync(storeFolder('pipao'), { recursive: true });
     fs.symlinkSync(outside, path.join(storeFolder('pipao'), 'NEMIA.md'));
@@ -173,7 +172,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     assert.equal(fs.readFileSync(outside, 'utf8'), 'Words from elsewhere.\n');
     assert.ok(!fs.lstatSync(path.join(storeFolder('pipao'), 'NEMIA.md')).isSymbolicLink());
   });
-  await t.test('instruction in the folder: a link leading outside it does not read; one that stays inside reads', () => {
+  test('instruction in the folder: a link leading outside it does not read; one that stays inside reads', () => {
     const repo = filed();
     const secret = path.join(ROOT, 'secret.md');
     fs.writeFileSync(secret, 'secret\n');
@@ -189,14 +188,14 @@ test('a rules or instruction file that cannot be told is read with why, and neve
       error: null,
     });
   });
-  await t.test('instruction: a path written by hand that climbs out of the folder is not read', () => {
+  test('instruction: a path written by hand that climbs out of the folder is not read', () => {
     const repo = filed({ instruction: { path: '../secret.md' } });
     fs.writeFileSync(path.join(path.dirname(repo), 'secret.md'), 'secret\n');
     const answer = factoryInstruction(ROOT, 'pipao');
     assert.equal(answer.words, null);
     names(answer.error, 'inside');
   });
-  await t.test('instruction: a record whose instruction is no path nor the store is listed with why, never thrown', () => {
+  test('instruction: a record whose instruction is no path nor the store is listed with why, never thrown', () => {
     filed({ instruction: 5 });
     fs.writeFileSync(recordOf('half'), JSON.stringify({ repos: ['/x'], instruction: { store: false } }));
     assert.deepEqual(

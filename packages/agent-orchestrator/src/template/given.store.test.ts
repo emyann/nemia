@@ -5,7 +5,7 @@
  * path of the api's machine as it is, an archive kept by its name and the digest of its content, removed after a preview and after a
  * failure, kept where a factory is made from it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

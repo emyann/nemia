@@ -7,7 +7,7 @@
  * Each refusal asserts its status and the step it names, never its sentence.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -88,8 +88,8 @@ async function writtenBack(files: ReturnType<typeof filesOf>): Promise<Proposal>
   return (await approved.json()) as Proposal;
 }
 
-test("a factory's own workflow, its step filled by a hire, read for the factory and written back: unchanged, then one line changed", async (t) => {
-  await t.test('read for the factory, the hired step with `skills:` and no `agent:` line reads as the factory serves it', async () => {
+describe("a factory's own workflow, its step filled by a hire, read for the factory and written back: unchanged, then one line changed", () => {
+  test('read for the factory, the hired step with `skills:` and no `agent:` line reads as the factory serves it', async () => {
     const res = await post(`/api/workflows/read?factory=${FACTORY}`, { name: 'hired', files: filesOf() });
     const answer = (await res.json()) as WorkflowCreate;
     assert.equal(res.status, 200, JSON.stringify(answer));
@@ -97,12 +97,12 @@ test("a factory's own workflow, its step filled by a hire, read for the factory 
     assert.equal(served.status.error, null, 'the tree reads in its factory');
     assert.deepEqual(answer.spec, served.spec, 'the spec a GET of the same folder in the factory answers');
   });
-  await t.test('written back unchanged, the proposal is applied and the step file is as it was', async () => {
+  test('written back unchanged, the proposal is applied and the step file is as it was', async () => {
     const applied = await writtenBack(filesOf());
     assert.equal(applied.status.phase, 'applied', applied.status.message);
     assert.equal(fs.readFileSync(path.join(TREE, 'noted.md'), 'utf8'), STEP);
   });
-  await t.test('written back with one line changed, the tree holds that line', async () => {
+  test('written back with one line changed, the tree holds that line', async () => {
     const changed = STEP.replace('Do it.', 'Do it twice.');
     const applied = await writtenBack(filesOf({ 'noted.md': changed }));
     assert.equal(applied.status.phase, 'applied', applied.status.message);

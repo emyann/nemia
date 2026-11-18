@@ -6,7 +6,7 @@
  * are told in `test/auto-rules.test.ts`.
  */
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { describe, test } from 'vitest';
 import { names } from '../../test/assessed.ts';
 import {
   allowedBy,
@@ -24,8 +24,8 @@ import {
 /** A run where all agree: every condition holds, and it has cost $3. */
 const ALL_AGREE: Facts = { recommends: true, checked: true, accepted: true, withinBudget: true, nothingOpen: true, spend: 3 };
 
-test('`allowedBy`: the default allows an approval at any step where all agree and nothing else; a rule covers its answer, steps and line', async (t) => {
-  await t.test('the default allows an approval at any step where all agree, and nothing else', () => {
+describe('`allowedBy`: the default allows an approval at any step where all agree and nothing else; a rule covers its answer, steps and line', () => {
+  test('the default allows an approval at any step where all agree, and nothing else', () => {
     assert.equal(allowedBy([DEFAULT_POLICY], { answer: 'approve', step: 'design' }, ALL_AGREE), DEFAULT_POLICY);
     assert.equal(allowedBy([DEFAULT_POLICY], { answer: 'approve', step: 'land' }, ALL_AGREE), DEFAULT_POLICY);
     assert.equal(allowedBy([DEFAULT_POLICY], { answer: 'retry', step: 'design' }, ALL_AGREE), undefined, 'a try is no approval');
@@ -33,10 +33,10 @@ test('`allowedBy`: the default allows an approval at any step where all agree an
     assert.equal(allowedBy([], { answer: 'approve', step: 'design' }, ALL_AGREE), undefined, 'an empty list allows nothing');
   });
   for (const condition of CONDITIONS)
-    await t.test(`REFUSED: the default asks when ${condition} fails`, () => {
+    test(`REFUSED: the default asks when ${condition} fails`, () => {
       assert.equal(allowedBy([DEFAULT_POLICY], { answer: 'approve', step: 'design' }, { ...ALL_AGREE, [condition]: false }), undefined);
     });
-  await t.test("a rule covers only its answer, its steps and the run's spend under its line", () => {
+  test("a rule covers only its answer, its steps and the run's spend under its line", () => {
     const rule: PolicyRule = { id: 'gate', answer: 'approve', steps: ['design'], when: ['recommends'], under: 10 };
     const facts = { ...NO_FACTS, recommends: true, spend: 9.99 };
     assert.equal(allowedBy([rule], { answer: 'approve', step: 'design' }, facts), rule);
@@ -96,10 +96,10 @@ test('a confirmed list replaces the default; the default is in force only while 
   assert.deepEqual(listInForce([]), [], 'a list with the default dropped holds none');
 });
 
-test('`ruleRefusal`: a rule with no id, the default id, an answer or condition that is none, a condition twice, steps or a line that are none', async (t) => {
+describe('`ruleRefusal`: a rule with no id, the default id, an answer or condition that is none, a condition twice, steps or a line that are none', () => {
   const good = { id: 'gate', answer: 'approve', when: ['checked'] };
   const refused = (rule: unknown): string | undefined => ruleRefusal(rule, 'rule 1');
-  await t.test('a rule, with steps and a line or without', () => {
+  test('a rule, with steps and a line or without', () => {
     assert.equal(refused(good), undefined);
     assert.equal(refused({ ...good, steps: ['design'], under: 5 }), undefined);
   });
@@ -120,7 +120,7 @@ test('`ruleRefusal`: a rule with no id, the default id, an answer or condition t
     ['REFUSED: a line below zero', { ...good, under: -1 }, ['rule 1: under is the dollars']],
     ['REFUSED: a line that is no number', { ...good, under: '5' }, ['rule 1: under is the dollars']],
   ] as const)
-    await t.test(name, () => {
+    test(name, () => {
       const said = refused(rule);
       names(said, ...facts);
       assert.ok(said!.startsWith(facts[0]), said);

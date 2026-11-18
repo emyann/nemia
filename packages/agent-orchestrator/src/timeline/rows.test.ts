@@ -2,7 +2,7 @@
  * A run's timeline as rows: each row's number is the timeline's own field, the names sort as text into the workflow's order with each
  * check under its step, and a number nobody measured is no row. One table, each case a row. Pure: no disk, no engine.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Run } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
@@ -99,8 +99,8 @@ const HELD: TaskClock = {
   state: { brief: 'Do it.', settled: null, attempts: [turn(0, '10:01', '10:05', 'blocked'), turn(1, '10:11', '10:20')] },
 };
 
-test("`timelineRows`: a run's timeline as rows, each the timeline's own field, sorted into the workflow's order, and a number nobody measured no row", async (t) => {
-  await t.test("each row's number is the timeline's own field: a try's, its check's, a step's tries, a round's wall and the run's", () => {
+describe("`timelineRows`: a run's timeline as rows, each the timeline's own field, sorted into the workflow's order, and a number nobody measured no row", () => {
+  test("each row's number is the timeline's own field: a try's, its check's, a step's tries, a round's wall and the run's", () => {
     const tl = timeline(RUN, filedViews(VIEWS, FILED), STEPS);
     const rows = timelineRows(RUN, tl, STEPS);
     for (const r of rows) {
@@ -154,7 +154,7 @@ test("`timelineRows`: a run's timeline as rows, each the timeline's own field, s
       "a round's and the run's rows are of no step and no try",
     );
   });
-  await t.test("the rows' names, sorted as text, are the workflow's order with each check under its step", () => {
+  test("the rows' names, sorted as text, are the workflow's order with each check under its step", () => {
     const names = ['k', 'j', 'i', 'h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'];
     const steps = names.map((name, i) => ({ name, after: i ? [names[i - 1]] : [], check: 'npm test' }) as unknown as StepSpec);
     const run = {
@@ -174,32 +174,29 @@ test("`timelineRows`: a run's timeline as rows, each the timeline's own field, s
     assert.deepEqual(sorted.slice(0, 2), ['01 k', '01 k check']);
     assert.deepEqual(sorted.slice(-2), ['11 a', '11 a check']);
   });
-  await t.test(
-    'REFUSED: a session still running gives no ran row and no 0, and a run whose wall is not known gives no run row at all',
-    () => {
-      const views = new Map([...VIEWS, ['review-2', task('11:31', null)]]);
-      const tl = timeline(RUN, filedViews(views, FILED), STEPS);
-      assert.equal(tl.steps.review[1].session!.ranMs, null);
-      assert.equal(tl.run.wallMs, null);
-      const rows = timelineRows(RUN, tl, STEPS);
-      assert.equal(valueOf(rows, '03 review', 'ran', 2), undefined);
-      assert.equal(valueOf(rows, '03 review', 'queued', 2), MIN, 'what was measured of it is still a row');
-      assert.deepEqual(
-        rows.filter((r) => r.of === 'run'),
-        [],
-      );
-      assert.deepEqual(
-        rows.filter((r) => r.of === 'round').map((r) => r.row),
-        ['review round 01'],
-        'the round in flight has no wall yet',
-      );
-      assert.equal(
-        rows.some((r) => r.value === 0 && r.part === 'ran'),
-        false,
-      );
-    },
-  );
-  await t.test('a run that never left its first step has rows for that step alone, and none for a step not filed', () => {
+  test('REFUSED: a session still running gives no ran row and no 0, and a run whose wall is not known gives no run row at all', () => {
+    const views = new Map([...VIEWS, ['review-2', task('11:31', null)]]);
+    const tl = timeline(RUN, filedViews(views, FILED), STEPS);
+    assert.equal(tl.steps.review[1].session!.ranMs, null);
+    assert.equal(tl.run.wallMs, null);
+    const rows = timelineRows(RUN, tl, STEPS);
+    assert.equal(valueOf(rows, '03 review', 'ran', 2), undefined);
+    assert.equal(valueOf(rows, '03 review', 'queued', 2), MIN, 'what was measured of it is still a row');
+    assert.deepEqual(
+      rows.filter((r) => r.of === 'run'),
+      [],
+    );
+    assert.deepEqual(
+      rows.filter((r) => r.of === 'round').map((r) => r.row),
+      ['review round 01'],
+      'the round in flight has no wall yet',
+    );
+    assert.equal(
+      rows.some((r) => r.value === 0 && r.part === 'ran'),
+      false,
+    );
+  });
+  test('a run that never left its first step has rows for that step alone, and none for a step not filed', () => {
     const run = { ...RUN, steps: { plan: { taskId: 'plan' } }, approvals: [] } as unknown as Run;
     const rows = timelineRows(run, timeline(run, filedViews(VIEWS, FILED), STEPS), STEPS);
     assert.deepEqual([...new Set(rows.map((r) => r.row))], ['01 plan', 'run']);
@@ -207,39 +204,32 @@ test("`timelineRows`: a run's timeline as rows, each the timeline's own field, s
     assert.equal(valueOf(rows, 'run', 'check'), 0, 'no check, no time in one');
     assert.equal(valueOf(rows, 'run', 'answer'), 0, 'no answer, no time waiting on one');
   });
-  await t.test(
-    "a run answered then approved: its wait on the answer and its wait at the gate are two parts, and its session's rows are one",
-    () => {
-      const tl = timeline(ANSWERED, filedViews(new Map([['ask', HELD]]), new Map([['ask', at('10:00')]])), [ASK]);
-      const rows = timelineRows(ANSWERED, tl, [ASK]);
-      assert.deepEqual(
-        rows.map((r) => [r.of, r.try, r.part, r.value]),
-        [
-          ['try', 1, 'queued', MIN],
-          ['try', 1, 'ran', 13 * MIN],
-          ['try', 1, 'cost', 4],
-          ['step', null, 'tries', 2],
-          ['run', null, 'wall', 20 * MIN],
-          ['run', null, 'queued', MIN],
-          ['run', null, 'check', 0],
-          ['run', null, 'gate', 9 * MIN],
-          ['run', null, 'answer', 6 * MIN],
-        ],
-      );
-      const run = (part: TimelineRow['part']) => valueOf(rows, 'run', part);
-      assert.equal(
-        valueOf(rows, '01 ask', 'ran', 1) + run('queued') + run('answer'),
-        run('wall'),
-        'what ran, queued and waited is the wall',
-      );
-      const signedDone: TaskClock = { ...HELD, state: { ...HELD.state, attempts: [turn(0, '10:01', '10:05'), turn(1, '10:11', '10:20')] } };
-      const back = timelineRows(
-        ANSWERED,
-        timeline(ANSWERED, filedViews(new Map([['ask', signedDone]]), new Map([['ask', at('10:00')]])), [ASK]),
-        [ASK],
-      );
-      assert.equal(valueOf(back, 'run', 'answer'), 0, 'REFUSED: the same record after a done sign-off is work sent back from its gate');
-      assert.equal(valueOf(back, 'run', 'gate'), 9 * MIN);
-    },
-  );
+  test("a run answered then approved: its wait on the answer and its wait at the gate are two parts, and its session's rows are one", () => {
+    const tl = timeline(ANSWERED, filedViews(new Map([['ask', HELD]]), new Map([['ask', at('10:00')]])), [ASK]);
+    const rows = timelineRows(ANSWERED, tl, [ASK]);
+    assert.deepEqual(
+      rows.map((r) => [r.of, r.try, r.part, r.value]),
+      [
+        ['try', 1, 'queued', MIN],
+        ['try', 1, 'ran', 13 * MIN],
+        ['try', 1, 'cost', 4],
+        ['step', null, 'tries', 2],
+        ['run', null, 'wall', 20 * MIN],
+        ['run', null, 'queued', MIN],
+        ['run', null, 'check', 0],
+        ['run', null, 'gate', 9 * MIN],
+        ['run', null, 'answer', 6 * MIN],
+      ],
+    );
+    const run = (part: TimelineRow['part']) => valueOf(rows, 'run', part);
+    assert.equal(valueOf(rows, '01 ask', 'ran', 1) + run('queued') + run('answer'), run('wall'), 'what ran, queued and waited is the wall');
+    const signedDone: TaskClock = { ...HELD, state: { ...HELD.state, attempts: [turn(0, '10:01', '10:05'), turn(1, '10:11', '10:20')] } };
+    const back = timelineRows(
+      ANSWERED,
+      timeline(ANSWERED, filedViews(new Map([['ask', signedDone]]), new Map([['ask', at('10:00')]])), [ASK]),
+      [ASK],
+    );
+    assert.equal(valueOf(back, 'run', 'answer'), 0, 'REFUSED: the same record after a done sign-off is work sent back from its gate');
+    assert.equal(valueOf(back, 'run', 'gate'), 9 * MIN);
+  });
 });

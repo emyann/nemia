@@ -2,7 +2,7 @@
  * What a remote agent's client says of another party's content, bounded: the address of a request that did not answer, whose path
  * a served card chose, and a missing secret's fix, which names a scheme the card chose. The card's own refusals are `card.test.ts`'s.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { AgentCard } from '@a2a-js/sdk';
 import { WORDS_QUOTE } from '../core/index.ts';
@@ -41,9 +41,9 @@ const ROWS: Array<{ name: string; got: () => string; most: number }> = [
   },
 ];
 
-test('the remote client: an address and a missing secret are said with what another party chose quoted', async (t) => {
+describe('the remote client: an address and a missing secret are said with what another party chose quoted', () => {
   for (const row of ROWS) {
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const got = row.got();
       assert.ok(got.length > 0, 'something is said');
       assert.ok(got.length <= row.most, `${got.length} characters`);

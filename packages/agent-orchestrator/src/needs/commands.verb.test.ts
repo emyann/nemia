@@ -4,7 +4,7 @@
  * every harness is deactivated, so the carry installs nothing. After the carry, which an upgrade runs, the tools folder's `nemia` names
  * the launcher under `releases/current`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -9,7 +9,7 @@
  * key, a spec type with a member per key). Such a list drifts from the format the day a key is added. A file whose list is still to go
  * is counted in `DEBT`, which only shrinks.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import ts from 'typescript';
 import { STEP_KEYS } from 'agent-orchestrator/workflow';

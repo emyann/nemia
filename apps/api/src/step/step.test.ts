@@ -3,7 +3,7 @@
  * each a pure reading of what it is handed, so each fixture breaks the rule it holds.
  */
 import '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

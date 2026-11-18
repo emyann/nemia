@@ -5,7 +5,7 @@
  * list printed whole is asked for pages of `LIST_PAGE.most`, each `continue` sent back as answered, until a page answers none, its
  * objects (or its `Table`'s rows) read as one list in order; a page answering back the `continue` it was asked with is refused.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -26,7 +26,7 @@ const TIMER_SLACK_MS = 5;
 /** A server that accepts every request and answers none, held open until the file ends. */
 const silent = http.createServer(() => {});
 await new Promise<void>((resolve) => silent.listen(0, '127.0.0.1', resolve));
-after(() => {
+afterAll(() => {
   silent.closeAllConnections();
   silent.close();
 });
@@ -131,7 +131,7 @@ test("REFUSED: a refusal the daemon answers in the api's own error shape is said
     response.writeHead(500, { 'content-type': 'application/json' }).end(JSON.stringify({ error: said }));
   });
   await new Promise<void>((resolve) => failing.listen(0, '127.0.0.1', resolve));
-  after(() => {
+  afterAll(() => {
     failing.closeAllConnections();
     failing.close();
   });

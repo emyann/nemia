@@ -2,7 +2,7 @@
  * The runs a run is handed as context: what a start refuses of them — pure, as data. What a start says of each is the client's
  * (`apps/cli/test/runs-lines.test.ts`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { contextRefusal } from './context.ts';
 

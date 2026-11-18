@@ -4,7 +4,7 @@
  * day: the first minutes after its midnight included, where `ci` failed the overview strip at 00:00:58 UTC.
  */
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'vitest';
 import { middayZone } from './e2e/visit.ts';
 
 /** The hour and minute `at` reads in `zone`, as the browser placed there reads them. */

@@ -4,7 +4,8 @@
  * while a piece a run waits on is missing, none while that stands, and one `Ready` line once it is met. The tick is the store's pass, on
  * the stage's engine given a pass of its own that does nothing, as `level-feed.test.ts` gives it. The test's store is its own, at `ROOT`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,28 +42,32 @@ const readinessSaid = () =>
     .lines.filter((l) => l.reason === 'NotReady' || l.reason === 'Ready')
     .map((l) => [l.reason, l.involved?.kind]);
 
-test("the store's readiness the daemon read is said by the tick's pass: NotReady while a piece a run waits on is missing, Ready once it is met", async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
-  let read: { pieces: ReadinessPiece[] } | undefined;
+describe("the store's readiness the daemon read is said by the tick's pass: NotReady while a piece a run waits on is missing, Ready once it is met", () => {
+  let b!: import('./story.ts').Board;
+  let read!: { pieces: ReadinessPiece[] } | undefined;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
+    return t.end;
+  });
+  const s = story(test);
   const pass = () => stage.runWith(b.e, tickRun({ readiness: () => read }));
-
-  await s.test('a pass handed no read says nothing of the readiness', async () => {
+  s.test('a pass handed no read says nothing of the readiness', async () => {
     await pass();
     assert.deepEqual(readinessSaid(), []);
   });
-  await s.test('a pass handed a read with mise missing writes one NotReady line of the store, naming its fix', async () => {
+  s.test('a pass handed a read with mise missing writes one NotReady line of the store, naming its fix', async () => {
     read = { pieces: [mise('missing')] };
     await pass();
     assert.deepEqual(readinessSaid(), [['NotReady', 'Store']]);
     assert.ok(readFeed(ROOT, 0).lines.at(-1)?.note?.includes('nemia doctor fix mise'));
   });
-  await s.test('a second pass, the read the same, writes none', async () => {
+  s.test('a second pass, the read the same, writes none', async () => {
     await pass();
     assert.equal(readinessSaid().length, 1);
   });
-  await s.test('mise met, the next pass writes one Ready line', async () => {
+  s.test('mise met, the next pass writes one Ready line', async () => {
     read = { pieces: [mise('met')] };
     await pass();
     await pass();

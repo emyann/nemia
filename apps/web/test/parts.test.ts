@@ -2,7 +2,7 @@
  * The board's own parts the runs page stands on, each rendered apart from any page: the steps rail, the pager, the text link, and the
  * look's marks — the cut-corner frame, the plate, the sticker and the scan lines. A cut corner is an overlay, never a clip.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -74,8 +74,8 @@ const grains = (markup: string): number => markup.split('data-grain=').length - 
 /** Each way `markup` would cut what an element holds off: a clip path, or an overflow that hides or clips. */
 const clips = (markup: string): string[] => [...markup.matchAll(/clip-?path|overflow-(?:hidden|clip)|overflow\s*:/gi)].map((m) => m[0]);
 
-test('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each wears, and no clip on what a frame holds', async (t) => {
-  await t.test('the cut tag cuts its top-right corner by seven pixels, around what it holds', async () => {
+describe('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each wears, and no clip on what a frame holds', () => {
+  test('the cut tag cuts its top-right corner by seven pixels, around what it holds', async () => {
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const html = await drawn(createElement(CutTag, { children: 'YOUR WORD' }));
     assert.match(
@@ -85,48 +85,42 @@ test('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each wears
     );
     assert.match(html, />YOUR WORD<\/span>$/);
   });
-  await t.test(
-    'the cut frame: a shape nobody reads or presses, before what the frame holds: an edge in its hue around the card ground',
-    async () => {
-      const child = createElement('button', { type: 'button' }, 'Approve');
-      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
-      const html = await drawn(createElement(CutFrame, { hue: 'yours', children: child }));
-      assert.match(tagWith(html, 'data-cut-frame'), /data-cut-frame="yours"/);
-      const shape = tagWith(html, 'data-cut-shape');
-      assert.match(shape, /aria-hidden="true"/);
-      assert.match(shape, /pointer-events-none/);
-      assert.match(shape, /filter:drop-shadow\(0 0 10px color-mix\(in srgb, var\(--meaning-yours\) 26%, transparent\)\)/, 'its glow');
-      assert.match(
-        tagWith(html, 'data-cut-edge'),
-        /background-color:var\(--meaning-yours\);clip-path:polygon\(0px 0px, calc\(100% - 28px\) 0px, 100% 28px, 100% 100%, 28px 100%, 0px calc\(100% - 28px\)\)/,
-      );
-      assert.match(
-        tagWith(html, 'data-cut-ground'),
-        /bg-card[^>]*clip-path:polygon\(1px 1px, calc\(100% - 28\.41px\) 1px, calc\(100% - 1px\) 28\.41px,/,
-        "the ground a pixel inside the edge, its cut beside the edge's",
-      );
-      assert.ok(html.indexOf('data-cut-ground') < html.indexOf('<button'), 'the shape comes before the content, which stands above it');
-      assert.match(html, /<div class="relative"><button/);
-      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
-      const quiet = await drawn(createElement(CutFrame, { size: 24, children: child }));
-      assert.match(
-        tagWith(quiet, 'data-cut-edge'),
-        /var\(--md-sys-color-outline-variant\);clip-path:polygon\(0px 0px, calc\(100% - 24px\)/,
-      );
-      assert.doesNotMatch(tagWith(quiet, 'data-cut-shape'), /filter/, 'a frame with no hue casts no glow');
-      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
-      const alive = await drawn(createElement(CutFrame, { hue: 'alive', children: child }));
-      assert.doesNotMatch(tagWith(alive, 'data-cut-shape'), /filter/, 'nor one of a session at work');
-    },
-  );
-  await t.test('a frame of what failed: its edge in failure, and no glow', async () => {
+  test('the cut frame: a shape nobody reads or presses, before what the frame holds: an edge in its hue around the card ground', async () => {
+    const child = createElement('button', { type: 'button' }, 'Approve');
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const html = await drawn(createElement(CutFrame, { hue: 'yours', children: child }));
+    assert.match(tagWith(html, 'data-cut-frame'), /data-cut-frame="yours"/);
+    const shape = tagWith(html, 'data-cut-shape');
+    assert.match(shape, /aria-hidden="true"/);
+    assert.match(shape, /pointer-events-none/);
+    assert.match(shape, /filter:drop-shadow\(0 0 10px color-mix\(in srgb, var\(--meaning-yours\) 26%, transparent\)\)/, 'its glow');
+    assert.match(
+      tagWith(html, 'data-cut-edge'),
+      /background-color:var\(--meaning-yours\);clip-path:polygon\(0px 0px, calc\(100% - 28px\) 0px, 100% 28px, 100% 100%, 28px 100%, 0px calc\(100% - 28px\)\)/,
+    );
+    assert.match(
+      tagWith(html, 'data-cut-ground'),
+      /bg-card[^>]*clip-path:polygon\(1px 1px, calc\(100% - 28\.41px\) 1px, calc\(100% - 1px\) 28\.41px,/,
+      "the ground a pixel inside the edge, its cut beside the edge's",
+    );
+    assert.ok(html.indexOf('data-cut-ground') < html.indexOf('<button'), 'the shape comes before the content, which stands above it');
+    assert.match(html, /<div class="relative"><button/);
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const quiet = await drawn(createElement(CutFrame, { size: 24, children: child }));
+    assert.match(tagWith(quiet, 'data-cut-edge'), /var\(--md-sys-color-outline-variant\);clip-path:polygon\(0px 0px, calc\(100% - 24px\)/);
+    assert.doesNotMatch(tagWith(quiet, 'data-cut-shape'), /filter/, 'a frame with no hue casts no glow');
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const alive = await drawn(createElement(CutFrame, { hue: 'alive', children: child }));
+    assert.doesNotMatch(tagWith(alive, 'data-cut-shape'), /filter/, 'nor one of a session at work');
+  });
+  test('a frame of what failed: its edge in failure, and no glow', async () => {
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const html = await drawn(createElement(CutFrame, { hue: 'failure', children: createElement('span', null, 'Not sent') }));
     assert.match(tagWith(html, 'data-cut-frame'), /data-cut-frame="failure"/);
     assert.match(tagWith(html, 'data-cut-edge'), /background-color:var\(--meaning-failure\);/);
     assert.doesNotMatch(tagWith(html, 'data-cut-shape'), /filter/);
   });
-  await t.test("the cut field: its edge drawn in the cut shape, the whole of it in a session's hue when the focus is in it", async () => {
+  test("the cut field: its edge drawn in the cut shape, the whole of it in a session's hue when the focus is in it", async () => {
     const field = createElement('input', { 'aria-label': 'Message' });
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const html = await drawn(createElement(CutField, { size: 10, children: field }));
@@ -159,7 +153,7 @@ test('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each wears
     assert.match(tagWith(quiet, 'data-cut-edge'), /calc\(100% - 12px\) 0px/, 'a field cut 12 by default');
     for (const layer of ['quiet', 'focus']) assert.match(tagWith(quiet, `data-cut-ground="${layer}"`), /\bbg-surface-container\b/);
   });
-  await t.test('a cue: its words in small caps, in the ink of its hue, in a frame of that hue cut 9', async () => {
+  test('a cue: its words in small caps, in the ink of its hue, in a frame of that hue cut 9', async () => {
     const inks = { yours: 'text-yours', alive: 'text-alive', failure: 'text-failure', none: 'text-on-surface-variant' } as const;
     for (const [hue, ink] of Object.entries(inks)) {
       // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
@@ -174,138 +168,119 @@ test('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each wears
       assert.equal(/filter/.test(tagWith(html, 'data-cut-shape')), hue === 'yours', `${hue}: only what waits on you glows`);
     }
   });
-  await t.test(
-    "the grain: the cut frame's ground wears the surface's, a sticker and a plate a label's, a tag and a button none",
-    async () => {
-      const child = createElement('button', { type: 'button' }, 'Approve');
-      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
-      const frame = await drawn(createElement(CutFrame, { hue: 'yours', children: child }));
-      assert.match(tagWith(frame, 'data-cut-ground'), /data-grain="surface"/);
-      assert.equal(grains(frame), 1, 'the ground alone: neither the edge, the shape that casts the glow, nor what the frame holds');
-      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
-      const sticker = await drawn(createElement(Sticker, { hue: 'money', label: 'Cost', children: '$4.25' }));
-      assert.match(tagWith(sticker, 'data-sticker'), /data-grain="label"/);
-      assert.equal(grains(sticker), 1);
-      for (const quiet of [false, true]) {
-        const plate = await drawn(createElement(Plate, { count: 2, title: 'Waiting on you', quiet }));
-        assert.match(tagWith(plate, 'data-plate='), /data-grain="label"/, quiet ? 'a quiet plate' : 'a loud plate');
-        assert.equal(grains(plate), 1, 'the barcode wears none');
-      }
-      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
-      assert.equal(grains(await drawn(createElement(CutTag, { children: 'YOUR WORD' }))), 0, 'a cut tag');
-      const { CutButton } = await import('../src/components/look/CutButton.tsx');
-      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
-      assert.equal(grains(await drawn(createElement(CutButton, { to: '/runs', children: 'Open' }))), 0, 'a cut button');
-    },
-  );
-  await t.test(
-    'REFUSED: the cut frame clips what it holds: only its shape, which holds nothing, is cut, so a focus ring inside is whole',
-    async () => {
-      assert.deepEqual(clips('style="clip-path:polygon(0 0)"'), ['clip-path']);
-      assert.deepEqual(clips('style={{ clipPath: "polygon(0 0)" }}'), ['clipPath']);
-      assert.deepEqual(clips('class="relative overflow-hidden"'), ['overflow-hidden']);
-      assert.deepEqual(clips('class="overflow-clip" style="overflow:hidden"'), ['overflow-clip', 'overflow:']);
-      const child = createElement('button', { type: 'button' }, 'Approve');
-      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
-      const html = await drawn(createElement(CutFrame, { hue: 'yours', className: 'h-full', children: child }));
-      const shape = /<span[^>]*data-cut-shape[^>]*>(?:<span[^>]*><\/span>)+<\/span>/.exec(html);
-      assert.ok(shape, 'the shape is a span that holds its two layers and nothing else');
-      assert.equal(clips(shape[0]).length, 2, 'each layer of the shape is cut');
-      assert.deepEqual(
-        clips(html.replace(shape[0], '')),
-        [],
-        'and nothing else of the frame is: not the frame, not what holds its content',
-      );
-    },
-  );
+  test("the grain: the cut frame's ground wears the surface's, a sticker and a plate a label's, a tag and a button none", async () => {
+    const child = createElement('button', { type: 'button' }, 'Approve');
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const frame = await drawn(createElement(CutFrame, { hue: 'yours', children: child }));
+    assert.match(tagWith(frame, 'data-cut-ground'), /data-grain="surface"/);
+    assert.equal(grains(frame), 1, 'the ground alone: neither the edge, the shape that casts the glow, nor what the frame holds');
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const sticker = await drawn(createElement(Sticker, { hue: 'money', label: 'Cost', children: '$4.25' }));
+    assert.match(tagWith(sticker, 'data-sticker'), /data-grain="label"/);
+    assert.equal(grains(sticker), 1);
+    for (const quiet of [false, true]) {
+      const plate = await drawn(createElement(Plate, { count: 2, title: 'Waiting on you', quiet }));
+      assert.match(tagWith(plate, 'data-plate='), /data-grain="label"/, quiet ? 'a quiet plate' : 'a loud plate');
+      assert.equal(grains(plate), 1, 'the barcode wears none');
+    }
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    assert.equal(grains(await drawn(createElement(CutTag, { children: 'YOUR WORD' }))), 0, 'a cut tag');
+    const { CutButton } = await import('../src/components/look/CutButton.tsx');
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    assert.equal(grains(await drawn(createElement(CutButton, { to: '/runs', children: 'Open' }))), 0, 'a cut button');
+  });
+  test('REFUSED: the cut frame clips what it holds: only its shape, which holds nothing, is cut, so a focus ring inside is whole', async () => {
+    assert.deepEqual(clips('style="clip-path:polygon(0 0)"'), ['clip-path']);
+    assert.deepEqual(clips('style={{ clipPath: "polygon(0 0)" }}'), ['clipPath']);
+    assert.deepEqual(clips('class="relative overflow-hidden"'), ['overflow-hidden']);
+    assert.deepEqual(clips('class="overflow-clip" style="overflow:hidden"'), ['overflow-clip', 'overflow:']);
+    const child = createElement('button', { type: 'button' }, 'Approve');
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const html = await drawn(createElement(CutFrame, { hue: 'yours', className: 'h-full', children: child }));
+    const shape = /<span[^>]*data-cut-shape[^>]*>(?:<span[^>]*><\/span>)+<\/span>/.exec(html);
+    assert.ok(shape, 'the shape is a span that holds its two layers and nothing else');
+    assert.equal(clips(shape[0]).length, 2, 'each layer of the shape is cut');
+    assert.deepEqual(clips(html.replace(shape[0], '')), [], 'and nothing else of the frame is: not the frame, not what holds its content');
+  });
 });
 
-test("StepGraph, Pager and TextLink: a run's steps as its graph, and the ways off a page", async (t) => {
-  await t.test(
-    "the step graph: one node a step by its mark, at work and waiting on you a size larger, read aloud as a group named, each node told in the kit's tooltip",
-    async () => {
-      const html = await drawn(createElement(StepGraph, { run: graphRun(STEPS) }));
-      assert.match(tagWith(html, 'data-run-steps'), /role="group"/);
-      assert.match(html, /aria-label="design verified, implement at work, review failed its check, land waits on you"/);
-      assert.deepEqual(
-        [...html.matchAll(/data-step="([^"]+)" data-state="([^"]+)" data-mark="([^"]+)"/g)].map((m) => [m[1], m[2], m[3]]),
-        [
-          ['design', 'verified', 'done'],
-          ['implement', 'working', 'alive'],
-          ['review', 'failed-check', 'failure'],
-          ['land', 'awaiting-approval', 'yours'],
-        ],
-      );
-      assert.match(html, /role="img" aria-label="review · failed its check"[^>]*tabindex="0"/, 'each node a stop of the keyboard, told');
-      const sizeOf = (step: string) => Number(/d="M0,-([\d.]+) /.exec(html.slice(html.indexOf(`data-step="${step}"`)))![1]);
-      assert.ok(sizeOf('implement') > sizeOf('design') && sizeOf('land') > sizeOf('design'), 'at work and yours a size larger');
-      assert.equal(html.match(/data-step-pulse/g)?.length, 1, 'the step at work alone pulses');
-      assert.match(html, /data-step="implement"[\s\S]*?data-step-pulse/, "the pulse is the step at work's");
-      assert.deepEqual(
-        [...html.matchAll(/data-gate="([^"]+)"[^>]*stroke="([^"]+)"/g)].map((m) => [m[1], m[2]]),
-        [
-          ['design', 'var(--md-sys-color-outline)'],
-          ['land', 'var(--meaning-yours)'],
-        ],
-        "a gate's tick before each gated step, yellow where that step waits on you",
-      );
-    },
-  );
-  await t.test(
-    'the step graph with a wrap: each node inside what the wrap gives, its step and state handed, and no tooltip of its own',
-    async () => {
-      const wrap = (node: unknown, step: { name: string; state: string }) =>
-        createElement('button', { 'data-wrapped': `${step.name} ${step.state}` }, node as ReactElement);
-      const html = await drawn(createElement(StepGraph, { run: graphRun(STEPS), wrap }));
-      assert.match(
-        tagWith(html, 'data-run-steps'),
-        /aria-label="design verified, implement at work, review failed its check, land waits on you"/,
-      );
-      assert.deepEqual(
-        [...html.matchAll(/data-step="([^"]+)"[^>]*><button data-wrapped="([^"]+)"/g)].map((m) => [m[1], m[2]]),
-        [
-          ['design', 'design verified'],
-          ['implement', 'implement working'],
-          ['review', 'review failed-check'],
-          ['land', 'land awaiting-approval'],
-        ],
-      );
-      assert.doesNotMatch(html, /tabindex="0"/, 'the wrap is the stop, not a told mark');
-    },
-  );
-  await t.test(
-    'done is filled whether a check says so or its own word does; one to come is hollow; one that waits on something now by its corners; a held run as not started',
-    async () => {
-      const steps = [
-        { name: 'design', ...coded('unverified'), note: null, roundDue: false },
-        { name: 'implement', ...coded('verified ✓'), note: null, roundDue: false },
-        { name: 'review', ...coded('waiting'), note: null, roundDue: false },
-      ];
-      const html = await drawn(createElement(StepGraph, { run: graphRun(steps) }));
-      const markOf = (markup: string, step: string) => /data-mark="([^"]+)"/.exec(tagWith(markup, `data-step="${step}"`))?.[1];
-      assert.match(tagWith(html, 'data-step="design"'), /data-state="unverified"/, 'the state is still said as it is');
-      assert.equal(markOf(html, 'design'), 'done');
-      assert.equal(markOf(html, 'implement'), 'done');
-      assert.equal(markOf(html, 'review'), 'todo', 'a step that only waits its turn is hollow');
-      const waiting = await drawn(
-        createElement(StepGraph, { run: graphRun([{ name: 'land', ...coded('waiting on r-0'), note: null, roundDue: false }]) }),
-      );
-      assert.equal(markOf(waiting, 'land'), 'waits', 'a step that waits on a run is drawn by its corners');
-      assert.match(waiting, /stroke-dasharray:3.2 3.871/);
-      const held = await drawn(createElement(StepGraph, { run: graphRun(steps, true) }));
-      assert.equal(markOf(held, 'review'), 'waits', "a held run's first step not started waits on the hold");
-      const gate = await drawn(createElement(StepGraph, { run: graphRun(STEPS, true) }));
-      assert.match(tagWith(gate, 'data-step="land"'), /data-state="held"/, "a held run's gate is drawn held");
-      assert.equal(markOf(gate, 'land'), 'waits', 'and as not started');
-      assert.match(html, /aria-label="design done, implement verified, review to come"/, 'read aloud, a check is told from a word');
-    },
-  );
-  await t.test('a run listed without its graph says what to do', async () => {
+describe("StepGraph, Pager and TextLink: a run's steps as its graph, and the ways off a page", () => {
+  test("the step graph: one node a step by its mark, at work and waiting on you a size larger, read aloud as a group named, each node told in the kit's tooltip", async () => {
+    const html = await drawn(createElement(StepGraph, { run: graphRun(STEPS) }));
+    assert.match(tagWith(html, 'data-run-steps'), /role="group"/);
+    assert.match(html, /aria-label="design verified, implement at work, review failed its check, land waits on you"/);
+    assert.deepEqual(
+      [...html.matchAll(/data-step="([^"]+)" data-state="([^"]+)" data-mark="([^"]+)"/g)].map((m) => [m[1], m[2], m[3]]),
+      [
+        ['design', 'verified', 'done'],
+        ['implement', 'working', 'alive'],
+        ['review', 'failed-check', 'failure'],
+        ['land', 'awaiting-approval', 'yours'],
+      ],
+    );
+    assert.match(html, /role="img" aria-label="review · failed its check"[^>]*tabindex="0"/, 'each node a stop of the keyboard, told');
+    const sizeOf = (step: string) => Number(/d="M0,-([\d.]+) /.exec(html.slice(html.indexOf(`data-step="${step}"`)))![1]);
+    assert.ok(sizeOf('implement') > sizeOf('design') && sizeOf('land') > sizeOf('design'), 'at work and yours a size larger');
+    assert.equal(html.match(/data-step-pulse/g)?.length, 1, 'the step at work alone pulses');
+    assert.match(html, /data-step="implement"[\s\S]*?data-step-pulse/, "the pulse is the step at work's");
+    assert.deepEqual(
+      [...html.matchAll(/data-gate="([^"]+)"[^>]*stroke="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+      [
+        ['design', 'var(--md-sys-color-outline)'],
+        ['land', 'var(--meaning-yours)'],
+      ],
+      "a gate's tick before each gated step, yellow where that step waits on you",
+    );
+  });
+  test('the step graph with a wrap: each node inside what the wrap gives, its step and state handed, and no tooltip of its own', async () => {
+    const wrap = (node: unknown, step: { name: string; state: string }) =>
+      createElement('button', { 'data-wrapped': `${step.name} ${step.state}` }, node as ReactElement);
+    const html = await drawn(createElement(StepGraph, { run: graphRun(STEPS), wrap }));
+    assert.match(
+      tagWith(html, 'data-run-steps'),
+      /aria-label="design verified, implement at work, review failed its check, land waits on you"/,
+    );
+    assert.deepEqual(
+      [...html.matchAll(/data-step="([^"]+)"[^>]*><button data-wrapped="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+      [
+        ['design', 'design verified'],
+        ['implement', 'implement working'],
+        ['review', 'review failed-check'],
+        ['land', 'land awaiting-approval'],
+      ],
+    );
+    assert.doesNotMatch(html, /tabindex="0"/, 'the wrap is the stop, not a told mark');
+  });
+  test('done is filled whether a check says so or its own word does; one to come is hollow; one that waits on something now by its corners; a held run as not started', async () => {
+    const steps = [
+      { name: 'design', ...coded('unverified'), note: null, roundDue: false },
+      { name: 'implement', ...coded('verified ✓'), note: null, roundDue: false },
+      { name: 'review', ...coded('waiting'), note: null, roundDue: false },
+    ];
+    const html = await drawn(createElement(StepGraph, { run: graphRun(steps) }));
+    const markOf = (markup: string, step: string) => /data-mark="([^"]+)"/.exec(tagWith(markup, `data-step="${step}"`))?.[1];
+    assert.match(tagWith(html, 'data-step="design"'), /data-state="unverified"/, 'the state is still said as it is');
+    assert.equal(markOf(html, 'design'), 'done');
+    assert.equal(markOf(html, 'implement'), 'done');
+    assert.equal(markOf(html, 'review'), 'todo', 'a step that only waits its turn is hollow');
+    const waiting = await drawn(
+      createElement(StepGraph, { run: graphRun([{ name: 'land', ...coded('waiting on r-0'), note: null, roundDue: false }]) }),
+    );
+    assert.equal(markOf(waiting, 'land'), 'waits', 'a step that waits on a run is drawn by its corners');
+    assert.match(waiting, /stroke-dasharray:3.2 3.871/);
+    const held = await drawn(createElement(StepGraph, { run: graphRun(steps, true) }));
+    assert.equal(markOf(held, 'review'), 'waits', "a held run's first step not started waits on the hold");
+    const gate = await drawn(createElement(StepGraph, { run: graphRun(STEPS, true) }));
+    assert.match(tagWith(gate, 'data-step="land"'), /data-state="held"/, "a held run's gate is drawn held");
+    assert.equal(markOf(gate, 'land'), 'waits', 'and as not started');
+    assert.match(html, /aria-label="design done, implement verified, review to come"/, 'read aloud, a check is told from a word');
+  });
+  test('a run listed without its graph says what to do', async () => {
     const html = await drawn(createElement(StepGraph, { run: { ...graphRun(STEPS), graph: undefined as never } }));
     assert.match(html, /data-graph-error/);
     assert.match(html, /restart the api/);
   });
-  await t.test('the pager: Newer and Older keep the address and change its trail alone, and say the rows and where it stands', async () => {
+  test('the pager: Newer and Older keep the address and change its trail alone, and say the rows and where it stands', async () => {
     const at = { trail: ['f.a'], next: 'f.b', count: 9, total: 25, size: 9 };
     const html = await drawn(createElement(Pager, at), '/?factory=nemia&older=f.a');
     assert.match(html, /role="group" aria-label="Pages of finished runs"/);
@@ -319,7 +294,7 @@ test("StepGraph, Pager and TextLink: a run's steps as its graph, and the ways of
     );
     assert.match(tagWith(html, 'data-pager-older'), /href="\/\?factory=nemia&amp;older=f.a%7Ef.b"/, "Older puts the page's continue on");
   });
-  await t.test('REFUSED: the pager at an end offers no link there, and from a page past the last Newer leads back', async () => {
+  test('REFUSED: the pager at an end offers no link there, and from a page past the last Newer leads back', async () => {
     const first = await drawn(createElement(Pager, { trail: [], next: 'f.a', count: 9, total: 25, size: 9 }));
     const newer = tagWith(first, 'data-pager-newer');
     assert.match(newer, /aria-disabled="true"/);
@@ -334,7 +309,7 @@ test("StepGraph, Pager and TextLink: a run's steps as its graph, and the ways of
     assert.match(tagWith(past, 'data-pager-newer'), /href="\/\?older=f.a%7Ef.b"/);
     assert.match(tagWith(past, 'data-pager-older'), /aria-disabled="true"/);
   });
-  await t.test('the pager writes its buttons in the label face, never the mono of its counts, and rings them as the kit does', async () => {
+  test('the pager writes its buttons in the label face, never the mono of its counts, and rings them as the kit does', async () => {
     const html = await drawn(createElement(Pager, { trail: ['f.a'], next: 'f.b', count: 9, total: 25, size: 9 }));
     for (const mark of ['data-pager-newer', 'data-pager-older']) {
       const button = tagWith(html, mark);
@@ -344,26 +319,23 @@ test("StepGraph, Pager and TextLink: a run's steps as its graph, and the ways of
       assert.doesNotMatch(button, /font-mono|ring-2\b|ring-offset/);
     }
   });
-  await t.test(
-    'the text link is a link to its route, underlined under the pointer and the keyboard alone, with a ring for the keyboard',
-    async () => {
-      const html = await drawn(createElement(TextLink, { to: '/', search: { factory: 'nemia' } } as never, 'Read the review'));
-      const link = tagWith(html, 'data-text-link');
-      assert.match(link, /^<a /);
-      assert.match(link, /href="\/\?factory=nemia"/);
-      assert.match(link, / no-underline /, 'no line at rest: a title reads as a title');
-      assert.match(link, / hover:underline /, 'underlined under the pointer');
-      assert.match(link, / focus-visible:underline /, 'and with the keyboard on it');
-      assert.doesNotMatch(link, /(?<![\w:-])underline(?![\w-])/, 'never underlined at rest');
-      assert.match(link, /outline-none outline-3 outline-offset-2 outline-ring focus-visible:outline-solid/, "the kit's ring, not its own");
-      assert.doesNotMatch(link, /ring-2\b|ring-offset/);
-      assert.match(html, />Read the review</);
-    },
-  );
+  test('the text link is a link to its route, underlined under the pointer and the keyboard alone, with a ring for the keyboard', async () => {
+    const html = await drawn(createElement(TextLink, { to: '/', search: { factory: 'nemia' } } as never, 'Read the review'));
+    const link = tagWith(html, 'data-text-link');
+    assert.match(link, /^<a /);
+    assert.match(link, /href="\/\?factory=nemia"/);
+    assert.match(link, / no-underline /, 'no line at rest: a title reads as a title');
+    assert.match(link, / hover:underline /, 'underlined under the pointer');
+    assert.match(link, / focus-visible:underline /, 'and with the keyboard on it');
+    assert.doesNotMatch(link, /(?<![\w:-])underline(?![\w-])/, 'never underlined at rest');
+    assert.match(link, /outline-none outline-3 outline-offset-2 outline-ring focus-visible:outline-solid/, "the kit's ring, not its own");
+    assert.doesNotMatch(link, /ring-2\b|ring-offset/);
+    assert.match(html, />Read the review</);
+  });
 });
 
-test("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and ground", async (t) => {
-  await t.test('the plate: its count, its heading and a barcode nobody reads, in grey too; quiet, in grey with none', async () => {
+describe("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and ground", () => {
+  test('the plate: its count, its heading and a barcode nobody reads, in grey too; quiet, in grey with none', async () => {
     const loud = await drawn(createElement(Plate, { count: 2, title: 'Waiting on you' }));
     assert.match(tagWith(loud, 'data-plate='), /data-plate="loud"[^>]*bg-yours text-on-yours/);
     assert.match(loud, /data-plate-count[^>]*>2</);
@@ -377,7 +349,7 @@ test("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and gro
     assert.match(tagWith(quiet, 'data-plate='), /data-plate="quiet"[^>]*bg-rest text-on-rest/);
     assert.doesNotMatch(quiet, /data-plate-barcode/);
   });
-  await t.test('each plate carries its own barcode, bar for bar, and two swapped are seen', async () => {
+  test('each plate carries its own barcode, bar for bar, and two swapped are seen', async () => {
     const tags = Object.fromEntries(
       await Promise.all(
         (Object.keys(BARS) as (keyof typeof BARS)[]).map(
@@ -390,7 +362,7 @@ test("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and gro
     const swapped: Record<string, string> = { ...tags, alive: tags.grey, grey: tags.alive };
     assert.equal(wrongBarcodes((hue) => swapped[hue]).join(','), 'alive,grey', 'two barcodes swapped: the check names both plates');
   });
-  await t.test("a page's name stands over a hairline, lit under the name alone, as wide as the name and never a fixed width", async () => {
+  test("a page's name stands over a hairline, lit under the name alone, as wide as the name and never a fixed width", async () => {
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const html = await drawn(createElement(PageName, { children: 'Factories' }));
     const [name, rule, text, lit] = ['data-page-name', 'data-page-rule', 'data-page-name-text', 'data-page-rule-lit'].map((mark) =>
@@ -415,13 +387,13 @@ test("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and gro
       'the lit part hangs from the name',
     );
   });
-  await t.test('the sticker: a label over its value, filled in its hue', async () => {
+  test('the sticker: a label over its value, filled in its hue', async () => {
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const html = await drawn(createElement(Sticker, { hue: 'money', label: 'Cost', children: '$4.25' }));
     assert.match(tagWith(html, 'data-sticker'), /data-sticker="money"[^>]*bg-money text-on-money/);
     assert.match(html, />Cost<\/span><span[^>]*>\$4\.25</);
   });
-  await t.test('the scan lines: a glow and lines in the hue of a session at work, thinned, and the glow alone without lines', async () => {
+  test('the scan lines: a glow and lines in the hue of a session at work, thinned, and the glow alone without lines', async () => {
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const html = await drawn(createElement(ScanLines, { children: 'page' }));
     const ground = tagWith(html, 'data-scan-lines');
@@ -450,18 +422,7211 @@ async function inTable(row: ReactElement): Promise<ReactElement> {
   );
 }
 
-test('Run: each size draws what its ladder says and no more, in its tone, and only a card at lg or xl that waits on you glows', async (t) => {
-  const { Run } = await import('../src/components/look/Run.tsx');
-  const { says, smallestSize } = await import('../src/lib/runSays.ts');
-  const { nowOf } = await import('../src/lib/runWords.ts');
-  const { runViewOf } = await import('../src/lib/api/judged.ts');
-  const { TARGET_RUNS, READS } = await import('../.storybook/fixtures/runs.ts');
-  const asOf = new Date('2026-11-15T18:00:00.000Z');
-  const among = Object.values(TARGET_RUNS).map((one) => ({ ...runViewOf(one), clock: null }));
-  const run = among.find((one) => one.id.endsWith('1sw7'))!;
+describe('Run: each size draws what its ladder says and no more, in its tone, and only a card at lg or xl that waits on you glows', () => {
+  let Run!: (props: import('../src/components/look/Run.tsx').RunProps) => import('react').JSX.Element;
+  let says!: (
+    size: import('../contracts/run-says.contract.ts').RunSize,
+    layout: import('../contracts/run-says.contract.ts').RunLayout,
+  ) => ReadonlySet<import('../contracts/run-says.contract.ts').RunSays>;
+  let smallestSize!: (
+    thing: import('../contracts/run-says.contract.ts').RunSays,
+    layout: import('../contracts/run-says.contract.ts').RunLayout,
+  ) => import('../contracts/run-says.contract.ts').RunSize;
+  let nowOf!: (
+    row: Omit<
+      Pick<import('../src/lib/api/judged.ts').RunView, 'waiting' | 'cancelledAt' | 'waitingOnYou' | 'holding'> & {
+        steps: ReadonlyArray<
+          Pick<import('../src/lib/api/judged.ts').RunStep, 'name' | 'phase' | 'reason' | 'verdict' | 'on' | 'via'> &
+            Partial<Pick<import('../src/lib/api/judged.ts').RunStep, 'baseHeldBy'>>
+        >;
+      },
+      'steps'
+    > & {
+      steps: ReadonlyArray<
+        (Pick<import('../src/lib/api/judged.ts').RunStep, 'name' | 'phase' | 'reason' | 'verdict' | 'on' | 'via'> &
+          Partial<Pick<import('../src/lib/api/judged.ts').RunStep, 'baseHeldBy'>>) &
+          Partial<Pick<import('../src/lib/api/judged.ts').RunView['steps'][number], 'spec' | 'current' | 'budget' | 'spent'>>
+      >;
+    },
+  ) => import('../src/lib/runWords.ts').Now | null;
+  let runViewOf!: (object: import('objects').Run) => import('../src/lib/api/judged.ts').RunView;
+  let TARGET_RUNS!: {
+    readonly lgll: {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+    readonly '649a': {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+    readonly '5zt1': {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+    readonly vqvd: {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+    readonly '72wy': {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+    readonly '1sw7': {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+    readonly wov8: {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+    readonly onLgll: {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+    readonly k2rq: {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+    readonly c7un: {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+    readonly f41l: {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+    readonly x57v: {
+      readonly apiVersion: 'nemia/v1';
+      readonly kind: 'Run';
+      readonly metadata: {
+        readonly name: string;
+        readonly labels: { readonly [x: string]: string };
+        readonly creationTimestamp: string;
+        readonly namespace?: string | undefined;
+        readonly resourceVersion?: string | undefined;
+      };
+      readonly spec: {
+        readonly steps: {
+          readonly name: string;
+          readonly input: string[];
+          readonly after: string[];
+          readonly loop: string | null;
+          readonly rounds: number | null;
+          readonly harness: string | null;
+          readonly model: string | null;
+          readonly effort: string | null;
+          readonly context: number | null;
+          readonly workspace: string | null;
+          readonly place: string | null;
+          readonly resume: string | null;
+          readonly fence: string | null;
+          readonly sandbox: string | null;
+          readonly tools: string[] | null;
+          readonly deadlineSeconds: number | null;
+          readonly agent?: string | undefined;
+          readonly fields?: { readonly name: string; readonly shape: 'link' | 'questions' | 'budgets' | 'commit' | null }[] | undefined;
+        }[];
+        readonly brief: string;
+        readonly place: 'git' | 'folder';
+        readonly repo: string | null;
+        readonly baseRef: string | null;
+        readonly branch: string | null;
+        readonly isolate: boolean | null;
+        readonly work: string | null;
+        readonly workflowDir: string;
+        readonly try: { readonly agent: string } | null;
+        readonly after: string[];
+        readonly context: string[];
+        readonly from: { readonly inbox: string } | null;
+      };
+      readonly status: {
+        readonly graph: {
+          readonly roots: string[];
+          readonly edges: (
+            | { readonly from: string; readonly to: string; readonly kind: 'after' }
+            | { readonly from: string; readonly to: string; readonly kind: 'input' }
+            | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+            | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+          )[];
+          readonly nodes?:
+            | {
+                readonly name: string;
+                readonly kind: 'step' | 'condition' | 'workflow';
+                readonly workflow?: string | undefined;
+                readonly ends?: string[] | undefined;
+              }[]
+            | undefined;
+        };
+        readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        readonly steps: {
+          readonly name: string;
+          readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+          readonly lastLine: string | null;
+          readonly workspace: string | null;
+          readonly branch: string | null;
+          readonly said: {
+            readonly text: string;
+            readonly at: string;
+            readonly attempt: number;
+            readonly from?: { readonly kind: 'person' } | { readonly kind: 'agent'; readonly name: string } | undefined;
+            readonly words?: string | undefined;
+            readonly after?:
+              | { readonly kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'; readonly id: string }
+              | null
+              | undefined;
+          }[];
+          readonly approve: string | null;
+          readonly filed: {
+            readonly model: string | null;
+            readonly askedModel: string | null;
+            readonly effort: string | null;
+            readonly contextTokens: number | null;
+            readonly fence: string | null;
+            readonly runsIn: { readonly mode: string; readonly by: 'default' | 'harness' | 'filed' } | null;
+            readonly remote: { readonly name: string; readonly address: string | null } | null;
+            readonly bridge: { readonly url: string | null; readonly why: string | null } | null;
+            readonly tools: string[] | null;
+            readonly deadlineSeconds: number | null;
+          } | null;
+          readonly denied: { readonly words: string; readonly calls: string[] } | null;
+          readonly taskId: string | null;
+          readonly attempts: {
+            readonly count: number;
+            readonly latest: {
+              readonly startedAt: string;
+              readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+              readonly endedAt: string | null;
+              readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+              readonly release:
+                | { readonly kind: 'install'; readonly tag: string }
+                | { readonly kind: 'checkout'; readonly root: string }
+                | null;
+              readonly harness: { readonly name: string; readonly version: string } | null;
+            } | null;
+          };
+          readonly used: {
+            readonly usage: {
+              readonly responses?: number | undefined;
+              readonly toolCalls?: number | undefined;
+              readonly inputTokens?: number | undefined;
+              readonly outputTokens?: number | undefined;
+              readonly costUsd?: number | undefined;
+              readonly apiMs?: number | undefined;
+              readonly toolMs?: number | undefined;
+              readonly cacheReadTokens?: number | undefined;
+              readonly cacheWriteTokens?: number | undefined;
+              readonly uncachedTokens?: number | undefined;
+              readonly peakContextTokens?: number | undefined;
+              readonly firstContextTokens?: number | undefined;
+              readonly firstCacheWriteTokens?: number | undefined;
+              readonly compactions?: number | undefined;
+              readonly rebuiltCaches?: number | undefined;
+            } | null;
+            readonly used: string;
+            readonly cost: string;
+            readonly costUsd: number | null;
+            readonly apiMs: number | null;
+            readonly toolMs: number | null;
+            readonly read: string | null;
+            readonly peak: 'cap' | 'large' | null;
+            readonly rebuilt: number;
+          } | null;
+          readonly asked: {
+            readonly try: number;
+            readonly mode: 'continue' | 'fresh' | 'recheck';
+            readonly model: string | null;
+            readonly message: string | null;
+            readonly stopFirst: boolean;
+          } | null;
+          readonly check: {
+            readonly command: string;
+            readonly taskId: string | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+            readonly refused: {
+              readonly exit: string;
+              readonly stdout: { readonly lines: string[]; readonly truncated: boolean } | null;
+              readonly stderr: { readonly lines: string[]; readonly truncated: boolean };
+              readonly unreadable: string | null;
+            } | null;
+          } | null;
+          readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+          readonly reason:
+            | 'Unknown'
+            | 'Running'
+            | 'Waiting'
+            | 'Succeeded'
+            | 'Failed'
+            | 'AwaitingApproval'
+            | 'AwaitingAnswer'
+            | 'AwaitingRound'
+            | 'OverBudget'
+            | 'BudgetExhausted'
+            | 'Unsigned'
+            | 'Denied'
+            | 'Pending'
+            | 'Checking'
+            | 'Paused'
+            | 'CheckPassed'
+            | 'CheckFailed'
+            | 'UnreadableCloseout'
+            | 'Stopped'
+            | 'Skipped'
+            | 'Sent';
+          readonly verdict: {
+            readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+            readonly exit: number | null;
+          } | null;
+          readonly message: string;
+          readonly files: (
+            | {
+                readonly name: string;
+                readonly path: string;
+                readonly kind: 'image' | 'text' | 'other';
+                readonly url: string;
+                readonly size: number;
+                readonly relativePath?: string | undefined;
+              }
+            | { readonly path: string; readonly pruned: string; readonly prunedAt: string; readonly relativePath?: string | undefined }
+            | { readonly path: string; readonly relativePath?: string | undefined }
+          )[];
+          readonly status:
+            | 'running'
+            | 'failed'
+            | 'awaiting approval'
+            | 'pending'
+            | 'stopped'
+            | 'blocked'
+            | 'unsigned'
+            | 'checking'
+            | 'verified'
+            | 'unverified'
+            | 'exhausted'
+            | 'over budget'
+            | 'budget exhausted'
+            | 'denied'
+            | 'failed (check)'
+            | 'skipped'
+            | 'sent';
+          readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+          readonly via: 'session' | 'closeout' | null;
+          readonly raise: {
+            readonly by: 'round' | 'retry';
+            readonly above: number;
+            readonly said: string;
+            readonly modes: ('continue' | 'fresh' | 'recheck')[];
+            readonly own:
+              | 'running'
+              | 'failed'
+              | 'awaiting approval'
+              | 'pending'
+              | 'stopped'
+              | 'blocked'
+              | 'unsigned'
+              | 'checking'
+              | 'verified'
+              | 'unverified'
+              | 'exhausted'
+              | 'over budget'
+              | 'budget exhausted'
+              | 'denied'
+              | 'failed (check)'
+              | 'skipped'
+              | 'sent'
+              | null;
+          } | null;
+          readonly timeline: {
+            readonly round: number;
+            readonly try: number;
+            readonly session: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly used: {
+              readonly usage: {
+                readonly responses?: number | undefined;
+                readonly toolCalls?: number | undefined;
+                readonly inputTokens?: number | undefined;
+                readonly outputTokens?: number | undefined;
+                readonly costUsd?: number | undefined;
+                readonly apiMs?: number | undefined;
+                readonly toolMs?: number | undefined;
+                readonly cacheReadTokens?: number | undefined;
+                readonly cacheWriteTokens?: number | undefined;
+                readonly uncachedTokens?: number | undefined;
+                readonly peakContextTokens?: number | undefined;
+                readonly firstContextTokens?: number | undefined;
+                readonly firstCacheWriteTokens?: number | undefined;
+                readonly compactions?: number | undefined;
+                readonly rebuiltCaches?: number | undefined;
+              } | null;
+              readonly used: string;
+              readonly cost: string;
+              readonly costUsd: number | null;
+              readonly apiMs: number | null;
+              readonly toolMs: number | null;
+              readonly read: string | null;
+              readonly peak: 'cap' | 'large' | null;
+              readonly rebuilt: number;
+            } | null;
+            readonly sessionOf: number | null;
+            readonly check: {
+              readonly taskId: string;
+              readonly at: 'running' | 'queued' | 'unknown' | 'starting' | 'ended' | 'unspawned';
+              readonly filedAt: string | null;
+              readonly spawnedAt: string | null;
+              readonly endedAt: string | null;
+              readonly attempts: number;
+              readonly queuedMs: number | null;
+              readonly ranMs: number | null;
+              readonly queued: string;
+              readonly ran: string;
+            } | null;
+            readonly turn?:
+              | {
+                  readonly asked: boolean;
+                  readonly heldFrom: string | null;
+                  readonly spawnedAt: string | null;
+                  readonly endedAt: string | null;
+                }
+              | undefined;
+          }[];
+          readonly current: {
+            readonly try: number;
+            readonly round: number;
+            readonly phase: 'running' | 'succeeded' | 'failed' | 'waiting' | 'pending' | 'stopped';
+            readonly reason:
+              | 'Unknown'
+              | 'Running'
+              | 'Waiting'
+              | 'Succeeded'
+              | 'Failed'
+              | 'AwaitingApproval'
+              | 'AwaitingAnswer'
+              | 'AwaitingRound'
+              | 'OverBudget'
+              | 'BudgetExhausted'
+              | 'Unsigned'
+              | 'Denied'
+              | 'Pending'
+              | 'Checking'
+              | 'Paused'
+              | 'CheckPassed'
+              | 'CheckFailed'
+              | 'UnreadableCloseout'
+              | 'Stopped'
+              | 'Skipped'
+              | 'Sent';
+            readonly outcome: 'blocked' | 'done' | null;
+            readonly verdict: {
+              readonly result: 'running' | 'failed' | 'passed' | 'unfinished' | 'unknown';
+              readonly exit: number | null;
+            } | null;
+          } | null;
+          readonly filesError: string | null;
+          readonly note: string | null;
+          readonly roundDue: boolean;
+          readonly needs: string | null;
+          readonly waitingFor: { readonly words: string; readonly advice: string } | null;
+          readonly sessionUnread: string | null;
+          readonly gate: {
+            readonly awaiting: boolean;
+            readonly approval: {
+              readonly at: string;
+              readonly try: number;
+              readonly message: string | null;
+              readonly actor?:
+                | {
+                    readonly kind: 'agent' | 'person';
+                    readonly step?: string | undefined;
+                    readonly agent?: string | undefined;
+                    readonly run?: string | undefined;
+                    readonly token?: string | undefined;
+                  }
+                | undefined;
+            } | null;
+            readonly budgets?:
+              | {
+                  readonly from: 'proposed' | 'approved';
+                  readonly steps: {
+                    readonly step: string;
+                    readonly usd: number;
+                    readonly said: string;
+                    readonly why: string | null;
+                    readonly workflow: number | null;
+                    readonly above: boolean;
+                  }[];
+                  readonly said: string;
+                  readonly line?: { readonly usd: number; readonly said: string } | undefined;
+                }
+              | undefined;
+          } | null;
+          readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          readonly baseHeldBy?: { readonly run: string; readonly step: string } | undefined;
+          readonly asks?: number | undefined;
+          readonly artifactsFolder?:
+            | {
+                readonly files: (
+                  | {
+                      readonly name: string;
+                      readonly path: string;
+                      readonly kind: 'image' | 'text' | 'other';
+                      readonly url: string;
+                      readonly size: number;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | {
+                      readonly path: string;
+                      readonly pruned: string;
+                      readonly prunedAt: string;
+                      readonly relativePath?: string | undefined;
+                    }
+                  | { readonly path: string; readonly relativePath?: string | undefined }
+                )[];
+                readonly error: string | null;
+              }
+            | undefined;
+        }[];
+        readonly waiting: {
+          readonly runs: {
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+        } | null;
+        readonly cancelledAt: string | null;
+        readonly waitingOnYou: string[];
+        readonly read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+        readonly phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+        readonly reason:
+          | 'Running'
+          | 'Waiting'
+          | 'Succeeded'
+          | 'Failed'
+          | 'Cancelled'
+          | 'AwaitingApproval'
+          | 'AwaitingAnswer'
+          | 'AwaitingRound'
+          | 'OverBudget'
+          | 'BudgetExhausted'
+          | 'Unsigned'
+          | 'Denied';
+        readonly pruned: {
+          readonly at: string;
+          readonly worktrees: { readonly path: string; readonly bytes: number }[];
+          readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+          readonly said?: string | undefined;
+        } | null;
+        readonly startedAt: string | null;
+        readonly status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+        readonly on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+        readonly via: 'session' | 'closeout' | null;
+        readonly timeline: {
+          readonly rounds: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          }[];
+          readonly run: {
+            readonly loop: string | null;
+            readonly round: number | null;
+            readonly tasks: number;
+            readonly inFlight: number;
+            readonly queuedMs: number;
+            readonly ranMs: number;
+            readonly wallMs: number | null;
+            readonly queued: string;
+            readonly ran: string;
+            readonly wall: string;
+            readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+          };
+          readonly slot: {
+            readonly from: string;
+            readonly filedAt: string | null;
+            readonly ms: number | null;
+            readonly queued: string;
+          } | null;
+        };
+        readonly moving: boolean;
+        readonly atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+        readonly tokens: {
+          readonly total: number;
+          readonly input: number;
+          readonly output: number;
+          readonly cacheRead: number | null;
+          readonly cacheWrite: number | null;
+          readonly uncached: number | null;
+          readonly measured: number;
+          readonly unmeasured: number;
+          readonly said: string;
+          readonly split: string;
+        } | null;
+        readonly holding: {
+          readonly at: string;
+          readonly runs: {
+            readonly landed: boolean;
+            readonly run: string;
+            readonly missing: boolean;
+            readonly cancelledAt: string | null;
+            readonly gone: string[];
+          }[];
+          readonly word: string;
+          readonly advice: string;
+          readonly waitingOnYou: boolean;
+          readonly actor?:
+            | {
+                readonly kind: 'agent' | 'person';
+                readonly step?: string | undefined;
+                readonly agent?: string | undefined;
+                readonly run?: string | undefined;
+                readonly token?: string | undefined;
+              }
+            | undefined;
+        } | null;
+        readonly toDecide:
+          | {
+              readonly kind: 'approve';
+              readonly step: string;
+              readonly says: string | null;
+              readonly filed: boolean;
+              readonly back: string[];
+              readonly onto: string | null;
+              readonly said: string;
+              readonly command: string;
+            }
+          | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+          | null;
+        readonly onDisk: { readonly worktrees: boolean; readonly files: boolean };
+        readonly holdUntil: string[];
+        readonly waitingOnYouWords: string[];
+        readonly gates: string[];
+        readonly warning: string | null;
+        readonly kinds: {
+          readonly name: string;
+          readonly now: number;
+          readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+          readonly pinned: number;
+          readonly step?: string | undefined;
+        }[];
+        readonly state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+        readonly clock?:
+          | {
+              readonly wallMs: number;
+              readonly sessionsMs: number;
+              readonly checksMs: number;
+              readonly personMs: number;
+              readonly slotMs: number;
+              readonly restMs: number;
+            }
+          | null
+          | undefined;
+        readonly result?: string[] | undefined;
+        readonly wallMs?: number | undefined;
+        readonly outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+        readonly cancelledBy?:
+          | {
+              readonly kind: 'agent' | 'person';
+              readonly step?: string | undefined;
+              readonly agent?: string | undefined;
+              readonly run?: string | undefined;
+              readonly token?: string | undefined;
+            }
+          | undefined;
+        readonly stepCosts?:
+          | {
+              readonly step: string;
+              readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+            }[]
+          | null
+          | undefined;
+        readonly waitingSince?: string | null | undefined;
+        readonly finishedAt?: string | null | undefined;
+      };
+    };
+  };
+  let READS!: Record<
+    '1sw7' | '72wy' | 'vqvd',
+    {
+      steps: {
+        readonly name: string;
+        readonly budget: { readonly usd: number; readonly said: string; readonly of: string | null; readonly over: boolean } | null;
+        readonly lastLine: string | null;
+        readonly taskId: string | null;
+        readonly attempts: {
+          readonly count: number;
+          readonly latest: {
+            readonly startedAt: string;
+            readonly ended: 'succeeded' | 'failed' | 'stopped' | null;
+            readonly endedAt: string | null;
+            readonly reason: 'budget' | 'harness' | 'unsigned' | 'lost' | 'unstartable' | 'operator' | 'deadline' | null;
+            readonly release:
+              | { readonly kind: 'install'; readonly tag: string }
+              | { readonly kind: 'checkout'; readonly root: string }
+              | null;
+            readonly harness: { readonly name: string; readonly version: string } | null;
+          } | null;
+        };
+        readonly spent: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+      }[];
+    }
+  >;
+  let asOf!: Date;
+  let among!: {
+    clock: null;
+    after: string[];
+    context: string[];
+    place: 'git' | 'folder';
+    brief: string;
+    repo: string | null;
+    baseRef: string | null;
+    branch: string | null;
+    isolate: boolean | null;
+    work: string | null;
+    workflowDir: string;
+    try: { readonly agent: string } | null;
+    state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+    cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+    waiting: {
+      readonly runs: { readonly run: string; readonly missing: boolean; readonly cancelledAt: string | null; readonly gone: string[] }[];
+      readonly word: string;
+      readonly advice: string;
+      readonly waitingOnYou: boolean;
+    } | null;
+    cancelledAt: string | null;
+    waitingOnYou: string[];
+    result?: string[] | undefined;
+    wallMs?: number | undefined;
+    read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+    phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+    reason:
+      | 'Running'
+      | 'Waiting'
+      | 'Succeeded'
+      | 'Failed'
+      | 'Cancelled'
+      | 'AwaitingApproval'
+      | 'AwaitingAnswer'
+      | 'AwaitingRound'
+      | 'OverBudget'
+      | 'BudgetExhausted'
+      | 'Unsigned'
+      | 'Denied';
+    outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+    pruned: {
+      readonly at: string;
+      readonly worktrees: { readonly path: string; readonly bytes: number }[];
+      readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+      readonly said?: string | undefined;
+    } | null;
+    startedAt: string | null;
+    status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+    on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+    via: 'session' | 'closeout' | null;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly run?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    stepCosts?:
+      | {
+          readonly step: string;
+          readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        }[]
+      | null
+      | undefined;
+    waitingSince?: string | null | undefined;
+    finishedAt?: string | null | undefined;
+    moving: boolean;
+    atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+    tokens: {
+      readonly total: number;
+      readonly input: number;
+      readonly output: number;
+      readonly cacheRead: number | null;
+      readonly cacheWrite: number | null;
+      readonly uncached: number | null;
+      readonly measured: number;
+      readonly unmeasured: number;
+      readonly said: string;
+      readonly split: string;
+    } | null;
+    holding: {
+      readonly at: string;
+      readonly runs: {
+        readonly landed: boolean;
+        readonly run: string;
+        readonly missing: boolean;
+        readonly cancelledAt: string | null;
+        readonly gone: string[];
+      }[];
+      readonly word: string;
+      readonly advice: string;
+      readonly waitingOnYou: boolean;
+      readonly actor?:
+        | {
+            readonly kind: 'agent' | 'person';
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly run?: string | undefined;
+            readonly token?: string | undefined;
+          }
+        | undefined;
+    } | null;
+    toDecide:
+      | {
+          readonly kind: 'approve';
+          readonly step: string;
+          readonly says: string | null;
+          readonly filed: boolean;
+          readonly back: string[];
+          readonly onto: string | null;
+          readonly said: string;
+          readonly command: string;
+        }
+      | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+      | null;
+    onDisk: { readonly worktrees: boolean; readonly files: boolean };
+    holdUntil: string[];
+    waitingOnYouWords: string[];
+    gates: string[];
+    warning: string | null;
+    kinds: {
+      readonly name: string;
+      readonly now: number;
+      readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+      readonly pinned: number;
+      readonly step?: string | undefined;
+    }[];
+    labels: Readonly<Record<string, string>>;
+    id: string;
+    factory: string | null;
+    createdAt: string;
+    from?: { readonly inbox: string };
+    graph: {
+      readonly roots: readonly string[];
+      readonly edges: readonly (
+        | { readonly from: string; readonly to: string; readonly kind: 'after' }
+        | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+        | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+      )[];
+      readonly nodes?: import('objects').RunStatus['graph']['nodes'];
+    };
+    steps: readonly import('../src/lib/api/judged.ts').RunStep[];
+    timeline: Pick<import('objects').RunStatus['timeline'], 'rounds' | 'run'>;
+  }[];
+  let run!: {
+    clock: null;
+    after: string[];
+    context: string[];
+    place: 'git' | 'folder';
+    brief: string;
+    repo: string | null;
+    baseRef: string | null;
+    branch: string | null;
+    isolate: boolean | null;
+    work: string | null;
+    workflowDir: string;
+    try: { readonly agent: string } | null;
+    state?: 'waiting' | 'inFlight' | 'finished' | undefined;
+    cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+    waiting: {
+      readonly runs: { readonly run: string; readonly missing: boolean; readonly cancelledAt: string | null; readonly gone: string[] }[];
+      readonly word: string;
+      readonly advice: string;
+      readonly waitingOnYou: boolean;
+    } | null;
+    cancelledAt: string | null;
+    waitingOnYou: string[];
+    result?: string[] | undefined;
+    wallMs?: number | undefined;
+    read: { readonly said: string; readonly peak: 'cap' | 'large' | null; readonly rebuilt: number } | null;
+    phase: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'waiting' | 'pending' | 'stopped';
+    reason:
+      | 'Running'
+      | 'Waiting'
+      | 'Succeeded'
+      | 'Failed'
+      | 'Cancelled'
+      | 'AwaitingApproval'
+      | 'AwaitingAnswer'
+      | 'AwaitingRound'
+      | 'OverBudget'
+      | 'BudgetExhausted'
+      | 'Unsigned'
+      | 'Denied';
+    outcome?: 'succeeded' | 'failed' | 'cancelled' | 'undecided' | null | undefined;
+    pruned: {
+      readonly at: string;
+      readonly worktrees: { readonly path: string; readonly bytes: number }[];
+      readonly artifacts: { readonly at: string; readonly bytes: number } | null;
+      readonly said?: string | undefined;
+    } | null;
+    startedAt: string | null;
+    status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+    on: 'base' | 'run' | 'limit' | 'pause' | 'hold' | null;
+    via: 'session' | 'closeout' | null;
+    cancelledBy?:
+      | {
+          readonly kind: 'agent' | 'person';
+          readonly step?: string | undefined;
+          readonly agent?: string | undefined;
+          readonly run?: string | undefined;
+          readonly token?: string | undefined;
+        }
+      | undefined;
+    stepCosts?:
+      | {
+          readonly step: string;
+          readonly cost: { readonly usd: number; readonly measured: number; readonly unmeasured: number; readonly said: string } | null;
+        }[]
+      | null
+      | undefined;
+    waitingSince?: string | null | undefined;
+    finishedAt?: string | null | undefined;
+    moving: boolean;
+    atWork: { readonly ms: number; readonly since: string | null; readonly endedAt: string | null } | null;
+    tokens: {
+      readonly total: number;
+      readonly input: number;
+      readonly output: number;
+      readonly cacheRead: number | null;
+      readonly cacheWrite: number | null;
+      readonly uncached: number | null;
+      readonly measured: number;
+      readonly unmeasured: number;
+      readonly said: string;
+      readonly split: string;
+    } | null;
+    holding: {
+      readonly at: string;
+      readonly runs: {
+        readonly landed: boolean;
+        readonly run: string;
+        readonly missing: boolean;
+        readonly cancelledAt: string | null;
+        readonly gone: string[];
+      }[];
+      readonly word: string;
+      readonly advice: string;
+      readonly waitingOnYou: boolean;
+      readonly actor?:
+        | {
+            readonly kind: 'agent' | 'person';
+            readonly step?: string | undefined;
+            readonly agent?: string | undefined;
+            readonly run?: string | undefined;
+            readonly token?: string | undefined;
+          }
+        | undefined;
+    } | null;
+    toDecide:
+      | {
+          readonly kind: 'approve';
+          readonly step: string;
+          readonly says: string | null;
+          readonly filed: boolean;
+          readonly back: string[];
+          readonly onto: string | null;
+          readonly said: string;
+          readonly command: string;
+        }
+      | { readonly kind: 'result'; readonly branches: string[]; readonly said: string; readonly command: string }
+      | null;
+    onDisk: { readonly worktrees: boolean; readonly files: boolean };
+    holdUntil: string[];
+    waitingOnYouWords: string[];
+    gates: string[];
+    warning: string | null;
+    kinds: {
+      readonly name: string;
+      readonly now: number;
+      readonly kind: 'agent' | 'workflow' | 'skill' | 'rules';
+      readonly pinned: number;
+      readonly step?: string | undefined;
+    }[];
+    labels: Readonly<Record<string, string>>;
+    id: string;
+    factory: string | null;
+    createdAt: string;
+    from?: { readonly inbox: string };
+    graph: {
+      readonly roots: readonly string[];
+      readonly edges: readonly (
+        | { readonly from: string; readonly to: string; readonly kind: 'after' }
+        | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+        | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+      )[];
+      readonly nodes?: import('objects').RunStatus['graph']['nodes'];
+    };
+    steps: readonly import('../src/lib/api/judged.ts').RunStep[];
+    timeline: Pick<import('objects').RunStatus['timeline'], 'rounds' | 'run'>;
+  };
+  let none!: Set<string>;
+  beforeAll(async () => {
+    ({ Run } = await import('../src/components/look/Run.tsx'));
+    ({ says, smallestSize } = await import('../src/lib/runSays.ts'));
+    ({ nowOf } = await import('../src/lib/runWords.ts'));
+    ({ runViewOf } = await import('../src/lib/api/judged.ts'));
+    ({ TARGET_RUNS, READS } = await import('../.storybook/fixtures/runs.ts'));
+    asOf = new Date('2026-11-15T18:00:00.000Z');
+    among = Object.values(TARGET_RUNS).map((one) => ({ ...runViewOf(one), clock: null }));
+    run = among.find((one) => one.id.endsWith('1sw7'))!;
+    none = new Set(['words']);
+  });
   const said = (html: string): string[] =>
     [...new Set([...html.matchAll(/data-run-says="([^"]+)"/g)].flatMap((m) => m[1].split(' ')))].sort();
-  const none = new Set(['words']);
   const sizes = [
     ['xs', 'card'],
     ['sm', 'card'],
@@ -471,7 +7636,7 @@ test('Run: each size draws what its ladder says and no more, in its tone, and on
     ['xl', 'card'],
   ] as const;
   for (const [size, layout] of sizes)
-    await t.test(`${size} ${layout}`, async () => {
+    test(`${size} ${layout}`, async () => {
       const element = createElement(Run, { run, size, layout, asOf, among, read: READS['1sw7'] });
       const html = await drawn(size === 'md' && layout === 'row' ? await inTable(element) : element);
       assert.deepEqual(said(html), [...says(size, layout)].filter((thing) => !none.has(thing)).sort());
@@ -480,7 +7645,7 @@ test('Run: each size draws what its ladder says and no more, in its tone, and on
         assert.match(html, /data-factory="/, 'and says its factory');
       }
     });
-  await t.test('each thing a card says is drawn first at its smallest size, and at every size above it', async () => {
+  test('each thing a card says is drawn first at its smallest size, and at every size above it', async () => {
     const ladder = ['xs', 'sm', 'md', 'lg', 'xl'] as const;
     const drawings = await Promise.all(
       ladder.map(async (size) => said(await drawn(createElement(Run, { run, size, layout: 'card', asOf, among, read: READS['1sw7'] })))),
@@ -494,7 +7659,7 @@ test('Run: each size draws what its ladder says and no more, in its tone, and on
       );
     }
   });
-  await t.test("xs: a run's mark is the mark its own graph draws on the step it is on, in every staged state, finished too", async () => {
+  test("xs: a run's mark is the mark its own graph draws on the step it is on, in every staged state, finished too", async () => {
     for (const one of among) {
       const xs = await drawn(createElement(Run, { run: one, size: 'xs', layout: 'card', asOf, among }));
       const mark = /data-mark="([^"]+)"/.exec(xs)?.[1];
@@ -505,13 +7670,13 @@ test('Run: each size draws what its ladder says and no more, in its tone, and on
       assert.equal(mark, node, `${one.id}: on ${step}`);
     }
   });
-  await t.test('its words where it has some: 649a waits on a run, by its mark', async () => {
+  test('its words where it has some: 649a waits on a run, by its mark', async () => {
     const waits = among.find((one) => one.id.endsWith('649a'))!;
     const html = await drawn(createElement(Run, { run: waits, size: 'md', layout: 'card', asOf, among }));
     assert.ok(said(html).includes('words'));
     assert.match(html, /data-run-mark="api-a-factorys-pages-stop-paying-lgll"/);
   });
-  await t.test('its tone is its chip’s, rest when finished; a yours card glows at lg and xl, never at md', async () => {
+  test('its tone is its chip’s, rest when finished; a yours card glows at lg and xl, never at md', async () => {
     for (const one of among) {
       const html = await drawn(createElement(Run, { run: one, size: 'md', layout: 'card', asOf, among }));
       assert.match(tagWith(html, 'data-size="md"'), new RegExp(`data-tone="${nowOf(one)?.tone ?? 'rest'}"`), one.id);
@@ -525,14 +7690,14 @@ test('Run: each size draws what its ladder says and no more, in its tone, and on
   });
 });
 
-test('CutFrame given a ground and no glow, and StepGraph naming its steps', async (t) => {
-  await t.test('a ground replaces the card’s on its ground layer, and glow={false} leaves a yours frame unlit', async () => {
+describe('CutFrame given a ground and no glow, and StepGraph naming its steps', () => {
+  test('a ground replaces the card’s on its ground layer, and glow={false} leaves a yours frame unlit', async () => {
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const html = await drawn(createElement(CutFrame, { hue: 'yours', ground: 'bg-background', glow: false, children: 'x' }));
     assert.match(tagWith(html, 'data-cut-ground'), /class="absolute inset-0 bg-background"/);
     assert.doesNotMatch(tagWith(html, 'data-cut-shape'), /filter/);
   });
-  await t.test('named: each step under its node, its agent and what is said of it; without, none', async () => {
+  test('named: each step under its node, its agent and what is said of it; without, none', async () => {
     const run = graphRun(STEPS);
     const named = new Map(STEPS.map((step) => [step.name, { agent: `${step.name}-agent`, said: '4m · $1.00' }]));
     const html = await drawn(createElement(StepGraph, { run, named, width: 600 }));
@@ -544,7 +7709,7 @@ test('CutFrame given a ground and no glow, and StepGraph naming its steps', asyn
     assert.doesNotMatch(html, /data-fold/, 'no column folds');
     assert.doesNotMatch(await drawn(createElement(StepGraph, { run })), /data-named/);
   });
-  await t.test('named, forked: two steps in one column, each a lane, are named in boxes of their own', async () => {
+  test('named, forked: two steps in one column, each a lane, are named in boxes of their own', async () => {
     const [design, implement, review, land] = STEPS;
     const tokens = { ...implement, name: 'tokens' };
     const steps = [design, implement, tokens, review, land];

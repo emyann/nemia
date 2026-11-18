@@ -4,7 +4,7 @@
  * `queueFactoryRefusal`), each row refused as `Invalid`, exit 2, or said, naming its facts. The inbox on disk is `inbox.store.test.ts`,
  * and the queue the tick drains `test/queue-store.test.ts`.
  */
-import { test } from 'node:test';
+import { afterAll, beforeAll, describe, test } from 'vitest';
 import { queueFactoryRefusal } from './queue-factory.ts';
 import assert from 'node:assert/strict';
 import {
@@ -425,11 +425,13 @@ test('`ideaCard` reads a YAML card — quoted values, `from:` as a list — and 
   );
 });
 
-test("`ideaCard` files a card's workflow by its name, and refuses a path, given or the file's own, and a `repo:` in the file, retired, each naming the fix", async (t) => {
+describe("`ideaCard` files a card's workflow by its name, and refuses a path, given or the file's own, and a `repo:` in the file, retired, each naming the fix", () => {
+  beforeAll(() => {
+    assert.equal(filed('dev'), 'dev', 'a name is the one its factory offers, found at start');
+    assert.equal(filed('ui', { workflow: 'dev' }), 'dev', 'the flag over it');
+  });
   const filed = (workflow: string, given: { workflow?: string } = {}) =>
     parseInboxCard('x-ab12.md', ideaCard('./plans/idea.md', `---\nworkflow: ${workflow}\n---\nCache the views.\n`, given).text).workflow;
-  assert.equal(filed('dev'), 'dev', 'a name is the one its factory offers, found at start');
-  assert.equal(filed('ui', { workflow: 'dev' }), 'dev', 'the flag over it');
   const rows: [string, () => unknown, RegExp][] = [
     ["the file's own path", () => filed('../workflows/dev'), /\.\.\/workflows\/dev/],
     ['a path given', () => filed('dev', { workflow: '/home/me/mine' }), /\/home\/me\/mine/],
@@ -440,7 +442,7 @@ test("`ideaCard` files a card's workflow by its name, and refuses a path, given 
       /\/home\/me\/code\/app[\s\S]*nemia factory attach/,
     ],
   ];
-  for (const [name, act, fact] of rows) await t.test(name, () => assert.throws(act, refusedWith(fact, /Nothing was filed/)));
+  for (const [name, act, fact] of rows) test(name, () => assert.throws(act, refusedWith(fact, /Nothing was filed/)));
 });
 
 test('`inboxNameOf`: every path under the inbox names a card — `<inbox>/<name>.md`, and `<inbox>/<name>` as `nemia inbox` lists it — for the start to refuse by name when it is not one; a path outside the inbox, and the inbox itself, names none', () => {
@@ -661,7 +663,7 @@ test("`inboxListing` gives each queued card its place in the order — by when i
   );
 });
 
-test("`cardState`: one closed word per entry — its run's phase whatever the card carries, the first still in play, else the last; then refused, queued, filed", async (t) => {
+describe("`cardState`: one closed word per entry — its run's phase whatever the card carries, the first still in play, else the last; then refused, queued, filed", () => {
   const tried = (refused: boolean) => ({ at: '2026-09-16T10:06:00.000Z', repo: '/home/me/code/app', why: 'x', refused });
   const queued = { at: '2026-09-16T10:00:00.000Z', place: null };
   const rows: [string, Parameters<typeof cardState>[0], CardState][] = [
@@ -674,11 +676,13 @@ test("`cardState`: one closed word per entry — its run's phase whatever the ca
     ['queued, never tried', { phases: [], queued }, 'queued'],
     ['neither queued nor started, or its run removed', { phases: [] }, 'filed'],
   ];
-  for (const [name, entry, state] of rows) await t.test(name, () => assert.equal(cardState(entry), state));
-  assert.deepEqual([...new Set(rows.map(([, , state]) => state))].sort(), [...CARD_STATES].sort(), 'every state has its row');
+  for (const [name, entry, state] of rows) test(name, () => assert.equal(cardState(entry), state));
+  afterAll(() => {
+    assert.deepEqual([...new Set(rows.map(([, , state]) => state))].sort(), [...CARD_STATES].sort(), 'every state has its row');
+  });
 });
 
-test('`CARD_IN_PLAY`: a card not started and one whose run has not ended are in play; one whose run ended is not', async (t) => {
+describe('`CARD_IN_PLAY`: a card not started and one whose run has not ended are in play; one whose run ended is not', () => {
   const rows: [CardState, boolean][] = [
     ['filed', true],
     ['queued', true],
@@ -691,8 +695,10 @@ test('`CARD_IN_PLAY`: a card not started and one whose run has not ended are in 
     ['stopped', false],
     ['cancelled', false],
   ];
-  for (const [state, inPlay] of rows) await t.test(state, () => assert.equal(cardInPlay({ state }), inPlay));
-  assert.deepEqual(rows.map(([state]) => state).sort(), [...CARD_STATES].sort(), 'every state has its row');
+  for (const [state, inPlay] of rows) test(state, () => assert.equal(cardInPlay({ state }), inPlay));
+  afterAll(() => {
+    assert.deepEqual(rows.map(([state]) => state).sort(), [...CARD_STATES].sort(), 'every state has its row');
+  });
 });
 
 test("a queued card of a factory is tried on the repository its wiring names for the workflow, else its only one, never the card's repo:, and its refusal there is remembered: `nextQueued` passes over it from a daemon anywhere — `queueRepo` says the daemon's repository only for a card of the default factory", () => {
@@ -863,7 +869,7 @@ const refusedNaming =
     return true;
   };
 
-test("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's keys — one it does not have, one with no value or set twice, a value it does not take — an empty body and a frontmatter that never closes", async (t) => {
+describe("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's keys — one it does not have, one with no value or set twice, a value it does not take — an empty body and a frontmatter that never closes", () => {
   const F = 'cache-the-views-k2q9.md';
   const rows: Record<string, [text: string, facts: string[]]> = {
     'a key it does not have, naming the keys it has': [
@@ -928,9 +934,8 @@ test("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's key
     '`labels:` with a prefixed key': ['---\nlabels: { a/b: x }\n---\nx\n', [F, '"a/b"', 'prefix']],
     '`labels:` twice': ['---\nlabels: { a: x }\nlabels: { b: y }\n---\nx\n', [F, '`labels` is set twice']],
   };
-  for (const [name, [text, facts]] of Object.entries(rows))
-    await t.test(name, () => assert.throws(() => read(text), refusedNaming(...facts)));
-  await t.test('`queued:` that is not a time — a word, a day, a space, an offset, no such day, a number', () => {
+  for (const [name, [text, facts]] of Object.entries(rows)) test(name, () => assert.throws(() => read(text), refusedNaming(...facts)));
+  test('`queued:` that is not a time — a word, a day, a space, an offset, no such day, a number', () => {
     for (const bad of ['tomorrow', '2026-09-16', '2026-09-16 10:00:00', '2026-09-16T10:00:00+02:00', '2026-13-40T10:00:00.000Z', '1'])
       assert.throws(
         () => read(`---\nworkflow: dev\nqueued: ${bad}\n---\nx\n`),
@@ -945,7 +950,7 @@ test("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's key
   });
 });
 
-test('REFUSED by name at shipped defaults: `ideaCard` refuses what `nemia inbox add` is given — nothing in the idea, a card with a key it does not keep, a key given empty or on two lines, a path to a workflow, a retired repo:', async (t) => {
+describe('REFUSED by name at shipped defaults: `ideaCard` refuses what `nemia inbox add` is given — nothing in the idea, a card with a key it does not keep, a key given empty or on two lines, a path to a workflow, a retired repo:', () => {
   const rows: Record<string, [thrown: () => unknown, facts: string[]]> = {
     'an empty body in a file': [() => ideaCard('./empty.md', '---\nworkflow: dev\n---\n', {}), ['./empty.md: the body is empty']],
     "`after:` in a file: not a card yet, so no card's path is named — file the idea, then give the wait at start": [
@@ -979,8 +984,8 @@ test('REFUSED by name at shipped defaults: `ideaCard` refuses what `nemia inbox 
       ['the idea: the factory given, ', 'is more than one line', "a card's factory: is one"],
     ],
   };
-  for (const [name, [thrown, facts]] of Object.entries(rows)) await t.test(name, () => assert.throws(thrown, refusedNaming(...facts)));
-  await t.test('nothing in the idea — empty, spaces, blank lines', () => {
+  for (const [name, [thrown, facts]] of Object.entries(rows)) test(name, () => assert.throws(thrown, refusedNaming(...facts)));
+  test('nothing in the idea — empty, spaces, blank lines', () => {
     for (const text of ['', '   ', '\n\n'])
       assert.throws(
         () => ideaCard('the idea', text, {}),
@@ -996,7 +1001,14 @@ test('REFUSED by name at shipped defaults: `ideaCard` refuses what `nemia inbox 
   });
 });
 
-test('REFUSED by name at shipped defaults: `inboxNameRefusal` refuses a name that would leave the inbox, a hidden file, and no name at all', async (t) => {
+describe('REFUSED by name at shipped defaults: `inboxNameRefusal` refuses a name that would leave the inbox, a hidden file, and no name at all', () => {
+  beforeAll(() => {
+    for (const name of ['../runs/r-1', '..', '.', 'drafts/idea', '/etc/passwd', 'a\\b', 'a\0b'])
+      rows[`a name that leaves the inbox: ${JSON.stringify(name)}`] = [
+        name,
+        [`\`${name}\` is not a card's name`, 'no slash', 'not . or ..'],
+      ];
+  });
   const rows: Record<string, [name: string, facts: string[] | undefined]> = {
     'a name of the inbox passes': ['cache-the-views-k2q9', undefined],
     'two dots inside a name stay in the folder': ['a..b', undefined],
@@ -1004,17 +1016,15 @@ test('REFUSED by name at shipped defaults: `inboxNameRefusal` refuses a name tha
     'no name': ['', ['this name is empty', 'nemia inbox lists it']],
     'a blank name': ['  ', ['this name is empty']],
   };
-  for (const name of ['../runs/r-1', '..', '.', 'drafts/idea', '/etc/passwd', 'a\\b', 'a\0b'])
-    rows[`a name that leaves the inbox: ${JSON.stringify(name)}`] = [name, [`\`${name}\` is not a card's name`, 'no slash', 'not . or ..']];
   for (const [row, [name, facts]] of Object.entries(rows))
-    await t.test(row, () => {
+    test(row, () => {
       const said = inboxNameRefusal(name);
       if (facts === undefined) assert.equal(said, undefined);
       else names(said, ...facts);
     });
 });
 
-test('REFUSED by name at shipped defaults: `queueRefusal` refuses a card with no workflow and none given, one already queued, and one a run was started from', async (t) => {
+describe('REFUSED by name at shipped defaults: `queueRefusal` refuses a card with no workflow and none given, one already queued, and one a run was started from', () => {
   const where = '/home/me/.agent-workflows/inbox/cache-the-views-k2q9.md';
   const card = read('---\nrepo: /home/me/code/app\n---\nCache the views.\n');
   const queued = read('---\nworkflow: dev\nqueued: 2026-09-16T10:00:00.000Z\n---\nCache the views.\n');
@@ -1040,10 +1050,22 @@ test('REFUSED by name at shipped defaults: `queueRefusal` refuses a card with no
     ],
   };
   for (const [row, [said, facts]] of Object.entries(rows))
-    await t.test(row, () => (facts === undefined ? assert.equal(said(), undefined) : names(said(), ...facts)));
+    test(row, () => (facts === undefined ? assert.equal(said(), undefined) : names(said(), ...facts)));
 });
 
-test('REFUSED: `queueFactoryRefusal` refuses a card that names no factory, naming those on file or how one is filed, and one that names default whatever is allowed — a card of a factory passes, and one of none where unfactored starts are allowed', async (t) => {
+describe('REFUSED: `queueFactoryRefusal` refuses a card that names no factory, naming those on file or how one is filed, and one that names default whatever is allowed — a card of a factory passes, and one of none where unfactored starts are allowed', () => {
+  beforeAll(() => {
+    for (const allowed of [false, true]) {
+      rows[`default, unfactored starts ${allowed ? '' : 'not '}allowed`] = [
+        () => queueFactoryRefusal({ name: 'a', factory: 'default' }, file, ['shop'], allowed),
+        ['`default` is the default factory', `\`factory: <name>\` in ${file}`, 'one of shop.', 'Nothing was queued.'],
+      ];
+      rows[`a card of a factory, unfactored starts ${allowed ? '' : 'not '}allowed`] = [
+        () => queueFactoryRefusal({ name: 'a', factory: 'shop' }, file, ['shop'], allowed),
+        null,
+      ];
+    }
+  });
   const file = '/s/inbox/a.md';
   const loose = { name: 'a', factory: undefined };
   const rows: Record<string, [said: () => string | null, facts: string[] | null]> = {
@@ -1057,18 +1079,8 @@ test('REFUSED: `queueFactoryRefusal` refuses a card that names no factory, namin
     ],
     'no factory, where unfactored starts are allowed': [() => queueFactoryRefusal(loose, file, ['shop'], true), null],
   };
-  for (const allowed of [false, true]) {
-    rows[`default, unfactored starts ${allowed ? '' : 'not '}allowed`] = [
-      () => queueFactoryRefusal({ name: 'a', factory: 'default' }, file, ['shop'], allowed),
-      ['`default` is the default factory', `\`factory: <name>\` in ${file}`, 'one of shop.', 'Nothing was queued.'],
-    ];
-    rows[`a card of a factory, unfactored starts ${allowed ? '' : 'not '}allowed`] = [
-      () => queueFactoryRefusal({ name: 'a', factory: 'shop' }, file, ['shop'], allowed),
-      null,
-    ];
-  }
   for (const [row, [said, facts]] of Object.entries(rows))
-    await t.test(row, () => {
+    test(row, () => {
       const got = said();
       if (facts === null) return assert.equal(got, null);
       names(got, ...facts);

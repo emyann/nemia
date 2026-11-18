@@ -4,7 +4,7 @@
  * table condition whose table answered, the same once approved, a filed gated step at its gate, an ending approved before it is filed,
  * and a workflow with no routing. `npm run contracts` proves `approvalRefusal` given these; this file is what makes them more than a claim.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { brokenOn } from '@emyann/tsverify';
 import { theRunsWords } from '../contracts/gate.contract.ts';

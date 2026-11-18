@@ -7,7 +7,7 @@
  * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness the test signs by hand. On a store of its
  * own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

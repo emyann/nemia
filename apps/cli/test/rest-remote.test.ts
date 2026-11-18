@@ -3,7 +3,7 @@
  * every call presents the context's token): each reads or writes that store, prints what it prints under this machine's context, and
  * reads or makes nothing on this machine. The verbs under this machine's context are `rest.test.ts`'s.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -31,7 +31,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
 const exposed = await servedStore('nemia-rest-remote-', (root) => write(path.join(root, 'nemia', 'memory', 'feed-cursor'), '42\n'), {
   WF_EXPOSED: '1',
 });
-after(exposed.stop);
+afterAll(exposed.stop);
 
 /** A laptop with no store of its own, its config naming the exposed store's api with a token of the person's. */
 async function laptop(): Promise<NodeJS.ProcessEnv> {

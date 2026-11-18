@@ -2,7 +2,7 @@
  * `wf`, run as a process, is `nemia` under its old name: the same stdout and the same exit code for the same arguments, and on stderr
  * one line more, first, `WF_HINT`, naming what to type next. `nemia` prints no hint. A script that reads `wf`'s stdout reads what it read.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';

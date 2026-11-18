@@ -3,7 +3,7 @@
  * That a `WorkflowDir` is what `workflowFolder` resolves is `contracts/workflow-dir.contract.ts`'s. Refusals are asserted by the fact,
  * never by their words.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { Workflow, WorkflowDir } from './folder.model.ts';
@@ -11,7 +11,7 @@ import { Workflow, WorkflowDir } from './folder.model.ts';
 const step = (name: string, after: string[] = []) => ({ name, after });
 const workflow = (steps: unknown[], dir = '/store/workflows/dev', name = 'dev') => ({ dir, name, steps });
 
-test("a workflow's invariants: each refuses its planted breach, and lets through a folder its writer writes", async (t) => {
+describe("a workflow's invariants: each refuses its planted breach, and lets through a folder its writer writes", () => {
   const rows: Array<[string, unknown, boolean]> = [
     ['two steps, one waiting on the other', workflow([step('plan'), step('build', ['plan'])]), true],
     ['REFUSED: no step', workflow([]), false],
@@ -20,7 +20,7 @@ test("a workflow's invariants: each refuses its planted breach, and lets through
     ['REFUSED: a step waiting on one not there', workflow([step('build', ['plan'])]), false],
     ['REFUSED: steps waiting on each other', workflow([step('plan', ['build']), step('build', ['plan'])]), false],
   ];
-  for (const [what, value, ok] of rows) await t.test(what, () => assert.equal(Schema.is(Workflow)(value), ok));
+  for (const [what, value, ok] of rows) test(what, () => assert.equal(Schema.is(Workflow)(value), ok));
 });
 
 test('a stored folder reads as a WorkflowDir whatever it is, and only a resolved one is minted', () => {

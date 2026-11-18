@@ -4,7 +4,7 @@
  * names and that was not sent is refused naming it, and a file that does not read is refused naming the file.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

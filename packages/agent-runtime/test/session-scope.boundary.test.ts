@@ -11,7 +11,7 @@
  * started bare, which saw nothing of its scope's worker run its job to its end, runs nothing once the job is spawned again under its
  * name: it would otherwise run the first job again, on the second's streams and run file.
  */
-import { test, type TestContext } from 'node:test';
+import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -45,7 +45,7 @@ const there = (pid: number) => {
 
 /** Kills the process `pid` when the test ends, whatever became of it: a test that fails leaves no `sleep 600` behind. */
 const bounded = (t: TestContext, pid: number) =>
-  t.after(() => {
+  t.onTestFinished(() => {
     try {
       process.kill(pid, 'SIGKILL');
     } catch {}
@@ -141,7 +141,7 @@ test(
   async (t) => {
     const { root, dir, request } = kept({ leave: true });
     const h = await holder(root);
-    t.after(async () => {
+    t.onTestFinished(async () => {
       fs.writeFileSync(path.join(dir, 'end'), '');
       await h.close();
     });
@@ -185,7 +185,7 @@ test(
       request: { ...request, brief: undefined },
     });
     const h = await holder(root);
-    t.after(h.close);
+    t.onTestFinished(h.close);
     const seen = (await Effect.runPromise(h.attached.ops.observe)).get(NAME);
     assert.ok(seen, 'the holder lists the ended session');
     const release = h.attached.ops.release;
@@ -225,8 +225,8 @@ const failingScope = () => {
   return program;
 };
 
-test('an unlimited session whose scope cannot be made runs bare, as with no scope, and says why', WAITED, async (t) => {
-  await t.test('a detached job', async (sub) => {
+describe('an unlimited session whose scope cannot be made runs bare, as with no scope, and says why', WAITED, () => {
+  test('a detached job', async (sub) => {
     const root = scratch('ae-scope-');
     const cwd = scratch('ae-scope-cwd-');
     const ops = detachedOps(commandHarness, root, { ...QUICK, scopeProgram: failingScope() });
@@ -245,11 +245,10 @@ test('an unlimited session whose scope cannot be made runs bare, as with no scop
     assert.equal(typeof written?.unscoped, 'string', 'its run file says why it ran bare');
     assert.equal(written?.cgroup, undefined, 'and records no scope');
   });
-
-  await t.test('a held session', async (sub) => {
+  test('a held session', async (sub) => {
     const { root, dir, request } = kept({});
     const h = await holder(root, undefined, undefined, { scopeProgram: failingScope() });
-    sub.after(async () => {
+    sub.onTestFinished(async () => {
       fs.writeFileSync(path.join(dir, 'end'), '');
       await h.close();
     });
@@ -310,7 +309,7 @@ test(
     bounded(t, handing);
     await until(t, () => fs.existsSync(`${hold}.asked`), 'the worker started bare asked the scope for the run', { everyMs: 20 });
     process.kill(handing, 'SIGSTOP');
-    t.after(() => {
+    t.onTestFinished(() => {
       try {
         process.kill(handing, 'SIGCONT');
       } catch {}

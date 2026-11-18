@@ -1,5 +1,5 @@
 /** A script condition's answer file, decoded (`scriptAnswerOf`): a route or `unsure`, exactly one of them, or nothing the run can use. */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { scriptAnswerOf } from './script.store.ts';
 

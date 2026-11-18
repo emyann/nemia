@@ -5,7 +5,7 @@
  * its own written as given; the spec it will hold once written (`mergedSpec`) shows them so in its README, beside what is there now;
  * and an undo, which proposes the spec read before, writes the README back byte for byte.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -130,12 +130,12 @@ test('a Workflow read as the api serves it, proposed back with its needs left ou
   assert.match(fs.readFileSync(readme, 'utf8'), /^---\nowner: team\n/, "the frontmatter's other key is kept");
 });
 
-test('a Workflow proposed with other needs writes those, and with needs [] writes none, each shown so by the preview', async (t) => {
+describe('a Workflow proposed with other needs writes those, and with needs [] writes none, each shown so by the preview', () => {
   for (const [label, needs] of [
     ['other needs', [{ name: 'git-identity', message: 'a git identity', check: 'git config user.name' }]],
     ['none', []],
   ] as const) {
-    await t.test(label, async () => {
+    test(label, async () => {
       const { home, readme } = plantedNeeds('wf-apply-needs-given-');
       const { version, spec } = await servedDev(home);
       const object = devProposed(version, { ...spec, needs });

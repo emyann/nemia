@@ -2,16 +2,16 @@
  * The contrast measure on pages made for it: what it reads, what it composites, and what it answers unmeasured or exempt. Launches
  * Chromium, so it runs with the look's tests (`npm run e2e -- --look`), not with the node tests.
  */
-import { after, before, test } from 'node:test';
+import { afterAll, beforeAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { chromium, type Browser } from 'playwright';
 import { hex, measure, ratioOf, under, type Pair } from './contrast.ts';
 
 let browser: Browser;
-before(async () => {
+beforeAll(async () => {
   browser = await chromium.launch();
 });
-after(() => browser.close());
+afterAll(() => browser.close());
 
 async function pairsOf(html: string, scheme: 'light' | 'dark' = 'light'): Promise<{ scheme: string; pairs: readonly Pair[] }> {
   const context = await browser.newContext({ colorScheme: scheme });

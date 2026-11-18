@@ -4,7 +4,7 @@
  * hold, a run waited on that never lands — with the command that answers it, and a run that could not be judged a row whose note says
  * so. Cells are asserted as the values a run gives them, never as sentences.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Run, RunList } from 'objects';
 import { RUN_COLUMNS, runCells, runTable } from './table.ts';

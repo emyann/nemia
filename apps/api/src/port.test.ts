@@ -4,7 +4,7 @@
  * the variable to set); and the address the lease records for a bind (`leaseHostOf`), which a client of the store reaches.
  */
 import '../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { acknowledgedHost, bindOf, hostOf, isAddress, leaseHostOf, LOOPBACK } from './port.ts';
 

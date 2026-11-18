@@ -4,7 +4,7 @@
  * was; and the rows a step's tries total to (`tallyRowsOf`). The fixtures name a workflow of their own, and no source of the counting
  * names this repository's: the source guard at the file's end.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -88,9 +88,9 @@ const TALLY_OF: TallyOfRow[] = [
   { name: 'REFUSED: an entry with a value given twice', written: 'issues.kind=bug, issues.kind=bug', output: triage, reads: 'refused' },
 ];
 
-test("`tallyOf` reads a `tally:` line against the step's `output:` schema, and refuses what the closeout cannot hold", async (t) => {
+describe("`tallyOf` reads a `tally:` line against the step's `output:` schema, and refuses what the closeout cannot hold", () => {
   for (const row of TALLY_OF)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       if (row.reads !== 'refused') return assert.deepEqual(tallyOf('triage', row.written, row.output), row.reads);
       assert.throws(
         () => tallyOf('triage', row.written, row.output),
@@ -132,9 +132,8 @@ const TALLY_IN: Array<{ name: string; tally: string; output?: Record<string, unk
   { name: 'no closeout measured no match', tally: 'issues.kind=bug', output: undefined, value: null },
 ];
 
-test("`tallyIn` gives a closeout's value of a tally: null where nothing was measured, 0 where a zero was", async (t) => {
-  for (const row of TALLY_IN)
-    await t.test(row.name, () => assert.equal(tallyIn(row.tally, 'output' in row ? row.output : OUTPUT), row.value));
+describe("`tallyIn` gives a closeout's value of a tally: null where nothing was measured, 0 where a zero was", () => {
+  for (const row of TALLY_IN) test(row.name, () => assert.equal(tallyIn(row.tally, 'output' in row ? row.output : OUTPUT), row.value));
 });
 
 const DAYS = ['2026-09-01', '2026-09-02', '2026-09-03'];
@@ -187,8 +186,8 @@ const TALLY_ROWS: Array<{ name: string; tries: Parameters<typeof tallyRowsOf>[0]
   { name: 'no try declares a tally: no row', tries: [{ step: 'plain', day: '2026-09-01', tallies: [] }], rows: [] },
 ];
 
-test("`tallyRowsOf` totals a step's tries per tally, over the range and on each of its days", async (t) => {
-  for (const row of TALLY_ROWS) await t.test(row.name, () => assert.deepEqual(tallyRowsOf(row.tries, DAYS), row.rows));
+describe("`tallyRowsOf` totals a step's tries per tally, over the range and on each of its days", () => {
+  for (const row of TALLY_ROWS) test(row.name, () => assert.deepEqual(tallyRowsOf(row.tries, DAYS), row.rows));
 });
 
 /** The words of this repository's build workflow that the counting must never know. */

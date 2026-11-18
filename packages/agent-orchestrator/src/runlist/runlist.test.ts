@@ -2,7 +2,7 @@
  * The version a watch compares a run at (`runWatchVersion`, `runlist.ts`): its frame's time left out exactly where it is measured to the
  * read. Pure: hand-built objects, no store.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { WatchedObject } from 'objects';
 import { runWatchVersion } from './runlist.ts';
@@ -30,7 +30,7 @@ const framed = (state: string, wallMs: number, more: Record<string, unknown> = {
   ...more,
 });
 
-test("a watch compares a run leaving out its frame's time exactly where it is measured to the read", async (t) => {
+describe("a watch compares a run leaving out its frame's time exactly where it is measured to the read", () => {
   const rows: { name: string; a: WatchedObject; b: WatchedObject; same: boolean }[] = [
     {
       name: 'two waiting runs apart only in their time',
@@ -83,8 +83,8 @@ test("a watch compares a run leaving out its frame's time exactly where it is me
     { name: 'two runs whose state is no run state', a: watched(framed('later', 1000)), b: watched(framed('later', 9000)), same: false },
     { name: 'an object whose status is no object', a: watched('waiting'), b: watched('inFlight'), same: false },
   ];
-  for (const row of rows) await t.test(row.name, () => assert.equal(runWatchVersion(row.a) === runWatchVersion(row.b), row.same));
-  await t.test('an object with no status, or a status that is no object, is compared as its JSON', () => {
+  for (const row of rows) test(row.name, () => assert.equal(runWatchVersion(row.a) === runWatchVersion(row.b), row.same));
+  test('an object with no status, or a status that is no object, is compared as its JSON', () => {
     const bare: WatchedObject = {
       apiVersion: 'nemia/v1',
       kind: 'Run',
@@ -93,7 +93,7 @@ test("a watch compares a run leaving out its frame's time exactly where it is me
     assert.equal(runWatchVersion(bare), JSON.stringify(bare));
     assert.equal(runWatchVersion(watched('waiting')), JSON.stringify(watched('waiting')));
   });
-  await t.test('a finished run is compared as its JSON', () => {
+  test('a finished run is compared as its JSON', () => {
     const done = watched(framed('finished', 1000));
     assert.equal(runWatchVersion(done), JSON.stringify(done));
   });

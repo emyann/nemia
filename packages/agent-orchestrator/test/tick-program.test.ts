@@ -10,7 +10,7 @@
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
  */
 import { settingsOf, type Env } from '../src/config/config.store.ts';
-import { test } from 'node:test';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -145,9 +145,9 @@ test('a pass whose series cannot be written keeps its own cost and says so: the 
   fs.rmSync(path.join(ROOT, 'metrics'), { recursive: true, force: true });
   fs.writeFileSync(path.join(ROOT, 'metrics'), 'not a folder');
   const said: string[] = [];
-  t.mock.method(process.stderr, 'write', (text: string) => said.push(text) > 0);
+  vi.spyOn(process.stderr, 'write').mockImplementation((text: string) => said.push(text) > 0);
   const pass = await runWith(e, tickRun({ repo: ROOT, quota: () => ({ h: { w: 12 } }) }));
-  t.mock.restoreAll();
+  vi.restoreAllMocks();
   fs.rmSync(path.join(ROOT, 'metrics'), { force: true });
   assert.ok(pass.cost, 'the pass answered with its cost');
   assert.ok(

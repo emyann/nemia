@@ -2,7 +2,7 @@
  * What an append says of itself (`appendSaid`, through `Journal.layer`): a span of its own, `append`, under the verb that wrote it, and a
  * `Debug` log of the event's kind, each annotated with the task, the kind and the attempt — the runtime's words, never a caller's.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Logger, Option, References, Tracer } from 'effect';
 import { appendFields, Journal } from './journal.ts';

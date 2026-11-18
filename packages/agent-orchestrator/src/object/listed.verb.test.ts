@@ -2,7 +2,7 @@
  * Objects listed the one way (`objectsListed`), on the factories as objects off a listing as `nemia factory` reads it, its file beside it
  * in a scratch store: a page walked and selected as a CardList is.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

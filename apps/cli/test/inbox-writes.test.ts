@@ -7,7 +7,7 @@
  *
  * Each refusal asserts its exit code and the command or name it names, never its sentence.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -40,7 +40,7 @@ const seeded = (root: string): void => write(path.join(root, 'runs', 'r-ctx.json
 const STARTS = { WF_DEFAULT_FACTORY_STARTS: '1' };
 
 const store = await servedStore('nemia-inbox-', seeded, STARTS);
-after(store.stop);
+afterAll(store.stop);
 
 /** `nemia <argv>` on `env`, waited on for its end. */
 function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
@@ -189,7 +189,7 @@ test("REFUSED, exit 2, before anything is asked: a folder as the idea or a card'
 
 test('under a remote context pointed at another store, the same writes land there, the idea read on this machine', async () => {
   const exposed = await servedStore('nemia-inbox-remote-', seeded, { WF_EXPOSED: '1', ...STARTS });
-  after(exposed.stop);
+  afterAll(exposed.stop);
   const minted = await nemia(['token', 'add', 'laptop'], exposed.env);
   ok(minted, 'token add');
   const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1] ?? assert.fail(minted.out);

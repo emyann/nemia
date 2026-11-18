@@ -13,7 +13,7 @@
  * The labels a step's task is filed with are read off the engine's stand-in, in the measured run's story. The test place does not
  * model the shipped engine nor a process. Its store is its own at `ROOT`, given to each engine the client builds.
  */
-import { test, type TestContext } from 'node:test';
+import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,7 +43,7 @@ const withEnv = (t: TestContext, vars: Record<string, string | undefined>) => {
     }
   };
   put(vars);
-  t.after(() => put(before));
+  t.onTestFinished(() => put(before));
 };
 
 /** Sets `OTEL_EXPORTER_OTLP_ENDPOINT` to `endpoint` for the rest of test `t`. */
@@ -64,7 +64,7 @@ const filedTrace = async () => {
  * of a task that has not settled still fails the test.
  */
 const stoppedAfter = (t: TestContext, e: ClientEngine, id: string) =>
-  t.after(() =>
+  t.onTestFinished(() =>
     Effect.runPromise(
       e
         .stop(id)
@@ -154,6 +154,6 @@ const HANDED: Row[] = [
   },
 ];
 
-test("what the client's engine hands the runtime of the process's telemetry: a collector or none, a session's tools' details, a refusal said", async (t) => {
-  for (const row of HANDED) await t.test(row.name, row.options ?? {}, row.check);
+describe("what the client's engine hands the runtime of the process's telemetry: a collector or none, a session's tools' details, a refusal said", () => {
+  for (const row of HANDED) test(row.name, row.options ?? {}, row.check);
 });

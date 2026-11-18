@@ -4,7 +4,7 @@
  * `from` read as the subscription's start; a get by name, and a `Missing`; a bad selector or limit `Invalid`. And over the files, a
  * deliverer's file that does not read says why in `status.error`, the subscription read at its start. Kinds are asserted, never sentences.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { Effect, Exit, Schema } from 'effect';
@@ -71,12 +71,12 @@ test('each subscription is listed with its status from its own delivery', () => 
   assert.deepEqual(list.items[0]?.status, { from: 120, cursor: 120, pending: 0 });
 });
 
-test('a delivery written for another task or another from reads as the subscription at its start', async (t) => {
+describe('a delivery written for another task or another from reads as the subscription at its start', () => {
   for (const [name, kept] of [
     ['another task', aDelivery(300, 'nemia-9')],
     ['another from', { ...aDelivery(300, 'nemia-1'), of: { task: 'nemia-1', from: 7 } }],
   ] as const)
-    await t.test(name, () => {
+    test(name, () => {
       const one = ok(over({ subscriptions: { mill: aSubscription('nemia-1') }, deliveries: { mill: kept } }, subscriptionObject('mill')));
       assert.deepEqual(one.status, { from: 120, cursor: 120, pending: 0 });
     });

@@ -4,7 +4,7 @@
  * awk` lost 219 of 321 lines). The reader here drains nothing until the child has exited or a short while has passed, whichever is
  * first: a bin that exits on a full pipe has exited by then, and one that waits for its streams is still there to be read.
  */
-import { test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
@@ -18,7 +18,7 @@ const name = (i: number) => `card-${String(i).padStart(4, '0')}-${LONG}`;
 const store = await servedStore('nemia-cli-pipe-', (root) => {
   for (let i = 0; i < CARDS; i++) write(path.join(root, 'inbox', `${name(i)}.md`), `Card ${i}, ${LONG}.\n`);
 });
-test.after(() => store.stop());
+afterAll(() => store.stop());
 
 /** Each line's first word, the card a row names: the reads are compared by it, since a time cell may read differently a second later. */
 const firstWords = (out: string) => out.split('\n').map((line) => line.split(' ')[0]);

@@ -2,7 +2,7 @@
  * Why a step's session alone could not be read, as a person is told it (`StepNeeds.sessionUnread`): the runtime's words off the views the
  * request already read, by the step's own task, and nothing where its view says nothing.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { TaskView } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';

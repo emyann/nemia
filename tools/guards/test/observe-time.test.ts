@@ -11,7 +11,7 @@
  * (`/otel-lgtm/tempo-config.yaml`, read by its Tempo; a second `--config` merged by its collector) are its pinned digest's, as
  * measured (`tools/observe/README.md`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

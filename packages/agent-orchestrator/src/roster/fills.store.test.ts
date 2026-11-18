@@ -6,7 +6,7 @@
  * `plan` names `ada` and whose `stray` names `../agents/ada`; its `agents/` has `iris` and `ada`. The store `home` has `ada` and `zed`, and
  * the workflow `omega`, whose `step` names `zed`. A factory made from a template has a tree of its own, with `alpha` and `proof`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

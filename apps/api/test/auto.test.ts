@@ -9,7 +9,7 @@
  * At shipped defaults, over the harness's scratch store (`root`).
  */
 import { PERSON_TOKEN, root } from './harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -45,9 +45,9 @@ const WORDS = 'Try implement again on its own once its check passed and it staye
 
 propose(TRIES);
 
-test('A person keeps her rules: the default in force, a proposed rule refused but as proposed, a confirm put in force once, and a drop that takes the default out', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('A person keeps her rules: the default in force, a proposed rule refused but as proposed, a confirm put in force once, and a drop that takes the default out', () => {
+  const s = story(test);
+  s.test(
     'the default is in force while nothing is confirmed, read beside what the agent proposed and the words it keeps as guidance',
     async () => {
       const read = await asked('GET', '/api/policy/nemia');
@@ -71,7 +71,7 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
       assert.equal(read.body.instruction, null);
     },
   );
-  await s.test(
+  s.test(
     'REFUSED, writing nothing: a rule not proposed, a body with no words or blank ones, a request from another site, and a name that is no agent',
     async () => {
       const ghost = await asked('PUT', '/api/policy/nemia/rules/ghost', { words: WORDS });
@@ -97,21 +97,18 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
       assert.match(String(hidden.body.error), /is not an agent's name/);
     },
   );
-  await s.test(
-    'REFUSED (409), writing nothing: a confirm of the words the person read, once the agent proposed the rule otherwise',
-    async () => {
-      propose({ answer: 'approve', when: [] });
-      try {
-        const stale = await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS });
-        assert.equal(stale.status, 409);
-        assert.match(String(stale.body.error), /^nemia's rule tries now reads "Approve any step on its own, whatever its state\."/);
-        assert.equal(fs.existsSync(CONFIRMED), false);
-      } finally {
-        propose(TRIES);
-      }
-    },
-  );
-  await s.test('a confirm puts the rule in force beside the default; again is a 409; a drop takes the default out', async () => {
+  s.test('REFUSED (409), writing nothing: a confirm of the words the person read, once the agent proposed the rule otherwise', async () => {
+    propose({ answer: 'approve', when: [] });
+    try {
+      const stale = await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS });
+      assert.equal(stale.status, 409);
+      assert.match(String(stale.body.error), /^nemia's rule tries now reads "Approve any step on its own, whatever its state\."/);
+      assert.equal(fs.existsSync(CONFIRMED), false);
+    } finally {
+      propose(TRIES);
+    }
+  });
+  s.test('a confirm puts the rule in force beside the default; again is a 409; a drop takes the default out', async () => {
     const confirmed = await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS });
     assert.equal(confirmed.status, 200);
     assert.deepEqual(
@@ -131,12 +128,9 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
     );
     assert.equal(dropped.body.isDefault, false);
   });
-  await s.test(
-    "the routes' former spelling, /api/auto/…, is no route: the api's 404, naming where the paths it serves are listed",
-    async () => {
-      const res = await asked('PUT', '/api/auto/nemia/rules/tries?x=1', { words: WORDS });
-      assert.equal(res.status, 404);
-      assert.match(String(res.body.error), /is no route of this api/);
-    },
-  );
+  s.test("the routes' former spelling, /api/auto/…, is no route: the api's 404, naming where the paths it serves are listed", async () => {
+    const res = await asked('PUT', '/api/auto/nemia/rules/tries?x=1', { words: WORDS });
+    assert.equal(res.status, 404);
+    assert.match(String(res.body.error), /is no route of this api/);
+  });
 });

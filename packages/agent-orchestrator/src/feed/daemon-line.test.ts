@@ -2,7 +2,7 @@
  * The feed's daemon line (`startedLine`): what it says of the daemon before, how a person reads it, that the fold and a pass's lines
  * ignore it, and that the store appends it as it appends a pass's and reads it back.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

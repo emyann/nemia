@@ -2,7 +2,7 @@
  * Who ticks the store, as data: `daemon.json`'s text judged at a fixed `now` with liveness handed in, and the words said of it. The file on
  * disk, `nemia up` and `nemia tick` taking and refusing the store, are daemon.store.test.ts's.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_EVERY_MS,
@@ -309,7 +309,7 @@ test("nemia ls's line: whether a daemon ticks the store, and when its last pass 
   );
 });
 
-test('REFUSED: an interval the file cannot hold — negative, zero, fractional, not a number, or longer than a timer keeps', async (t) => {
+describe('REFUSED: an interval the file cannot hold — negative, zero, fractional, not a number, or longer than a timer keeps', () => {
   const refused: readonly (readonly [string, string])[] = [
     ['negative', '-5'],
     ['zero', '0'],
@@ -323,21 +323,21 @@ test('REFUSED: an interval the file cannot hold — negative, zero, fractional, 
     ['longer than a timer keeps', String(MAX_EVERY_MS + 1)],
   ];
   for (const [name, arg] of refused)
-    await t.test(name, () => {
+    test(name, () => {
       const asked = everyOf(arg);
       assert.ok('refusal' in asked);
       assert.match(asked.refusal, /whole milliseconds, from 1 to 2147483647/);
       assert.ok(asked.refusal.includes(JSON.stringify(arg)), 'the refusal names what it was given');
       assert.match(asked.refusal, /nemia up \[ms\]/);
     });
-  await t.test('none given is the shipped interval', () => assert.deepEqual(everyOf(undefined), { every: DEFAULT_EVERY_MS }));
+  test('none given is the shipped interval', () => assert.deepEqual(everyOf(undefined), { every: DEFAULT_EVERY_MS }));
   for (const [arg, every] of [
     ['1', 1],
     ['10', 10],
     ['4000', 4000],
     [String(MAX_EVERY_MS), MAX_EVERY_MS],
   ] as const)
-    await t.test(`${arg} is taken, and the file reads it back`, () => {
+    test(`${arg} is taken, and the file reads it back`, () => {
       assert.deepEqual(everyOf(arg), { every });
       assert.equal(parseDaemonFile(text(holder({ every })))?.every, every);
     });

@@ -2,7 +2,7 @@
  * The decider screen's pure part, at shipped defaults: what a branch touched, the files that decide a
  * check, the lesson line, and what a step consumed. Every guard here has a case that makes it refuse.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   AGENT_FACING,

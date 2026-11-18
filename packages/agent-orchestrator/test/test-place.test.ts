@@ -3,7 +3,7 @@
  * (`placed.ts`) has a new one for each test, which that test's subtests share; it starts no process, by what its files import; both ways
  * of asking answer the same, and a verb that throws is unread in one sentence; and it declares every sentence the code prints of a place.
  */
-import { test } from 'node:test';
+import { afterAll, beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -62,14 +62,18 @@ test('REFUSED: a place shared by two tests — the second sees the repository an
   second(testPlace());
 });
 
-test("a test's subtests share its place, and the program it runs is given that one", async (t) => {
-  const root = scratch('wf-test-place-sub-');
-  const mine = stand();
-  await t.test('a first subtest makes a repository', () => {
+describe("a test's subtests share its place, and the program it runs is given that one", () => {
+  let root!: string;
+  let mine!: TestPlace;
+  beforeAll(() => {
+    root = scratch('wf-test-place-sub-');
+    mine = stand();
+  });
+  test('a first subtest makes a repository', () => {
     assert.equal(stand(), mine, 'the place of the test it is in');
     stand().world.repository(root, { 'a.txt': 'one\n' });
   });
-  await t.test('a second sees it, and so does a program given the layer', async () => {
+  test('a second sees it, and so does a program given the layer', async () => {
     assert.equal(stand(), mine);
     const asked = Effect.gen(function* () {
       const place = yield* PlaceService;
@@ -78,7 +82,9 @@ test("a test's subtests share its place, and the program it runs is given that o
     const opened = await runPlaced(asked);
     assert.ok('answer' in opened && opened.answer.branch === 'main', JSON.stringify(opened));
   });
-  assert.equal(stand(), mine, 'and the test still has it after them');
+  afterAll(() => {
+    assert.equal(stand(), mine, 'and the test still has it after them');
+  });
 });
 
 test('REFUSED: a place made for each test, asked at the head of the file, outside any test', () => {

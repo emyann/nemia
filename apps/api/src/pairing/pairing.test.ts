@@ -10,7 +10,7 @@
  * tokens minted through the package's `TokenDoor` under the harness's store.
  */
 import { NO_TOKEN, root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
@@ -168,9 +168,12 @@ const statusOf = async (res: Response): Promise<[number, string | undefined]> =>
   res.status === 200 ? undefined : ((await res.json()) as { reason?: string }).reason,
 ];
 
-test('an exposed store takes a pairing and a link claim at a name it is served at, and refuses them at any other name', async (t) => {
-  const app = servedApp(true);
-  await t.test('a pairing asked at the declared name, on any port and in any case, is taken, and claimed there', async () => {
+describe('an exposed store takes a pairing and a link claim at a name it is served at, and refuses them at any other name', () => {
+  let app!: import('hono').Hono<import('../layer.ts').ApiEnv, import('hono/types').BlankSchema, '/'>;
+  beforeAll(() => {
+    app = servedApp(true);
+  });
+  test('a pairing asked at the declared name, on any port and in any case, is taken, and claimed there', async () => {
     for (const host of [`${SERVED}:8787`, 'Nemia.Taile26745.ts.net']) {
       const res = await sentTo(app, host, '/api/pairings', { client: 'phone' });
       assert.equal(res.status, 200, `${host}: ${await res.clone().text()}`);
@@ -179,38 +182,31 @@ test('an exposed store takes a pairing and a link claim at a name it is served a
       assert.equal(((await claimed.json()) as PairingClaimed).phase, 'waiting', host);
     }
   });
-  await t.test('a pairing asked at the address the store binds is taken', async () =>
-    assert.deepEqual(await statusOf(await sentTo(app, `${BOUND}:8787`, '/api/pairings', { client: 'phone' })), [200, undefined]),
-  );
-  await t.test('a pairing asked at the loopback is taken as on every store', async () => {
+  test('a pairing asked at the address the store binds is taken', async () =>
+    assert.deepEqual(await statusOf(await sentTo(app, `${BOUND}:8787`, '/api/pairings', { client: 'phone' })), [200, undefined]));
+  test('a pairing asked at the loopback is taken as on every store', async () => {
     for (const host of ['127.0.0.1:8787', 'localhost:8787', '[::1]:8787'])
       assert.deepEqual(await statusOf(await sentTo(app, host, '/api/pairings', { client: 'desk' })), [200, undefined], host);
   });
-  await t.test(
-    'REFUSED 403 host: a pairing asked at any other name — a site whose name points here, a name beside the declared one',
-    async () => {
-      for (const host of ['evil.example:8787', `evil.${SERVED}:8787`, `${SERVED}.evil.example`, '100.64.0.70:8787'])
-        assert.deepEqual(await statusOf(await sentTo(app, host, '/api/pairings', { client: 'phone' })), [403, 'host'], host);
-    },
-  );
-  await t.test("a first-visit link printed under the declared name is claimed there, into the board's cookie", async () => {
+  test('REFUSED 403 host: a pairing asked at any other name — a site whose name points here, a name beside the declared one', async () => {
+    for (const host of ['evil.example:8787', `evil.${SERVED}:8787`, `${SERVED}.evil.example`, '100.64.0.70:8787'])
+      assert.deepEqual(await statusOf(await sentTo(app, host, '/api/pairings', { client: 'phone' })), [403, 'host'], host);
+  });
+  test("a first-visit link printed under the declared name is claimed there, into the board's cookie", async () => {
     const secret = await linkUnder(`http://${SERVED}:8787`);
     const res = await sentTo(app, `${SERVED}:8787`, '/api/links/claim', { secret });
     assert.equal(res.status, 200, await res.clone().text());
     assert.equal(((await res.json()) as LinkClaimed).cookie, 'set');
   });
-  await t.test(
-    'REFUSED 403 host: a link printed under a name not declared is not claimed at that name, its base no name the store takes',
-    async () => {
-      const secret = await linkUnder('http://elsewhere.example:8787');
-      assert.deepEqual(await statusOf(await sentTo(app, 'elsewhere.example:8787', '/api/links/claim', { secret })), [403, 'host']);
-      assert.deepEqual(
-        await statusOf(await sentTo(app, `${SERVED}:8787`, '/api/links/claim', { secret })),
-        [200, undefined],
-        'claimed at a declared name',
-      );
-    },
-  );
+  test('REFUSED 403 host: a link printed under a name not declared is not claimed at that name, its base no name the store takes', async () => {
+    const secret = await linkUnder('http://elsewhere.example:8787');
+    assert.deepEqual(await statusOf(await sentTo(app, 'elsewhere.example:8787', '/api/links/claim', { secret })), [403, 'host']);
+    assert.deepEqual(
+      await statusOf(await sentTo(app, `${SERVED}:8787`, '/api/links/claim', { secret })),
+      [200, undefined],
+      'claimed at a declared name',
+    );
+  });
 });
 
 test('REFUSED 403 host: a store not marked exposed takes a pairing at the loopback alone, its declared names and bind none', async () => {

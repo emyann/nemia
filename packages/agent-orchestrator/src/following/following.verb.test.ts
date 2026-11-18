@@ -3,7 +3,7 @@
  * by hand, and a store of its own, whose run record and feed lines it writes: across a person's answer, across a try, to its end, and a
  * harness that does not stream. A file of its own, since the feed's hub is the process's, so a line written wakes a follower at once.
  */
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Cause, Effect, Exit, Layer, Logger, ManagedRuntime, Stream } from 'effect';
@@ -103,7 +103,7 @@ const followed = (t: Task) =>
 /** A runtime with the feed's hub and no logger, over the engine `e`: let go once the test `t` ends. */
 function runtimeOf(t: TestContext, e: Engine) {
   const rt = ManagedRuntime.make(Layer.mergeAll(feedHubLayer(), Logger.layer([]), EngineService.layer(e), door(), StoreRoot.layer(ROOT)));
-  t.after(() => rt.dispose());
+  t.onTestFinished(() => rt.dispose());
   return rt;
 }
 

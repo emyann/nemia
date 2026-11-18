@@ -7,7 +7,7 @@
  * default factory's two converters (namespace.ts); read.ts imports effect alone, decodes.ts no value at all and namespace.ts the objects'
  * entry alone. The objects' client alone imports effect's HTTP client and HttpApi modules besides, which make it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

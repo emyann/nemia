@@ -10,7 +10,8 @@
  * The tick is the store's pass (`tickRun`), on the stage's engine given a pass of its own that does nothing, as `level-feed.test.ts` gives
  * it. The store is its own, at `ROOT`, given as `ENV`.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -61,11 +62,11 @@ const handedTo = async (...argv: string[]): Promise<void> => {
  * is proposed only where a template is a folder on the machine, so its handler refuses it from anywhere else.
  */
 const resolvedBy = async (t: TestContext, ...argv: string[]): Promise<void> => {
-  const log = t.mock.method(console, 'log', () => {});
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
   try {
     await stage.main(['factory', 'resolve', ...argv]);
   } finally {
-    log.mock.restore();
+    log.mockRestore();
   }
 };
 
@@ -87,14 +88,19 @@ const factorySaid = () =>
     .lines.filter((l) => l.involved?.kind === 'Factory')
     .map((l) => [l.involved?.name, l.reason, l.labels, l.source]);
 
-test("a factory's upgrade conflicts said on the feed: one line when they turn pending, one when they settle, and none again", async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
+describe("a factory's upgrade conflicts said on the feed: one line when they turn pending, one when they settle, and none again", () => {
+  let b!: import('./story.ts').Board;
+  let dir!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
+    dir = path.join(scratch('wf-conflicts-feed-template-'), 'team');
+    return t.end;
+  });
+  const s = story(test);
   const pass = () => stage.runWith(b.e, tickRun());
-  const dir = path.join(scratch('wf-conflicts-feed-template-'), 'team');
-
-  await s.test('a factory applied at 0.1.0 with its rules, and one with no conflict: a pass says no factory', async () => {
+  s.test('a factory applied at 0.1.0 with its rules, and one with no conflict: a pass says no factory', async () => {
     const repo = scratch('wf-conflicts-feed-repo-');
     fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
     stage.place().world.repository(repo, {});
@@ -108,8 +114,7 @@ test("a factory's upgrade conflicts said on the feed: one line when they turn pe
     await pass();
     assert.deepEqual(factorySaid(), []);
   });
-
-  await s.test('the upgrade filed over a line both changed, the controller says ConflictsPending True: a pass says it once', async () => {
+  s.test('the upgrade filed over a line both changed, the controller says ConflictsPending True: a pass says it once', async () => {
     rewrite(treeDir(ROOT, 'acme'), 'on a Friday', 'on a Friday, nor on a Monday');
     const doc = parse(fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8'));
     doc.spec.version = '0.2.0';
@@ -129,16 +134,14 @@ test("a factory's upgrade conflicts said on the feed: one line when they turn pe
     assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), line), true, 'her selectors wake her on it');
     assert.equal(selects(parseSelectors(['kind=Factory,factory=acme']), line), true);
   });
-
-  await s.test('more passes, and a daemon restarted with no fold of its own, say it no second time', async () => {
+  s.test('more passes, and a daemon restarted with no fold of its own, say it no second time', async () => {
     await pass();
     await pass();
     const conflicts = await stage.runPlaced(conflictsNow());
     assert.deepEqual(recordFeed(ROOT, new Map(), { memo: freshFeedMemo(), conflicts }).lines, []);
     assert.equal(factorySaid().length, 1);
   });
-
-  await s.test(
+  s.test(
     'the person chooses and approves the rules as the Factory, the controller merges and says it False: a pass says it settled, once',
     async (sub) => {
       await resolvedBy(sub, 'acme', LINE, '--theirs');
@@ -154,8 +157,7 @@ test("a factory's upgrade conflicts said on the feed: one line when they turn pe
       assert.deepEqual(factorySaid().slice(1), [['acme', 'ConflictsSettled', { factory: 'acme' }, 'tick']]);
     },
   );
-
-  await s.test('a factory that never had a conflict is never said', () => {
+  s.test('a factory that never had a conflict is never said', () => {
     assert.deepEqual([...new Set(factorySaid().map((l) => l[0]))], ['acme']);
   });
 });

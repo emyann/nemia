@@ -2,7 +2,7 @@
  * Every picture the e2e takes is taken by `photograph` (`test/e2e/board.ts`), which stills every animation for the shot: an agent's face
  * moves at all times, and a picture taken mid-blink or mid-bob would differ from run to run.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

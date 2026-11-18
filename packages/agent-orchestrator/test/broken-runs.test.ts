@@ -13,7 +13,8 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_MAX_CONCURRENT` admits sessions enough for every run, and no cap is set on
  * runs but in the checkpoint that counts the slots, which sets it on `ENV` for its own scope.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test, vi } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -109,16 +110,16 @@ const JOURNAL_OUT = (id: string) => `${id} is not advanced while a task it reads
 const printedBy = async (t: test.TestContext, argv: string[], engine: Parameters<typeof stage.main>[1]) => {
   const out: string[] = [];
   const err: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => void out.push(...a.map(String).join(' ').split('\n')));
-  const error = t.mock.method(console, 'error', (...a: unknown[]) => void err.push(a.map(String).join(' ')));
+  const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void out.push(...a.map(String).join(' ').split('\n')));
+  const error = vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => void err.push(a.map(String).join(' ')));
   let threw: unknown;
   try {
     await stage.main(argv, engine);
   } catch (caught) {
     threw = caught;
   } finally {
-    log.mock.restore();
-    error.mock.restore();
+    log.mockRestore();
+    error.mockRestore();
   }
   return { out, err, threw };
 };
@@ -136,10 +137,16 @@ const unreadableOf = (listed: RunsListed['runs'][number]['listed']): string | un
 /** Whether the feed says `id` was removed. */
 const saidRemoved = (id: string) => readFeed(ROOT).lines.some((l) => 'run' in l && l.run === id && l.word === REMOVED);
 
-test('one broken run does not stop the others: each left out and said once, the others filed, and mended, it goes on', async (t) => {
-  const s = story(t);
-  const { b, e } = broken();
-  stage.place().world.repository(REPO, {});
+describe('one broken run does not stop the others: each left out and said once, the others filed, and mended, it goes on', () => {
+  let b!: import('./story.ts').Board;
+  let e!: import('agent-runtime').EngineShape;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ b, e } = broken());
+    stage.place().world.repository(REPO, {});
+    return t.end;
+  });
+  const s = story(test);
   const pass = () => stage.runWith(e, tickRun({ repo: ROOT }));
   const lsOf = async (...argv: string[]) => (await typed(['ls', ...argv], e, undefined, stage.place().place, ENV)) as RunsListed;
   const runs: Record<'journal' | 'gone' | 'unplaced' | 'checked' | 'tried' | 'waiting' | 'good', string> = {
@@ -151,8 +158,7 @@ test('one broken run does not stop the others: each left out and said once, the 
     waiting: '',
     good: '',
   };
-
-  await s.test('every run is at work before anything breaks, but the one whose unfrozen folder says no `place:`', async () => {
+  s.test('every run is at work before anything breaks, but the one whose unfrozen folder says no `place:`', async () => {
     runs.journal = (await started('the journal spoiled')).id;
     runs.gone = (await started('the folder taken away')).id;
     runs.checked = (await started('the check spoiled', CHECKED, { isolate: true })).id;
@@ -184,8 +190,7 @@ test('one broken run does not stop the others: each left out and said once, the 
     assert.ok(check, 'the checked run filed its check');
     assert.equal(runRecord(ROOT, runs.tried).steps.work.tries?.length, 1, 'the retried run holds an earlier try');
   });
-
-  await s.test(
+  s.test(
     'a journal no runtime wrote, a folder gone and a torn record leave their runs out, each said once, while a run beside them files',
     async (c) => {
       spoil(runRecord(ROOT, runs.journal).steps.work.taskId!);
@@ -196,11 +201,11 @@ test('one broken run does not stop the others: each left out and said once, the 
       runs.good = (await started('the good one')).id;
 
       const wrote: string[] = [];
-      const stderr = c.mock.method(process.stderr, 'write', (line: string) => {
+      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((line: string) => {
         wrote.push(String(line));
         return true;
       });
-      const now = await pass().finally(() => stderr.mock.restore());
+      const now = await pass().finally(() => stderr.mockRestore());
 
       assert.deepEqual(now.runs.find((a) => a.run.id === runs.good)?.filed, ['work'], 'the good run filed its step');
       for (const id of [runs.journal, runs.gone, runs.unplaced])
@@ -228,8 +233,7 @@ test('one broken run does not stop the others: each left out and said once, the 
         assert.equal(saidRemoved(id), false, `the feed does not say ${id} removed`);
     },
   );
-
-  await s.test('`nemia tick` says each run left out on stderr, lists the others, and fails nothing', async (c) => {
+  s.test('`nemia tick` says each run left out on stderr, lists the others, and fails nothing', async (c) => {
     const { out, err, threw } = await printedBy(c, ['tick'], e);
     assert.equal(threw, undefined);
     assert.ok(
@@ -245,8 +249,7 @@ test('one broken run does not stop the others: each left out and said once, the 
       out.join('\n'),
     );
   });
-
-  await s.test('`nemia ls` says each broken run unreadable, on the step whose task does not read, and lists every other run', async () => {
+  s.test('`nemia ls` says each broken run unreadable, on the step whose task does not read, and lists every other run', async () => {
     const lines = await lsOf();
     for (const [id, task] of [
       [runs.checked, runRecord(ROOT, runs.checked).steps.work.check!.taskId],
@@ -275,8 +278,7 @@ test('one broken run does not stop the others: each left out and said once, the 
       JSON.stringify(one.runs),
     );
   });
-
-  await s.test("the decision of a broken run is unjudged in the list's words, and a run whose tasks read is decided", async () => {
+  s.test("the decision of a broken run is unjudged in the list's words, and a run whose tasks read is decided", async () => {
     const listed = await lsOf();
     for (const id of [runs.checked, runs.tried]) {
       const read = await stage.runWith(e, decisionRead(id));
@@ -290,43 +292,38 @@ test('one broken run does not stop the others: each left out and said once, the 
     assert.ok(!('unjudged' in good), JSON.stringify(good));
     assert.deepEqual([good.run.id, good.run.brief], [runs.good, 'the good one']);
   });
+  s.test("the board answers an unfrozen run unjudged and running, in the folder's words alone, its steps off its record", async () => {
+    const [one] = await stage.runWith(e, judgedNow(e, ROOT, [runRecord(ROOT, runs.unplaced)]));
+    assert.equal(one.status, 'running');
+    assert.ok(
+      one.unreadable?.startsWith(`${runs.unplaced}'s workflow folder does not load, so the board does not judge the run`),
+      one.unreadable ?? '',
+    );
+    assert.match(one.unreadable ?? '', /work: says no `place:`/);
+    assert.deepEqual(
+      one.steps.map((step) => step.name),
+      ['work'],
+    );
 
-  await s.test(
-    "the board answers an unfrozen run unjudged and running, in the folder's words alone, its steps off its record",
-    async () => {
-      const [one] = await stage.runWith(e, judgedNow(e, ROOT, [runRecord(ROOT, runs.unplaced)]));
-      assert.equal(one.status, 'running');
-      assert.ok(
-        one.unreadable?.startsWith(`${runs.unplaced}'s workflow folder does not load, so the board does not judge the run`),
-        one.unreadable ?? '',
-      );
-      assert.match(one.unreadable ?? '', /work: says no `place:`/);
-      assert.deepEqual(
-        one.steps.map((step) => step.name),
-        ['work'],
-      );
-
-      const run = runRecord(ROOT, runs.unplaced);
-      const loaded = (() => {
-        try {
-          loadWorkflows(UNPLACED, { repo: run.repo, home: ROOT });
-          return 'it loaded';
-        } catch (err) {
-          return (err as Error).message;
-        }
-      })();
-      assert.deepEqual(workflowsOf(run, ROOT), {
-        steps: null,
-        warning: `The workflow folder ${UNPLACED} no longer reads as a workflow: ${/[.!?]$/.test(loaded) ? loaded : `${loaded}.`}`,
-      });
-      const gone = path.join(ROOT, 'no-such-folder');
-      assert.deepEqual(workflowsOf({ ...run, workflowDir: gone }, ROOT), { steps: null, warning: `The workflow folder ${gone} is gone.` });
-    },
-  );
-
-  await s.test('the cap counts a broken run in flight, as the pass does', async (c) => {
+    const run = runRecord(ROOT, runs.unplaced);
+    const loaded = (() => {
+      try {
+        loadWorkflows(UNPLACED, { repo: run.repo, home: ROOT });
+        return 'it loaded';
+      } catch (err) {
+        return (err as Error).message;
+      }
+    })();
+    assert.deepEqual(workflowsOf(run, ROOT), {
+      steps: null,
+      warning: `The workflow folder ${UNPLACED} no longer reads as a workflow: ${/[.!?]$/.test(loaded) ? loaded : `${loaded}.`}`,
+    });
+    const gone = path.join(ROOT, 'no-such-folder');
+    assert.deepEqual(workflowsOf({ ...run, workflowDir: gone }, ROOT), { steps: null, warning: `The workflow folder ${gone} is gone.` });
+  });
+  s.test('the cap counts a broken run in flight, as the pass does', async (c) => {
     ENV.WF_MAX_RUNS = '20';
-    c.after(() => {
+    c.onTestFinished(() => {
       ENV.WF_MAX_RUNS = undefined;
     });
 
@@ -334,12 +331,11 @@ test('one broken run does not stop the others: each left out and said once, the 
     const slots = await stage.runWith(e, slotsRead());
     for (const id of [runs.unplaced, runs.journal]) assert.ok(slots.inFlight?.includes(id), `${id}: ${JSON.stringify(slots.inFlight)}`);
   });
-
-  await s.test(
+  s.test(
     'under a pause, a pass and `nemia ls` over a run at work whose folder stops loading finish, its finishing tasks read without it',
     async (c) => {
       putPause(ROOT, { why: 'a test pauses', by: 'ann' });
-      c.after(() => resumePause(ROOT));
+      c.onTestFinished(() => resumePause(ROOT));
       const paused = await pass();
       assert.ok(paused.pause, 'the pass read the pause');
       assert.ok(
@@ -354,8 +350,7 @@ test('one broken run does not stop the others: each left out and said once, the 
       );
     },
   );
-
-  await s.test('`nemia up` over the broken runs ends no daemon: it passes again and again, and says each once', async (c) => {
+  s.test('`nemia up` over the broken runs ends no daemon: it passes again and again, and says each once', async (c) => {
     const STOP = new Error('the test stops the daemon');
     let ticks = 0;
     const counted = Object.assign({ ...e }, { tick: () => (++ticks > 3 ? Effect.die(STOP) : e.tick()) });
@@ -365,8 +360,7 @@ test('one broken run does not stop the others: each left out and said once, the 
     assert.equal(all.filter((l) => l.includes(`left out: ${LEFT_OUT(runs.unplaced)}`)).length, 1, all.join('\n'));
     assert.equal(all.filter((l) => l.includes(`left out: ${JOURNAL_OUT(runs.journal)}`)).length, 1, all.join('\n'));
   });
-
-  await s.test('mended, each run goes on at the next pass, with nothing remembered', async () => {
+  s.test('mended, each run goes on at the next pass, with nothing remembered', async () => {
     fs.writeFileSync(path.join(UNPLACED, 'work.md'), PLACED);
     spoiled.delete(runRecord(ROOT, runs.journal).steps.work.taskId!);
     const mended = await pass();
@@ -380,8 +374,7 @@ test('one broken run does not stop the others: each left out and said once, the 
       JSON.stringify(mended.unreadable),
     );
   });
-
-  await s.test(
+  s.test(
     "an unfrozen run whose step names an agent only its repository's, or only the store's, agents hold is read with its places, and filed",
     async () => {
       const repoOwn = path.join(ROOT, 'wf-repo-agent');

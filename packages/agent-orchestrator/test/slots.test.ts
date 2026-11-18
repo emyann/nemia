@@ -10,7 +10,7 @@
  */
 import { configGiven } from './config-given.ts';
 import { settingsOf, type Env } from '../src/config/config.store.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { Effect } from 'effect';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -126,34 +126,30 @@ writeRun('r-new', 4, {});
 writeRun('r-old', 3, {});
 const RUNS = () => ['r-a', 'r-bad', 'r-new', 'r-old'].map((id) => runRecord(ROOT, id));
 
-test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, off one look at the harnesses or none', async (t) => {
-  await t.test(
-    'the runs in flight in the order a pass admits them, one unreadable among them, and the runs the cap holds — off one list',
-    async () => {
-      const capped: Env = { ...ENV, WF_MAX_RUNS: '2' };
-      calls.list = calls.view = 0;
-      const slots = await runWith(e, Effect.provide(slotsOf(e, RUNS(), settingsOf(capped), noParents()), configGiven(ROOT)));
-      assert.deepEqual(
-        { ...slots, held: [...slots.held] },
-        {
-          cap: 2,
-          inFlight: ['r-bad', 'r-a'],
-          held: [
-            ['r-old', { inFlight: 2, cap: 2 }],
-            ['r-new', { inFlight: 2, cap: 2 }],
-          ],
-        },
-      );
-      assert.deepEqual(calls, { list: 1, view: 0 }, 'one look at the harnesses for the whole store, and no task viewed again');
-      assert.deepEqual(
-        [...(await runWith(e, Effect.provide(runSlots(e, RUNS(), settingsOf(capped), noParents()), configGiven(ROOT))))],
-        [...slots.held],
-        'runSlots answers slotsOf’s held runs',
-      );
-    },
-  );
-
-  await t.test('with no cap slotsOf reads nothing, and runSlots reads nothing on a store with no run waiting to start', async () => {
+describe('`slotsOf` and `runSlots`: what the cap counts and holds between passes, off one look at the harnesses or none', () => {
+  test('the runs in flight in the order a pass admits them, one unreadable among them, and the runs the cap holds — off one list', async () => {
+    const capped: Env = { ...ENV, WF_MAX_RUNS: '2' };
+    calls.list = calls.view = 0;
+    const slots = await runWith(e, Effect.provide(slotsOf(e, RUNS(), settingsOf(capped), noParents()), configGiven(ROOT)));
+    assert.deepEqual(
+      { ...slots, held: [...slots.held] },
+      {
+        cap: 2,
+        inFlight: ['r-bad', 'r-a'],
+        held: [
+          ['r-old', { inFlight: 2, cap: 2 }],
+          ['r-new', { inFlight: 2, cap: 2 }],
+        ],
+      },
+    );
+    assert.deepEqual(calls, { list: 1, view: 0 }, 'one look at the harnesses for the whole store, and no task viewed again');
+    assert.deepEqual(
+      [...(await runWith(e, Effect.provide(runSlots(e, RUNS(), settingsOf(capped), noParents()), configGiven(ROOT))))],
+      [...slots.held],
+      'runSlots answers slotsOf’s held runs',
+    );
+  });
+  test('with no cap slotsOf reads nothing, and runSlots reads nothing on a store with no run waiting to start', async () => {
     calls.list = calls.view = 0;
     const uncapped: Env = { ...ENV, WF_MAX_RUNS: '0' };
     assert.deepEqual(await runWith(e, Effect.provide(slotsOf(e, RUNS(), settingsOf(uncapped), noParents()), configGiven(ROOT))), {
@@ -206,10 +202,9 @@ const filledInformer = async (env: Env) => {
   return memo;
 };
 
-test('`slotsRead` through an informer: a run it serves ended at rest is left out, unlisted, and a wrong judgement of one refused when verified', async (t) => {
+describe('`slotsRead` through an informer: a run it serves ended at rest is left out, unlisted, and a wrong judgement of one refused when verified', () => {
   const capped: Env = { ...ENV, WF_MAX_RUNS: '2' };
-
-  await t.test('the tasks of no ended run are listed, and the answer is the one read with no informer', async () => {
+  test('the tasks of no ended run are listed, and the answer is the one read with no informer', async () => {
     const unverified: Env = { ...capped, WF_VERIFY_REST: '0' };
     const memo = await filledInformer(unverified);
     assert.equal(memo.runs.get('r-done')?.value.judged.status, 'succeeded', 'the informer serves r-done as ended');
@@ -226,8 +221,7 @@ test('`slotsRead` through an informer: a run it serves ended at rest is left out
     assert.ok(!listedTasks[0]?.some((id) => id.startsWith('r-done-')), 'no task of the ended run is listed');
     assert.deepEqual({ ...informed, held: [...informed.held] }, { ...plain, held: [...plain.held] });
   });
-
-  await t.test('verified, a run served as ended at rest whose tasks are in flight dies naming it', async () => {
+  test('verified, a run served as ended at rest whose tasks are in flight dies naming it', async () => {
     const verified: Env = { ...capped, WF_VERIFY_REST: '1' };
     const memo = await filledInformer(verified);
     const entry = memo.runs.get('r-a');

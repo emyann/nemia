@@ -24,7 +24,8 @@
  * `nemia subscribe` writes is dropped as its test ends, whatever their verdict, so a story on the files leaves no subscription for the
  * next one's deliverer to follow.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -194,7 +195,7 @@ const gate = (run: string): object[] => {
  */
 const kept = (t: TestContext, w: World, name: string, subscription: Subscription): void => {
   done(w.subs.subscriptions.put(SubscriptionName.read(name), subscription));
-  t.after(() => {
+  t.onTestFinished(() => {
     if (listedIn(w).includes(name)) done(w.subs.subscriptions.drop(SubscriptionName.read(name)));
   });
 };
@@ -242,7 +243,7 @@ const delivering = (
     if (f) await Effect.runPromise(Fiber.interrupt(f));
     stopped = clock.asked.length - clock.woken.length;
   };
-  t.after(stop);
+  t.onTestFinished(stop);
   const rests = () => clock.asked.length - clock.woken.length - stopped;
   const quiet = (n: number, what = `${n} rests asked`) =>
     until(
@@ -261,20 +262,166 @@ const delivering = (
 /** Waits in test `t` until `holds` does, asked as the clock moves, as a task is asked to hear, and every 10ms for what is written. */
 const held = (t: TestContext, holds: () => boolean, what: string) => until(t, holds, what, { bell: heard, everyMs: 10 });
 
-test(
+describe(
   'a subscribed task is told each read of the feed in one say, its digest riding a wake, across restarts that drop no line',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const w = inMemory();
-    const { e, hanging } = engineFor();
-    const task = await longLived('t-once');
-    let d: ReturnType<typeof delivering>;
+  () => {
+    let w!: World;
+    let e!: {
+      say: (
+        taskId: string,
+        text: string,
+      ) => Effect.Effect<
+        import('agent-runtime').Said,
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
+        never
+      >;
+      file: (
+        spec: import('agent-runtime').TaskSpec,
+      ) => Effect.Effect<string, import('agent-runtime').FileRefused | import('agent-runtime').JournalError>;
+      tick: () => Effect.Effect<
+        import('agent-runtime').TickReport,
+        import('agent-runtime').TickRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      admit: (
+        taskIds: readonly string[],
+      ) => Effect.Effect<string[], import('agent-runtime').AdmitRefused | import('agent-runtime').JournalError>;
+      view: (taskId: string) => Effect.Effect<import('agent-runtime').TaskView, import('agent-runtime').JournalError>;
+      path: (taskId: string) => Effect.Effect<import('agent-runtime').LifecycleTransition[], import('agent-runtime').JournalError>;
+      list: (
+        taskIds?: readonly string[],
+      ) => Effect.Effect<
+        import('agent-runtime').TaskList,
+        import('agent-runtime').ListRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      stop: (taskId: string) => Effect.Effect<void, import('agent-runtime').StopRefused | import('agent-runtime').JournalError>;
+      logs: (taskId: string) => Effect.Effect<string, import('agent-runtime').JournalError | import('agent-runtime').RunnerError>;
+      transcript: (
+        taskId: string,
+        after?: import('agent-runtime').TranscriptCursor,
+        options?: { readonly attempt?: number },
+      ) => Effect.Effect<
+        import('agent-runtime').Transcript,
+        import('agent-runtime').TranscriptRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      output: (
+        taskId: string,
+        stream: 'stdout' | 'stderr',
+        lastBytes?: number,
+      ) => Effect.Effect<
+        string | undefined,
+        import('agent-runtime').OutputRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      follow: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('effect/Stream').Stream<import('agent-runtime').Followed, import('agent-runtime').RunnerError> | undefined,
+        import('agent-runtime').FollowRefused | import('agent-runtime').JournalError
+      >;
+      interrupt: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('../../../node_modules/agent-runtime/src/service/interrupt.ts').Interrupted,
+        import('agent-runtime').InterruptRefused | import('agent-runtime').InterruptUnsent | import('agent-runtime').JournalError
+      >;
+      answerAsk: (
+        taskId: string,
+        given: import('agent-runtime').Answering,
+      ) => Effect.Effect<
+        import('agent-runtime').AskAnswered,
+        import('agent-runtime').AnswerRefused | import('agent-runtime').AnswerUnsent | import('agent-runtime').JournalError
+      >;
+      quota: (
+        harness?: string,
+      ) => Effect.Effect<import('agent-runtime').HarnessQuota, import('agent-runtime').QuotaRefused | import('agent-runtime').RunnerError>;
+      mcpState: (
+        servers: Record<string, import('agent-runtime').RemoteMcpServer>,
+      ) => Effect.Effect<import('agent-runtime').McpServersRead, import('agent-runtime').McpStateRefused>;
+      mcpSignIn: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+        clientSecret?: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInStarted, import('agent-runtime').McpSignInRefused>;
+      mcpSignInState: (name: string) => Effect.Effect<import('agent-runtime').McpSignInState>;
+      mcpSignInCallback: (
+        name: string,
+        url: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInState, import('agent-runtime').McpSignInRefused>;
+      mcpSignOut: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+      ) => Effect.Effect<{ readonly signedOut: true }, import('agent-runtime').McpSignInRefused>;
+      answer: (
+        taskId: string,
+        text: string,
+        options?: { config?: import('agent-runtime').HarnessArgs },
+      ) => Effect.Effect<import('agent-runtime').Input, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      close: (taskId: string) => Effect.Effect<void, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      sweep: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<import('agent-runtime').SweepReport, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      removeBody: (ref: string) => Effect.Effect<void, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      forget: (
+        taskIds: readonly string[],
+        options?: { yes?: boolean },
+      ) => Effect.Effect<
+        import('agent-runtime').ForgetReport,
+        import('../../../node_modules/agent-runtime/src/service/forget.ts').ForgetFailure
+      >;
+      kept: () => Effect.Effect<
+        import('agent-runtime').KeptReport,
+        import('agent-runtime').KeptRefused | import('agent-runtime').JournalError
+      >;
+      compact: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<
+        import('agent-runtime').CompactReport,
+        import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
+      >;
+      feed: (
+        after?: import('agent-runtime').Cursor,
+      ) => Effect.Effect<
+        {
+          entries: import('agent-runtime').FeedEntry[];
+          cursor: import('agent-runtime').Cursor;
+          refused?: import('agent-runtime').FeedRefusal[];
+          forgotten?: number;
+        },
+        import('agent-runtime').JournalError
+      >;
+      watch: (options: {
+        onEntry: (entry: import('agent-runtime').FeedEntry) => void | Promise<void>;
+        from?: import('agent-runtime').Cursor;
+        intervalMs?: number;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+      io: () => Effect.Effect<import('agent-runtime').EngineIo>;
+      tallied: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+      hold: () => Effect.Effect<import('agent-runtime').Served | null, never, import('effect/Scope').Scope>;
+      drain: (holder: number | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      drainSessions: (given: { graceMs: number } | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      up: (options?: {
+        intervalMs?: number;
+        onTick?: (r: import('agent-runtime').TickReport) => void;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+    };
+    let hanging!: Set<string>;
+    let task!: string;
+    let d!: ReturnType<typeof delivering>;
+    beforeAll(async () => {
+      const t = teardowns();
+      w = inMemory();
+      ({ e, hanging } = engineFor());
+      task = await longLived('t-once');
+      return t.end;
+    });
+    const s = story(test);
     const beat = async (rests = 3) => {
       await d.quiet(rests);
       await d.clock.adjust('1 second');
     };
-    await s.test('nemia subscribe puts the long-lived task’s subscription from the feed’s end, by the default selector', async () => {
+    s.test('nemia subscribe puts the long-lived task’s subscription from the feed’s end, by the default selector', async (t) => {
       appended(w, line('r-0', 'running'));
       await typed(w, SUBSCRIBE, ['once', task]);
       assert.deepEqual(done(w.subs.subscriptions.list()).listed.find((x) => x.name === 'once')?.subscription, {
@@ -286,9 +433,9 @@ test(
       d = delivering(t, e, w);
       await d.quiet(3, 'the deliverer at rest: its subscriptions, its digest and its beat');
     });
-    await s.test(
+    s.test(
       'a wake line is said once, the routine lines before it riding it as one digest, and the cursor kept once it is said',
-      async () => {
+      async (t) => {
         appended(w, line('r-1', 'running'), line('r-1', 'verified ✓'), line('r-1', 'awaiting approval'));
         await d.quiet(3, 'the deliverer at rest: its subscriptions, its digest and its beat');
         await d.clock.adjust('999 millis');
@@ -308,7 +455,7 @@ test(
         assert.deepEqual(readDelivery(w, 'once')?.digest, []);
       },
     );
-    await s.test("REFUSED: one gate's two lines are one say, holding both in feed order", async () => {
+    s.test("REFUSED: one gate's two lines are one say, holding both in feed order", async (t) => {
       appended(w, ...gate('r-20'));
       await beat();
       await held(t, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
@@ -318,7 +465,7 @@ test(
         'r-20 land awaiting approval · approve it: nemia approve r-20 land',
       ]);
     });
-    await s.test('three gates in one read: one say, their lines in feed order, with the digest once', async () => {
+    s.test('three gates in one read: one say, their lines in feed order, with the digest once', async (t) => {
       appended(w, line('r-21', 'running'), ...gate('r-22'), ...gate('r-23'), ...gate('r-24'));
       await beat();
       await held(t, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
@@ -329,9 +476,9 @@ test(
       names(said.split('Since your last news:')[1], '1 routine line of the feed:', 'r-21  build  running');
       assert.deepEqual(readDelivery(w, 'once')?.digest, []);
     });
-    await s.test(
+    s.test(
       'a digest not yet due is not said: its routine lines wait for their minutes over its checks, or ride the next wake',
-      async () => {
+      async (t) => {
         appended(w, line('r-11', 'running'), line('r-11', 'verified ✓'));
         await beat();
         await held(t, () => readDelivery(w, 'once')?.digest.length === 2, 'both routine lines folded');
@@ -348,7 +495,7 @@ test(
         names(toldTo(task)[4], 'Since your last news:', '2 routine lines');
       },
     );
-    await s.test('a restart reads where the deliverer was off its door: no line said again, none dropped', async () => {
+    s.test('a restart reads where the deliverer was off its door: no line said again, none dropped', async (t) => {
       appended(w, line('r-4', 'failed ✗ check (exit 1)'));
       await beat();
       await held(t, () => toldTo(task).length === 6, 'the first wake said');
@@ -364,7 +511,7 @@ test(
       names(second.split('Since your last news:')[1], '1 routine line of the feed:', 'r-4  build  running');
       assert.doesNotMatch(second, /failed/, 'the first wake not said again');
     });
-    await s.test('a restart between a say and its cursor write says the message again: at least once, never dropped', async () => {
+    s.test('a restart between a say and its cursor write says the message again: at least once, never dropped', async (t) => {
       await held(t, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
       const from = feedSize(w);
       hanging.add(task);
@@ -380,7 +527,7 @@ test(
       assert.equal(again, first, 'the same message, whole');
       assert.deepEqual(fieldsOf(first), ['r-26 build awaiting approval', 'r-27 build blocked']);
     });
-    await s.test('an unsubscribe stops delivery, and the deliverer drops its delivery once it reads the subscriptions again', async () => {
+    s.test('an unsubscribe stops delivery, and the deliverer drops its delivery once it reads the subscriptions again', async (t) => {
       const staying = await longLived('t-staying');
       subscribed(t, w, 'staying', staying);
       await d.stop();
@@ -402,9 +549,9 @@ test(
       await held(t, () => toldTo(staying).length === 1, 'the one staying told');
       assert.equal(toldTo(task).length, 9, 'the one gone told nothing more');
     });
-    await s.test(
+    s.test(
       "a name subscribed again starts from its own from: a deliverer's delivery written for the last one under it is not its",
-      async () => {
+      async (t) => {
         await d.stop();
         appended(w, line('r-12', 'awaiting approval'));
         const from = subscribed(t, w, 'once', task);
@@ -423,19 +570,164 @@ test(
   },
 );
 
-test(
+describe(
   'a feed cut under the cursor is read again from its start: on the files, since a cut is a file written shorter under its reader',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const w = onFiles();
-    const { e } = engineFor();
-    const task = await longLived('t-cut');
-    let d: ReturnType<typeof delivering>;
-    await s.test('a wake said, and the cursor kept at the end of the file', async () => {
+  () => {
+    let w!: World;
+    let e!: {
+      say: (
+        taskId: string,
+        text: string,
+      ) => Effect.Effect<
+        import('agent-runtime').Said,
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
+        never
+      >;
+      file: (
+        spec: import('agent-runtime').TaskSpec,
+      ) => Effect.Effect<string, import('agent-runtime').FileRefused | import('agent-runtime').JournalError>;
+      tick: () => Effect.Effect<
+        import('agent-runtime').TickReport,
+        import('agent-runtime').TickRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      admit: (
+        taskIds: readonly string[],
+      ) => Effect.Effect<string[], import('agent-runtime').AdmitRefused | import('agent-runtime').JournalError>;
+      view: (taskId: string) => Effect.Effect<import('agent-runtime').TaskView, import('agent-runtime').JournalError>;
+      path: (taskId: string) => Effect.Effect<import('agent-runtime').LifecycleTransition[], import('agent-runtime').JournalError>;
+      list: (
+        taskIds?: readonly string[],
+      ) => Effect.Effect<
+        import('agent-runtime').TaskList,
+        import('agent-runtime').ListRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      stop: (taskId: string) => Effect.Effect<void, import('agent-runtime').StopRefused | import('agent-runtime').JournalError>;
+      logs: (taskId: string) => Effect.Effect<string, import('agent-runtime').JournalError | import('agent-runtime').RunnerError>;
+      transcript: (
+        taskId: string,
+        after?: import('agent-runtime').TranscriptCursor,
+        options?: { readonly attempt?: number },
+      ) => Effect.Effect<
+        import('agent-runtime').Transcript,
+        import('agent-runtime').TranscriptRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      output: (
+        taskId: string,
+        stream: 'stdout' | 'stderr',
+        lastBytes?: number,
+      ) => Effect.Effect<
+        string | undefined,
+        import('agent-runtime').OutputRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      follow: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('effect/Stream').Stream<import('agent-runtime').Followed, import('agent-runtime').RunnerError> | undefined,
+        import('agent-runtime').FollowRefused | import('agent-runtime').JournalError
+      >;
+      interrupt: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('../../../node_modules/agent-runtime/src/service/interrupt.ts').Interrupted,
+        import('agent-runtime').InterruptRefused | import('agent-runtime').InterruptUnsent | import('agent-runtime').JournalError
+      >;
+      answerAsk: (
+        taskId: string,
+        given: import('agent-runtime').Answering,
+      ) => Effect.Effect<
+        import('agent-runtime').AskAnswered,
+        import('agent-runtime').AnswerRefused | import('agent-runtime').AnswerUnsent | import('agent-runtime').JournalError
+      >;
+      quota: (
+        harness?: string,
+      ) => Effect.Effect<import('agent-runtime').HarnessQuota, import('agent-runtime').QuotaRefused | import('agent-runtime').RunnerError>;
+      mcpState: (
+        servers: Record<string, import('agent-runtime').RemoteMcpServer>,
+      ) => Effect.Effect<import('agent-runtime').McpServersRead, import('agent-runtime').McpStateRefused>;
+      mcpSignIn: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+        clientSecret?: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInStarted, import('agent-runtime').McpSignInRefused>;
+      mcpSignInState: (name: string) => Effect.Effect<import('agent-runtime').McpSignInState>;
+      mcpSignInCallback: (
+        name: string,
+        url: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInState, import('agent-runtime').McpSignInRefused>;
+      mcpSignOut: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+      ) => Effect.Effect<{ readonly signedOut: true }, import('agent-runtime').McpSignInRefused>;
+      answer: (
+        taskId: string,
+        text: string,
+        options?: { config?: import('agent-runtime').HarnessArgs },
+      ) => Effect.Effect<import('agent-runtime').Input, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      close: (taskId: string) => Effect.Effect<void, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      sweep: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<import('agent-runtime').SweepReport, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      removeBody: (ref: string) => Effect.Effect<void, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      forget: (
+        taskIds: readonly string[],
+        options?: { yes?: boolean },
+      ) => Effect.Effect<
+        import('agent-runtime').ForgetReport,
+        import('../../../node_modules/agent-runtime/src/service/forget.ts').ForgetFailure
+      >;
+      kept: () => Effect.Effect<
+        import('agent-runtime').KeptReport,
+        import('agent-runtime').KeptRefused | import('agent-runtime').JournalError
+      >;
+      compact: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<
+        import('agent-runtime').CompactReport,
+        import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
+      >;
+      feed: (
+        after?: import('agent-runtime').Cursor,
+      ) => Effect.Effect<
+        {
+          entries: import('agent-runtime').FeedEntry[];
+          cursor: import('agent-runtime').Cursor;
+          refused?: import('agent-runtime').FeedRefusal[];
+          forgotten?: number;
+        },
+        import('agent-runtime').JournalError
+      >;
+      watch: (options: {
+        onEntry: (entry: import('agent-runtime').FeedEntry) => void | Promise<void>;
+        from?: import('agent-runtime').Cursor;
+        intervalMs?: number;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+      io: () => Effect.Effect<import('agent-runtime').EngineIo>;
+      tallied: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+      hold: () => Effect.Effect<import('agent-runtime').Served | null, never, import('effect/Scope').Scope>;
+      drain: (holder: number | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      drainSessions: (given: { graceMs: number } | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      up: (options?: {
+        intervalMs?: number;
+        onTick?: (r: import('agent-runtime').TickReport) => void;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+    };
+    let task!: string;
+    let d!: ReturnType<typeof delivering>;
+    beforeAll(async () => {
+      const t = teardowns();
+      w = onFiles();
+      ({ e } = engineFor());
+      task = await longLived('t-cut');
+      return t.end;
+    });
+    const s = story(test);
+    s.test('a wake said, and the cursor kept at the end of the file', async (t) => {
       assert.equal(deliveryAtRoot(ROOT, 'cut'), undefined, 'no file of the deliverer before the subscription');
       await stage.main(['subscribe', 'cut', task]);
-      t.after(() => {
+      t.onTestFinished(() => {
         if (listedIn(w).includes('cut')) dropSubscription(w, 'cut');
       });
       assert.deepEqual(listedIn(w), ['cut'], 'nemia subscribe writes its file at the store root the deliverer reads');
@@ -446,7 +738,7 @@ test(
       await held(t, () => toldTo(task).length === 1, 'the wake said on the beat');
       await held(t, () => readDelivery(w, 'cut')?.cursor === feedSize(w), 'the cursor at the end of the feed');
     });
-    await s.test('a feed cut under the cursor is read again from its start', async () => {
+    s.test('a feed cut under the cursor is read again from its start', async (t) => {
       fs.writeFileSync(feedAt(ROOT), `${JSON.stringify(line('r-10', 'blocked'))}\n`);
       assert.ok(feedSize(w) < (readDelivery(w, 'cut')?.cursor ?? 0), 'the file cut shorter than the cursor');
       await d.quiet(3);
@@ -455,7 +747,7 @@ test(
       assert.deepEqual(fieldsOf(toldTo(task)[1]), ['r-10 build blocked']);
       await held(t, () => deliveryAtRoot(ROOT, 'cut')?.cursor === feedSize(w), 'the cursor at the end of the new feed');
     });
-    await s.test("unsubscribed through nemia, its file and the deliverer's gone from the files", async () => {
+    s.test("unsubscribed through nemia, its file and the deliverer's gone from the files", async (t) => {
       await stage.main(['unsubscribe', 'cut']);
       assert.deepEqual(listedIn(w), [], 'its file removed');
       await d.clock.adjust('5 seconds');
@@ -467,19 +759,173 @@ test(
 /** The shipped backoff of a failed say, a try at a time: from one second doubling, and never longer than five minutes. */
 const BACKOFF = [1000, 2000, 4000, 8000, 16_000, 32_000, 64_000, 128_000, 256_000, 300_000, 300_000, 300_000];
 
-test(
+describe(
   'a say that fails is said again whole after a backoff doubling from one second to five minutes, the cursor held until it is taken',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const w = inMemory();
-    const { e, asked } = engineFor();
-    const task = await longLived('t-held');
-    subscribed(t, w, 'held', task);
-    const d = delivering(t, e, w);
+  () => {
+    let w!: World;
+    let e!: {
+      say: (
+        taskId: string,
+        text: string,
+      ) => Effect.Effect<
+        import('agent-runtime').Said,
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
+        never
+      >;
+      file: (
+        spec: import('agent-runtime').TaskSpec,
+      ) => Effect.Effect<string, import('agent-runtime').FileRefused | import('agent-runtime').JournalError>;
+      tick: () => Effect.Effect<
+        import('agent-runtime').TickReport,
+        import('agent-runtime').TickRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      admit: (
+        taskIds: readonly string[],
+      ) => Effect.Effect<string[], import('agent-runtime').AdmitRefused | import('agent-runtime').JournalError>;
+      view: (taskId: string) => Effect.Effect<import('agent-runtime').TaskView, import('agent-runtime').JournalError>;
+      path: (taskId: string) => Effect.Effect<import('agent-runtime').LifecycleTransition[], import('agent-runtime').JournalError>;
+      list: (
+        taskIds?: readonly string[],
+      ) => Effect.Effect<
+        import('agent-runtime').TaskList,
+        import('agent-runtime').ListRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      stop: (taskId: string) => Effect.Effect<void, import('agent-runtime').StopRefused | import('agent-runtime').JournalError>;
+      logs: (taskId: string) => Effect.Effect<string, import('agent-runtime').JournalError | import('agent-runtime').RunnerError>;
+      transcript: (
+        taskId: string,
+        after?: import('agent-runtime').TranscriptCursor,
+        options?: { readonly attempt?: number },
+      ) => Effect.Effect<
+        import('agent-runtime').Transcript,
+        import('agent-runtime').TranscriptRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      output: (
+        taskId: string,
+        stream: 'stdout' | 'stderr',
+        lastBytes?: number,
+      ) => Effect.Effect<
+        string | undefined,
+        import('agent-runtime').OutputRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      follow: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('effect/Stream').Stream<import('agent-runtime').Followed, import('agent-runtime').RunnerError> | undefined,
+        import('agent-runtime').FollowRefused | import('agent-runtime').JournalError
+      >;
+      interrupt: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('../../../node_modules/agent-runtime/src/service/interrupt.ts').Interrupted,
+        import('agent-runtime').InterruptRefused | import('agent-runtime').InterruptUnsent | import('agent-runtime').JournalError
+      >;
+      answerAsk: (
+        taskId: string,
+        given: import('agent-runtime').Answering,
+      ) => Effect.Effect<
+        import('agent-runtime').AskAnswered,
+        import('agent-runtime').AnswerRefused | import('agent-runtime').AnswerUnsent | import('agent-runtime').JournalError
+      >;
+      quota: (
+        harness?: string,
+      ) => Effect.Effect<import('agent-runtime').HarnessQuota, import('agent-runtime').QuotaRefused | import('agent-runtime').RunnerError>;
+      mcpState: (
+        servers: Record<string, import('agent-runtime').RemoteMcpServer>,
+      ) => Effect.Effect<import('agent-runtime').McpServersRead, import('agent-runtime').McpStateRefused>;
+      mcpSignIn: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+        clientSecret?: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInStarted, import('agent-runtime').McpSignInRefused>;
+      mcpSignInState: (name: string) => Effect.Effect<import('agent-runtime').McpSignInState>;
+      mcpSignInCallback: (
+        name: string,
+        url: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInState, import('agent-runtime').McpSignInRefused>;
+      mcpSignOut: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+      ) => Effect.Effect<{ readonly signedOut: true }, import('agent-runtime').McpSignInRefused>;
+      answer: (
+        taskId: string,
+        text: string,
+        options?: { config?: import('agent-runtime').HarnessArgs },
+      ) => Effect.Effect<import('agent-runtime').Input, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      close: (taskId: string) => Effect.Effect<void, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      sweep: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<import('agent-runtime').SweepReport, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      removeBody: (ref: string) => Effect.Effect<void, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      forget: (
+        taskIds: readonly string[],
+        options?: { yes?: boolean },
+      ) => Effect.Effect<
+        import('agent-runtime').ForgetReport,
+        import('../../../node_modules/agent-runtime/src/service/forget.ts').ForgetFailure
+      >;
+      kept: () => Effect.Effect<
+        import('agent-runtime').KeptReport,
+        import('agent-runtime').KeptRefused | import('agent-runtime').JournalError
+      >;
+      compact: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<
+        import('agent-runtime').CompactReport,
+        import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
+      >;
+      feed: (
+        after?: import('agent-runtime').Cursor,
+      ) => Effect.Effect<
+        {
+          entries: import('agent-runtime').FeedEntry[];
+          cursor: import('agent-runtime').Cursor;
+          refused?: import('agent-runtime').FeedRefusal[];
+          forgotten?: number;
+        },
+        import('agent-runtime').JournalError
+      >;
+      watch: (options: {
+        onEntry: (entry: import('agent-runtime').FeedEntry) => void | Promise<void>;
+        from?: import('agent-runtime').Cursor;
+        intervalMs?: number;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+      io: () => Effect.Effect<import('agent-runtime').EngineIo>;
+      tallied: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+      hold: () => Effect.Effect<import('agent-runtime').Served | null, never, import('effect/Scope').Scope>;
+      drain: (holder: number | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      drainSessions: (given: { graceMs: number } | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      up: (options?: {
+        intervalMs?: number;
+        onTick?: (r: import('agent-runtime').TickReport) => void;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+    };
+    let asked!: { taskId: string; text: string; at: number }[];
+    let task!: string;
+    let d!: {
+      clock: import('./steered.ts').Steered;
+      start: () => void;
+      stop: () => Promise<void>;
+      rests: () => number;
+      quiet: (n: number, what?: string) => Promise<true>;
+      cut: (n: number) => void;
+    };
+    let before!: KeptDelivery | undefined;
+    beforeAll(async () => {
+      const t = teardowns();
+      w = inMemory();
+      ({ e, asked } = engineFor());
+      task = await longLived('t-held');
+      subscribed(t, w, 'held', task);
+      d = delivering(t, e, w);
+      return t.end;
+    });
+    const s = story(test);
     const tries = () => asked.filter((a) => a.taskId === task);
-    let before: KeptDelivery | undefined;
-    await s.test('a routine line is folded into the digest, and nothing said', async () => {
+    s.test('a routine line is folded into the digest, and nothing said', async (t) => {
       await d.quiet(3);
       appended(w, line('r-6', 'running'));
       await d.clock.adjust('1 second');
@@ -487,7 +933,7 @@ test(
       before = readDelivery(w, 'held');
       assert.deepEqual(tries(), []);
     });
-    await s.test('each failed say is said again a backoff later, from one second doubling, never longer than five minutes', async () => {
+    s.test('each failed say is said again a backoff later, from one second doubling, never longer than five minutes', async (t) => {
       await d.stop();
       stage.board().refuseSay(12);
       appended(w, line('r-6', 'blocked'), line('r-6', 'running'), line('r-6b', 'failed ✗ check (exit 1)'));
@@ -513,7 +959,7 @@ test(
         BACKOFF,
       );
     });
-    await s.test('said once say takes it, the cursor kept after it, every try the message whole and the same', async () => {
+    s.test('said once say takes it, the cursor kept after it, every try the message whole and the same', async (t) => {
       await held(t, () => toldTo(task).length === 1, 'said once say takes it');
       await held(t, () => readDelivery(w, 'held')?.cursor === feedSize(w), 'the cursor kept after it');
       const [said] = toldTo(task);
@@ -526,15 +972,162 @@ test(
   },
 );
 
-test(
+describe(
   "the process's hub: a gate published is one say as the daemon delivers it, and lines published while a say is in flight are gathered",
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const w = inMemory();
-    const { e, asked } = engineFor();
-    const rt = ManagedRuntime.make(Layer.mergeAll(feedHubLayer(), Logger.layer([]), StoreRoot.layer(ROOT), w.layer));
-    t.after(() => rt.dispose());
+  () => {
+    let w!: World;
+    let e!: {
+      say: (
+        taskId: string,
+        text: string,
+      ) => Effect.Effect<
+        import('agent-runtime').Said,
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
+        never
+      >;
+      file: (
+        spec: import('agent-runtime').TaskSpec,
+      ) => Effect.Effect<string, import('agent-runtime').FileRefused | import('agent-runtime').JournalError>;
+      tick: () => Effect.Effect<
+        import('agent-runtime').TickReport,
+        import('agent-runtime').TickRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      admit: (
+        taskIds: readonly string[],
+      ) => Effect.Effect<string[], import('agent-runtime').AdmitRefused | import('agent-runtime').JournalError>;
+      view: (taskId: string) => Effect.Effect<import('agent-runtime').TaskView, import('agent-runtime').JournalError>;
+      path: (taskId: string) => Effect.Effect<import('agent-runtime').LifecycleTransition[], import('agent-runtime').JournalError>;
+      list: (
+        taskIds?: readonly string[],
+      ) => Effect.Effect<
+        import('agent-runtime').TaskList,
+        import('agent-runtime').ListRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      stop: (taskId: string) => Effect.Effect<void, import('agent-runtime').StopRefused | import('agent-runtime').JournalError>;
+      logs: (taskId: string) => Effect.Effect<string, import('agent-runtime').JournalError | import('agent-runtime').RunnerError>;
+      transcript: (
+        taskId: string,
+        after?: import('agent-runtime').TranscriptCursor,
+        options?: { readonly attempt?: number },
+      ) => Effect.Effect<
+        import('agent-runtime').Transcript,
+        import('agent-runtime').TranscriptRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      output: (
+        taskId: string,
+        stream: 'stdout' | 'stderr',
+        lastBytes?: number,
+      ) => Effect.Effect<
+        string | undefined,
+        import('agent-runtime').OutputRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      follow: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('effect/Stream').Stream<import('agent-runtime').Followed, import('agent-runtime').RunnerError> | undefined,
+        import('agent-runtime').FollowRefused | import('agent-runtime').JournalError
+      >;
+      interrupt: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('../../../node_modules/agent-runtime/src/service/interrupt.ts').Interrupted,
+        import('agent-runtime').InterruptRefused | import('agent-runtime').InterruptUnsent | import('agent-runtime').JournalError
+      >;
+      answerAsk: (
+        taskId: string,
+        given: import('agent-runtime').Answering,
+      ) => Effect.Effect<
+        import('agent-runtime').AskAnswered,
+        import('agent-runtime').AnswerRefused | import('agent-runtime').AnswerUnsent | import('agent-runtime').JournalError
+      >;
+      quota: (
+        harness?: string,
+      ) => Effect.Effect<import('agent-runtime').HarnessQuota, import('agent-runtime').QuotaRefused | import('agent-runtime').RunnerError>;
+      mcpState: (
+        servers: Record<string, import('agent-runtime').RemoteMcpServer>,
+      ) => Effect.Effect<import('agent-runtime').McpServersRead, import('agent-runtime').McpStateRefused>;
+      mcpSignIn: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+        clientSecret?: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInStarted, import('agent-runtime').McpSignInRefused>;
+      mcpSignInState: (name: string) => Effect.Effect<import('agent-runtime').McpSignInState>;
+      mcpSignInCallback: (
+        name: string,
+        url: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInState, import('agent-runtime').McpSignInRefused>;
+      mcpSignOut: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+      ) => Effect.Effect<{ readonly signedOut: true }, import('agent-runtime').McpSignInRefused>;
+      answer: (
+        taskId: string,
+        text: string,
+        options?: { config?: import('agent-runtime').HarnessArgs },
+      ) => Effect.Effect<import('agent-runtime').Input, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      close: (taskId: string) => Effect.Effect<void, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      sweep: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<import('agent-runtime').SweepReport, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      removeBody: (ref: string) => Effect.Effect<void, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      forget: (
+        taskIds: readonly string[],
+        options?: { yes?: boolean },
+      ) => Effect.Effect<
+        import('agent-runtime').ForgetReport,
+        import('../../../node_modules/agent-runtime/src/service/forget.ts').ForgetFailure
+      >;
+      kept: () => Effect.Effect<
+        import('agent-runtime').KeptReport,
+        import('agent-runtime').KeptRefused | import('agent-runtime').JournalError
+      >;
+      compact: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<
+        import('agent-runtime').CompactReport,
+        import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
+      >;
+      feed: (
+        after?: import('agent-runtime').Cursor,
+      ) => Effect.Effect<
+        {
+          entries: import('agent-runtime').FeedEntry[];
+          cursor: import('agent-runtime').Cursor;
+          refused?: import('agent-runtime').FeedRefusal[];
+          forgotten?: number;
+        },
+        import('agent-runtime').JournalError
+      >;
+      watch: (options: {
+        onEntry: (entry: import('agent-runtime').FeedEntry) => void | Promise<void>;
+        from?: import('agent-runtime').Cursor;
+        intervalMs?: number;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+      io: () => Effect.Effect<import('agent-runtime').EngineIo>;
+      tallied: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+      hold: () => Effect.Effect<import('agent-runtime').Served | null, never, import('effect/Scope').Scope>;
+      drain: (holder: number | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      drainSessions: (given: { graceMs: number } | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      up: (options?: {
+        intervalMs?: number;
+        onTick?: (r: import('agent-runtime').TickReport) => void;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+    };
+    let asked!: { taskId: string; text: string; at: number }[];
+    let rt!: ManagedRuntime.ManagedRuntime<StoreRoot, never>;
+    let d!: ReturnType<typeof delivering>;
+    beforeAll(() => {
+      const t = teardowns();
+      w = inMemory();
+      ({ e, asked } = engineFor());
+      rt = ManagedRuntime.make(Layer.mergeAll(feedHubLayer(), Logger.layer([]), StoreRoot.layer(ROOT), w.layer));
+      t.onTestFinished(() => rt.dispose());
+      return t.end;
+    });
+    const s = story(test);
     const following = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
     const handed = () => Effect.runSync(Metric.value(FEED_FOLLOW_LINES)).count;
     const published = (run: string, judged: FeedWords) =>
@@ -548,8 +1141,7 @@ test(
         }),
       );
     const awaiting = { run: { word: 'awaiting approval', note: 'waiting on you: approve land' }, steps: [] };
-    let d: ReturnType<typeof delivering>;
-    await s.test("a gate published to the process's hub is one say, with no beat to wait for", async () => {
+    s.test("a gate published to the process's hub is one say, with no beat to wait for", async (t) => {
       const task = await longLived('t-hub');
       subscribed(t, w, 'hub', task);
       const was = following();
@@ -561,51 +1153,192 @@ test(
       assert.equal(toldTo(task).length, 1, 'one say for the pass');
       assert.deepEqual(fieldsOf(toldTo(task)[0], 2, 4), ['r-25 —', 'r-25 land']);
     });
-    await s.test(
-      'REFUSED: the lines published while a say is in flight are gathered: one more say holds them all, in feed order',
-      async () => {
-        await d.stop();
-        dropSubscription(w, 'hub');
-        const task = await longLived('t-busy');
-        subscribed(t, w, 'busy', task);
-        const was = following();
-        d.start();
-        await held(t, () => following() > was, 'the deliverer following the hub');
-        await d.quiet(3);
-        stage.board().refuseSay(1);
-        await published('r-40', awaiting);
-        await held(t, () => asked.filter((a) => a.taskId === task).length >= 1, 'the first message asked, its say refused');
-        const mark = handed();
-        await published('r-41', awaiting);
-        await held(t, () => handed() >= mark + 1, 'r-41 handed on by the reader');
-        await published('r-42', awaiting);
-        await held(t, () => handed() >= mark + 2, 'r-42 handed on by the reader');
-        await until(t, () => d.clock.asked.at(-1) === 1000, 'the backoff asked', { bell: d.clock.bell });
-        await d.clock.adjust('1 second');
-        await held(
-          t,
-          () => readDelivery(w, 'busy')?.cursor === feedSize(w) && toldTo(task).length === 2,
-          'the cursor at the end of the feed',
-        );
-        assert.deepEqual(
-          toldTo(task).map((said) => wakesIn(said).map((l) => l.split('  ')[2])),
-          [['r-40'], ['r-41', 'r-42']],
-          'the first message alone, then one say for both lines that came while it was in flight',
-        );
-      },
-    );
+    s.test('REFUSED: the lines published while a say is in flight are gathered: one more say holds them all, in feed order', async (t) => {
+      await d.stop();
+      dropSubscription(w, 'hub');
+      const task = await longLived('t-busy');
+      subscribed(t, w, 'busy', task);
+      const was = following();
+      d.start();
+      await held(t, () => following() > was, 'the deliverer following the hub');
+      await d.quiet(3);
+      stage.board().refuseSay(1);
+      await published('r-40', awaiting);
+      await held(t, () => asked.filter((a) => a.taskId === task).length >= 1, 'the first message asked, its say refused');
+      const mark = handed();
+      await published('r-41', awaiting);
+      await held(t, () => handed() >= mark + 1, 'r-41 handed on by the reader');
+      await published('r-42', awaiting);
+      await held(t, () => handed() >= mark + 2, 'r-42 handed on by the reader');
+      await until(t, () => d.clock.asked.at(-1) === 1000, 'the backoff asked', { bell: d.clock.bell });
+      await d.clock.adjust('1 second');
+      await held(
+        t,
+        () => readDelivery(w, 'busy')?.cursor === feedSize(w) && toldTo(task).length === 2,
+        'the cursor at the end of the feed',
+      );
+      assert.deepEqual(
+        toldTo(task).map((said) => wakesIn(said).map((l) => l.split('  ')[2])),
+        [['r-40'], ['r-41', 'r-42']],
+        'the first message alone, then one say for both lines that came while it was in flight',
+      );
+    });
   },
 );
 
-test(
+describe(
   'a digest falls due after its minutes with no wake, said alone; the deliverer’s own pace, at its shipped durations',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const w = inMemory();
-    const { e } = engineFor();
-    let d: ReturnType<typeof delivering>;
-    await s.test('a digest due is said alone, as the deliverer starts, then emptied', async () => {
+  () => {
+    let w!: World;
+    let e!: {
+      say: (
+        taskId: string,
+        text: string,
+      ) => Effect.Effect<
+        import('agent-runtime').Said,
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
+        never
+      >;
+      file: (
+        spec: import('agent-runtime').TaskSpec,
+      ) => Effect.Effect<string, import('agent-runtime').FileRefused | import('agent-runtime').JournalError>;
+      tick: () => Effect.Effect<
+        import('agent-runtime').TickReport,
+        import('agent-runtime').TickRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      admit: (
+        taskIds: readonly string[],
+      ) => Effect.Effect<string[], import('agent-runtime').AdmitRefused | import('agent-runtime').JournalError>;
+      view: (taskId: string) => Effect.Effect<import('agent-runtime').TaskView, import('agent-runtime').JournalError>;
+      path: (taskId: string) => Effect.Effect<import('agent-runtime').LifecycleTransition[], import('agent-runtime').JournalError>;
+      list: (
+        taskIds?: readonly string[],
+      ) => Effect.Effect<
+        import('agent-runtime').TaskList,
+        import('agent-runtime').ListRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      stop: (taskId: string) => Effect.Effect<void, import('agent-runtime').StopRefused | import('agent-runtime').JournalError>;
+      logs: (taskId: string) => Effect.Effect<string, import('agent-runtime').JournalError | import('agent-runtime').RunnerError>;
+      transcript: (
+        taskId: string,
+        after?: import('agent-runtime').TranscriptCursor,
+        options?: { readonly attempt?: number },
+      ) => Effect.Effect<
+        import('agent-runtime').Transcript,
+        import('agent-runtime').TranscriptRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      output: (
+        taskId: string,
+        stream: 'stdout' | 'stderr',
+        lastBytes?: number,
+      ) => Effect.Effect<
+        string | undefined,
+        import('agent-runtime').OutputRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      follow: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('effect/Stream').Stream<import('agent-runtime').Followed, import('agent-runtime').RunnerError> | undefined,
+        import('agent-runtime').FollowRefused | import('agent-runtime').JournalError
+      >;
+      interrupt: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('../../../node_modules/agent-runtime/src/service/interrupt.ts').Interrupted,
+        import('agent-runtime').InterruptRefused | import('agent-runtime').InterruptUnsent | import('agent-runtime').JournalError
+      >;
+      answerAsk: (
+        taskId: string,
+        given: import('agent-runtime').Answering,
+      ) => Effect.Effect<
+        import('agent-runtime').AskAnswered,
+        import('agent-runtime').AnswerRefused | import('agent-runtime').AnswerUnsent | import('agent-runtime').JournalError
+      >;
+      quota: (
+        harness?: string,
+      ) => Effect.Effect<import('agent-runtime').HarnessQuota, import('agent-runtime').QuotaRefused | import('agent-runtime').RunnerError>;
+      mcpState: (
+        servers: Record<string, import('agent-runtime').RemoteMcpServer>,
+      ) => Effect.Effect<import('agent-runtime').McpServersRead, import('agent-runtime').McpStateRefused>;
+      mcpSignIn: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+        clientSecret?: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInStarted, import('agent-runtime').McpSignInRefused>;
+      mcpSignInState: (name: string) => Effect.Effect<import('agent-runtime').McpSignInState>;
+      mcpSignInCallback: (
+        name: string,
+        url: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInState, import('agent-runtime').McpSignInRefused>;
+      mcpSignOut: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+      ) => Effect.Effect<{ readonly signedOut: true }, import('agent-runtime').McpSignInRefused>;
+      answer: (
+        taskId: string,
+        text: string,
+        options?: { config?: import('agent-runtime').HarnessArgs },
+      ) => Effect.Effect<import('agent-runtime').Input, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      close: (taskId: string) => Effect.Effect<void, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      sweep: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<import('agent-runtime').SweepReport, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      removeBody: (ref: string) => Effect.Effect<void, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      forget: (
+        taskIds: readonly string[],
+        options?: { yes?: boolean },
+      ) => Effect.Effect<
+        import('agent-runtime').ForgetReport,
+        import('../../../node_modules/agent-runtime/src/service/forget.ts').ForgetFailure
+      >;
+      kept: () => Effect.Effect<
+        import('agent-runtime').KeptReport,
+        import('agent-runtime').KeptRefused | import('agent-runtime').JournalError
+      >;
+      compact: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<
+        import('agent-runtime').CompactReport,
+        import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
+      >;
+      feed: (
+        after?: import('agent-runtime').Cursor,
+      ) => Effect.Effect<
+        {
+          entries: import('agent-runtime').FeedEntry[];
+          cursor: import('agent-runtime').Cursor;
+          refused?: import('agent-runtime').FeedRefusal[];
+          forgotten?: number;
+        },
+        import('agent-runtime').JournalError
+      >;
+      watch: (options: {
+        onEntry: (entry: import('agent-runtime').FeedEntry) => void | Promise<void>;
+        from?: import('agent-runtime').Cursor;
+        intervalMs?: number;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+      io: () => Effect.Effect<import('agent-runtime').EngineIo>;
+      tallied: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+      hold: () => Effect.Effect<import('agent-runtime').Served | null, never, import('effect/Scope').Scope>;
+      drain: (holder: number | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      drainSessions: (given: { graceMs: number } | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      up: (options?: {
+        intervalMs?: number;
+        onTick?: (r: import('agent-runtime').TickReport) => void;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+    };
+    let d!: ReturnType<typeof delivering>;
+    beforeAll(() => {
+      const t = teardowns();
+      w = inMemory();
+      ({ e } = engineFor());
+      return t.end;
+    });
+    const s = story(test);
+    s.test('a digest due is said alone, as the deliverer starts, then emptied', async (t) => {
       const task = await longLived('t-quiet');
       const from = subscribed(t, w, 'quiet', task);
       const folded = line('r-3', 'verified ✓');
@@ -616,9 +1349,9 @@ test(
       names(said, 'News from the feed, nothing waiting on you:', '1 routine line of the feed:', 'r-3  build  verified ✓');
       await held(t, () => readDelivery(w, 'quiet')?.digest.length === 0, 'the digest emptied');
     });
-    await s.test(
+    s.test(
       'REFUSED: a subscription written after a read is not delivered before five seconds, nor its digest asked again before thirty',
-      async () => {
+      async (t) => {
         await d.stop();
         dropSubscription(w, 'quiet');
         const mark = d.clock.asked.length;
@@ -666,18 +1399,163 @@ const plantRun = (door: Layer.Layer<never>, id: string, factory: string) =>
     ),
   );
 
-test(
+describe(
   "a subscription scoped by a floor is told only of the runs of factories at it or above, and every one carries a daemon's line and the store's",
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const w = inMemory();
-    const { e } = engineFor();
-    const door = runDoorMemory();
-    let d: ReturnType<typeof delivering>;
-    await s.test(
+  () => {
+    let w!: World;
+    let e!: {
+      say: (
+        taskId: string,
+        text: string,
+      ) => Effect.Effect<
+        import('agent-runtime').Said,
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
+        never
+      >;
+      file: (
+        spec: import('agent-runtime').TaskSpec,
+      ) => Effect.Effect<string, import('agent-runtime').FileRefused | import('agent-runtime').JournalError>;
+      tick: () => Effect.Effect<
+        import('agent-runtime').TickReport,
+        import('agent-runtime').TickRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      admit: (
+        taskIds: readonly string[],
+      ) => Effect.Effect<string[], import('agent-runtime').AdmitRefused | import('agent-runtime').JournalError>;
+      view: (taskId: string) => Effect.Effect<import('agent-runtime').TaskView, import('agent-runtime').JournalError>;
+      path: (taskId: string) => Effect.Effect<import('agent-runtime').LifecycleTransition[], import('agent-runtime').JournalError>;
+      list: (
+        taskIds?: readonly string[],
+      ) => Effect.Effect<
+        import('agent-runtime').TaskList,
+        import('agent-runtime').ListRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      stop: (taskId: string) => Effect.Effect<void, import('agent-runtime').StopRefused | import('agent-runtime').JournalError>;
+      logs: (taskId: string) => Effect.Effect<string, import('agent-runtime').JournalError | import('agent-runtime').RunnerError>;
+      transcript: (
+        taskId: string,
+        after?: import('agent-runtime').TranscriptCursor,
+        options?: { readonly attempt?: number },
+      ) => Effect.Effect<
+        import('agent-runtime').Transcript,
+        import('agent-runtime').TranscriptRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      output: (
+        taskId: string,
+        stream: 'stdout' | 'stderr',
+        lastBytes?: number,
+      ) => Effect.Effect<
+        string | undefined,
+        import('agent-runtime').OutputRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+      >;
+      follow: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('effect/Stream').Stream<import('agent-runtime').Followed, import('agent-runtime').RunnerError> | undefined,
+        import('agent-runtime').FollowRefused | import('agent-runtime').JournalError
+      >;
+      interrupt: (
+        taskId: string,
+      ) => Effect.Effect<
+        import('../../../node_modules/agent-runtime/src/service/interrupt.ts').Interrupted,
+        import('agent-runtime').InterruptRefused | import('agent-runtime').InterruptUnsent | import('agent-runtime').JournalError
+      >;
+      answerAsk: (
+        taskId: string,
+        given: import('agent-runtime').Answering,
+      ) => Effect.Effect<
+        import('agent-runtime').AskAnswered,
+        import('agent-runtime').AnswerRefused | import('agent-runtime').AnswerUnsent | import('agent-runtime').JournalError
+      >;
+      quota: (
+        harness?: string,
+      ) => Effect.Effect<import('agent-runtime').HarnessQuota, import('agent-runtime').QuotaRefused | import('agent-runtime').RunnerError>;
+      mcpState: (
+        servers: Record<string, import('agent-runtime').RemoteMcpServer>,
+      ) => Effect.Effect<import('agent-runtime').McpServersRead, import('agent-runtime').McpStateRefused>;
+      mcpSignIn: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+        clientSecret?: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInStarted, import('agent-runtime').McpSignInRefused>;
+      mcpSignInState: (name: string) => Effect.Effect<import('agent-runtime').McpSignInState>;
+      mcpSignInCallback: (
+        name: string,
+        url: string,
+      ) => Effect.Effect<import('agent-runtime').McpSignInState, import('agent-runtime').McpSignInRefused>;
+      mcpSignOut: (
+        name: string,
+        server: import('agent-runtime').RemoteMcpServer,
+      ) => Effect.Effect<{ readonly signedOut: true }, import('agent-runtime').McpSignInRefused>;
+      answer: (
+        taskId: string,
+        text: string,
+        options?: { config?: import('agent-runtime').HarnessArgs },
+      ) => Effect.Effect<import('agent-runtime').Input, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      close: (taskId: string) => Effect.Effect<void, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+      sweep: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<import('agent-runtime').SweepReport, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      removeBody: (ref: string) => Effect.Effect<void, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+      forget: (
+        taskIds: readonly string[],
+        options?: { yes?: boolean },
+      ) => Effect.Effect<
+        import('agent-runtime').ForgetReport,
+        import('../../../node_modules/agent-runtime/src/service/forget.ts').ForgetFailure
+      >;
+      kept: () => Effect.Effect<
+        import('agent-runtime').KeptReport,
+        import('agent-runtime').KeptRefused | import('agent-runtime').JournalError
+      >;
+      compact: (options?: {
+        yes?: boolean;
+      }) => Effect.Effect<
+        import('agent-runtime').CompactReport,
+        import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
+      >;
+      feed: (
+        after?: import('agent-runtime').Cursor,
+      ) => Effect.Effect<
+        {
+          entries: import('agent-runtime').FeedEntry[];
+          cursor: import('agent-runtime').Cursor;
+          refused?: import('agent-runtime').FeedRefusal[];
+          forgotten?: number;
+        },
+        import('agent-runtime').JournalError
+      >;
+      watch: (options: {
+        onEntry: (entry: import('agent-runtime').FeedEntry) => void | Promise<void>;
+        from?: import('agent-runtime').Cursor;
+        intervalMs?: number;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+      io: () => Effect.Effect<import('agent-runtime').EngineIo>;
+      tallied: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+      hold: () => Effect.Effect<import('agent-runtime').Served | null, never, import('effect/Scope').Scope>;
+      drain: (holder: number | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      drainSessions: (given: { graceMs: number } | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+      up: (options?: {
+        intervalMs?: number;
+        onTick?: (r: import('agent-runtime').TickReport) => void;
+        onError?: (e: unknown) => void;
+      }) => Effect.Effect<{ stop: () => void }>;
+    };
+    let door!: Layer.Layer<never, never, never>;
+    let d!: ReturnType<typeof delivering>;
+    beforeAll(() => {
+      const t = teardowns();
+      w = inMemory();
+      ({ e } = engineFor());
+      door = runDoorMemory();
+      return t.end;
+    });
+    const s = story(test);
+    s.test(
       'REFUSED: a subscription scoped by a floor is told nothing of a run whose factory is below it; one unscoped is told of both',
-      async () => {
+      async (t) => {
         for (const name of ['pipao', 'hkb']) addFactoryAt(ROOT, { name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
         writeFactoryLevel(ROOT, 'hkb', { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
         await plantRun(door, 'r-pipao', 'pipao');
@@ -705,9 +1583,9 @@ test(
         assert.deepEqual(readDelivery(w, 'floored')?.digest, [], 'a line below the floor is not folded either');
       },
     );
-    await s.test(
+    s.test(
       'a daemon’s line is carried by every subscription, scoped or not: routine in a digest kept, a wake where it names daemon',
-      async () => {
+      async (t) => {
         await d.stop();
         dropSubscription(w, 'floored');
         dropSubscription(w, 'everything');
@@ -731,9 +1609,9 @@ test(
         assert.equal(toldTo(scoped).length, 0, 'routine by the default words');
       },
     );
-    await s.test(
+    s.test(
       'the store’s line is carried by every subscription as a daemon’s is: routine in a scoped digest, a wake where it names kind=Store',
-      async () => {
+      async (t) => {
         await d.stop();
         dropSubscription(w, 'scoped-d');
         dropSubscription(w, 'woken-d');
@@ -756,9 +1634,9 @@ test(
         assert.equal(toldTo(scoped).length, 0, 'routine by the default words');
       },
     );
-    await s.test(
+    s.test(
       'REFUSED: a level that does not read holds a scoped line back, read again each beat, and the beat after it is mended says it',
-      async () => {
+      async (t) => {
         await d.stop();
         dropSubscription(w, 'scoped-s');
         dropSubscription(w, 'woken-s');
@@ -767,7 +1645,7 @@ test(
         kept(t, w, 'manual', { task: manual, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'manual' } });
         fs.mkdirSync(path.dirname(levelFile(ROOT)), { recursive: true });
         fs.writeFileSync(levelFile(ROOT), '{ not json');
-        t.after(() => fs.rmSync(levelFile(ROOT), { force: true }));
+        t.onTestFinished(() => fs.rmSync(levelFile(ROOT), { force: true }));
         d.start();
         await d.quiet(3);
         const handed = () => Effect.runSync(Metric.value(FEED_FOLLOW_LINES)).count;

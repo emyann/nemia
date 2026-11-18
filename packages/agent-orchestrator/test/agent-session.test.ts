@@ -6,7 +6,8 @@
  * and its skills whole in its brief. And a table: a start that cannot tell a step its agent stops, and writes no run. The pure renderers
  * are tables in `rendering.test.ts`; an agent file's rules, in `src/agents/agents.test.ts`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -95,47 +96,46 @@ const specOf = (id: string) => stage.board().specs.find((s) => s.id === id) ?? a
 const frozen = (id: string, name: string) =>
   (runRecord(ROOT, id).workflow ?? []).find((s) => s.name === name) ?? assert.fail(`${name} not frozen`);
 
-test('hire an agent and render its session: frozen at the start, rendered for Claude Code, filed with its flags, an edit reaching only a later run', async (t) => {
-  const s = story(t);
-  const dir = storeTeam('noted', {
-    write: `---\nagent: scribe\n${FOLDER}mcp: notes, docs\n---\nWrite about tides.\n`,
-    code: '---\nagent: coder\nworkspace: folder\nafter: write\n---\nCode it.\n',
-    wrap: '---\nafter: code\nworkspace: folder\n---\nWrap it up.\n',
+describe('hire an agent and render its session: frozen at the start, rendered for Claude Code, filed with its flags, an edit reaching only a later run', () => {
+  let dir!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    dir = storeTeam('noted', {
+      write: `---\nagent: scribe\n${FOLDER}mcp: notes, docs\n---\nWrite about tides.\n`,
+      code: '---\nagent: coder\nworkspace: folder\nafter: write\n---\nCode it.\n',
+      wrap: '---\nafter: code\nworkspace: folder\n---\nWrap it up.\n',
+    });
+    customFor('scribe', 'Before: French.\n');
+    return t.end;
   });
-  customFor('scribe', 'Before: French.\n');
+  const s = story(test);
   let id = '';
   let at = '';
   let prompt = '';
   let copy = '';
-
-  await s.test('a load from the store gives the step its custom instructions; without the store, none', () => {
+  s.test('a load from the store gives the step its custom instructions; without the store, none', () => {
     const write = loadWorkflows(dir, { home: ROOT, repo: HERE }).find((w) => w.name === 'write')!;
     assert.equal(write.agent?.customInstructions, 'Before: French.');
     const away = loadWorkflows(dir, { repo: HERE }).find((w) => w.name === 'write')!;
     assert.equal(away.agent?.customInstructions, undefined);
   });
-
-  await s.test(
-    "`nemia start` names each node's agent beside it — by the agent's name — and a node with no agent by its name alone",
-    async () => {
-      const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-      stage.place().world.repository(repo, { 'README.md': 'x\n' });
-      const named = storeTeam('named', {
-        build: '---\nplace: git\nagent: plain\n---\n',
-        judge: '---\nafter: build\nplace: git\nagent: coder\n---\n',
-        wrap: '---\nafter: judge\nplace: git\n---\nWrap it up.\n',
-      });
-      const started = factsOf((await stage.main(['start', 'build it', '--workflows', named, '--repo', repo])) as Started);
-      assert.deepEqual(
-        started.facts.steps,
-        [{ name: 'build', agent: 'plain' }, { name: 'judge', agent: 'coder' }, { name: 'wrap' }],
-        'each step in order, with its agent where it has one',
-      );
-      id = (await stage.runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }))).id;
-    },
-  );
-
-  await s.test("the start froze the step with its agent's words, the person's, its own note and the servers of both, each once", () => {
+  s.test("`nemia start` names each node's agent beside it — by the agent's name — and a node with no agent by its name alone", async () => {
+    const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+    stage.place().world.repository(repo, { 'README.md': 'x\n' });
+    const named = storeTeam('named', {
+      build: '---\nplace: git\nagent: plain\n---\n',
+      judge: '---\nafter: build\nplace: git\nagent: coder\n---\n',
+      wrap: '---\nafter: judge\nplace: git\n---\nWrap it up.\n',
+    });
+    const started = factsOf((await stage.main(['start', 'build it', '--workflows', named, '--repo', repo])) as Started);
+    assert.deepEqual(
+      started.facts.steps,
+      [{ name: 'build', agent: 'plain' }, { name: 'judge', agent: 'coder' }, { name: 'wrap' }],
+      'each step in order, with its agent where it has one',
+    );
+    id = (await stage.runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }))).id;
+  });
+  s.test("the start froze the step with its agent's words, the person's, its own note and the servers of both, each once", () => {
     const write = frozen(id, 'write');
     assert.equal(
       write.body,
@@ -158,8 +158,7 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
       "the agent's servers, then the step's, each once",
     );
   });
-
-  await s.test(
+  s.test(
     "Claude Code's prompt is rendered under runs/<id>/agents/<step>/: instructions, custom instructions, skills by name, a preload whole",
     () => {
       at = agentFilesDir(ROOT, runRecord(ROOT, id), 'write');
@@ -170,8 +169,7 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
       );
     },
   );
-
-  await s.test('its plugin holds a copy of each skill whole, its manifest and its style; the codex step is not rendered', () => {
+  s.test('its plugin holds a copy of each skill whole, its manifest and its style; the codex step is not rendered', () => {
     copy = fs.readFileSync(path.join(at, 'nemia-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8');
     assert.equal(copy, SKILL('write-a-note'), "the store's skill, copied");
     assert.equal(
@@ -184,30 +182,25 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
     assert.equal(fs.readFileSync(path.join(at, 'nemia-scribe', 'output-styles', 'no-coding.md'), 'utf8'), noCodingStyle('scribe'));
     assert.equal(fs.existsSync(agentFilesDir(ROOT, runRecord(ROOT, id), 'code')), false);
   });
-
-  await s.test(
-    'the tick files the step with its flags, its skills as a closed list, its servers, and a brief that is its own note',
-    async () => {
-      const { filed, spec } = await tick(id);
-      assert.deepEqual(filed, ['write']);
-      const write = spec('write');
-      assert.deepEqual(write.config?.claude, {
-        appendSystemPromptFile: path.join(at, 'prompt.md'),
-        pluginDir: [path.join(at, 'nemia-scribe')],
-        settings: JSON.stringify({ outputStyle: 'nemia-scribe:no-coding' }),
-      });
-      assert.deepEqual(
-        write.config?.enabledSkills,
-        ['nemia-scribe:write-a-note', 'nemia-scribe:mind-the-tone'],
-        "its plugin's copies, and no other",
-      );
-      assert.deepEqual(write.config?.projectMcp, ['docs', 'notes']);
-      assert.ok(write.brief.startsWith(`${PRECEDENCE}\n\nWrite about tides.\n`), 'the precedence, then its own note');
-      assert.doesNotMatch(write.brief, /You write notes|Before: French/, "the layers above it are in Claude Code's prompt");
-    },
-  );
-
-  await s.test('an edit after the start — the agent, its skill, the custom instructions — reaches no step of the run started', () => {
+  s.test('the tick files the step with its flags, its skills as a closed list, its servers, and a brief that is its own note', async () => {
+    const { filed, spec } = await tick(id);
+    assert.deepEqual(filed, ['write']);
+    const write = spec('write');
+    assert.deepEqual(write.config?.claude, {
+      appendSystemPromptFile: path.join(at, 'prompt.md'),
+      pluginDir: [path.join(at, 'nemia-scribe')],
+      settings: JSON.stringify({ outputStyle: 'nemia-scribe:no-coding' }),
+    });
+    assert.deepEqual(
+      write.config?.enabledSkills,
+      ['nemia-scribe:write-a-note', 'nemia-scribe:mind-the-tone'],
+      "its plugin's copies, and no other",
+    );
+    assert.deepEqual(write.config?.projectMcp, ['docs', 'notes']);
+    assert.ok(write.brief.startsWith(`${PRECEDENCE}\n\nWrite about tides.\n`), 'the precedence, then its own note');
+    assert.doesNotMatch(write.brief, /You write notes|Before: French/, "the layers above it are in Claude Code's prompt");
+  });
+  s.test('an edit after the start — the agent, its skill, the custom instructions — reaches no step of the run started', () => {
     fs.writeFileSync(path.join(STORE, 'agents', 'scribe.md'), SCRIBE.replace('You write notes.', 'Something else.'));
     fs.appendFileSync(path.join(STORE, 'skills', 'write-a-note', 'SKILL.md'), 'Edited later.\n');
     customFor('scribe', 'After: German.\n');
@@ -223,8 +216,7 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
     fs.rmSync(CUSTOM, { recursive: true });
     assert.equal(frozen(id, 'write').agent?.customInstructions, 'Before: French.', 'and a removal neither');
   });
-
-  await s.test('once the step is done, the codex step is filed with its instructions in its brief and no Claude Code flags', async () => {
+  s.test('once the step is done, the codex step is filed with its instructions in its brief and no Claude Code flags', async () => {
     stage.board().settle(`${id}-write`, 'succeeded', { outcome: 'done', summary: 'wrote it', artifacts: [], needs: null });
     const { filed, spec } = await tick(id);
     assert.deepEqual(filed, ['code']);
@@ -232,8 +224,7 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
     assert.equal(code.config?.claude, undefined);
     assert.ok(code.brief.startsWith(`${PRECEDENCE}\n\n${HEAD.instructions}\n\nYou write code.\n\n${HEAD.policy}\n\nCode it.`), code.brief);
   });
-
-  await s.test('a run started after the edits is told them', async () => {
+  s.test('a run started after the edits is told them', async () => {
     customFor('scribe', 'After: German.\n');
     const later = await stage.runPlaced(startRun({ brief: 'the later words', repo: HERE, workflowDir: dir }));
     const write = frozen(later.id, 'write');
@@ -249,42 +240,41 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
   });
 });
 
-test('a step whose rendered folder is gone is told its layers and its skills whole in its brief, as its start found them', async (t) => {
-  const s = story(t);
-  fs.rmSync(CUSTOM, { recursive: true, force: true });
-  fs.writeFileSync(path.join(STORE, 'agents', 'scribe.md'), SCRIBE);
-
-  await s.test(
-    'filed as before 2026-09-25: the instructions in its brief, no flag naming a file not there, each skill told whole',
-    async () => {
-      const dir = storeTeam('lost', { write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n` });
-      const run = await stage.runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }));
-      fs.rmSync(agentFilesDir(ROOT, run, 'write'), { recursive: true });
-      const write = (await tick(run.id)).spec('write');
-      assert.equal(write.config?.claude, undefined);
-      assert.ok(
-        write.brief.startsWith(`${PRECEDENCE}\n\n${HEAD.instructions}\n\nYou write notes.\n\n${HEAD.policy}\n\nWrite about tides.`),
-        write.brief,
-      );
-      assert.match(
-        write.brief,
-        /Write about tides\.\n\nNo skill is loaded with the Skill tool for this step[^\n]*\n\n## Skill `write-a-note`\n\nHow to write a note\./,
-      );
-      assert.ok(
-        write.brief.includes(
-          `/workflows/skills, ${PLACE_SKILLS}, ${BUILTIN_SKILLS}. Sign off blocked if you need it.\n\n## What was asked for`,
-        ),
-        write.brief,
-      );
-      assert.match(
-        write.brief,
-        /\n## Skill `mind-the-tone`\n\nNot told: no folder holds it in [^\n]*\/workflows\/skills, [^\n]*\. Sign off blocked if you need it\.\n\n## What was asked for/,
-        'a folder run keeps no repository: the skill its start found where it was typed is said not to be told',
-      );
-    },
-  );
-
-  await s.test(
+describe('a step whose rendered folder is gone is told its layers and its skills whole in its brief, as its start found them', () => {
+  beforeAll(() => {
+    const t = teardowns();
+    fs.rmSync(CUSTOM, { recursive: true, force: true });
+    fs.writeFileSync(path.join(STORE, 'agents', 'scribe.md'), SCRIBE);
+    return t.end;
+  });
+  const s = story(test);
+  s.test('filed as before 2026-09-25: the instructions in its brief, no flag naming a file not there, each skill told whole', async () => {
+    const dir = storeTeam('lost', { write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n` });
+    const run = await stage.runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }));
+    fs.rmSync(agentFilesDir(ROOT, run, 'write'), { recursive: true });
+    const write = (await tick(run.id)).spec('write');
+    assert.equal(write.config?.claude, undefined);
+    assert.ok(
+      write.brief.startsWith(`${PRECEDENCE}\n\n${HEAD.instructions}\n\nYou write notes.\n\n${HEAD.policy}\n\nWrite about tides.`),
+      write.brief,
+    );
+    assert.match(
+      write.brief,
+      /Write about tides\.\n\nNo skill is loaded with the Skill tool for this step[^\n]*\n\n## Skill `write-a-note`\n\nHow to write a note\./,
+    );
+    assert.ok(
+      write.brief.includes(
+        `/workflows/skills, ${PLACE_SKILLS}, ${BUILTIN_SKILLS}. Sign off blocked if you need it.\n\n## What was asked for`,
+      ),
+      write.brief,
+    );
+    assert.match(
+      write.brief,
+      /\n## Skill `mind-the-tone`\n\nNot told: no folder holds it in [^\n]*\/workflows\/skills, [^\n]*\. Sign off blocked if you need it\.\n\n## What was asked for/,
+      'a folder run keeps no repository: the skill its start found where it was typed is said not to be told',
+    );
+  });
+  s.test(
     'a plugin under another name, as a start before the rename wrote it, is a folder gone; one with no plugin is filed with its prompt',
     async () => {
       const dir = storeTeam('renamed', {
@@ -309,8 +299,7 @@ test('a step whose rendered folder is gone is told its layers and its skills who
       assert.deepEqual(plain.config?.enabledSkills, [], 'a step that names no skill is given none');
     },
   );
-
-  await s.test("a repository run's step is told a skill of the run's repository too, as its start found it", async () => {
+  s.test("a repository run's step is told a skill of the run's repository too, as its start found it", async () => {
     const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
     const tone = SKILL('mind-the-tone', 'preload: true\n').replace('How to', 'In this repository, how to');
     fs.mkdirSync(path.join(repo, '.claude', 'skills', 'mind-the-tone'), { recursive: true });
@@ -323,8 +312,7 @@ test('a step whose rendered folder is gone is told its layers and its skills who
     assert.equal(write.config?.claude, undefined);
     assert.match(write.brief, /\n## Skill `mind-the-tone`\n\nIn this repository, how to mind the tone\.\n/);
   });
-
-  await s.test('a skill named with its folder is told under the name its line writes, or why the folder no longer holds it', async () => {
+  s.test('a skill named with its folder is told under the name its line writes, or why the folder no longer holds it', async () => {
     const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
     const tone = SKILL('mind-the-tone');
     const nested = SKILL('y').replace(/\n---\n[\s\S]*$/, '\n---\nOf the folder app.\n');
@@ -355,11 +343,14 @@ test('a step whose rendered folder is gone is told its layers and its skills who
   });
 });
 
-test('REFUSED at shipped defaults: a start that cannot tell a step its agent stops, names what to fix, and writes no run', async (t) => {
-  const runs = path.join(ROOT, 'runs');
+describe('REFUSED at shipped defaults: a start that cannot tell a step its agent stops, names what to fix, and writes no run', () => {
+  let runs!: string;
+  beforeAll(() => {
+    runs = path.join(ROOT, 'runs');
+    fs.writeFileSync(outside, 'Words from elsewhere.\n');
+  });
   const runsIn = (): string[] => (fs.existsSync(runs) ? fs.readdirSync(runs).sort() : []);
   const outside = path.join(ROOT, 'elsewhere.md');
-  fs.writeFileSync(outside, 'Words from elsewhere.\n');
   const file = path.join(CUSTOM, 'implementer.md');
   const custom: Array<[string, () => void, string]> = [
     [
@@ -371,7 +362,7 @@ test('REFUSED at shipped defaults: a start that cannot tell a step its agent sto
     ['custom instructions that are a directory', () => fs.mkdirSync(file, { recursive: true }), 'is not a file'],
   ];
   for (const [row, plant, fact] of custom)
-    await t.test(`${row}, for the step naming the agent; a start naming another starts`, async () => {
+    test(`${row}, for the step naming the agent; a start naming another starts`, async () => {
       const team = teamCopy('wf-agent-session-team-');
       const solo = path.join(team, 'solo');
       fs.mkdirSync(solo);
@@ -396,7 +387,7 @@ test('REFUSED at shipped defaults: a start that cannot tell a step its agent sto
         fs.rmSync(CUSTOM, { recursive: true, force: true });
       }
     });
-  await t.test('a team whose agent gives a skill no place has', async () => {
+  test('a team whose agent gives a skill no place has', async () => {
     const dir = storeTeam('unskilled', { write: `---\nagent: scribe\n${FOLDER}---\nWrite.\n` });
     const before = runsIn();
     const elsewhere = fs.mkdtempSync(path.join(ROOT, 'elsewhere-'));

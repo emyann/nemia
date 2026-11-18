@@ -4,7 +4,7 @@
  * frozen, never waited for, and the drawn text is written here.
  */
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'vitest';
 import type { Locator, Page } from 'playwright';
 import { DREW_WITHIN_MS, expectInstant } from './e2e/board.ts';
 import { instantWhole } from '../src/lib/instant.ts';

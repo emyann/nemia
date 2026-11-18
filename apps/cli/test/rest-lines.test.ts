@@ -4,7 +4,7 @@
  * store, and `nemia level`'s (`levelLines`), whose data the orchestrator's `nemia-keeper.test.ts` holds. A number nothing measured reads
  * `—`, never 0.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { NemiaLevel, PassesRead, StatsGroup, StatsHeadline, StatsHealth, StatsStepRow } from 'objects';
 import { passesLines, seriesLines } from '../src/commands/rest/meters.ts';
@@ -166,31 +166,34 @@ test("`nemia series`' lines: the range, then a series and its labels a line, its
   assert.match(seriesLines({ range: '7d', span: 'hour', from: '', to: '', series: [] })[0] ?? '', /^nothing is kept for 7d yet/);
 });
 
-test('`statsLines` and `statsLine`: the stats in words, — where nothing was measured', async (t) => {
-  const empty = statsLine(stats());
-  await t.test('the recap line is one line, — where no round or landing was measured', () => {
+describe('`statsLines` and `statsLine`: the stats in words, — where nothing was measured', () => {
+  let empty!: string;
+  beforeAll(() => {
+    empty = statsLine(stats());
+  });
+  test('the recap line is one line, — where no round or landing was measured', () => {
     assert.equal(empty.split('\n').length, 1);
     assert.match(empty, /— \(—\) rounds/);
     assert.match(empty, /— \(—\) landed/);
     assert.match(empty, /— \(—\) skills loaded$/);
   });
-  await t.test('an empty store says nothing has ended, and no recap line', () => {
+  test('an empty store says nothing has ended, and no recap line', () => {
     const words = statsLines(stats());
     assert.ok(words.includes('no try has ended, and no run has finished'), words.join('\n'));
     assert.ok(!words.some((l) => l.includes('runs finished')));
   });
-  await t.test('the day row reads — under landed where no run recorded it, not 0', () => {
+  test('the day row reads — under landed where no run recorded it, not 0', () => {
     const day = { ...headline({ runs: 2, tries: 2 }), day: '2026-09-28' };
     hasLine(statsLines(stats(group({ days: [day] }), { from: '2026-09-28' })), /^2026-09-28\s+2\s+—\s/);
   });
-  await t.test('refused calls: — where none were measured, a measured 0 as 0/try, a small rate keeps a significant figure', () => {
+  test('refused calls: — where none were measured, a measured 0 as 0/try, a small rate keeps a significant figure', () => {
     const last = (deniedPerTry: number | null) =>
       stats(group({ tiles: { ...group().tiles, last: { ...group().tiles.last, deniedPerTry } } }));
     assert.match(statsLine(last(null)), /— \(—\) calls denied/);
     assert.match(statsLine(last(0)), /0\/try \(—\) calls denied/);
     assert.match(statsLine(last(1 / 300)), / 0\.003\/try \(—\) calls denied/);
   });
-  await t.test('the step row says its tries, time, check time and cost, and how many tries had their skills measured', () => {
+  test('the step row says its tries, time, check time and cost, and how many tries had their skills measured', () => {
     const words = statsLines(
       stats(
         group({
@@ -211,33 +214,30 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
     hasLine(words, /^implement\s+implementer\s+2\s+4h00m\s+2h00m\s+\$2\.00\s/);
     hasLine(words, /^design .*\s4 \(2 of 3\)$/);
   });
-  await t.test(
-    "a skill's row says how many touched tries loaded it, and — where it declares no path; a rule row its kept and broken",
-    () => {
-      const words = statsLines(
-        stats(
-          group({
-            steps: [
-              stepRow('design', {
-                skills: [
-                  { skill: 'change-the-board', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
-                  { skill: 'shadcn', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
-                ],
-                rules: [{ skill: 'write-a-spec', rule: 'read-with-read', kept: 0, broken: 1 }],
-              }),
-            ],
-          }),
-        ),
-      );
-      hasLine(words, /^step\s+agent\s+skill\s+loads\s+tries\s+when touched$/);
-      hasLine(words, /^design\s+planner\s+change-the-board\s+1\s+1\s+1 of 2$/);
-      hasLine(words, /^design\s+planner\s+shadcn\s+1\s+1\s+—$/);
-      hasLine(words, /^step\s+agent\s+skill\s+rule\s+kept\s+broken$/);
-      hasLine(words, /^design\s+planner\s+write-a-spec\s+read-with-read\s+0\s+1$/);
-      assert.ok(!statsLines(stats(group({ steps: [stepRow('design')] }))).some((l) => /^step\s+agent\s+skill\s+rule/.test(l)));
-    },
-  );
-  await t.test('a day row says the calls refused and the skills loaded a try, — where none was measured; a call refused a row', () => {
+  test("a skill's row says how many touched tries loaded it, and — where it declares no path; a rule row its kept and broken", () => {
+    const words = statsLines(
+      stats(
+        group({
+          steps: [
+            stepRow('design', {
+              skills: [
+                { skill: 'change-the-board', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
+                { skill: 'shadcn', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
+              ],
+              rules: [{ skill: 'write-a-spec', rule: 'read-with-read', kept: 0, broken: 1 }],
+            }),
+          ],
+        }),
+      ),
+    );
+    hasLine(words, /^step\s+agent\s+skill\s+loads\s+tries\s+when touched$/);
+    hasLine(words, /^design\s+planner\s+change-the-board\s+1\s+1\s+1 of 2$/);
+    hasLine(words, /^design\s+planner\s+shadcn\s+1\s+1\s+—$/);
+    hasLine(words, /^step\s+agent\s+skill\s+rule\s+kept\s+broken$/);
+    hasLine(words, /^design\s+planner\s+write-a-spec\s+read-with-read\s+0\s+1$/);
+    assert.ok(!statsLines(stats(group({ steps: [stepRow('design')] }))).some((l) => /^step\s+agent\s+skill\s+rule/.test(l)));
+  });
+  test('a day row says the calls refused and the skills loaded a try, — where none was measured; a call refused a row', () => {
     const days = [
       { ...headline({ tries: 2, deniedPerTry: 2, skillsPerTry: 3 }), day: '2026-09-26' },
       { ...headline({ tries: 1, deniedPerTry: 0, skillsPerTry: 0 }), day: '2026-09-25' },
@@ -253,7 +253,7 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
     hasLine(words, /^write\s+implementer\s+3\s.*\s4 \(2 of 3\)\s+—$/);
     hasLine(words, /^write\s+implementer\s+Write\(\/x\)\s+2$/);
   });
-  await t.test('a change to what the runs froze is a row under its header: its day, what changed, its run and the run before', () => {
+  test('a change to what the runs froze is a row under its header: its day, what changed, its run and the run before', () => {
     const marks = [
       { day: '2026-09-21', kind: 'skill' as const, name: 'review-a-change', run: 'marks-2', since: 'marks-1' },
       { day: '2026-09-23', kind: 'agent' as const, name: 'reviewer', run: 'marks-5', since: 'marks-4' },
@@ -264,7 +264,7 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
     hasLine(words, /^2026-09-23\s+agent reviewer\s+marks-5\s+marks-4$/);
     assert.ok(!statsLines(stats()).some((l) => /^day\s+changed/.test(l)), 'no change, no header');
   });
-  await t.test("a tally's rows per day and over the range: — on a day with a try and no measure", () => {
+  test("a tally's rows per day and over the range: — on a day with a try and no measure", () => {
     const days = [
       { ...headline({ tries: 2 }), day: '2026-09-08' },
       { ...headline({ tries: 1 }), day: '2026-09-09' },
@@ -281,7 +281,7 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
     assert.ok(!words.some((l) => l.startsWith('2026-09-10  triage')), 'a day nothing happened on is left out');
     hasLine(words, /^all\s+triage\s+issues\s+3\s+2$/);
   });
-  await t.test('a slow landing is said under its header, and counted on the recap line within the last 14 days', () => {
+  test('a slow landing is said under its header, and counted on the recap line within the last 14 days', () => {
     const slow = { day: '2026-09-28', run: 'slow', step: 'land', try: 1, checkMs: 1_377_000, deadlineMs: 2_700_000, share: 1377 / 2700 };
     const one = stats(group({ slowLandings: [slow] }));
     hasLine(statsLines(one), /^landing checks over half their deadline: measure .* LANDING_CHECK_DEADLINE_SECONDS/);
@@ -291,7 +291,7 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
     assert.doesNotMatch(statsLine(stats(group({ slowLandings: [{ ...slow, day: '2026-09-01' }] }))), /over half/);
     assert.ok(!statsLines(stats()).some((l) => l.startsWith('landing checks over half')));
   });
-  await t.test("the system's health is said under `system` where the series kept some, and nothing where none", () => {
+  test("the system's health is said under `system` where the series kept some, and nothing where none", () => {
     const health: StatsHealth = {
       pass: { p50: 12.3, p95: 80 },
       runs: 40,
@@ -312,7 +312,7 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
     ]);
     assert.ok(!statsLines(stats()).includes('system'));
   });
-  await t.test('a run left out because a journal of it does not read is named; a filter and a group by key are said', () => {
+  test('a run left out because a journal of it does not read is named; a filter and a group by key are said', () => {
     const words = statsLines(
       stats(group(), {
         unreadable: ['marks-2', 'spoilt'],

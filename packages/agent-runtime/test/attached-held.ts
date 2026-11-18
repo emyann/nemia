@@ -6,7 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { TestContext } from 'node:test';
+import type { TestContext } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { Effect, Exit, Logger, Scope } from 'effect';
 import { attachedSessions } from '../src/harness/claude/attached.ts';

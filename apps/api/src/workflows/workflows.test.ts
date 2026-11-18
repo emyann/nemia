@@ -7,7 +7,8 @@
  */
 import { root } from '../../test/harness.ts';
 import { everyOrigin, listedIn } from '../../test/definitions.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -204,9 +205,9 @@ test("a step's check failure policy is listed on its spec as its line writes it,
   assert.equal(specOf({ name: 'implement', after: [], body: '', check: 'npm test' }).checkFailurePolicy, null);
 });
 
-test("a person reads the workflows on the board, opens a step's page, and is refused a page that is not there", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("a person reads the workflows on the board, opens a step's page, and is refused a page that is not there", () => {
+  const s = story(test);
+  s.test(
     "GET /api/namespaces/default/workflows lists each folder, the repository's then yours (each by its ?origin=): its description, its steps' specs and bodies, its graph, the schemas beside its steps and its other text files — and a folder the loader refuses, with the refusal and no steps",
     async () => {
       const refused = loaderRefusal(broken);
@@ -314,8 +315,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
       ]);
     },
   );
-
-  await s.test(
+  s.test(
     "GET /api/namespaces/default/workflows/:name/steps/:step?origin= is a step's page: which workflow and step, its body, its file as written, and every key a step may set with its value as the loader read it and what it means",
     async () => {
       const before = [filesOf(good), filesOf(mine)];
@@ -454,8 +454,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
       assert.deepEqual([filesOf(good), filesOf(mine)], before, 'read, and nothing written');
     },
   );
-
-  await s.test(
+  s.test(
     "a step's page from an origin that is none (422, naming the origins), for a workflow the namespace does not serve there (404, naming where they are listed), a folder the loader refuses (422, in its words), and a step the folder does not have (404, naming its steps) — nothing read outside the folder",
     async () => {
       const from = await stepPage('elsewhere', 'good', 'review');
@@ -496,15 +495,14 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
       }
     },
   );
-
-  await s.test(
+  s.test(
     "a step that names a server its agent does not is listed with its own line in `spec.mcp`, and in `mcp` what its sessions load: the agent's, then its own",
     async (t) => {
       const dir = path.join(repo, 'workflows', 'served');
       write(path.join(dir, 'look.md'), '---\nplace: git\nagent: looker\nmcp: docs, browser\n---\nLook.\n');
       write(path.join(dir, 'plain.md'), '---\nplace: git\nagent: looker\n---\nLook.\n');
       write(path.join(repo, 'workflows', 'agents', 'looker.md'), '---\nharness: claude\nmcp: browser\n---\nYou look.\n');
-      t.after(() => {
+      t.onTestFinished(() => {
         fs.rmSync(dir, { recursive: true });
         fs.rmSync(path.join(repo, 'workflows', 'agents', 'looker.md'));
       });
@@ -541,10 +539,14 @@ const filesOf = (dir: string): Array<[string, string]> =>
     .sort()
     .map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]);
 
-test('a person starts runs from the board: the record as `nemia start` writes it, `after` frozen and read, `context` filed at once', async (t) => {
-  benchHires();
-  const s = story(t);
-  await s.test(
+describe('a person starts runs from the board: the record as `nemia start` writes it, `after` frozen and read, `context` filed at once', () => {
+  beforeAll(() => {
+    const t = teardowns();
+    benchHires();
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     'POST /api/namespaces/default/runs starts a run of the workflow it names as `nemia start` does: the record is written, and nothing is filed',
     async () => {
       assert.deepEqual(runFiles(), []);
@@ -600,8 +602,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       );
     },
   );
-
-  await s.test(
+  s.test(
     "a start as the board sends it is not refused: same-origin through vite's `/api` proxy, which rewrites Host to the api's and leaves the origin header the board's page; and one from a client outside a browser, which sends no Sec-Fetch-Site",
     async () => {
       const records = (): number => runFiles().filter((f) => f.endsWith('.json')).length;
@@ -617,14 +618,12 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.equal(records(), before + 3);
     },
   );
-
-  await s.test('GET /api/repository is the repository a start runs in, as the start form lists the runs of', async () => {
+  s.test('GET /api/repository is the repository a start runs in, as the start form lists the runs of', async () => {
     const res = await app.request('/api/repository?factory=bench');
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), { repo });
   });
-
-  await s.test(
+  s.test(
     'POST /api/namespaces/default/runs takes `after` and passes it to `startRun`, which freezes it on the record as `nemia start --after` does — and the board reads the run waiting on it',
     async () => {
       parents();
@@ -652,8 +651,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       );
     },
   );
-
-  await s.test(
+  s.test(
     'POST /api/namespaces/default/runs takes `context` and passes it to `start()`, which freezes it on the record as `nemia start --from` does, and files at once: it waits on none',
     async () => {
       parents();
@@ -665,8 +663,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.deepEqual([detail.spec.context, detail.spec.after, detail.status.waiting], [['p-running'], [], null]);
     },
   );
-
-  await s.test(
+  s.test(
     "POST /api/namespaces/default/runs takes `cards` and passes them to `start()`, which copies each into the run's inputs/cards as `nemia start --card` does",
     async () => {
       fs.mkdirSync(path.join(root, 'inbox'), { recursive: true });
@@ -681,8 +678,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       );
     },
   );
-
-  await s.test(
+  s.test(
     "a step's page reads its recent runs off the app's memo: a run whose record has not moved is answered from it, and one written since is on the page",
     async () => {
       const runs = path.join(root, 'runs');
@@ -731,211 +727,182 @@ const sentWith = (headers: Record<string, string>) =>
 /** The key a 400 of `RunStart`'s decode names, `payload.<key>…`. */
 const fieldOf = async (res: Response): Promise<string> => ((await res.json()) as { field?: string }).field ?? '';
 
-test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, and the name two places have', async (t) => {
-  benchHires();
-  await t.test(
-    'an unknown workflow (404, naming the ones there are), a missing or blank brief (422), a body `RunStart` does not read (400, naming the key) — and nothing is written',
-    async () => {
-      const before = runFiles();
+describe('POST /api/namespaces/default/runs: what a start refuses, writing nothing, and the name two places have', () => {
+  beforeAll(() => {
+    benchHires();
+  });
+  test('an unknown workflow (404, naming the ones there are), a missing or blank brief (422), a body `RunStart` does not read (400, naming the key) — and nothing is written', async () => {
+    const before = runFiles();
 
-      const unknown = await post({ workflow: 'nope', brief: 'Do it.' });
-      assert.equal(unknown.status, 404);
-      const { error } = (await unknown.json()) as { error: string };
-      assert.ok(error.startsWith("No workflow 'nope' in "), error);
-      assert.ok(error.includes('broken (repo), good (repo), mine (user).'), error);
-      for (const workflow of ['..', 'good/../mine', 'NOTES.txt', '.draft', '.git', '.vscode', 'agents'])
-        assert.equal(
-          (await post({ workflow, brief: 'Do it.' })).status,
-          404,
-          `${workflow}: found among the folders, never joined onto a path — \`..\` names none of them, nor does a hidden folder, one with a step in it included, nor \`agents/\`, whose files read as steps`,
-        );
-
-      for (const brief of [undefined, '', '  \n']) {
-        const res = await post({ workflow: 'good', brief });
-        assert.equal(res.status, 422, String(brief));
-        assert.ok(((await res.json()) as { error: string }).error.startsWith('A run needs a brief'), String(brief));
-      }
-
-      for (const [body, field] of [
-        ['not json', 'payload'],
-        [[], 'payload'],
-        [{ workflow: 'good', brief: 42 }, 'payload.brief'],
-        [{ brief: 'Do it.' }, 'payload.workflow'],
-        [{ workflow: 'good', brief: 'Do it.', from: 'elsewhere' }, 'payload.from'],
-      ] as const) {
-        const res = await post(body);
-        assert.equal(res.status, 400, JSON.stringify(body));
-        const said = await fieldOf(res);
-        assert.ok(said.startsWith(field), `${JSON.stringify(body)}: ${said}`);
-      }
-
-      assert.deepEqual(runFiles(), before);
-      assert.deepEqual(filedTasks(), []);
-    },
-  );
-
-  await t.test(
-    "a start's `workflow` that is not a name, and a `from` that is neither place, are 400s naming the key — and nothing is written",
-    async () => {
-      const before = runFiles();
-      for (const workflow of ['', '  ', 7, null]) {
-        const res = await post({ workflow, brief: 'Do it.' });
-        assert.equal(res.status, 400, JSON.stringify(workflow));
-        const said = await fieldOf(res);
-        assert.ok(said.startsWith('payload.workflow'), `${JSON.stringify(workflow)}: ${said}`);
-      }
-      for (const from of ['elsewhere', 7, null]) {
-        const res = await post({ workflow: 'good', brief: 'Do it.', from });
-        assert.equal(res.status, 400, JSON.stringify(from));
-        const said = await fieldOf(res);
-        assert.ok(said.startsWith('payload.from'), `${JSON.stringify(from)}: ${said}`);
-      }
-      assert.deepEqual(runFiles(), before);
-      assert.deepEqual(filedTasks(), []);
-    },
-  );
-
-  await t.test(
-    "what `startRun` refuses is a 422 — a folder the loader refuses, a step named for another's check, which names itself — and nothing is written",
-    async (t) => {
-      const before = runFiles();
-
-      const broke = await post({ workflow: 'broken', brief: 'Do it.' });
-      assert.equal(broke.status, 422);
-
-      const clash = path.join(root, 'workflows', 'clash');
-      write(path.join(clash, 'build.md'), '---\nplace: git\ncheck: npm run build\n---\nBuild it.\n');
-      write(path.join(clash, 'build-check.md'), '---\nafter: build\nplace: git\n---\nCheck the build by hand.\n');
-      const yoursImplementer = path.join(root, 'workflows', 'agents', 'implementer.md');
-      write(yoursImplementer, '---\nharness: claude\n---\nImplement what you are asked.\n');
-      t.after(() => fs.rmSync(yoursImplementer));
-      attachWorkflow({ factory: 'bench', workflow: 'clash' });
-      for (const step of ['build', 'build-check']) hireAgent({ factory: 'bench', agent: 'implementer', step: `clash/${step}` });
+    const unknown = await post({ workflow: 'nope', brief: 'Do it.' });
+    assert.equal(unknown.status, 404);
+    const { error } = (await unknown.json()) as { error: string };
+    assert.ok(error.startsWith("No workflow 'nope' in "), error);
+    assert.ok(error.includes('broken (repo), good (repo), mine (user).'), error);
+    for (const workflow of ['..', 'good/../mine', 'NOTES.txt', '.draft', '.git', '.vscode', 'agents'])
       assert.equal(
-        (
-          await listWorkflows(
-            engine(process.env),
-            { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
-            repo,
-            root,
-            inRoot,
-          )
-        ).find((w) => w.name === 'clash')?.error,
-        null,
-        "the loader reads this folder; `nemia start` refuses it, as the run files build's check as `build-check`",
+        (await post({ workflow, brief: 'Do it.' })).status,
+        404,
+        `${workflow}: found among the folders, never joined onto a path — \`..\` names none of them, nor does a hidden folder, one with a step in it included, nor \`agents/\`, whose files read as steps`,
       );
-      const res = await post({ workflow: 'clash', brief: 'Do it.' });
-      assert.equal(res.status, 422);
+
+    for (const brief of [undefined, '', '  \n']) {
+      const res = await post({ workflow: 'good', brief });
+      assert.equal(res.status, 422, String(brief));
+      assert.ok(((await res.json()) as { error: string }).error.startsWith('A run needs a brief'), String(brief));
+    }
+
+    for (const [body, field] of [
+      ['not json', 'payload'],
+      [[], 'payload'],
+      [{ workflow: 'good', brief: 42 }, 'payload.brief'],
+      [{ brief: 'Do it.' }, 'payload.workflow'],
+      [{ workflow: 'good', brief: 'Do it.', from: 'elsewhere' }, 'payload.from'],
+    ] as const) {
+      const res = await post(body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      const said = await fieldOf(res);
+      assert.ok(said.startsWith(field), `${JSON.stringify(body)}: ${said}`);
+    }
+
+    assert.deepEqual(runFiles(), before);
+    assert.deepEqual(filedTasks(), []);
+  });
+  test("a start's `workflow` that is not a name, and a `from` that is neither place, are 400s naming the key — and nothing is written", async () => {
+    const before = runFiles();
+    for (const workflow of ['', '  ', 7, null]) {
+      const res = await post({ workflow, brief: 'Do it.' });
+      assert.equal(res.status, 400, JSON.stringify(workflow));
+      const said = await fieldOf(res);
+      assert.ok(said.startsWith('payload.workflow'), `${JSON.stringify(workflow)}: ${said}`);
+    }
+    for (const from of ['elsewhere', 7, null]) {
+      const res = await post({ workflow: 'good', brief: 'Do it.', from });
+      assert.equal(res.status, 400, JSON.stringify(from));
+      const said = await fieldOf(res);
+      assert.ok(said.startsWith('payload.from'), `${JSON.stringify(from)}: ${said}`);
+    }
+    assert.deepEqual(runFiles(), before);
+    assert.deepEqual(filedTasks(), []);
+  });
+  test("what `startRun` refuses is a 422 — a folder the loader refuses, a step named for another's check, which names itself — and nothing is written", async (t) => {
+    const before = runFiles();
+
+    const broke = await post({ workflow: 'broken', brief: 'Do it.' });
+    assert.equal(broke.status, 422);
+
+    const clash = path.join(root, 'workflows', 'clash');
+    write(path.join(clash, 'build.md'), '---\nplace: git\ncheck: npm run build\n---\nBuild it.\n');
+    write(path.join(clash, 'build-check.md'), '---\nafter: build\nplace: git\n---\nCheck the build by hand.\n');
+    const yoursImplementer = path.join(root, 'workflows', 'agents', 'implementer.md');
+    write(yoursImplementer, '---\nharness: claude\n---\nImplement what you are asked.\n');
+    t.onTestFinished(() => fs.rmSync(yoursImplementer));
+    attachWorkflow({ factory: 'bench', workflow: 'clash' });
+    for (const step of ['build', 'build-check']) hireAgent({ factory: 'bench', agent: 'implementer', step: `clash/${step}` });
+    assert.equal(
+      (
+        await listWorkflows(
+          engine(process.env),
+          { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
+          repo,
+          root,
+          inRoot,
+        )
+      ).find((w) => w.name === 'clash')?.error,
+      null,
+      "the loader reads this folder; `nemia start` refuses it, as the run files build's check as `build-check`",
+    );
+    const res = await post({ workflow: 'clash', brief: 'Do it.' });
+    assert.equal(res.status, 422);
+    const { error } = (await res.json()) as { error: string };
+    assert.ok(error.startsWith('build-check: a step may not be named for another'), error);
+    assert.ok(error.includes('build has a `check:`'), error);
+
+    assert.deepEqual(runFiles(), before);
+    assert.deepEqual(filedTasks(), []);
+  });
+  test('`after` that is not a list of run ids is a 400 naming it, before the workflow is looked for — and nothing is written', async () => {
+    const before = runFiles();
+    for (const after of ['p-running', {}, null, 42, [1], [null], ['p-running', 7], [''], ['  ']]) {
+      const res = await post({ workflow: 'good', from: 'repo', brief: 'Do it.', after });
+      assert.equal(res.status, 400, JSON.stringify(after));
+      const said = await fieldOf(res);
+      assert.ok(said.startsWith('payload.after'), `${JSON.stringify(after)}: ${said}`);
+    }
+    assert.equal(
+      (await post({ workflow: 'nope', brief: 'Do it.', after: 'p-running' })).status,
+      400,
+      'shaped before the folder is read: a workflow nobody has is not what it is told first',
+    );
+    assert.deepEqual(runFiles(), before);
+    assert.deepEqual(filedTasks(), []);
+  });
+  test('a run `nemia start --after` will not wait on is a 422 naming it — no such run, a cancelled one, one given twice — and nothing is written', async () => {
+    parents();
+    const before = runFiles();
+    const refusedBy = async (after: string[]): Promise<string> => {
+      const res = await post({ workflow: 'good', from: 'repo', brief: 'Wait for it.', after });
+      assert.equal(res.status, 422, JSON.stringify(after));
       const { error } = (await res.json()) as { error: string };
-      assert.ok(error.startsWith('build-check: a step may not be named for another'), error);
-      assert.ok(error.includes('build has a `check:`'), error);
+      return error;
+    };
+    tells(await refusedBy(['no-such-run']), '--after no-such-run: ', ['no run no-such-run', 'nemia ls']);
+    tells(await refusedBy(['p-running', 'p-cancelled']), '--after p-cancelled: ', [
+      'cancelled at 2026-09-14T00:30:00.000Z',
+      'without --after p-cancelled',
+    ]);
+    tells(await refusedBy(['p-running', 'p-running']), '--after p-running is given twice', ['one --after']);
+    assert.deepEqual(runFiles(), before);
+    assert.deepEqual(filedTasks(), []);
+  });
+  test('`context` with a blank run id is a 400 naming the key, and one the store does not have a 404 in `nemia start --from` words — and nothing is written', async () => {
+    parents();
+    const before = runFiles();
+    for (const context of [[''], ['p-running', '  ']]) {
+      const res = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context });
+      assert.equal(res.status, 400, JSON.stringify(context));
+      const said = await fieldOf(res);
+      assert.ok(said.startsWith('payload.context'), `${JSON.stringify(context)}: ${said}`);
+    }
+    const missing = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context: ['no-such-run'] });
+    assert.equal(missing.status, 404);
+    const missingSaid = ((await missing.json()) as { error: string }).error;
+    assert.ok(missingSaid.startsWith('--from no-such-run: '), missingSaid);
+    for (const fact of ['no run no-such-run', 'nemia ls']) assert.ok(missingSaid.includes(fact), `${fact}: ${missingSaid}`);
+    assert.deepEqual(runFiles(), before);
+    assert.deepEqual(filedTasks(), []);
+  });
+  test('`cards` with a blank name is a 400 naming the key, and a card the inbox does not have a 404 — and nothing is written', async () => {
+    const before = runFiles();
+    const blank = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', cards: ['  '] });
+    assert.equal(blank.status, 400);
+    assert.ok((await fieldOf(blank)).startsWith('payload.cards'));
+    const missing = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', cards: ['no-such-card'] });
+    assert.equal(missing.status, 404);
+    assert.deepEqual(runFiles(), before);
+    assert.deepEqual(filedTasks(), []);
+  });
+  test('REFUSED: a name both the repository and yours have is a 409 until `from` says which, and then starts that one', async (t) => {
+    const yours = path.join(root, 'workflows', 'good');
+    write(path.join(yours, 'implement.md'), '---\nplace: git\n---\nImplement it my way.\n');
+    const yoursImplementer = path.join(root, 'workflows', 'agents', 'implementer.md');
+    write(yoursImplementer, '---\nharness: claude\n---\nImplement what you are asked.\n');
+    t.onTestFinished(() => fs.rmSync(yoursImplementer));
+    const before = runFiles();
 
-      assert.deepEqual(runFiles(), before);
-      assert.deepEqual(filedTasks(), []);
-    },
-  );
+    const both = await post({ workflow: 'good', brief: 'Do it.' });
+    assert.equal(both.status, 409);
+    const { error } = (await both.json()) as { error: string };
+    assert.ok(error.includes(`(${good} and ${yours})`), error);
+    assert.ok(error.includes('"from": "repo"'), error);
+    assert.deepEqual(runFiles(), before);
 
-  await t.test(
-    '`after` that is not a list of run ids is a 400 naming it, before the workflow is looked for — and nothing is written',
-    async () => {
-      const before = runFiles();
-      for (const after of ['p-running', {}, null, 42, [1], [null], ['p-running', 7], [''], ['  ']]) {
-        const res = await post({ workflow: 'good', from: 'repo', brief: 'Do it.', after });
-        assert.equal(res.status, 400, JSON.stringify(after));
-        const said = await fieldOf(res);
-        assert.ok(said.startsWith('payload.after'), `${JSON.stringify(after)}: ${said}`);
-      }
-      assert.equal(
-        (await post({ workflow: 'nope', brief: 'Do it.', after: 'p-running' })).status,
-        400,
-        'shaped before the folder is read: a workflow nobody has is not what it is told first',
-      );
-      assert.deepEqual(runFiles(), before);
-      assert.deepEqual(filedTasks(), []);
-    },
-  );
-
-  await t.test(
-    'a run `nemia start --after` will not wait on is a 422 naming it — no such run, a cancelled one, one given twice — and nothing is written',
-    async () => {
-      parents();
-      const before = runFiles();
-      const refusedBy = async (after: string[]): Promise<string> => {
-        const res = await post({ workflow: 'good', from: 'repo', brief: 'Wait for it.', after });
-        assert.equal(res.status, 422, JSON.stringify(after));
-        const { error } = (await res.json()) as { error: string };
-        return error;
-      };
-      tells(await refusedBy(['no-such-run']), '--after no-such-run: ', ['no run no-such-run', 'nemia ls']);
-      tells(await refusedBy(['p-running', 'p-cancelled']), '--after p-cancelled: ', [
-        'cancelled at 2026-09-14T00:30:00.000Z',
-        'without --after p-cancelled',
-      ]);
-      tells(await refusedBy(['p-running', 'p-running']), '--after p-running is given twice', ['one --after']);
-      assert.deepEqual(runFiles(), before);
-      assert.deepEqual(filedTasks(), []);
-    },
-  );
-
-  await t.test(
-    '`context` with a blank run id is a 400 naming the key, and one the store does not have a 404 in `nemia start --from` words — and nothing is written',
-    async () => {
-      parents();
-      const before = runFiles();
-      for (const context of [[''], ['p-running', '  ']]) {
-        const res = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context });
-        assert.equal(res.status, 400, JSON.stringify(context));
-        const said = await fieldOf(res);
-        assert.ok(said.startsWith('payload.context'), `${JSON.stringify(context)}: ${said}`);
-      }
-      const missing = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context: ['no-such-run'] });
-      assert.equal(missing.status, 404);
-      const missingSaid = ((await missing.json()) as { error: string }).error;
-      assert.ok(missingSaid.startsWith('--from no-such-run: '), missingSaid);
-      for (const fact of ['no run no-such-run', 'nemia ls']) assert.ok(missingSaid.includes(fact), `${fact}: ${missingSaid}`);
-      assert.deepEqual(runFiles(), before);
-      assert.deepEqual(filedTasks(), []);
-    },
-  );
-
-  await t.test(
-    '`cards` with a blank name is a 400 naming the key, and a card the inbox does not have a 404 — and nothing is written',
-    async () => {
-      const before = runFiles();
-      const blank = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', cards: ['  '] });
-      assert.equal(blank.status, 400);
-      assert.ok((await fieldOf(blank)).startsWith('payload.cards'));
-      const missing = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', cards: ['no-such-card'] });
-      assert.equal(missing.status, 404);
-      assert.deepEqual(runFiles(), before);
-      assert.deepEqual(filedTasks(), []);
-    },
-  );
-
-  await t.test(
-    'REFUSED: a name both the repository and yours have is a 409 until `from` says which, and then starts that one',
-    async (t) => {
-      const yours = path.join(root, 'workflows', 'good');
-      write(path.join(yours, 'implement.md'), '---\nplace: git\n---\nImplement it my way.\n');
-      const yoursImplementer = path.join(root, 'workflows', 'agents', 'implementer.md');
-      write(yoursImplementer, '---\nharness: claude\n---\nImplement what you are asked.\n');
-      t.after(() => fs.rmSync(yoursImplementer));
-      const before = runFiles();
-
-      const both = await post({ workflow: 'good', brief: 'Do it.' });
-      assert.equal(both.status, 409);
-      const { error } = (await both.json()) as { error: string };
-      assert.ok(error.includes(`(${good} and ${yours})`), error);
-      assert.ok(error.includes('"from": "repo"'), error);
-      assert.deepEqual(runFiles(), before);
-
-      const chosen = await post({ workflow: 'good', from: 'user', brief: 'Do it my way.' });
-      assert.equal(chosen.status, 201);
-      const run = runsAtOnce(root).runs.read(((await chosen.json()) as { id: string }).id);
-      assert.equal(run.workflowDir, yours);
-      assert.deepEqual(Object.keys(run.steps), ['implement']);
-    },
-  );
+    const chosen = await post({ workflow: 'good', from: 'user', brief: 'Do it my way.' });
+    assert.equal(chosen.status, 201);
+    const run = runsAtOnce(root).runs.read(((await chosen.json()) as { id: string }).id);
+    assert.equal(run.workflowDir, yours);
+    assert.deepEqual(Object.keys(run.steps), ['implement']);
+  });
 });
 
 /** A run of the repository's `good` as `nemia start` records one, never filed — and called off, when `cancelledAt` says when. */
@@ -967,16 +934,194 @@ function parents(): void {
   parentRun('p-cancelled', '2026-09-14T00:30:00.000Z');
 }
 
-test("a Workflow's spec carries its folder's other text files: served sorted, written whole by a PUT, and refused where named twice or misshapen", async (t) => {
-  const dir = path.join(root, 'workflows', 'scripted');
-  write(path.join(dir, 'plan.md'), '---\nplace: git\n---\nPlan it.\n');
-  write(path.join(dir, 'route.schema.json'), '{"type":"object"}\n');
-  write(path.join(dir, 'check.ts'), 'process.exit(0);\n');
-  write(path.join(dir, 'old.sh'), 'exit 0\n');
-  write(path.join(dir, 'README.MD'), '# Scripted\n');
-  const picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
-  fs.writeFileSync(path.join(dir, 'logo.png'), picture);
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+describe("a Workflow's spec carries its folder's other text files: served sorted, written whole by a PUT, and refused where named twice or misshapen", () => {
+  let dir!: string;
+  let picture!: Uint8Array<ArrayBuffer>;
+  let read!: {
+    readonly apiVersion: 'nemia/v1';
+    readonly kind: 'Workflow';
+    readonly metadata: {
+      readonly name: string;
+      readonly creationTimestamp: string;
+      readonly resourceVersion: string;
+      readonly labels?: { readonly [x: string]: string } | undefined;
+      readonly namespace?: string | undefined;
+      readonly generation?: number | undefined;
+    };
+    readonly spec: {
+      readonly steps: readonly {
+        readonly name: string;
+        readonly keys: {
+          readonly [x: string]: unknown;
+          readonly agent?: string | null | undefined;
+          readonly input?: readonly string[] | undefined;
+          readonly output?: string | null | undefined;
+          readonly skills?: readonly string[] | undefined;
+          readonly workflow?: string | null | undefined;
+          readonly route?: string | null | undefined;
+          readonly workspace?: 'base' | null | undefined;
+          readonly check?: string | null | undefined;
+          readonly retries?: number | null | undefined;
+          readonly model?: string | null | undefined;
+          readonly budget?: number | null | undefined;
+          readonly place?: 'folder' | 'git' | null | undefined;
+          readonly after?: readonly string[] | undefined;
+          readonly context?: number | null | undefined;
+          readonly harness?: string | null | undefined;
+          readonly resume?: string | null | undefined;
+          readonly writable?: readonly string[] | undefined;
+          readonly reads?: readonly string[] | undefined;
+          readonly slot?: 'none' | null | undefined;
+          readonly mcp?: readonly string[] | undefined;
+          readonly effort?: string | null | undefined;
+          readonly permissionMode?: string | null | undefined;
+          readonly sandbox?: string | null | undefined;
+          readonly tools?: readonly string[] | null | undefined;
+          readonly disallowedTools?: readonly string[] | undefined;
+          readonly allowedTools?: readonly string[] | undefined;
+          readonly denials?: 'fail' | null | undefined;
+          readonly remote?: boolean | null | undefined;
+          readonly deadlineSeconds?: number | null | undefined;
+          readonly memory?: string | null | undefined;
+          readonly checkMemory?: string | null | undefined;
+          readonly checkFailurePolicy?: string | null | undefined;
+          readonly gate?: true | null | undefined;
+          readonly tally?: readonly string[] | undefined;
+          readonly loop?: string | null | undefined;
+          readonly rounds?: number | null | undefined;
+          readonly routes?: readonly string[] | null | undefined;
+          readonly when?: readonly string[] | null | undefined;
+          readonly ends?: readonly string[] | null | undefined;
+        };
+        readonly body: string;
+      }[];
+      readonly description?: string | null | undefined;
+      readonly needs?:
+        | readonly {
+            readonly message: string;
+            readonly name: string;
+            readonly check: string;
+            readonly fixes?:
+              | readonly {
+                  readonly message: string;
+                  readonly command: string;
+                  readonly kind?: 'puts' | 'typed' | 'removes' | undefined;
+                  readonly asks?: readonly { readonly name: string; readonly message: string }[] | undefined;
+                  readonly code?: string | undefined;
+                }[]
+              | undefined;
+            readonly fills?: string | undefined;
+            readonly scope?: 'machine' | 'repository' | undefined;
+          }[]
+        | undefined;
+      readonly readme?: string | null | undefined;
+      readonly files?: readonly { readonly path: string; readonly text: string }[] | undefined;
+    };
+    readonly status: {
+      readonly dir: string;
+      readonly steps: readonly {
+        readonly name: string;
+        readonly spec: {
+          readonly [x: string]: unknown;
+          readonly agent?: string | null | undefined;
+          readonly input?: readonly string[] | undefined;
+          readonly output?: string | null | undefined;
+          readonly skills?: readonly string[] | undefined;
+          readonly workflow?: string | null | undefined;
+          readonly route?: string | null | undefined;
+          readonly workspace?: 'base' | null | undefined;
+          readonly check?: string | null | undefined;
+          readonly retries?: number | null | undefined;
+          readonly model?: string | null | undefined;
+          readonly budget?: number | null | undefined;
+          readonly place?: 'folder' | 'git' | null | undefined;
+          readonly after?: readonly string[] | undefined;
+          readonly context?: number | null | undefined;
+          readonly harness?: string | null | undefined;
+          readonly resume?: string | null | undefined;
+          readonly writable?: readonly string[] | undefined;
+          readonly reads?: readonly string[] | undefined;
+          readonly slot?: 'none' | null | undefined;
+          readonly mcp?: readonly string[] | undefined;
+          readonly effort?: string | null | undefined;
+          readonly permissionMode?: string | null | undefined;
+          readonly sandbox?: string | null | undefined;
+          readonly tools?: readonly string[] | null | undefined;
+          readonly disallowedTools?: readonly string[] | undefined;
+          readonly allowedTools?: readonly string[] | undefined;
+          readonly denials?: 'fail' | null | undefined;
+          readonly remote?: boolean | null | undefined;
+          readonly deadlineSeconds?: number | null | undefined;
+          readonly memory?: string | null | undefined;
+          readonly checkMemory?: string | null | undefined;
+          readonly checkFailurePolicy?: string | null | undefined;
+          readonly gate?: true | null | undefined;
+          readonly tally?: readonly string[] | undefined;
+          readonly loop?: string | null | undefined;
+          readonly rounds?: number | null | undefined;
+          readonly routes?: readonly string[] | null | undefined;
+          readonly when?: readonly string[] | null | undefined;
+          readonly ends?: readonly string[] | null | undefined;
+        };
+        readonly body: string;
+        readonly own: { readonly keys: readonly string[]; readonly body: string } | null;
+        readonly hired: string | null;
+        readonly layers: {
+          readonly agent: string | null;
+          readonly instructions: string | null;
+          readonly custom: string | null;
+          readonly factory: string | null;
+          readonly agentSkills: readonly string[];
+          readonly policy: string;
+          readonly addedSkills: readonly string[];
+          readonly fence: readonly { readonly key: string; readonly value: string }[];
+          readonly folderFiles: boolean;
+          readonly task: string | null;
+          readonly via: 'brief' | 'prompt';
+        } | null;
+        readonly mcp: readonly string[];
+      }[];
+      readonly origin: 'factory' | 'repo' | 'user' | 'builtin';
+      readonly graph: {
+        readonly roots: string[];
+        readonly edges: (
+          | { readonly from: string; readonly to: string; readonly kind: 'after' }
+          | { readonly from: string; readonly to: string; readonly kind: 'input' }
+          | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+          | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+        )[];
+        readonly nodes: {
+          readonly kind: 'condition' | 'workflow' | 'step';
+          readonly name: string;
+          readonly workflow?: string | undefined;
+          readonly ends?: string[] | undefined;
+        }[];
+      };
+      readonly schemas: readonly string[];
+      readonly folderTeam: boolean;
+      readonly error: string | null;
+      readonly unfilled: string | null;
+      readonly removed?: readonly string[] | undefined;
+      readonly shadowedBy?: 'factory' | 'repo' | 'user' | 'builtin' | undefined;
+      readonly revision?: number | undefined;
+      readonly factories?: readonly string[] | undefined;
+      readonly builtinChanged?: boolean | undefined;
+    };
+  };
+  beforeAll(async () => {
+    const t = teardowns();
+    dir = path.join(root, 'workflows', 'scripted');
+    write(path.join(dir, 'plan.md'), '---\nplace: git\n---\nPlan it.\n');
+    write(path.join(dir, 'route.schema.json'), '{"type":"object"}\n');
+    write(path.join(dir, 'check.ts'), 'process.exit(0);\n');
+    write(path.join(dir, 'old.sh'), 'exit 0\n');
+    write(path.join(dir, 'README.MD'), '# Scripted\n');
+    picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
+    fs.writeFileSync(path.join(dir, 'logo.png'), picture);
+    t.onTestFinished(() => fs.rmSync(dir, { recursive: true, force: true }));
+    read = await got();
+    return t.end;
+  });
   const url = '/api/namespaces/default/workflows/scripted';
   const got = async () => (await (await app.request(`${url}?origin=user`)).json()) as import('objects').Workflow;
   const put = (body: unknown) =>
@@ -986,17 +1131,14 @@ test("a Workflow's spec carries its folder's other text files: served sorted, wr
       body: JSON.stringify(body),
     });
   const files = () => fs.readdirSync(dir).sort();
-
-  const read = await got();
-  await t.test("GET serves the folder's other text files in spec.files, sorted, with no markdown and no picture", () => {
+  test("GET serves the folder's other text files in spec.files, sorted, with no markdown and no picture", () => {
     assert.deepEqual(read.spec.files, [
       { path: 'check.ts', text: 'process.exit(0);\n' },
       { path: 'old.sh', text: 'exit 0\n' },
       { path: 'route.schema.json', text: '{"type":"object"}\n' },
     ]);
   });
-
-  await t.test('REFUSED: a file named both in schemas and in spec.files is a 400, and nothing is written', async () => {
+  test('REFUSED: a file named both in schemas and in spec.files is a 400, and nothing is written', async () => {
     const res = await put({
       metadata: { resourceVersion: read.metadata.resourceVersion },
       spec: { steps: read.spec.steps, files: [{ path: 'route.schema.json', text: '{}\n' }] },
@@ -1006,8 +1148,7 @@ test("a Workflow's spec carries its folder's other text files: served sorted, wr
     assert.equal(fs.readFileSync(path.join(dir, 'route.schema.json'), 'utf8'), '{"type":"object"}\n');
     assert.deepEqual(files(), ['README.MD', 'check.ts', 'logo.png', 'old.sh', 'plan.md', 'route.schema.json']);
   });
-
-  await t.test('REFUSED: a spec.files entry whose path is a number is a 400 at that field', async () => {
+  test('REFUSED: a spec.files entry whose path is a number is a 400 at that field', async () => {
     const res = await put({
       metadata: { resourceVersion: read.metadata.resourceVersion },
       spec: { steps: read.spec.steps, files: [{ path: 7, text: 'x\n' }] },
@@ -1016,8 +1157,7 @@ test("a Workflow's spec carries its folder's other text files: served sorted, wr
     assert.match(String(((await res.json()) as { field?: unknown }).field), /spec\.files.*0.*path/);
     assert.deepEqual(files(), ['README.MD', 'check.ts', 'logo.png', 'old.sh', 'plan.md', 'route.schema.json']);
   });
-
-  await t.test('PUT with spec.files writes them, removes a text file it leaves out, and leaves the picture', async () => {
+  test('PUT with spec.files writes them, removes a text file it leaves out, and leaves the picture', async () => {
     const res = await put({
       metadata: { resourceVersion: read.metadata.resourceVersion },
       spec: {
@@ -1043,15 +1183,192 @@ test("a Workflow's spec carries its folder's other text files: served sorted, wr
   });
 });
 
-test("a Workflow's spec carries the needs its README's frontmatter declares: served apart from the README, and kept by a read then a write", async (t) => {
-  const dir = path.join(root, 'workflows', 'needful');
+describe("a Workflow's spec carries the needs its README's frontmatter declares: served apart from the README, and kept by a read then a write", () => {
+  let dir!: string;
+  let read!: {
+    readonly apiVersion: 'nemia/v1';
+    readonly kind: 'Workflow';
+    readonly metadata: {
+      readonly name: string;
+      readonly creationTimestamp: string;
+      readonly resourceVersion: string;
+      readonly labels?: { readonly [x: string]: string } | undefined;
+      readonly namespace?: string | undefined;
+      readonly generation?: number | undefined;
+    };
+    readonly spec: {
+      readonly steps: readonly {
+        readonly name: string;
+        readonly keys: {
+          readonly [x: string]: unknown;
+          readonly agent?: string | null | undefined;
+          readonly input?: readonly string[] | undefined;
+          readonly output?: string | null | undefined;
+          readonly skills?: readonly string[] | undefined;
+          readonly workflow?: string | null | undefined;
+          readonly route?: string | null | undefined;
+          readonly workspace?: 'base' | null | undefined;
+          readonly check?: string | null | undefined;
+          readonly retries?: number | null | undefined;
+          readonly model?: string | null | undefined;
+          readonly budget?: number | null | undefined;
+          readonly place?: 'folder' | 'git' | null | undefined;
+          readonly after?: readonly string[] | undefined;
+          readonly context?: number | null | undefined;
+          readonly harness?: string | null | undefined;
+          readonly resume?: string | null | undefined;
+          readonly writable?: readonly string[] | undefined;
+          readonly reads?: readonly string[] | undefined;
+          readonly slot?: 'none' | null | undefined;
+          readonly mcp?: readonly string[] | undefined;
+          readonly effort?: string | null | undefined;
+          readonly permissionMode?: string | null | undefined;
+          readonly sandbox?: string | null | undefined;
+          readonly tools?: readonly string[] | null | undefined;
+          readonly disallowedTools?: readonly string[] | undefined;
+          readonly allowedTools?: readonly string[] | undefined;
+          readonly denials?: 'fail' | null | undefined;
+          readonly remote?: boolean | null | undefined;
+          readonly deadlineSeconds?: number | null | undefined;
+          readonly memory?: string | null | undefined;
+          readonly checkMemory?: string | null | undefined;
+          readonly checkFailurePolicy?: string | null | undefined;
+          readonly gate?: true | null | undefined;
+          readonly tally?: readonly string[] | undefined;
+          readonly loop?: string | null | undefined;
+          readonly rounds?: number | null | undefined;
+          readonly routes?: readonly string[] | null | undefined;
+          readonly when?: readonly string[] | null | undefined;
+          readonly ends?: readonly string[] | null | undefined;
+        };
+        readonly body: string;
+      }[];
+      readonly description?: string | null | undefined;
+      readonly needs?:
+        | readonly {
+            readonly message: string;
+            readonly name: string;
+            readonly check: string;
+            readonly fixes?:
+              | readonly {
+                  readonly message: string;
+                  readonly command: string;
+                  readonly kind?: 'puts' | 'typed' | 'removes' | undefined;
+                  readonly asks?: readonly { readonly name: string; readonly message: string }[] | undefined;
+                  readonly code?: string | undefined;
+                }[]
+              | undefined;
+            readonly fills?: string | undefined;
+            readonly scope?: 'machine' | 'repository' | undefined;
+          }[]
+        | undefined;
+      readonly readme?: string | null | undefined;
+      readonly files?: readonly { readonly path: string; readonly text: string }[] | undefined;
+    };
+    readonly status: {
+      readonly dir: string;
+      readonly steps: readonly {
+        readonly name: string;
+        readonly spec: {
+          readonly [x: string]: unknown;
+          readonly agent?: string | null | undefined;
+          readonly input?: readonly string[] | undefined;
+          readonly output?: string | null | undefined;
+          readonly skills?: readonly string[] | undefined;
+          readonly workflow?: string | null | undefined;
+          readonly route?: string | null | undefined;
+          readonly workspace?: 'base' | null | undefined;
+          readonly check?: string | null | undefined;
+          readonly retries?: number | null | undefined;
+          readonly model?: string | null | undefined;
+          readonly budget?: number | null | undefined;
+          readonly place?: 'folder' | 'git' | null | undefined;
+          readonly after?: readonly string[] | undefined;
+          readonly context?: number | null | undefined;
+          readonly harness?: string | null | undefined;
+          readonly resume?: string | null | undefined;
+          readonly writable?: readonly string[] | undefined;
+          readonly reads?: readonly string[] | undefined;
+          readonly slot?: 'none' | null | undefined;
+          readonly mcp?: readonly string[] | undefined;
+          readonly effort?: string | null | undefined;
+          readonly permissionMode?: string | null | undefined;
+          readonly sandbox?: string | null | undefined;
+          readonly tools?: readonly string[] | null | undefined;
+          readonly disallowedTools?: readonly string[] | undefined;
+          readonly allowedTools?: readonly string[] | undefined;
+          readonly denials?: 'fail' | null | undefined;
+          readonly remote?: boolean | null | undefined;
+          readonly deadlineSeconds?: number | null | undefined;
+          readonly memory?: string | null | undefined;
+          readonly checkMemory?: string | null | undefined;
+          readonly checkFailurePolicy?: string | null | undefined;
+          readonly gate?: true | null | undefined;
+          readonly tally?: readonly string[] | undefined;
+          readonly loop?: string | null | undefined;
+          readonly rounds?: number | null | undefined;
+          readonly routes?: readonly string[] | null | undefined;
+          readonly when?: readonly string[] | null | undefined;
+          readonly ends?: readonly string[] | null | undefined;
+        };
+        readonly body: string;
+        readonly own: { readonly keys: readonly string[]; readonly body: string } | null;
+        readonly hired: string | null;
+        readonly layers: {
+          readonly agent: string | null;
+          readonly instructions: string | null;
+          readonly custom: string | null;
+          readonly factory: string | null;
+          readonly agentSkills: readonly string[];
+          readonly policy: string;
+          readonly addedSkills: readonly string[];
+          readonly fence: readonly { readonly key: string; readonly value: string }[];
+          readonly folderFiles: boolean;
+          readonly task: string | null;
+          readonly via: 'brief' | 'prompt';
+        } | null;
+        readonly mcp: readonly string[];
+      }[];
+      readonly origin: 'factory' | 'repo' | 'user' | 'builtin';
+      readonly graph: {
+        readonly roots: string[];
+        readonly edges: (
+          | { readonly from: string; readonly to: string; readonly kind: 'after' }
+          | { readonly from: string; readonly to: string; readonly kind: 'input' }
+          | { readonly from: string; readonly to: string; readonly kind: 'loop'; readonly rounds: number }
+          | { readonly from: string; readonly to: string; readonly kind: 'route'; readonly route: string }
+        )[];
+        readonly nodes: {
+          readonly kind: 'condition' | 'workflow' | 'step';
+          readonly name: string;
+          readonly workflow?: string | undefined;
+          readonly ends?: string[] | undefined;
+        }[];
+      };
+      readonly schemas: readonly string[];
+      readonly folderTeam: boolean;
+      readonly error: string | null;
+      readonly unfilled: string | null;
+      readonly removed?: readonly string[] | undefined;
+      readonly shadowedBy?: 'factory' | 'repo' | 'user' | 'builtin' | undefined;
+      readonly revision?: number | undefined;
+      readonly factories?: readonly string[] | undefined;
+      readonly builtinChanged?: boolean | undefined;
+    };
+  };
+  beforeAll(async () => {
+    const t = teardowns();
+    dir = path.join(root, 'workflows', 'needful');
+    write(path.join(dir, 'plan.md'), '---\nplace: git\n---\nPlan it.\n');
+    write(
+      path.join(dir, 'README.md'),
+      '---\nneeds:\n  - name: tool\n    message: the tool is installed\n    check: command -v tool\n---\n# Needful\n',
+    );
+    t.onTestFinished(() => fs.rmSync(dir, { recursive: true, force: true }));
+    read = await got();
+    return t.end;
+  });
   const tool = { name: 'tool', message: 'the tool is installed', check: 'command -v tool' };
-  write(path.join(dir, 'plan.md'), '---\nplace: git\n---\nPlan it.\n');
-  write(
-    path.join(dir, 'README.md'),
-    '---\nneeds:\n  - name: tool\n    message: the tool is installed\n    check: command -v tool\n---\n# Needful\n',
-  );
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const url = '/api/namespaces/default/workflows/needful';
   const got = async () => (await (await app.request(`${url}?origin=user`)).json()) as import('objects').Workflow;
   const put = (body: unknown) =>
@@ -1060,21 +1377,17 @@ test("a Workflow's spec carries the needs its README's frontmatter declares: ser
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
-
-  const read = await got();
-  await t.test('GET serves the needs in spec.needs, and the README without its frontmatter', () => {
+  test('GET serves the needs in spec.needs, and the README without its frontmatter', () => {
     assert.deepEqual(read.spec.needs, [tool]);
     assert.equal(read.spec.readme, '# Needful\n');
   });
-
-  await t.test('PUT of the Workflow as it was read keeps the needs in the README', async () => {
+  test('PUT of the Workflow as it was read keeps the needs in the README', async () => {
     const res = await put({ metadata: { resourceVersion: read.metadata.resourceVersion }, spec: read.spec });
     assert.equal(res.status, 200, await res.clone().text());
     assert.deepEqual(((await res.json()) as import('objects').Workflow).spec.needs, [tool]);
     assert.match(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), /^---\nneeds:/, 'the frontmatter written back');
   });
-
-  await t.test('PUT of a new README with no needs given keeps the needs; needs given replace them', async () => {
+  test('PUT of a new README with no needs given keeps the needs; needs given replace them', async () => {
     const now = await got();
     const res = await put({
       metadata: { resourceVersion: now.metadata.resourceVersion },

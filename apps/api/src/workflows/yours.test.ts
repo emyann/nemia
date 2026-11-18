@@ -1,7 +1,7 @@
 /** `GET /api/store` (yours.ts): your store's folders under the root of the app asked, and the line that files a factory, off the table. */
 import '../../test/harness.ts';
 import { root, seatPerson } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Layer } from 'effect';

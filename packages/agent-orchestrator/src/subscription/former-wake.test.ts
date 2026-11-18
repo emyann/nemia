@@ -3,7 +3,7 @@
  * a store holds today, the subsumption that makes them read as they did, a word the table does not know, and the refusal of the retired
  * flags. Pure: it needs no stand-in.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { FORMER_DEFAULT_WAKE, FORMER_NEMIA_WAKE, FORMER_WAKE, retiredWakeRefusal, selectorsOfWake } from './former-wake.ts';
 import { NEMIA_SELECTORS } from '../nemia/nemia.ts';
@@ -16,8 +16,8 @@ const SUBSETS: readonly string[][] = Array.from({ length: 1 << FORMER_NEMIA_WAKE
   FORMER_NEMIA_WAKE.filter((_word, i) => (mask & (1 << i)) !== 0),
 );
 
-test('selectorsOfWake converts a stored wake list to what each word was selecting: the shipped words, the two lists a store holds, a word unknown, every subset', async (t) => {
-  await t.test('each shipped word converts to what it was selecting, and a word with no reason to the wait a note carried', () => {
+describe('selectorsOfWake converts a stored wake list to what each word was selecting: the shipped words, the two lists a store holds, a word unknown, every subset', () => {
+  test('each shipped word converts to what it was selecting, and a word with no reason to the wait a note carried', () => {
     assert.deepEqual(selectorsOfWake(['awaiting approval']).selectors, ['reason=AwaitingApproval']);
     assert.deepEqual(selectorsOfWake(['rounds exhausted']).selectors, ['reason=AwaitingRound']);
     assert.deepEqual(selectorsOfWake(['needs-human']).selectors, ['reason=AwaitingAnswer']);
@@ -42,27 +42,24 @@ test('selectorsOfWake converts a stored wake list to what each word was selectin
       'and the reasons of one list are one selector, in the table’s order whatever the order they were typed in',
     );
   });
-  await t.test(
-    'the two lists a store holds today convert to the selectors the package ships, but her level and conflicts lines, which no wake word named',
-    () => {
-      assert.deepEqual(selectorsOfWake(FORMER_DEFAULT_WAKE), { selectors: [...DEFAULT_SELECTORS], unconverted: [] });
-      assert.deepEqual(selectorsOfWake(FORMER_NEMIA_WAKE), {
-        selectors: NEMIA_SELECTORS.filter((s) => s !== 'reason=LevelChanged' && s !== 'reason=ConflictsPending'),
-        unconverted: [],
-      });
-      assert.deepEqual(
-        [...NEMIA_SELECTORS],
-        ['waits=person', 'reason=ToolDenied', 'reason=LevelChanged', 'reason=ConflictsPending'],
-        'her record reads as the intent words it; one converted lacks the level and conflicts lines, and the keeper puts it again (`nemia.test.ts`)',
-      );
-    },
-  );
-  await t.test('a word the table does not know converts to nothing and is said; the rest of its list still converts', () => {
+  test('the two lists a store holds today convert to the selectors the package ships, but her level and conflicts lines, which no wake word named', () => {
+    assert.deepEqual(selectorsOfWake(FORMER_DEFAULT_WAKE), { selectors: [...DEFAULT_SELECTORS], unconverted: [] });
+    assert.deepEqual(selectorsOfWake(FORMER_NEMIA_WAKE), {
+      selectors: NEMIA_SELECTORS.filter((s) => s !== 'reason=LevelChanged' && s !== 'reason=ConflictsPending'),
+      unconverted: [],
+    });
+    assert.deepEqual(
+      [...NEMIA_SELECTORS],
+      ['waits=person', 'reason=ToolDenied', 'reason=LevelChanged', 'reason=ConflictsPending'],
+      'her record reads as the intent words it; one converted lacks the level and conflicts lines, and the keeper puts it again (`nemia.test.ts`)',
+    );
+  });
+  test('a word the table does not know converts to nothing and is said; the rest of its list still converts', () => {
     assert.deepEqual(selectorsOfWake(['blocked', 'verified']), { selectors: ['reason=AwaitingAnswer'], unconverted: ['verified'] });
     assert.deepEqual(selectorsOfWake(['verified']), { selectors: [], unconverted: ['verified'] }, 'a list of its own converts to nothing');
     assert.deepEqual(selectorsOfWake([]), { selectors: [], unconverted: [] }, 'and so does an empty list, which woke on no line');
   });
-  await t.test('every subset of the eight words converts to text the grammar takes, and every reason it names is one the feed has', () => {
+  test('every subset of the eight words converts to text the grammar takes, and every reason it names is one the feed has', () => {
     for (const subset of SUBSETS) {
       const { selectors } = selectorsOfWake(subset);
       assert.equal(selectorsRefusal(selectors), undefined, JSON.stringify(subset));

@@ -6,7 +6,7 @@
  * `src/closeout/envelope.test.ts`, the artifact path rules and `nemia decide`'s lines of a step's files in
  * `src/artifacts/artifacts.store.test.ts`, and the stories of a run's closeouts in `test/closeouts.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   assess,
@@ -105,8 +105,8 @@ const reviewSaid = (extra: Record<string, unknown> = {}): Closeout => ({
 const jsonIn = (brief: string) => JSON.parse(/```json\n([\s\S]*?)\n```/.exec(brief)![1]);
 const FILES = '/wf/runs/r-1/artifacts/implement';
 
-test('composeBrief of a closeout: what finishing means, and who commits', async (t) => {
-  await t.test('every brief says what finishing means — and names no file to write; a resumed step too', () => {
+describe('composeBrief of a closeout: what finishing means, and who commits', () => {
+  test('every brief says what finishing means — and names no file to write; a resumed step too', () => {
     for (const s of [step('implement'), step('review', ['implement'])]) {
       const brief = composeBrief(s, run({ implement: 't1', review: null }), STEPS);
       assert.match(brief, /When you are finished/, 'finishing is mechanism in every brief, not prose each workflow must remember');
@@ -120,7 +120,7 @@ test('composeBrief of a closeout: what finishing means, and who commits', async 
     const resumed: StepSpec = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement' };
     assert.match(composeBrief(resumed, run({ implement: 't1', respond: null }), [step('implement'), resumed]), /When you are finished/);
   });
-  await t.test('a step is told the run commits for it — being unable to commit is not being blocked', () => {
+  test('a step is told the run commits for it — being unable to commit is not being blocked', () => {
     const brief = composeBrief(step('review', ['implement']), run({ implement: 't1', review: null }), STEPS);
     assert.match(brief, /the run commits whatever you left/);
     assert.match(brief, /\*\*not\*\* a reason to block/);
@@ -132,8 +132,8 @@ test('composeBrief of a closeout: what finishing means, and who commits', async 
   });
 });
 
-test('closeoutSchemaOf: a step is filed with the closeout and the fields it declares', async (t) => {
-  await t.test('merged, still strict, and the base untouched; a step that declares nothing is filed as before', () => {
+describe('closeoutSchemaOf: a step is filed with the closeout and the fields it declares', () => {
+  test('merged, still strict, and the base untouched; a step that declares nothing is filed as before', () => {
     assert.equal(closeoutSchemaOf(step('implement'), []), CLOSEOUT_SCHEMA, 'a step that declares nothing is filed as before');
     const merged = closeoutSchemaOf(REVIEW, []);
     assert.equal(merged.additionalProperties, false);
@@ -149,8 +149,8 @@ test('closeoutSchemaOf: a step is filed with the closeout and the fields it decl
   });
 });
 
-test('assess, stepStatus and decision of how a step signed off', async (t) => {
-  await t.test('BLOCKED stops the DAG, however its session ended', () => {
+describe('assess, stepStatus and decision of how a step signed off', () => {
+  test('BLOCKED stops the DAG, however its session ended', () => {
     const blockedAt = (name: string) => (s: string) =>
       s === name ? { outcome: 'blocked' as const, summary: 'stuck', artifacts: [], needs: 'pick one' } : undefined;
 
@@ -164,7 +164,7 @@ test('assess, stepStatus and decision of how a step signed off', async (t) => {
     );
     assert.deepEqual(a.unreachable, ['review']);
   });
-  await t.test('a blocked run is AWAITING you, and is not called failed', () => {
+  test('a blocked run is AWAITING you, and is not called failed', () => {
     const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'pick one' });
     const d = decision(aRead(STEPS, finished(), { phaseOf: DONE, signedOff: blocked }), nothingShipped);
     assert.equal(d.kind, 'awaiting');
@@ -172,7 +172,7 @@ test('assess, stepStatus and decision of how a step signed off', async (t) => {
     assert.deepEqual(d.kind === 'awaiting' && d.failed, [], 'nothing broke');
     assert.deepEqual(d.kind === 'awaiting' && d.awaitingAnswer, ['implement', 'review']);
   });
-  await t.test('UNSIGNED: a producer whose closeout lacks a declared field satisfies nothing, and what waits on it is not filed', () => {
+  test('UNSIGNED: a producer whose closeout lacks a declared field satisfies nothing, and what waits on it is not filed', () => {
     const steps = [step('implement'), REVIEW, READS];
     const r = run({ implement: 't1', review: 't2', respond: null });
     const p = phases({ t1: 'succeeded', t2: 'succeeded' });
@@ -208,8 +208,8 @@ test('assess, stepStatus and decision of how a step signed off', async (t) => {
   });
 });
 
-test('listing of how a step signed off', async (t) => {
-  await t.test('a step that signed off says how, next to the phase', () => {
+describe('listing of how a step signed off', () => {
+  test('a step that signed off says how, next to the phase', () => {
     const l = listing({
       steps: STEPS,
       run: finished(),
@@ -219,7 +219,7 @@ test('listing of how a step signed off', async (t) => {
     assert.deepEqual(statuses(l), ['unverified · done', 'unverified · done']);
     assert.deepEqual(l.waitingOnYou, []);
   });
-  await t.test('BLOCKED stands out — its session succeeded, and it is the step waiting on you', () => {
+  test('BLOCKED stands out — its session succeeded, and it is the step waiting on you', () => {
     const l = listing({
       steps: STEPS,
       run: finished(),
@@ -233,7 +233,7 @@ test('listing of how a step signed off', async (t) => {
     );
     assert.deepEqual(l.waitingOnYou, ['review']);
   });
-  await t.test('a step with no closeout is credited with nothing — still running, never filed, or from before closeouts', () => {
+  test('a step with no closeout is credited with nothing — still running, never filed, or from before closeouts', () => {
     const live = listing({
       steps: STEPS,
       run: run({ implement: 't1', review: null }),
@@ -260,7 +260,7 @@ test('listing of how a step signed off', async (t) => {
     );
     assert.deepEqual(old.waitingOnYou, []);
   });
-  await t.test('one line per step — the summary and what it needs are for `nemia decide`', () => {
+  test('one line per step — the summary and what it needs are for `nemia decide`', () => {
     const l = listing({
       steps: STEPS,
       run: finished(),
@@ -272,7 +272,7 @@ test('listing of how a step signed off', async (t) => {
       assert.doesNotMatch(status, /parser|flag name/);
     }
   });
-  await t.test('a closeout nobody can read is said so, and is not taken for either answer', () => {
+  test('a closeout nobody can read is said so, and is not taken for either answer', () => {
     const l = listing({
       steps: STEPS,
       run: finished(),
@@ -282,7 +282,7 @@ test('listing of how a step signed off', async (t) => {
     assert.deepEqual(statuses(l), ['unverified · closeout unreadable', 'unverified']);
     assert.deepEqual(l.waitingOnYou, []);
   });
-  await t.test('a cancelled run is waiting on nobody, though its step still says it signed off blocked', () => {
+  test('a cancelled run is waiting on nobody, though its step still says it signed off blocked', () => {
     const l = listing({
       steps: STEPS,
       run: finished(CANCELLED),
@@ -294,29 +294,26 @@ test('listing of how a step signed off', async (t) => {
   });
 });
 
-test('composeBrief of declared fields: `output:` and `input:`', async (t) => {
-  await t.test(
-    "a step that does not ask is handed nothing of another step's closeout — the implementer's account never reaches the reviewer",
-    () => {
-      const implementSaid: Closeout = {
-        outcome: 'done',
-        summary: 'IMPLEMENTER-ACCOUNT',
-        artifacts: ['IMPL-NOTES.md'],
-        needs: undefined,
-        output: { plan: 'IMPLEMENTER-PLAN' },
-      };
-      const everyone = (name: string) => (name === 'implement' ? implementSaid : reviewSaid({ extra: 'EXTRA-FIELD' }));
-      const briefs = [
-        composeBrief(REVIEW, run({ implement: 't1', review: null }), [step('implement'), REVIEW], everyone),
-        composeBrief(IGNORES, run({ implement: 't1', review: 't2', respond: null }), [step('implement'), REVIEW, IGNORES], everyone),
-      ];
-      for (const brief of briefs) {
-        assert.doesNotMatch(brief, /## From/);
-        assert.doesNotMatch(brief, /IMPLEMENTER-|SUMMARY-FOR-THE-DECIDER|NOTES\.md|src\/run\.ts|EXTRA-FIELD/);
-      }
-    },
-  );
-  await t.test('a step that reads another is handed exactly its declared fields, as data — not its summary, needs or artifacts', () => {
+describe('composeBrief of declared fields: `output:` and `input:`', () => {
+  test("a step that does not ask is handed nothing of another step's closeout — the implementer's account never reaches the reviewer", () => {
+    const implementSaid: Closeout = {
+      outcome: 'done',
+      summary: 'IMPLEMENTER-ACCOUNT',
+      artifacts: ['IMPL-NOTES.md'],
+      needs: undefined,
+      output: { plan: 'IMPLEMENTER-PLAN' },
+    };
+    const everyone = (name: string) => (name === 'implement' ? implementSaid : reviewSaid({ extra: 'EXTRA-FIELD' }));
+    const briefs = [
+      composeBrief(REVIEW, run({ implement: 't1', review: null }), [step('implement'), REVIEW], everyone),
+      composeBrief(IGNORES, run({ implement: 't1', review: 't2', respond: null }), [step('implement'), REVIEW, IGNORES], everyone),
+    ];
+    for (const brief of briefs) {
+      assert.doesNotMatch(brief, /## From/);
+      assert.doesNotMatch(brief, /IMPLEMENTER-|SUMMARY-FOR-THE-DECIDER|NOTES\.md|src\/run\.ts|EXTRA-FIELD/);
+    }
+  });
+  test('a step that reads another is handed exactly its declared fields, as data — not its summary, needs or artifacts', () => {
     const said = { ...reviewSaid({ extra: 'EXTRA-FIELD' }), needs: 'NEEDS-FOR-A-PERSON' };
     const reads = (name: string) => (name === 'review' ? said : undefined);
 
@@ -355,12 +352,12 @@ test('composeBrief of declared fields: `output:` and `input:`', async (t) => {
       'a finding that quotes a fence does not close the one it is handed in',
     );
   });
-  await t.test('a brief shown before the producer signs off says what will be handed — and hands no values', () => {
+  test('a brief shown before the producer signs off says what will be handed — and hands no values', () => {
     const brief = composeBrief(READS, run({ implement: 't1', review: null, respond: null }), [step('implement'), REVIEW, READS]);
     assert.match(brief, /## From review\n\nreview has not signed off yet\. What it declares — `findings` — is given here when it has\./);
     assert.doesNotMatch(brief, /```json/);
   });
-  await t.test('a step that declares an output is told so where it is told of its closeout; one that does not, is not', () => {
+  test('a step that declares an output is told so where it is told of its closeout; one that does not, is not', () => {
     const told = composeBrief(REVIEW, run({ implement: 't1', review: null }), [step('implement'), REVIEW]);
     assert.match(
       told,
@@ -374,8 +371,8 @@ test('composeBrief of declared fields: `output:` and `input:`', async (t) => {
   });
 });
 
-test('outputLines and placeText: `nemia decide` of a declared output', async (t) => {
-  await t.test('a list as a list, anything else as name: value, in the schema order; what is declared and not given is said', () => {
+describe('outputLines and placeText: `nemia decide` of a declared output', () => {
+  test('a list as a list, anything else as name: value, in the schema order; what is declared and not given is said', () => {
     const schema: OutputSchema = {
       ...FINDINGS,
       properties: { ...FINDINGS.properties, verdict: { type: 'string' }, score: { type: 'number' } },
@@ -405,60 +402,57 @@ test('outputLines and placeText: `nemia decide` of a declared output', async (t)
     assert.deepEqual(outputLines(more, reviewSaid()).at(-1), '!! declared and not given: verdict, score');
     assert.deepEqual(outputLines(step('implement'), reviewSaid()), [], 'a step that declares nothing prints nothing of what else it said');
   });
-  await t.test(
-    "a finding's `where` as a place, never as JSON: file:line, page · theme, a string as it is, any other object as its keys and values",
-    () => {
-      const findings = [
-        { where: { file: 'apps/web/src/components/step/StepNode.tsx', line: 12 }, what: 'the legend covers a node' },
-        { where: { file: 'apps/web/test/components.test.ts', line: null }, what: 'nothing tests it' },
-        { where: { page: '/workflows', theme: 'dark' }, what: 'the label cannot be read' },
-        { where: { url: 'http://localhost:5173/runs', selector: '.legend' }, what: 'off the screen' },
-        { where: 'src/run.ts:958', what: 'as it is' },
-      ];
-      const lines = outputLines(REVIEW, reviewSaid({ findings }));
-      assert.deepEqual(lines, [
-        'findings:',
-        '  - apps/web/src/components/step/StepNode.tsx:12',
-        '    what: the legend covers a node',
-        '  - apps/web/test/components.test.ts',
-        '    what: nothing tests it',
-        '  - /workflows · dark',
-        '    what: the label cannot be read',
-        '  - url: http://localhost:5173/runs · selector: .legend',
-        '    what: off the screen',
-        '  - src/run.ts:958',
-        '    what: as it is',
-      ]);
-      assert.equal(
-        lines.some((l) => /[{}"]/.test(l)),
-        false,
-        'no JSON anywhere',
-      );
+  test("a finding's `where` as a place, never as JSON: file:line, page · theme, a string as it is, any other object as its keys and values", () => {
+    const findings = [
+      { where: { file: 'apps/web/src/components/step/StepNode.tsx', line: 12 }, what: 'the legend covers a node' },
+      { where: { file: 'apps/web/test/components.test.ts', line: null }, what: 'nothing tests it' },
+      { where: { page: '/workflows', theme: 'dark' }, what: 'the label cannot be read' },
+      { where: { url: 'http://localhost:5173/runs', selector: '.legend' }, what: 'off the screen' },
+      { where: 'src/run.ts:958', what: 'as it is' },
+    ];
+    const lines = outputLines(REVIEW, reviewSaid({ findings }));
+    assert.deepEqual(lines, [
+      'findings:',
+      '  - apps/web/src/components/step/StepNode.tsx:12',
+      '    what: the legend covers a node',
+      '  - apps/web/test/components.test.ts',
+      '    what: nothing tests it',
+      '  - /workflows · dark',
+      '    what: the label cannot be read',
+      '  - url: http://localhost:5173/runs · selector: .legend',
+      '    what: off the screen',
+      '  - src/run.ts:958',
+      '    what: as it is',
+    ]);
+    assert.equal(
+      lines.some((l) => /[{}"]/.test(l)),
+      false,
+      'no JSON anywhere',
+    );
 
-      assert.equal(
-        placeText({ page: '/runs/r-1', theme: 'both', width: 400 }),
-        '/runs/r-1 · both · width: 400',
-        'what a place holds beside its lead follows it',
-      );
-      assert.equal(placeText({ file: 'a.ts', line: 3, column: 7 }), 'a.ts:3 · column: 7');
-      assert.equal(
-        placeText({ page: '/', viewport: { width: 400, height: 800 } }),
-        '/ · viewport: width: 400 · height: 800',
-        'a place inside a place reads the same',
-      );
-      assert.equal(placeText('line one\nline two'), 'line one\nline two', 'a string as it is');
-      assert.deepEqual(outputLines(REVIEW, reviewSaid({ findings: [{ where: 'line one\nline two', what: 'x' }] })), [
-        'findings:',
-        '  - line one',
-        '    line two',
-        '    what: x',
-      ]);
-    },
-  );
+    assert.equal(
+      placeText({ page: '/runs/r-1', theme: 'both', width: 400 }),
+      '/runs/r-1 · both · width: 400',
+      'what a place holds beside its lead follows it',
+    );
+    assert.equal(placeText({ file: 'a.ts', line: 3, column: 7 }), 'a.ts:3 · column: 7');
+    assert.equal(
+      placeText({ page: '/', viewport: { width: 400, height: 800 } }),
+      '/ · viewport: width: 400 · height: 800',
+      'a place inside a place reads the same',
+    );
+    assert.equal(placeText('line one\nline two'), 'line one\nline two', 'a string as it is');
+    assert.deepEqual(outputLines(REVIEW, reviewSaid({ findings: [{ where: 'line one\nline two', what: 'x' }] })), [
+      'findings:',
+      '  - line one',
+      '    line two',
+      '    what: x',
+    ]);
+  });
 });
 
-test('a declared field named `__proto__`', async (t) => {
-  await t.test('travels like any other — into the brief, into `nemia decide`, and into the unsigned rule', () => {
+describe('a declared field named `__proto__`', () => {
+  test('travels like any other — into the brief, into `nemia decide`, and into the unsigned rule', () => {
     const schema = JSON.parse(
       '{"type":"object","properties":{"__proto__":{"type":"string"}},"required":["__proto__"],"additionalProperties":false}',
     ) as OutputSchema;
@@ -493,8 +487,8 @@ test('a declared field named `__proto__`', async (t) => {
   });
 });
 
-test("composeBrief of a step's files", async (t) => {
-  await t.test('a step is told where its files go, before its closeout — a fresh step, a fan-in and a resumed one alike', () => {
+describe("composeBrief of a step's files", () => {
+  test('a step is told where its files go, before its closeout — a fresh step, a fan-in and a resumed one alike', () => {
     const fanIn = step('integrate', ['a', 'b']);
     const resumed: StepSpec = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement', check: 'npm test' };
     const briefs = [
@@ -516,9 +510,9 @@ test("composeBrief of a step's files", async (t) => {
   });
 });
 
-test('inputRefusal: what `nemia start --input` refuses, by name', async (t) => {
+describe('inputRefusal: what `nemia start --input` refuses, by name', () => {
   const f = (given: string, kind: InputFile['kind'] = 'file', resolved = `/work/${given}`): InputFile => ({ given, resolved, kind });
-  await t.test('lets through none, and files that are there, each of its own name', () => {
+  test('lets through none, and files that are there, each of its own name', () => {
     assert.equal(inputRefusal([]), null);
     assert.equal(inputRefusal([f('mock.png'), f('notes/brief.md'), f('notes/mock.png.md')]), null);
   });
@@ -541,136 +535,113 @@ test('inputRefusal: what `nemia start --input` refuses, by name', async (t) => {
       ['--input ./notes.md', 'twice', 'one --input'],
     ],
   ];
-  for (const [name, given, facts] of rows) await t.test(name, () => names(inputRefusal(given), ...facts));
-  await t.test('a file that is not there is named before a clash of names, whatever order they were given in', () => {
+  for (const [name, given, facts] of rows) test(name, () => names(inputRefusal(given), ...facts));
+  test('a file that is not there is named before a clash of names, whatever order they were given in', () => {
     assert.match(inputRefusal([f('a/notes.md'), f('b/notes.md'), f('gone.png', 'missing')])!, /^--input gone\.png: there is no file/);
   });
 });
 
-test("inputsLine, inputsNote and composeBrief of a run's inputs", async (t) => {
-  await t.test(
-    'a run given inputs names them once, under what was asked for, on every brief that carries it — and a run given none composes exactly as before',
-    () => {
-      const DIR = '/wf/runs/r-1/inputs';
-      const line =
-        'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. They are in `/wf/runs/r-1/inputs`.';
-      const inputs = ['mock.png', 'brief notes.md'];
-      const brief = (s: StepSpec, r: Run, steps: readonly StepSpec[], retry?: RetryBriefing, dir: string | undefined = DIR) =>
-        composeBrief(s, r, steps, undefined, undefined, undefined, retry, undefined, undefined, dir);
-      const r = run({ implement: null, review: null });
-      const plain = composeBrief(step('implement'), r, STEPS);
-      for (const [why, given] of [
-        ['no inputs on the record', r],
-        ['an empty list', { ...r, inputs: [] }],
-      ] satisfies [string, Run][]) {
-        assert.equal(brief(step('implement'), given, STEPS), plain, why);
-      }
-      assert.equal(
-        composeBrief(step('implement'), { ...r, inputs }, STEPS),
-        plain,
-        "no directory to name: nothing said (composed with none at all, as undefined would not skip brief's default directory)",
-      );
-      assert.equal(
-        brief(step('implement'), { ...r, inputs }, STEPS),
-        plain.replace('\n\nadd a flag\n', `\n\nadd a flag\n\n## Files given with it\n\n${line}\n`),
-        'under a heading of their own, after what was asked for',
-      );
-      assert.equal(inputsLine(DIR, inputs), line);
-      assert.match(line, /part of what was asked/);
-      assert.match(
-        inputsLine(DIR, ['shot.JPG', 'trace.bin', 'Makefile'])!,
-        /`shot\.JPG`, a picture; `trace\.bin`, a file; `Makefile`, a file\./,
-      );
-      const sectioned = { ...r, brief: 'add a flag\n\n## Proof\n\n- it is there', inputs };
-      const parts = briefParts(brief(step('implement'), sectioned, STEPS));
-      const proof = parts.find((p) => p.startsWith('## Proof'))!;
-      assert.doesNotMatch(proof, /mock\.png/, "outside the card's last section");
-      assert.equal(parts[parts.indexOf(proof) + 1].startsWith(`## Files given with it\n\n${line}`), true, parts.join('|'));
+describe("inputsLine, inputsNote and composeBrief of a run's inputs", () => {
+  test('a run given inputs names them once, under what was asked for, on every brief that carries it — and a run given none composes exactly as before', () => {
+    const DIR = '/wf/runs/r-1/inputs';
+    const line =
+      'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. They are in `/wf/runs/r-1/inputs`.';
+    const inputs = ['mock.png', 'brief notes.md'];
+    const brief = (s: StepSpec, r: Run, steps: readonly StepSpec[], retry?: RetryBriefing, dir: string | undefined = DIR) =>
+      composeBrief(s, r, steps, undefined, undefined, undefined, retry, undefined, undefined, dir);
+    const r = run({ implement: null, review: null });
+    const plain = composeBrief(step('implement'), r, STEPS);
+    for (const [why, given] of [
+      ['no inputs on the record', r],
+      ['an empty list', { ...r, inputs: [] }],
+    ] satisfies [string, Run][]) {
+      assert.equal(brief(step('implement'), given, STEPS), plain, why);
+    }
+    assert.equal(
+      composeBrief(step('implement'), { ...r, inputs }, STEPS),
+      plain,
+      "no directory to name: nothing said (composed with none at all, as undefined would not skip brief's default directory)",
+    );
+    assert.equal(
+      brief(step('implement'), { ...r, inputs }, STEPS),
+      plain.replace('\n\nadd a flag\n', `\n\nadd a flag\n\n## Files given with it\n\n${line}\n`),
+      'under a heading of their own, after what was asked for',
+    );
+    assert.equal(inputsLine(DIR, inputs), line);
+    assert.match(line, /part of what was asked/);
+    assert.match(
+      inputsLine(DIR, ['shot.JPG', 'trace.bin', 'Makefile'])!,
+      /`shot\.JPG`, a picture; `trace\.bin`, a file; `Makefile`, a file\./,
+    );
+    const sectioned = { ...r, brief: 'add a flag\n\n## Proof\n\n- it is there', inputs };
+    const parts = briefParts(brief(step('implement'), sectioned, STEPS));
+    const proof = parts.find((p) => p.startsWith('## Proof'))!;
+    assert.doesNotMatch(proof, /mock\.png/, "outside the card's last section");
+    assert.equal(parts[parts.indexOf(proof) + 1].startsWith(`## Files given with it\n\n${line}`), true, parts.join('|'));
 
-      const fanIn = step('integrate', ['a', 'b']);
-      const carried = [
-        brief(step('review', ['implement']), run({ implement: 't1', review: null }, { inputs }), STEPS),
-        brief(fanIn, run({ a: 't1', b: 't2', integrate: null }, { inputs }), [step('a'), step('b'), fanIn]),
-        brief(step('implement'), run({ implement: 't1' }, { inputs }), [step('implement')], {
-          try: 2,
-          by: 'ask',
-          mode: 'fresh',
-          resumed: false,
-          status: 'stopped',
-        }),
-      ];
-      for (const b of carried) {
-        assert.equal(
-          b.split(line).length,
-          2,
-          `a step after another, a fan-in, and a new session tried again carry it, each exactly once:\n${b}`,
-        );
-        assert.ok(
-          b.indexOf('## What was asked for') < b.indexOf(`\n## Files given with it\n\n${line}`),
-          'after the request, under its heading',
-        );
-      }
-      const resumed: StepSpec = { name: 'respond', after: ['implement'], resume: 'implement', body: 'answer it' };
-      assert.doesNotMatch(
-        brief(resumed, run({ implement: 't1', respond: null }, { inputs }), [step('implement'), resumed]),
-        /nemia start --input/,
-        'a step that resumes another was handed the request and its files already',
-      );
-      assert.doesNotMatch(
-        brief(step('implement'), run({ implement: 't1' }, { inputs }), [step('implement')], {
-          try: 2,
-          by: 'ask',
-          mode: 'continue',
-          resumed: true,
-          status: 'stopped',
-        }),
-        /nemia start --input/,
-        'and so was a nudge, which continues the session',
-      );
-    },
-  );
-  await t.test(
-    "a step filed its run's inputs folder is told it there, to read and never write; a step filed none, a folder run's copy and the board's preview as before",
-    () => {
-      const DIR = '/wf/runs/r-1/inputs';
-      const inputs = ['mock.png', 'brief notes.md'];
-      const mounted = { handed: [], store: [], inputs: [{ path: DIR, readOnly: true }] };
-      const told =
-        'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. You may read them and must not write them, in `/wf/runs/r-1/inputs`. The folder is mounted read-only; read them with Read, Grep and Glob.';
-      assert.equal(inputsLine(DIR, inputs, false, mounted), told);
+    const fanIn = step('integrate', ['a', 'b']);
+    const carried = [
+      brief(step('review', ['implement']), run({ implement: 't1', review: null }, { inputs }), STEPS),
+      brief(fanIn, run({ a: 't1', b: 't2', integrate: null }, { inputs }), [step('a'), step('b'), fanIn]),
+      brief(step('implement'), run({ implement: 't1' }, { inputs }), [step('implement')], {
+        try: 2,
+        by: 'ask',
+        mode: 'fresh',
+        resumed: false,
+        status: 'stopped',
+      }),
+    ];
+    for (const b of carried) {
       assert.equal(
-        inputsLine(DIR, inputs, false, { inputs: [] }),
-        inputsLine(DIR, inputs),
-        'a step filed none, as codex is: named on disk',
+        b.split(line).length,
+        2,
+        `a step after another, a fan-in, and a new session tried again carry it, each exactly once:\n${b}`,
       );
-      assert.equal(inputsLine(DIR, [], false, mounted), undefined, 'a run given none');
-      assert.equal(
-        inputsLine(DIR, inputs, true, mounted),
-        'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. They are copied into `given/inputs` in this folder.',
-        "a folder run's step reads its copy",
+      assert.ok(
+        b.indexOf('## What was asked for') < b.indexOf(`\n## Files given with it\n\n${line}`),
+        'after the request, under its heading',
       );
-      const r = run({ implement: null, review: null }, { inputs });
-      const brief = (folders?: typeof mounted) =>
-        composeBrief(
-          step('implement'),
-          r,
-          STEPS,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          DIR,
-          undefined,
-          folders,
-        );
-      assert.equal(brief(mounted).split(told).length, 2, brief(mounted));
-      assert.equal(brief(mounted).replace(told, inputsLine(DIR, inputs)!), brief(), 'the line alone differs');
-      assert.doesNotMatch(brief({ ...mounted, inputs: [] }), /mounted read-only/, 'a step filed none is told none');
-    },
-  );
-  await t.test("`nemia decide` names a run's inputs under its line, and a run given none says nothing of them", () => {
+    }
+    const resumed: StepSpec = { name: 'respond', after: ['implement'], resume: 'implement', body: 'answer it' };
+    assert.doesNotMatch(
+      brief(resumed, run({ implement: 't1', respond: null }, { inputs }), [step('implement'), resumed]),
+      /nemia start --input/,
+      'a step that resumes another was handed the request and its files already',
+    );
+    assert.doesNotMatch(
+      brief(step('implement'), run({ implement: 't1' }, { inputs }), [step('implement')], {
+        try: 2,
+        by: 'ask',
+        mode: 'continue',
+        resumed: true,
+        status: 'stopped',
+      }),
+      /nemia start --input/,
+      'and so was a nudge, which continues the session',
+    );
+  });
+  test("a step filed its run's inputs folder is told it there, to read and never write; a step filed none, a folder run's copy and the board's preview as before", () => {
+    const DIR = '/wf/runs/r-1/inputs';
+    const inputs = ['mock.png', 'brief notes.md'];
+    const mounted = { handed: [], store: [], inputs: [{ path: DIR, readOnly: true }] };
+    const told =
+      'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. You may read them and must not write them, in `/wf/runs/r-1/inputs`. The folder is mounted read-only; read them with Read, Grep and Glob.';
+    assert.equal(inputsLine(DIR, inputs, false, mounted), told);
+    assert.equal(inputsLine(DIR, inputs, false, { inputs: [] }), inputsLine(DIR, inputs), 'a step filed none, as codex is: named on disk');
+    assert.equal(inputsLine(DIR, [], false, mounted), undefined, 'a run given none');
+    assert.equal(
+      inputsLine(DIR, inputs, true, mounted),
+      'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. They are copied into `given/inputs` in this folder.',
+      "a folder run's step reads its copy",
+    );
+    const r = run({ implement: null, review: null }, { inputs });
+    const brief = (folders?: typeof mounted) =>
+      composeBrief(step('implement'), r, STEPS, undefined, undefined, undefined, undefined, undefined, undefined, DIR, undefined, folders);
+    assert.equal(brief(mounted).split(told).length, 2, brief(mounted));
+    assert.equal(brief(mounted).replace(told, inputsLine(DIR, inputs)!), brief(), 'the line alone differs');
+    assert.doesNotMatch(brief({ ...mounted, inputs: [] }), /mounted read-only/, 'a step filed none is told none');
+  });
+  test("`nemia decide` names a run's inputs under its line, and a run given none says nothing of them", () => {
     assert.equal(
       inputsNote('/wf/runs/r-1/inputs', ['mock.png', 'brief notes.md']),
       'inputs  mock.png, brief notes.md  —  in /wf/runs/r-1/inputs',
@@ -680,23 +651,23 @@ test("inputsLine, inputsNote and composeBrief of a run's inputs", async (t) => {
   });
 });
 
-test("what was read of a closeout's files: its own task's, dropped by a new try, a send-back and a round", async (t) => {
+describe("what was read of a closeout's files: its own task's, dropped by a new try, a send-back and a round", () => {
   const LACKING: StepRecord = { taskId: 't1', filesRead: { taskId: 't1', lacked: { 'a.md': 'not there' } } };
   const LOOP = [step('implement'), { ...step('review', ['implement']), loop: 'implement' }] as StepSpec[];
-  await t.test('lackedOf: a mark of another task unsigns nothing', () => {
+  test('lackedOf: a mark of another task unsigns nothing', () => {
     assert.deepEqual(lackedOf(LACKING), [{ path: 'a.md', why: 'not there' }]);
     assert.deepEqual(lackedOf({ ...LACKING, taskId: 't2' }), []);
     assert.deepEqual(lackedOf({ taskId: 't1', filesRead: { taskId: 't1', lacked: {} } }), []);
     assert.deepEqual(lackedOf(undefined), []);
   });
-  await t.test('nextTry: a new try drops it, and a recheck, the same task, keeps it', () => {
+  test('nextTry: a new try drops it, and a recheck, the same task, keeps it', () => {
     assert.equal(nextTry(LACKING, { step: 'implement', try: 2, mode: 'continue', by: 'signoff' }, 't2').filesRead, undefined);
     assert.equal(nextTry(LACKING, { step: 'implement', try: 2, mode: 'fresh', by: 'ask' }, 't2').filesRead, undefined);
     const rechecked = nextTry({ ...LACKING, check: { taskId: 't1-check' } }, { step: 'implement', try: 2, mode: 'recheck', by: 'ask' });
     assert.deepEqual([rechecked.taskId, rechecked.filesRead, rechecked.check], ['t1', LACKING.filesRead, undefined]);
   });
-  await t.test('sentBack: a send-back drops it', () => assert.equal(sentBack(LACKING).filesRead, undefined));
-  await t.test('roundFiled: a new round drops it', () => {
+  test('sentBack: a send-back drops it', () => assert.equal(sentBack(LACKING).filesRead, undefined));
+  test('roundFiled: a new round drops it', () => {
     const round = { step: 'review', target: 'implement', round: 2, by: 'loop' } as unknown as Parameters<typeof roundFiled>[2];
     const r = { id: 'r-1', steps: { implement: LACKING }, settlesCounted: [] } as unknown as Run;
     assert.equal(roundFiled(LOOP, r, round, 't1-try2').implement.filesRead, undefined);

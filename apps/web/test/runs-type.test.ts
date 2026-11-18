@@ -2,7 +2,7 @@
  * The files that draw the Runs page are a list this test holds to the page's imports, and none writes a focus ring by hand: a box that
  * takes the focus takes the kit's. Their text sizes are held with the whole board's (`type.test.ts`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

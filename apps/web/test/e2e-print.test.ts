@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { drift, fingerprint, leftOver } from './e2e/print.ts';
 import { scratch } from 'test-kit/scratch';
 

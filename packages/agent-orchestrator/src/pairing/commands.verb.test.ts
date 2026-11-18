@@ -4,7 +4,7 @@
  * minted under the board's address or `--base`, and nothing answered holds a token. What the client prints of them is `apps/cli`'s
  * `rest.test.ts`'s. Refusals are asserted by their kind, never by their sentence.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { scratch } from 'test-kit/scratch';
 import { typed } from '../../test/typed.ts';

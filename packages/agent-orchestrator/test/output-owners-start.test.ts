@@ -3,7 +3,7 @@
  * both declarers, and no run is written. The test's store is its own, at `ROOT`, handed to `main` as `ENV`, and a start
  * outside a factory is allowed, with no daemon started, whether or not the test setup's preload ran.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

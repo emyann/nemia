@@ -9,7 +9,7 @@
  * The test reads files outside this package; the api's source is among `guards#test`'s inputs in `turbo.json`, and the packages' reach
  * it through its dependency on `agent-orchestrator`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

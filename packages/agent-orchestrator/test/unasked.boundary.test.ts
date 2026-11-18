@@ -2,7 +2,7 @@
  * `heldUnasked` at a file's head, on a real run of the test runner: a fixture file whose one test files on the engine it holds unasked
  * (`test/fixtures/unasked/filed.ts`) is run as a child, and fails after that test, in the words of `unasked`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';

@@ -2,7 +2,7 @@
  * `compact` from `ae` to a harness: the CLI's arguments and lines (`cli/compact.ts`), and the engine's verb (`compactVerbOf`) over
  * harnesses as the A2A seam offers them, which lists `compactSessions` only for a harness with a `compact`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Exit } from 'effect';
 import { a2aOps } from '../src/a2a/index.ts';
@@ -22,9 +22,9 @@ const SAID: SessionsCompacted = {
 /** A harness through the seam: `testOps` with `compact`, which records each ask, when given. */
 const seamed = (compact?: RunnerOps['compact']) => a2aOps('fake', { ...testOps(), ...(compact ? { compact } : {}) }, async () => []);
 
-test('ae compact: the CLI takes its arguments, the verb asks each harness with a compact through the seam, and the lines say what it found', async (t) => {
-  const s = story(t);
-  await s.test('ae compact takes --yes or nothing, and refuses any other argument with exit code 2', () => {
+describe('ae compact: the CLI takes its arguments, the verb asks each harness with a compact through the seam, and the lines say what it found', () => {
+  const s = story(test);
+  s.test('ae compact takes --yes or nothing, and refuses any other argument with exit code 2', () => {
     assert.deepEqual(compactAsked([]), { yes: false });
     assert.deepEqual(compactAsked(['--yes']), { yes: true });
     assert.throws(
@@ -37,7 +37,7 @@ test('ae compact: the CLI takes its arguments, the verb asks each harness with a
       },
     );
   });
-  await s.test('compact asks each harness with a compact through the seam, dry unless told yes, and skips one without', async () => {
+  s.test('compact asks each harness with a compact through the seam, dry unless told yes, and skips one without', async () => {
     const asked: boolean[] = [];
     const runners = {
       claude: seamed(({ dry }) => Effect.sync(() => (asked.push(dry), SAID))),
@@ -49,7 +49,7 @@ test('ae compact: the CLI takes its arguments, the verb asks each harness with a
     assert.deepEqual(await Effect.runPromise(verb({ yes: true })), { compacted: true, harnesses: { claude: SAID } });
     assert.deepEqual(asked, [true, false]);
   });
-  await s.test('ae compact says each harness its captures and bytes, and each capture left with why', () => {
+  s.test('ae compact says each harness its captures and bytes, and each capture left with why', () => {
     assert.deepEqual(compactLines({ compacted: false, harnesses: { claude: SAID } }), [
       'claude: 3 capture(s), 2 to rewrite: `ae compact --yes` rewrites them; 900 bytes before, 300 after',
       '  left a.log: its worker is at work',
@@ -57,7 +57,7 @@ test('ae compact: the CLI takes its arguments, the verb asks each harness with a
     assert.match(compactLines({ compacted: true, harnesses: { claude: SAID } })[0], /2 rewritten;/);
     assert.deepEqual(compactLines({ compacted: true, harnesses: {} }), ['no harness keeps less of an ended capture: nothing to compact']);
   });
-  await s.test("a harness's failure fails compact", async () => {
+  s.test("a harness's failure fails compact", async () => {
     const failing = seamed(() => Effect.fail(new RunnerError({ verb: 'compact', message: 'the disk is gone' })));
     const exit = await Effect.runPromiseExit(compactVerbOf({ claude: failing })({ yes: true }));
     assert.ok(Exit.isFailure(exit));

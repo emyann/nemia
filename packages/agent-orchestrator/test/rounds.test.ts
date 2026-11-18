@@ -10,7 +10,8 @@
  * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` on it: its runs start
  * in repositories no factory holds.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -169,98 +170,87 @@ const typedOn = async (_t: TestContext, argv: string[]): Promise<{ hints: string
 /** A wf pictures line a check printed, naming the picture `n`. */
 const named = (n: string) => `wf pictures: named ${n}`;
 
-test('three rounds, then a person accepts the work as it stands', async (t) => {
-  const s = story(t);
+describe('three rounds, then a person accepts the work as it stands', () => {
+  const s = story(test);
   let id = '';
-  await s.test(
-    'round 1: implement is filed and told something while it works; `nemia retry --round` refuses a round still running',
-    async () => {
-      id = await startedLoop(looped('', '', { ship: ['gate: true'] }));
-      stage.board().settle(`${id}-implement`, 'working');
-      await over(sayRun(id, 'implement', 'Leave the parser alone.', { caller: PERSON }));
-      await assert.rejects(
-        over(roundRun(id)),
-        refusedAs('Conflict', "round 1 of review's loop is still running", `nemia ls ${id}`, `nemia cancel ${id}`),
-      );
-      assert.deepEqual(asksOf(id, 'round'), [], 'no ask written');
-    },
-  );
-  await s.test(
-    'review is handed what the check said, and asks again: `nemia retry --round` refuses a round the run files itself',
-    async () => {
-      await toReview(id, true, SIGNED, `${named('#1 run-dark.png')}\nok\n`);
-      assert.ok(
-        (dataUnder(specOf(`${id}-review`).brief, CHECK_SAID) as { reported: string[] }).reported.includes(named('#1 run-dark.png')),
-      );
-      await assert.rejects(
-        over(roundRun(id)),
-        refusedAs('Conflict', 'the run goes round again itself', '`rounds: 3` has 2 left', `nemia ls ${id}`),
-      );
-      assert.deepEqual(asksOf(id, 'round'), []);
-    },
-  );
-  await s.test(
-    'round 2: implement continued, handed what was said to it, then the findings and not the summary; owing replies',
-    async () => {
-      const pass = await tick(id);
-      const try2 = `${id}-implement-try2`;
-      assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.status], [['review'], [], [], 'running']);
-      namesFor(
-        'the note',
-        pass.notes.find((n) => n.startsWith('review: round 2')),
-        'round 2',
-        'rounds: 3',
-        'implement goes again',
-      );
-      const spec = specOf(try2);
-      const run = runRecord(ROOT, id);
-      assert.deepEqual(
-        { resumeFrom: spec.resumeFrom, cwd: spec.cwd },
-        { resumeFrom: `native-${id}-implement`, cwd: run.workspace },
-        "implement's own session, continued",
-      );
-      assert.match(spec.brief, /^## Round 2 of 3\n/);
-      const said = spec.brief.indexOf('## Said to your session');
-      assert.ok(said > 0 && said < spec.brief.indexOf('## From review'), 'what was said to it, before the findings');
-      assert.ok(spec.brief.includes('```text\nLeave the parser alone.\n```'));
-      assert.deepEqual(dataUnder(spec.brief, '## From review'), { findings: FOUND });
-      assert.doesNotMatch(spec.brief, /REVIEWER-SUMMARY|"again"/);
-      assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, [
-        'apiVersion',
-        'outcome',
-        'summary',
-        'body',
-        'artifacts',
-        'needs',
-        'replies',
-      ]);
-      const branch = run.steps.implement.branch;
-      const tip = branch ? stage.place().world.tip(run.repo ?? '', branch) : null;
-      const implemented = [{ taskId: `${id}-implement`, check: { taskId: `${id}-implement-check`, tip }, cause: 'round' }];
-      const reviewed = [{ taskId: `${id}-review`, cause: 'round' }];
-      assert.deepEqual(Object.fromEntries(Object.entries(run.steps).map(([name, record]) => [name, filedAs(record)])), {
-        implement: { taskId: try2, workspace: run.workspace, branch, tries: implemented },
-        review: { taskId: null, workspace: run.workspace, branch, tries: reviewed },
-        ship: { taskId: null },
-      });
-      assert.deepEqual(
-        (await over(list(stage.board().e, runRecord(ROOT, id)))).steps.slice(0, 2).map((x) => [x.name, x.note]),
-        [
-          ['implement', 'round 2 of 3'],
-          ['review', 'round 2 of 3'],
-        ],
-      );
-      await tick(id);
-      assert.equal(stage.board().filings.filter((f) => f === try2).length, 1, 'filed once, however many passes');
-    },
-  );
-  await s.test('UNSIGNED: try 2 signs off answering nothing, so it is not checked and review waits', async () => {
+  s.test('round 1: implement is filed and told something while it works; `nemia retry --round` refuses a round still running', async () => {
+    id = await startedLoop(looped('', '', { ship: ['gate: true'] }));
+    stage.board().settle(`${id}-implement`, 'working');
+    await over(sayRun(id, 'implement', 'Leave the parser alone.', { caller: PERSON }));
+    await assert.rejects(
+      over(roundRun(id)),
+      refusedAs('Conflict', "round 1 of review's loop is still running", `nemia ls ${id}`, `nemia cancel ${id}`),
+    );
+    assert.deepEqual(asksOf(id, 'round'), [], 'no ask written');
+  });
+  s.test('review is handed what the check said, and asks again: `nemia retry --round` refuses a round the run files itself', async () => {
+    await toReview(id, true, SIGNED, `${named('#1 run-dark.png')}\nok\n`);
+    assert.ok((dataUnder(specOf(`${id}-review`).brief, CHECK_SAID) as { reported: string[] }).reported.includes(named('#1 run-dark.png')));
+    await assert.rejects(
+      over(roundRun(id)),
+      refusedAs('Conflict', 'the run goes round again itself', '`rounds: 3` has 2 left', `nemia ls ${id}`),
+    );
+    assert.deepEqual(asksOf(id, 'round'), []);
+  });
+  s.test('round 2: implement continued, handed what was said to it, then the findings and not the summary; owing replies', async () => {
+    const pass = await tick(id);
+    const try2 = `${id}-implement-try2`;
+    assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.status], [['review'], [], [], 'running']);
+    namesFor(
+      'the note',
+      pass.notes.find((n) => n.startsWith('review: round 2')),
+      'round 2',
+      'rounds: 3',
+      'implement goes again',
+    );
+    const spec = specOf(try2);
+    const run = runRecord(ROOT, id);
+    assert.deepEqual(
+      { resumeFrom: spec.resumeFrom, cwd: spec.cwd },
+      { resumeFrom: `native-${id}-implement`, cwd: run.workspace },
+      "implement's own session, continued",
+    );
+    assert.match(spec.brief, /^## Round 2 of 3\n/);
+    const said = spec.brief.indexOf('## Said to your session');
+    assert.ok(said > 0 && said < spec.brief.indexOf('## From review'), 'what was said to it, before the findings');
+    assert.ok(spec.brief.includes('```text\nLeave the parser alone.\n```'));
+    assert.deepEqual(dataUnder(spec.brief, '## From review'), { findings: FOUND });
+    assert.doesNotMatch(spec.brief, /REVIEWER-SUMMARY|"again"/);
+    assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, [
+      'apiVersion',
+      'outcome',
+      'summary',
+      'body',
+      'artifacts',
+      'needs',
+      'replies',
+    ]);
+    const branch = run.steps.implement.branch;
+    const tip = branch ? stage.place().world.tip(run.repo ?? '', branch) : null;
+    const implemented = [{ taskId: `${id}-implement`, check: { taskId: `${id}-implement-check`, tip }, cause: 'round' }];
+    const reviewed = [{ taskId: `${id}-review`, cause: 'round' }];
+    assert.deepEqual(Object.fromEntries(Object.entries(run.steps).map(([name, record]) => [name, filedAs(record)])), {
+      implement: { taskId: try2, workspace: run.workspace, branch, tries: implemented },
+      review: { taskId: null, workspace: run.workspace, branch, tries: reviewed },
+      ship: { taskId: null },
+    });
+    assert.deepEqual(
+      (await over(list(stage.board().e, runRecord(ROOT, id)))).steps.slice(0, 2).map((x) => [x.name, x.note]),
+      [
+        ['implement', 'round 2 of 3'],
+        ['review', 'round 2 of 3'],
+      ],
+    );
+    await tick(id);
+    assert.equal(stage.board().filings.filter((f) => f === try2).length, 1, 'filed once, however many passes');
+  });
+  s.test('UNSIGNED: try 2 signs off answering nothing, so it is not checked and review waits', async () => {
     stage.board().settle(`${id}-implement-try2`, 'succeeded', { ...SIGNED, summary: 'IMPLEMENTER-SUMMARY' });
     const pass = await tick(id);
     assert.deepEqual([pass.checked, pass.unreachable], [[], ['review']]);
     assert.match((await over(list(stage.board().e, runRecord(ROOT, id)))).steps[0].message, /^unsigned/);
   });
-  await s.test(
+  s.test(
     "a fresh try inside round 2 is a new session handed the round's findings, off review's try that asked, owing replies",
     async () => {
       await over(retryRun(id, 'implement', { mode: 'fresh' }));
@@ -273,7 +263,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
       assert.ok((spec.closeoutSchema as { required: string[] }).required.includes('replies'));
     },
   );
-  await s.test("the reviewer of round 2 is a new session, handed the replies and its own round's check", async () => {
+  s.test("the reviewer of round 2 is a new session, handed the replies and its own round's check", async () => {
     await toReview(id, true, ANSWERED, `${named('#9 card-dark.png')}\nok\n`);
     const review2 = specOf(`${id}-review-try2`);
     assert.equal(review2.resumeFrom, undefined, 'the reviewer is a new session each round');
@@ -284,7 +274,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     assert.ok(reported.includes(named('#9 card-dark.png')), reported.join('\n'));
     assert.ok(!reported.some((l) => l.includes('#1 ')), 'round 2 reads its own check, not the first try’s');
   });
-  await s.test('REFUSED at the cap, at shipped defaults: round 3 asks again, files nothing, reads exhausted and waits on you', async () => {
+  s.test('REFUSED at the cap, at shipped defaults: round 3 asks again, files nothing, reads exhausted and waits on you', async () => {
     assert.deepEqual((await tick(id)).looped, ['review'], 'round 3');
     await toReview(id, true);
     const filed = [...stage.board().filings];
@@ -303,7 +293,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     namesFor('enough', offers[1], `nemia approve ${id} review --message "<why>"`);
     assert.deepEqual((closeouts.review as { output?: object }).output, { findings: FOUND, again: true }, 'the last findings');
   });
-  await s.test('a round ask file the run cannot read is not honoured, and not touched: the pass says so, and files nothing', async () => {
+  s.test('a round ask file the run cannot read is not honoured, and not touched: the pass says so, and files nothing', async () => {
     fs.mkdirSync(asksDir(ROOT, id), { recursive: true });
     fs.writeFileSync(path.join(asksDir(ROOT, id), 'round-review-4'), 'once more, please');
     fs.writeFileSync(path.join(asksDir(ROOT, id), 'round-review-5'), '[]');
@@ -318,7 +308,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     for (const f of asksOf(id, 'round')) fs.rmSync(path.join(asksDir(ROOT, id), f));
   });
   let file = '';
-  await s.test('`nemia retry --round` takes it once more, once: the ask written whole, and no record', async () => {
+  s.test('`nemia retry --round` takes it once more, once: the ask written whole, and no record', async (t) => {
     const { hints } = await typedOn(t, ['retry', id, 'review', '--round']);
     file = path.join(asksDir(ROOT, id), 'round-review-4');
     assert.deepEqual([fs.existsSync(file), hints], [true, []], 'the file `nemia round` wrote, and no hint: this is the spelling to type');
@@ -328,20 +318,20 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     await assert.rejects(over(roundRun(id)), refusedAs('Conflict', "round 4 of review's loop is already asked for"));
     assert.match((await over(list(stage.board().e, runRecord(ROOT, id)))).steps[1].note ?? '', /^round 4 asked \(nemia retry --round\)/);
   });
-  await s.test('the next pass files round 4, past the cap, and spends the ask; a round is refused while it runs', async () => {
+  s.test('the next pass files round 4, past the cap, and spends the ask; a round is refused while it runs', async () => {
     assert.deepEqual((await tick(id)).looped, ['review']);
     assert.match(specOf(`${id}-implement-try5`).brief, /^## Round 4, past rounds: 3\n/);
     assert.deepEqual(asksOf(id, 'round'), [], 'consumed');
     assert.ok(fs.existsSync(path.join(asksDir(ROOT, id), 'done', 'round-review-4')), 'moved whole');
     await assert.rejects(over(roundRun(id)), refusedAs('Conflict', "round 4 of review's loop is still running"));
   });
-  await s.test('an ask a pass filed and wrote down, then died before moving, is spent: it files nothing', async () => {
+  s.test('an ask a pass filed and wrote down, then died before moving, is spent: it files nothing', async () => {
     fs.copyFileSync(path.join(asksDir(ROOT, id), 'done', 'round-review-4'), file);
     const again = await tick(id);
     assert.deepEqual([again.looped, again.filed, asksOf(id, 'round')], [[], [], []]);
     assert.equal(stage.board().filings.filter((f) => f === `${id}-implement-try5`).length, 1);
   });
-  await s.test('an acceptance file the run cannot read is not honoured, and not touched: the loop is still out of rounds', async () => {
+  s.test('an acceptance file the run cannot read is not honoured, and not touched: the loop is still out of rounds', async () => {
     await toReview(id, true);
     assert.deepEqual((await tick(id)).filed, [], 'round 4 asks again, past its cap: nothing after the loop');
     const accept = path.join(asksDir(ROOT, id), 'accept-review-4');
@@ -366,9 +356,9 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     fs.rmSync(accept);
   });
   let at = '';
-  await s.test(
+  s.test(
     "`nemia approve` of the loop out of rounds ends it on a person's word, refused without `--message`: the acceptance written whole, beside the asks, and no record; the former `nemia accept` still runs as it",
-    async () => {
+    async (t) => {
       const accepted = path.join(asksDir(ROOT, id), 'accept-review-4');
       await assert.rejects(typedOn(t, ['approve', id, 'review']), refusedAs('Invalid', '--message'));
       assert.deepEqual(asksOf(id, 'accept'), [], 'refused without your words: nothing written');
@@ -394,7 +384,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
       namesFor('the note', l.steps[1].note, `accepted as it stands at ${at}`, 'its findings open');
     },
   );
-  await s.test('the next pass files the ending, handed the words and the findings open', async () => {
+  s.test('the next pass files the ending, handed the words and the findings open', async () => {
     const pass = await tick(id);
     assert.deepEqual([pass.filed, pass.looped, pass.tried, pass.status], [['ship'], [], [], 'running']);
     assert.deepEqual(asksOf(id, 'accept'), ['accept-review-4'], 'the acceptance stays where it was written, as an approval does');
@@ -406,7 +396,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     assert.doesNotMatch(brief, /REVIEWER-SUMMARY|"again"/);
     assert.deepEqual((await tick(id)).filed, [], 'filed once, however many passes');
   });
-  await s.test('the gated ending goes to its gate as ever, offered no round, and approved the run succeeds', async () => {
+  s.test('the gated ending goes to its gate as ever, offered no round, and approved the run succeeds', async (t) => {
     stage.board().settle(`${id}-ship`, 'succeeded', SIGNED);
     await tick(id);
     const held = await over(list(stage.board().e, runRecord(ROOT, id)));
@@ -421,10 +411,10 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
   });
 });
 
-test('a loop past its budget waits for a person to raise it, then goes round and ends', async (t) => {
-  const s = story(t);
+describe('a loop past its budget waits for a person to raise it, then goes round and ends', () => {
+  const s = story(test);
   let id = '';
-  await s.test("REFUSED past a budget: review's `again: true` files no round while implement is over its budget", async () => {
+  s.test("REFUSED past a budget: review's `again: true` files no round while implement is over its budget", async () => {
     id = await startedLoop(looped('', 'budget: 3\n'));
     await toReview(id, true, SIGNED);
     stage.board().tasks.get(`${id}-implement`)!.attempt!.usage = { costUsd: 4.25 };
@@ -443,16 +433,16 @@ test('a loop past its budget waits for a person to raise it, then goes round and
       ],
     );
   });
-  await s.test('`nemia retry --round` is refused without `--budget`, and no ask written', async () => {
+  s.test('`nemia retry --round` is refused without `--budget`, and no ask written', async () => {
     await assert.rejects(
       over(roundRun(id)),
       refusedAs('Conflict', 'review asked for round 2', '$4.25 of its $3 budget', `nemia retry ${id} review --round --budget <amount>`),
     );
     assert.deepEqual(asksOf(id, 'round'), []);
   });
-  await s.test(
+  s.test(
     'with `--budget` the round is asked, typed in its former spelling `nemia round`, which still runs as `nemia retry --round` and says so: no step of the loop is held on its budget, and the run waits on nobody',
-    async () => {
+    async (t) => {
       const { hints } = await typedOn(t, ['round', id, '--budget', '10']);
       assert.equal(hints.length, 1, 'one hint line');
       names(hints[0], 'nemia round is now nemia retry --round', `nemia retry ${id} `);
@@ -479,7 +469,7 @@ test('a loop past its budget waits for a person to raise it, then goes round and
       );
     },
   );
-  await s.test("the next pass files the round, the raised cap on implement's record, handed what is left of it", async () => {
+  s.test("the next pass files the round, the raised cap on implement's record, handed what is left of it", async () => {
     const pass = await tick(id);
     assert.deepEqual(pass.looped, ['review']);
     namesFor(
@@ -494,7 +484,7 @@ test('a loop past its budget waits for a person to raise it, then goes round and
     assert.equal(specOf(`${id}-implement-try2`).config?.budgetUsd, 5.75, 'on claude, a job, what is left of the raised cap');
     assert.equal((await over(list(stage.board().e, runRecord(ROOT, id)))).steps[0].note, 'round 2 of 3, budget $10');
   });
-  await s.test('`again: false` ends the loop: the run succeeded, and `nemia decide` prints the replies beside the findings', async () => {
+  s.test('`again: false` ends the loop: the run succeeded, and `nemia decide` prints the replies beside the findings', async () => {
     await toReview(id, false);
     const last = await tick(id);
     assert.deepEqual([last.looped, last.filed, last.status], [[], [], 'succeeded']);
@@ -512,10 +502,10 @@ test('a loop past its budget waits for a person to raise it, then goes round and
   });
 });
 
-test("a loop's target over its budget whose check refused: the round reads it as `nemia ls` does, and points to a try it takes", async (t) => {
-  const s = story(t);
+describe("a loop's target over its budget whose check refused: the round reads it as `nemia ls` does, and points to a try it takes", () => {
+  const s = story(test);
   let id = '';
-  await s.test('implement cost $4.25 of its $3 and its check exited 1: `nemia ls` reads it over budget', async () => {
+  s.test('implement cost $4.25 of its $3 and its check exited 1: `nemia ls` reads it over budget', async () => {
     id = await startedLoop(looped('', 'budget: 3\n'));
     const implement = taskOf(id, 'implement');
     stage.board().settle(implement, 'succeeded', SIGNED);
@@ -526,35 +516,44 @@ test("a loop's target over its budget whose check refused: the round reads it as
     const l = await over(list(stage.board().e, runRecord(ROOT, id)));
     assert.match(l.steps[0].message, /^over budget /);
   });
-  await s.test('REFUSED: `nemia retry --round` names it over budget, and a try of it with `--budget`', async () => {
+  s.test('REFUSED: `nemia retry --round` names it over budget, and a try of it with `--budget`', async () => {
     await assert.rejects(
       over(roundRun(id)),
       refusedAs('Conflict', 'implement is over budget', `nemia retry ${id} implement --budget <amount>`),
     );
   });
-  await s.test('the try its advice names, with a `--budget` above what it cost, is taken', async () => {
+  s.test('the try its advice names, with a `--budget` above what it cost, is taken', async () => {
     await over(retryRun(id, 'implement', { mode: 'continue', budget: 10 }));
     assert.deepEqual(asksOf(id, 'retry').length, 1);
   });
 });
 
-test('REFUSED: `nemia retry --round` and `nemia approve`, and their former spellings `nemia round` and `nemia accept` typed on purpose, before anything is written', async (t) => {
+describe('REFUSED: `nemia retry --round` and `nemia approve`, and their former spellings `nemia round` and `nemia accept` typed on purpose, before anything is written', () => {
+  beforeAll(async () => {
+    const t = teardowns();
+    await refused(['retry', 'no-such-run', 'review', 'again', '--round'], 'Invalid', 'does not take again', '--round');
+    await refused(['retry', 'no-such-run', '--round', '--budget', 'lots'], 'Invalid', 'lots is not one', '--budget <amount>');
+    await refused(
+      ['approve', 'no-such-run', 'review', '--message', ' '],
+      'Invalid',
+      '--message is empty',
+      'nemia approve no-such-run review',
+    );
+    await refused(['approve', 'no-such-run', 'review'], 'Missing', 'no such run: no-such-run');
+    await refused(['round', 'no-such-run', 'review', 'again'], 'Invalid', 'does not take again', '--round');
+    await refused(
+      ['accept', 'no-such-run', 'review', '--message', ' '],
+      'Invalid',
+      '--message is empty',
+      'nemia approve no-such-run review',
+    );
+    return t.end;
+  });
   const refused = (argv: string[], tag: string, ...facts: string[]) =>
     t.test(`nemia ${argv.join(' ')}`, async () => {
       await assert.rejects(stage.main(argv), refusedAs(tag, ...facts));
     });
-  await refused(['retry', 'no-such-run', 'review', 'again', '--round'], 'Invalid', 'does not take again', '--round');
-  await refused(['retry', 'no-such-run', '--round', '--budget', 'lots'], 'Invalid', 'lots is not one', '--budget <amount>');
-  await refused(
-    ['approve', 'no-such-run', 'review', '--message', ' '],
-    'Invalid',
-    '--message is empty',
-    'nemia approve no-such-run review',
-  );
-  await refused(['approve', 'no-such-run', 'review'], 'Missing', 'no such run: no-such-run');
-  await refused(['round', 'no-such-run', 'review', 'again'], 'Invalid', 'does not take again', '--round');
-  await refused(['accept', 'no-such-run', 'review', '--message', ' '], 'Invalid', '--message is empty', 'nemia approve no-such-run review');
-  await t.test('a cancelled run: a round would never be honoured, and no ask is written', async () => {
+  test('a cancelled run: a round would never be honoured, and no ask is written', async () => {
     const id = await startedLoop(looped('rounds: 1\n'));
     markCancelled(ROOT, id);
     await assert.rejects(over(roundRun(id)), refusedAs('Conflict', 'was cancelled at', 'never be honoured'));

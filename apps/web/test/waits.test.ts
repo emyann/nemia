@@ -8,7 +8,7 @@
  * bound, under `test/`: each left is the reaper's bound or an e2e assertion's timeout, never a test's wait, and a count only shrinks
  * (`deadlineBreaks`). A change that takes one out lowers its count in the same commit.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

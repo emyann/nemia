@@ -1,5 +1,5 @@
 import './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -118,7 +118,7 @@ function startApi(port: string, args: string[] = [], root = scratch('nemia-api-m
 
 test('PORT=0 starts the api on a free port, and it prints the port it got', async (t) => {
   const api = startApi('0');
-  t.after(() => api.child.kill());
+  t.onTestFinished(() => api.child.kill());
   const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);
   assert.notEqual(Number(got), 0);
   assert.notEqual(Number(got), DEFAULT_PORT);
@@ -131,7 +131,7 @@ test("REFUSED: the api listens on 127.0.0.1 alone — nothing answers on this ma
     .flat()
     .find((a) => a?.family === 'IPv4' && !a.internal)?.address;
   const api = startApi('0');
-  t.after(() => api.child.kill());
+  t.onTestFinished(() => api.child.kill());
   const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);
   assert.deepEqual(
     await (await fetch(`http://127.0.0.1:${got}/api/health`, { headers: asPerson(api.root) })).json(),
@@ -163,7 +163,7 @@ test('REFUSED exit 2: NEMIA_BIND=0.0.0.0 on a store marked exposed, unacknowledg
 
 test('NEMIA_BIND=0.0.0.0 on a store marked exposed and acknowledged listens on every interface, and the lease names the loopback', async (t) => {
   const api = startApi('0', [], scratch('nemia-api-main-'), '', { NEMIA_BIND: '0.0.0.0', WF_EXPOSED: '1', NEMIA_BIND_PUBLIC: '1' });
-  t.after(() => api.child.kill());
+  t.onTestFinished(() => api.child.kill());
   const [, got] = await api.said(/api listening on http:\/\/0\.0\.0\.0:(\d+)/);
   await leaseSays(api.root, (l) => l.url === `http://127.0.0.1:${got}`);
   assert.equal((await fetch(`http://127.0.0.1:${got}/api/health`)).status, 401, 'an exposed store asks every caller for a token');
@@ -205,7 +205,7 @@ test("REFUSED at shipped defaults: the checkout's api on a store that runs an in
 
 test("the checkout's api serves that store told NEMIA_ON_INSTALLED=1", async (t) => {
   const api = startApi('0', ['--no-tick'], installedStore(), '', { NEMIA_ON_INSTALLED: '1' });
-  t.after(() => api.child.kill());
+  t.onTestFinished(() => api.child.kill());
   await api.said(/api listening on http:\/\/127\.0\.0\.1:\d+/);
 });
 
@@ -220,7 +220,7 @@ const leaseSays = async (root: string, pred: (lease: Record<string, unknown>) =>
 
 test("(a) the api is the store's daemon: it holds the lease as the api, at its url, and /api/daemon says so", async (t) => {
   const api = startApi('0');
-  t.after(() => api.child.kill());
+  t.onTestFinished(() => api.child.kill());
   const [url] = await api.said(/http:\/\/127\.0\.0\.1:\d+/);
   const lease = await leaseSays(api.root, (l) => l.url === url);
   assert.deepEqual([lease.pid, lease.by], [api.child.pid, 'api']);
@@ -231,7 +231,7 @@ test("(a) the api is the store's daemon: it holds the lease as the api, at its u
 
 test('REFUSED (b, c): a second api, and a nemia up, on a store the api holds — exit 2 naming it, and the second api binds no port', async (t) => {
   const first = startApi('0');
-  t.after(() => first.child.kill());
+  t.onTestFinished(() => first.child.kill());
   const [url] = await first.said(/http:\/\/127\.0\.0\.1:\d+/);
   await leaseSays(first.root, (l) => l.url === url);
   const second = startApi('0', [], first.root);
@@ -259,7 +259,7 @@ test('REFUSED (d): with a nemia up holding the store, the api exits 2 naming its
     cwd: root,
     timeout: 60_000,
   });
-  t.after(() => wf.kill());
+  t.onTestFinished(() => wf.kill());
   await leaseSays(root, (l) => l.pid === wf.pid && l.passedAt !== null);
   const api = startApi('0', [], root);
   assert.equal(await api.ended, 2);
@@ -275,14 +275,14 @@ test('(e) SIGTERM ends the api with 143 and lets the lease go, and the next api 
   assert.equal(await first.ended, 143, 'its own exit, 128 + 15, once the lease is let go');
   assert.ok(leaseOf(first.root).stoppedAt, 'stoppedAt written');
   const next = startApi('0', [], first.root);
-  t.after(() => next.child.kill());
+  t.onTestFinished(() => next.child.kill());
   await leaseSays(first.root, (l) => l.pid === next.child.pid && l.by === 'api');
 });
 
 test('REFUSED: a port another process holds ends the daemon with exit 2, naming the port and PORT=, and lets the lease go', async (t) => {
   const holder = net.createServer();
   await new Promise<void>((resolve) => holder.listen(0, '127.0.0.1', resolve));
-  t.after(() => holder.close());
+  t.onTestFinished(() => holder.close());
   const taken = String((holder.address() as net.AddressInfo).port);
   const api = startApi(taken);
   assert.equal(await api.ended, 2, 'a refusal, not a crash');
@@ -299,7 +299,7 @@ test('REFUSED: a port another process holds ends the daemon with exit 2, naming 
 
 test('(f) --no-tick serves the board and writes no lease', async (t) => {
   const viewer = startApi('0', ['--no-tick']);
-  t.after(() => viewer.child.kill());
+  t.onTestFinished(() => viewer.child.kill());
   const [url] = await viewer.said(/http:\/\/127\.0\.0\.1:\d+/);
   assert.deepEqual(await (await fetch(`${url}/api/health`, { headers: asPerson(viewer.root) })).json(), { ok: true });
   assert.equal(fs.existsSync(path.join(viewer.root, 'daemon.json')), false);
@@ -346,9 +346,9 @@ test("a client that reuses its connection after a pause past Node's keep-alive i
   const pastNodesKeepAlive = defaults.keepAliveTimeout + (defaults.keepAliveTimeoutBuffer ?? 0) + 500;
   assert.ok(pastNodesKeepAlive < SERVER_TIMEOUTS.keepAliveTimeout, 'the api keeps an idle connection past the pause');
   await new Promise<void>((listening) => node.listen(0, '127.0.0.1', listening));
-  t.after(() => new Promise<void>((closed) => node.close(() => closed())));
+  t.onTestFinished(() => new Promise<void>((closed) => node.close(() => closed())));
   const api = startApi('0', ['--no-tick']);
-  t.after(() => api.child.kill());
+  t.onTestFinished(() => api.child.kill());
   const [, port] = await api.said(/http:\/\/127\.0\.0\.1:(\d+)/);
   const [control, served] = await Promise.all([
     callAfterPause((node.address() as net.AddressInfo).port, pastNodesKeepAlive),
@@ -366,7 +366,7 @@ const PASS_MS = 100;
 const EXPORT_MS = '100';
 
 /** A collector on loopback that answers each post: its url, and the body of the first post to `path` that has `word`. */
-async function collector(t: { after: (fn: () => Promise<void>) => void }) {
+async function collector(t: { onTestFinished: (fn: () => Promise<void>) => void }) {
   const waiting: { path: string; word: string; found: (body: string) => void }[] = [];
   const server = http.createServer((req, res) => {
     let body = '';
@@ -377,7 +377,7 @@ async function collector(t: { after: (fn: () => Promise<void>) => void }) {
     });
   });
   await new Promise<void>((listening) => server.listen(0, '127.0.0.1', listening));
-  t.after(() => new Promise<void>((closed) => server.close(() => closed())));
+  t.onTestFinished(() => new Promise<void>((closed) => server.close(() => closed())));
   const posted = (path: string, word: string) => new Promise<string>((found) => waiting.push({ path, word, found }));
   return { url: `http://127.0.0.1:${(server.address() as net.AddressInfo).port}`, posted };
 }
@@ -386,7 +386,7 @@ test("the api's daemon exports its passes' spans to the collector OTEL_EXPORTER_
   const c = await collector(t);
   const pass = c.posted('/v1/traces', '"tick"');
   const api = startApi('0', [], undefined, c.url, { OTEL_BSP_SCHEDULE_DELAY: EXPORT_MS });
-  t.after(() => api.child.kill());
+  t.onTestFinished(() => api.child.kill());
   const spans = await Promise.race([pass, api.ended.then((code) => assert.fail(`the api exited ${code}:\n${api.output()}`))]);
   assert.match(spans, /"nemia"/);
 });
@@ -395,7 +395,7 @@ test('an api started --no-tick exports a server span per request, with the HTTP 
   const c = await collector(t);
   const posted = c.posted('/v1/traces', '"GET /api/version"');
   const api = startApi('0', ['--no-tick'], undefined, c.url, { OTEL_BSP_SCHEDULE_DELAY: EXPORT_MS });
-  t.after(() => api.child.kill());
+  t.onTestFinished(() => api.child.kill());
   const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);
   assert.equal((await fetch(`http://127.0.0.1:${got}/api/version`, { headers: asPerson(api.root) })).status, 200);
   await api.said(/\d\d:\d\d:\d\d {2}GET \/api\/version 200 \d+ms/);
@@ -441,7 +441,7 @@ test("the api's daemon posts its own series and the pass's at zero before any re
   const c = await collector(t);
   const born = c.posted('/v1/metrics', '"pass.duration"');
   const api = startApi('0', [], undefined, c.url);
-  t.after(() => api.child.kill());
+  t.onTestFinished(() => api.child.kill());
   const body = await Promise.race([born, api.ended.then((code) => assert.fail(`the api exited ${code}:\n${api.output()}`))]);
   const series = postedSeries(body);
   assert.deepEqual(
@@ -502,11 +502,11 @@ function signedOffRun(root: string): void {
 test("REFUSED: a line the api's daemon writes reaches the api's stream from the hub its runtime built, with no read of the file", async (t) => {
   assert.ok(PASS_MS < DEFAULT_EVERY_MS);
   const api = startApi('0', [String(PASS_MS)]);
-  t.after(() => api.child.kill());
+  t.onTestFinished(() => api.child.kill());
   const [url] = await api.said(/http:\/\/127\.0\.0\.1:\d+/);
   await leaseSays(api.root, (l) => l.url === url);
   const stream = new AbortController();
-  t.after(() => stream.abort());
+  t.onTestFinished(() => stream.abort());
   const res = await fetch(`${url}/api/feed/stream`, { signal: stream.signal, headers: asPerson(api.root) });
   const reader = res.body!.getReader();
   while ((await metricOf(url, api.root, 'feed.followers'))?.value !== 1) await new Promise((r) => setTimeout(r, 20));
@@ -533,7 +533,7 @@ test("REFUSED: a line the api's daemon writes reaches the api's stream from the 
 
 test("the api's daemon still says its own pass lines, in the time-first layout, through the logger the app's layer holds", async (t) => {
   const api = startApi('0', [String(PASS_MS)]);
-  t.after(() => api.child.kill());
+  t.onTestFinished(() => api.child.kill());
   await api.said(/api listening on/);
   signedOffRun(api.root);
   const [line] = await api.said(/\d\d:\d\d:\d\d {2}r-hub .*/);

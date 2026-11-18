@@ -30,7 +30,7 @@
  * Each rule is a pure function over a map of each file's imports, run first on planted sources it must refuse (`REFUSED`), so that none
  * passes by seeing nothing, and then on the package. A rule a session can re-break is a rule this suite refuses.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { builtinModules } from 'node:module';

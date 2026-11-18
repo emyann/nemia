@@ -14,7 +14,8 @@
  * journal in the store, or a `view` each, which observes its harness for each task in flight.
  */
 import { Effect } from 'effect';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -73,19 +74,25 @@ const held = () => {
   return { cwd, let: () => fs.rmSync(path.join(cwd, 'hold')) };
 };
 
-test(
+describe(
   'a board of checks, as the orchestrator keeps one: a view observes a check pending or in flight and never a settled one, a tick says what it took, and io() counts every read, observe and worker',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const root = scratch('ae-io-root-');
-    const engine = builtEngine(Engine.layer({ root, harnesses: { check }, defaultHarness: 'check' }));
+  () => {
+    let root!: string;
+    let engine!: import('../src/index.ts').EngineShape;
+    let first!: { cwd: string; let: () => void };
+    beforeAll(() => {
+      const t = teardowns();
+      root = scratch('ae-io-root-');
+      engine = builtEngine(Engine.layer({ root, harnesses: { check }, defaultHarness: 'check' }));
+      first = held();
+      return t.end;
+    });
+    const s = story(test);
     const io = () => Effect.runSync(engine.io());
     const calls = () => io().observed.check?.calls ?? 0;
-    const first = held();
     let id = '';
-
-    await s.test('a pending check, on a harness that cannot find, is observed by its view, which reads its journal whole', async () => {
+    s.test('a pending check, on a harness that cannot find, is observed by its view, which reads its journal whole', async () => {
       id = await Effect.runPromise(engine.file({ brief: 'b', cwd: first.cwd }));
       const read0 = io();
       const before = calls();
@@ -99,8 +106,7 @@ test(
       );
       assert.ok(read1.reads > read0.reads);
     });
-
-    await s.test(
+    s.test(
       "the pass that starts it starts its worker, and a view of it in flight observes: its phase is its session's state",
       async (sub) => {
         const spawn0 = io().spawned;
@@ -112,8 +118,7 @@ test(
         assert.equal(calls() - before, 1, "an attempt in flight is observed: its phase is its session's state");
       },
     );
-
-    await s.test("a tick counts only the observes made during it; io() counts every observe, a view's too", async () => {
+    s.test("a tick counts only the observes made during it; io() counts every observe, a view's too", async () => {
       const one = await Effect.runPromise(engine.tick());
       const before = io().observed.check;
       await Effect.runPromise(engine.view(id));
@@ -123,8 +128,7 @@ test(
       assert.equal(two.observed.check.calls, one.observed.check.calls, "the view's observe is not charged to the next pass");
       assert.equal(io().observed.check.calls, afterView.calls + two.observed.check.calls, 'the running total has both');
     });
-
-    await s.test(
+    s.test(
       'REFUSED at shipped defaults: a view of a settled check observes nothing, and its logs are still read by the session it ended as',
       async (sub) => {
         first.let();
@@ -142,23 +146,18 @@ test(
         assert.equal(calls() - before, 0, 'viewed, and its logs read, with no observe of the check harness');
       },
     );
-
-    await s.test(
-      'a tick says what it took and what each harness listed, and a directory of run files starts no process to be read',
-      async () => {
-        const report = await Effect.runPromise(engine.tick());
-        assert.equal(typeof report.ms, 'number');
-        assert.ok(report.ms >= 0);
-        assert.deepEqual(Object.keys(report.observed), ['check'], 'one entry per harness observed in the pass');
-        const o = report.observed.check;
-        assert.ok(o.calls >= 1, 'the pass observed the harness');
-        assert.equal(o.listed, o.calls, 'each observe listed the one run file there is');
-        assert.equal(o.spawned, 0, 'reading run files starts nothing');
-        assert.ok(o.ms >= 0 && o.ms <= report.ms + 1, 'an observe inside the pass takes no longer than the pass');
-      },
-    );
-
-    await s.test(
+    s.test('a tick says what it took and what each harness listed, and a directory of run files starts no process to be read', async () => {
+      const report = await Effect.runPromise(engine.tick());
+      assert.equal(typeof report.ms, 'number');
+      assert.ok(report.ms >= 0);
+      assert.deepEqual(Object.keys(report.observed), ['check'], 'one entry per harness observed in the pass');
+      const o = report.observed.check;
+      assert.ok(o.calls >= 1, 'the pass observed the harness');
+      assert.equal(o.listed, o.calls, 'each observe listed the one run file there is');
+      assert.equal(o.spawned, 0, 'reading run files starts nothing');
+      assert.ok(o.ms >= 0 && o.ms <= report.ms + 1, 'an observe inside the pass takes no longer than the pass');
+    });
+    s.test(
       'a pass and a view of every task, as the orchestrator makes each pass: the check harness is observed once for the pass and once for each check in flight',
       async (sub) => {
         const done = [id];
@@ -224,13 +223,43 @@ const listBoard = async () => {
 /** A `measured` line whose usage no runtime wrote, as a person's or another program's edit leaves one. */
 const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { responses: 'three' } }) + '\n';
 
-test('the api lists some tasks: each journal read once, one look at the harness for those in flight, an unreadable task named once, and anything else refused', async (t) => {
-  const s = story(t);
-  const b = await listBoard();
-  const { engine, root, runner, counts, settled, flying, queued } = b;
+describe('the api lists some tasks: each journal read once, one look at the harness for those in flight, an unreadable task named once, and anything else refused', () => {
+  let b!: {
+    settled: string[];
+    flying: string[];
+    queued: string;
+    sessions: Map<string, Sighting>;
+    counts: { observe: number };
+    runner: {
+      spawn(r: { name: string }): Promise<void>;
+      observe(): Promise<Map<string, Sighting>>;
+      stop(): Promise<void>;
+      logs(sessionId: string): Promise<string>;
+    };
+    engine: import('../src/index.ts').EngineShape;
+    root: string;
+  };
+  let engine!: import('../src/index.ts').EngineShape;
+  let root!: string;
+  let runner!: {
+    spawn(r: { name: string }): Promise<void>;
+    observe(): Promise<Map<string, Sighting>>;
+    stop(): Promise<void>;
+    logs(sessionId: string): Promise<string>;
+  };
+  let counts!: { observe: number };
+  let settled!: string[];
+  let flying!: string[];
+  let queued!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    b = await listBoard();
+    ({ engine, root, runner, counts, settled, flying, queued } = b);
+    return t.end;
+  });
+  const s = story(test);
   const reads = (e: ReturnType<typeof builtEngine>) => Effect.runSync(e.io()).reads;
-
-  await s.test(
+  s.test(
     'the views of some tasks are their views, each journal read once and the harness observed once for all those in flight',
     async () => {
       const asked = [flying[1], settled[0], queued, flying[0], settled[0]];
@@ -267,8 +296,7 @@ test('the api lists some tasks: each journal read once, one look at the harness 
       assert.equal(reads(cold) - again, 0, 'and once read, a journal nothing has written to since is not read again');
     },
   );
-
-  await s.test(
+  s.test(
     "a view on an engine that never read the task reads its journal once, observed or settled: it views the fold it chose what to ask by, and a harness held in memory makes every read counted the journal's",
     async () => {
       const cold = builtEngine(Engine.layer({ root, harnesses: { mine: asyncOps(runner) } }));
@@ -283,8 +311,7 @@ test('the api lists some tasks: each journal read once, one look at the harness 
       assert.equal(reads(cold) - again, 0, 'and once read, a journal nothing has written to since is not read again');
     },
   );
-
-  await s.test('the views of tasks none of which is in flight observe nothing, and of no tasks are nothing', async () => {
+  s.test('the views of tasks none of which is in flight observe nothing, and of no tasks are nothing', async () => {
     const observes = counts.observe;
     const { views } = await Effect.runPromise(engine.list([...settled, queued]));
     assert.deepEqual(
@@ -294,15 +321,13 @@ test('the api lists some tasks: each journal read once, one look at the harness 
     assert.equal(counts.observe - observes, 0);
     assert.deepEqual(await Effect.runPromise(engine.list([])), { views: [], unreadable: [] });
   });
-
-  await s.test('with no ids, every task on the board over one observation, as before', async () => {
+  s.test('with no ids, every task on the board over one observation, as before', async () => {
     const observes = counts.observe;
     const { views } = await Effect.runPromise(engine.list());
     assert.deepEqual(new Set(views.map((v) => v.id)), new Set([...settled, ...flying, queued]));
     assert.equal(counts.observe - observes, 1);
   });
-
-  await s.test('REFUSED: `list` handed anything but a list of task ids, or more than one argument, says what it takes', async () => {
+  s.test('REFUSED: `list` handed anything but a list of task ids, or more than one argument, says what it takes', async () => {
     const untyped = engine.list as (...args: unknown[]) => ReturnType<typeof engine.list>;
     for (const args of [[settled[0]], [[1]], [{ ids: settled }], [settled, 'more'], [null]]) {
       const refused = await Effect.runPromise(Effect.flip(untyped(...args)));
@@ -310,8 +335,7 @@ test('the api lists some tasks: each journal read once, one look at the harness 
       assert.match(refused.message, /^takes the task ids to view, a list of strings/, refused.message);
     }
   });
-
-  await s.test(
+  s.test(
     'a task whose journal holds an entry no runtime wrote is left out of `list()` and `list(ids)` and named once, as the pass says it; the others are answered',
     async () => {
       const [bad, other] = [flying[1], flying[0]];
@@ -333,8 +357,7 @@ test('the api lists some tasks: each journal read once, one look at the harness 
       assert.deepEqual(every.unreadable, [{ taskId: bad, why: said[0] }]);
     },
   );
-
-  await s.test('any other failure of a read fails `list()`: a store that cannot be listed', async () => {
+  s.test('any other failure of a read fails `list()`: a store that cannot be listed', async () => {
     const journal: AsyncJournal = {
       async append() {},
       async read() {

@@ -6,7 +6,7 @@
  * `Api`'s handlers; a status the api's own readers refuse with is the class of that status (`declaredAs`), none folded into another.
  */
 import './harness.ts';
-import { test, type TestContext } from 'node:test';
+import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -33,7 +33,7 @@ const answered = async (thrown: unknown): Promise<{ status: number; body: unknow
 
 /** A run of `answered` with stderr held: what an error that is no refusal says there, and nothing of it on the test's output. */
 const quietly = async <T>(t: TestContext, run: () => Promise<T>) => {
-  const said = t.mock.method(console, 'error', () => {});
+  const said = vi.spyOn(console, 'error').mockImplementation(() => {});
   return { answer: await run(), said: said.mock.calls.length };
 };
 
@@ -49,8 +49,8 @@ test('REFUSED: each kind thrown in a mounted router is answered its status, in i
   }
 });
 
-test('answerError: what each thrown thing is answered with, a refusal by its kind and anything else a 500', async (t) => {
-  await t.test("every kind of refusal is answered at the status objects' class of its name declares, and no other", async () => {
+describe('answerError: what each thrown thing is answered with, a refusal by its kind and anything else a 500', () => {
+  test("every kind of refusal is answered at the status objects' class of its name declares, and no other", async () => {
     const kinds = [
       new Missing({ message: 'm' }),
       new Conflict({ message: 'c' }),
@@ -64,7 +64,7 @@ test('answerError: what each thrown thing is answered with, a refusal by its kin
       [404, 409, 422, 403, 401],
     );
   });
-  await t.test("a status the api's own readers refuse with is the class of that status: a 400 stays 400 and a 403 stays 403", () => {
+  test("a status the api's own readers refuse with is the class of that status: a 400 stays 400 and a 403 stays 403", () => {
     const kinds = [objects.BadRequest, objects.Forbidden, objects.Missing, objects.Conflict, objects.Invalid, objects.UnsupportedMediaType];
     for (const status of [400, 403, 404, 409, 415, 422]) {
       const refused = declaredAs(kinds, { status, error: 'e' });
@@ -75,7 +75,7 @@ test('answerError: what each thrown thing is answered with, a refusal by its kin
       'a status its endpoint declares no class of is a fault',
     );
   });
-  await t.test('a caller refused is answered by its kind, its reason beside its words: Forbidden 403, Unauthorized 401', async () => {
+  test('a caller refused is answered by its kind, its reason beside its words: Forbidden 403, Unauthorized 401', async () => {
     const forbidden = await answered(new Forbidden({ message: 'f', reason: 'person-only' }));
     assert.equal(forbidden.status, 403);
     assert.equal((forbidden.body as { reason?: string }).reason, 'person-only');
@@ -83,40 +83,34 @@ test('answerError: what each thrown thing is answered with, a refusal by its kin
     assert.equal(unauthorized.status, 401);
     assert.equal((unauthorized.body as { reason?: string }).reason, 'session-ended');
   });
-  await t.test('a Conflict that names the steps holding what is asked of is answered 409 with them, as `users`', async () => {
+  test('a Conflict that names the steps holding what is asked of is answered 409 with them, as `users`', async () => {
     const thrown = new Conflict({ message: 'agents/reviewer.md is named by a step beside it.', users: ['dev/review'] });
     assert.deepEqual(await answered(thrown), {
       status: 409,
       body: { error: 'agents/reviewer.md is named by a step beside it.', users: ['dev/review'] },
     });
   });
-  await t.test(
-    'REFUSED: an Error carrying exitCode 2 by hand is no refusal — a 500, said on stderr — and so is any other error; an HTTPException answers its own',
-    async (t) => {
-      const byHand = await quietly(t, () => answered(Object.assign(new Error('refused by hand.'), { exitCode: 2 })));
-      assert.deepEqual(byHand, { answer: { status: 500, body: { error: 'refused by hand.' } }, said: 1 });
-      const broken = await quietly(t, () => answered(new TypeError('x is undefined')));
-      assert.deepEqual(broken.answer, { status: 500, body: { error: 'x is undefined' } });
-      const own = await new Hono()
-        .get('/thrown', () => {
-          throw new HTTPException(418, { message: 'a teapot' });
-        })
-        .onError(answerError)
-        .request('/thrown');
-      assert.deepEqual([own.status, await own.text()], [418, 'a teapot']);
-    },
-  );
-  await t.test(
-    "the api's own app answers with it: a card written whole that is not there is the package's Missing, a 404 in its words",
-    async () => {
-      const res = await app.request('/api/namespaces/default/cards/no-such-card', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ metadata: {}, spec: { body: 'An idea' } }),
-      });
-      assert.equal(res.status, 404);
-      const { error } = (await res.json()) as { error: string };
-      assert.ok(error.includes('no-such-card') && error.includes('nemia inbox add'), error);
-    },
-  );
+  test('REFUSED: an Error carrying exitCode 2 by hand is no refusal — a 500, said on stderr — and so is any other error; an HTTPException answers its own', async (t) => {
+    const byHand = await quietly(t, () => answered(Object.assign(new Error('refused by hand.'), { exitCode: 2 })));
+    assert.deepEqual(byHand, { answer: { status: 500, body: { error: 'refused by hand.' } }, said: 1 });
+    const broken = await quietly(t, () => answered(new TypeError('x is undefined')));
+    assert.deepEqual(broken.answer, { status: 500, body: { error: 'x is undefined' } });
+    const own = await new Hono()
+      .get('/thrown', () => {
+        throw new HTTPException(418, { message: 'a teapot' });
+      })
+      .onError(answerError)
+      .request('/thrown');
+    assert.deepEqual([own.status, await own.text()], [418, 'a teapot']);
+  });
+  test("the api's own app answers with it: a card written whole that is not there is the package's Missing, a 404 in its words", async () => {
+    const res = await app.request('/api/namespaces/default/cards/no-such-card', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ metadata: {}, spec: { body: 'An idea' } }),
+    });
+    assert.equal(res.status, 404);
+    const { error } = (await res.json()) as { error: string };
+    assert.ok(error.includes('no-such-card') && error.includes('nemia inbox add'), error);
+  });
 });

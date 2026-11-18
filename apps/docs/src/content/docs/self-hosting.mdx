@@ -98,9 +98,10 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
 
 ## 4. The board
 
-Open the first-visit link the installer printed, `http://<address>:8787/?link=…`, on your laptop within ten minutes: it signs that
+Open the first-visit link the installer printed, `http://<address>:8787/welcome?link=…`, on your laptop within ten minutes: it signs that
 browser in once, and the board keeps the token in a cookie no script reads. `nemia board link` on the server makes another; given
-`--base` and the address your browser uses, it prints the link under that name, since a browser keeps one cookie per host name. Or
+`--base` and the address your browser uses, it prints the link under that name, since a browser keeps one cookie per host name. A
+store with no harness and no factory opens on the welcome, which activates a harness and proves it with two checks. Or
 press _Pair this browser_ on the board's sign-in, and approve the code it shows with `nemia pairings approve <code>` on the server.
 
 A browser with no token signs in only at a name the store takes: the loopback, the address it binds, and on a store marked exposed the

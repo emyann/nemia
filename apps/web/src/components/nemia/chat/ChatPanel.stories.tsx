@@ -67,7 +67,7 @@ export const Resting: StoryObj<typeof ChatPanel> = {
 export const Down: StoryObj<typeof ChatPanel> = {
   args: {
     chat: CHAT,
-    nemia: { ...RESTING, rests: false, untrusted: 'Claude Code did not take the trust of her folder: mend its file.' },
+    nemia: { ...RESTING, rests: false, untrusted: 'Her harness did not take the trust of her folder: mend its file.' },
     presence: { ...UP, down: true },
   },
   render,

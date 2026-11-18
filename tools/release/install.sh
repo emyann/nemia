@@ -6,14 +6,23 @@
 # It fetches the release archive for this machine and its SHA256SUMS, refuses an archive whose sum differs, unpacks it into
 # $WF_ROOT/releases/<tag> through a hidden folder renamed into place, points releases/current at it and links ~/.local/bin/nemia and the
 # store's tools/bin/nemia to its launcher.
-# Then it asks, on the server, or reads from its flags under --yes: starting at login, and the address to bind, picked from the
-# private ones nemia service addresses lists or typed (a public or wildcard one refused but with --public). A bind exposes the store:
-# this machine's own person token is minted straight into the local context's file and never printed, and the board's single-use
-# first-visit link (nemia board link) is printed in its place. With --client it starts no
+# Then it takes one of three paths, picked from its flags once they are read.
+#
+# On a laptop, with neither --serve, --bind nor --client, it asks nothing: it starts Nemia now on this machine alone (nemia daemon
+# --json, the read that starts this store's daemon on demand, bound to 127.0.0.1), with no login service, mints the board's single-use
+# first-visit link under <url>/welcome (nemia board link --base) and opens it in the browser (open on macOS, xdg-open on Linux where a
+# display is set; --no-open opens nothing, and a failure to open fails nothing), then prints a short summary of what it did, ending on
+# the link, and nemia service install named for starting at login. The summary is coloured where stdout is a terminal whose TERM is not
+# dumb, or FORCE_COLOR is set; a set NO_COLOR keeps it plain whatever else (https://no-color.org, https://force-color.org).
+#
+# On a server, said by --serve or by a --bind, it asks, or reads from its flags under --yes: starting at login, and the address to bind,
+# picked from the private ones nemia service addresses lists or typed (a public or wildcard one refused but with --public). A bind
+# exposes the store: this machine's own person token is minted straight into the local context's file and never printed, and the
+# board's single-use first-visit link (nemia board link) is printed in its place. With --client it starts no
 # service and pairs this machine with its server (nemia pair <url>), or takes a token by --token-file. A release carries no harness
-# and the installer asks for no harness's sign-in: it ends on nemia doctor, the read of what is in place and what is missing, whose
-# exit fails no install, and a harness is activated after, on the board's Setup page or by nemia doctor fix <harness>. It never
-# prints a token.
+# and the installer asks for no harness's sign-in: the server and client paths end on nemia doctor, the read of what is in place and
+# what is missing, whose exit fails no install, and a harness is activated after, on the board's Setup page or by nemia doctor fix
+# <harness>. It never prints a token.
 #
 # NEMIA_INSTALL_TTY names a file read in place of the terminal, one answer a line, its prompts on stderr: the test's seam alone.
 #
@@ -33,11 +42,13 @@ context_given=0
 token_file=
 public=0
 board_base=
+serve=0
+open=1
 
 usage() {
   cat <<'EOF'
-usage: install.sh [--yes] [--version <tag>] [--base <download base>]
-                  [--no-service] [--bind <address> [--public]] [--board-base <url>]
+usage: install.sh [--yes] [--version <tag>] [--base <download base>] [--no-service] [--no-open]
+                  [--serve] [--bind <address> [--public]] [--board-base <url>]
                   [--client --server <url> [--context <name>] [--token-file <file>]]
 EOF
 }
@@ -63,6 +74,8 @@ while [ "$#" -gt 0 ]; do
     --yes | -y) yes=1 ;;
     --no-service) service=0 ;;
     --client) client=1 ;;
+    --serve) serve=1 ;;
+    --no-open) open=0 ;;
     --public) public=1 ;;
     --version) value "$@"; tag=$2; shift ;;
     --base) value "$@"; base=${2%/}; shift ;;
@@ -81,10 +94,19 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+# The path: a client, a server (--serve, or a --bind, which already says one), else a laptop, which asks nothing.
+mode=laptop
+if [ "$client" = 1 ]; then
+  mode=client
+elif [ "$serve" = 1 ] || [ -n "$bind" ]; then
+  mode=server
+fi
+
 # A person answers on the terminal, even when the script itself comes down a pipe; with no terminal it goes on as --yes would. The
-# answers are read on descriptor 3 and the prompts written on 4, opened once, so each read takes the next line.
+# answers are read on descriptor 3 and the prompts written on 4, opened once, so each read takes the next line. A laptop asks nothing,
+# so it opens no terminal.
 interactive=0
-if [ "$yes" = 0 ]; then
+if [ "$yes" = 0 ] && [ "$mode" != laptop ]; then
   if [ -n "${NEMIA_INSTALL_TTY:-}" ] && [ -r "$NEMIA_INSTALL_TTY" ]; then
     interactive=1
     exec 3<"$NEMIA_INSTALL_TTY" 4>&2
@@ -142,7 +164,7 @@ case $base in
   *) has curl || has wget || fail "neither curl nor wget is installed: install one, then run this again" ;;
 esac
 if [ "$os" = linux ] && [ "$client" = 0 ] && [ "$service" = 1 ]; then
-  systemctl --user show-environment >/dev/null 2>&1 ||
+  [ "$mode" != server ] || systemctl --user show-environment >/dev/null 2>&1 ||
     warn "systemd --user does not answer here: nemia service install will not start Nemia at login; run nemia up by hand"
   [ -f /sys/fs/cgroup/cgroup.controllers ] ||
     warn "this machine has no cgroup v2: sessions run with no memory limit of their own"
@@ -226,14 +248,19 @@ if [ "$os" = darwin ]; then
 else
   mv -fT "$work/current" "$releases/current"
 fi
-say "installed $tag in $releases/$tag"
+size=$(wc -c <"$work/$asset" | tr -d ' ')
+[ "$mode" = laptop ] || say "installed $tag in $releases/$tag"
 
 bindir=$HOME/.local/bin
 mkdir -p "$bindir"
 ln -sfn "$releases/current/bin/nemia" "$bindir/nemia"
+on_path=1
 case ":$PATH:" in
   *":$bindir:"*) ;;
-  *) warn "$bindir is not on your PATH: add it (export PATH=\"$bindir:\$PATH\" in your shell's profile)" ;;
+  *)
+    on_path=0
+    [ "$mode" = laptop ] || warn "$bindir is not on your PATH: add it (export PATH=\"$bindir:\$PATH\" in your shell's profile)"
+    ;;
 esac
 nemia=$bindir/nemia
 
@@ -249,6 +276,95 @@ doctor() {
   "$nemia" doctor || warn "something is still missing: run the fix each line above names, then nemia doctor to read it again"
   say "a harness is activated on the board's Setup page or by nemia doctor fix <harness>, then signed in by the fix nemia doctor names"
   say "done: nemia doctor reads it again, nemia version says what runs"
+}
+
+# home <path>: the path with this HOME written as ~, as a person reads it.
+home() {
+  case $1 in
+    "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+# laptop: start Nemia now on this machine alone, open the board's first-visit link to its welcome page, and print the summary. It asks
+# nothing, installs no login service, and nothing it does past the unpacking fails the install.
+laptop() {
+  url=http://127.0.0.1:8787
+  started=0
+  link=
+  opened=0
+  if [ "$service" = 1 ]; then
+    if "$nemia" daemon --json >"$work/daemon"; then
+      started=1
+      said=$(sed -n 's/.*"url":"\([^"]*\)".*/\1/p' "$work/daemon")
+      [ -z "$said" ] || url=${said%/}
+    fi
+  fi
+  welcome=$url/welcome
+  if [ "$started" = 1 ]; then
+    if "$nemia" board link --base "$welcome" >"$work/link"; then
+      link=$(awk '/^https?:\/\// { print; exit }' "$work/link")
+    fi
+    [ -n "$link" ] || warn "no first-visit link was made: run nemia board link --base $welcome"
+  fi
+  if [ -n "$link" ] && [ "$open" = 1 ]; then
+    if [ "$os" = darwin ] && has open; then
+      if open "$link" >/dev/null 2>&1; then opened=1; fi
+    elif [ "$os" = linux ] && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && has xdg-open; then
+      if xdg-open "$link" >/dev/null 2>&1; then opened=1; fi
+    fi
+  fi
+
+  colour=0
+  if [ -n "${FORCE_COLOR:-}" ]; then
+    colour=1
+  elif [ -t 1 ] && [ -n "${TERM:-}" ] && [ "$TERM" != dumb ]; then
+    colour=1
+  fi
+  [ -z "${NO_COLOR:-}" ] || colour=0
+  bold= ok= note= reset=
+  if [ "$colour" = 1 ]; then
+    esc=$(printf '\033')
+    bold="$esc[1m" ok="$esc[32m" note="$esc[33m" reset="$esc[0m"
+  fi
+  row() { printf '  %s%s%s %-34s %s\n' "$1" "$2" "$reset" "$3" "$4"; }
+
+  case $os in darwin) system=macOS ;; *) system=Linux ;; esac
+  megabytes=$(awk -v b="$size" 'BEGIN { if (b >= 1000000) printf "%d MB", (b + 500000) / 1000000; else printf "%d kB", (b + 500) / 1000 }')
+  address=${url#*://}
+  case ${address%:*} in
+    127.0.0.1 | localhost | '[::1]') running="Running, on this machine alone" ;;
+    *) running=Running ;;
+  esac
+
+  printf '\n  %sNEMIA%s  %s · %s %s\n\n' "$bold" "$reset" "$tag" "$system" "$arch"
+  row "$ok" ✓ "Downloaded and verified" "$megabytes · sha256 ok"
+  row "$ok" ✓ "Installed" "$(home "$releases/$tag")"
+  if [ "$on_path" = 1 ]; then
+    row "$ok" ✓ "nemia is on your PATH" "$(home "$bindir/nemia")"
+  else
+    row "$note" ! "$(home "$bindir") is not on your PATH" "add export PATH=\"\$HOME/.local/bin:\$PATH\" to your shell's profile"
+  fi
+  if [ "$started" = 1 ]; then
+    row "$ok" ✓ "$running" "$address"
+  elif [ "$service" = 0 ]; then
+    row "$note" ! "Not started" "nemia up starts it"
+  else
+    row "$note" ! "Not running" "nemia up starts it; nemia daemon says why"
+  fi
+  printf '\n  Nothing else is set up yet, and that is expected.\n'
+  if [ "$opened" = 1 ]; then
+    printf '  Nemia is open in your browser to finish there, at:\n\n    %s\n' "$welcome"
+  elif [ -n "$link" ]; then
+    printf '  Open Nemia to finish in your browser:\n\n    %s\n\n' "$link"
+    printf '  It opens once, within ten minutes; nemia board link --base %s makes another.\n' "$welcome"
+  elif [ "$started" = 1 ]; then
+    printf '  Open Nemia to finish in your browser:\n\n    %s\n' "$welcome"
+  else
+    printf '  Start it, then open Nemia to finish in your browser:\n\n    nemia up && nemia board link --base %s\n' "$welcome"
+  fi
+  printf '\n  Later: nemia doctor says what is in place · nemia --help\n'
+  printf '         nemia service install starts Nemia at login\n\n'
 }
 
 if [ "$client" = 1 ]; then
@@ -273,6 +389,11 @@ if [ "$client" = 1 ]; then
   fi
   say "nemia now talks to $server; no service was installed"
   doctor
+  exit 0
+fi
+
+if [ "$mode" = laptop ]; then
+  laptop
   exit 0
 fi
 

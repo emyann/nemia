@@ -1047,7 +1047,7 @@
     },
     {
       "term": "First-visit link",
-      "meaning": "a single-use ticket the person makes at the server (`nemia board link`), needing no approval: the browser that opens it within ten minutes is signed in to the board by a person token minted then, set as its cookie and never shown (`linkMinted`, `linkClaimed`)."
+      "meaning": "a single-use ticket the person makes at the server (`nemia board link`, or `nemia open`, which opens this machine's browser on it), needing no approval: the browser that opens it within ten minutes is signed in to the board by a person token minted then, set as its cookie and never shown (`linkMinted`, `linkClaimed`)."
     },
     {
       "term": "Address kind",

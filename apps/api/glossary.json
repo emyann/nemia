@@ -163,6 +163,10 @@
         { "spelling": "PAIR_PATH", "card": "api: pairing, links and tokens grouped by what each does" },
         { "spelling": "aPairingRouteNeedsNone", "card": "api: pairing, links and tokens grouped by what each does" }
       ]
+    },
+    {
+      "term": "Board sign-in",
+      "meaning": "the board's HttpOnly, `SameSite=Strict` cookie (`TOKEN_COOKIE`) holding a person's token, set by a sign-in or a first-visit link's claim, kept thirty days and set again for as long on each read the person's cookie alone signs in (`cookieRenewed`, `apps/api/src/server/renewal.ts`); ended by Settings' Forget (`DELETE /api/session`) or by its token retired (`nemia token rm`), whose `unknown-token` refusal clears it."
     }
   ]
 }

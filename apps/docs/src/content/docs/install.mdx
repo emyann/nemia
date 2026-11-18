@@ -33,6 +33,10 @@ opens the board's welcome page in your browser, and prints a short summary of wh
 printed link yourself; `nemia board link --base http://localhost:8787/welcome` makes another. `--no-open` opens nothing. To start
 Nemia at login later, run `nemia service install`. The summary is plain where the output is no terminal or `NO_COLOR` is set.
 
+After that, `nemia open` opens the board in your browser signed in, at any time, with no token to see or type: it makes a first-visit
+link and opens it under `localhost`, or prints it where no browser can be opened. The board stays signed in while you use it, until
+thirty days after your last visit or until you forget it in Settings. `nemia board link` still prints a link without opening it.
+
 On a server, said by `--serve` or by a `--bind <address>`, it asks two things instead, each of which you can also answer by a flag
 with `--yes`, for a machine you set up by script:
 

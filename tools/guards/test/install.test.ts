@@ -9,12 +9,13 @@
  * asserts is exit codes and files, never a sentence.
  *
  * The stand-in Node is also the stand-in `nemia` of the steps after the unpacking: given `STUB_LOG`, it logs each verb it is asked,
- * answers `service addresses` with one address of each kind, `token add` with a person token (on its `Authorization:` line and
+ * answers `daemon --json` with a daemon on 127.0.0.1 (or exits 1 under `STUB_DAEMON=down`), `service addresses` with one address of
+ * each kind, `token add` with a person token (on its `Authorization:` line and
  * another), `board link` with a link, `doctor` with a missing piece and exit 1, and keeps the token file `config set-context` was
  * handed beside the log. A release carries no harness: an archive `pack` makes from a tree npm put the SDK's platform package in holds
  * none, and the installer asks for no harness's credential. A person's answers are lines of a file named by `NEMIA_INSTALL_TTY`,
- * which the installer reads in place of its terminal; `loginctl` and `systemctl` are stand-ins first on PATH, so no test touches
- * the machine's own.
+ * which the installer reads in place of its terminal; `loginctl`, `systemctl` and the browser's openers `open` and `xdg-open` are
+ * stand-ins first on PATH, so no test touches the machine's own or opens a browser.
  *
  * `install.sh` is POSIX sh: each test parses it with `sh -n` first, so a bashism the host's sh refuses fails here.
  */
@@ -41,11 +42,13 @@ const STUB = [
   'shift',
   'printf "%s\\n" "$*" >>"$STUB_LOG"',
   'case "$1 $2" in',
+  '  "daemon --json") [ "${STUB_DAEMON:-}" = down ] && exit 1;',
+  '    printf "%s\\n" \'{"state":"ticking","by":"api","pid":4242,"url":"http://127.0.0.1:8787"}\' ;;',
   '  "service addresses") printf "127.0.0.1 lo loopback\\n192.168.1.20 eth0 private\\n100.100.1.2 tailscale0 shared\\n" ;',
   '    printf "fd7a::1 tailscale0 unique-local\\n203.0.113.5 eth1 public\\n" ;;',
   '  "token add") printf "minted person-secret-1 for %s\\nAuthorization: Bearer person-secret-1\\n" "$3" ;;',
   '  "config set-context") if [ "$3" = local ]; then cat "$5" >"$STUB_LOG.local"; ls -l "$5" | cut -c1-10 >"$STUB_LOG.mode"; fi ;;',
-  '  "board link") printf "%s/link/first-visit\\n" "${4:-http://127.0.0.1:8787}" ;;',
+  '  "board link") printf "%s/link/first-visit\\nopen it once\\n" "${4:-http://127.0.0.1:8787}" ;;',
   '  "doctor ") printf "harness missing: nemia doctor fix <harness>\\n"; exit 1 ;;',
   'esac',
   '',
@@ -83,7 +86,7 @@ const machine = () => {
 const install = (home: string, root: string, args: string[], more: Record<string, string> = {}) => {
   const env = { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: home, WF_ROOT: root, ...more };
   const ran = spawnSync('sh', [INSTALL, ...args], { env, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] });
-  return { status: ran.status, out: `${ran.stdout}${ran.stderr}` };
+  return { status: ran.status, stdout: ran.stdout, out: `${ran.stdout}${ran.stderr}` };
 };
 
 test('install.sh parses as POSIX sh', () => {
@@ -163,35 +166,51 @@ test('REFUSED: an argument the installer does not take exits 2, and a flag with 
   assert.equal(fs.existsSync(root), false, 'nothing is written before the arguments are read');
 });
 
-/** Stand-in `loginctl` and `systemctl` that answer yes, first on PATH, so a service install touches neither of the machine's. */
+/**
+ * Stand-in `loginctl` and `systemctl` that answer yes, and the openers `open` and `xdg-open`, which log what they were handed to
+ * `$OPEN_LOG` and exit `${OPEN_EXIT:-0}`, first on PATH, so a service install touches neither of the machine's and no browser opens.
+ */
 const systemStandIns = (): string => {
   const dir = fs.realpathSync(scratch('install-system-'));
   for (const name of ['loginctl', 'systemctl']) fs.writeFileSync(path.join(dir, name), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  for (const name of ['open', 'xdg-open'])
+    fs.writeFileSync(path.join(dir, name), '#!/bin/sh\nprintf "%s\\n" "$1" >>"$OPEN_LOG"\nexit "${OPEN_EXIT:-0}"\n', { mode: 0o755 });
   return dir;
 };
 
 /**
- * A person's machine with the release `v1.2.3` published for it, and `run`, which installs on it with `args` and, when `answers`
- * is given, those lines as what the person types. It returns the exit, everything printed, and what the stand-in `nemia` logged.
+ * A person's machine with the release `v1.2.3` published for it, and `run`, which installs on it with `args`, `env` added to its
+ * environment and, when `answers` is given, those lines as what the person types. A display is set, so an opener may be called. It
+ * returns the exit, stdout alone, everything printed, what the stand-in `nemia` logged, and what the opener was handed.
  */
 const server = () => {
   const base = fs.realpathSync(scratch('install-base-'));
   publish(base, 'v1.2.3', HOST as Platform);
   const system = systemStandIns();
-  return (args: string[], answers?: string[]) => {
+  return (args: string[], answers?: string[], env: Record<string, string> = {}) => {
     const { home, root } = machine();
     const log = path.join(home, 'nemia.log');
-    const more: Record<string, string> = { STUB_LOG: log, PATH: `${system}:${process.env.PATH ?? '/usr/bin:/bin'}` };
+    const openLog = path.join(home, 'opened.log');
+    const more: Record<string, string> = {
+      STUB_LOG: log,
+      OPEN_LOG: openLog,
+      DISPLAY: ':0',
+      PATH: `${system}:${process.env.PATH ?? '/usr/bin:/bin'}`,
+      ...env,
+    };
     if (answers !== undefined) {
       more.NEMIA_INSTALL_TTY = path.join(home, 'answers');
       fs.writeFileSync(more.NEMIA_INSTALL_TTY, answers.map((line) => `${line}\n`).join(''));
     }
     const ran = install(home, root, [...args, '--base', `file://${base}`], more);
-    const asked = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean) : [];
+    const lines = (file: string) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean) : []);
     const kept = (suffix: string) => (fs.existsSync(`${log}.${suffix}`) ? fs.readFileSync(`${log}.${suffix}`, 'utf8') : undefined);
-    return { ...ran, asked, kept };
+    return { ...ran, asked: lines(log), opened: lines(openLog), kept };
   };
 };
+
+/** The escape a terminal's colour begins with. */
+const ESC = String.fromCharCode(0x1b);
 
 const onHost = { skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}` };
 
@@ -200,7 +219,7 @@ test(
   onHost,
   () => {
     const run = server();
-    const ran = run([], ['', '2']);
+    const ran = run(['--serve'], ['', '2']);
     assert.equal(ran.status, 0, ran.out);
 
     for (const offered of ['127.0.0.1', '192.168.1.20', '100.100.1.2', 'fd7a::1'])
@@ -224,14 +243,14 @@ test(
 
 test('a typed address is taken, and the 1 of the offer binds this machine alone, with no token minted', onHost, () => {
   const run = server();
-  const typed = run([], ['', '10.0.0.7']);
+  const typed = run(['--serve'], ['', '10.0.0.7']);
   assert.equal(typed.status, 0, typed.out);
   assert.ok(typed.asked.includes('service install --size auto --bind 10.0.0.7'), typed.asked.join('\n'));
   assert.ok(typed.asked.includes('board link --base http://10.0.0.7:8787'), 'the link is made under the bind, not the lease');
-  const v6 = run([], ['', 'fd7a::7']);
+  const v6 = run(['--serve'], ['', 'fd7a::7']);
   assert.ok(v6.asked.includes('board link --base http://[fd7a::7]:8787'), v6.asked.join('\n'));
 
-  const alone = run([], ['', '1']);
+  const alone = run(['--serve'], ['', '1']);
   assert.equal(alone.status, 0, alone.out);
   assert.ok(alone.asked.includes('service install --size auto'), alone.asked.join('\n'));
   assert.equal(
@@ -240,6 +259,68 @@ test('a typed address is taken, and the 1 of the offer binds this machine alone,
     alone.asked.join('\n'),
   );
   assert.equal(alone.asked.at(-1), 'doctor');
+});
+
+test(
+  'a laptop is asked nothing: Nemia started on the loopback, no login service, and the first-visit link to localhost/welcome opened',
+  onHost,
+  () => {
+    const run = server();
+    const ran = run([], ['n', '2']);
+    assert.equal(ran.status, 0, ran.out);
+    assert.deepEqual(ran.asked, ['daemon --json', 'board link --base http://localhost:8787/welcome'], 'no service, token or doctor');
+    assert.deepEqual(ran.opened, ['http://localhost:8787/welcome/link/first-visit']);
+    assert.doesNotMatch(ran.out, /Start Nemia at login|Pick a number/, 'no question is put');
+    assert.match(ran.stdout, /http:\/\/localhost:8787\/welcome/);
+    assert.doesNotMatch(ran.stdout, /127\.0\.0\.1/, 'the loopback is named localhost, on the running line and the link alike');
+    assert.match(ran.stdout, /v1\.2\.3/);
+    assert.match(ran.stdout, /nemia service install/, 'starting at login is named, not asked');
+    assert.equal(ran.stdout.includes(ESC), false, 'plain where stdout is no terminal');
+  },
+);
+
+test('a laptop whose browser does not open, or under --no-open, still installs and prints the first-visit link', onHost, () => {
+  const run = server();
+  const failed = run([], undefined, { OPEN_EXIT: '1' });
+  assert.equal(failed.status, 0, failed.out);
+  assert.deepEqual(failed.opened, ['http://localhost:8787/welcome/link/first-visit']);
+  assert.match(failed.stdout, /http:\/\/localhost:8787\/welcome\/link\/first-visit/);
+
+  const unopened = run(['--no-open']);
+  assert.equal(unopened.status, 0, unopened.out);
+  assert.deepEqual(unopened.opened, []);
+  assert.match(unopened.stdout, /http:\/\/localhost:8787\/welcome\/link\/first-visit/);
+
+  const headless = run([], undefined, { DISPLAY: '' });
+  assert.equal(headless.status, 0, headless.out);
+  assert.deepEqual(process.platform === 'linux' ? headless.opened : [], [], 'no display on Linux, no opener');
+});
+
+test('a laptop with --no-service, or whose daemon does not start, still installs, opens nothing and names nemia up', onHost, () => {
+  const run = server();
+  const unserved = run(['--no-service']);
+  assert.equal(unserved.status, 0, unserved.out);
+  assert.deepEqual(unserved.asked, []);
+  assert.deepEqual(unserved.opened, []);
+  assert.match(unserved.stdout, /nemia up/);
+
+  const down = run([], undefined, { STUB_DAEMON: 'down' });
+  assert.equal(down.status, 0, down.out);
+  assert.deepEqual(down.asked, ['daemon --json'], 'no link is minted for a daemon that is not there');
+  assert.deepEqual(down.opened, []);
+  assert.match(down.stdout, /nemia up/);
+});
+
+test('the summary is plain unless colour is asked: FORCE_COLOR colours it, and NO_COLOR wins over it', onHost, () => {
+  const run = server();
+  assert.equal(run(['--no-open']).stdout.includes(ESC), false);
+  assert.ok(run(['--no-open'], undefined, { FORCE_COLOR: '1' }).stdout.includes(`${ESC}[`));
+  assert.equal(run(['--no-open'], undefined, { FORCE_COLOR: '1', NO_COLOR: '1' }).stdout.includes(ESC), false);
+  assert.equal(
+    run(['--no-open'], undefined, { TERM: 'xterm-256color', NO_COLOR: '' }).stdout.includes(ESC),
+    false,
+    'no terminal, no colour',
+  );
 });
 
 test('REFUSED: a public or wildcard bind exits 1 with no service installed, unless --public, which is passed on', onHost, () => {
@@ -253,7 +334,7 @@ test('REFUSED: a public or wildcard bind exits 1 with no service installed, unle
       `${bind}: ${refused.asked.join('\n')}`,
     );
   }
-  const typed = run([], ['', '203.0.113.5']);
+  const typed = run(['--serve'], ['', '203.0.113.5']);
   assert.equal(typed.status, 1, typed.out);
   assert.equal(
     typed.asked.some((line) => line.startsWith('service install')),

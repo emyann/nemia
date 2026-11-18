@@ -67,14 +67,22 @@ const hostShown = (address: string): string => {
   return address.includes(':') ? `[${address}]` : address;
 };
 
+/** A url's loopback host, `127.0.0.1` or `[::1]`, at its scheme's end. */
+const LOOPBACK_URL_HOST = /^(https?:\/\/)(?:127\.0\.0\.1|\[::1\])(?=[:/]|$)/i;
+
 /**
  * The board's address a first-visit link is printed under where `--base` gives none: where the api ticking the store says it serves (its
- * lease's url: the bound address, or the loopback for every interface), else `http://<NEMIA_BIND or 127.0.0.1>:<PORT or 8787>` of `env`.
+ * lease's url: the bound address, or the loopback for every interface), else `http://<NEMIA_BIND or the loopback>:<PORT or 8787>` of
+ * `env`. The loopback is named `localhost`, the name a person types on their own machine: the board's cookie is kept per host name, so
+ * every link printed on this machine names it alike, and the api takes it (`loopback`, apps/api).
  * @param leaseUrl The url the api ticking the store serves at, off its lease, or undefined where none ticks it.
  * @param env The environment, whose `NEMIA_BIND` and `PORT` are read where no lease says the url.
  */
 export const boardBase = (leaseUrl: string | undefined, env: Env): string =>
-  leaseUrl ?? `http://${hostShown(env.NEMIA_BIND?.trim() || '127.0.0.1')}:${env.PORT?.trim() || API_PORT}`;
+  (leaseUrl ?? `http://${hostShown(env.NEMIA_BIND?.trim() || '127.0.0.1')}:${env.PORT?.trim() || API_PORT}`).replace(
+    LOOPBACK_URL_HOST,
+    '$1localhost',
+  );
 
 /** The url the api ticking the store `home` serves at, off its lease, or undefined where none ticks it. */
 const leaseUrl = (home: string): string | undefined => {

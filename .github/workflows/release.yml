@@ -129,8 +129,8 @@ jobs:
         run: node tools/release/release.ts pr
 
   # One archive per platform, each built on a runner of that platform: npm ci there takes the platform's own Claude binary. The labels
-  # are GitHub's standard runners (docs.github.com, Actions, GitHub-hosted runners): ubuntu-24.04 is x64, ubuntu-24.04-arm arm64, and
-  # macos-15 arm64 (M1). No concurrency group: legs of one group would cancel each other while pending.
+  # are GitHub's standard runners (docs.github.com, Actions, GitHub-hosted runners): ubuntu-24.04 is x64, ubuntu-24.04-arm arm64,
+  # macos-15-intel x64 (Intel) and macos-15 arm64 (M1). No concurrency group: legs of one group would cancel each other while pending.
   archive:
     needs: [tag]
     if: needs.tag.outputs.due == 'true'
@@ -142,6 +142,8 @@ jobs:
             runner: ubuntu-24.04
           - platform: linux-arm64
             runner: ubuntu-24.04-arm
+          - platform: darwin-x64
+            runner: macos-15-intel
           - platform: darwin-arm64
             runner: macos-15
     runs-on: ${{ matrix.runner }}
@@ -172,7 +174,7 @@ jobs:
           path: assets/
           if-no-files-found: error
 
-  # Every asset onto the release: the three archives, their SHA256SUMS merged, install.sh, and latest.json last, which says the
+  # Every asset onto the release: the four archives, their SHA256SUMS merged, install.sh, and latest.json last, which says the
   # release is whole and names the release's page as its notes, the link the board's Settings shows beside an upgrade. --clobber makes a rerun replace what an earlier one attached.
   # Then the draft is published, and made the latest: until then no upgrade, install.sh nor latest/download reads a release whose
   # archives are not there yet.

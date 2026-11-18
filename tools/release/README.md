@@ -80,6 +80,7 @@ Each release carries what a machine installs from (`install.sh`) and what `nemia
 | -------------------------------- | ------------------------------------------------------------------------------------------- |
 | `nemia-<tag>-linux-x64.tar.gz`   | the release folder for that platform, its entries at the archive's root                     |
 | `nemia-<tag>-linux-arm64.tar.gz` | the same, for Linux on arm64                                                                |
+| `nemia-<tag>-darwin-x64.tar.gz`  | the same, for macOS on Intel                                                                |
 | `nemia-<tag>-darwin-arm64.tar.gz`| the same, for macOS on Apple silicon                                                        |
 | `SHA256SUMS`                     | one line per archive, `<sha256>  <asset>`, as `sha256sum` writes it                         |
 | `install.sh`                     | the installer (`install.sh` beside this file), a POSIX sh script                            |
@@ -89,8 +90,8 @@ GitHub serves the newest release's assets at `https://github.com/<owner>/<repo>/
 at `.../releases/download/<tag>/<asset>`; that `releases` URL is the download base an archive's `release.json` names as its `source`.
 
 **How one is built.** The `tag` job's step `due` reads the release of the version main names and says `due=true` where it is still
-a draft or has no `latest.json`. Then the `archive` job runs on a runner of each platform (`ubuntu-24.04` x64, `ubuntu-24.04-arm`, `macos-15` arm64,
-GitHub's standard runners) at the tag:
+a draft or has no `latest.json`. Then the `archive` job runs on a runner of each platform (`ubuntu-24.04` x64, `ubuntu-24.04-arm`, `macos-15-intel` x64,
+`macos-15` arm64, GitHub's standard runners) at the tag:
 
 ```sh
 node tools/release/archive.ts --platform linux-x64 --tag v1.3.0 --source https://github.com/<owner>/<repo>/releases --out assets
@@ -104,15 +105,15 @@ platform, wherever npm put one; the SDK itself stays), `node/`, `bin/nemia` (sh:
 `release.json` (`tag`, `commit`, `source`, `builtAt`, `from: "archive"`, `platform`), the tar.gz and its `SHA256SUMS` line. A machine
 of another platform is refused: `npm ci` takes the binaries of the machine it runs on. Given `--tree <dir> --node <dir>`, it packs that
 tree with that Node and builds nothing, which is how `tools/guards/test/install.test.ts` makes a release. The `upload` job merges the
-three `SHA256SUMS`, writes `latest.json`, and attaches every asset with `gh release upload --clobber`, `latest.json` in a call of its
+four `SHA256SUMS`, writes `latest.json`, and attaches every asset with `gh release upload --clobber`, `latest.json` in a call of its
 own after the rest, then publishes the draft and makes it the latest (`gh release edit --draft=false --latest`): a release is never
 published with nothing to download, so neither its page nor `latest/download/latest.json` names one too early. A run cut off before
 the end leaves the release a draft, so the next run builds, attaches and publishes it again. An upgrade asked while a release already
 published lacks its archive — one published by hand, or before this order — is told to wait for it and upgrade again, not that no
 release exists.
-To move Node, set `version` in `node.json` and the three sums from `https://nodejs.org/dist/v<version>/SHASUMS256.txt`.
+To move Node, set `version` in `node.json` and the four sums from `https://nodejs.org/dist/v<version>/SHASUMS256.txt`.
 
-**What `install.sh` does.** It reads the platform from `uname`, refuses where `git`, `tar`, `curl` or `wget`, or `sha256sum` or `shasum`
+**What `install.sh` does.** It reads the platform from `uname`, refuses a Mac below macOS 13.5 (the oldest the release's Node 24 runs on), refuses where `git`, `tar`, `curl` or `wget`, or `sha256sum` or `shasum`
 is missing, and on Linux warns where `systemd --user` or cgroup v2 is (each a service's need, not the install's). It downloads the archive
 and `SHA256SUMS` (the tag from `latest.json` unless `--version`, refused before anything is downloaded or deleted unless it is `v` and
 three numbers, digits and dots alone, as `nemia upgrade` reads a published one, so no tag reaches above `releases/` and no pre-release
@@ -132,7 +133,9 @@ nothing, and a failure to open fails nothing) and ends on a summary of what it d
 **No harness comes with a release.** The archive holds no harness's binary (`npm ci --omit=optional` would have dropped every package's
 optional dependencies, so the archive takes the SDK's platform package out by name instead), and the installer asks for no harness's
 credential. A person activates the harness their sessions run on after the install, on the board's Setup page or by `nemia doctor fix
-<harness>`, which installs it at the version the release pins under the tools folder; `nemia doctor` then names its sign-in, a command
+<harness>`, which installs it at the version the release pins under the tools folder, from the SDK's package for the machine's platform
+(`@anthropic-ai/claude-agent-sdk-<platform>-<arch>`, which the SDK publishes for each of the four, held by
+`tools/guards/test/release-platforms.test.ts`); `nemia doctor` then names its sign-in, a command
 the person types on the server. `nemia doctor fix <harness> --index 1` removes it again. An upgrade carries the harnesses activated
 before it to the new release's pins (`nemia doctor carry`); it never runs the installer.
 

@@ -23,7 +23,8 @@ she is and how to reach her.
 A level is how much you hand over. There are three (`LEVELS`, in `packages/agent-orchestrator/src/level/level.ts`), set on the store
 and, if you like, on each factory:
 
-- **`manual`**: she is off. Nothing runs her.
+- **`manual`**: she operates nothing. She is still there to talk to: a message in her chat starts her, and she rests again after 15
+  quiet minutes.
 - **`semi-auto`**: she is on. Only what waits on you prompts you: an answer to a gate, a question, a loop or a cap is asked of you, and
   so is a write that cannot be undone or changes your settings or a factory. The rest is hers.
 - **`auto`**: as `semi-auto`, with one difference: an answer your confirmed list allows, in the run's current state, she gives without
@@ -37,7 +38,7 @@ and, if you like, on each factory:
 nemia level                        # where she is: her level, her session, how to reach her
 nemia level semi-auto              # put her on
 nemia level --factory pipao auto   # one factory at auto
-nemia level manual                 # put her off
+nemia level manual                 # she operates nothing, and answers her chat
 ```
 
 A factory's level can also be raised for a stretch of time, and falls back to its own default after it (`Raise`).
@@ -65,12 +66,17 @@ Before she acts in a factory, she reads its [instruction](/factories/#its-instru
 ## The keeper
 
 Nobody starts Nemia by hand. The daemon's keeper does (`packages/agent-orchestrator/src/nemia/keep.verb.ts`). On each beat it reads
-the levels again, reads her task off the runtime and her subscription off the store, and does what is owed (`nemiaDue`):
+the levels again, reads her task off the runtime, her chat and her subscription off the store, and does what is owed (`nemiaDue`):
 
-- While any factory is above `manual`, her task is filed as a long-lived session, and once it is open she is subscribed to the feed.
-- Once none is, her session is stopped and her subscription dropped.
+- While any factory is above `manual`, she operates: her task is filed as a long-lived session, once it is open she is subscribed to
+  the feed, and she never rests.
+- A message in her chat starts her whenever she is not running, at any level: her task is filed, the message is said to her.
+- Once no factory is above `manual`, her subscription is dropped and she stays for the conversation. After 15 quiet minutes (nothing
+  said to her, nothing said by her) she rests: the keeper stops her task. Your next message files a new one that resumes her last
+  session, so her chat reads as one conversation across her tasks.
 - When your custom instruction for her changes, her open session is told the new words through the runtime's `say`, with no restart.
-- A session stopped from outside is never filed again: setting a level above `manual` again starts a fresh one.
+- A session stopped from outside is not filed again until you speak: your next message or a level set starts a fresh one.
+- Her first meeting happens on a fresh store, at your first message: no level need be set first.
 
 The keeper is level-triggered like the tick: it carries nothing between beats, so after a restart it owes exactly what the files and
 the runtime say. Its machine is drawn from its code:
@@ -79,10 +85,11 @@ the runtime say. Its machine is drawn from its code:
 
 ```
 
-Read it this way: she is `off` until a factory is above `manual`, then `due` to be filed. If the harness does not yet trust her folder,
+Read it this way: she is `resting` until you write to her or set a factory above `manual`, then `due` to be filed. If the harness does not yet trust her folder,
 she is `untrusted`, and the keeper gives the trust itself before it files her, in the same beat: the folder is Nemia's own. Only a
-write the harness's file refuses keeps her there, and `nemia level`, the board and `nemia doctor` say why and what to mend. Once `filed`, she is subscribed and `kept`. A session that settles from outside leaves her
-`stopped`. When no factory is above `manual`, she is `leaving` until her session is stopped and her subscription dropped, then `off`.
+write the harness's file refuses keeps her there, and `nemia level`, the board and `nemia doctor` say why and what to mend. Once `filed`
+above `manual`, she is subscribed and `kept`; at `manual` she is `talking`. Quiet at `manual`, she is `leaving` until her session is
+stopped, then `resting`. A session that settles from outside leaves her `stopped`, until you speak.
 
 ## Her subscription
 

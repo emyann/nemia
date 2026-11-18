@@ -16,7 +16,6 @@ import {
   durationOf,
   durationRefusal,
   factoryAsked,
-  levelsAfter,
   type FactoryAsk,
   type FactoryLevel,
   type FactoryLevelFile,
@@ -28,14 +27,14 @@ import { EngineService, asked, tried, trustedFolder, type Engine } from '../runt
 import { taskSpend, type Spend } from '../status/status.ts';
 import { bridgeOf, type Bridge } from '../views/views.verb.ts';
 import type { EnginePhase } from '../views/views-words.ts';
-import { nemiaDir, promptAllows, readLevel, readUntrusted, writeLevel } from './level.store.ts';
-import { LEVEL_FORM, nemiaTaskId, type Level, type LevelFile } from './nemia.ts';
+import { herTasks, nemiaDir, promptAllows, readLevel, readSession, readUntrusted, writeLevel } from './level.store.ts';
+import { LEVEL_FORM, type Level, type LevelFile } from './nemia.ts';
 
 /**
  * Where Nemia is, as `nemia level` answers: the store's `level` and since when; each factory's level (`factories`), the default factory
  * first; her task, its phase and its session where one is filed; how a person reaches her session (`reach`), and her session's web link
- * where it was asked (`bridge`, null where not; `bridgeOf`); whether her task was stopped
- * from outside (`stopped`); what her sessions cost (`spend`, counted as each ends, as a step's; null where none is filed); and the allow
+ * where it was asked (`bridge`, null where not; `bridgeOf`); whether her task ended with no rest of the keeper's (`stopped`, filed
+ * again on the person's next word); whether no task of hers is open and a message in her chat would start one (`rests`); what her sessions cost (`spend`, counted as each ends, as a step's; null where none is filed); and the allow
  * rules a person gave her at a prompt (`allows`); and why the keeper could not trust her folder, naming the fix (`untrusted`, the keeper's
  * record), null where her harness trusts it or keeps no trust, or where the keeper's write was not refused: the keeper trusts her own
  * folder itself before it files her, and no person runs a command for it.
@@ -49,6 +48,7 @@ export type NemiaLevel = {
   reach: string[];
   bridge: Bridge | null;
   stopped: boolean;
+  rests: boolean;
   spend: Spend | null;
   allows: string[];
   factories: FactoryLevel[];
@@ -76,46 +76,45 @@ const spendOf = (view: Parameters<typeof taskSpend>[0]): Spend | null => {
 const untrustedNow = (home: string): string | null =>
   trustedFolder(DEFAULT_HARNESS, nemiaDir(home)) === false ? (readUntrusted(home) ?? null) : null;
 
-/** Where she is, off the level files and her task's view. */
+/** Where she is, off the level files, the keeper's record of her session and her current task's view. */
 const levelNow = (e: Engine) =>
   Effect.gen(function* () {
     const home = yield* StoreRoot;
     const file = yield* tried(() => readLevel(home));
+    const task = (yield* tried(() => herTasks(home))).at(-1);
+    const rested = (yield* tried(() => readSession(home)))?.rested !== undefined;
     const factories = yield* levelsNow();
-    const above = factories.some((row) => row.level !== 'manual');
-    const view = file?.task === undefined ? undefined : yield* asked('view', e.view(file.task));
+    const view = task === undefined ? undefined : yield* asked('view', e.view(task));
     const filed = view !== undefined && Boolean(view.state.filedAt);
     const sessionId = filed ? view.sessionId : null;
     const open = filed && !view.state.settled;
+    const ended = filed && (Boolean(view.state.settled) || view.state.stopRequested);
     const bridge = open ? bridgeOf(new Map([[view.id, view]]))(view.id) : null;
+    const untrusted = yield* tried(() => untrustedNow(home));
     return {
       level: file?.level ?? 'manual',
       since: file?.since ?? null,
-      task: file?.task ?? null,
+      task: task ?? null,
       phase: filed ? view.phase : null,
       sessionId,
       reach: open ? reachOf(sessionId, bridge) : [],
       bridge,
-      stopped: above && filed && (Boolean(view.state.settled) || view.state.stopRequested),
+      stopped: ended && !rested,
+      rests: !open && untrusted === null,
       spend: filed ? spendOf(view) : null,
       allows: yield* tried(() => promptAllows(home)),
       factories,
-      untrusted: yield* tried(() => untrustedNow(home)),
+      untrusted,
     } satisfies NemiaLevel;
   });
 
 /**
- * The store's level file once the store's level is `level` (the same where only a factory changes, `storeSet` false) and some factory is
- * above `manual` or none (`above`), after `now`; undefined where nothing of it changes. Above `manual`, her task is kept where it is open
- * or not yet filed and some factory already was, and a fresh one named otherwise, whatever her folder's trust, which the keeper gives; at
- * none, the task stays named, so the keeper stops it.
+ * The store's level file once the person set a level at `at`, the store's (`level`) or a factory's (`level` the store's as it is):
+ * `since` moved where the store's level changed, `asked` always, and a former task the file named carried on as it is read.
  */
-function storeAsked(level: Level, storeSet: boolean, above: boolean, now: NemiaLevel, at: string): LevelFile | undefined {
-  const since = storeSet && level !== now.level ? at : (now.since ?? at);
-  if (!above) return storeSet ? { level, since: at, ...(now.task === null ? {} : { task: now.task }) } : undefined;
-  const wasAbove = now.factories.some((row) => row.level !== 'manual');
-  if (wasAbove && now.task !== null && !now.stopped) return storeSet ? { level, since, task: now.task } : undefined;
-  return { level, since, task: nemiaTaskId(at) };
+function storeAsked(level: Level, now: NemiaLevel, former: LevelFile | undefined, at: string): LevelFile {
+  const since = level !== now.level || now.since === null ? at : now.since;
+  return { level, since, asked: at, ...(former?.task === undefined ? {} : { task: former.task }) };
 }
 
 /** The factory's file a person's write asks for at `at`, or refused: no such factory (`Missing`), no raise to end, a raise of nothing. */
@@ -149,8 +148,8 @@ const factoryAskOf = (args: LevelInput): FactoryAsk | undefined =>
 
 /**
  * `nemia level`'s handler: where she is, after the level asked is written, where one is; refused (`Invalid`) as `factoryArgsRefusal`
- * refuses, so a caller that runs no `check` is refused the same. Her task is named in the store's file first, then
- * the factory's file written: a failure between them leaves a task named and nothing above `manual`, which the keeper leaves alone.
+ * refuses, so a caller that runs no `check` is refused the same. The store's file is written first, saying when the person set a level
+ * (`asked`), then the factory's: a failure between them leaves a set the keeper reads as the person speaking and no level changed.
  */
 const levelBy = (args: LevelInput, home: string) =>
   Effect.gen(function* () {
@@ -166,9 +165,8 @@ const levelBy = (args: LevelInput, home: string) =>
     const store = asked ?? now.level;
     const file = factory === undefined ? undefined : yield* factoryFileAsked(factory, now.level, at);
     const changed = factory === undefined || file === undefined ? undefined : { factory: factory.factory, file };
-    const above = levelsAfter(now.factories, store, changed, at.getTime(), DEFAULT_NAMESPACE).some((row) => row.level !== 'manual');
-    const storeFile = yield* tried(() => storeAsked(store, storeSet, above, now, at.toISOString()));
-    if (storeFile !== undefined) yield* tried(() => writeLevel(home, storeFile));
+    const former = yield* tried(() => readLevel(home));
+    yield* tried(() => writeLevel(home, storeAsked(store, now, former, at.toISOString())));
     if (changed !== undefined)
       yield* Effect.flatMap(FactoryDoor, (door) => door.level.write(FactoryName.read(changed.factory), changed.file));
     return yield* levelNow(e);

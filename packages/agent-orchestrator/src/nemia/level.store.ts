@@ -1,7 +1,8 @@
 /**
  * Nemia's folder in the store, `$WF_ROOT/nemia/`: the person's level (`level.json`, written by `nemia level` alone), her memory
  * (`memory/`, written by her session alone, read here), the instruction her session is filed with (`prompt.md`, composed by the keeper),
- * the custom words she was last filed or told with (`told.json`, the keeper's record), why the keeper could not trust her folder
+ * the custom words she was last filed or told with (`told.json`, the keeper's record), her tasks and the marks of her current one
+ * (`session.json`, the keeper's record), why the keeper could not trust her folder
  * (`untrusted.json`, the keeper's record, there only while its write is refused), and what is built in with her in the package's
  * `nemia/` folder, a plugin: her definition (`agents/nemia.md`), her skills and the MCP port's server entry.
  *
@@ -17,7 +18,7 @@ import type { StepSpec } from '../step/step.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { POLICY_FOLDER } from '../auto/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { LEVELS, nemiaPrompt, type LevelFile, type ToldCustom } from './nemia.ts';
+import { LEVELS, nemiaPrompt, type LevelFile, type NemiaSession, type ToldCustom } from './nemia.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /**
@@ -51,6 +52,12 @@ export const promptFile = (home: string): string => path.join(nemiaDir(home), 'p
 export const toldFile = (home: string): string => path.join(nemiaDir(home), 'told.json');
 
 /**
+ * The keeper's record of her session (`NemiaSession`): her tasks and the marks of her current one.
+ * @param home The store's root folder.
+ */
+export const sessionFile = (home: string): string => path.join(nemiaDir(home), 'session.json');
+
+/**
  * The keeper's record of why it could not give her harness's trust to her folder: there only while that write is refused.
  * @param home The store's root folder.
  */
@@ -69,6 +76,7 @@ export const nemiaDefinition = (): string => path.join(SHIPPED_NEMIA, 'agents', 
 const LevelSchema = Schema.Struct({
   level: Schema.Literals(LEVELS),
   since: Schema.String.check(Schema.isNonEmpty()),
+  asked: Schema.optionalKey(Schema.String.check(Schema.isNonEmpty())),
   task: Schema.optionalKey(Schema.String.check(Schema.isNonEmpty())),
 });
 
@@ -102,7 +110,7 @@ export function readLevel(home: string): LevelFile | undefined {
 /**
  * Writes the person's level whole, through a hidden file renamed over it, so the keeper never reads half of it.
  * @param home The store's root folder.
- * @param level The level to write: the level, since when, and her task where she has one.
+ * @param level The level to write: the level, since when, when the person last set one, and a former task carried on.
  */
 export function writeLevel(home: string, level: LevelFile): void {
   fs.mkdirSync(nemiaDir(home), { recursive: true });
@@ -183,9 +191,9 @@ export function ownBin(root: string = PACKAGE): string | undefined {
 
 /**
  * The deny rules on every write in the store `root` but her own folder's: an `Edit` rule on each entry at its top, a folder's whole, the
- * rules for auto among them whether or not their folder is there yet (`POLICY_FOLDER`), and on her level, her instruction and the record
- * of the custom words she was told (`toldFile`) and why her folder could not be trusted (`untrustedFile`), the four files of her folder
- * she does not own. Read at each filing, so a folder the
+ * rules for auto among them whether or not their folder is there yet (`POLICY_FOLDER`), and on her level, her instruction, the record
+ * of the custom words she was told (`toldFile`), why her folder could not be trusted (`untrustedFile`) and the keeper's record of her
+ * session (`sessionFile`), the five files of her folder she does not own, and her chat's. Read at each filing, so a folder the
  * store gains is denied at the next.
  * @param home The store's root folder, whose entries are denied.
  */
@@ -208,17 +216,71 @@ export function storeDenies(home: string): string[] {
     `Edit(/${promptFile(home)})`,
     `Edit(/${toldFile(home)})`,
     `Edit(/${untrustedFile(home)})`,
+    `Edit(/${sessionFile(home)})`,
     `Edit(/${path.join(nemiaDir(home), 'chat')}/**)`,
   ];
 }
 
+/** The keeper's record of her session as it is decoded: her tasks, each named, and its marks, each a time. */
+const SessionSchema = Schema.Struct({
+  tasks: Schema.Array(Schema.String.check(Schema.isNonEmpty())),
+  idleSince: Schema.optionalKey(Schema.String),
+  rested: Schema.optionalKey(Schema.String),
+  stoppedSeen: Schema.optionalKey(Schema.String),
+});
+
 /**
- * Her chat as the chat's verbs and its delivery are given it: the task her session is filed under, if any, and her folder.
+ * The keeper's record of her session (`sessionFile`), or undefined where it kept none, or one that does not read as one: its next write
+ * replaces it, so a file a hand broke stops no filing.
  * @param home The store's root folder.
  */
-export const nemiaChatPlace = (home: string): { task: string | undefined; dir: string } => ({
-  task: readLevel(home)?.task,
+export function readSession(home: string): NemiaSession | undefined {
+  let text: string;
+  try {
+    text = fs.readFileSync(sessionFile(home), 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw err;
+  }
+  try {
+    const read = Schema.decodeUnknownResult(SessionSchema)(JSON.parse(text));
+    return Result.isSuccess(read) ? { ...read.success, tasks: [...read.success.tasks] } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Writes the keeper's record of her session whole, through a hidden file renamed over it, so no reader reads half of it.
+ * @param home The store's root folder.
+ * @param session Her tasks and the marks of her current one.
+ */
+export function writeSession(home: string, session: NemiaSession): void {
+  fs.mkdirSync(nemiaDir(home), { recursive: true });
+  writeWhole(sessionFile(home), `${JSON.stringify(session)}\n`);
+}
+
+/**
+ * Her tasks, oldest first, the last her current one: the keeper's record's; where it kept none, the task an older store's level file
+ * named, adopted as her first; else none.
+ * @param home The store's root folder.
+ */
+export function herTasks(home: string): string[] {
+  const kept = readSession(home);
+  if (kept !== undefined) return kept.tasks;
+  const former = readLevel(home)?.task;
+  return former === undefined ? [] : [former];
+}
+
+/**
+ * Her chat as the chat's verbs and its delivery are given it: her tasks, oldest first (`herTasks`), her folder, and whether a message
+ * starts her where no task of hers is open (`wakes`): so, but while the keeper's record says it could not trust her folder.
+ * @param home The store's root folder.
+ */
+export const nemiaChatPlace = (home: string): { tasks: string[]; dir: string; wakes: boolean } => ({
+  tasks: herTasks(home),
   dir: nemiaDir(home),
+  wakes: readUntrusted(home) === undefined,
 });
 
 /**

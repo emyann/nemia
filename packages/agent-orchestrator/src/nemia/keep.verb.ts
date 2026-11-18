@@ -1,14 +1,16 @@
 /**
- * The keeper of Nemia: each beat, the levels read again (`levelsNow`), her task read off the engine and her subscription off the store, and
- * what is owed done (`nemiaDue`) — her harness's trust given to her own folder where it is not, before she is filed in the same beat
- * (`trustHer`), the folder being Nemia's own, and why where that write is refused recorded for the person (`writeUntrusted`); her task
- * filed long-lived while any factory is above `manual`, her subscription put once it is open with her floor (`NEMIA_FLOOR`), both taken
- * away once none is, whether a level set or a raise's end made it so; and while she is kept, the person's custom words said to her open
- * task (`sayCustom`) once they are not those she was last filed or told with (`customChanged`), which are recorded, and her instruction
- * written, only after she was told: a change to her builtin instruction alone tells her nothing; and while she is kept and her session
- * live, the person's chat words said to her (`sayOutbox`), the questions her session holds open written down (`recordAsks`) and the
- * person's answers to them carried to her (`answersDue`). Level-triggered: it carries nothing between beats, so a restart owes what the
- * files and the engine say. A task stopped from outside is never filed again.
+ * The keeper of Nemia: each beat, the levels read again (`levelsNow`), the keeper's record of her session (`session.json`: her tasks and
+ * the marks of her current one), her current task read off the engine, her subscription off the store and her chat's files, and what is
+ * owed done (`nemiaDue`). Two roles on one session. **Conversation**: a word of the person's in her chat files her where no task of hers
+ * is open, at any level, as a new task continuing her last session (`resumeFrom`), after her harness's trust is given to her own folder
+ * where it is not (`trustHer`), why where that write is refused recorded for the person (`writeUntrusted`); at `manual`, once her session
+ * has been idle `restAfter` since the last word said to her (`quietOf`), she is put to rest: the record marked, then her task stopped.
+ * **Operating**: while any factory is above `manual` she is filed and kept, subscribed with her floor (`NEMIA_FLOOR`), and never rests; once
+ * none is, her subscription is dropped and the conversation goes on until it is quiet. While the keeper speaks to her session, the
+ * person's custom words are said to it (`sayCustom`) once they are not those she was last filed or told with (`customChanged`), and,
+ * while it is live, the person's chat words (`sayOutbox`), the questions it holds open written down (`recordAsks`) and the person's answers
+ * carried (`answersDue`). A task that ended with no rest of the keeper's is marked so, and filed again only on a word of the person's
+ * after the mark. Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer, and
  * her subscription through the Subscription door (`SubscriptionDoor`) and the person's custom words for her through the Agent door
@@ -18,7 +20,7 @@ import { listedAtOnce } from '../factory/door/factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Cause, Effect, Metric, type Duration } from 'effect';
+import { Cause, Duration, Effect, Metric } from 'effect';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { ownOf } from '../tick/told.verb.ts';
 import { factoryMounts } from '../factory/factory.ts';
@@ -35,19 +37,23 @@ import { upOf } from '../chat/index.ts';
 import {
   composePrompt,
   filedPrompt,
+  herTasks,
   memoryDir,
   nemiaDir,
   ownBin,
   promptAllows,
   readLevel,
   readNemia,
+  readSession,
   readTold,
   SHIPPED_NEMIA,
   storeDenies,
   writePrompt,
+  writeSession,
   writeTold,
   writeUntrusted,
 } from './level.store.ts';
+import { readAnswers, readOutbox } from '../chat/chat.store.ts';
 import { nemiaFence, widened } from '../admission/index.ts';
 import { TABLE } from '../command/commands.verb.ts';
 import { daemonFile, parseDaemonFile } from '../daemon/daemon.store.ts';
@@ -57,32 +63,38 @@ import { TokenDoor } from '../token/token.store.ts';
 import {
   NEMIA_DIGEST_EVERY,
   NEMIA_FLOOR,
+  NEMIA_REST_AFTER,
   NEMIA_SUBSCRIPTION,
   NEMIA_SELECTORS,
   customChanged,
   nemiaDue,
   nemiaPrompt,
   nemiaSettings,
-  nemiaState,
+  nemiaTaskId,
+  quietOf,
   toldCustom,
   folderUnmade,
   trustRefused,
   type HerSubscription,
   type HerTask,
   type NemiaAct,
+  type NemiaSession,
 } from './nemia.ts';
 
 /** What the keeper did, each act counted once done. */
 export const NEMIA_ACTS = Metric.counter('nemia.acts', {
   description:
-    "the keeper's acts on Nemia's session: her folder trusted, filed, subscribed, stopped, dropped, her custom words said, the outbox said",
+    "the keeper's acts on Nemia's session: her folder trusted, filed, subscribed, put to rest, dropped, marked, her custom words said, the outbox said",
 });
 
-/** How often the keeper reads the level, her task and her subscription again. */
-export type KeepOptions = { every: Duration.Input };
+/**
+ * How often the keeper reads the level, her task and her subscription again (`every`), and how long the conversation is quiet before
+ * she rests at `manual` (`restAfter`).
+ */
+export type KeepOptions = { every: Duration.Input; restAfter: Duration.Input };
 
-/** The keeper's pace when it is given none. */
-export const KEEP_DEFAULTS: KeepOptions = { every: '5 seconds' };
+/** The keeper's pace and her rest when it is given none. */
+export const KEEP_DEFAULTS: KeepOptions = { every: '5 seconds', restAfter: NEMIA_REST_AFTER };
 
 /** Her priority among the tasks waiting for a slot: above every step, so the person's agent is never queued behind the work. */
 const NEMIA_PRIORITY = 1_000_000;
@@ -106,10 +118,14 @@ const quotaUrl = (home: string): string | undefined => {
  */
 export const quotaCall = (quota: string): string => `curl -s ${quota}`;
 
-/** What her session is told first, once filed, and how she reads the quota at `quota`, where the daemon serves one. */
-const nemiaBrief = (quota: string | undefined): string =>
+/**
+ * What her session is told first, once filed: what she does while the person writes to her, and, while a factory is above `manual`
+ * (`operating`), that the feed is said to her; and how she reads the quota at `quota`, where the daemon serves one.
+ */
+const nemiaBrief = (quota: string | undefined, operating: boolean): string =>
   [
-    'You are on. Read your memory, then wait: the feed is said to you when it needs the person, and the person may open you.',
+    'You are on. Read your memory, then answer what the person wrote in your chat, if anything; then wait for their next words.',
+    ...(operating ? ['The feed is said to you when it needs the person.'] : []),
     "At auto, `nemia policy nemia` lists the answers the person's confirmed rules let you give unasked; propose rules from their custom",
     'instruction with `nemia policy propose nemia --file -`.',
     ...(quota === undefined ? [] : [`The quota and its pace: \`${quotaCall(quota)}\`.`]),
@@ -127,13 +143,23 @@ const factoryFolders = (home: string): Mount[] => {
  * folder (`widened`, `promptAllows`), the store's denies (`storeDenies`) and the daemon's own bin first on her path (`ownBin`) in the
  * harness's settings, and her admission (`nemia admit`, with her floor and her rules for auto) asked before each of her shell calls. A
  * prompt allowed while she runs is widened the next time she is filed. Her instruction is composed with the person's custom words for
- * her, `custom` (`herCustom`), and her session token, minted as she is filed (`herToken`), is in her environment as `SESSION_TOKEN`.
+ * her, `custom` (`herCustom`), and her session token, minted as she is filed (`herToken`), is in her environment as `SESSION_TOKEN`. A
+ * task that continues her last session (`resumeFrom`) starts with her memory of the conversation.
  * @param id The id her task is filed under.
  * @param custom The person's custom words for her, or undefined where there are none.
  * @param token Her session token, minted as she is filed.
  * @param home The store's root folder.
+ * @param resumeFrom The session of her last task to continue, or undefined to start cold.
+ * @param operating Whether a factory is above `manual`, so her brief says the feed is said to her.
  */
-export function nemiaSpec(id: string, custom: string | undefined, token: string, home: string): Parameters<Engine['file']>[0] {
+export function nemiaSpec(
+  id: string,
+  custom: string | undefined,
+  token: string,
+  home: string,
+  resumeFrom?: string,
+  operating = true,
+): Parameters<Engine['file']>[0] {
   const step = readNemia();
   const prompt = composePrompt(home, step.body, custom);
   const memory = `Edit(/${memoryDir(home)}/**)`;
@@ -143,8 +169,9 @@ export function nemiaSpec(id: string, custom: string | undefined, token: string,
   const settings = nemiaSettings({ ask: fence.ask, deny: [...fence.deny, ...storeDenies(home)] }, bin, process.env.PATH ?? '');
   return {
     id,
-    brief: nemiaBrief(quota),
+    brief: nemiaBrief(quota, operating),
     cwd: nemiaDir(home),
+    ...(resumeFrom === undefined ? {} : { resumeFrom }),
     harness: step.harness ?? DEFAULT_HARNESS,
     restartPolicy: 'Always',
     priority: NEMIA_PRIORITY,
@@ -187,21 +214,52 @@ const herCustom = Effect.fnUntraced(function* () {
 const herToken = (id: string) =>
   Effect.flatMap(TokenDoor, (door) => door.tokens.mint({ agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task: id }));
 
-/** Her task `id` filed, warned of where no nemia of the daemon's is first on her path. */
-const fileHer = (e: Engine, id: string) =>
+/**
+ * The session of her latest filed task before `id` among `tasks`, which a new task continues, or undefined where none of them holds one.
+ */
+const lastSession = (e: Engine, tasks: readonly string[], id: string) =>
+  Effect.gen(function* () {
+    const at = tasks.indexOf(id);
+    for (const task of tasks.slice(0, at < 0 ? tasks.length : at).reverse()) {
+      const view = yield* asked('view', e.view(task));
+      if (view.state.filedAt && view.sessionId !== null) return view.sessionId;
+    }
+    return undefined;
+  });
+
+/**
+ * A task of hers filed: under the record's last task where it is not filed yet, else under a new id named for `now` and appended to the
+ * record first, its marks cleared, so a filing that fails is filed again under the same id; continuing the session of her task before it
+ * (`resumeFrom`). Warned of where no nemia of the daemon's is first on her path.
+ */
+const fileHer = (e: Engine, beat: Beat) =>
   Effect.gen(function* () {
     if (ownBin() === undefined)
       yield* Effect.logWarning(`Nemia is filed with no nemia of the daemon's first on her path: none links ${SHIPPED_NEMIA}/../bin.`);
+    const home = beat.home;
+    const tasks = herTasks(home);
+    const last = tasks.at(-1);
+    const minted = (n: number): string => (n === 0 ? nemiaTaskId(beat.at) : `${nemiaTaskId(beat.at)}-${n}`);
+    let fresh = 0;
+    while (tasks.includes(minted(fresh))) fresh++;
+    const id = last !== undefined && !beat.filed ? last : minted(fresh);
+    const listed = id === last ? tasks : [...tasks, id];
+    writeSession(home, { tasks: listed });
+    const resumeFrom = yield* lastSession(e, listed, id);
     const custom = yield* herCustom();
-    yield* asked('file', e.file(nemiaSpec(id, custom, yield* herToken(id), yield* StoreRoot)));
+    yield* asked('file', e.file(nemiaSpec(id, custom, yield* herToken(id), home, resumeFrom, beat.above)));
   });
+
+/** The keeper's record of her session with `marks` laid over it, written whole. */
+const marked = (home: string, marks: Omit<NemiaSession, 'tasks'>) =>
+  Effect.sync(() => writeSession(home, { ...(readSession(home) ?? { tasks: herTasks(home) }), ...marks }));
 
 /**
  * Her open task `id` told the person's custom words as they read now (`toldCustom`), and only once the runtime took them, her instruction
  * written with them, so an attempt it starts again reads them too, and the words recorded as told: words she was not told are never
  * written as hers.
  */
-const sayCustom = (e: Engine, id: string) =>
+const sayCustom = (e: Engine, { id }: Beat) =>
   Effect.gen(function* () {
     const home = yield* StoreRoot;
     const custom = yield* herCustom();
@@ -211,13 +269,24 @@ const sayCustom = (e: Engine, id: string) =>
   });
 
 /**
- * Each act the keeper owes on her task `id`, but the trust of her folder (`trustHer`): a stop or a drop already done by another is no
- * failure.
+ * What an act reads of its beat: the store, her current task's id (empty where she has none), whether it is filed, whether a factory is
+ * above `manual`, and the beat's moment as an ISO time.
  */
-const ACTS: Record<Exclude<NemiaAct, 'trust'>, (e: Engine, id: string) => Effect.Effect<void, Refusal, StoreRoot>> = {
+type Beat = { home: string; id: string; filed: boolean; above: boolean; at: string };
+
+/**
+ * Each act the keeper owes on her current task, but the trust of her folder (`trustHer`): a stop or a drop already done by another is no
+ * failure, and a rest marks the record before her task is stopped, so a stop it asked is never read as one from outside.
+ */
+const ACTS: Record<Exclude<NemiaAct, 'trust'>, (e: Engine, beat: Beat) => Effect.Effect<void, Refusal, StoreRoot>> = {
   file: fileHer,
-  stop: (e, id) => asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void))),
-  subscribe: (_e, id) =>
+  rest: (e, beat) =>
+    marked(beat.home, { rested: beat.at }).pipe(
+      Effect.andThen(asked('stop', e.stop(beat.id).pipe(Effect.catchTag('StopRefused', () => Effect.void)))),
+    ),
+  markIdle: (_e, beat) => marked(beat.home, { idleSince: beat.at }),
+  markStopped: (_e, beat) => marked(beat.home, { stoppedSeen: beat.at }),
+  subscribe: (_e, { id }) =>
     Effect.gen(function* () {
       yield* (yield* SubscriptionDoor).subscriptions.put(HERS, {
         task: id,
@@ -233,14 +302,14 @@ const ACTS: Record<Exclude<NemiaAct, 'trust'>, (e: Engine, id: string) => Effect
       if ((yield* door.subscriptions.list()).listed.some((s) => s.name === NEMIA_SUBSCRIPTION)) yield* door.subscriptions.drop(HERS);
     }),
   sayCustom,
-  sayOutbox: (e, id) => Effect.flatMap(StoreRoot, (home) => sayOutbox(id, nemiaDir(home))).pipe(over(e), Effect.asVoid),
-  record: (e, id) => Effect.flatMap(StoreRoot, (home) => recordAsks(id, nemiaDir(home))).pipe(over(e), Effect.asVoid),
-  answer: (e, id) => Effect.flatMap(StoreRoot, (home) => answersDue(id, nemiaDir(home))).pipe(over(e), Effect.asVoid),
+  sayOutbox: (e, { home, id }) => sayOutbox(id, nemiaDir(home)).pipe(over(e), Effect.asVoid),
+  record: (e, { home, id }) => recordAsks(id, nemiaDir(home)).pipe(over(e), Effect.asVoid),
+  answer: (e, { home, id }) => answersDue(id, nemiaDir(home)).pipe(over(e), Effect.asVoid),
 };
 
-/** One act owed on her task `id`, counted once done. */
-const act = (e: Engine, id: string, owed: Exclude<NemiaAct, 'trust'>) =>
-  ACTS[owed](e, id).pipe(Effect.andThen(Metric.update(NEMIA_ACTS, 1)));
+/** One act owed on her current task, counted once done. */
+const act = (e: Engine, beat: Beat, owed: Exclude<NemiaAct, 'trust'>) =>
+  ACTS[owed](e, beat).pipe(Effect.andThen(Metric.update(NEMIA_ACTS, 1)));
 
 /** The words of what the write of her folder's trust threw. */
 const threwWords = (err: unknown): string => (err instanceof Error ? err.message : String(err));
@@ -277,23 +346,34 @@ const trustHer = (home: string) =>
   });
 
 /**
- * Her task's record off the engine, undefined where none is filed under `id`, whether her session is live (`upOf`), whether it
- * holds a question open on the person (`asking`, off the view's `asks`) and whether the chat holds one whose mark no longer says what
- * became of its call (`closing`, `closesOwed` read against the same view).
+ * Her task's record off the engine, undefined where none is filed under `id`, whether her session is live (`upOf`) and idle between
+ * turns (the runtime's phase `idle`), when each word the runtime journalled as said to it was said (`said`),
+ * whether it holds a question open on the person (`asking`, off the view's `asks`) and whether the chat holds one whose mark no longer
+ * says what became of its call (`closing`, `closesOwed` read against the same view).
  */
 const herTask = (e: Engine, id: string | undefined) =>
   Effect.gen(function* () {
     const home = yield* StoreRoot;
-    if (id === undefined) return { task: undefined, up: false, asking: false, closing: false };
+    const none = { task: undefined, up: false, idle: false, said: [], asking: false, closing: false };
+    if (id === undefined) return none;
     const { state, phase, asks } = yield* asked('view', e.view(id));
-    if (!state.filedAt) return { task: undefined, up: false, asking: false, closing: false };
+    if (!state.filedAt) return none;
     return {
       task: { settled: Boolean(state.settled), stopRequested: state.stopRequested } satisfies HerTask,
       up: upOf(phase),
+      idle: phase === 'idle',
+      said: (state.said ?? []).map((one) => one.at),
       asking: (asks ?? []).length > 0,
       closing: closesOwed(nemiaDir(home), asks),
     };
   });
+
+/** The latest of `times`, ISO times, in milliseconds, or null where none reads as one. */
+const latest = (times: readonly (string | undefined)[]): number | null =>
+  times.reduce<number | null>((max, at) => {
+    const ms = at === undefined ? Number.NaN : Date.parse(at);
+    return Number.isNaN(ms) || (max !== null && max >= ms) ? max : ms;
+  }, null);
 
 /** Her subscription's name, as the Subscription door takes it. */
 const HERS = SubscriptionName.read(NEMIA_SUBSCRIPTION);
@@ -315,33 +395,56 @@ const herSubscription = Effect.fn('herSubscription')(function* () {
 });
 
 /**
- * One beat: the levels, her task, her subscription and her folder's trust read (`trustedFolder`), her folder trusted by the keeper before
- * she is filed where it is not (`trustHer`, so no task is filed where her harness would refuse its start, and the filing left undone where
- * the trust was refused), the keeper's record of a refusal taken away on a beat that owes no trust, and, while she is kept, the person's
- * custom words against those she was last filed or told with (`customChanged`); each act owed done in order. Answers the acts done: those
- * owed, but past a trust refused.
+ * One beat: the levels, the keeper's record of her session (`readSession`, her tasks by `herTasks`), her current task, her subscription,
+ * her folder's trust (`trustedFolder`), her chat's files and the person's custom words read; whether the conversation is quiet enough
+ * for her to rest (`quietOf`, her idle mark against the latest word said or answered to her, at least `restAfterMs` old on the wall
+ * clock); whether the person spoke after her task was seen ended with no rest (a chat entry, an answer, or a level set after the mark);
+ * her folder trusted by the keeper before she is filed where it is not (`trustHer`, the filing left undone where the trust was refused),
+ * the keeper's record of a refusal taken away on a beat that owes no trust; each act owed (`nemiaDue`) done in order. Answers the acts
+ * done: those owed, but past a trust refused.
+ * @param restAfterMs How long the conversation is quiet before she rests at `manual`, in milliseconds.
  */
-export const keepOnce = Effect.fn('keepOnce')(function* () {
+export const keepOnce = Effect.fn('keepOnce')(function* (restAfterMs: number = Duration.toMillis(Duration.fromInputUnsafe(NEMIA_REST_AFTER))) {
   const home = yield* StoreRoot;
   const e = yield* EngineService;
-  const id = readLevel(home)?.task;
+  const now = Date.now();
+  const record = readSession(home);
+  const id = herTasks(home).at(-1);
+  const levelFile = readLevel(home);
   const above = (yield* levelsNow()).some((row) => row.level !== 'manual');
-  const { task, up, asking, closing } = yield* herTask(e, id);
-  const trusted = trustedFolder(DEFAULT_HARNESS, nemiaDir(home));
-  const keeping = { above, ...(id === undefined ? {} : { task: id }), ...(trusted === undefined ? {} : { trusted }) };
-  const subscribed = yield* herSubscription();
-  const kept = nemiaState(keeping, task, subscribed) === 'kept';
-  const stale = kept && customChanged(readTold(home), yield* herCustom(), filedPrompt(home));
-  const owed = nemiaDue(
-    { ...keeping, stale, up, asking, closing, owed: kept && outboxOwed(nemiaDir(home)), answered: kept && answersOwed(nemiaDir(home)) },
-    task,
-    subscribed,
-  );
+  const { task, up, idle, said, asking, closing } = yield* herTask(e, id);
+  const dir = nemiaDir(home);
+  const answers = readAnswers(dir);
+  const ms = (at: string | undefined): number | null => latest([at]);
+  const lastSaid = latest([...said, ...answers.map((a) => a.at)]);
+  const quiet = quietOf({ idleSince: ms(record?.idleSince), lastSaid, now, restAfterMs });
+  const spoke = latest([...readOutbox(dir).map((entry) => entry.at), ...answers.map((a) => a.at), levelFile?.asked]);
+  const seen = ms(record?.stoppedSeen);
+  const trusted = trustedFolder(DEFAULT_HARNESS, dir);
+  const keeping = {
+    above,
+    ...(id === undefined ? {} : { task: id }),
+    ...(trusted === undefined ? {} : { trusted }),
+    rested: record?.rested !== undefined,
+    stoppedMarked: seen !== null,
+    heard: seen !== null && spoke !== null && spoke > seen,
+    idle,
+    idleMarked: quiet.marked,
+    quiet: quiet.quiet,
+    stale: customChanged(readTold(home), yield* herCustom(), filedPrompt(home)),
+    up,
+    asking,
+    closing,
+    owed: outboxOwed(dir),
+    answered: answersOwed(dir),
+  };
+  const owed = nemiaDue(keeping, task, yield* herSubscription());
   if (!owed.includes('trust')) writeUntrusted(home, undefined);
+  const beat: Beat = { home, id: id ?? '', filed: task !== undefined, above, at: new Date(now).toISOString() };
   const done: NemiaAct[] = [];
   for (const one of owed) {
     if (one === 'trust' && !(yield* trustHer(home))) break;
-    if (one !== 'trust' && (id !== undefined || one === 'drop')) yield* act(e, id ?? '', one);
+    if (one !== 'trust') yield* act(e, beat, one);
     done.push(one);
   }
   return done;
@@ -353,7 +456,8 @@ export const keepOnce = Effect.fn('keepOnce')(function* () {
  */
 export const keep = (options: Partial<KeepOptions> = {}): Effect.Effect<never, never, EngineService | StoreRoot> => {
   const o = { ...KEEP_DEFAULTS, ...options };
-  const beat = Effect.suspend(() => keepOnce()).pipe(
+  const restAfterMs = Duration.toMillis(Duration.fromInputUnsafe(o.restAfter));
+  const beat = Effect.suspend(() => keepOnce(restAfterMs)).pipe(
     Effect.catchCause((cause) => Effect.logWarning(`Nemia could not be kept this beat: ${Cause.pretty(cause)}`)),
   );
   return Effect.forever(beat.pipe(Effect.andThen(Effect.sleep(o.every))));

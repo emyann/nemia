@@ -115,8 +115,8 @@ const stoppedUnheard = (k: Keeping, t: HerTask | undefined): boolean =>
 /** Whether `out` holds the act `a`. */
 const has = (out: readonly NemiaAct[], a: NemiaAct): boolean => out.includes(a);
 
-/** Whether `a` comes before `b` in `out`, both being there. */
-const before = (out: readonly NemiaAct[], a: NemiaAct, b: NemiaAct): boolean => out.indexOf(a) < out.indexOf(b);
+/** Whether `a` comes before `b` in `out`, both being there: the first of the two in `out` is `a`. */
+const before = (out: readonly NemiaAct[], a: NemiaAct, b: NemiaAct): boolean => out.filter((x) => x === a || x === b).at(0) === a;
 
 const nemiaDueSpec = spec<(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined) => NemiaAct[]>({
   ensures: {
@@ -197,7 +197,7 @@ const nemiaDueSpec = spec<(keeping: Keeping, task: HerTask | undefined, subscrib
     },
     eachActOnce: {
       description: 'No act is owed twice on one beat',
-      condition: ({ output }) => output.every((a, i) => output.indexOf(a) === i),
+      condition: ({ output }) => output.every((a) => output.filter((x) => x === a).length === 1),
     },
   },
 });
@@ -206,7 +206,7 @@ const nemiaDueSpec = spec<(keeping: Keeping, task: HerTask | undefined, subscrib
 export type NemiaDue = Implementation<typeof nemiaDueSpec>;
 
 /**
- * What `quietOf` reads, each a moment in milliseconds on the wall clock: `idleSince`, the keeper's idle mark of her current task (null
+ * What `quietOf` reads, each a whole number of milliseconds, a moment on the wall clock since the epoch: `idleSince`, the keeper's idle mark of her current task (null
  * where none); `lastSaid`, the latest word the runtime journalled as said to it (null where none); `now`; and `restAfterMs`, how long a
  * quiet conversation lasts before she rests (`NEMIA_REST_AFTER`).
  */
@@ -217,10 +217,12 @@ export type Quiet = { marked: boolean; quiet: boolean };
 
 const quietOfSpec = spec<(read: IdleRead) => Quiet>({
   requires: ({ input: [r] }) =>
+    Number.isSafeInteger(r.restAfterMs) &&
     r.restAfterMs > 0 &&
-    Number.isFinite(r.now) &&
-    (r.idleSince === null || Number.isFinite(r.idleSince)) &&
-    (r.lastSaid === null || Number.isFinite(r.lastSaid)),
+    Number.isSafeInteger(r.now) &&
+    r.now >= 0 &&
+    (r.idleSince === null || (Number.isSafeInteger(r.idleSince) && r.idleSince >= 0)) &&
+    (r.lastSaid === null || (Number.isSafeInteger(r.lastSaid) && r.lastSaid >= 0)),
   ensures: {
     markedExactlyWhenIdleSeenSinceTheLastWord: {
       description: 'The idle mark stands exactly when there is one and no word was said to her after it',

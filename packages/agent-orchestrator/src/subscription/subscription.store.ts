@@ -228,7 +228,7 @@ function decoded<S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: s
   }
   const read = Schema.decodeUnknownResult(schema)(raw);
   if (Result.isSuccess(read)) return { value: read.success };
-  const { path: at, words } = firstRefusal(raw, read.failure);
+  const { path: at, words } = firstRefusal(schema, raw);
   return { error: `${at.length ? `its ${at.join('.')} ` : ''}${words}` };
 }
 

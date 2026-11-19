@@ -107,7 +107,7 @@ function wiringOfText(file: string, text: string): { wiring: TreeWiring } | { er
   }
   const decoded = Schema.decodeUnknownResult(TreeWiringSchema)(raw);
   if (Result.isSuccess(decoded)) return { wiring: decoded.success };
-  const { path: where, words } = firstRefusal(raw, decoded.failure);
+  const { path: where, words } = firstRefusal(TreeWiringSchema, raw);
   const field = where.length ? `\`${where.map(String).join('.')}\`` : 'the whole';
   return { error: `${file} does not read as a tree's wiring: ${field} ${words}. Fix it by hand.` };
 }

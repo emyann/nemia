@@ -5,7 +5,7 @@ import { milestonesQuery } from '@/lib/api/readiness';
 
 /**
  * The welcome's volume step, at /welcome/volume: `welcome_` draws it on its own, not inside the welcome. Reached by the factory step's
- * Next and by Getting started; no redirect. Its loader reads the factories' names and the milestones.
+ * Next; no redirect. Its loader reads the factories' names and the milestones.
  */
 export const Route = createFileRoute('/welcome_/volume')({
   loader: ({ context }) =>

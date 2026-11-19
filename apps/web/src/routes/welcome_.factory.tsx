@@ -5,7 +5,7 @@ import { templatesQuery } from '@/lib/api/templates';
 
 /**
  * The welcome's factory step, at /welcome/factory: `welcome_` draws it on its own, not inside the welcome, which sends a store with its
- * harness on to the board as it enters. Reached by the harness step's Next and by Getting started; no redirect. Its loader reads the
+ * harness on to the board as it enters. Reached by the harness step's Next; no redirect. Its loader reads the
  * milestones and the templates.
  */
 export const Route = createFileRoute('/welcome_/factory')({

@@ -4,8 +4,9 @@
  * client, objects.ts, which every read goes through), so no runtime import cycle can form among them. A type crosses by `import type`,
  * which is erased; the other values they import are react-query's, effect's, the objects' (`objects`, by its entry, whose words and
  * schemas the board reads rather than copies), the feed's pace, the refusals and the decode (read.ts) and the default
- * factory's two converters (namespace.ts); read.ts imports effect alone and namespace.ts the objects' entry alone. The objects' client
- * alone imports effect's HTTP client and HttpApi modules besides, which make it.
+ * factory's two converters (namespace.ts); read.ts imports effect and the objects' entry alone (its decode reads a refusal through
+ * objects' `refusedIn`), and namespace.ts the objects' entry alone. The objects' client alone imports effect's HTTP client and HttpApi
+ * modules besides, which make it.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -27,11 +28,11 @@ const ALLOWED = new Set(['@tanstack/react-query', 'effect', 'objects', '../feed.
 const OWN: ReadonlyMap<string, ReadonlySet<string>> = new Map([['objects.ts', new Set(['effect/http', 'effect/http-api'])]]);
 
 /** What read.ts, the reads every file imports, may import values from. */
-const READ_ALLOWED = new Set(['effect']);
+const READ_ALLOWED = new Set(['effect', 'objects']);
 
 /**
- * What each file every other file imports may import values from: read.ts effect alone, and namespace.ts, the default factory's two
- * converters, the objects' entry alone, for `DEFAULT_NAMESPACE`.
+ * What each file every other file imports may import values from: read.ts effect and the objects' entry alone, and namespace.ts, the
+ * default factory's two converters, the objects' entry alone, for `DEFAULT_NAMESPACE`.
  */
 const SHARED: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['read.ts', READ_ALLOWED],
@@ -106,7 +107,7 @@ test('REFUSED: a value import of a sibling that imports a sibling, of anything b
   ]);
 });
 
-test('the files under src/lib/api/ import values from react-query, effect, objects, the feed, read.ts and a leaf sibling alone, and read.ts from effect', () => {
+test('the files under src/lib/api/ import values from react-query, effect, objects, the feed, read.ts and a leaf sibling alone, and read.ts from effect and objects', () => {
   const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.ts'));
   assert.ok(files.length > 10 && files.includes('read.ts'), `the mirror's files: ${files.join(', ')}`);
   const texts = new Map(files.map((f) => [f, fs.readFileSync(path.join(DIR, f), 'utf8')]));

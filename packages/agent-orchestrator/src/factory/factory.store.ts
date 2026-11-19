@@ -168,7 +168,7 @@ function factoryFile(home: string, name: string): FileRead {
     };
   const decoded = Schema.decodeUnknownResult(FactoryFileSchema)(raw);
   if (Result.isSuccess(decoded)) return { file, content: decoded.success };
-  const { path: where, words } = firstRefusal(raw, decoded.failure);
+  const { path: where, words } = firstRefusal(FactoryFileSchema, raw);
   const field = where.length ? `\`${where.map(String).join('.')}\`` : 'the whole';
   return { file, error: `does not read as a factory: ${field} ${words}. nemia factory rm ${name}, then add it again.` };
 }

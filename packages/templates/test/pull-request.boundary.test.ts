@@ -201,7 +201,7 @@ test('REFUSED: open with no title or no body file, and a verb the script has not
   }
   const unknown = pr(at, 'merge');
   assert.equal(unknown.code, 1);
-  assert.match(unknown.err, /`merge` is no verb: give open, push or wait/);
+  assert.match(unknown.err, /`merge` is no verb: give open, push, wait or declares-ci/);
   assert.deepEqual(unknown.calls, []);
 });
 
@@ -970,6 +970,38 @@ test('wait reads the CI context --check names and no other: a green `ci` is no v
   assert.match(passed.out, /nemia ci: `gate` passed on/);
 });
 
+test('declares-ci passes where HEAD or the remote default branch declares a CI workflow, the base read only where HEAD declares none; REFUSED where neither does', () => {
+  const withCi = (repo: string) => {
+    fs.mkdirSync(path.join(repo, '.github', 'workflows'), { recursive: true });
+    fs.writeFileSync(path.join(repo, '.github', 'workflows', 'ci.yml'), 'name: ci\n');
+    gitIn(repo, 'add', '-A');
+    gitIn(repo, 'commit', '-qm', 'ci');
+  };
+  const baseOf = (at: ReturnType<typeof placed>, ci: boolean) => {
+    gitIn(at.repo, 'switch', '-q', '-c', 'main');
+    if (ci) withCi(at.repo);
+    else commit(at.repo, 'm.ts');
+    gitIn(at.repo, 'push', '-q', 'origin', 'main');
+    gitIn(at.repo, 'switch', '-q', at.branch);
+  };
+
+  const head = placed();
+  withCi(head.repo);
+  const own = pr(head, 'declares-ci');
+  assert.equal(own.code, 0, own.err);
+  assert.equal(head.gh.calls().length, 0, 'a head that declares CI asks nothing of the base');
+
+  const removed = placed();
+  baseOf(removed, true);
+  const kept = pr(removed, 'declares-ci');
+  assert.equal(kept.code, 0, kept.err);
+
+  const none = placed();
+  baseOf(none, false);
+  const local = pr(none, 'declares-ci');
+  assert.equal(local.code, 1, local.out);
+});
+
 test('REFUSED: a wait with no --check, a --check with no name, or more after it, before anything calls gh', () => {
   const at = placed();
   for (const given of [[], ['--check'], ['--check', '--x'], ['--check', 'ci', 'more']]) {
@@ -1283,10 +1315,16 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
   const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const frozen = check as string;
-  const clauses = [...frozen.matchAll(/node\s+"\$\{WF_CARRIED_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(
+  const clauses = [...frozen.matchAll(/node\s+"\$\{WF_CARRIED_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(check|push|declares-ci|wait)?/g)].map(
     ([, script, verb]) => (verb ? `${script} ${verb}` : script),
   );
-  assert.deepEqual(clauses, ['probe.ts check', 'parts.ts check', 'pull-request.ts push', 'pull-request.ts wait']);
+  assert.deepEqual(clauses, [
+    'probe.ts check',
+    'parts.ts check',
+    'pull-request.ts push',
+    'pull-request.ts declares-ci',
+    'pull-request.ts wait',
+  ]);
   const round = frozen.indexOf('{ round-check --all; }');
   assert.ok(round > 0, `the round check the factory set is a clause of its own:\n${frozen}`);
   assert.ok(

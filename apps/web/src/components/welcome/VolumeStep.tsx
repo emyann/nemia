@@ -208,7 +208,7 @@ function TrustAsk({
       {screen === 'waiting' ? (
         <p data-volume-waiting className="m-0 text-body-medium text-on-surface-variant">
           {factory.name} waits on your trust: its runs do not start in {added?.path} until a harness trusts it. Trust it here, or later from
-          its Settings ({factory.commands.trust}); Getting started says so meanwhile.
+          its Settings ({factory.commands.trust}).
         </p>
       ) : (
         <p className="m-0 text-body-medium text-on-surface-variant">{added?.path} is added. Before a run works in it, trust it:</p>

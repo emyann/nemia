@@ -769,7 +769,6 @@ export {
 } from './commands-factories-templated.ts';
 export { FACTORY_INSTRUCT_WORDS, FACTORY_INSTRUCTION_WORDS, FACTORY_RULES_WORDS } from './commands-factories-words.ts';
 export { FACTORY_MANUAL } from './commands-factories-manual.ts';
-export { FACTORY_MOVE_WORDS } from './commands-factories-move.ts';
 export {
   DEFINITION_WORDS,
   POLICY_CONFIRM_WORDS,
@@ -800,3 +799,4 @@ export { STATS_KEYS, STATS_MANUAL, STATS_WORDS, statsRefusal } from './commands-
 export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow } from './stats-read.ts';
 export { RUN_PHASE_OF, runCodesLegal, STEP_PHASE_OF, stepCodesLegal, tryCodesLegal } from './codes.ts';
 export type { RunCodes, StepCodes, TryCodes } from './codes.ts';
+export { refusedIn, type RefusedPlace } from './refused.ts';

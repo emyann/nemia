@@ -2,7 +2,8 @@
  * The runner of `nemia factory home`: a person's own session in a factory's home. The home is asked of the api of the context in use
  * (`GET /api/factories/<name>/home`), rendered into the client's cache by its digest (`renderedCopy`), the earlier copies of it removed
  * (`prunedCopies`), and the session started there as `ownSessionOf` decides, the repository (the folder typed, else this one) added
- * beside it. The session runs with the person's terminal; its exit code is the command's.
+ * beside it. Both folders are compared and given by their real paths, so a cache or a repository reached through a link is still told
+ * apart. The session runs with the person's terminal; its exit code is the command's.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,12 +25,13 @@ import { textOf } from './lines.ts';
  */
 export async function factoryHome(args: Args, env: NodeJS.ProcessEnv = process.env, here: string = process.cwd()): Promise<number> {
   const factory = textOf(args, 'factory');
-  const repo = path.resolve(here, textArg(args, 'repo') ?? '.');
-  if (!fs.statSync(repo, { throwIfNoEntry: false })?.isDirectory())
-    throw new Refused(`${repo} is not a folder: give the repository to add beside the home, nemia factory home ${factory} <repo>.`);
+  const typed = path.resolve(here, textArg(args, 'repo') ?? '.');
+  if (!fs.statSync(typed, { throwIfNoEntry: false })?.isDirectory())
+    throw new Refused(`${typed} is not a folder: give the repository to add beside the home, nemia factory home ${factory} <repo>.`);
+  const repo = fs.realpathSync(typed);
   const home = await asked('factory home', (c) => c.factories.home({ params: { name: factory } }), env);
   const dir = homeCopiesDir(env, inUse(env), factory);
-  const copy = renderedCopy(dir, home);
+  const copy = fs.realpathSync(renderedCopy(dir, home));
   prunedCopies(dir, home.digest);
   const session = ownSessionOf({ copy, repo, claudeMd: textArg(args, 'claudeMd') === 'on' });
   if (session.kind === 'refused')

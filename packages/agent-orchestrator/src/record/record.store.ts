@@ -8,8 +8,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema, SchemaIssue } from 'effect';
-import { Actor } from 'objects';
+import { Result, Schema } from 'effect';
+import { Actor, refusedIn } from 'objects';
 import {
   BY_CAP,
   CARDS_FOLDER,
@@ -141,29 +141,29 @@ const fieldOf = (value: unknown, key: PropertyKey): unknown =>
 const shown = (text: string): string => (text.length > 60 ? `${text.slice(0, 60)}…` : text);
 
 /**
- * The first thing `schema` refuses in `value`: the path to it, and what is there in place of what the tick writes.
+ * The first thing `schema` refuses in `value`: the path to it, and what is there in place of what the tick writes. It decodes `value`
+ * itself, keeping the value it refuses (`reportInput`), and reads the refusal by its `_tag` (objects' `refusedIn`): a missing key `is
+ * missing`; anything else is the value found there, then the message the schema declared or the type it expected.
+ * @param schema The schema the value is read by.
  * @param value The value the schema was given.
- * @param error What the schema refused the value with.
  */
-export function firstRefusal(value: unknown, error: Schema.SchemaError): { path: readonly PropertyKey[]; words: string } {
-  const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues;
-  const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
-  const found = path.reduce<unknown>((at, key) => fieldOf(at, key), value);
-  const message = first?.message ?? 'is not what nemia writes';
+export function firstRefusal(schema: Schema.ConstraintDecoder<unknown>, value: unknown): { path: readonly PropertyKey[]; words: string } {
+  const decoded = Schema.decodeUnknownResult(schema)(value, { reportInput: true });
+  const place = Result.isFailure(decoded) ? refusedIn(decoded.failure.issue)[0] : undefined;
+  if (place === undefined) return { path: [], words: 'is not what nemia writes' };
   const words =
-    message === 'Missing key'
+    place._tag === 'MissingKey'
       ? 'is missing'
-      : `is ${shown(JSON.stringify(found) ?? 'undefined')}, where ${message.replace(/^Expected /, 'nemia writes ').replace(/ \| undefined$/, '')}`;
-  return { path, words };
+      : `is ${shown(JSON.stringify(place.input) ?? 'undefined')}, where ${place.message ?? `nemia writes ${place.expected}`}`;
+  return { path: place.path, words };
 }
 
 /** Why a record does not read as a run: its first field that is not what the tick writes, read against the kind of run it says it is. */
 function recordRefusal(raw: unknown): string {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return 'is no run record: it holds no object';
   const kind = fieldOf(raw, 'place') === undefined ? GitRecordSchema : FolderRecordSchema;
-  const decoded = Schema.decodeUnknownResult(kind)(raw);
-  if (Result.isSuccess(decoded)) return 'is no run record';
-  const { path, words } = firstRefusal(raw, decoded.failure);
+  if (Result.isSuccess(Schema.decodeUnknownResult(kind)(raw))) return 'is no run record';
+  const { path, words } = firstRefusal(kind, raw);
   return `does not read as a run: its ${path.length ? `\`${path.map(String).join('.')}\`` : 'shape'} ${words}`;
 }
 
@@ -716,7 +716,7 @@ export function heldIn(file: string): { read: unknown } | { unreadable: string }
 export function readAs<S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): { read: S['Type'] } | { refused: string } {
   const decoded = Schema.decodeUnknownResult(schema)(value);
   if (Result.isSuccess(decoded)) return { read: decoded.success };
-  const [key] = firstRefusal(value, decoded.failure).path;
+  const [key] = firstRefusal(schema, value).path;
   return { refused: key === undefined ? '' : String(key) };
 }
 

@@ -101,7 +101,7 @@ export function readLevel(home: string): LevelFile | undefined {
   }
   const read = Schema.decodeUnknownResult(LevelSchema)(raw);
   if (Result.isSuccess(read)) return { ...read.success };
-  const { path: at, words } = firstRefusal(raw, read.failure);
+  const { path: at, words } = firstRefusal(LevelSchema, raw);
   throw new Invalid({
     message: `${levelFile(home)}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: set the level again with nemia level manual.`,
   });

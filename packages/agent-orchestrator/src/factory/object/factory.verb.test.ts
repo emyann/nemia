@@ -12,7 +12,7 @@ import { Factory as FactorySchema } from 'objects';
 import { Cause, Effect, Exit, Schema } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import type { FactoryListing } from '../factory.ts';
-import { factoryCommands, factoryObjectsOf, type FactoryListed } from './factory.verb.ts';
+import { factoryCommands, factoryObjectsOf, followOf, type FactoryListed } from './factory.verb.ts';
 import { volumeBase } from '../volume/volume.ts';
 import { doorFrom, done } from '../../../test/door-walks.ts';
 import { FactoryDoor } from '../door/factories.store.ts';
@@ -153,6 +153,16 @@ test("a factory's commands are the lines a person types for it, with each schedu
     volumeRm: { a: 'nemia factory volume rm acme /data/a', [volumeBase(repo)]: `nemia factory volume rm acme ${repo}` },
   });
   assert.match(factoryCommands(m, []).attach, /^nemia factory attach acme/);
+});
+
+test('a factory whose template declares a boolean that follows a host is told how to follow it, and one whose template declares none is not', () => {
+  const follow = followOf('acme', '4.9.0', {
+    model: { type: 'string', description: 'a model', whenOrigin: 'example.org' },
+    lands: { type: 'boolean', description: 'whether it lands there', default: false, whenOrigin: 'example.org' },
+  });
+  assert.deepEqual([follow?.host, follow?.parameter], ['example.org', 'lands']);
+  assert.match(follow?.line ?? '', /^nemia factory diff acme --to 4\.9\.0 --set lands=true$/);
+  assert.equal(followOf('acme', '4.9.0', { lands: { type: 'boolean', description: 'whether it lands', default: false } }), undefined);
 });
 
 test("a cloned volume's origin is on its spec, and a volume given no URL has none", () => {

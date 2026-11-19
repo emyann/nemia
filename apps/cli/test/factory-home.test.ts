@@ -115,7 +115,15 @@ test("opened, mill's home is rendered by its digest, read-only, and the session 
   assert.equal((fs.statSync(path.join(at, 'bin', 'run.sh')).mode & 0o111) !== 0, true, 'a script stays executable');
   const started = saw() ?? assert.fail('the session was started');
   assert.equal(fs.realpathSync(started.cwd), fs.realpathSync(at), 'started in the copy');
-  assert.deepEqual(started.argv, ['--add-dir', REPO, '--disallowedTools', `Edit(/${at}/**)`, '--setting-sources', 'project']);
+  const real = fs.realpathSync(at);
+  assert.deepEqual(started.argv, [
+    '--add-dir',
+    fs.realpathSync(REPO),
+    '--disallowedTools',
+    `Edit(/${real}/**)`,
+    '--setting-sources',
+    'project',
+  ]);
   assert.equal(started.memory, null, "the repository's memory is off by default");
 });
 
@@ -142,6 +150,16 @@ test('REFUSED: a repository inside the copy, exit 2 naming the command, and no s
   const [copy] = copies().filter((name) => !name.startsWith('.'));
   const inside = path.join(COPIES, copy ?? assert.fail('a copy'), 'bin');
   const said = await typed(['factory', 'home', 'mill', inside], 2);
+  assert.ok(said.err.includes('nemia factory home mill'), said.err);
+  assert.equal(saw(), undefined, 'nothing was started');
+});
+
+test('REFUSED: typed from inside the copy with the cache reached through a link, exit 2, and no session started', async () => {
+  const [copy] = copies().filter((name) => !name.startsWith('.'));
+  const linked = path.join(scratch('nemia-home-link-'), 'cache');
+  fs.symlinkSync(CACHE, linked);
+  const inside = path.join(COPIES, copy ?? assert.fail('a copy'), 'bin');
+  const said = await typed(['factory', 'home', 'mill'], 2, { ...person, XDG_CACHE_HOME: linked }, inside);
   assert.ok(said.err.includes('nemia factory home mill'), said.err);
   assert.equal(saw(), undefined, 'nothing was started');
 });

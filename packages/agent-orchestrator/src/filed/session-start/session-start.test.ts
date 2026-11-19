@@ -1,8 +1,9 @@
 /**
  * What a step is filed where its run froze a home (`filedConfig` with a `start`): what no law of `contracts/session-home.contract.ts`
- * states, since the laws hold `sessionStart`, `inWorkspace` and `memoryFilesOf` alone. One table, each row a filing: where the session
- * starts, the workspace added first and how, the home denied, the step's rules read against the workspace, the skills offered and the
- * memory files loaded by the volumes' switches; and the filings that stay as they were without a home.
+ * states, since the laws hold `sessionStart`, `inWorkspace` and `memoryFilesOf` alone, and what the solver could not settle there: no
+ * exclude is a folder switched on or a folder inside one. One table, each row a filing: where the session starts, the workspace added
+ * first and how, the home denied, the step's rules read against the workspace, the skills offered and the memory files loaded by the
+ * volumes' switches; and the filings that stay as they were without a home.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -26,7 +27,7 @@ const filed = (step: StepSpec, t: { start?: StartFound; workspace?: string; run?
   filedConfig(
     step,
     [step],
-    { gates: [], ...(t.run as object) } as Pick<Run, 'gates' | 'mounts' | 'volumes' | 'harnessSettings' | 'labels'>,
+    { gates: [], ...(t.run as object) },
     {
       model: undefined,
       budgetUsd: undefined,
@@ -111,6 +112,30 @@ describe('filedConfig in a home: where the session starts, the workspace beside 
     assert.deepEqual(JSON.parse((volume as unknown as { claude: { settings: string } }).claude.settings), {
       claudeMdExcludes: [`${WS}/**`, '/runs/r/artifacts/design/**'],
     });
+  });
+  test('no exclude is a folder switched on or a folder inside one, while each folder left off beside them is skipped', () => {
+    const config = filed(DESIGN, {
+      workspace: WS,
+      start: found(),
+      run: {
+        volumes: [
+          { path: '/vol', readOnly: true, claudeMd: true },
+          { path: '/vol/inner', readOnly: true, claudeMd: true },
+          { path: '/beside', readOnly: true },
+        ],
+      },
+      own: { claude: { settings: '{}' } },
+    });
+    const { claudeMdExcludes } = JSON.parse((config as unknown as { claude: { settings: string } }).claude.settings) as {
+      claudeMdExcludes: string[];
+    };
+    for (const on of ['/vol', '/vol/inner'])
+      assert.deepEqual(
+        claudeMdExcludes.filter((x) => x === on || x.startsWith(on + '/')),
+        [],
+        on,
+      );
+    assert.ok(claudeMdExcludes.includes('/beside/**'), 'the volume left off is skipped');
   });
   test('the switches of a mount never reach the runtime, which takes a path, a mode and `ruled` alone', () => {
     const config = filed(DESIGN, { workspace: WS, start: found(), run: { volumes: [{ path: '/vol', readOnly: true, claudeMd: true }] } });

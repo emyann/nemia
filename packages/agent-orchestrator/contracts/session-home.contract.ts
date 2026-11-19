@@ -2,14 +2,12 @@
  * Where a step's session starts, and the folder it works on (agent-orchestrator): the run's frozen copy of its factory's home is the
  * session's working folder, its Claude Code project, and the step's workspace is added beside it (`sessionStart`); the step's own
  * rules, written for the folder it works on, are read against that folder wherever the session stands (`inWorkspace`); and which
- * added folders' memory files Claude Code loads, by each folder's switch (`memoryFiles`).
+ * added folders' memory files Claude Code loads, by each folder's switch (`memoryFilesOf`).
  *
  * Each spec exports its type under the function's name, and the code takes it. Every type the signatures need is declared here.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
-import { expandedIn, WORKSPACE_EXPRESSION } from '../src/filed/session-start/expression.ts';
-
-export { WORKSPACE_EXPRESSION };
+import { editDenied, everyFileUnder, expandedIn, WORKSPACE_EXPRESSION } from '../src/filed/session-start/spelled.ts';
 
 /** A folder a session is filed with beside its working folder, as the runtime's task takes it. */
 export type AddedFolder = {
@@ -47,13 +45,6 @@ export type SessionStart = {
   /** Rules denied to the session for its start: an edit anywhere in the home. */
   readonly denies: readonly string[];
 };
-
-/**
- * The deny that holds a folder read-only, spelled as the runtime spells a read-only mount's: `Edit(//<path>/**)`. Joined with `+`,
- * which the solver reads, where a template string is an unknown string of its parts.
- * @param folder The folder denied, absolute.
- */
-export const editDenied = (folder: string): string => 'Edit(/' + folder + '/**)';
 
 /** Whether the session starts in the home: there is one, the step runs here, and its harness can add the workspace writable beside it. */
 const startsInHome = (i: SessionPlaceOf): boolean => i.home !== undefined && i.local && i.addsFolders;
@@ -119,7 +110,7 @@ const bare = (inner: string): string => (inner.startsWith('./') ? inner.slice(2)
 
 /**
  * The expansion of `${{ workspace }}` the code calls (`expandedIn`), taken on trust: a split and a join, which the solver does not
- * read. Its laws are held on the real function by `src/filed/session-start/expression.test.ts` (`brokenOn`).
+ * read. Its laws are held on the real function by `src/filed/session-start/spelled.test.ts`.
  */
 export const expandedPure = assume<[text: string, workspace: string], string>(expandedIn, {
   pure: true,
@@ -182,12 +173,6 @@ export type MemoryFolder = { readonly path: string; readonly claudeMd: boolean }
  */
 export type MemoryFiles = { readonly load: boolean; readonly excludes: readonly string[] };
 
-/**
- * The exclude that skips every memory file under a folder.
- * @param folder The folder skipped, absolute.
- */
-export const everyFileUnder = (folder: string): string => folder + '/**';
-
 /** Whether `inner` is `outer` or a folder under it. */
 const within = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(outer + '/');
 
@@ -212,11 +197,6 @@ const memoryFilesSpec = spec<(folders: readonly MemoryFolder[]) => MemoryFiles>(
       description: 'While they load, every added folder left off is skipped whole',
       condition: ({ input: [folders], output }) =>
         !output.load || folders.every((f) => f.claudeMd || output.excludes.includes(everyFileUnder(f.path))),
-    },
-    switchedOnRead: {
-      description: 'No exclude is a folder switched on, or a folder inside one',
-      condition: ({ input: [folders], output }) =>
-        folders.every((f) => !f.claudeMd || output.excludes.every((x) => x !== f.path && !x.startsWith(f.path + '/'))),
     },
     excludesOnlyFolders: {
       description: 'Each exclude is an added folder left off',

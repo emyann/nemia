@@ -17,7 +17,7 @@ import type { HandedRunFolders } from '../../contracts/handed-folders.contract.t
 import { handedFolders } from './handed-folders/handed-folders.ts';
 import { inWorkspace, memoryFilesOf, sessionStart } from './session-start/session-start.ts';
 import type { SessionStart } from '../../contracts/session-home.contract.ts';
-import { expandedIn } from './session-start/expression.ts';
+import { expandedIn } from './session-start/spelled.ts';
 
 export { handedFolders } from './handed-folders/handed-folders.ts';
 

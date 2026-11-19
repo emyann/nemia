@@ -122,7 +122,7 @@
     },
     {
       "term": "Home",
-      "meaning": "a factory's home, the `home/` folder of its tree, copied byte for byte from its template's `home/`: the Claude Code project its runs' sessions start in, its `CLAUDE.md`, `.claude/` and `.mcp.json` theirs. A run copies it at start under `runs/<id>/home/<hex>/` and records the digest as `homeFiles`; a local step whose harness adds a writable folder starts there, read-only, its workspace added beside it, writable by the step's own rules or read-only where its fence writes nothing, and every relative file rule of the step read against the workspace (`sessionStart`, `inWorkspace` and `memoryFilesOf`, proved by `packages/agent-orchestrator/contracts/session-home.contract.ts`). A factory with no home, a run started before homes were, and a step on another harness start in their workspace as before."
+      "meaning": "a factory's home, the home folder of its tree, copied byte for byte from its template's, as sdlc's `packages/templates/sdlc/home/CLAUDE.md`: the Claude Code project its runs' sessions start in, its `CLAUDE.md`, `.claude/` and `.mcp.json` theirs. A run copies it at start under `runs/<id>/home/<hex>/` and records the digest as `homeFiles`; a local step whose harness adds a writable folder starts there, read-only, its workspace added beside it, writable by the step's own rules or read-only where its fence writes nothing, and every relative file rule of the step read against the workspace (`sessionStart`, `inWorkspace` and `memoryFilesOf`, proved by `packages/agent-orchestrator/contracts/session-home.contract.ts`). A factory with no home, a run started before homes were, and a step on another harness start in their workspace as before."
     },
     {
       "term": "Workflow's repository",

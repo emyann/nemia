@@ -2,14 +2,8 @@
  * Where a step's session starts, the folder it works on, its rules read against that folder, and which added folders' memory files
  * load (`contracts/session-home.contract.ts`).
  */
-import {
-  editDenied,
-  everyFileUnder,
-  type InWorkspace,
-  type MemoryFilesOf,
-  type SessionStartOf,
-} from '../../../contracts/session-home.contract.ts';
-import { expandedIn, WORKSPACE_EXPRESSION } from './expression.ts';
+import type { InWorkspace, MemoryFilesOf, SessionStartOf } from '../../../contracts/session-home.contract.ts';
+import { editDenied, everyFileUnder, expandedIn, WORKSPACE_EXPRESSION } from './spelled.ts';
 
 const FILE_TOOLS: readonly string[] = ['Read', 'Edit', 'Write', 'NotebookEdit'];
 

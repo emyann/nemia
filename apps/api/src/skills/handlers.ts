@@ -25,10 +25,9 @@ import {
   SKILLS_WRITE,
   skillCopyCommand,
   skillTable,
-  type SkillChange,
 } from 'agent-orchestrator';
 import { frontmatterKey, SKILLS_FOLDER, skillDraftOf, skillNameRefusal, WorkflowError } from 'agent-orchestrator/workflow';
-import { Api, API_VERSION, type DefinitionFiles, Invalid, type Skill, type SkillDrafted, type SkillSpec, type SkillWrite } from 'objects';
+import { Api, API_VERSION, type DefinitionFiles, Invalid, type Skill, type SkillSpec, type SkillWrite } from 'objects';
 import type { Served } from '../layer.ts';
 import { repoLayer } from '../factory/place.ts';
 import {
@@ -77,7 +76,7 @@ type Row = Pick<SkillRow, 'dir' | 'entry' | 'error' | 'preload' | 'cost'>;
  * @param s The request's services, its caller and the place it is answered in.
  * @param origin The origin each skill is held at.
  */
-export async function treeSkillsHeld(s: Served, origin: Origin): Promise<Held<Row>[]> {
+export async function treeSkillsHeld(s: Served, origin: Origin) {
   const tree = s.factory?.tree === undefined ? undefined : path.join(s.factory.tree, 'workflows', SKILLS_FOLDER);
   const names = tree === undefined ? [] : skillFoldersIn(tree);
   const dirs = names.map((name) => path.join(tree ?? '', name));
@@ -90,7 +89,7 @@ export async function treeSkillsHeld(s: Served, origin: Origin): Promise<Held<Ro
  * picker lists them (`listSkills`: where an agent of yours finds each name, a link or a SKILL.md that does not read listed with why). On
  * no repository (the default factory with no `?repo=`), the repository's are none.
  */
-async function heldIn(s: Served): Promise<Held<Row>[]> {
+async function heldIn(s: Served) {
   const own = await treeSkillsHeld(s, 'factory');
   const repo = repoLayer(s);
   const places = await listSkills((dirs) => readsOf(s, dirs), repo, s.home, await s.inRequest(yourSkillsRead(repo, s.home)));
@@ -107,7 +106,7 @@ async function heldIn(s: Served): Promise<Held<Row>[]> {
     ...own,
     ...folded.map((dir) => ({ name: path.basename(dir), origin: 'repo' as const, item: { dir, ...readAt(foldedReads, dir) } })),
     ...places.flatMap((place) => place.skills.map((row) => ({ name: row.name, origin: place.from, item: row }))),
-  ];
+  ] satisfies Held<Row>[] as Held<Row>[];
 }
 
 /**
@@ -115,10 +114,10 @@ async function heldIn(s: Served): Promise<Held<Row>[]> {
  * (`skillSpecOf`); nothing read through a link refused, whose refusal the row says; and an empty body where the file cannot be read, with
  * the disk's words.
  */
-function specOf({ dir, error }: Row, name: string): { spec: SkillSpec; unread: string | null } {
+function specOf({ dir, error }: Row, name: string) {
   const read = skillTextOf(dir, error !== null);
-  if ('unread' in read) return { spec: { body: '' }, unread: read.unread };
-  return skillSpecOf(path.join(dir, 'SKILL.md'), name, read.text);
+  if ('unread' in read) return { spec: { body: '' }, unread: read.unread } satisfies { spec: SkillSpec; unread: string | null };
+  return skillSpecOf(path.join(dir, 'SKILL.md'), name, read.text) satisfies { spec: SkillSpec; unread: string | null };
 }
 
 /**
@@ -128,7 +127,7 @@ function specOf({ dir, error }: Row, name: string): { spec: SkillSpec; unread: s
  * @param served The skills to answer, each with its origin and what shadows it.
  * @param namespace The namespace the objects are in, whose ledger gives each its revision; none for a template's documents.
  */
-export async function skillObjectsOf(s: Served, served: ReturnType<typeof servedOf<Row>>, namespace?: string): Promise<Skill[]> {
+export async function skillObjectsOf(s: Served, served: ReturnType<typeof servedOf<Row>>, namespace?: string) {
   const read = served.filter(({ item }) => item.error === null).map(({ item }) => item.dir);
   const shown = new Map(await Promise.all(read.map(async (dir) => [dir, await skillShownAt(s, dir)] as const)));
   const repo = repoLayer(s);
@@ -188,14 +187,14 @@ const LIBRARY = 'default';
 const LIBRARY_PATH = 'GET /api/skills';
 
 /** The skills the library holds: the person's and the builtins, at each origin. */
-const libraryHeld = async (s: Served): Promise<Held<Row>[]> =>
-  (await heldIn(s)).filter((h) => h.origin === 'user' || h.origin === 'builtin');
+const libraryHeld = async (s: Served) =>
+  (await heldIn(s)).filter((h) => h.origin === 'user' || h.origin === 'builtin') satisfies Held<Row>[] as Held<Row>[];
 
 /**
  * The library's objects of the skills `served`, in no namespace, each with the factories that use it and, on the person's copy of a
  * builtin, whether the builtin changed since the copy (`builtinCopies`).
  */
-async function libraryObjectsOf(s: Served, served: ReturnType<typeof servedOf<Row>>): Promise<Skill[]> {
+async function libraryObjectsOf(s: Served, served: ReturnType<typeof servedOf<Row>>) {
   const copies = builtinCopies(s.home);
   const objects = await skillObjectsOf(s, served);
   return Promise.all(
@@ -216,41 +215,41 @@ async function libraryObjectsOf(s: Served, served: ReturnType<typeof servedOf<Ro
 }
 
 /** The version of Nemia's builtin skill `name` now, or undefined where Nemia builds in none. */
-const builtinVersion = async (s: Served, name: string): Promise<string | undefined> =>
+const builtinVersion = async (s: Served, name: string) =>
   skillFoldersIn(BUILTIN_SKILLS).includes(name)
     ? ((await skillShownAt(s, path.join(BUILTIN_SKILLS, name))).version ?? undefined)
     : undefined;
 
 /** The library's skill `name` (from `asked`, where one is), read now. */
-async function libraryAt(s: Served, name: string, asked?: Origin): Promise<Skill> {
+async function libraryAt(s: Served, name: string, asked?: Origin) {
   const [one] = await libraryObjectsOf(s, [servedNamed(await libraryHeld(s), name, asked, LIBRARY_PATH)]);
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
-  return one;
+  return one satisfies Skill as Skill;
 }
 
 /** The builtin skill `name` copied to the person's, its digest at the copy recorded so a later change of it is flagged. */
-async function copied(s: Served, name: string): Promise<void> {
+async function copied(s: Served, name: string) {
   const version = await builtinVersion(s, name);
   await s.inRequest(SKILLS_WRITE.handler({ from: 'user', copy: name, builtin: BUILTIN_SKILLS }));
   if (version !== undefined) recordBuiltinCopy(s.home, `Skill/${name}`, version);
 }
 
 /** The skill `name` the namespace serves (from `asked`, where one is), read now. */
-async function skillAt(s: Served, namespace: string, name: string, asked?: Origin): Promise<Skill> {
+async function skillAt(s: Served, namespace: string, name: string, asked?: Origin) {
   const [one] = await skillObjectsOf(
     s,
     [servedNamed(addsGated(s.home, namespace, 'skills', await heldIn(s)), name, asked, listPath(namespace))],
     namespace,
   );
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
-  return one;
+  return one satisfies Skill as Skill;
 }
 
 /**
  * A spec as the change the package writes, named `name`: its draft, refused as `skillDraftFrom` refuses it, and its `files` where given,
  * which the package judges.
  */
-const draftOf = (spec: SkillSpec, name: string, route: string): SkillChange => {
+const draftOf = (spec: SkillSpec, name: string, route: string) => {
   const { files, ...lines } = spec;
   const draft = skillDraftFrom({ ...lines, name }, route, SHAPE);
   if ('status' in draft) throw readerRefused(draft);
@@ -265,7 +264,7 @@ const READ_ROUTE = 'POST /api/skills/read';
  * text files (`spec.files`), left out where none is sent. Refused `Invalid`, naming the file, for a SKILL.md that does not read, and for
  * one that names no skill where `name` is not sent.
  */
-export function skillReadOf({ name, files }: DefinitionFiles): SkillDrafted {
+export function skillReadOf({ name, files }: DefinitionFiles) {
   const [file, ...others] = files;
   if (file === undefined) throw new Invalid({ error: `${READ_ROUTE} reads a skill's SKILL.md: send it first in \`files\`.` });
   const unread = (err: unknown): never => {
@@ -294,7 +293,7 @@ export function skillReadOf({ name, files }: DefinitionFiles): SkillDrafted {
 }
 
 /** The skill `payload` names made in the user library, read back. */
-async function libraryCreated(s: Served, payload: SkillWrite): Promise<Skill> {
+async function libraryCreated(s: Served, payload: SkillWrite) {
   const route = 'POST /api/skills';
   const name = payload.metadata.name;
   if (name === undefined || !('spec' in payload))
@@ -305,7 +304,7 @@ async function libraryCreated(s: Served, payload: SkillWrite): Promise<Skill> {
 }
 
 /** The library's skill `name` written over from `payload`, a builtin copied to the user library first, read back. */
-async function libraryReplaced(s: Served, name: string, payload: SkillWrite): Promise<Skill> {
+async function libraryReplaced(s: Served, name: string, payload: SkillWrite) {
   const route = `PUT /api/skills/${name}`;
   const there = thereOf(await libraryHeld(s), name);
   writeGoes('library', 'replace', there);

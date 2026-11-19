@@ -23,7 +23,7 @@ export type { Ceilings, MetricRead };
  * `held` the runs it holds, each with `nemia ls`'s words on its roots (`slotWord`).
  * @param s The request's services, its caller and the place it is answered in.
  */
-export async function ceilingsOf(s: Served): Promise<Ceilings> {
+export async function ceilingsOf(s: Served) {
   const { cap, inFlight, held } = await s.inRequest(CEILINGS.handler({}));
   return {
     last: lastCeilings(s.home) ?? null,
@@ -38,9 +38,9 @@ export async function ceilingsOf(s: Served): Promise<Ceilings> {
  * The metrics of a registry's snapshot (`Metric.snapshot`) as JSON (`MetricRead`), by name and then attributes.
  * @param snapshot The registry's metrics, as Metric.snapshot reads them.
  */
-export const metricsOf = (snapshot: ReadonlyArray<Metric.Metric.Snapshot>): MetricRead[] =>
+export const metricsOf = (snapshot: ReadonlyArray<Metric.Metric.Snapshot>) =>
   snapshot
-    .map((m): MetricRead => {
+    .map((m) => {
       const head = { name: m.id, type: m.type, description: m.description ?? null, attributes: { ...m.attributes } };
       switch (m.type) {
         case 'Counter':
@@ -55,4 +55,6 @@ export const metricsOf = (snapshot: ReadonlyArray<Metric.Metric.Snapshot>): Metr
           return head;
       }
     })
-    .sort((a, b) => a.name.localeCompare(b.name) || JSON.stringify(a.attributes).localeCompare(JSON.stringify(b.attributes)));
+    .sort(
+      (a, b) => a.name.localeCompare(b.name) || JSON.stringify(a.attributes).localeCompare(JSON.stringify(b.attributes)),
+    ) satisfies MetricRead[] as MetricRead[];

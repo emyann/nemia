@@ -9,7 +9,7 @@ import { Informer, runDecision } from 'agent-orchestrator';
 import { answered } from '../objects/refused.ts';
 
 /** The globs `?sensitive=` names, comma-separated, each trimmed and none empty; none asked where it is not given. */
-const globsOf = (sensitive: string | undefined): { sensitive?: string[] } => {
+const globsOf = (sensitive: string | undefined) => {
   const globs = (sensitive ?? '')
     .split(',')
     .map((glob) => glob.trim())

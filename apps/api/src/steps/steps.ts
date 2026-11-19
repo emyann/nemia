@@ -40,8 +40,6 @@ import {
   Missing,
   ReadFailed,
   type StepCloseout,
-  type StepLog,
-  type StepPath,
   type StepStreamEvent,
   type StepTranscript,
   TRANSCRIPT_PAGE,
@@ -58,7 +56,7 @@ import { readsBounded } from '../objects/answer-bound.ts';
  * The count the query's `key` asks (`given`): `bounds.byDefault` where it is not given, never more than `bounds.most` (a larger one is
  * answered the most, as Kubernetes' server answers fewer than a `limit` asks), and `Invalid` where it is no whole number from `least`.
  */
-const countOf = (key: string, given: string | undefined, least: 0 | 1, bounds: PageBounds): number => {
+const countOf = (key: string, given: string | undefined, least: 0 | 1, bounds: PageBounds) => {
   if (given === undefined) return bounds.byDefault;
   if (!/^\d+$/.test(given) || Number(given) < least)
     throw new Invalid({
@@ -79,7 +77,7 @@ const closeoutsNarrowed = ({ fields, bodyFrom, bodyLimit }: CloseoutQuery) => {
   const from = countOf('bodyFrom', bodyFrom, 0, { byDefault: 0, most: Number.MAX_SAFE_INTEGER });
   const limit = countOf('bodyLimit', bodyLimit, 1, BODY_PAGE);
   const named = fields === undefined ? undefined : fieldsNamed(fields);
-  return <C extends StepCloseout | null>(closeout: C): C =>
+  return <C extends StepCloseout | null>(closeout: C) =>
     (closeout === null ? null : closeoutNarrowed(closeout, named, { from, limit })) as C;
 };
 
@@ -133,7 +131,7 @@ class Unread extends Error {
 }
 
 /** `err` as the `Api`'s error of its status where it is an `Unread`, as it is otherwise. */
-const unreadAs = (err: unknown): unknown =>
+const unreadAs = (err: unknown) =>
   !(err instanceof Unread)
     ? err
     : err.status === 400
@@ -159,14 +157,7 @@ const unreadAs = (err: unknown): unknown =>
  * refused read from a cursor is asked again from the start, which refuses only the harness: the words of the engine's refusal are the
  * engine's to change, and are never parsed.
  */
-async function readTranscript(
-  r: Reader,
-  id: string,
-  step: string,
-  taskId: string,
-  after: string | undefined,
-  page?: PageAskedOf,
-): Promise<Read> {
+async function readTranscript(r: Reader, id: string, step: string, taskId: string, after: string | undefined, page?: PageAskedOf) {
   let view: TaskView;
   try {
     view = await engineRead('view', r.e.view(taskId));
@@ -235,7 +226,7 @@ type Writer = {
  * `run` returns, and `run` told the reader has gone (`Writer.gone`) once the response is let go. Its wait (`sleep`) is the beat's alone:
  * `readAgain` is its one caller.
  */
-const streamOf = (run: (stream: Writer) => Promise<void>): Stream.Stream<StepStreamEvent> =>
+const streamOf = (run: (stream: Writer) => Promise<void>) =>
   Stream.callback<StepStreamEvent>(
     (queue) =>
       Effect.gen(function* () {
@@ -273,7 +264,7 @@ const streamOf = (run: (stream: Writer) => Promise<void>): Stream.Stream<StepStr
  * reconnects from before the events it did not get and is sent the read again, rather than past them. Sent twice, an event
  * is still one event to a reader: it is unique by its `id` and `kind`.
  */
-async function send(stream: Writer, read: Read): Promise<void> {
+async function send(stream: Writer, read: Read) {
   for (const [i, event] of read.events.entries()) {
     if (stream.gone.aborted) return;
     const last = i === read.events.length - 1;
@@ -282,7 +273,7 @@ async function send(stream: Writer, read: Read): Promise<void> {
 }
 
 /** The end of the stream of a task that has settled: `read`'s events, then `settled`. */
-async function settledFrom(stream: Writer, read: Read): Promise<void> {
+async function settledFrom(stream: Writer, read: Read) {
   await send(stream, read);
   if (!stream.gone.aborted) await stream.write({ event: 'settled', data: { cursor: read.cursor }, id: read.cursor });
 }
@@ -297,19 +288,23 @@ const markOf = (event: TranscriptEvent) => `${event.kind} ${event.id}`;
  * (`moved`, after which its events are sent again from the start) and the step finished (`settled`). A state, and an upstream that
  * failed (`ended`), are sent nothing: a failed upstream's words are said by the beat that takes over from it (`readAgain`).
  */
-function messagesOf(m: Relayed, sent: Set<string>, at: { cursor: string }): StepStreamEvent[] {
-  if (m.kind === 'streamed') return [{ event: 'following', data: { streamed: m.yes } }];
-  if (m.kind === 'partial') return [{ event: 'partial', data: { key: m.key, delta: m.text, last: m.last } }];
+function messagesOf(m: Relayed, sent: Set<string>, at: { cursor: string }) {
+  if (m.kind === 'streamed') return [{ event: 'following', data: { streamed: m.yes } }] satisfies StepStreamEvent[];
+  if (m.kind === 'partial') return [{ event: 'partial', data: { key: m.key, delta: m.text, last: m.last } }] satisfies StepStreamEvent[];
   if (m.kind === 'moved') {
     sent.clear();
-    return [{ event: 'moved', data: { taskId: m.taskId } }];
+    return [{ event: 'moved', data: { taskId: m.taskId } }] satisfies StepStreamEvent[];
   }
-  if (m.kind === 'settled') return [{ event: 'settled', data: { cursor: at.cursor }, id: at.cursor }];
-  if (m.kind !== 'events') return [];
+  if (m.kind === 'settled') return [{ event: 'settled', data: { cursor: at.cursor }, id: at.cursor }] satisfies StepStreamEvent[];
+  if (m.kind !== 'events') return [] satisfies StepStreamEvent[];
   at.cursor = m.cursor;
   const fresh = m.events.filter((ev) => !sent.has(markOf(ev)));
   for (const ev of fresh) sent.add(markOf(ev));
-  return fresh.map((ev, i) => ({ event: 'transcript', data: ev, ...(i === fresh.length - 1 ? { id: m.cursor } : {}) }));
+  return fresh.map((ev, i) => ({
+    event: 'transcript',
+    data: ev,
+    ...(i === fresh.length - 1 ? { id: m.cursor } : {}),
+  })) satisfies StepStreamEvent[];
 }
 
 /**
@@ -335,13 +330,13 @@ type Stopped = { taskId: string; error: string | null };
  * goes. Answers why the following stopped short of `settled` (`Stopped`) — the step's session not pushed, or its upstream failed — so the
  * stream takes to reading the conversation again on a beat; else `null`: the task settled, or nobody reads.
  */
-async function followed(stream: Writer, r: Reading, taskId: string, read: Read, live?: () => Promise<void>): Promise<Stopped | null> {
+async function followed(stream: Writer, r: Reading, taskId: string, read: Read, live?: () => Promise<void>) {
   const sent = new Set(read.events.map(markOf));
   const at = { cursor: read.cursor };
   let stopped: Stopped | null = null;
   let followedTask = taskId;
   const caught = Effect.tryPromise(() => readTranscript(r.reader, r.id, r.step, taskId, read.cursor)).pipe(
-    Effect.map((got): Relayed => ({ kind: 'events', events: got.events, cursor: got.cursor })),
+    Effect.map((got) => ({ kind: 'events', events: got.events, cursor: got.cursor }) satisfies Relayed),
     Effect.orElseSucceed(() => undefined),
   );
   const relayed = r.followings.follow(r.reader.e, { kind: 'step', runId: r.id, step: r.step }, caught).pipe(
@@ -358,7 +353,7 @@ async function followed(stream: Writer, r: Reading, taskId: string, read: Read, 
     ),
   );
   await Effect.runPromiseExitWith(r.context)(relayed, { signal: stream.gone });
-  return stopped !== null && !stream.gone.aborted ? stopped : null;
+  return (stopped !== null && !stream.gone.aborted ? stopped : null) satisfies Stopped | null as Stopped | null;
 }
 
 /** The words a step's stream says of a session its harness will not push as it is written, read again on the beat instead. */
@@ -378,11 +373,7 @@ export const STEP_BEAT_MS = 5_000;
  * the cursor it reached: the cursor is dropped at the move alone, never again. Ends on a settled task or a reader that has gone, and on
  * nothing else: no road here gives up.
  */
-async function readAgain(
-  stream: Writer,
-  r: Reading,
-  from: { task: string; after: string | undefined; error: string | null },
-): Promise<void> {
+async function readAgain(stream: Writer, r: Reading, from: { task: string; after: string | undefined; error: string | null }) {
   let task = from.task;
   let after = from.after;
   let words = from.error ?? unpushedWords(r.id, r.step);
@@ -421,7 +412,7 @@ async function readAgain(
  * reads it whole; a `tail` that is no whole number from 1 `Invalid`.
  */
 const logOf = (runId: string, step: string, tail: string | undefined) =>
-  answered(async (s): Promise<StepLog> => {
+  answered(async (s) => {
     const lines = countOf('tail', tail, 1, LOG_TAIL);
     const { taskId } = stepOf(s, runId, step);
     try {
@@ -485,7 +476,7 @@ const fileOf = (runId: string, step: string, name: string) =>
 
 /** The path of the task of the step's try `tried` (`STEP_PATH`), the current one's for none, cut to that try's turn (`pathToTurn`). */
 const pathOf = (runId: string, step: string, tried: string | undefined) =>
-  answered(async (s): Promise<StepPath> => {
+  answered(async (s) => {
     const { run } = stepOf(s, runId, step);
     const asked = tryOfStep(run, step, tried);
     if ('error' in asked) throw asked.status === 400 ? new BadRequest({ error: asked.error }) : new Missing({ error: asked.error });
@@ -512,7 +503,7 @@ const pathOf = (runId: string, step: string, tried: string | undefined) =>
  * @param bounds The most a page holds; TRANSCRIPT_PAGE by default.
  */
 export const transcriptAt = (runId: string, step: string, after: string | undefined, asked: TranscriptAsked, bounds = TRANSCRIPT_PAGE) =>
-  answered(async (s): Promise<StepTranscript> => {
+  answered(async (s) => {
     const at = transcriptCursorRead(after);
     if (at instanceof Error) throw at;
     const checked = transcriptAskedRead(asked, bounds);

@@ -42,7 +42,6 @@ import { AGENTS_FOLDER, agentDraftOf as agentFileDraft, agentNameRefusal, Workfl
 import {
   type Agent,
   type AgentInstructions,
-  type AgentDrafted,
   type AgentInstructionsCleared,
   type AgentSpec,
   Api,
@@ -54,7 +53,7 @@ import {
 } from 'objects';
 import type { Served } from '../layer.ts';
 import { repoLayer } from '../factory/place.ts';
-import { agentDraftOf, listingOf, saved, type AgentDraftBody, type LibraryAgent } from './agents.ts';
+import { agentDraftOf, listingOf, saved, type LibraryAgent } from './agents.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn } from '../objects/refused.ts';
 import { wantsTable } from '../objects/table.ts';
@@ -102,17 +101,17 @@ const fillsIn = (s: Served) => ({
  * @param origin The origin each agent is held at.
  * @param fills What fills each agent's lines, read from the request's services by default.
  */
-export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(s)): Promise<Held<LibraryAgent>[]> {
+export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(s)) {
   const tree = await s.inRequest(treeAgents(s));
   const listings = await s.inRequest(Effect.forEach(tree, (one) => listingOf(one, repoLayer(s), s.home, s.factory?.tree)));
-  return inFactory(listings, fills.filled, fills.byFile).map((item) => ({ name: item.name, origin, item }));
+  return inFactory(listings, fills.filled, fills.byFile).map((item) => ({ name: item.name, origin, item })) satisfies Held<LibraryAgent>[];
 }
 
 /**
  * Every agent the namespace holds, at each origin, read now with its users and fills: the factory's tree's (`treeAgentsHeld`); every
  * other only where it fills a step there (`inFactory`).
  */
-async function heldIn(s: Served): Promise<Held<LibraryAgent>[]> {
+async function heldIn(s: Served) {
   const repo = repoLayer(s);
   const { agents } = await s.inRequest(AGENTS.handler({ repo }));
   const fills = fillsIn(s);
@@ -125,7 +124,7 @@ async function heldIn(s: Served): Promise<Held<LibraryAgent>[]> {
     ),
   );
   const elsewhere = inFactory(listings, fills.filled, fills.byFile, s.factory);
-  return [...own, ...elsewhere.map((item) => ({ name: item.name, origin: item.from, item }))];
+  return [...own, ...elsewhere.map((item) => ({ name: item.name, origin: item.from, item }))] satisfies Held<LibraryAgent>[];
 }
 
 /**
@@ -139,44 +138,45 @@ const agentObject = (
   shadowedBy: Origin | null,
   a: LibraryAgent,
   revision: number | undefined,
-): Agent => ({
-  apiVersion: API_VERSION,
-  kind: 'Agent',
-  metadata: {
-    name: a.name,
-    ...(namespace !== undefined && { namespace }),
-    creationTimestamp: writtenAt(a.file),
-    resourceVersion: a.version,
-  },
-  spec: {
-    role: a.role,
-    description: a.description,
-    keys: a.keys,
-    skills: a.skills,
-    harnessPrompt: a.harnessPrompt,
-    mcp: a.mcp,
-    output: a.schema,
-    instructions: a.body,
-  },
-  status: {
-    origin,
-    ...(shadowedBy !== null && { shadowedBy }),
-    ...(revision !== undefined && { revision }),
-    dir: a.dir,
-    file: a.file,
-    source: a.source,
-    usedBy: a.usedBy,
-    fills: a.fills,
-    factories: a.factories,
-    given: a.given,
-    copied: a.copied,
-    untried: a.untried,
-    card: a.card,
-    cardError: a.cardError,
-    error: a.error,
-    custom: customOf(home, a.name),
-  },
-});
+) =>
+  ({
+    apiVersion: API_VERSION,
+    kind: 'Agent',
+    metadata: {
+      name: a.name,
+      ...(namespace !== undefined && { namespace }),
+      creationTimestamp: writtenAt(a.file),
+      resourceVersion: a.version,
+    },
+    spec: {
+      role: a.role,
+      description: a.description,
+      keys: a.keys,
+      skills: a.skills,
+      harnessPrompt: a.harnessPrompt,
+      mcp: a.mcp,
+      output: a.schema,
+      instructions: a.body,
+    },
+    status: {
+      origin,
+      ...(shadowedBy !== null && { shadowedBy }),
+      ...(revision !== undefined && { revision }),
+      dir: a.dir,
+      file: a.file,
+      source: a.source,
+      usedBy: a.usedBy,
+      fills: a.fills,
+      factories: a.factories,
+      given: a.given,
+      copied: a.copied,
+      untried: a.untried,
+      card: a.card,
+      cardError: a.cardError,
+      error: a.error,
+      custom: customOf(home, a.name),
+    },
+  }) satisfies Agent;
 
 /**
  * The objects of the agents `served`: in `namespace`, with the ledger's revision, where one is given; with neither where none is (a
@@ -185,7 +185,7 @@ const agentObject = (
  * @param served The agents to answer, each with its origin and what shadows it.
  * @param namespace The namespace the objects are in, whose ledger gives each its revision; none for a template's documents.
  */
-export const agentObjectsOf = (s: Served, served: ReturnType<typeof servedOf<LibraryAgent>>, namespace?: string): Promise<Agent[]> =>
+export const agentObjectsOf = (s: Served, served: ReturnType<typeof servedOf<LibraryAgent>>, namespace?: string) =>
   s.inRequest(
     Effect.forEach(served, ({ origin, shadowedBy, item }) =>
       namespace === undefined
@@ -194,19 +194,19 @@ export const agentObjectsOf = (s: Served, served: ReturnType<typeof servedOf<Lib
             agentObject(s.home, namespace, origin, shadowedBy, item, revision),
           ),
     ),
-  );
+  ) satisfies Promise<Agent[]>;
 
 const listPath = (namespace: string) => `GET /api/namespaces/${namespace}/agents`;
 
 /** The agent `name` the namespace serves (from `asked`, where one is), read now. */
-async function agentAt(s: Served, namespace: string, name: string, asked?: Origin): Promise<Agent> {
+async function agentAt(s: Served, namespace: string, name: string, asked?: Origin) {
   const [one] = await agentObjectsOf(
     s,
     [servedNamed(addsGated(s.home, namespace, 'agents', await heldIn(s)), name, asked, listPath(namespace))],
     namespace,
   );
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
-  return one;
+  return one satisfies Agent;
 }
 
 /** The namespace the library is read in: the default factory with no repository, whose agents are the person's and the builtins. */
@@ -219,36 +219,36 @@ const LIBRARY_PATH = 'GET /api/agents';
 const libraryHeld = async (s: Served) => (await heldIn(s)).filter((h) => h.origin === 'user' || h.origin === 'builtin');
 
 /** The library's objects of the agents `served`, in no namespace, each with the factories that add it. */
-const libraryObjectsOf = async (s: Served, served: ReturnType<typeof servedOf<LibraryAgent>>): Promise<Agent[]> =>
+const libraryObjectsOf = async (s: Served, served: ReturnType<typeof servedOf<LibraryAgent>>) =>
   (await agentObjectsOf(s, served)).map((one) => ({
     ...one,
     status: { ...one.status, factories: libraryUsers(s.home, { kind: 'Agent', name: one.metadata.name }) },
-  }));
+  })) satisfies Agent[];
 
 /** The library's agent `name` (from `asked`, where one is), read now. */
-async function libraryAt(s: Served, name: string, asked?: Origin): Promise<Agent> {
+async function libraryAt(s: Served, name: string, asked?: Origin) {
   const [one] = await libraryObjectsOf(s, [servedNamed(await libraryHeld(s), name, asked, LIBRARY_PATH)]);
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
-  return one;
+  return one satisfies Agent as Agent;
 }
 
 /** A write's spec as the draft the package writes: `instructions` its body, `output` its schema. */
-const draftBodyOf = ({ output, instructions, ...lines }: AgentSpec): AgentDraftBody => ({
+const draftBodyOf = ({ output, instructions, ...lines }: AgentSpec) => ({
   ...lines,
   ...(instructions !== undefined && { body: instructions }),
   ...(output !== undefined && { schema: output }),
 });
 
 /** `name` as an agent's, or `Invalid` in the package's words. */
-const named = (route: string, name: string | undefined): string => {
+const named = (route: string, name: string | undefined) => {
   if (name === undefined) throw new Invalid({ error: `${route} takes the agent's name, as \`metadata.name\`.` });
   const wrong = agentNameRefusal(name);
   if (wrong !== undefined) throw new Invalid({ error: `${route}: ${wrong}` });
-  return name;
+  return name satisfies string as string;
 };
 
 /** The `resourceVersion` a write carries, or `Invalid` saying why it must. */
-const versioned = (route: string, version: string | undefined): string => {
+const versioned = (route: string, version: string | undefined) => {
   if (version === undefined)
     throw new Invalid({
       error: `${route} takes the resourceVersion the Agent was read at, so an agent changed since is not written over.`,
@@ -260,20 +260,20 @@ const versioned = (route: string, version: string | undefined): string => {
 const instructionsPath = (namespace: string, name: string) => `/api/namespaces/${namespace}/agents/${name}/instructions`;
 
 /** `name` as an agent's, or a 400 (`BadRequest`) in the package's words, before any file is read. */
-const agentNamed = (route: string, name: string): string => {
+const agentNamed = (route: string, name: string) => {
   const wrong = agentNameRefusal(name);
   if (wrong !== undefined) throw new BadRequest({ error: `${route}: ${wrong}` });
   return name;
 };
 
 /** What `nemia agents custom` answers when it is asked for words: the words read or written, never a clear's. */
-const wordsOf = (answer: AgentInstructions | AgentInstructionsCleared): AgentInstructions => {
+const wordsOf = (answer: AgentInstructions | AgentInstructionsCleared) => {
   if ('removed' in answer) throw new Error(`nemia agents custom answered a clear of ${answer.name} where its words were asked.`);
   return answer;
 };
 
 /** What `nemia agents custom` answers when it is asked to clear: the clear, never words. */
-const clearedOf = (answer: AgentInstructions | AgentInstructionsCleared): AgentInstructionsCleared => {
+const clearedOf = (answer: AgentInstructions | AgentInstructionsCleared) => {
   if (!('removed' in answer)) throw new Error(`nemia agents custom answered the words of ${answer.name} where a clear was asked.`);
   return answer;
 };
@@ -283,7 +283,7 @@ const clearedOf = (answer: AgentInstructions | AgentInstructionsCleared): AgentI
  * package refuses — a link, a frontmatter block, not a file — answered with its words in `error`, beside no words, since it stops every
  * run naming the agent until it is cleared or written again; a name no place has is the package's `Missing`.
  */
-async function instructionsRead(s: Served, name: string): Promise<AgentInstructions> {
+async function instructionsRead(s: Served, name: string) {
   try {
     return wordsOf(await s.inRequest(AGENTS_CUSTOM.handler({ name, repo: s.repo })));
   } catch (err) {
@@ -296,7 +296,7 @@ const A2A_WHY = (name: string) =>
   `Nothing here serves ${name} over A2A: this card describes the agent, and declares no interfaces and no security schemes. A2A marks \`supportedInterfaces\` REQUIRED, so it is not a card a client could call.`;
 
 /** The agent `name` tried on `brief` (`nemia agents run`'s entry): one of the user library alone, any other refused with how to copy it. */
-async function triedIn(s: Served, name: string, brief: string | undefined): Promise<{ id: string }> {
+async function triedIn(s: Served, name: string, brief: string | undefined) {
   const route = `POST /api/agents/${name}/try`;
   const held = await libraryHeld(s);
   const there = thereOf(held, name);
@@ -333,7 +333,7 @@ const READ_ROUTE = 'POST /api/agents/read';
  * read from the files sent beside it. Refused `Invalid`, naming the file, for a file that does not read and for a schema named and not
  * sent.
  */
-export function agentReadOf({ name, files }: DefinitionFiles): AgentDrafted {
+export function agentReadOf({ name, files }: DefinitionFiles) {
   const [file, ...beside] = files;
   if (file === undefined)
     throw new Invalid({ error: `${READ_ROUTE} reads an agent's file: send it first in \`files\`, then the schema its output: names.` });
@@ -360,7 +360,7 @@ export function agentReadOf({ name, files }: DefinitionFiles): AgentDrafted {
 }
 
 /** The agent `payload` names made in the user library, read back. */
-async function libraryCreated(s: Served, payload: AgentWrite): Promise<Agent> {
+async function libraryCreated(s: Served, payload: AgentWrite) {
   const name = named('POST /api/agents', payload.metadata.name);
   writeGoes('library', 'create', thereOf(await libraryHeld(s), name));
   await saved(s, agentDraftOf(draftBodyOf(payload.spec), name));
@@ -368,7 +368,7 @@ async function libraryCreated(s: Served, payload: AgentWrite): Promise<Agent> {
 }
 
 /** The library's agent `name` written over from `payload`, read back. */
-async function libraryReplaced(s: Served, name: string, payload: AgentWrite): Promise<Agent> {
+async function libraryReplaced(s: Served, name: string, payload: AgentWrite) {
   const route = `PUT /api/agents/${name}`;
   writeGoes('library', 'replace', thereOf(await libraryHeld(s), name));
   const version = versioned(route, payload.metadata.resourceVersion);

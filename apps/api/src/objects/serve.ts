@@ -76,7 +76,7 @@ const OBJECT_BODY_LIMIT_SAID = `${ByteSize.format(OBJECT_BODY_LIMIT)} (${Number(
  * api's words: a 404 naming the restart that makes a client and the api one build, and where the paths it serves are listed.
  * @param c The request's context.
  */
-export function noRoute(c: RequestContext<ApiEnv>): Response {
+export function noRoute(c: RequestContext<ApiEnv>) {
   return c.json(
     {
       error: `${c.req.method} ${new URL(c.req.url).pathname} is no route of this api, which a client of another build may still ask: restart the daemon with \`nemia service restart\` so the two are one build, or ask a path ${DOCUMENT} lists.`,
@@ -92,7 +92,7 @@ const issuesOf = SchemaIssue.makeFormatterStandardSchemaV1();
  * The key a refused decode names, from the request's part it is in (`payload.spec.steps`, `query.limit`, `params.name`), and what its
  * Schema says of it: the message it was declared with, where it says what to send instead, or the decoder's own.
  */
-const refusedOf = (error: HttpApiError.HttpApiSchemaError): { field: string; said: string | undefined } => {
+const refusedOf = (error: HttpApiError.HttpApiSchemaError) => {
   const first = issuesOf(error.cause.issue).issues[0];
   const path = (first?.path ?? []).map((segment) => String(typeof segment === 'object' ? segment.key : segment));
   return { field: [error.kind.toLowerCase(), ...path].join('.'), said: first?.message };
@@ -138,7 +138,7 @@ const answerRefused = HttpRouter.middleware(
 );
 
 /** Whether `response` already says a refusal of the api's: a JSON object whose `error` is a sentence. */
-const saysError = async (response: Response): Promise<boolean> => {
+const saysError = async (response: Response) => {
   try {
     const body: unknown = await response.clone().json();
     return typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string';
@@ -152,7 +152,7 @@ const saysError = async (response: Response): Promise<boolean> => {
  * a 404 the api's `noRoute`, a 413 the limit, a 415 a body of a content-type its endpoint does not take (JSON sent to the form a file is
  * uploaded as), a 400 its decoding said nothing of where the document is. Anything else as it is.
  */
-async function inApiWords(c: RequestContext<ApiEnv>, response: Response): Promise<Response> {
+async function inApiWords(c: RequestContext<ApiEnv>, response: Response) {
   if (response.status !== 400 && response.status !== 404 && response.status !== 413 && response.status !== 415) return response;
   if (await saysError(response)) return response;
   if (response.status === 404) return noRoute(c);
@@ -170,7 +170,7 @@ async function inApiWords(c: RequestContext<ApiEnv>, response: Response): Promis
  * The kind of list a GET of `path` answers — its endpoint's success a `<Kind>List` — or none where it is no list's.
  * @param path The request's path.
  */
-export const listAt = (path: string): string | undefined => endpointOf('GET', path)?.kinds.find((kind) => kind.endsWith('List'));
+export const listAt = (path: string) => endpointOf('GET', path)?.kinds.find((kind) => kind.endsWith('List'));
 
 /**
  * The web handler of the `Api`, its layer built in the app runtime's memo map: every group's handlers, so a group left out does not
@@ -223,7 +223,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
  * (`ServedNow`), its answer in the api's words (`inApiWords`); a GET of a list through `watchable`.
  * @param runtime The app's runtime, whose handler serves the Api.
  */
-export function mount(runtime: ApiRuntime): (c: RequestContext<ApiEnv>) => Promise<Response> {
+export function mount(runtime: ApiRuntime) {
   const { handler } = objectsHandler(runtime);
   const handed: Listed = (c, request = c.req.raw) =>
     served(c, async (s) => inApiWords(c, await handler(request, Context.make(ServedNow, s))));
@@ -232,9 +232,11 @@ export function mount(runtime: ApiRuntime): (c: RequestContext<ApiEnv>) => Promi
     RunList: watchable(handed, { versionOf: runWatchVersion }),
     EventList: watchable(handed, { follow: eventsFollowed }),
   };
-  return async (c) => {
+  return (async (c) => {
     const kind = c.req.method === 'GET' ? listAt(new URL(c.req.url).pathname) : undefined;
     if (kind === undefined) return handed(c);
     return (kind === 'RunList' || kind === 'EventList' ? watched[kind] : watched.plain)(c);
-  };
+  }) satisfies (c: RequestContext<ApiEnv>) => Promise<Response> satisfies (c: RequestContext<ApiEnv>) => Promise<Response> as (
+    c: RequestContext<ApiEnv>,
+  ) => Promise<Response>;
 }

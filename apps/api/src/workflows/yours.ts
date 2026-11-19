@@ -16,7 +16,7 @@ export type { YourStore };
  * --volume <path|url>:rw`. `turnOnNemia`: the line that turns Nemia on, `nemia level semi-auto`, the act the board's switch takes.
  * @param home The store's root folder.
  */
-export const yourStore = (home: string): YourStore => ({
+export const yourStore = (home: string) => ({
   workflows: path.join(home, 'workflows'),
   agents: yourAgentsDir(home),
   skills: librarySkills(home),

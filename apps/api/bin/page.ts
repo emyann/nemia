@@ -55,7 +55,7 @@ app.all(REFERENCE_PROXY_PATH, async (c) => {
   const started = performance.now();
   const headers = new Headers(SENT_ON.flatMap((name) => (c.req.header(name) === undefined ? [] : [[name, c.req.header(name) ?? '']])));
   const body = c.req.method === 'GET' || c.req.method === 'HEAD' ? undefined : await c.req.arrayBuffer();
-  const line = (status: number | string, bytes: number): void => {
+  const line = (status: number | string, bytes: number) => {
     process.stdout.write(`${c.req.method} ${to.href}  ${status}  ${Math.round(performance.now() - started)} ms  ${bytes} B\n`);
   };
   try {

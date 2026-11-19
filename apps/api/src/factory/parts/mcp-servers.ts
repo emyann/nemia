@@ -36,11 +36,11 @@ import { wantsTable } from '../../objects/table.ts';
 import { readsBounded } from '../../objects/answer-bound.ts';
 
 /** The route of the server `name` of `namespace`, as a refusal says it. */
-const routeOf = (method: string, namespace: string, name: string, sub = ''): string =>
+const routeOf = (method: string, namespace: string, name: string, sub = '') =>
   `${method} /api/namespaces/${namespace}/mcpservers/${name}${sub}`;
 
 /** `namespace` and `name` as a factory's and a server's, or `Invalid` naming the route, before anything is read. */
-const named = (route: string, namespace: string, name: string): void => {
+const named = (route: string, namespace: string, name: string) => {
   factoryNamed(route, namespace);
   const wrong = serverNameRefusal(name);
   if (wrong !== undefined) throw new Refused({ message: `${route}: ${wrong}` });

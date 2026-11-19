@@ -52,16 +52,16 @@ export const API_PATHS = ['/api', '/openapi'] as const;
  * Whether `path` is `root` or a path under it: joined with `+`, which the verifier reads, where it reads a template string as an unknown
  * string (`apps/api/contracts/token-need.contract.ts` joins it the same way).
  */
-const under = (path: string, root: string): boolean => path === root || path.startsWith(root + '/');
+const under = (path: string, root: string) => path === root || path.startsWith(root + '/');
 
 /**
  * Whether `path` is the MCP port's, or under it.
  * @param path The request's path.
  */
-export const onPort = (path: string): boolean => under(path, MCP_PATH);
+export const onPort = (path: string) => under(path, MCP_PATH);
 
 /** Whether `path` is a pairing's claim, `/api/pairings/<id>/claim`, its id one segment that is not empty. */
-const pairingClaim = (path: string): boolean => {
+const pairingClaim = (path: string) => {
   const id =
     path.startsWith(PAIRINGS_PATH + '/') && path.endsWith(CLAIM_SEGMENT) ? path.slice(PAIRINGS_PATH.length + 1, -CLAIM_SEGMENT.length) : '';
   return id !== '' && !id.includes('/');
@@ -71,14 +71,14 @@ const pairingClaim = (path: string): boolean => {
  * Whether `method` on `path` is one of the three routes a client with no token yet reaches, each judging the secret it is sent: `POST
  * /api/pairings`, `POST /api/pairings/:id/claim` and `POST /api/links/claim`.
  */
-const openRoute = (method: string, path: string): boolean =>
+const openRoute = (method: string, path: string) =>
   method === OPEN_METHOD && (path === PAIRINGS_PATH || path === LINK_CLAIM_PATH || pairingClaim(path));
 
 /**
  * Whether `path` is one the api answers on (`API_PATHS`): any other but the port's is a page of the board (board/board.ts).
  * @param path The request's path.
  */
-export const answered = (path: string): boolean => API_PATHS.some((root) => under(path, root));
+export const answered = (path: string) => API_PATHS.some((root) => under(path, root));
 
 /**
  * What a request of `method` to `path` needs of a token: a standing one on the MCP port; none on the three routes a client with no token
@@ -112,11 +112,7 @@ const REFUSED_WORDS: Readonly<Record<TokenRefusal, string>> = {
  * @param token The token the request presents, or undefined where it presents none.
  * @param need What the request's route needs of a token (needOf).
  */
-export async function callerBy(
-  c: Parameters<MiddlewareHandler<ApiEnv>>[0],
-  token: string | undefined,
-  need: TokenNeed,
-): Promise<ProposalCaller> {
+export async function callerBy(c: Parameters<MiddlewareHandler<ApiEnv>>[0], token: string | undefined, need: TokenNeed) {
   if (token === undefined && need === 'none') return PERSON;
   const { e, placed } = await c.var.runtime.runPromise(
     Effect.gen(function* () {
@@ -171,9 +167,7 @@ export const callerGate: MiddlewareHandler<ApiEnv> = async (c, next) => {
  * `POST /api/session` sets) on a path the api answers or the port's: a page of the board carries no data and reads no cookie, so one
  * gone stale still loads the page that asks for a token.
  */
-async function callerOfRequest(
-  c: Parameters<MiddlewareHandler<ApiEnv>>[0],
-): Promise<{ readonly caller: ProposalCaller; readonly presented: Presented }> {
+async function callerOfRequest(c: Parameters<MiddlewareHandler<ApiEnv>>[0]) {
   const path = c.req.path;
   const bearer = bearerOf(c.req.header('authorization'));
   if (bearer === null)
@@ -195,7 +189,7 @@ async function callerOfRequest(
  * @param route The route the request reached, as the refusal names it.
  * @param instead The command the person types to do it, as the refusal names it.
  */
-export const personOnly = (s: Served, route: string, instead: string): void => {
+export const personOnly = (s: Served, route: string, instead: string) => {
   if (s.caller.kind === 'person') return;
   throw new Forbidden({
     reason: 'person-only',

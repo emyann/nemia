@@ -47,7 +47,7 @@ const QUERY_KEYS: Record<QueryKey, keyof StatsAsked> = {
  *   grammar refuses is a 422 naming the key or the clause.
  * @param query The request's query: the days, the key to go by, and the values each fact is kept by.
  */
-export async function statsOf(query: StatsAsked, { memo, inRequest }: Served): Promise<Stats> {
+export async function statsOf(query: StatsAsked, { memo, inRequest }: Served) {
   const given = Object.fromEntries(
     (Object.entries(QUERY_KEYS) as [QueryKey, keyof StatsAsked][]).flatMap(([key, name]) => {
       const value = query[name];

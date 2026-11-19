@@ -27,7 +27,7 @@ import { API_VERSION, AnyObjectList, LIST_PAGE, TABLE_ACCEPT, type WatchedObject
 import { acceptsTable } from '../objects/table.ts';
 import { type ApiEnv, Beats } from '../layer.ts';
 import { StoreRoot } from '../store.ts';
-import type { WatchStart, WatchStartOf, WatchStartRefusal } from '../../contracts/watch-start.contract.ts';
+import type { WatchStartOf, WatchStartRefusal } from '../../contracts/watch-start.contract.ts';
 
 /** The least time between two reads again of a watched list, however many feed lines arrive. */
 export const WATCH_SETTLE: Duration.Input = '500 millis';
@@ -46,20 +46,29 @@ const WATCH_TAKES =
   '`?watch=true` follows the list as server-sent events, with `labelSelector` if you like, and on the Event lists `resourceVersion` to resume from; `limit` and `continue` page a list and are left out of a watch';
 
 /** Why `c`'s query cannot be watched, or null where it asks a watch rightly. */
-const refusalOf = (c: RequestContext<ApiEnv>): { readonly status: 400 | 406; readonly error: string } | null => {
+const refusalOf = (c: RequestContext<ApiEnv>) => {
   const watch = c.req.queries('watch') ?? [];
   if (watch.length !== 1 || watch[0] !== 'true')
-    return { status: 400, error: `watch=${watch.join(',')} is not a watch this list takes: ${WATCH_TAKES}.` };
+    return { status: 400, error: `watch=${watch.join(',')} is not a watch this list takes: ${WATCH_TAKES}.` } satisfies {
+      readonly status: 400 | 406;
+      readonly error: string;
+    } | null;
   if (c.req.query('limit') !== undefined || c.req.query('continue') !== undefined)
-    return { status: 400, error: `a watch is sent the whole list, so it takes no page: ${WATCH_TAKES}. Send it again without them.` };
+    return {
+      status: 400,
+      error: `a watch is sent the whole list, so it takes no page: ${WATCH_TAKES}. Send it again without them.`,
+    } satisfies { readonly status: 400 | 406; readonly error: string } | null;
   if ((c.req.queries('resourceVersion') ?? []).length > 1)
-    return { status: 400, error: `a watch resumes from one resourceVersion: send it once. ${WATCH_TAKES}.` };
+    return { status: 400, error: `a watch resumes from one resourceVersion: send it once. ${WATCH_TAKES}.` } satisfies {
+      readonly status: 400 | 406;
+      readonly error: string;
+    } | null;
   if (acceptsTable(c.req.header('accept')))
     return {
       status: 406,
       error: `a watch streams the list's objects, never a Table: send it again without Accept: ${TABLE_ACCEPT}, or ask the Table without watch=true.`,
-    };
-  return null;
+    } satisfies { readonly status: 400 | 406; readonly error: string } | null;
+  return null satisfies { readonly status: 400 | 406; readonly error: string } | null;
 };
 
 /**
@@ -70,7 +79,7 @@ const refusalOf = (c: RequestContext<ApiEnv>): { readonly status: 400 | 406; rea
  * @param follows Whether the list follows the feed.
  * @param byte The byte the asked word reads as (byteOf), or undefined where it is no byte.
  */
-export const watchStartOf: WatchStartOf = (asked, follows, byte): WatchStart => {
+export const watchStartOf: WatchStartOf = (asked, follows, byte) => {
   if (asked === undefined || asked === '') return { kind: 'state' };
   if (!follows) return { kind: 'refused', reason: 'not-followed' };
   if (byte === undefined) return { kind: 'refused', reason: 'not-a-cursor' };
@@ -81,14 +90,13 @@ export const watchStartOf: WatchStartOf = (asked, follows, byte): WatchStart => 
  * A byte of the feed as an event's `resourceVersion` writes it: a decimal with no sign and no leading zero, else none.
  * @param text The resourceVersion as asked, or undefined where none is.
  */
-export const byteOf = (text: string | undefined): number | undefined =>
-  text !== undefined && /^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : undefined;
+export const byteOf = (text: string | undefined) => (text !== undefined && /^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : undefined);
 
 /** A read of the list: its objects by key, and the objects themselves. */
 type Read = { readonly kind: string; readonly versions: Versioned[]; readonly objects: Map<string, WatchedObject>; readonly at: number };
 
 /** The key an object is watched by: its namespace and its name. */
-const keyOf = (o: WatchedObject): string => `${o.metadata.namespace ?? ''}/${o.metadata.name}`;
+const keyOf = (o: WatchedObject) => `${o.metadata.namespace ?? ''}/${o.metadata.name}`;
 
 /** The version a list's objects are compared at between two reads: its JSON as served where its route hands none. */
 export type VersionOf = (o: WatchedObject) => string;
@@ -100,7 +108,7 @@ export type VersionOf = (o: WatchedObject) => string;
 export const WatchPage = Context.Reference<number>('api/WatchPage', { defaultValue: () => LIST_PAGE.most });
 
 /** The `continue` of a list's answer, where more of it is left. */
-const continueOf = (list: AnyObjectList): string | undefined => {
+const continueOf = (list: AnyObjectList) => {
   const metadata = list.metadata;
   if (typeof metadata !== 'object' || metadata === null || !('continue' in metadata)) return undefined;
   return typeof metadata.continue === 'string' && metadata.continue !== '' ? metadata.continue : undefined;
@@ -165,7 +173,7 @@ export type Follow = (
 ) => Stream.Stream<{ readonly object: WatchedObject | undefined; readonly at: number }, unknown>;
 
 /** What a watch refused before anything is read answers in `error`: what to send instead. */
-const startRefusal = (reason: WatchStartRefusal, asked: string): string =>
+const startRefusal = (reason: WatchStartRefusal, asked: string) =>
   reason === 'not-followed'
     ? `this list is read again on each change and keeps no old versions, so its watch takes no resourceVersion (${JSON.stringify(asked)}): send it again without resourceVersion, and the state is sent whole`
     : `resourceVersion ${JSON.stringify(asked)} is no byte of the feed: send the resourceVersion of the last event or BOOKMARK a watch sent, or the metadata.resourceVersion of a page of GET /api/events, as it is`;
@@ -222,7 +230,7 @@ async function openedAt(c: RequestContext<ApiEnv>, list: Listed, versionOf: Vers
  */
 export const watchable =
   (list: Listed, { follow, versionOf = JSON.stringify }: { readonly follow?: Follow; readonly versionOf?: VersionOf } = {}) =>
-  async (c: RequestContext<ApiEnv>): Promise<Response> => {
+  async (c: RequestContext<ApiEnv>) => {
     const asked = c.req.query('watch');
     if (asked === undefined || asked === 'false') return list(c);
     const refused = refusalOf(c);

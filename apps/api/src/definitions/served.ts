@@ -23,7 +23,7 @@ export type Served<T> = Held<T> & { shadowedBy: Origin | null };
  * `asked`, the `?origin=` of a read, as an origin, or `Invalid` naming the words it takes.
  * @param asked The read's origin query, or undefined where it names none.
  */
-export function originAsked(asked: string | undefined): Origin | undefined {
+export function originAsked(asked: string | undefined) {
   if (asked === undefined) return undefined;
   const origin = DEFINITION_ORIGINS.find((o) => o === asked);
   if (origin === undefined)
@@ -40,10 +40,10 @@ export function originAsked(asked: string | undefined): Origin | undefined {
  * @param place The repository and factory the request is answered in.
  * @param asked The read's origin query, or undefined where it names none.
  */
-export function originIn(place: Pick<Place, 'repo' | 'factory'>, asked: string | undefined): Origin | undefined {
+export function originIn(place: Pick<Place, 'repo' | 'factory'>, asked: string | undefined) {
   const origin = originAsked(asked);
   if (origin === 'repo') repoNeeded(place);
-  return origin;
+  return origin satisfies Origin | undefined as Origin | undefined;
 }
 
 /**
@@ -52,14 +52,14 @@ export function originIn(place: Pick<Place, 'repo' | 'factory'>, asked: string |
  * @param held Every definition held, each with its name and origin.
  * @param asked The origin asked for, or undefined for the one each name resolves to.
  */
-export function servedOf<T>(held: readonly Held<T>[], asked: Origin | undefined): Served<T>[] {
+export function servedOf<T>(held: readonly Held<T>[], asked: Origin | undefined) {
   return definitionsServed(
     held.map(({ name, origin }) => ({ name, origin })),
     asked,
   ).flatMap((listed) => {
     const one = held.find((h) => h.name === listed.name && h.origin === listed.origin);
     return one ? [{ ...one, shadowedBy: listed.shadowedBy }] : [];
-  });
+  }) satisfies Served<T>[] as Served<T>[];
 }
 
 /**
@@ -69,7 +69,7 @@ export function servedOf<T>(held: readonly Held<T>[], asked: Origin | undefined)
  * @param asked The origin asked for, or undefined for the one the name resolves to.
  * @param list The command that lists the names, as the refusal names it.
  */
-export function servedNamed<T>(held: readonly Held<T>[], name: string, asked: Origin | undefined, list: string): Served<T> {
+export function servedNamed<T>(held: readonly Held<T>[], name: string, asked: Origin | undefined, list: string) {
   const one = servedOf(
     held.filter((h) => h.name === name),
     asked,
@@ -87,7 +87,7 @@ export function servedNamed<T>(held: readonly Held<T>[], name: string, asked: Or
  * @param held Every definition held, each with its name and origin.
  * @param name The definition's name the write names.
  */
-export function thereOf<T>(held: readonly Held<T>[], name: string): Origin | 'none' {
+export function thereOf<T>(held: readonly Held<T>[], name: string) {
   const at = held.filter((h) => h.name === name);
   if (at.some((h) => h.origin === 'factory')) return 'factory';
   if (at.some((h) => h.origin === 'user')) return 'user';
@@ -102,7 +102,7 @@ export function thereOf<T>(held: readonly Held<T>[], name: string): Origin | 'no
  * @param there What the write would change (thereOf), none where nothing is.
  * @param users The factories that use the definition (`libraryUsers`); none for a write in a namespace, which is refused before them.
  */
-export function writeGoes(at: WriteAt, does: DefinitionWrite, there: Origin | 'none', users: readonly string[] = []): void {
+export function writeGoes(at: WriteAt, does: DefinitionWrite, there: Origin | 'none', users: readonly string[] = []) {
   const refused = definitionWriteRefusal(at, does, there, users);
   if (refused === null) return;
   if (refused.kind === 'Missing') throw new Missing({ error: refused.message });
@@ -146,8 +146,8 @@ export const listed = <const K extends string, T extends Named>(kind: K, items: 
  * @param kind Which of the factory's adds gate `held`: its agents or its skills.
  * @param held What the namespace holds at each origin.
  */
-export function addsGated<T>(home: string, namespace: string, kind: 'agents' | 'skills', held: readonly Held<T>[]): Held<T>[] {
+export function addsGated<T>(home: string, namespace: string, kind: 'agents' | 'skills', held: readonly Held<T>[]) {
   const added = addedOf(home, namespace);
-  if (added === undefined) return [...held];
-  return held.filter((h) => (h.origin !== 'user' && h.origin !== 'builtin') || added[kind].has(h.name));
+  if (added === undefined) return [...held] satisfies Held<T>[] as Held<T>[];
+  return held.filter((h) => (h.origin !== 'user' && h.origin !== 'builtin') || added[kind].has(h.name)) satisfies Held<T>[] as Held<T>[];
 }

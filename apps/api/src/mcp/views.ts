@@ -43,7 +43,7 @@ export type FeedViews = {
 };
 
 /** The headers a view's request is sent with: JSON, and the caller's `Authorization` where it gave one. */
-const headersOf = (from: Request): Headers => {
+const headersOf = (from: Request) => {
   const headers = new Headers({ accept: 'application/json' });
   const authorization = from.headers.get('authorization');
   if (authorization !== null) headers.set('authorization', authorization);
@@ -51,22 +51,27 @@ const headersOf = (from: Request): Headers => {
 };
 
 /** The words of a refused answer: its body's `error`, else its status. */
-const refusalOf = async (res: Response, asked: string): Promise<string> => {
+const refusalOf = async (res: Response, asked: string) => {
   const body = (await res.json().catch(() => undefined)) as { error?: unknown } | undefined;
   return typeof body?.error === 'string' ? body.error : `GET ${asked} answered ${res.status}`;
 };
 
 /** The feed's end as `view`'s list answers it to `from` (a page of one), or the api's refusal. */
-async function feedEnd(app: Fetching, view: FeedView, from: Request): Promise<{ at: string | undefined } | { refused: string }> {
+async function feedEnd(app: Fetching, view: FeedView, from: Request) {
   const asked = pathOf(view, { limit: '1' });
   const res = await app.fetch(new Request(new URL(asked, from.url), { headers: headersOf(from) }));
-  if (!res.ok) return { refused: await refusalOf(res, asked) };
+  if (!res.ok)
+    return { refused: await refusalOf(res, asked) } satisfies { at: string | undefined } | { refused: string } as
+      | { at: string | undefined }
+      | { refused: string };
   const page = (await res.json()) as { metadata?: { resourceVersion?: string } };
-  return { at: page.metadata?.resourceVersion };
+  return { at: page.metadata?.resourceVersion } satisfies { at: string | undefined } | { refused: string } as
+    | { at: string | undefined }
+    | { refused: string };
 }
 
 /** Each `data:` of the server-sent events `body` carries, as it arrives. */
-async function* dataOf(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+async function* dataOf(body: ReadableStream<Uint8Array>) {
   const decoder = new TextDecoder();
   let held = '';
   for await (const chunk of body) {
@@ -86,7 +91,7 @@ async function* dataOf(body: ReadableStream<Uint8Array>): AsyncGenerator<string>
 }
 
 /** One watch of `followed` from where it was read to, through to its end: each Event kept and told, each position taken. */
-async function watchOnce(app: Fetching, followed: Followed, from: Request, told: (uri: string) => void): Promise<Response> {
+async function watchOnce(app: Fetching, followed: Followed, from: Request, told: (uri: string) => void) {
   const asked = pathOf(followed.view, { watch: 'true', ...(followed.at === undefined ? {} : { resourceVersion: followed.at }) });
   const res = await app.fetch(new Request(new URL(asked, from.url), { headers: headersOf(from), signal: followed.gone.signal }));
   if (!res.ok || res.body === null) return res;
@@ -136,7 +141,7 @@ async function follow(app: Fetching, followed: Followed, from: Request, told: (u
  * @param appOf What gives the app whose fetch reads the views.
  * @param told What is told each URI that has a new event.
  */
-export function feedViews(appOf: () => Fetching, told: (uri: string) => void): FeedViews {
+export function feedViews(appOf: () => Fetching, told: (uri: string) => void) {
   const views = new Map<string, Followed>();
   const drop = (followed: Followed) => {
     if (views.get(followed.view.uri) === followed) views.delete(followed.view.uri);
@@ -147,9 +152,9 @@ export function feedViews(appOf: () => Fetching, told: (uri: string) => void): F
     for (const holder of followed.holders) holder();
     followed.holders.clear();
   };
-  const hold = async (view: FeedView, from: Request, closed: () => void): Promise<Held> => {
+  const hold = async (view: FeedView, from: Request, closed: () => void) => {
     const end = await feedEnd(appOf(), view, from);
-    if ('refused' in end) return { kind: 'refused', message: end.refused };
+    if ('refused' in end) return { kind: 'refused', message: end.refused } satisfies Held;
     let followed = views.get(view.uri);
     if (followed === undefined) {
       followed = { view, holders: new Set(), gone: new AbortController(), events: [], at: end.at };
@@ -166,7 +171,7 @@ export function feedViews(appOf: () => Fetching, told: (uri: string) => void): F
       mine.holders.delete(holder);
       if (mine.holders.size === 0) drop(mine);
     };
-    return { kind: 'held', release };
+    return { kind: 'held', release } satisfies Held;
   };
   const read = async (view: FeedView, from: Request) => {
     const end = await feedEnd(appOf(), view, from);
@@ -174,5 +179,5 @@ export function feedViews(appOf: () => Fetching, told: (uri: string) => void): F
     const followed = views.get(view.uri);
     return followed === undefined ? readAnswer([], end.at) : readAnswer(followed.events, followed.at);
   };
-  return { hold, read, live: () => views.size };
+  return { hold, read, live: () => views.size } satisfies FeedViews as FeedViews;
 }

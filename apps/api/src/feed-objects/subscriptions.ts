@@ -20,7 +20,7 @@ import { answered, answeredWrite } from '../objects/refused.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 
 /** A subscription's name that names no file of its own, refused before anything is read: a 400 in the package's words. */
-const misnamed = (name: string): Effect.Effect<void, BadRequest> => {
+const misnamed = (name: string) => {
   const wrong = subscriptionNameRefusal(name);
   return wrong === undefined ? Effect.void : Effect.fail(new BadRequest({ error: wrong }));
 };

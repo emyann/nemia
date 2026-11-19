@@ -138,7 +138,7 @@ const wholePaths = (
   values: readonly string[] | undefined,
   isPath: (given: string) => boolean = () => true,
   orElse = '',
-): void => {
+) => {
   const relative = (values ?? []).filter((given) => isPath(given) && !path.isAbsolute(given));
   if (relative.length)
     throw new Refused({
@@ -147,19 +147,19 @@ const wholePaths = (
 };
 
 /** Whether a repository given names a folder, as the verb reads it (`cloneTarget`): a URL or a refused one is the verb's to judge. */
-const repoPath = (given: string): boolean => cloneTarget(given).kind === 'path';
+const repoPath = (given: string) => cloneTarget(given).kind === 'path';
 
 /** The other fix a refusal of a repository's relative path names. */
 const OR_URL = ', or give the repository by its git URL for this machine to clone';
 
 /** An import's `repos`, each held to the whole-path rule where it is a path, `route` named in a refusal. */
-const wholeRepos = (route: string, repos: readonly string[] | undefined): void => wholePaths(route, 'repos', repos, repoPath, OR_URL);
+const wholeRepos = (route: string, repos: readonly string[] | undefined) => wholePaths(route, 'repos', repos, repoPath, OR_URL);
 
 /** A volume as typed, `<path|url>:ro|:rw`, without its mark: what the whole-path rule reads. */
-const unmarked = (volume: string): string => (volume.lastIndexOf(':') < 0 ? volume : volume.slice(0, volume.lastIndexOf(':')));
+const unmarked = (volume: string) => (volume.lastIndexOf(':') < 0 ? volume : volume.slice(0, volume.lastIndexOf(':')));
 
 /** `volumes` held to the whole-path rule where they name a path, `route` named in a refusal; a mark is the verb's to judge. */
-const wholeVolumes = (route: string, volumes: readonly string[] | undefined): void =>
+const wholeVolumes = (route: string, volumes: readonly string[] | undefined) =>
   wholePaths(route, 'volumes', volumes?.map(unmarked), repoPath, OR_URL);
 
 /**
@@ -176,8 +176,8 @@ const withTemplate = <A, E, R>(
  * A preview as the Api answers it: an upgrade's merge without its files' builds, a version no status names left out; a takeover as it
  * is.
  */
-const planOf = (planned: Effect.Success<ReturnType<typeof FACTORY_PLAN.handler>>): FactoryPlan => {
-  if (planned.kind === 'adopt') return planned;
+const planOf = (planned: Effect.Success<ReturnType<typeof FACTORY_PLAN.handler>>) => {
+  if (planned.kind === 'adopt') return planned satisfies FactoryPlan;
   const { name, from, to, merge, next, switched } = planned;
   return {
     kind: 'upgrade',
@@ -187,7 +187,7 @@ const planOf = (planned: Effect.Success<ReturnType<typeof FACTORY_PLAN.handler>>
     merge: { base: merge.base, merged: merge.merged, conflicts: merge.conflicts },
     next: { line: next.line, digest: next.digest, dropped: next.dropped },
     ...(switched === undefined ? {} : { switched }),
-  };
+  } satisfies FactoryPlan;
 };
 
 /**

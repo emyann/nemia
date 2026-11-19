@@ -40,7 +40,7 @@ const COUNTS = ['limit', 'last', 'tail', 'bodyLimit'];
  * Whether `key`, sent as `value`, already asks the least of its read: a count of 1, or a list of fields or diffs that names none. A
  * refusal never asks a call to narrow by it again.
  */
-const atNarrowest = (key: string, value: unknown): boolean =>
+const atNarrowest = (key: string, value: unknown) =>
   COUNTS.includes(key) ? String(value) === '1' : (key === 'fields' || key === 'diffs') && value === '';
 
 /**
@@ -50,11 +50,7 @@ const atNarrowest = (key: string, value: unknown): boolean =>
  * @param queryKeys The keys the endpoint's query takes.
  * @param sent The arguments the call was sent with.
  */
-export const narrowingOf = (
-  narrow: readonly string[] | undefined,
-  queryKeys: readonly string[],
-  sent: Readonly<Record<string, unknown>>,
-): string[] =>
+export const narrowingOf = (narrow: readonly string[] | undefined, queryKeys: readonly string[], sent: Readonly<Record<string, unknown>>) =>
   (narrow ?? NARROWING.filter((key) => queryKeys.includes(key))).filter((key) => !(key in sent && atNarrowest(key, sent[key])));
 
 /**
@@ -65,7 +61,7 @@ export const narrowingOf = (
  * @param bound The most the port answers at once, in characters.
  * @param keys The keys that narrow the read (narrowingOf), empty where none does.
  */
-export const pastTheBound = (tool: string, size: number, bound: number, keys: readonly string[]): string => {
+export const pastTheBound = (tool: string, size: number, bound: number, keys: readonly string[]) => {
   const how =
     keys.length > 0
       ? `narrow it: give ${keys.join(', ')}${keys.includes('limit') ? ' (a smaller limit, then continue for the next page)' : ''}`

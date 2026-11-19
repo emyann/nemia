@@ -64,21 +64,22 @@ export type PortOptions = { readonly progressEveryMs?: number };
 const SERVER_INFO = { name: 'nemia', version: '1' };
 
 /** A value of a call's arguments as a path segment or a query value says it: a string as it is, anything else as its JSON. */
-const asText = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value));
+const asText = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
 
 /** A tool's error: `text`, which says what to do next, and the body it was read off where there is one. */
-const failed = (text: string, body?: Readonly<Record<string, unknown>>): CallToolResult => ({
-  isError: true,
-  content: [{ type: 'text', text }],
-  ...(body === undefined ? {} : { structuredContent: body }),
-});
+const failed = (text: string, body?: Readonly<Record<string, unknown>>) =>
+  ({
+    isError: true,
+    content: [{ type: 'text', text }],
+    ...(body === undefined ? {} : { structuredContent: body }),
+  }) satisfies CallToolResult;
 
 /** `text` read as JSON, or none where it is not. */
-const jsonOf = (text: string): unknown => {
+const jsonOf = (text: string) => {
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) as unknown;
   } catch {
-    return undefined;
+    return undefined as unknown;
   }
 };
 
@@ -91,7 +92,7 @@ const jsonOf = (text: string): unknown => {
  * @param from The request to the port that carried the call, whose address and Authorization are taken.
  * @param signal What aborts the request, where one is given.
  */
-export function requestOf(tool: PortTool, args: Readonly<Record<string, unknown>>, from: Request, signal?: AbortSignal): Request {
+export function requestOf(tool: PortTool, args: Readonly<Record<string, unknown>>, from: Request, signal?: AbortSignal) {
   const filled = tool.path.replace(/:([A-Za-z]+)/g, (_, key: string) => encodeURIComponent(asText(args[key])));
   const url = new URL(filled, from.url);
   for (const key of tool.queryKeys) {
@@ -115,7 +116,7 @@ export function requestOf(tool: PortTool, args: Readonly<Record<string, unknown>
  * @param tool The tool called: its link's defaults and its endpoint's keys.
  * @param args The call's arguments, by key.
  */
-export function argsSent(tool: PortTool, args: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+export function argsSent(tool: PortTool, args: Readonly<Record<string, unknown>>) {
   const absent = (key: string) => args[key] === undefined || args[key] === null;
   const sent: Record<string, unknown> = { ...args };
   for (const [key, value] of Object.entries(tool.defaults)) if (absent(key)) sent[key] = value;
@@ -131,7 +132,7 @@ const isTable = (json: unknown): json is Table =>
  * The text a `Table` is answered as: its lines as `nemia <verb> -o wide` prints them, then the token of the next page where there is one;
  * where it has no row, a line saying so and the defaults `tool` sent that `args` did not lift.
  */
-const tableText = (tool: PortTool, table: Table, args: Readonly<Record<string, unknown>>): string => {
+const tableText = (tool: PortTool, table: Table, args: Readonly<Record<string, unknown>>) => {
   const lines = tableLines(table, { wide: true, showLabels: true, columns: [] });
   const sent = Object.entries(tool.defaults).filter(([key, value]) => args[key] === value);
   const none =
@@ -145,14 +146,13 @@ const tableText = (tool: PortTool, table: Table, args: Readonly<Record<string, u
 };
 
 /** How `tool`'s endpoint is bounded (`objects`' `READS`), where it is a read. */
-const readOf = (tool: PortTool): ReadBound | undefined =>
-  tool.method === 'GET' ? (READS as Readonly<Record<string, ReadBound>>)[tool.endpoint] : undefined;
+const readOf = (tool: PortTool) => (tool.method === 'GET' ? (READS as Readonly<Record<string, ReadBound>>)[tool.endpoint] : undefined);
 
 /**
  * The key that counts the page `args` asks of `tool`: a list's `limit`; a read from a cursor's `last` where the call asks the last
  * events, its `limit` otherwise; none for a read of neither.
  */
-const countKeyOf = (tool: PortTool, args: Readonly<Record<string, unknown>>): 'limit' | 'last' | null => {
+const countKeyOf = (tool: PortTool, args: Readonly<Record<string, unknown>>) => {
   const shape = readOf(tool)?.shape;
   if (shape === 'cursor' && tool.queryKeys.includes('last') && args.last !== undefined && args.last !== null) return 'last';
   return tool.queryKeys.includes('limit') && (shape === undefined || shape === 'page' || shape === 'cursor') ? 'limit' : null;
@@ -161,7 +161,7 @@ const countKeyOf = (tool: PortTool, args: Readonly<Record<string, unknown>>): 'l
 /**
  * The page `args` asks for, as `answerFit` judges it: its count (`countKeyOf`, no longer than `PAGE_MOST`), or null where it asks none.
  */
-const pageOf = (tool: PortTool, args: Readonly<Record<string, unknown>>): number | null => {
+const pageOf = (tool: PortTool, args: Readonly<Record<string, unknown>>) => {
   const key = countKeyOf(tool, args);
   if (key === null) return null;
   const count = Number(args[key]);
@@ -169,7 +169,7 @@ const pageOf = (tool: PortTool, args: Readonly<Record<string, unknown>>): number
 };
 
 /** The characters a result holds, as a host counts them: its texts and the JSON of its `structuredContent`. */
-const sizeOf = (result: CallToolResult): number =>
+const sizeOf = (result: CallToolResult) =>
   result.content.reduce((n, c) => n + (c.type === 'text' ? c.text.length : 0), 0) +
   (result.structuredContent === undefined ? 0 : JSON.stringify(result.structuredContent).length);
 
@@ -178,26 +178,23 @@ const sizeOf = (result: CallToolResult): number =>
  * and as `structuredContent` (a list as `{ items }`), or its text alone where it is not JSON; anything else the tool's error, the body's
  * `error` sentence its text.
  */
-async function answerOf(
-  tool: PortTool,
-  args: Readonly<Record<string, unknown>>,
-  from: Request,
-  app: Fetching,
-  signal?: AbortSignal,
-): Promise<CallToolResult> {
+async function answerOf(tool: PortTool, args: Readonly<Record<string, unknown>>, from: Request, app: Fetching, signal?: AbortSignal) {
   const res = await app.fetch(requestOf(tool, args, from, signal));
   const text = await res.text();
   const json = jsonOf(text);
   if (res.ok) {
-    if (tool.table && isTable(json)) return { content: [{ type: 'text', text: tableText(tool, json, args) }] };
+    if (tool.table && isTable(json)) return { content: [{ type: 'text', text: tableText(tool, json, args) }] } satisfies CallToolResult;
     const structured = Array.isArray(json) ? { items: json } : Predicate.isObject(json) ? json : undefined;
-    return { content: [{ type: 'text', text }], ...(structured === undefined ? {} : { structuredContent: structured }) };
+    return {
+      content: [{ type: 'text', text }],
+      ...(structured === undefined ? {} : { structuredContent: structured }),
+    } satisfies CallToolResult;
   }
   const said = Predicate.isObject(json) && typeof json.error === 'string' ? json.error : undefined;
   return failed(
     said ?? `${tool.method} ${tool.path} answered ${res.status}${text === '' ? '' : `: ${text}`}`,
     Predicate.isObject(json) ? json : undefined,
-  );
+  ) satisfies CallToolResult;
 }
 
 /**
@@ -211,24 +208,23 @@ async function answerOf(
  * @param app The app whose fetch answers the call.
  * @param signal What aborts the call, where one is given.
  */
-export async function called(
-  tool: PortTool,
-  args: Readonly<Record<string, unknown>>,
-  from: Request,
-  app: Fetching,
-  signal?: AbortSignal,
-): Promise<CallToolResult> {
+export async function called(tool: PortTool, args: Readonly<Record<string, unknown>>, from: Request, app: Fetching, signal?: AbortSignal) {
   const missing = tool.pathKeys.filter((key) => args[key] === undefined || args[key] === null || args[key] === '');
-  if (missing.length > 0) return failed(`${tool.name} needs ${missing.join(' and ')}: give each in its arguments (${tool.path})`);
+  if (missing.length > 0)
+    return failed(
+      `${tool.name} needs ${missing.join(' and ')}: give each in its arguments (${tool.path})`,
+    ) satisfies CallToolResult as CallToolResult;
   let sent = argsSent(tool, args);
   for (;;) {
     const result = await answerOf(tool, sent, from, app, signal);
     const size = sizeOf(result);
     const fit = answerFit(size, ANSWER_BOUND, pageOf(tool, sent));
-    if (fit.kind === 'answer') return result;
+    if (fit.kind === 'answer') return result satisfies CallToolResult as CallToolResult;
     const key = countKeyOf(tool, sent);
     if (fit.kind === 'refuse' || key === null)
-      return failed(pastTheBound(tool.name, size, ANSWER_BOUND, narrowingOf(readOf(tool)?.narrow, tool.queryKeys, sent)));
+      return failed(
+        pastTheBound(tool.name, size, ANSWER_BOUND, narrowingOf(readOf(tool)?.narrow, tool.queryKeys, sent)),
+      ) satisfies CallToolResult as CallToolResult;
     sent = { ...sent, [key]: fit.limit };
   }
 }
@@ -237,12 +233,13 @@ export async function called(
  * A tool as `tools/list` says it: its name, description, input and hints, and nothing of how the port calls it. Its input is JSON by
  * construction (`Schema.toJsonSchemaDocument`, tools.ts), which the SDK's type says as JSON values where ours says `unknown`.
  */
-const listed = (tool: PortTool): Tool => ({
-  name: tool.name,
-  description: tool.description,
-  inputSchema: tool.inputSchema as Tool['inputSchema'],
-  annotations: tool.annotations,
-});
+const listed = (tool: PortTool) =>
+  ({
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema as Tool['inputSchema'],
+    annotations: tool.annotations,
+  }) satisfies Tool as Tool;
 
 /** The era a request of `/mcp` speaks, as the SDK tells the factory: `modern` (its version in `_meta`) or `legacy`. */
 type Era = McpRequestContext['era'];
@@ -252,7 +249,7 @@ type Era = McpRequestContext['era'];
  * the `Api` (`FEED_TEMPLATES`, resources.ts), and a read of a view answered from `views` (its newest events, under `ANSWER_BOUND`), a URI
  * that names none refused as a resource not found, in words naming the templates, and one the api refuses with its words.
  */
-function servesFeed(server: Server, views: FeedViews): void {
+function servesFeed(server: Server, views: FeedViews) {
   const templates = FEED_TEMPLATES.map(({ uriTemplate, name, title, description, mimeType }) => ({
     uriTemplate,
     name,
@@ -290,7 +287,7 @@ export function portServer(
   appOf: () => Fetching,
   progressEveryMs: number,
   feed?: { readonly era: Era; readonly views: FeedViews },
-): Server {
+) {
   const byName = new Map(tools.map((tool) => [tool.name, tool] as const));
   const list = tools.map(listed);
   const server = new Server(SERVER_INFO, {
@@ -336,20 +333,31 @@ export function portServer(
 }
 
 /** The URIs a `subscriptions/listen` request asks `notifications/resources/updated` of, or none where `body` is no such request. */
-const subscribedIn = (body: unknown): { readonly id: unknown; readonly uris: readonly string[] } | undefined => {
-  if (!Predicate.isObject(body) || body.method !== 'subscriptions/listen' || !Predicate.isObject(body.params)) return undefined;
+const subscribedIn = (body: unknown) => {
+  if (!Predicate.isObject(body) || body.method !== 'subscriptions/listen' || !Predicate.isObject(body.params))
+    return undefined satisfies { readonly id: unknown; readonly uris: readonly string[] } | undefined as
+      | { readonly id: unknown; readonly uris: readonly string[] }
+      | undefined;
   const filter = body.params.notifications;
-  if (!Predicate.isObject(filter) || !Array.isArray(filter.resourceSubscriptions)) return undefined;
+  if (!Predicate.isObject(filter) || !Array.isArray(filter.resourceSubscriptions))
+    return undefined satisfies { readonly id: unknown; readonly uris: readonly string[] } | undefined as
+      | { readonly id: unknown; readonly uris: readonly string[] }
+      | undefined;
   const uris = filter.resourceSubscriptions.filter((uri): uri is string => typeof uri === 'string');
-  return uris.length === 0 ? undefined : { id: body.id, uris: [...new Set(uris)] };
+  return (uris.length === 0 ? undefined : { id: body.id, uris: [...new Set(uris)] }) satisfies
+    | { readonly id: unknown; readonly uris: readonly string[] }
+    | undefined as { readonly id: unknown; readonly uris: readonly string[] } | undefined;
 };
 
 /** A JSON-RPC error answering the request `id`, in band (HTTP 200), as the SDK's listen router answers its own refusals. */
-const rpcRefused = (id: unknown, message: string): Response =>
-  Response.json({ jsonrpc: '2.0', id: id ?? null, error: { code: INVALID_PARAMS, message } }, { status: 200 });
+const rpcRefused = (id: unknown, message: string) =>
+  Response.json(
+    { jsonrpc: '2.0', id: id ?? null, error: { code: INVALID_PARAMS, message } },
+    { status: 200 },
+  ) satisfies Response as Response;
 
 /** `body` read off `request` within the SDK's bound, as JSON, or none where it is past it or no JSON. */
-const bodyOf = async (request: Request): Promise<unknown> => {
+const bodyOf = async (request: Request) => {
   const read = await readRequestBody(request, DEFAULT_MAX_REQUEST_BODY_SIZE).catch(() => undefined);
   if (read === undefined || read.tooLarge) return undefined;
   return jsonOf(read.text);
@@ -359,29 +367,28 @@ const bodyOf = async (request: Request): Promise<unknown> => {
  * Every view `wanted` names held for one stream, each closing it where the api closes the view (`closing`): the releases, or the api's
  * refusal of one, the views held before it let go again.
  */
-async function heldAll(
-  views: FeedViews,
-  wanted: readonly FeedView[],
-  from: Request,
-  closing: () => void,
-): Promise<{ readonly releases: readonly (() => void)[] } | { readonly refused: string }> {
+async function heldAll(views: FeedViews, wanted: readonly FeedView[], from: Request, closing: () => void) {
   const releases: (() => void)[] = [];
   for (const view of wanted) {
     const held = await views.hold(view, from, closing);
     if (held.kind === 'refused') {
       for (const release of releases) release();
-      return { refused: `${view.uri}: ${held.message}` };
+      return { refused: `${view.uri}: ${held.message}` } satisfies
+        | { readonly releases: readonly (() => void)[] }
+        | { readonly refused: string } as { readonly releases: readonly (() => void)[] } | { readonly refused: string };
     }
     releases.push(held.release);
   }
-  return { releases };
+  return { releases } satisfies { readonly releases: readonly (() => void)[] } | { readonly refused: string } as
+    | { readonly releases: readonly (() => void)[] }
+    | { readonly refused: string };
 }
 
 /**
  * `response`'s body, handed on as it is read, and `releases` let go once when it ends, when its reader cancels it, when `signal` aborts or
  * when `end` is called (a view closed by the api), which cancels the SDK's stream so its listen is torn down too.
  */
-function releasedWith(response: Response, releases: readonly (() => void)[], signal: AbortSignal): { response: Response; end: () => void } {
+function releasedWith(response: Response, releases: readonly (() => void)[], signal: AbortSignal) {
   let done = false;
   const finish = () => {
     if (done) return;
@@ -413,7 +420,7 @@ function releasedWith(response: Response, releases: readonly (() => void)[], sig
  * @param handler The SDK's handler of the port.
  * @param views The feed's views, which hold each URI subscribed to.
  */
-export async function listened(request: Request, handler: McpHttpHandler, views: FeedViews): Promise<Response> {
+export async function listened(request: Request, handler: McpHttpHandler, views: FeedViews) {
   if (request.method !== 'POST') return handler.fetch(request);
   const body = await bodyOf(request.clone());
   const asked = subscribedIn(body);
@@ -447,6 +454,6 @@ export function mcpPort(appOf: () => Fetching, { progressEveryMs = PROGRESS_EVER
     legacy: 'stateless',
     responseMode: 'auto',
   });
-  const served = (c: Context): Promise<Response> => listened(c.req.raw, handler, views);
+  const served = (c: Context) => listened(c.req.raw, handler, views);
   return Object.assign(served, { liveViews: () => views.live() });
 }

@@ -83,7 +83,7 @@ try {
  * Why the app cannot listen on `port`, as a refusal (exit 2) naming the fix: a port in use is another process's, so another `PORT` —
  * `0` for any free one — or that process stopped; any other error is said with its own words beside the same fix.
  */
-const unserved = (err: Error & { code?: string }): Error =>
+const unserved = (err: Error & { code?: string }) =>
   Object.assign(
     new Error(
       `api: ${leaseHostOf(host)}:${port} ${err.code === 'EADDRINUSE' ? 'is in use by another process' : `cannot be listened on: ${err.message}`}. ` +

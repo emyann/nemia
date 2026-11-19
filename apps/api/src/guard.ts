@@ -72,7 +72,7 @@ export { saysJson } from './media/media.ts';
  * What a request's `Authorization` header presents: no header (`undefined`), a bearer token, or a header of another shape (`null`).
  * @param header The Authorization header's value, or undefined where the request sends none.
  */
-export function bearerOf(header: string | undefined): string | undefined | null {
+export function bearerOf(header: string | undefined) {
   if (header === undefined) return undefined;
   const match = /^Bearer +(\S+)\s*$/i.exec(header.trim());
   return match?.[1] ?? null;
@@ -82,7 +82,7 @@ export function bearerOf(header: string | undefined): string | undefined | null 
  * The token the board's cookie (`TOKEN_COOKIE`) holds, or `undefined` where the request sends none, or an empty one.
  * @param c The request's context, whose cookies are read.
  */
-export const cookieTokenOf = (c: Context): string | undefined => {
+export const cookieTokenOf = (c: Context) => {
   const token = getCookie(c, TOKEN_COOKIE);
   return token === undefined || token === '' ? undefined : token;
 };
@@ -111,7 +111,7 @@ const DOCUMENT = 'GET /openapi/v3/nemia/v1';
  * Why a request addressed to `host` is refused, in words that name the fix where it came from: on a store marked exposed (`exposed`), the
  * setting that declares a name it is served at; on any other, the loopback, the one name it is reached at.
  */
-const hostWords = (route: string, host: string | undefined, exposed: boolean): string =>
+const hostWords = (route: string, host: string | undefined, exposed: boolean) =>
   exposed
     ? `${route} refuses a request with no token addressed to ${host}: this exposed store takes one only at the loopback, the address it binds (NEMIA_BIND) and the names declared in WF_SERVED_NAMES, so that a site whose name points here cannot write through it. If it is a name you reach this store by, declare it in the service's environment, beside the names already there: nemia service install --bind <address> --env WF_SERVED_NAMES=${host === undefined ? '<name>' : nameOf(host)}; nemia doctor says the names it takes.`
     : `${route} refuses a request addressed to ${host}: the api writes only for a request to this machine — localhost, 127.0.0.1 or [::1] — so that a site whose name points here cannot write through it. Reach the api at http://127.0.0.1:<port>.`;
@@ -120,7 +120,7 @@ const hostWords = (route: string, host: string | undefined, exposed: boolean): s
  * `refusal` of the request `route` names, as `objects`' error answers it: in words that say what to do instead, a host's by whether the
  * store is marked exposed (`exposed`).
  */
-const answerOf = (refusal: WriteRefusal, route: string, request: WriteRequest, exposed: boolean): Forbidden | UnsupportedMediaType => {
+const answerOf = (refusal: WriteRefusal, route: string, request: WriteRequest, exposed: boolean) => {
   if (refusal === 'host') return new Forbidden({ reason: 'host', error: hostWords(route, request.host, exposed) });
   if (refusal === 'site')
     return new Forbidden({

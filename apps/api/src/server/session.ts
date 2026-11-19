@@ -17,7 +17,7 @@
  */
 import { Effect } from 'effect';
 import { HttpEffect, type HttpServerRequest, HttpServerResponse } from 'effect/http';
-import { Api, BadRequest, TOKEN_COOKIE, type SessionAnswer } from 'objects';
+import { Api, BadRequest, TOKEN_COOKIE } from 'objects';
 import { bearerOf } from '../guard.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 import { httpsBy, KEPT } from './keeping.ts';
@@ -26,7 +26,7 @@ import { httpsBy, KEPT } from './keeping.ts';
  * Whether `request` came over https: its own URL's scheme, or a proxy in front that says so (`X-Forwarded-Proto: https`).
  * @param request The request, its URL and its headers.
  */
-export const overHttps = (request: HttpServerRequest.HttpServerRequest): boolean =>
+export const overHttps = (request: HttpServerRequest.HttpServerRequest) =>
   httpsBy(request.headers['x-forwarded-proto'], request.originalUrl);
 
 /** The board's cookie as the browser keeps it, `Secure` where `secure`. */
@@ -51,9 +51,7 @@ export const cookieSent = (token: string | undefined, secure: boolean) =>
  * `POST /api/session`: the bearer the gate judged, set as the board's cookie; refused 400 where the request presents none.
  * @param request The request, whose Authorization header and scheme are read.
  */
-export const signIn = (
-  request: HttpServerRequest.HttpServerRequest,
-): Effect.Effect<SessionAnswer, BadRequest, HttpServerRequest.HttpServerRequest> =>
+export const signIn = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const token = bearerOf(request.headers.authorization);
     if (typeof token !== 'string')
@@ -71,9 +69,7 @@ export const signIn = (
  * `DELETE /api/session`: the board's cookie cleared.
  * @param request The request, whose scheme is read.
  */
-export const signOut = (
-  request: HttpServerRequest.HttpServerRequest,
-): Effect.Effect<SessionAnswer, never, HttpServerRequest.HttpServerRequest> =>
+export const signOut = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.as(cookieSent(undefined, overHttps(request)), { cookie: 'cleared' } as const);
 
 export const sessionHandlers = readsBounded(Api, 'session', (handlers) =>

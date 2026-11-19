@@ -4,13 +4,13 @@
  * own host reads these hints and decides whether to ask before a call.
  */
 import type { CommandSpec } from 'agent-orchestrator';
-import type { ToolClass, ToolHintsOf } from '../../contracts/tool-hints.contract.ts';
+import type { ToolHintsOf } from '../../contracts/tool-hints.contract.ts';
 
 /**
  * A verb's class as the hints read it: its word, and `setting` for the setting form of a verb that reads bare.
  * @param cls The verb's class, as the command table says it.
  */
-export const classWordOf = (cls: CommandSpec['class']): ToolClass => (typeof cls === 'object' ? 'setting' : cls);
+export const classWordOf = (cls: CommandSpec['class']) => (typeof cls === 'object' ? 'setting' : cls);
 
 /**
  * The hints of a tool whose verb is of class `cls` and whose endpoint answers `method`: read-only exactly when the endpoint is a GET, and

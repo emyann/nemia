@@ -57,14 +57,14 @@ type ApiErrorClass = (typeof API_ERRORS)[number];
 export type ApiError = InstanceType<ApiErrorClass>;
 
 /** The class `err` is of, among those the api answers with. */
-const classOf = (err: unknown): ApiErrorClass | undefined => API_ERRORS.find((kind) => err instanceof kind);
+const classOf = (err: unknown) => API_ERRORS.find((kind) => err instanceof kind);
 
 /**
  * `err` as the error the api answers it with, or none where it is no refusal: an error of `objects`' as it is; the orchestrator's refusal
  * by its tag, as the class of the same name; the api's own refusal of a session token as `Unauthorized`.
  * @param err What was thrown, of any type.
  */
-export const refusedAs = (err: unknown): ApiError | undefined => {
+export const refusedAs = (err: unknown) => {
   if (classOf(err) !== undefined) return err as ApiError;
   if (err instanceof TokenRefused)
     return new Unauthorized({
@@ -89,10 +89,11 @@ export const refusedAs = (err: unknown): ApiError | undefined => {
  * What `error` answers in its body: its own fields, `{ error }` and what its class carries beside it (`users`, `reason`).
  * @param error The api's error.
  */
-export const bodyOf = (error: ApiError): Record<string, unknown> => Object.fromEntries(Object.entries(error));
+export const bodyOf = (error: ApiError) =>
+  Object.fromEntries(Object.entries(error)) satisfies Record<string, unknown> as Record<string, unknown>;
 
 /** The status `kind` answers with: its `httpApiStatus`, which every class of `objects`' declares. */
-const statusOfClass = (kind: ApiErrorClass): number => {
+const statusOfClass = (kind: ApiErrorClass) => {
   const status: unknown = Schema.resolveAnnotations(kind)?.httpApiStatus;
   if (typeof status !== 'number') throw new Error(`${kind.name} declares no httpApiStatus: give it one in objects' api-errors.ts.`);
   return status;
@@ -102,7 +103,7 @@ const statusOfClass = (kind: ApiErrorClass): number => {
  * The status `error` answers with: its class's.
  * @param error The api's error, as refusedAs answers it.
  */
-export const statusOf = (error: ApiError): number => {
+export const statusOf = (error: ApiError) => {
   const kind = classOf(error);
   if (kind === undefined) throw new Error('statusOf was handed no error of the api: hand it what refusedAs answers.');
   return statusOfClass(kind);
@@ -117,11 +118,11 @@ export const statusOf = (error: ApiError): number => {
 export const declaredAs = <K extends Exclude<ApiErrorClass, typeof Gone>>(
   kinds: readonly K[],
   { status, error }: { status: number; error: string },
-): ApiError => {
+) => {
   const kind = kinds.find((k) => statusOfClass(k) === status);
   if (kind === undefined)
     throw new Error(`A refusal of status ${status} reached an endpoint that declares none (${error}): declare its class on the endpoint.`);
-  return new kind({ error });
+  return new kind({ error }) satisfies ApiError as ApiError;
 };
 
 /**
@@ -133,7 +134,7 @@ const READER_ERRORS = [BadRequest, Missing, Conflict, Invalid] as const;
  * One of the api's own `Refusal`s as the `Api`'s error of its status: 400 `BadRequest`, 404 `Missing`, 409 `Conflict`, 422 `Invalid`.
  * @param refusal The api's own refusal, its status and its words.
  */
-export const readerRefused = (refusal: Refusal): ApiError => declaredAs(READER_ERRORS, refusal);
+export const readerRefused = (refusal: Refusal) => declaredAs(READER_ERRORS, refusal) satisfies ApiError as ApiError;
 
 /**
  * `work` over the request's services, failing with the error the api answers a refusal with (`refusedAs`), dying with anything else, a
@@ -142,7 +143,7 @@ export const readerRefused = (refusal: Refusal): ApiError => declaredAs(READER_E
  */
 const answering =
   (failed: boolean) =>
-  <A>(work: (s: Served) => Promise<A>): Effect.Effect<A, ApiError, ServedNow> =>
+  <A>(work: (s: Served) => Promise<A>) =>
     Effect.gen(function* () {
       const s = yield* ServedNow;
       return yield* Effect.tryPromise({ try: () => work(s), catch: (err) => err }).pipe(
@@ -167,7 +168,7 @@ export const answeredWrite = answering(true);
  * @param namespace The namespace the request names, which names its factory.
  * @param work The handler's body, given the services placed in that factory.
  */
-export const answeredIn = <A>(namespace: string, work: (s: Served) => Promise<A>): Effect.Effect<A, ApiError, ServedNow> =>
+export const answeredIn = <A>(namespace: string, work: (s: Served) => Promise<A>) =>
   answered((s) => work({ ...s, ...s.placedIn(namespace) }));
 
 /**
@@ -175,7 +176,7 @@ export const answeredIn = <A>(namespace: string, work: (s: Served) => Promise<A>
  * @param namespace The namespace the request names, which names its factory.
  * @param work The handler's body, given the services placed in that factory.
  */
-export const answeredWriteIn = <A>(namespace: string, work: (s: Served) => Promise<A>): Effect.Effect<A, ApiError, ServedNow> =>
+export const answeredWriteIn = <A>(namespace: string, work: (s: Served) => Promise<A>) =>
   answeredWrite((s) => work({ ...s, ...s.placedIn(namespace) }));
 
 /**
@@ -196,7 +197,7 @@ export const locatedAt = (id: string) =>
  */
 export const orFailed =
   <A>(work: (s: Served) => Promise<A>) =>
-  async (s: Served): Promise<A | HttpServerResponse.HttpServerResponse> => {
+  async (s: Served) => {
     try {
       return await work(s);
     } catch (err) {

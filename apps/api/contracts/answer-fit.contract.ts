@@ -13,13 +13,13 @@ import { PAGE_MOST } from '../src/mcp/page.ts';
 export type AnswerFit = { readonly kind: 'answer' } | { readonly kind: 'smaller'; readonly limit: number } | { readonly kind: 'refuse' };
 
 /** Whether `n` is a count: a whole number from `least`. */
-const countFrom = (n: number, least: number): boolean => Number.isInteger(n) && n >= least;
+const countFrom = (n: number, least: number) => Number.isInteger(n) && n >= least;
 
 /** Whether an answer of `size` characters is past `bound`. */
-const past = (size: number, bound: number): boolean => size > bound;
+const past = (size: number, bound: number) => size > bound;
 
 /** Whether a page of `limit` can be asked smaller and still be a page: it is a page, of more than one. */
-const shrinks = (limit: number | null): boolean => limit !== null && limit > 1;
+const shrinks = (limit: number | null) => limit !== null && limit > 1;
 
 const answerFitSpec = spec<(size: number, bound: number, limit: number | null) => AnswerFit>({
   requires: ({ input: [size, bound, limit] }) =>

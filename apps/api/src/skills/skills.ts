@@ -48,7 +48,7 @@ import {
 import type { Refusal } from '../guard.ts';
 import type { Served } from '../layer.ts';
 import { placesOf } from '../workflows/workflows.ts';
-import type { DefinitionOrigin, SkillSpec } from 'objects';
+import type { DefinitionOrigin } from 'objects';
 
 /**
  * Where a skill is: your library (the store's), the repository the board serves (its `.claude/skills/`, or `workflows/skills/` beside its
@@ -80,7 +80,7 @@ export type SkillPlace = { from: SkillSource; dir: string; skills: SkillRow[] };
  * The repository's own skills folder, the one its sessions are given, which the skills page lists first of the repository's.
  * @param repo The repository's folder.
  */
-export const repoSkillsDir = (repo: string): string => path.join(path.resolve(repo), '.claude', SKILLS_FOLDER);
+export const repoSkillsDir = (repo: string) => path.join(path.resolve(repo), '.claude', SKILLS_FOLDER);
 
 /** Nemia's builtin skills: the orchestrator package's `skills/`, none while the package has no such folder. */
 export { BUILTIN_SKILLS };
@@ -89,10 +89,10 @@ export { BUILTIN_SKILLS };
  * Your library: the store's `workflows/skills/`, where the board copies a skill.
  * @param home The store's root folder.
  */
-export const librarySkills = (home: string): string => path.join(home, 'workflows', SKILLS_FOLDER);
+export const librarySkills = (home: string) => path.join(home, 'workflows', SKILLS_FOLDER);
 
 /** A folder of yours: where an agent of yours finds what a workflow of yours finds, its places named or none. */
-const yoursFolder = (home: string): string => path.join(home, 'workflows', '_');
+const yoursFolder = (home: string) => path.join(home, 'workflows', '_');
 
 /** Yours' agents, each found as a workflow of yours finds it with no other place, a refusal kept: read through the Agent door. */
 const yourAgentsFound = (home: string) => Effect.flatMap(AgentDoor, (door) => door.agents.found({ dir: yoursFolder(home) }));
@@ -127,10 +127,10 @@ export const yourSkillsRead = (repo: string | undefined, home: string, builtin: 
  * A factory's tree's folder of workflows (`<tree>/workflows`), whose `agents/` and `skills/` are the factory's own.
  * @param tree The factory's tree folder.
  */
-export const treeWorkflows = (tree: string): string => path.join(path.resolve(tree), 'workflows');
+export const treeWorkflows = (tree: string) => path.join(path.resolve(tree), 'workflows');
 
 /** Whether the skill folder `dir` is one of the factory's own, in the `skills/` of its tree `tree`; never where there is no tree. */
-const inTree = (dir: string, tree: string | undefined): boolean =>
+const inTree = (dir: string, tree: string | undefined) =>
   tree !== undefined && path.dirname(path.resolve(dir)) === path.join(treeWorkflows(tree), SKILLS_FOLDER);
 
 /**
@@ -140,7 +140,7 @@ const inTree = (dir: string, tree: string | undefined): boolean =>
  * @param repo The repository's folder, or undefined where there is none.
  * @param home The store's root folder, whose library is one of the places.
  */
-export function sourceOf(dir: string, repo: string | undefined, home: string): SkillSource | null {
+export function sourceOf(dir: string, repo: string | undefined, home: string) {
   const parent = path.dirname(path.resolve(dir));
   if (parent === librarySkills(home)) return 'user';
   if (parent === BUILTIN_SKILLS) return 'builtin';
@@ -158,7 +158,7 @@ export function sourceOf(dir: string, repo: string | undefined, home: string): S
  * @param repo The repository's folder, or undefined where there is none.
  * @param home The store's root folder.
  */
-export function foundInOf(dir: string, repo: string | undefined, home: string): string | null {
+export function foundInOf(dir: string, repo: string | undefined, home: string) {
   if (repo === undefined || sourceOf(dir, repo, home) !== null) return null;
   const parts = path.relative(path.resolve(repo), path.resolve(dir)).split(path.sep);
   return parts[0] === '' || parts[0] === '..' || path.isAbsolute(parts.join(path.sep)) ? null : parts.join('/');
@@ -169,8 +169,7 @@ export function foundInOf(dir: string, repo: string | undefined, home: string): 
  * @param s The request's services, its caller and the place it is answered in.
  * @param dirs The skill folders to read.
  */
-export const readsOf = (s: Served, dirs: readonly string[]): Promise<Record<string, SkillRead>> =>
-  s.inRequest(SKILLS_LIST.handler({ skills: dirs }));
+export const readsOf = (s: Served, dirs: readonly string[]) => s.inRequest(SKILLS_LIST.handler({ skills: dirs }));
 
 /**
  * The version of the skill in the folder `dir`, null where none reads, and the other text files of its folder, by path, as the package
@@ -178,10 +177,7 @@ export const readsOf = (s: Served, dirs: readonly string[]): Promise<Record<stri
  * @param s The request's services, its caller and the place it is answered in.
  * @param dir The skill's folder.
  */
-export const skillShownAt = async (
-  s: Served,
-  dir: string,
-): Promise<{ version: string | null; files: readonly { path: string; text: string }[] }> => {
+export const skillShownAt = async (s: Served, dir: string) => {
   const { version, files } = await s.inRequest(SKILLS_READ.handler({ name: path.basename(dir), dir }));
   return { version, files };
 };
@@ -192,7 +188,7 @@ export const skillShownAt = async (
  * @param reads The readings the table gave, by folder.
  * @param dir The folder whose reading is asked.
  */
-export function readAt(reads: Record<string, SkillRead>, dir: string): SkillRead {
+export function readAt(reads: Record<string, SkillRead>, dir: string) {
   const read = reads[dir];
   if (read === undefined) throw new Error(`The table's \`skills\` gave no reading of '${dir}', which it was asked to read.`);
   return read;
@@ -213,7 +209,7 @@ export function skillRow(
   { entry, error, preload, cost }: SkillRead,
   usedBy: string[] = [],
   found: SkillRow['found'] = null,
-): SkillRow {
+) {
   return { name, from, dir, entry, error, preload, cost, usedBy, found };
 }
 
@@ -221,7 +217,7 @@ export function skillRow(
  * The agents of yours (`agents`, `yourAgentsFound`), by name, each with the skills its `skills:` gives: the ones that read.
  * @param agents The agents of yours, by name, each read or the error it did not read with.
  */
-export function yourAgentsSkills(agents: Agents): Array<[string, string[]]> {
+export function yourAgentsSkills(agents: Agents) {
   return [...agents].flatMap(([name, agent]) => (agent instanceof Error ? [] : [[name, agent.skills ?? []] as [string, string[]]]));
 }
 
@@ -245,7 +241,7 @@ export async function listSkills(
   repo: string | undefined,
   home: string,
   yoursRead: YourSkills,
-): Promise<SkillPlace[]> {
+) {
   const { found } = yoursRead;
   const { dir: builtin, names: builtinNames } = yoursRead.builtin;
   const agents = yourAgentsSkills(yoursRead.agents);
@@ -253,7 +249,7 @@ export async function listSkills(
   const yours: SkillPlace = { from: 'user', dir: librarySkills(home), skills: [] };
   const inRepo: SkillPlace | undefined = repo === undefined ? undefined : { from: 'repo', dir: repoSkillsDir(repo), skills: [] };
   const places: SkillPlace[] = inRepo === undefined ? [yours] : [yours, inRepo];
-  const placed = (from: 'user' | 'repo'): SkillPlace => (from === 'repo' && inRepo !== undefined ? inRepo : yours);
+  const placed = (from: 'user' | 'repo') => (from === 'repo' && inRepo !== undefined ? inRepo : yours);
   const sorted = [...found.all]
     .filter(([, at]) => typeof at !== 'string' || !(isBuiltinPlace(at) || sourceOf(at, repo, home) === 'builtin'))
     .sort(([a], [b]) => a.localeCompare(b));
@@ -317,13 +313,7 @@ export type GivenSkill = {
  * @param home The store's root folder.
  * @param tree The factory's tree folder, or undefined where it has none.
  */
-export function givenSkills(
-  skills: readonly string[],
-  found: SkillsFound,
-  repo: string | undefined,
-  home: string,
-  tree?: string,
-): GivenSkill[] {
+export function givenSkills(skills: readonly string[], found: SkillsFound, repo: string | undefined, home: string, tree?: string) {
   return givenRead(skills, found).map(({ name, dir, entry, error, preload, cost }) => ({
     name,
     from: dir === null ? null : inTree(dir, tree) ? 'factory' : sourceOf(dir, repo, home),
@@ -332,7 +322,7 @@ export function givenSkills(
     error,
     preload,
     cost,
-  }));
+  })) satisfies GivenSkill[];
 }
 
 /**
@@ -391,11 +381,13 @@ export const skillUsers = Effect.fnUntraced(function* (dir: string, name: string
  * @param route The route, as a refusal names it.
  * @param shape The shape a skill is sent in, as a refusal says it.
  */
-export function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, shape: string): SkillDraft | Refusal {
+export function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, shape: string) {
   const unknown = Object.keys(skill).filter((key) => !Object.hasOwn(SKILL_KEYS, key));
   if (unknown.length) {
     const keys = unknown.map((key) => `\`${key}\``).join(' and ');
-    return { status: 400, error: `${route}: ${keys} ${unknown.length > 1 ? 'are' : 'is'} no key of a skill's. Send ${shape}.` };
+    return { status: 400, error: `${route}: ${keys} ${unknown.length > 1 ? 'are' : 'is'} no key of a skill's. Send ${shape}.` } satisfies
+      | SkillDraft
+      | Refusal as SkillDraft | Refusal;
   }
   const { name, title, description, tags, examples, preload, body } = skill;
   return {
@@ -406,7 +398,7 @@ export function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, sh
     examples: examples && [...examples],
     ...(preload !== undefined && { preload }),
     body,
-  };
+  } satisfies SkillDraft | Refusal as SkillDraft | Refusal;
 }
 
 /**
@@ -417,7 +409,7 @@ export function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, sh
  * @param name The skill's name.
  * @param text The SKILL.md's text.
  */
-export function skillSpecOf(file: string, name: string, text: string): { spec: SkillSpec; unread: string | null } {
+export function skillSpecOf(file: string, name: string, text: string) {
   try {
     const { name: _name, ...spec } = skillDraftOf(file, name, text);
     return { spec, unread: null };
@@ -428,7 +420,7 @@ export function skillSpecOf(file: string, name: string, text: string): { spec: S
 }
 
 /** The body of a SKILL.md that does not read as a draft: what follows its frontmatter, or all of it, trimmed, where that does not read. */
-function bodyOf(file: string, text: string): string {
+function bodyOf(file: string, text: string) {
   try {
     return splitFrontmatter(file, text).body;
   } catch (err) {
@@ -443,7 +435,7 @@ function bodyOf(file: string, text: string): string {
  * @param s The request's services, its caller and the place it is answered in.
  * @param change The skill's change, as the table's write takes it.
  */
-export async function written(s: Served, change: SkillChange, { version, name }: { version: string | null; name?: string }): Promise<void> {
+export async function written(s: Served, change: SkillChange, { version, name }: { version: string | null; name?: string }) {
   const input = { from: 'user', change, ...(version !== null && { version }), ...(name !== undefined && { name }) };
   await s.inRequest(SKILLS_WRITE.handler(input));
 }

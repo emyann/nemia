@@ -35,7 +35,7 @@ const AGENT: Readonly<Record<string, string>> = {
  * `toolsOf`), in the table's order, the command's line and usage, its tool on the MCP port, who answers for it when an agent calls it,
  * and the command's help as it is printed, in a block that keeps its `<words>`.
  */
-const equivalentsByEndpoint = (): Map<string, string[]> => {
+const equivalentsByEndpoint = () => {
   const said = new Map<string, string[]>();
   for (const words of COMMAND_WORDS)
     for (const tool of toolsOf(words)) {

@@ -54,7 +54,7 @@ export const STEP_FOLLOWS = Metric.counter('api.step.follows', {
  * @param held The message being written before m, or null where none is.
  * @param m What the step's session relayed next.
  */
-export const heldAfter = (held: Held | null, m: Relayed): Held | null => {
+export const heldAfter = (held: Held | null, m: Relayed) => {
   if (m.kind === 'partial') {
     if (m.last) return null;
     return m.append && held?.key === m.key ? { key: m.key, text: held.text + m.text } : { key: m.key, text: m.text };

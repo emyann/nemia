@@ -27,7 +27,7 @@ class NotOneFile extends Error {}
 class PastCap extends Error {}
 
 /** What a form's failure is answered as: a file past the cap a 413, a form of other parts a 422, one that does not parse a 400. */
-const refusalOf = (failure: unknown): TooLarge | Invalid | BadRequest => {
+const refusalOf = (failure: unknown) => {
   if (failure instanceof NotOneFile) return new Invalid({ error: `${ROUTE} ${failure.message} ${SEND}` });
   const reason = Multipart.isMultipartError(failure) ? failure.reason._tag : undefined;
   if (failure instanceof PastCap || reason === 'FileTooLarge' || reason === 'BodyTooLarge')

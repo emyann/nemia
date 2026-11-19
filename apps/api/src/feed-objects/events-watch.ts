@@ -12,7 +12,7 @@ import type { Follow } from '../watch/watch.ts';
  * The namespace a path of the Event lists names, `/api/namespaces/<ns>/events`, or none for `/api/events`: read off the path, which the
  * mount serves on one wildcard (`.all('/api/*')`) that names no parameter.
  */
-const namespaceOf = (url: string): string | undefined => {
+const namespaceOf = (url: string) => {
   const named = /^\/api\/namespaces\/([^/]+)\//.exec(new URL(url).pathname)?.[1];
   if (named === undefined) return undefined;
   try {

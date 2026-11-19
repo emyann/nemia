@@ -44,7 +44,7 @@ describe('the folder listing names folders under its roots alone', () => {
   test('a typed piece keeps the names that begin with it, and a dot asks for hidden ones', async () => {
     const { root, given } = planted();
     const typed = await given(foldersNamed(path.join(root, 'a')));
-    const hidden = await given(foldersNamed(path.join(root, '.')));
+    const hidden = await given(foldersNamed(`${root}/.`));
     assert.deepEqual(
       [typed._tag === 'Success' && typed.success.names, hidden._tag === 'Success' && hidden.success.names],
       [['a-one', 'a-two'], ['.hidden']],

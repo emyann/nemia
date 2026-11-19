@@ -16,8 +16,11 @@ export type FolderNamesShown = { readonly names: readonly string[]; readonly mor
 const named = (e: FolderEntry, prefix: string): boolean =>
   e.folder && e.name.startsWith(prefix) && (!e.name.startsWith('.') || prefix.startsWith('.'));
 
-/** Whether `names` is in ascending order, each before the next. */
-const ascending = (names: readonly string[]): boolean => names.every((n, i) => i === 0 || (names[i - 1] ?? '') < n);
+/** The names of the folders among `entries` the listing would name for `prefix`, in the order of their code units, as JavaScript sorts. */
+const inOrder = (entries: readonly FolderEntry[], prefix: string): readonly string[] => {
+  const found = entries.filter((e) => named(e, prefix)).map((e) => e.name);
+  return [...found].sort();
+};
 
 const folderNamesShownSpec = spec<(entries: readonly FolderEntry[], prefix: string, most: number) => FolderNamesShown>({
   requires: ({ input: [entries, , most] }) =>
@@ -36,8 +39,11 @@ const folderNamesShownSpec = spec<(entries: readonly FolderEntry[], prefix: stri
       condition: ({ input: [, , most], output }) => output.names.length <= most,
     },
     inOrderOnce: {
-      description: 'The names are answered in order, each once',
-      condition: ({ output }) => ascending(output.names),
+      description: 'The names are answered in order, the first ones up to the bound, each once as the entries name each once',
+      condition: ({ input: [entries, prefix, most], output }) => {
+        const ordered = inOrder(entries, prefix).slice(0, most);
+        return ordered.every((n, i) => output.names[i] === n) && output.names.every((n, i) => ordered[i] === n);
+      },
     },
     noneLeftOutUnsaid: {
       description: 'Every folder the listing would name is answered, or the answer says more were left out, and says so only then',

@@ -42,8 +42,8 @@ export const folderNamesShown: FolderNamesShownOf = (entries: readonly FolderEnt
   const found = entries
     .filter((e) => e.folder && e.name.startsWith(prefix) && (!e.name.startsWith('.') || prefix.startsWith('.')))
     .map((e) => e.name);
-  const named = [...found].sort();
-  return { names: named.slice(0, most), more: named.length > most };
+  const names = [...found].sort().slice(0, most);
+  return { names, more: found.some((n) => !names.includes(n)) };
 };
 
 /**
@@ -52,8 +52,8 @@ export const folderNamesShown: FolderNamesShownOf = (entries: readonly FolderEnt
  * @param typed The path as typed, absolute.
  */
 export const typedFolder = (typed: string): { readonly dir: string; readonly prefix: string } => {
-  if (typed.endsWith('/')) return { dir: path.resolve(typed), prefix: '' };
-  return { dir: path.dirname(path.resolve(typed)), prefix: path.basename(typed) };
+  const cut = typed.lastIndexOf('/');
+  return { dir: path.resolve(typed.slice(0, cut + 1) || '/'), prefix: typed.slice(cut + 1) };
 };
 
 /** A repository's name in the store: lowercase letters, digits, dots, dashes and underscores, from a letter or a digit, 64 at most. */

@@ -66,6 +66,7 @@ import {
   type FactoryResolveWrite,
   type FactoryUpgradeWrite,
   type TemplateGiven,
+  type VolumeWrite,
 } from 'objects';
 import type { Served } from '../layer.ts';
 import { factoryNamed, queryOf } from './parts/index.ts';
@@ -203,14 +204,14 @@ const created = ({ name, volumes, noTrust }: FactoryCreate) =>
 
 /**
  * `nemia factory volume add`: `volume`, a folder by its whole path or a git URL this machine clones, and its mark: a writable one a
- * repository the factory works on, trusted unless `noTrust`, a read-only one mounted for its runs.
+ * repository the factory works on, trusted unless `noTrust`, a read-only one mounted for its runs; and its switches, where given.
  */
-const volumeAdded = (factory: string, volume: string, noTrust: boolean | undefined) =>
+const volumeAdded = (factory: string, { volume, noTrust, claudeMd, skills }: VolumeWrite) =>
   answeredWrite(async (s: Served) => {
     const route = `POST /api/factories/${factory}/volumes`;
     factoryNamed(route, factory);
     wholeVolumes(route, [volume]);
-    return s.inRequest(FACTORY_VOLUME_ADD.handler({ factory, volume, noTrust }));
+    return s.inRequest(FACTORY_VOLUME_ADD.handler({ factory, volume, noTrust, claudeMd, skills }));
   });
 
 /** `nemia factory volume rm`: the volume at `at`, by its whole path or the URL it was cloned from, taken off the factory. */
@@ -359,7 +360,7 @@ export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
       }),
     )
     .handle('create', ({ payload }) => created(payload))
-    .handle('addVolume', ({ params: { factory }, payload: { volume, noTrust } }) => volumeAdded(factory, volume, noTrust))
+    .handle('addVolume', ({ params: { factory }, payload }) => volumeAdded(factory, payload))
     .handle('removeVolume', ({ params: { factory }, query: { path: at } }) => volumeRemoved(factory, at))
     .handle('apply', ({ params: { name }, payload }) => applied(name, payload))
     .handle('export', ({ params: { name }, query }) => exported(name, query.cards))

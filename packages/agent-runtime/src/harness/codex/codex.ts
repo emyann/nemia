@@ -10,7 +10,7 @@ import type { HarnessIO, HarnessSpec } from '../detached/detached.ts';
 import { CODEX_START, codexOutput, codexPartials } from './stream.ts';
 import { CODEX_DECLARATION, CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES, CODEX_SIGN_IN_COMMAND } from './vocabulary.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
-import { codexMcpServerNames, codexMcpServers, mcpRefuses, pickedProjectMcp } from '../mcp.ts';
+import { codexMcpServerNames, codexMcpServers, mcpFolderOf, mcpRefuses, pickedProjectMcp } from '../mcp.ts';
 import { programIn } from '../harness-bin.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 import { quote, WORDS_QUOTE } from '../../core/quote.ts';
@@ -98,9 +98,10 @@ const sseRefusal = (mcp: Record<string, McpServer> | undefined): string | undefi
 const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => {
   const names = r.config?.projectMcp;
   if (!names?.length) return undefined;
-  const picked = pickedProjectMcp(r.cwd, names);
+  const picked = pickedProjectMcp(mcpFolderOf(r.cwd, r.config), names);
   const refused = mcpRefuses(picked) ?? sseRefusal(picked as Record<string, McpServer>);
-  if (refused) throw new Error(`${refused} It is an entry of ${path.resolve(r.cwd, '.mcp.json')}, picked by \`projectMcp\`.`);
+  if (refused)
+    throw new Error(`${refused} It is an entry of ${path.resolve(mcpFolderOf(r.cwd, r.config), '.mcp.json')}, picked by \`projectMcp\`.`);
   return picked as Record<string, McpServer>;
 };
 

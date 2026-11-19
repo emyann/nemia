@@ -208,7 +208,14 @@ export const pickedProjectMcp = (cwd: string, names: readonly string[]): Record<
  * @param config The task's configuration, by its `projectMcp` and `mcp`; undefined where it has none.
  */
 export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> | undefined =>
-  config?.projectMcp ? { ...pickedProjectMcp(cwd, config.projectMcp), ...config.mcp } : config?.mcp;
+  config?.projectMcp ? { ...pickedProjectMcp(mcpFolderOf(cwd, config), config.projectMcp), ...config.mcp } : config?.mcp;
+
+/**
+ * The folder whose `.mcp.json` a task's servers are read from: its `projectMcpFrom` where it gives one, else its working folder.
+ * @param cwd The task's working folder.
+ * @param config The task's configuration, by its `projectMcpFrom`; undefined where it has none.
+ */
+export const mcpFolderOf = (cwd: string, config: HarnessArgs | undefined): string => config?.projectMcpFrom ?? cwd;
 
 /**
  * Every server a session is given, as a value: the checkout's own `.mcp.json` whole, as `claude -p` reads its second config — unless
@@ -222,7 +229,7 @@ export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record
  * @param config The task's configuration, by its `projectMcp` and `mcp`; undefined where it has none.
  */
 export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> => {
-  const checkout = config?.projectMcp ? undefined : projectMcpConfig(cwd);
+  const checkout = config?.projectMcp ? undefined : projectMcpConfig(mcpFolderOf(cwd, config));
   const theirs = checkout ? ((JSON.parse(fs.readFileSync(checkout, 'utf8')) as { mcpServers?: object }).mcpServers ?? {}) : {};
   return { ...theirs, ...sessionMcp(cwd, config) };
 };

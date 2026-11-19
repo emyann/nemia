@@ -116,6 +116,15 @@
       "type": "NamedVolume"
     },
     {
+      "term": "Volume switch",
+      "meaning": "what a factory's volume gives the sessions that start in the factory's home, a person's setting on the volume in the factory's own file that no proposal changes: `claudeMd`, whether its CLAUDE.md files load (off by default), and `skills`, whether the skills of its `.claude/skills` are offered beside a step's own (on by default), each set by `nemia factory volume add <factory> <path|url>:ro|:rw --claude-md on|off --skills on|off` and kept by an add that names none (`withVolume`, `packages/agent-orchestrator/src/factory/volume/volume.ts`). A run freezes them at start, a switch left at its default unwritten (`switchesOf`, `packages/agent-orchestrator/src/factory/factory.ts`).",
+      "type": "VolumeSwitches"
+    },
+    {
+      "term": "Home",
+      "meaning": "a factory's home, the home folder of its tree, copied byte for byte from its template's, as sdlc's `packages/templates/sdlc/home/CLAUDE.md`: the Claude Code project its runs' sessions start in, its `CLAUDE.md`, `.claude/` and `.mcp.json` theirs. A run copies it at start under `runs/<id>/home/<hex>/` and records the digest as `homeFiles`; a local step whose harness adds a writable folder starts there, read-only, its workspace added beside it, writable by the step's own rules or read-only where its fence writes nothing, and every relative file rule of the step read against the workspace (`sessionStart`, `inWorkspace` and `memoryFilesOf`, proved by `packages/agent-orchestrator/contracts/session-home.contract.ts`). A factory with no home, a run started before homes were, and a step on another harness start in their workspace as before."
+    },
+    {
       "term": "Workflow's repository",
       "meaning": "the one repository of its factory a workflow's runs work on, named by the repository's folder name in the factory's wiring (`workflowRepos`, `nemia factory attach <factory> <workflow> --repo <name>`), else the factory's only repository; a factory of several that names none for a workflow, or names one none or two of its repositories have, refuses the start (`workflowRepo`, proved by `packages/agent-orchestrator/contracts/workflow-repo.contract.ts`, in `packages/agent-orchestrator/src/factory/factory.ts`). A card's and a brief's run are placed by it alone, never by the card, the folder a start is typed in nor the daemon's. Kept in the factory's own file, or in its tree's wiring where it is made from a template, as an attach writes it. No verb adds a repository to a factory today: one that does names a repository for each workflow it leaves unwired.",
       "type": "WorkflowRepoOf"
@@ -242,7 +251,7 @@
     },
     {
       "term": "Parameter expression",
-      "meaning": "`${{ parameters.<name> }}`, written in a template's text: a render writes it with the parameter's value in every string of a document and in every text it writes — a step's and an agent's instructions, NEMIA.md, RULES.md (`substitute` and `interpolated` in `packages/agent-orchestrator/src/factory/applied/params.ts`) — and copies a carried file (a script, a skill's files, a schema) byte for byte; `nemia template lint` refuses a name nemia.yaml does not declare (`packages/agent-orchestrator/src/template/check.ts`). A shell's `$VAR` and `${VAR}` are none."
+      "meaning": "`${{ parameters.<name> }}`, written in a template's text: a render writes it with the parameter's value in every string of a document and in every text it writes — a step's and an agent's instructions, NEMIA.md, RULES.md (`substitute` and `interpolated` in `packages/agent-orchestrator/src/factory/applied/params.ts`) — and copies a carried file (a script, a skill's files, a schema) byte for byte; `nemia template lint` refuses a name nemia.yaml does not declare (`packages/agent-orchestrator/src/template/check.ts`). A shell's `$VAR` and `${VAR}` are none. `${{ workspace }}` is no parameter: a render leaves it, and a step's filing writes the step's workspace in its place in each rule of its fence (`inWorkspace`)."
     },
     {
       "term": "Default factory",

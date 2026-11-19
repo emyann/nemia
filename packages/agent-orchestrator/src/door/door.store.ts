@@ -12,7 +12,7 @@
  * `effect/Data`. The client builds `tried` on `fromThrow`, so a controller's read and a door's act fail and die alike.
  */
 import { Effect, Option, Result, Schema } from 'effect';
-import { refusedIn } from 'objects';
+import { refusedIn, type RefusedPlace } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import { Invalid, isRefusal, type Refusal } from '../refusal/refusal.ts';
 
@@ -64,9 +64,21 @@ export function atOnce<T, I extends string>(door: DoorOf<T, I>): T {
   ) as T;
 }
 
+const shownValue = (value: unknown): string => {
+  const json = JSON.stringify(value) ?? 'undefined';
+  return json.length > 60 ? `${json.slice(0, 60)}…` : json;
+};
+
+const placeWords = (place: RefusedPlace | undefined): string => {
+  if (place === undefined) return 'is not what the schema says';
+  if (place.message !== undefined) return place.message;
+  return place._tag === 'MissingKey' ? 'is missing' : `is ${shownValue(place.input)}, where the schema takes ${place.expected}`;
+};
+
 /**
- * Why `value` breaks `schema`: the words of its first issue, the check's own where a check refused it (each says its fix), or null when
- * it decodes. What a layer refuses a write by.
+ * Why `value` breaks `schema`: its first refused place, read by its `_tag` (objects' `refusedIn`), or null when it decodes. The words
+ * are the check's own where the schema declared them (each says its fix); else a missing key `is missing`, and any other place the value
+ * found there, quoted as JSON to at most 60 characters, and what the schema takes. What a layer refuses a write by.
  * @param schema The aggregate's schema.
  * @param value The value to decode.
  */
@@ -75,7 +87,7 @@ export function brokenBy(schema: Schema.Top, value: unknown): string | null {
   if (Result.isSuccess(decoded)) return null;
   const [place] = refusedIn(decoded.failure.issue);
   const at = (place?.path ?? []).map(String).join('.');
-  return `${at ? `its \`${at}\` ` : ''}${place ? (place.message ?? place.expected) : 'is not what the schema says'}`;
+  return `${at ? `its \`${at}\` ` : ''}${placeWords(place)}`;
 }
 
 /**

@@ -29,7 +29,10 @@ export default {
       await idle(page);
       await expectVisible(page.getByRole('heading', { level: 1, name: 'Settings' }), 'the rail leads to the Settings page');
       const section = page.locator('[data-nemia-section]');
-      await expectVisible(section.locator('[data-nemia-session][data-state="off"]'), 'her session is off, no level ever set');
+      await expectVisible(
+        section.locator('[data-nemia-session][data-state="resting"]'),
+        'her session rests, no level ever set: a message wakes her',
+      );
       const trustLine = section.locator('[data-nemia-level] [data-nemia-trust]');
       if ((await trustLine.count()) !== 0) throw new Refused('nothing is said of her trust while none was refused: the keeper gives it');
       fs.mkdirSync(nemia, { recursive: true });
@@ -58,7 +61,10 @@ export default {
       ]);
       if (back.status() !== 200) throw new Refused(`a pick of Manual takes it back — the api answered ${back.status()}`);
       await idle(page);
-      await expectVisible(section.locator('[data-nemia-session][data-state="off"]'), 'and her session reads off');
+      await expectVisible(
+        section.locator('[data-nemia-session][data-state="untrusted"]'),
+        'and at Manual her session still reads untrusted: no message wakes her until the trust is given',
+      );
     } finally {
       fs.rmSync(levelFile, { force: true });
       fs.rmSync(record, { force: true });

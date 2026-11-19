@@ -166,10 +166,11 @@ function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bool
 
 /** What each level of hers means. */
 const LEVEL_LINES: Record<Level, string> = {
-  manual: 'Manual: no session of hers is kept unless a factory is above Manual. Above it, the keeper files her one at its next beat.',
+  manual:
+    'Manual: she operates no factory unless one is above Manual. A message in her chat still starts her, and she rests after 15 quiet minutes.',
   'semi-auto':
-    'Semi-auto: the keeper keeps her session, and what waits on you waits for your answer. At Manual, her session stops at its next beat, unless a factory is still above Manual.',
-  auto: 'Auto: as Semi-auto, but an answer the rules you confirmed allow in the run’s state is given without asking you. It holds in a session of hers filed since the board offered Auto: one kept from before asks you every answer until it is filed again — set her level and every factory above Manual to Manual, ending any raise, and once her session reads Off, set them back.',
+    'Semi-auto: the keeper keeps her session, and what waits on you waits for your answer. Back at Manual, she stays for the conversation and rests once it is quiet, unless a factory is still above Manual.',
+  auto: 'Auto: as Semi-auto, but an answer the rules you confirmed allow in the run’s state is given without asking you. It holds in a session of hers filed since the board offered Auto: one kept from before asks you every answer until it is filed again — set her level and every factory above Manual to Manual, ending any raise, and once her session reads Resting, set them back.',
 };
 
 /**

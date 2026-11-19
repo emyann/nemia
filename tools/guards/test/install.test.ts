@@ -17,6 +17,9 @@
  * which the installer reads in place of its terminal; `loginctl`, `systemctl` and the browser's openers `open` and `xdg-open` are
  * stand-ins first on PATH, so no test touches the machine's own or opens a browser.
  *
+ * Stand-in `uname` and `sw_vers` say each platform in turn, so every platform's archive is picked on this host, and a Mac below
+ * macOS 13.5 is refused before any download.
+ *
  * `install.sh` is POSIX sh: each test parses it with `sh -n` first, so a bashism the host's sh refuses fails here.
  */
 import { test } from 'vitest';
@@ -158,6 +161,60 @@ test('REFUSED: an argument the installer does not take exits 2, and a flag with 
   assert.equal(install(home, root, ['--yes', '--no-such-flag']).status, 2);
   assert.equal(install(home, root, ['--yes', '--version']).status, 2);
   assert.equal(fs.existsSync(root), false, 'nothing is written before the arguments are read');
+});
+
+/** What `uname -s` and `uname -m` say on each platform a release is built for. */
+const UNAME: Record<Platform, { s: string; m: string }> = {
+  'linux-x64': { s: 'Linux', m: 'x86_64' },
+  'linux-arm64': { s: 'Linux', m: 'aarch64' },
+  'darwin-x64': { s: 'Darwin', m: 'x86_64' },
+  'darwin-arm64': { s: 'Darwin', m: 'arm64' },
+};
+
+/**
+ * Stand-in `uname` and `sw_vers` first on PATH, saying the machine `$UNAME_S` and `$UNAME_M` and the macOS `$SW_VERS`, so the
+ * installer meets a platform this host is not.
+ */
+const machineStandIns = (): string => {
+  const dir = fs.realpathSync(scratch('install-uname-'));
+  fs.writeFileSync(path.join(dir, 'uname'), '#!/bin/sh\ncase $1 in -s) echo "$UNAME_S" ;; -m) echo "$UNAME_M" ;; esac\n', {
+    mode: 0o755,
+  });
+  fs.writeFileSync(path.join(dir, 'sw_vers'), '#!/bin/sh\necho "$SW_VERS"\n', { mode: 0o755 });
+  return dir;
+};
+
+test("install.sh picks each platform's archive, the only one published, from what uname says, macOS 13.5 included", () => {
+  const stands = machineStandIns();
+  for (const platform of PLATFORMS) {
+    const base = fs.realpathSync(scratch('install-base-'));
+    publish(base, 'v1.2.3', platform);
+    const { home, root } = machine();
+    const ran = install(home, root, ['--yes', '--no-service', '--no-open', '--base', `file://${base}`], {
+      PATH: `${stands}:${process.env.PATH ?? '/usr/bin:/bin'}`,
+      UNAME_S: UNAME[platform].s,
+      UNAME_M: UNAME[platform].m,
+      SW_VERS: '13.5',
+    });
+    const unpacked = path.join(root, 'releases', 'v1.2.3', 'release.json');
+    assert.ok(fs.existsSync(unpacked), `${platform}: ${ran.out}`);
+    assert.equal((JSON.parse(fs.readFileSync(unpacked, 'utf8')) as Record<string, string>).platform, platform);
+    if (platform.startsWith(`${process.platform}-`)) assert.equal(ran.status, 0, `${platform}: ${ran.out}`);
+  }
+});
+
+test('REFUSED: a Mac below macOS 13.5 exits 1 before anything is downloaded', () => {
+  const base = fs.realpathSync(scratch('install-base-'));
+  publish(base, 'v1.2.3', 'darwin-x64');
+  const { home, root } = machine();
+  const ran = install(home, root, ['--yes', '--no-service', '--no-open', '--base', `file://${base}`], {
+    PATH: `${machineStandIns()}:${process.env.PATH ?? '/usr/bin:/bin'}`,
+    UNAME_S: 'Darwin',
+    UNAME_M: 'x86_64',
+    SW_VERS: '13.4.1',
+  });
+  assert.equal(ran.status, 1, ran.out);
+  assert.equal(fs.existsSync(path.join(root, 'releases')), false, 'no release folder, nothing downloaded');
 });
 
 /**

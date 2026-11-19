@@ -74,7 +74,8 @@ describe('A person sets where Nemia is: manual by default, a word that is no lev
       assert.equal(board.body.level, 'semi-auto');
       assert.equal(board.body.untrusted, null);
       const byBoard = level();
-      assert.equal(byBoard.task, board.body.task);
+      assert.equal(byBoard.task, undefined, 'a level set mints no task: the keeper files hers');
+      assert.equal(board.body.task, null);
       fs.writeFileSync(UNTRUSTED_FILE, JSON.stringify({ refused: 'the file did not read: mend it' }));
       assert.equal(
         (await asked('GET', '/api/level')).body.untrusted,
@@ -87,7 +88,8 @@ describe('A person sets where Nemia is: manual by default, a word that is no lev
       assert.equal(cli.level, 'semi-auto');
       assert.equal(cli.untrusted, 'the file did not read: mend it', 'the same words at the command line');
       const byCli = level();
-      assert.equal(byCli.task, cli.task);
+      assert.equal(byCli.task, undefined, 'the command line mints none either');
+      assert.equal(cli.task, null);
       assert.deepEqual(Object.keys(byCli).sort(), Object.keys(byBoard).sort(), 'the same file, written by the same act');
       assert.equal(byCli.level, byBoard.level);
       fs.writeFileSync(path.join(config, '.claude.json'), JSON.stringify({ projects: { [NEMIA]: { hasTrustDialogAccepted: true } } }));

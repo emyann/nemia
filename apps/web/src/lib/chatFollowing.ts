@@ -95,7 +95,7 @@ export const askInWords = (events: readonly ChatEvent[]): ChatAsk | undefined =>
 export const wordsAnswer = (ask: ChatAsk, text: string): AskPick[] => [{ question: ask.questions[0]?.question ?? '', words: text }];
 
 /** Where she is before a read answers: down, since nothing says she is up. */
-export const CHAT_DOWN: ChatPresence = { up: false, answering: false, waitsOnYou: 0, unread: 0 };
+export const CHAT_DOWN: ChatPresence = { up: false, answering: false, waitsOnYou: 0, unread: 0, wakes: false };
 
 /**
  * Her chat as the panel holds it: the events it knows, oldest first; where she is, as the api last said; the `cursor` a stream resumes
@@ -220,8 +220,8 @@ export const followChat = (stream: StreamLike, update: (change: (s: ChatFollowed
  * browser keeps a message the api would not take (`notSent`), the runs that wait on the person as the run list counts them
  * (`runsWaiting`, its `counts.waiting`, the number the Runs page and the rail say: `frameRunsQuery`), and her asks the person has not
  * answered among `events` (`asksOpen`). The api's own `waitsOnYou` adds those two into one number of its own, from a reading of the runs
- * that is not the run list's, so neither part is read from it. She reads as down when her session is not up, and only then: no level
- * says it, since a factory raised above Manual keeps her session up while the store's own level is at Manual. Whether she is at Manual
+ * that is not the run list's, so neither part is read from it. Where her session is not up she reads as resting where a message starts
+ * it (`wakes`), and as down only where none can: no level says either, since a message starts her at any level. Whether she is at Manual
  * everywhere is `anyAbove` (`lib/nemia.ts`), off every factory's level the api answers.
  * @param api Where she is, as the api last said.
  * @param notSent Whether this browser keeps a message the api would not take.
@@ -232,7 +232,8 @@ export const presenceOf = (api: ChatPresence, notSent: boolean, runsWaiting: num
   runsWaiting,
   asksWaiting: asksOpen(events).length,
   notSent,
-  down: !api.up,
+  down: !api.up && !api.wakes,
+  resting: !api.up && api.wakes,
   answering: api.answering,
   unread: api.unread,
 });

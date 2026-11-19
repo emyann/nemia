@@ -43,6 +43,7 @@ async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): 
     reach: [],
     bridge: null,
     stopped: false,
+    rests: true,
     spend: null,
     allows: [],
     factories: [],
@@ -111,15 +112,15 @@ test('at Auto: her level and a factory by default picked at Auto in one control 
   assert.doesNotMatch(html, /data-slot="switch"/, 'no switch beside it');
   assert.match(
     html,
-    /one kept from before asks you every answer until it is filed again — set her level and every factory above Manual to Manual, ending any raise, and once her session reads Off, set them back\./,
+    /one kept from before asks you every answer until it is filed again — set her level and every factory above Manual to Manual, ending any raise, and once her session reads Resting, set them back\./,
   );
 });
 
-test('Nemia off: her level picked at Manual, her session off, no reach, and her memory empty with how to prune it', async () => {
+test('Nemia resting: her level picked at Manual, her session resting, no reach, and her memory empty with how to prune it', async () => {
   const html = await nemiaWith({});
   assert.match(html, /data-nemia-level="manual"/);
   assert.equal(pickedAt(html, 'data-nemia-pick'), 'Manual');
-  assert.match(html, /data-nemia-session="true" data-state="off"/);
+  assert.match(html, /data-nemia-session="true" data-state="resting"/);
   assert.doesNotMatch(html, /data-nemia-reach/);
   assert.doesNotMatch(html, /data-nemia-restart/);
   assert.match(html, /data-nemia-no-facts[^>]*>She keeps no facts yet\./);
@@ -200,14 +201,14 @@ test('Nemia stopped from outside: said so, with a way to a fresh session', async
   assert.match(html, /data-nemia-restart[^>]*>(?:<[^>]*>)*Start a fresh session</);
 });
 
-test('Nemia not filed, or her folder untrusted, names no task; filed, it names its task and phase', async () => {
+test('Nemia not filed yet, or her folder untrusted, names no task; filed, it names its task and phase', async () => {
   const untrusted = await nemiaWith({ level: 'semi-auto', since: '2026-10-05T12:00:00.000Z', task: 'nemia-1', untrusted: UNTRUSTED });
   assert.match(untrusted, /data-state="untrusted"/);
   assert.doesNotMatch(untrusted, /data-nemia-task|>Task/, 'waiting on her trust: nothing filed, no task named');
   const notFiled = await nemiaWith({ level: 'semi-auto', task: 'nemia-1' });
   assert.match(notFiled, /data-state="not-filed"/);
   assert.doesNotMatch(notFiled, /data-nemia-task|>Task/, 'not filed yet: no task named');
-  const starting = await nemiaWith({ level: 'semi-auto', task: 'nemia-1', phase: 'pending' });
+  const starting = await nemiaWith({ level: 'semi-auto', task: 'nemia-1', phase: 'pending', rests: false });
   assert.match(starting, /data-state="starting"/);
   assert.match(starting, /data-nemia-task[^>]*>nemia-1</);
   assert.match(starting, /data-nemia-phase[^>]*>pending</);
@@ -255,11 +256,12 @@ test("her face in the rail is called by the presence that gives it its expressio
   assert.equal(dockWords({ ...UP, asksWaiting: 1 }, 'closed'), "Open Nemia's chat. 1 ask of hers waits on you.");
   assert.equal(dockWords({ ...UP, notSent: true }, 'closed'), "Open Nemia's chat. A message was not sent.");
   assert.equal(dockWords({ ...UP, down: true }, 'closed'), "Open Nemia's chat. Her session is down.");
+  assert.equal(dockWords({ ...UP, resting: true }, 'closed'), "Open Nemia's chat. She rests; a message wakes her.");
   assert.equal(dockWords({ ...UP, answering: true }, 'closed'), "Open Nemia's chat. She is answering.");
   assert.equal(dockWords({ ...UP, unread: 2 }, 'open'), "Close Nemia's chat. 2 new answers.");
   assert.equal(dockWords({ ...UP, unread: 1 }, 'closed'), "Open Nemia's chat. 1 new answer.");
   assert.equal(
-    dockWords({ runsWaiting: 2, asksWaiting: 1, notSent: true, down: true, answering: true, unread: 3 }, 'closed'),
+    dockWords({ runsWaiting: 2, asksWaiting: 1, notSent: true, down: true, resting: false, answering: true, unread: 3 }, 'closed'),
     "Open Nemia's chat. 2 wait on you.",
     'what waits on a person comes first, as her face does',
   );

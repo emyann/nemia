@@ -471,7 +471,7 @@ async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, env:
     for (let i = 0; i < repeat; i++) warm.push(await timed(() => folds(kept, rest)));
     return { cold: medianOf(cold), warm: medianOf(warm) };
   };
-  const task = orch.nemiaChatPlace(root).task ?? null;
+  const task = orch.nemiaChatPlace(root).tasks.at(-1) ?? null;
   const journalled = task !== null && fs.existsSync(path.join(root, 'engine', 'tasks', `${task}.jsonl`));
   return {
     asked: { task, events: listed.events.length, cursor: listed.cursor },

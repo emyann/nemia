@@ -1,13 +1,13 @@
 /**
  * Nemia's face wears one expression for every presence that holds at once, picked in the owner's order: runs that wait on you > her
- * asks unanswered > not sent > down > answering > unread > up. Her cues say every presence that holds, in the same order.
+ * asks unanswered > not sent > down > resting > answering > unread > up. Her cues say every presence that holds, in the same order.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { cuesOf, faceOf, UP, type Presence } from '../src/lib/presence.ts';
 
 /** Every presence holding at once. */
-const ALL: Presence = { runsWaiting: 2, asksWaiting: 1, notSent: true, down: true, answering: true, unread: 1 };
+const ALL: Presence = { runsWaiting: 2, asksWaiting: 1, notSent: true, down: true, resting: true, answering: true, unread: 1 };
 
 describe("faceOf, cuesOf: the face and the cues of every presence that holds, in the owner's order", () => {
   test('the face is the first presence that holds in the owner’s order, each winner taken away in turn', () => {
@@ -16,7 +16,8 @@ describe("faceOf, cuesOf: the face and the cues of every presence that holds, in
       [{ runsWaiting: 0 }, 'surprised'],
       [{ asksWaiting: 0 }, 'unsure'],
       [{ notSent: false }, 'sleepy'],
-      [{ down: false }, 'thinking'],
+      [{ down: false }, 'sleepy'],
+      [{ resting: false }, 'thinking'],
       [{ answering: false }, 'happy'],
       [{ unread: 0 }, 'idle'],
     ];
@@ -34,7 +35,8 @@ describe("faceOf, cuesOf: the face and the cues of every presence that holds, in
     assert.equal(faceOf({ ...UP, runsWaiting: 1, asksWaiting: 1 }), 'surprised');
     assert.equal(faceOf({ ...UP, asksWaiting: 1, notSent: true }), 'surprised');
     assert.equal(faceOf({ ...UP, notSent: true, down: true }), 'unsure');
-    assert.equal(faceOf({ ...UP, down: true, answering: true }), 'sleepy');
+    assert.equal(faceOf({ ...UP, down: true, resting: true }), 'sleepy');
+    assert.equal(faceOf({ ...UP, resting: true, answering: true }), 'sleepy');
     assert.equal(faceOf({ ...UP, answering: true, unread: 3 }), 'thinking');
     assert.equal(faceOf({ ...UP, unread: 3 }), 'happy');
     assert.equal(faceOf(UP), 'idle');
@@ -45,6 +47,7 @@ describe("faceOf, cuesOf: the face and the cues of every presence that holds, in
       { hue: 'yours', words: '1 ask of hers' },
       { hue: 'failure', words: 'Not sent' },
       { hue: 'none', words: 'Down' },
+      { hue: 'none', words: 'Resting' },
       { hue: 'alive', words: 'Answering' },
       { hue: 'alive', words: '1 new' },
     ]);

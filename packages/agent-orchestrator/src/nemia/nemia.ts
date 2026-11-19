@@ -1,7 +1,8 @@
 /**
- * Nemia, the store's own agent, kept on a long-lived session while a person has her on: the levels a person sets (`LEVELS`), the file
- * that says it (`LevelFile`), what the keeper owes on a beat (`nemiaDue`) off the state her session and her subscription are in
- * (`nemiaState`), the selectors of the feed that wake her (`NEMIA_SELECTORS`), the settings her session is filed with
+ * Nemia, the store's own agent, on a long-lived session that operates while a factory's level asks it and talks with the person whenever
+ * they write to her: the levels a person sets (`LEVELS`), the file that says it (`LevelFile`), what the keeper owes on a beat
+ * (`nemiaDue`) and whether the conversation is quiet enough for her to rest (`quietOf`), both proved by
+ * `contracts/nemia-keep.contract.ts`, the selectors of the feed that wake her (`NEMIA_SELECTORS`), the settings her session is filed with
  * (`nemiaSettings`), and her machine as a board draws it (`nemiaGraph`, `nemiaDiagram`).
  *
  * Pure. The person's file and her folder are `level.store.ts`'s, the keeper is `keep.verb.ts`, and the commands are `level.verb.ts` and
@@ -15,10 +16,18 @@ export { LEVELS, type Level } from '../level/level.ts';
 
 /**
  * What `nemia level` writes of the store: its `level`, the default factory's and that of every factory that names none, when (`since`),
- * and the task her session is filed under (`task`), named when some factory was put above `manual` and kept once none is, so the keeper
- * stops the session it kept.
+ * and when the person last set a level, the store's or a factory's (`asked`), which the keeper reads as the person speaking after a stop
+ * from outside. `task` is read and carried on, never written anew: the task a store kept before the keeper named her tasks in its own
+ * record (`session.json`), which the keeper adopts as her first.
  */
-export type LevelFile = { level: Level; since: string; task?: string };
+export type LevelFile = { level: Level; since: string; asked?: string; task?: string };
+
+/**
+ * The keeper's record of her session (`session.json`), written by the keeper alone: her tasks, oldest first, the last her current one,
+ * and three marks of the current one, each an ISO time — when the keeper saw it idle after the last word said to it (`idleSince`), that
+ * it put it to rest (`rested`), and that it saw it end with no rest of its own (`stoppedSeen`).
+ */
+export type NemiaSession = { tasks: string[]; idleSince?: string; rested?: string; stoppedSeen?: string };
 
 /** The level a factory is worked on by her from: below it, her subscription carries none of its lines and admission denies her its runs. */
 export const NEMIA_FLOOR: Level = 'semi-auto';
@@ -41,10 +50,10 @@ export const NEMIA_SELECTORS: readonly string[] = ['waits=person', 'reason=ToolD
 export const NEMIA_DIGEST_EVERY = 1440;
 
 /**
- * The task her session is filed under when some factory is put above `manual` at `since`: `nemia-` and the time's digits.
- * @param since When some factory was put above `manual`, an ISO time.
+ * A task of hers filed at `at`: `nemia-` and the time's digits.
+ * @param at When the keeper files her, an ISO time.
  */
-export const nemiaTaskId = (since: string): string => `nemia-${since.replace(/[^0-9]/g, '')}`;
+export const nemiaTaskId = (at: string): string => `nemia-${at.replace(/[^0-9]/g, '')}`;
 
 /**
  * The harness's settings her session is filed with, as JSON: her ask and deny rules (`rules`); `NEMIA_DAEMON_START=off` (`DEMAND_OFF`),
@@ -78,73 +87,88 @@ export function levelRefusal(word: string): string | undefined {
   return `${JSON.stringify(word)} is no level: ${LEVEL_FORM}.`;
 }
 
-/** What the keeper reads of her task: whether it settled, and whether a stop was asked. Absent where no task is filed under her id. */
-export type HerTask = { settled: boolean; stopRequested: boolean };
+import type { HerSubscription, HerTask, Keeping, NemiaAct, NemiaDue, QuietOf } from '../../contracts/nemia-keep.contract.ts';
+
+export type { HerSubscription, HerTask, IdleRead, Keeping, NemiaAct, Quiet } from '../../contracts/nemia-keep.contract.ts';
 
 /**
- * Where she is: `off`, no factory above `manual` and nothing to stop; `due`, some factory above it and no task filed; `untrusted`, as
- * `due` but her folder not trusted by her harness, which the keeper trusts itself before it files her, the folder being Nemia's own, and
- * where that write was refused, its refusal said to the person; `filed`, her task
- * open and not yet subscribed with her floor; `kept`, open and subscribed with it; `stopped`, her task stopped or ended from outside while
- * some factory is above `manual`, never filed again until the person sets a level again; `leaving`, none above `manual` with her task
- * open or her subscription still there.
+ * Where she is: `resting`, no task of hers open and nobody wanting her, or her last task put to rest by the keeper; `due`, wanted — a
+ * factory above `manual`, or a word of the person's waiting in her chat — and no task open; `untrusted`, as `due` but her folder not
+ * trusted by her harness, which the keeper trusts itself before it files her, the folder being Nemia's own, and where that write was
+ * refused, its refusal said to the person; `filed`, her task open while some factory is above `manual`, not yet subscribed with her floor;
+ * `kept`, open and subscribed, operating; `talking`, open with every factory at `manual`, in conversation with the person; `leaving`, put
+ * to rest by the keeper, the stop asked; `stopped`, her task ended with no rest of the keeper's, filed again only once the person speaks.
  */
-export type NemiaState = 'off' | 'due' | 'untrusted' | 'filed' | 'kept' | 'stopped' | 'leaving';
+export type NemiaState = 'resting' | 'due' | 'untrusted' | 'filed' | 'kept' | 'talking' | 'leaving' | 'stopped';
 
-/**
- * What the keeper does on a beat: give her harness's trust to her own folder (`trust`), file her task, subscribe it, stop it, drop her
- * subscription, say her custom words to her open task (`sayCustom`), say the person's chat words to her session (`sayOutbox`), write down
- * the questions of hers that wait on the person (`record`), and carry their answers to them (`answer`).
- */
-export type NemiaAct = 'trust' | 'file' | 'subscribe' | 'stop' | 'drop' | 'sayCustom' | 'sayOutbox' | 'record' | 'answer';
-
-/**
- * What the keeper reads of the levels and her folder: whether any factory, the default one included, is above `manual` now; her task's
- * id; whether her harness trusts her folder (`trusted`, absent for a harness that keeps no trust, which is read as trusted); and whether
- * the person's custom words are not those she was last filed or told with (`stale`), read only while she is kept; whether her session is
- * live (`up`); whether the person's chat holds words not yet delivered to her (`owed`); whether her session holds a question open on
- * the person (`asking`, off her task's view); whether the chat holds an ask whose mark no longer says what became of its call
- * (`closing`, a question cut with nothing answered, or one cut and asked again); and whether the chat holds an answer of theirs not
- * yet carried to her (`answered`).
- */
-export type Keeping = {
-  above: boolean;
-  task?: string;
-  trusted?: boolean;
-  stale?: boolean;
-  up?: boolean;
-  owed?: boolean;
-  asking?: boolean;
-  closing?: boolean;
-  answered?: boolean;
-};
-
-/**
- * What the keeper reads of her subscription: the task it tells, whether it carries her floor (`NEMIA_FLOOR`), and whether it carries her
- * selectors as they ship (`NEMIA_SELECTORS`, `selected`), false for one put before a selector was added.
- */
-export type HerSubscription = { task: string; scoped: boolean; selected: boolean };
-
-/** What the keeper owes where no task of hers is filed yet: her filing, after her folder's trust where it is not given. */
-const OPENING: Partial<Record<NemiaState, readonly NemiaAct[]>> = { due: ['file'], untrusted: ['trust', 'file'] };
+/** How long the conversation is quiet, her session idle since the last word said to her, before she rests at `manual`. */
+export const NEMIA_REST_AFTER = '15 minutes';
 
 /** Whether her task is open: filed, not settled, and no stop asked. */
 const isOpen = (task: HerTask | undefined): boolean => task !== undefined && !task.settled && !task.stopRequested;
 
+/** Whether her subscription tells her task `task` with her floor and her selectors as they ship. */
+const proper = (task: string | undefined, s: HerSubscription | undefined): boolean =>
+  s !== undefined && task !== undefined && s.task === task && s.scoped && s.selected;
+
 /**
- * Where she is (`NemiaState`), off the levels (`keeping`), her task's record (`task`, absent where none is filed under her id) and her
- * subscription (`subscribed`): kept only once it tells her task and carries her floor and her selectors, so one put before the floor, or
- * before a selector of hers was added, is put again. Pure.
- * @param keeping What the keeper reads of the levels and her folder.
- * @param task Her task's record, or undefined where none is filed under her id.
+ * What the keeper owes on a beat, in the order it acts. Where no task of hers is open: a subscription left over dropped, then, where she
+ * is wanted (a factory above `manual`, or a word of the person's waiting in her chat) and her last task, if any, was put to rest by the
+ * keeper or the person spoke after it ended, her folder trusted where her harness does not trust it and a new task filed; else, a task
+ * that ended with no rest marked once. Where it is open: put to rest where the keeper marked it so, or, with every factory at `manual`,
+ * the conversation is quiet; a subscription not hers dropped and hers put while she operates (a factory above `manual`); and while the
+ * keeper speaks to her session, the person's custom words said where they changed, the chat's words, her questions and the person's
+ * answers carried where her session is up, and her session marked idle once. Pure.
+ * @param keeping What the keeper reads of the levels, her folder, her record, her session and the chat.
+ * @param task Her current task's record, or undefined where none is filed under the record's last id.
  * @param subscribed Her subscription, or undefined where she has none.
  */
-export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaState {
-  if (!keeping.above) return isOpen(task) || subscribed !== undefined ? 'leaving' : 'off';
-  if (task === undefined) return keeping.trusted === false ? 'untrusted' : 'due';
-  if (!isOpen(task)) return 'stopped';
-  return subscribed !== undefined && subscribed.task === keeping.task && subscribed.scoped && subscribed.selected ? 'kept' : 'filed';
-}
+export const nemiaDue: NemiaDue = (keeping, task, subscribed) => {
+  const k = keeping;
+  const dropped: NemiaAct[] = subscribed === undefined ? [] : ['drop'];
+  if (!isOpen(task)) return [...dropped, ...dueClosed(k, task !== undefined)];
+  if (k.rested === true || (!k.above && quietNow(k))) return ['rest', ...dropped];
+  if (k.above && !proper(k.task, subscribed)) return [...dropped, 'subscribe'];
+  return [...(k.above ? [] : dropped), ...spoken(k)];
+};
+
+/** Whether a word of the person's waits for her: a message in her outbox or an answer to her question. */
+const waiting = (k: Keeping): boolean => k.owed === true || k.answered === true;
+
+/**
+ * What is owed where no task of hers is open, its subscription aside: her folder trusted where needed and a task filed, where she is
+ * wanted and her last task (`filed`) was put to rest or the person spoke after it ended; else a task ended from outside marked once.
+ */
+const dueClosed = (k: Keeping, filed: boolean): NemiaAct[] => {
+  const spoke = k.rested === true || k.heard === true;
+  if ((k.above || waiting(k)) && (!filed || spoke)) return [...(k.trusted === false ? (['trust'] as const) : []), 'file'];
+  return filed && !spoke && k.stoppedMarked !== true ? ['markStopped'] : [];
+};
+
+/** Whether the conversation is quiet long enough for her to rest: idle, nothing waiting, no question of hers open. */
+const quietNow = (k: Keeping): boolean => k.quiet === true && k.idle === true && !waiting(k) && k.asking !== true && k.closing !== true;
+
+/** What the keeper says to her open session: custom words changed, and what the chat owes where her session is up; its idle mark. */
+const spoken = (k: Keeping): NemiaAct[] => {
+  const up = k.up === true;
+  return [
+    ...(k.stale === true ? (['sayCustom'] as const) : []),
+    ...(up && k.owed === true ? (['sayOutbox'] as const) : []),
+    ...(up && (k.asking === true || k.closing === true) ? (['record'] as const) : []),
+    ...(up && k.answered === true ? (['answer'] as const) : []),
+    ...(k.idle === true && k.idleMarked !== true ? (['markIdle'] as const) : []),
+  ];
+};
+
+/**
+ * Whether the keeper's idle mark of her session stands, no word said to her after it, and whether it is old enough for her to rest: at
+ * least `restAfterMs` before `now`. Pure.
+ * @param read The idle mark, the last word said to her, now, and the rest's length, each in milliseconds.
+ */
+export const quietOf: QuietOf = (read) => {
+  const marked = read.idleSince !== null && (read.lastSaid === null || read.idleSince >= read.lastSaid);
+  return { marked, quiet: marked && read.idleSince !== null && read.now - read.idleSince >= read.restAfterMs };
+};
 
 /**
  * What the keeper reads of a trust its write left not given: the harness, the folder, the harness's file, why it is never kept, and why
@@ -193,37 +217,6 @@ export const folderUnmade = (folder: string, threw: string): string =>
   `her folder ${folder} could not be made (${threw}): make the store's folder writable by the user the store runs as; the keeper makes her folder at its next beat, gives it the trust and files her session`;
 
 /**
- * What the keeper owes on a beat, in order: at `due`, file; at `untrusted`, trust her folder, then file, in the same beat, the filing
- * left undone where the trust was refused; at `filed`, subscribe, dropping first a subscription left for another task or
- * without her floor or her selectors; at `kept`, say the person's custom words to her where they are not those her task was filed with
- * (`stale`), then say the person's chat words where some are owed and her session is live (`owed`, `up`), write down the questions her
- * live session holds open and mark what became of a question it no longer holds (`record`, where her task's view says one waits,
- * `asking`, or the chat holds one whose mark does not say what became of its call, `closing`), and carry the person's answers where one
- * is owed (`answered`); at `leaving`, stop the open task and drop the subscription; at `stopped`, drop a subscription left; else
- * nothing. A task settled
- * from outside is never filed again: the person said so by stopping it. Pure.
- * @param keeping What the keeper reads of the levels, her folder, her session and the chat.
- * @param task Her task's record, or undefined where none is filed under her id.
- * @param subscribed Her subscription, or undefined where she has none.
- */
-export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined): NemiaAct[] {
-  const state = nemiaState(keeping, task, subscribed);
-  const dropped: NemiaAct[] = subscribed === undefined ? [] : ['drop'];
-  const opening = OPENING[state];
-  if (opening !== undefined) return [...opening];
-  if (state === 'filed') return [...dropped, 'subscribe'];
-  if (state === 'stopped') return dropped;
-  if (state === 'leaving') return [...(isOpen(task) ? (['stop'] as const) : []), ...dropped];
-  if (state !== 'kept') return [];
-  return [
-    ...(keeping.stale === true ? (['sayCustom'] as const) : []),
-    ...(keeping.owed === true && keeping.up === true ? (['sayOutbox'] as const) : []),
-    ...((keeping.asking === true || keeping.closing === true) && keeping.up === true ? (['record'] as const) : []),
-    ...(keeping.answered === true && keeping.up === true ? (['answer'] as const) : []),
-  ];
-}
-
-/**
  * The instruction her session is filed with: her builtin instruction `body`, then the person's `custom` words where there are any.
  * @param body Her builtin instruction.
  * @param custom The person's custom words for her, or undefined where there are none.
@@ -265,50 +258,50 @@ export type NemiaVerb = { verb: string; from: NemiaState[]; to: NemiaState; guar
 export type NemiaGraph = { initial: NemiaState; states: NemiaState[]; final: NemiaState[]; edges: NemiaEdge[]; verbs: NemiaVerb[] };
 
 /** Every state, in the order a session goes through them. */
-const STATES: NemiaState[] = ['off', 'due', 'untrusted', 'filed', 'kept', 'stopped', 'leaving'];
+const STATES: NemiaState[] = ['resting', 'due', 'untrusted', 'filed', 'kept', 'talking', 'leaving', 'stopped'];
 
 /**
- * The keeper's moves, her folder's trust read each beat and given by the keeper where it is not, a change of her custom words said, the
- * person's chat words said, a stop or end from outside, which it never undoes, and the end of the last raise above `manual` as it passes.
+ * The keeper's moves: a word of the person's in her chat or a factory above `manual` files her, her folder's trust given first where it
+ * is not; operating, she is subscribed and kept; at `manual`, she talks until the conversation is quiet, then is put to rest; a stop or
+ * an end from outside holds her stopped until the person speaks.
  */
 const EDGES: NemiaEdge[] = [
-  { from: 'due', to: 'filed', event: 'NO_TASK', action: 'file' },
+  { from: 'due', to: 'filed', event: 'ABOVE_MANUAL', action: 'file' },
+  { from: 'due', to: 'talking', event: 'AT_MANUAL', action: 'file' },
   { from: 'due', to: 'untrusted', event: 'FOLDER_UNTRUSTED', action: 'nothing' },
-  { from: 'untrusted', to: 'filed', event: 'TRUST_WRITTEN', action: 'trust, file' },
+  { from: 'untrusted', to: 'due', event: 'TRUST_WRITTEN', action: 'trust, file' },
   { from: 'untrusted', to: 'untrusted', event: 'TRUST_REFUSED', action: 'trust' },
   { from: 'filed', to: 'kept', event: 'NOT_SUBSCRIBED', action: 'subscribe' },
-  { from: 'filed', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'nothing' },
-  { from: 'kept', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'nothing' },
   { from: 'kept', to: 'kept', event: 'CUSTOM_CHANGED', action: 'sayCustom' },
   { from: 'kept', to: 'kept', event: 'OUTBOX_OWED', action: 'sayOutbox' },
-  { from: 'stopped', to: 'stopped', event: 'SUBSCRIBED', action: 'drop' },
-  { from: 'leaving', to: 'off', event: 'OPEN_OR_SUBSCRIBED', action: 'stop, drop' },
-  { from: 'due', to: 'off', event: 'RAISE_ENDED', action: 'nothing' },
-  { from: 'untrusted', to: 'off', event: 'RAISE_ENDED', action: 'nothing' },
-  { from: 'filed', to: 'leaving', event: 'RAISE_ENDED', action: 'nothing' },
-  { from: 'kept', to: 'leaving', event: 'RAISE_ENDED', action: 'nothing' },
+  { from: 'kept', to: 'talking', event: 'RAISE_ENDED', action: 'drop' },
+  { from: 'talking', to: 'talking', event: 'CUSTOM_CHANGED', action: 'sayCustom' },
+  { from: 'talking', to: 'talking', event: 'OUTBOX_OWED', action: 'sayOutbox' },
+  { from: 'talking', to: 'talking', event: 'IDLE', action: 'markIdle' },
+  { from: 'talking', to: 'filed', event: 'ABOVE_MANUAL', action: 'nothing' },
+  { from: 'talking', to: 'leaving', event: 'QUIET', action: 'rest' },
+  { from: 'leaving', to: 'resting', event: 'SETTLED', action: 'nothing' },
+  { from: 'filed', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'markStopped' },
+  { from: 'kept', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'drop, markStopped' },
+  { from: 'talking', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'markStopped' },
 ];
 
 /**
- * The person's verbs: `nemia level` putting some factory above `manual` (the store's level, a factory's default or a raise), whatever
- * her folder's trust, which the keeper reads, and putting none above it (a level set, or a raise ended early); and `nemia agents custom
- * nemia` setting or clearing her custom words, which the next beat says to her. Nothing else raises a level: the level is the person's.
+ * The person's verbs: a message written in her chat, which files her from rest or from a stop; `nemia level` putting some factory above
+ * `manual` (the store's level, a factory's default or a raise), whatever her folder's trust, which the keeper reads, and putting none
+ * above it, which ends her operating and leaves the conversation as it is; and `nemia agents custom nemia` setting or clearing her custom
+ * words, which the next beat says to her. Nothing else raises a level: the level is the person's.
  */
 export const NEMIA_VERBS: NemiaVerb[] = [
-  { verb: 'level (a factory above manual)', from: ['off', 'untrusted', 'stopped', 'leaving'], to: 'due', guard: 'always', by: 'person' },
-  {
-    verb: 'level (none above manual)',
-    from: ['due', 'untrusted', 'filed', 'kept', 'stopped'],
-    to: 'leaving',
-    guard: 'always',
-    by: 'person',
-  },
+  { verb: 'chat (a message)', from: ['resting', 'stopped'], to: 'due', guard: 'always', by: 'person' },
+  { verb: 'level (a factory above manual)', from: ['resting', 'stopped'], to: 'due', guard: 'always', by: 'person' },
+  { verb: 'level (none above manual)', from: ['filed', 'kept'], to: 'talking', guard: 'always', by: 'person' },
   { verb: 'agents custom nemia (set or clear)', from: ['kept'], to: 'kept', guard: 'always', by: 'person' },
 ];
 
 /** Her machine as plain data, a fresh copy each call. */
 export const nemiaGraph = (): NemiaGraph => ({
-  initial: 'off',
+  initial: 'resting',
   states: [...STATES],
   final: [],
   edges: EDGES.map((e) => ({ ...e })),

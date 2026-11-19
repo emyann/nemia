@@ -337,6 +337,7 @@ const where = (more: Partial<typeof NemiaLevel.Type> = {}): typeof NemiaLevel.Ty
   reach: [],
   bridge: null,
   stopped: false,
+  rests: true,
   spend: null,
   allows: [],
   factories: [{ factory: 'default', level: 'manual', default: 'manual', own: null, raise: null }],
@@ -349,7 +350,12 @@ test("`nemia level`'s lines: the store, each factory and its raise, her session,
     'Nemia: the store at manual',
     'factories (a raise ends by itself, read as it passes):',
     "  default: manual (the store's level, for runs in no factory)",
+    'she rests: a message in her chat wakes her',
   ]);
+  assert.ok(!levelLines(where({ rests: false })).some((line) => line.startsWith('she rests')), 'her session open: she does not rest');
+  const stopped = levelLines(where({ stopped: true }));
+  hasLine(stopped, /^it was stopped from outside/);
+  assert.ok(!stopped.some((line) => line.startsWith('she rests')), 'stopped from outside: said as stopped, not as resting');
   const raise = { level: 'semi-auto' as const, until: '2026-11-12T12:00:00.000Z' };
   const words = levelLines(
     where({
@@ -358,6 +364,7 @@ test("`nemia level`'s lines: the store, each factory and its raise, her session,
       task: 'nemia',
       phase: 'working',
       reach: ['nemia chat'],
+      rests: false,
       spend: { usd: 0.004, measured: 1, unmeasured: 2 },
       untrusted: 'the file did not read: fix it',
       factories: [{ factory: 'mill', level: 'semi-auto', default: 'manual', own: null, raise }],

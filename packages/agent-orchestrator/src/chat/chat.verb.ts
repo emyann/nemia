@@ -55,6 +55,8 @@ import {
   readChatCursor,
   sourcesAt,
   fromRefusal,
+  offsetAfter,
+  spanned,
   speakerRefusal,
   stepSpeaker,
   withEvents,
@@ -68,11 +70,16 @@ import {
   type ReadMark,
   type SourceStop,
   type Speaker,
+  type TaskSpan,
 } from './chat.ts';
 import type { ProposalCaller } from '../caller/index.ts';
 
-/** Which chat: the long-lived task it is with (none while none is filed), and the folder its files are kept in. */
-export type ChatPlace = { readonly task: string | undefined; readonly dir: string };
+/**
+ * Which chat: the tasks of the long-lived agent it is with, oldest first, each continuing the last's session, the last its current one
+ * (none while none was named); the folder its files are kept in; and whether a message to it starts its agent where no task is open
+ * (`wakes`).
+ */
+export type ChatPlace = { readonly tasks: readonly string[]; readonly dir: string; readonly wakes: boolean };
 
 /**
  * How the runs that wait on the person are read, as the board's list reads them: the informer its caller keeps, a fresh one for a
@@ -88,8 +95,8 @@ export type ChatHistory = { events: ChatEvent[]; before: string | null; cursor: 
 /** What changed since a cursor: the events new or changed, the cursor after them, and the presence. */
 export type ChatChanges = { events: ChatEvent[]; cursor: string; presence: Presence };
 
-/** One attempt's events, or none where its harness keeps no transcript the engine reads. */
-const sessionOf = (task: string, attempt: { n: number; startedAt: string }) =>
+/** One attempt of the task `task` as the chat numbers it, past `offset`, its events, or none where its harness keeps no transcript. */
+const sessionOf = (task: string, attempt: { n: number; startedAt: string }, offset: number) =>
   Effect.gen(function* () {
     const e = yield* EngineService;
     const read = yield* asked(
@@ -99,36 +106,62 @@ const sessionOf = (task: string, attempt: { n: number; startedAt: string }) =>
         .pipe(Effect.catchTag('TranscriptRefused', () => Effect.succeed({ events: [] }))),
     );
     return {
-      attempt: attempt.n,
+      attempt: offset + attempt.n,
       startedAt: attempt.startedAt,
       events: read.events,
       ...('cursor' in read ? { cursor: read.cursor } : {}),
     } satisfies ChatSession;
   });
 
-/** The chat's own files at `place`, read now. */
-const filesOf = (place: ChatPlace) =>
-  tried(() => ({
-    outbox: readOutbox(place.dir),
-    delivered: readDelivered(place.dir),
-    stops: readStops(place.dir),
-    asks: readAsks(place.dir),
-    answers: readAnswers(place.dir),
-    closed: readAsksClosed(place.dir),
-  }));
+/** The chat's own files at `place`, as their files keep them. */
+const filesNow = (place: ChatPlace) => ({
+  outbox: readOutbox(place.dir),
+  delivered: readDelivered(place.dir),
+  stops: readStops(place.dir),
+  asks: readAsks(place.dir),
+  answers: readAnswers(place.dir),
+  closed: readAsksClosed(place.dir),
+});
 
-/** What the chat at `place` is projected from, read now, and its task's phase, null where no task is filed. */
-const sourcesOf = (place: ChatPlace) =>
+/** The chat's own files, as their files keep them. */
+type Files = ReturnType<typeof filesNow>;
+
+/** The chat's own files at `place`, read now. */
+const filesOf = (place: ChatPlace) => tried(() => filesNow(place));
+
+/** What a chat is projected from with the files numbered across its tasks (`spanned`). */
+const joined = (sources: ChatSources, spans: readonly TaskSpan[], files: Files): ChatSources => ({
+  ...sources,
+  ...files,
+  ...spanned(spans, files.delivered, files.stops),
+});
+
+/**
+ * What the chat at `place` is projected from, read now: each filed task's sessions, numbered across its tasks, and the words said to
+ * them; the chat's files; and its current task's phase, null where it is not filed. Beside it, the tasks as the chat spans them and the
+ * files as kept.
+ */
+const listed = (place: ChatPlace) =>
   Effect.gen(function* () {
     const e = yield* EngineService;
     const files = yield* filesOf(place);
-    const view = place.task === undefined ? undefined : yield* asked('view', e.view(place.task));
-    if (place.task === undefined || view === undefined || !view.state.filedAt)
-      return { sessions: [], said: [], ...files, phase: null } satisfies ChatSources;
-    const task = place.task;
-    const sessions = yield* Effect.forEach(view.state.attempts, (a) => sessionOf(task, a), { concurrency: 4 });
-    return { sessions, said: view.state.said, ...files, phase: view.phase } satisfies ChatSources;
+    const spans: TaskSpan[] = [];
+    const sessions: ChatSession[] = [];
+    let phase: ChatSources['phase'] = null;
+    for (const task of place.tasks) {
+      const view = yield* asked('view', e.view(task));
+      phase = view.state.filedAt ? view.phase : null;
+      if (!view.state.filedAt) continue;
+      const offset = offsetAfter(spans.at(-1));
+      sessions.push(...(yield* Effect.forEach(view.state.attempts, (a) => sessionOf(task, a, offset), { concurrency: 4 })));
+      spans.push({ task, offset, attempts: view.state.attempts.map((a) => a.n), said: view.state.said });
+    }
+    const empty: ChatSources = { sessions, said: [], ...files, phase };
+    return { sources: joined(empty, spans, files), spans, files };
   });
+
+/** What the chat at `place` is projected from, read now. */
+const sourcesOf = (place: ChatPlace) => Effect.map(listed(place), (read) => read.sources);
 
 /** How many runs wait on the person across every factory, as the board's list counts them (`kindOf`). */
 const waitingNow = (reads: ChatReads) =>
@@ -146,7 +179,7 @@ const waitingNow = (reads: ChatReads) =>
 const presenceNow = (place: ChatPlace, sources: ChatSources, events: readonly ChatEvent[], reads: ChatReads) =>
   Effect.gen(function* () {
     const mark = yield* tried(() => readReadMark(place.dir));
-    return presenceOf(sources.phase ?? undefined, yield* waitingNow(reads), events, mark);
+    return presenceOf(sources.phase ?? undefined, yield* waitingNow(reads), events, mark, place.wakes);
   });
 
 /**
@@ -205,7 +238,8 @@ const wordsOfCause = (cause: Cause.Cause<unknown>): string => {
 type Moved = { kind: 'moment'; m: ChatFollowed } | { kind: 'beat' } | { kind: 'files' } | { kind: 'runs' };
 
 /**
- * What one follower of a chat holds between what moves: where the chat is, the stamp of its files, the sources listed and folded since,
+ * What one follower of a chat holds between what moves: where the chat is, the stamp of its files, its tasks as it spans them, its files
+ * as kept, the sources listed and folded since,
  * their projection last sent, the read mark, the runs waiting, the presence last sent, and the words of a read that failed, until one
  * works.
  */
@@ -214,6 +248,8 @@ type Held = {
   readonly reads: ChatReads;
   place: ChatPlace;
   stamp: string;
+  spans: TaskSpan[];
+  files: Files;
   sources: ChatSources;
   events: ChatEvent[];
   mark: ReadMark | undefined;
@@ -225,40 +261,61 @@ type Held = {
 /** The session the follow's events are of: the last one listed, until a read of the view says another. */
 const followedOf = (h: Held) => h.sources.sessions.at(-1);
 
+/** The task the chat numbers `attempt` in, and that attempt as its task numbers it; undefined where no task holds it. */
+const ownerOf = (h: Held, attempt: number): { task: string; n: number } | undefined => {
+  const span = [...h.spans].reverse().find((s) => s.offset < attempt);
+  return span === undefined ? undefined : { task: span.task, n: attempt - span.offset };
+};
+
 /** What the follower has not read of the session followed, read once it joins the follow: from its cursor, of its own attempt. */
 const caughtOf = (h: Held, task: string): Effect.Effect<ChatFollowed | undefined> => {
   const at = followedOf(h);
-  if (at?.cursor === undefined) return Effect.succeed(undefined);
-  return asked('transcript', h.e.transcript(task, at.cursor, { attempt: at.attempt })).pipe(
+  const owner = at === undefined ? undefined : ownerOf(h, at.attempt);
+  if (at?.cursor === undefined || owner?.task !== task) return Effect.succeed(undefined);
+  return asked('transcript', h.e.transcript(task, at.cursor, { attempt: owner.n })).pipe(
     Effect.map((read): ChatFollowed => ({ kind: 'events', events: read.events, cursor: read.cursor })),
     Effect.orElseSucceed(() => undefined),
   );
 };
 
-/** The task's view read again into `h`: its phase and saids, and each attempt it names that is not held, read whole. */
+/** The files `h` holds numbered again across its tasks, into its sources. */
+const respanned = (h: Held): void => {
+  h.sources = joined(h.sources, h.spans, h.files);
+};
+
+/**
+ * The current task's view read again into `h`: its phase and saids, and each attempt it names that is not held, read whole; a task filed
+ * since it was listed spanned after the others.
+ */
 const viewed = (h: Held) =>
   Effect.gen(function* () {
-    const task = h.place.task;
+    const task = h.place.tasks.at(-1);
     if (task === undefined) return;
     const view = yield* asked('view', h.e.view(task));
     if (!view.state.filedAt) return;
+    const known = h.spans.at(-1)?.task === task ? h.spans.at(-1) : undefined;
+    const offset = known?.offset ?? offsetAfter(h.spans.at(-1));
     const held = new Set(h.sources.sessions.map((s) => s.attempt));
     const fresh = yield* Effect.forEach(
-      view.state.attempts.filter((a) => !held.has(a.n)),
-      (a) => sessionOf(task, a),
+      view.state.attempts.filter((a) => !held.has(offset + a.n)),
+      (a) => sessionOf(task, a, offset),
     );
-    h.sources = { ...h.sources, sessions: [...h.sources.sessions, ...fresh], said: view.state.said, phase: view.phase };
+    const span: TaskSpan = { task, offset, attempts: view.state.attempts.map((a) => a.n), said: view.state.said };
+    h.spans = known === undefined ? [...h.spans, span] : [...h.spans.slice(0, -1), span];
+    h.sources = { ...h.sources, sessions: [...h.sources.sessions, ...fresh], phase: view.phase };
+    respanned(h);
   });
 
 /** The last session's transcript read into `h` from its cursor. */
 const lastRead = (h: Held) =>
   Effect.gen(function* () {
     const at = followedOf(h);
-    if (h.place.task === undefined || at?.cursor === undefined) return;
+    const owner = at === undefined ? undefined : ownerOf(h, at.attempt);
+    if (owner === undefined || at?.cursor === undefined) return;
     const read = yield* asked(
       'transcript',
       h.e
-        .transcript(h.place.task, at.cursor, { attempt: at.attempt })
+        .transcript(owner.task, at.cursor, { attempt: owner.n })
         .pipe(Effect.catchTag('TranscriptRefused', () => Effect.succeed(undefined))),
     );
     if (read) h.sources = withEvents(h.sources, at.attempt, read.events, read.cursor);
@@ -267,21 +324,24 @@ const lastRead = (h: Held) =>
 /** The chat's files and the read mark read again into `h`. */
 const filesRead = (h: Held) =>
   Effect.gen(function* () {
-    h.sources = { ...h.sources, ...(yield* filesOf(h.place)) };
+    h.files = yield* filesOf(h.place);
+    respanned(h);
     h.mark = yield* tried(() => readReadMark(h.place.dir));
   });
 
 /**
- * A look at the chat's files: its task listed again whole where `placeOf` names another, else the files and the view read where they
- * moved, or while a read fails.
+ * A look at the chat's files: its tasks listed again whole where `placeOf` names others, else the files and the view read where they
+ * moved, or while a read fails; whether a message wakes its agent taken as `placeOf` says it.
  */
 const looked = (h: Held, placeOf: () => ChatPlace) =>
   Effect.gen(function* () {
     const now = placeOf();
-    if (now.task !== h.place.task) {
-      h.place = now;
+    const moved = now.tasks.join('\n') !== h.place.tasks.join('\n');
+    h.place = now;
+    if (moved) {
       h.stamp = filesStamp(now);
-      h.sources = yield* sourcesOf(now);
+      const read = yield* listed(now);
+      [h.sources, h.spans, h.files] = [read.sources, read.spans, read.files];
       h.mark = yield* tried(() => readReadMark(now.dir));
       return;
     }
@@ -308,7 +368,7 @@ const changesOf = (h: Held): ChatSent[] => {
   const now = projectChat(h.sources);
   const changed = changedSince(h.events, now);
   h.events = now;
-  const presence = presenceOf(h.sources.phase ?? undefined, h.waiting, now, h.mark);
+  const presence = presenceOf(h.sources.phase ?? undefined, h.waiting, now, h.mark, h.place.wakes);
   const shown = JSON.stringify(presence);
   if (!changed.length && shown === h.shown) return [];
   h.shown = shown;
@@ -334,7 +394,7 @@ const sentAfter = (h: Held, moved: Moved, exit: Exit.Exit<void, unknown>): ChatS
 /** The follow of the task `h` holds, then a beat that reads the record and the follow asked for again, for as long as it is read. */
 const following = (h: Held, follow: ChatFollow, beatMs: number): Stream.Stream<Moved> =>
   Stream.suspend(() => {
-    const task = h.place.task;
+    const task = h.spans.at(-1)?.task;
     const moments =
       task === undefined ? Stream.empty : follow(task, caughtOf(h, task)).pipe(Stream.map((m): Moved => ({ kind: 'moment', m })));
     const beat = Stream.fromEffect(Effect.sleep(Duration.millis(beatMs))).pipe(Stream.map((): Moved => ({ kind: 'beat' })));
@@ -365,14 +425,14 @@ export const followChat = Effect.fn('followChat')(function* (
   const feedEnd = (yield* (yield* FeedDoor).lines.end())?.cursor ?? 0;
   const place = placeOf();
   const stamp = filesStamp(place);
-  const sources = yield* sourcesOf(place);
+  const { sources, spans, files } = yield* listed(place);
   const events = projectChat(sources);
   const then = after === undefined ? [] : projectChat(yield* tried(() => sourcesAt(sources, readChatCursor(after), after)));
   const mark = yield* tried(() => readReadMark(place.dir));
   const waiting = yield* waitingNow(reads);
-  const presence = presenceOf(sources.phase ?? undefined, waiting, events, mark);
+  const presence = presenceOf(sources.phase ?? undefined, waiting, events, mark, place.wakes);
   const first: ChatChanges = { events: changedSince(then, events), cursor: chatCursor(cursorOf(sources)), presence };
-  const h: Held = { e, reads, place, stamp, sources, events, mark, waiting, shown: JSON.stringify(presence), unread: null };
+  const h: Held = { e, reads, place, stamp, spans, files, sources, events, mark, waiting, shown: JSON.stringify(presence), unread: null };
   const looks = Stream.tick(Duration.millis(filesMs)).pipe(
     Stream.drop(1),
     Stream.map((): Moved => ({ kind: 'files' })),
@@ -448,24 +508,24 @@ export const chatAnswer = Effect.fn('chatAnswer')(function* (place: ChatPlace, g
 });
 
 /**
- * The turn the task of the chat at `place` is answering stopped, and the stop as its record keeps it: the runtime ends the turn through
- * its harness and leaves the session open, and the stop is appended to the chat's own `stops.jsonl`, which the projection draws as the
- * keeper's quiet marker. The turn is ended before the line is written: a stop on the record is a turn the runtime stopped.
+ * The turn the current task of the chat at `place` is answering stopped, and the stop as its record keeps it: the runtime ends the turn
+ * through its harness and leaves the session open, and the stop is appended to the chat's own `stops.jsonl`, which the projection draws as
+ * the keeper's quiet marker. The turn is ended before the line is written: a stop on the record is a turn the runtime stopped.
  *
  * Refused (`Conflict`) where no task is filed, and in the runtime's own words where it will not end the turn — she is not answering,
  * her session is not running, or her harness cannot end a turn without ending it.
  */
 export const chatStop = Effect.fn('chatStop')(function* (place: ChatPlace) {
   const e = yield* EngineService;
-  if (place.task === undefined)
-    return yield* Effect.fail(new Conflict({ message: 'No session of hers is filed, so there is no turn to stop.' }));
-  const ended = yield* e.interrupt(place.task).pipe(
+  const task = place.tasks.at(-1);
+  if (task === undefined) return yield* Effect.fail(new Conflict({ message: 'No session of hers is filed, so there is no turn to stop.' }));
+  const ended = yield* e.interrupt(task).pipe(
     Effect.catchTags({
       InterruptRefused: (refused) => Effect.fail(new Conflict({ message: refused.message })),
       InterruptUnsent: (unsent) => Effect.fail(new Conflict({ message: unsent.message })),
     }),
   );
-  const stop: SourceStop = { at: ended.at, attempt: ended.attempt };
+  const stop: SourceStop = { at: ended.at, attempt: ended.attempt, task };
   yield* tried(() => appendStop(place.dir, stop));
   return stop;
 });

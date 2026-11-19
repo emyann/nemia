@@ -3,7 +3,8 @@
 #
 #   curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh
 #
-# It fetches the release archive for this machine and its SHA256SUMS, refuses an archive whose sum differs, unpacks it into
+# It fetches the release archive for this machine (linux-x64, linux-arm64, darwin-x64 or darwin-arm64; on macOS, 13.5 or later,
+# refused before anything is downloaded) and its SHA256SUMS, refuses an archive whose sum differs, unpacks it into
 # $WF_ROOT/releases/<tag> through a hidden folder renamed into place, points releases/current at it and links ~/.local/bin/nemia and the
 # store's tools/bin/nemia to its launcher.
 # Then it takes one of three paths, picked from its flags once they are read.
@@ -144,9 +145,23 @@ case $arch in
 esac
 platform=$os-$arch
 case $platform in
-  linux-x64 | linux-arm64 | darwin-arm64) ;;
-  *) fail "no release is built for $platform: the archives are linux-x64, linux-arm64 and darwin-arm64" ;;
+  linux-x64 | linux-arm64 | darwin-x64 | darwin-arm64) ;;
+  *) fail "no release is built for $platform: the archives are linux-x64, linux-arm64, darwin-x64 and darwin-arm64" ;;
 esac
+# macOS 13.5 or later: the release's own Node (24) starts on nothing older (Node's BUILDING.md), so an older Mac is refused here,
+# before anything is downloaded, rather than left with a release that does not start.
+if [ "$os" = darwin ]; then
+  macos=$(sw_vers -productVersion 2>/dev/null) || macos=
+  major=${macos%%.*}
+  minor=${macos#"$major"}
+  minor=${minor#.}
+  minor=${minor%%.*}
+  case $major in '' | *[!0-9]*) major=0 ;; esac
+  case $minor in '' | *[!0-9]*) minor=0 ;; esac
+  if [ "$major" -lt 13 ] || { [ "$major" -eq 13 ] && [ "$minor" -lt 5 ]; }; then
+    fail "this Mac runs macOS ${macos:-of an unknown version}, and Nemia needs macOS 13.5 or later: update macOS, then run this again"
+  fi
+fi
 
 # What the install needs, and on Linux what the service needs, warned about rather than refused.
 for tool in git tar; do

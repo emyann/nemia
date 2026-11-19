@@ -28,6 +28,7 @@ const nemiaLevel = (over: Partial<NemiaLevel> = {}): NemiaLevel => ({
   reach: [],
   bridge: null,
   stopped: false,
+  rests: true,
   spend: null,
   allows: [],
   factories: [],
@@ -53,35 +54,34 @@ const up = nemiaLevel({
   sessionId: '0123456789abcdef',
   reach: ['attach 01234567', 'https://example.test/code/session_0123'],
   bridge: { url: 'https://example.test/code/session_0123', why: null },
+  rests: false,
 });
 
 describe("sessionOf: her session's state, judged from the orchestrator's facts", () => {
-  test('her session reads off with no task, not filed with no phase, starting while nothing reaches it, and up once something does', () => {
-    assert.equal(sessionOf(nemiaLevel()).kind, 'off');
-    assert.equal(sessionOf(nemiaLevel({ level: 'semi-auto', task: 'nemia-1' })).kind, 'not-filed');
+  test('her session reads resting where none is open and a message starts one, at any level; starting while nothing reaches it; up once something does', () => {
+    assert.equal(sessionOf(nemiaLevel()).kind, 'resting', 'a fresh store: a message wakes her');
+    assert.equal(
+      sessionOf(nemiaLevel({ level: 'semi-auto', task: 'nemia-1' })).kind,
+      'not-filed',
+      'above Manual: the keeper files her at its next beat',
+    );
+    assert.equal(sessionOf(nemiaLevel({ factories: [raised] })).kind, 'not-filed', 'a factory above Manual keeps her too');
+    assert.match(sessionOf(nemiaLevel({ factories: [raised] })).words, /^Not filed yet/, 'never said filed while nothing is');
+    assert.match(sessionOf(nemiaLevel()).words, /^Resting: a message in her chat starts her session/);
     assert.equal(sessionOf({ ...up, reach: [], sessionId: null }).kind, 'starting');
     assert.equal(sessionOf(up).kind, 'up');
-    assert.match(sessionOf(nemiaLevel({ level: 'semi-auto', task: 'nemia-1' })).words, /^Not filed yet: the keeper files her session/);
+    assert.equal(sessionOf({ ...up, level: 'manual' }).kind, 'up', 'at manual her conversation goes on');
   });
-  test("her session not filed while the keeper's trust of her folder is refused reads untrusted, and off whatever the refusal", () => {
-    const waiting = nemiaLevel({ level: 'semi-auto', task: 'nemia-1', untrusted: 'the file did not read: fix it' });
+  test("her session not filed while the keeper's trust of her folder is refused reads untrusted, at any level", () => {
+    const waiting = nemiaLevel({ level: 'semi-auto', task: 'nemia-1', rests: false, untrusted: 'the file did not read: fix it' });
     assert.equal(sessionOf(waiting).kind, 'untrusted');
     assert.match(sessionOf(waiting).words, /^Not filed: the keeper could not trust her folder/);
-    assert.equal(sessionOf({ ...waiting, level: 'manual', task: null }).kind, 'off');
+    assert.equal(sessionOf({ ...waiting, level: 'manual', task: null }).kind, 'untrusted');
     assert.equal(
       sessionOf({ ...up, untrusted: 'the file did not read: fix it' }).kind,
       'up',
-      'a phase read is a session filed, whatever the trust',
+      'a session reached is up, whatever the trust',
     );
-  });
-  test('Manual asked of a session still reached reads leaving, and off once nothing reaches it', () => {
-    assert.equal(sessionOf({ ...up, level: 'manual' }).kind, 'leaving');
-    assert.equal(sessionOf({ ...up, level: 'manual', reach: [] }).kind, 'off');
-  });
-  test('REFUSED to read leaving: a factory raised above Manual keeps her session up with the store at Manual; its raise ended, leaving', () => {
-    assert.equal(sessionOf({ ...up, level: 'manual', factories: [raised] }).kind, 'up');
-    const ended: FactoryLevel = { ...raised, level: 'manual', raise: null };
-    assert.equal(sessionOf({ ...up, level: 'manual', factories: [ended] }).kind, 'leaving');
   });
   test('a session stopped from outside reads stopped, even while something still reaches it', () => {
     assert.equal(sessionOf({ ...up, stopped: true }).kind, 'stopped');

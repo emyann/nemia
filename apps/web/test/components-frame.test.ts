@@ -130,9 +130,10 @@ describe('the setup banner is raised by a missing piece a run waits on alone, sa
 
 test("presenceWord: the machine bar says Nemia's session in a word, down first, then answering, then what she asks", async () => {
   const { presenceWord } = await import('../src/components/frame/MachineBar.tsx');
-  const here = { runsWaiting: 0, asksWaiting: 0, notSent: false, down: false, answering: false, unread: 0 };
+  const here = { runsWaiting: 0, asksWaiting: 0, notSent: false, down: false, resting: false, answering: false, unread: 0 };
   assert.equal(presenceWord(here), 'Nemia here');
   assert.equal(presenceWord({ ...here, down: true, answering: true }), 'Nemia down');
+  assert.equal(presenceWord({ ...here, resting: true, asksWaiting: 1 }), 'Nemia resting');
   assert.equal(presenceWord({ ...here, answering: true, asksWaiting: 2 }), 'Nemia answering');
   assert.equal(presenceWord({ ...here, asksWaiting: 2, notSent: true }), 'Nemia asks 2');
   assert.equal(presenceWord({ ...here, notSent: true }), 'Nemia, not sent');

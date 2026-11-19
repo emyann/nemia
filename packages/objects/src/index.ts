@@ -800,3 +800,4 @@ export { STATS_KEYS, STATS_MANUAL, STATS_WORDS, statsRefusal } from './commands-
 export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow } from './stats-read.ts';
 export { RUN_PHASE_OF, runCodesLegal, STEP_PHASE_OF, stepCodesLegal, tryCodesLegal } from './codes.ts';
 export type { RunCodes, StepCodes, TryCodes } from './codes.ts';
+export { refusedIn, type RefusedPlace } from './refused.ts';

@@ -231,3 +231,20 @@ export const AgainFromSettings: Story = {
     await expect(within(page).getByRole('button', { name: 'Skip, set it later' })).toBeEnabled();
   },
 };
+
+/** Opened again from Settings, a new repository: no mode is offered, the store taking no read-only volume, and it is added writable. */
+export const AgainNewWritable: Story = {
+  args: { factory: ACME, again: true },
+  parameters: { msw: volumeStore({ held: true }) },
+  play: async ({ canvasElement, userEvent }) => {
+    const before = sent.length;
+    const page = await loaded(canvasElement, 'choose');
+    await choose(page, 'new', userEvent);
+    await expect(page.querySelector('[data-volume-mode]')).toBeNull();
+    await userEvent.type(within(page).getByRole('textbox', { name: /Name/ }), 'my-app');
+    await userEvent.click(within(page).getByRole('button', { name: 'Make it' }));
+    await loaded(canvasElement, 'trust');
+    await expect(sent.slice(before).map((s) => s.route)).toEqual(['POST /api/repositories', `POST /api/factories/${ACME}/volumes`]);
+    await expect(sent[sent.length - 1]?.body).toEqual({ volume: '/home/you/.agent-workflows/repositories/my-app:rw', noTrust: true });
+  },
+};

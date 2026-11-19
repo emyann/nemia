@@ -35,12 +35,20 @@ export type FolderNamesRead = {
 /** A repository made, or found made: its folder, and whether anything was made now. */
 export type RepositoryMadeRead = { readonly path: string; readonly made: boolean };
 
-/** `at` resolved through its links, or as it is written where it is not there. */
+/**
+ * `at` resolved through its links: where it is not there, its deepest folder that is, resolved, with the rest of the path under it, and a
+ * link that leads nowhere followed to where it would lead, so every link on the path is judged where it leads. A path the disk
+ * cannot follow (a loop of links, a file on the way) is answered as it is written, and the write refuses it.
+ */
 const realOr = (at: string): string => {
+  const whole = path.resolve(at);
   try {
-    return fs.realpathSync(at);
-  } catch {
-    return path.resolve(at);
+    return fs.realpathSync(whole);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') return whole;
+    const up = path.dirname(whole);
+    if (fs.lstatSync(whole, { throwIfNoEntry: false })?.isSymbolicLink()) return realOr(path.resolve(up, fs.readlinkSync(whole)));
+    return up === whole ? whole : path.join(realOr(up), path.basename(whole));
   }
 };
 

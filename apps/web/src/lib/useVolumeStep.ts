@@ -24,7 +24,8 @@ const refusedOf = (error: Error | null): string | undefined => (error === null ?
 
 /**
  * The writes the step makes for the factory `name`, each reading the factory again once it is answered: a volume added in `mode`, then
- * `onAdded` told it; a folder made a repository, or a new one, then added; the factory's places trusted.
+ * `onAdded` told it; a folder made a repository, then added; a new repository made in the store, then added writable, since the store
+ * takes no read-only volume of its own; the factory's places trusted.
  */
 function useVolumeWrites(name: string | undefined, mode: Mode, onAdded: (added: Added) => void) {
   const queryClient = useQueryClient();
@@ -33,16 +34,19 @@ function useVolumeWrites(name: string | undefined, mode: Mode, onAdded: (added: 
     void queryClient.invalidateQueries({ queryKey: ['readiness'] });
   };
   const add = useMutation({
-    mutationFn: async (target: string) => {
+    mutationFn: async ({ target, as = mode }: { target: string; as?: Mode }) => {
       if (name === undefined) throw new Error('No factory is chosen: make a factory first, then give it its work.');
-      const answer = await addVolumeUntrusted(name, `${target}:${mode}`);
+      const answer = await addVolumeUntrusted(name, `${target}:${as}`);
       await readAgain();
       return answer;
     },
     onSuccess: (answer) => onAdded({ path: answer.volume.path, readOnly: answer.volume.readOnly }),
   });
-  const init = useMutation({ mutationFn: (path: string) => makeRepository(path), onSuccess: (made) => add.mutate(made.path) });
-  const made = useMutation({ mutationFn: (repository: string) => newRepository(repository), onSuccess: (r) => add.mutate(r.path) });
+  const init = useMutation({ mutationFn: (path: string) => makeRepository(path), onSuccess: (made) => add.mutate({ target: made.path }) });
+  const made = useMutation({
+    mutationFn: (repository: string) => newRepository(repository),
+    onSuccess: (r) => add.mutate({ target: r.path, as: 'rw' }),
+  });
   const trust = useMutation({
     mutationFn: async () => {
       if (name === undefined) return;
@@ -92,9 +96,9 @@ function bodyOf(chosen: Chosen, set: Setters, { add, init, made, trust }: Return
       set.setFolder(undefined);
       set.setWay(way);
     },
-    add: { onAdd: (target: string) => add.mutate(target), pending: adding, refused: refusedOf(add.error) },
+    add: { onAdd: (target: string) => add.mutate({ target }), pending: adding, refused: refusedOf(add.error) },
     onFolder: (path: string, repository: boolean | undefined) =>
-      repository === false && mode === 'rw' ? set.setFolder({ path, notRepository: 'offered' }) : add.mutate(path),
+      repository === false && mode === 'rw' ? set.setFolder({ path, notRepository: 'offered' }) : add.mutate({ target: path }),
     init: {
       onYes: () => folder !== undefined && init.mutate(folder.path),
       onNo: () => folder !== undefined && set.setFolder({ ...folder, notRepository: 'declined' }),

@@ -128,6 +128,20 @@ describe('the listing makes a repository of a folder under its roots, and a new 
     assert.ok(fs.statSync(path.join(store, 'repositories', 'acme')).isDirectory());
     assert.equal(invalid(bad), true);
   });
+  test('REFUSED: a folder not there yet, under a link out of the root, a dead link, or a link into the store, is made no repository', async () => {
+    const { root, store, given } = planted();
+    const elsewhere = fs.realpathSync(scratch('wf-folders-elsewhere-'));
+    fs.symlinkSync(elsewhere, path.join(root, 'out'));
+    fs.symlinkSync(path.join(elsewhere, 'gone'), path.join(root, 'dead'));
+    fs.symlinkSync(store, path.join(root, 'kept'));
+    const results = [
+      await given(repositoryMade(path.join(root, 'out', 'new'))),
+      await given(repositoryMade(path.join(root, 'dead', 'new'))),
+      await given(repositoryMade(path.join(root, 'kept', 'new'))),
+    ];
+    assert.deepEqual(results.map(invalid), [true, true, true]);
+    assert.deepEqual([fs.readdirSync(elsewhere), fs.existsSync(path.join(store, 'new'))], [[], false]);
+  });
   test('REFUSED: a folder under no root is made no repository', async () => {
     const { given } = planted();
     const elsewhere = scratch('wf-folders-elsewhere-');

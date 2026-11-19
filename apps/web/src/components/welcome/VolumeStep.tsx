@@ -119,7 +119,7 @@ function StepBody(props: BodyProps) {
   return (
     <>
       <VolumeWays value={way} onChange={onWay} />
-      {again && screen !== 'choose' && <ModeChoice mode={mode} onMode={onMode} />}
+      {again && screen !== 'choose' && screen !== 'new' && <ModeChoice mode={mode} onMode={onMode} />}
       {screen === 'folder' && (
         <section data-volume-panel="folder">
           <FolderPick onUse={props.onFolder} pending={add.pending} refused={add.refused} />
@@ -139,7 +139,10 @@ function StepBody(props: BodyProps) {
   );
 }
 
-/** The mode a volume is given in, opened again from Settings where the factory holds its work: read-only first. */
+/**
+ * The mode a volume is given in, opened again from Settings where the factory holds its work: read-only first. A new repository is offered
+ * none: it is made in the store, which takes no read-only volume, so it is added writable.
+ */
 function ModeChoice({ mode, onMode }: { mode: Mode; onMode: (mode: Mode) => void }) {
   return (
     <RadioTileGroup label="How is it given?" layout="column" value={mode} onChange={(chosen) => onMode(chosen === 'rw' ? 'rw' : 'ro')}>

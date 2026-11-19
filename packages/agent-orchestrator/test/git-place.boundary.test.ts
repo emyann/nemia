@@ -3,7 +3,7 @@
  * git, in scratch repositories. It gives the answers the test place is held to, which `place-contract.test.ts` runs the same walks on.
  */
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'vitest';
@@ -55,4 +55,23 @@ test('root: a repository whose git folder is kept apart answers its checkout, ne
       bare: { answer: { root: at('bare.git') } },
     },
   );
+});
+
+test('REFUSED init: with no identity git will use, the folder is made a repository with no commit, and the refusal names git config', () => {
+  const area = fs.realpathSync(scratch('wf-init-no-identity-'));
+  const config = path.join(area, 'gitconfig');
+  fs.writeFileSync(config, '[user]\n\tuseConfigOnly = true\n');
+  const env: NodeJS.ProcessEnv = {
+    ...Object.fromEntries(Object.entries(GIT_ENV).filter(([key]) => !/^GIT_(AUTHOR|COMMITTER)_/.test(key))),
+    GIT_CONFIG_GLOBAL: config,
+    HOME: area,
+  };
+  const dir = path.join(area, 'work');
+  const outcome = gitPlace({ env }).askNow('init', { dir });
+  const head = spawnSync('git', ['rev-parse', '--verify', '--quiet', 'HEAD'], { cwd: dir, env: GIT_ENV, encoding: 'utf8' });
+  assert.deepEqual(
+    { refused: 'refused' in outcome, repository: fs.existsSync(path.join(dir, '.git')), commit: head.status === 0 },
+    { refused: true, repository: true, commit: false },
+  );
+  assert.match('refused' in outcome ? outcome.refused : '', /git config --global user\.email/);
 });

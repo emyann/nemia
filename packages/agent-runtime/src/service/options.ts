@@ -2,7 +2,7 @@
  * What `Engine.layer` is built from and what it answers with: the harnesses it names, its options, the task it files and the
  * reports it gives — and what the engine refuses of its options before it builds anything.
  */
-import { Layer } from 'effect';
+import { Layer, Predicate } from 'effect';
 import { own, type Event } from '../core/index.ts';
 import type { HarnessArgs, RunnerOps } from '../harness/index.ts';
 import { Admission, type IoCounts, type ObserveCount, type RefusedMove, type StoreOps, type TaskView } from '../core/engine/index.ts';
@@ -441,8 +441,6 @@ const ceilingRefusalOf = (maxConcurrent: unknown): string | undefined =>
     ? undefined
     : `\`maxConcurrent: ${typeof maxConcurrent === 'number' ? maxConcurrent : JSON.stringify(maxConcurrent)}\` is not a ceiling. Give the sessions each pool may have at work at once, a whole number from 1, or leave it out for none.`;
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-
 /** The name a systemd slice takes: a unit name, its parts joined by `-`, ending `.slice`. */
 const SLICE = /^[A-Za-z0-9:_.\\-]+\.slice$/;
 
@@ -452,8 +450,8 @@ const SLICE = /^[A-Za-z0-9:_.\\-]+\.slice$/;
  */
 const memoryOptionRefusalOf = (name: string, given: unknown, what: string): string | undefined => {
   if (given === undefined) return undefined;
-  const memory = isRecord(given) ? given.memory : undefined;
-  if (!isRecord(given) || typeof memory !== 'string' || Object.keys(given).some((k) => k !== 'memory'))
+  const memory = Predicate.isObject(given) ? given.memory : undefined;
+  if (!Predicate.isObject(given) || typeof memory !== 'string' || Object.keys(given).some((k) => k !== 'memory'))
     return `\`${name}: ${JSON.stringify(given) ?? typeof given}\` is not ${what}. Give \`{ memory: '8Gi' }\`, or leave it out.`;
   const words = memoryQuantityRefusal(memory);
   return words ? `\`${name}.memory\`: ${words}` : undefined;

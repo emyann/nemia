@@ -22,7 +22,7 @@
  * pending, a client that gave a progress token is told progress at once, so its answer streams from its start, and then every 30 s
  * (`PROGRESS_EVERY_MS`), so a host that ends a silent call (`nemia wait`, up to four minutes and a half) hears it is alive.
  */
-import { Effect, Schedule } from 'effect';
+import { Effect, Predicate, Schedule } from 'effect';
 import type { Context } from 'hono';
 import {
   type CallToolResult,
@@ -65,10 +65,6 @@ const SERVER_INFO = { name: 'nemia', version: '1' };
 
 /** A value of a call's arguments as a path segment or a query value says it: a string as it is, anything else as its JSON. */
 const asText = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value));
-
-/** Whether `value` is a record, as a JSON body or a call's arguments are. */
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** A tool's error: `text`, which says what to do next, and the body it was read off where there is one. */
 const failed = (text: string, body?: Readonly<Record<string, unknown>>): CallToolResult => ({
@@ -129,7 +125,7 @@ export function argsSent(tool: PortTool, args: Readonly<Record<string, unknown>>
 
 /** Whether `json` is a `Table`, as a list asked with `TABLE_ACCEPT` answers one. */
 const isTable = (json: unknown): json is Table =>
-  isRecord(json) && json.kind === 'Table' && Array.isArray(json.rows) && Array.isArray(json.columnDefinitions);
+  Predicate.isObject(json) && json.kind === 'Table' && Array.isArray(json.rows) && Array.isArray(json.columnDefinitions);
 
 /**
  * The text a `Table` is answered as: its lines as `nemia <verb> -o wide` prints them, then the token of the next page where there is one;
@@ -194,13 +190,13 @@ async function answerOf(
   const json = jsonOf(text);
   if (res.ok) {
     if (tool.table && isTable(json)) return { content: [{ type: 'text', text: tableText(tool, json, args) }] };
-    const structured = Array.isArray(json) ? { items: json } : isRecord(json) ? json : undefined;
+    const structured = Array.isArray(json) ? { items: json } : Predicate.isObject(json) ? json : undefined;
     return { content: [{ type: 'text', text }], ...(structured === undefined ? {} : { structuredContent: structured }) };
   }
-  const said = isRecord(json) && typeof json.error === 'string' ? json.error : undefined;
+  const said = Predicate.isObject(json) && typeof json.error === 'string' ? json.error : undefined;
   return failed(
     said ?? `${tool.method} ${tool.path} answered ${res.status}${text === '' ? '' : `: ${text}`}`,
-    isRecord(json) ? json : undefined,
+    Predicate.isObject(json) ? json : undefined,
   );
 }
 
@@ -341,9 +337,9 @@ export function portServer(
 
 /** The URIs a `subscriptions/listen` request asks `notifications/resources/updated` of, or none where `body` is no such request. */
 const subscribedIn = (body: unknown): { readonly id: unknown; readonly uris: readonly string[] } | undefined => {
-  if (!isRecord(body) || body.method !== 'subscriptions/listen' || !isRecord(body.params)) return undefined;
+  if (!Predicate.isObject(body) || body.method !== 'subscriptions/listen' || !Predicate.isObject(body.params)) return undefined;
   const filter = body.params.notifications;
-  if (!isRecord(filter) || !Array.isArray(filter.resourceSubscriptions)) return undefined;
+  if (!Predicate.isObject(filter) || !Array.isArray(filter.resourceSubscriptions)) return undefined;
   const uris = filter.resourceSubscriptions.filter((uri): uri is string => typeof uri === 'string');
   return uris.length === 0 ? undefined : { id: body.id, uris: [...new Set(uris)] };
 };

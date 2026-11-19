@@ -7,6 +7,7 @@
 import { lackedOf, tryOf, type CloseoutAsked, type Run, type StepRecord } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { Actor, RetryMode, TryCause } from 'objects';
+import { isObjectOrArray } from 'effect/Predicate';
 
 /**
  * How a person asks for another try of a step, with `nemia retry`.
@@ -58,7 +59,9 @@ export type { TryCause };
  * @param read An ask file's JSON, as parsed.
  */
 export const upgradeAsk = (read: unknown): unknown =>
-  isObject(read) && !Array.isArray(read) && Object.hasOwn(read, 'mode') ? { ...read, mode: upgradeMode(Reflect.get(read, 'mode')) } : read;
+  isObjectOrArray(read) && !Array.isArray(read) && Object.hasOwn(read, 'mode')
+    ? { ...read, mode: upgradeMode(Reflect.get(read, 'mode')) }
+    : read;
 
 /**
  * Every `RetryMode`, as the record's schema reads an ask file's: `objects`' list word for word, held equal by `wordsHeld`
@@ -88,23 +91,21 @@ export const TRY_CAUSES = [
  * @param raw A run record's JSON, as parsed.
  */
 export const upgradeTries = (raw: unknown): unknown => {
-  const steps: unknown = isObject(raw) ? Reflect.get(raw, 'steps') : undefined;
-  if (!isObject(steps) || Array.isArray(steps)) return raw;
+  const steps: unknown = isObjectOrArray(raw) ? Reflect.get(raw, 'steps') : undefined;
+  if (!isObjectOrArray(steps) || Array.isArray(steps)) return raw;
   const upgraded = Object.entries(steps).map(([name, step]) => {
-    const tries: unknown = isObject(step) ? Reflect.get(step, 'tries') : undefined;
+    const tries: unknown = isObjectOrArray(step) ? Reflect.get(step, 'tries') : undefined;
     return [name, Array.isArray(tries) ? { ...(step as object), tries: tries.map(upgradeTry) } : step];
   });
   return { ...(raw as object), steps: Object.fromEntries(upgraded) };
 };
-
-const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null;
 
 /**
  * One try under `cause`, in the word it has now: its former `then` moved there, where it holds no `cause` of its own, and dropped; a
  * former mode (`upgradeMode`) said as the mode it is.
  */
 const upgradeTry = (t: unknown): unknown => {
-  if (!isObject(t)) return t;
+  if (!isObjectOrArray(t)) return t;
   const { then, ...rest } = t as { then?: unknown; cause?: unknown };
   const cause = Object.hasOwn(rest, 'cause') ? rest.cause : then;
   if (!Object.hasOwn(t, 'then') && upgradeMode(cause) === cause) return t;

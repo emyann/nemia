@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { Context, Effect, Layer } from 'effect';
+import { Context, Effect, Layer, Predicate } from 'effect';
 import { MCP_TRANSPORTS as HARNESS_TRANSPORTS, transportOf, type McpTransport as HarnessTransport, type Running } from 'agent-orchestrator';
 import { CLAUDE_RULES, WorkflowError, readFrontmatter, splitFrontmatter } from 'agent-orchestrator/workflow';
 import type { FrontmatterEntry } from 'agent-orchestrator/workflow';
@@ -261,8 +261,6 @@ export function describedAt(repo: string, source: string, fallback: string, warn
 
 type Json = Record<string, unknown>;
 
-const isObject = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value);
-
 /**
  * A JSON object from a file in the checkout. Null when the file is absent; null and a warning saying what is left out when it does not
  * read.
@@ -277,7 +275,7 @@ function jsonAt(repo: string, file: string, warnings: string[], leftOut: string)
   }
   try {
     const value: unknown = JSON.parse(text);
-    if (isObject(value)) return value;
+    if (Predicate.isObject(value)) return value;
     warnings.push(`${file} is not a JSON object, so ${leftOut}. Make it one: \`{ … }\`.`);
   } catch (err) {
     warnings.push(
@@ -290,7 +288,7 @@ function jsonAt(repo: string, file: string, warnings: string[], leftOut: string)
 /** The list of strings at `keys` in `settings`. Absent is empty; anything but a list of strings is empty and a warning. */
 function stringsAt(settings: Json | null, keys: string[], warnings: string[]): string[] {
   let value: unknown = settings;
-  for (const key of keys) value = isObject(value) ? value[key] : undefined;
+  for (const key of keys) value = Predicate.isObject(value) ? value[key] : undefined;
   if (value === undefined) return [];
   if (Array.isArray(value) && value.every((item) => typeof item === 'string')) return value;
   warnings.push(`${keys.join('.')} in ${SETTINGS} is not a list of strings, so it is read as empty. Make it one: \`["…"]\`.`);
@@ -326,7 +324,7 @@ const transportWritten = (written: unknown, command: string | null): Pick<Declar
 
 function declaredServers(mcpJson: Json | null, warnings: string[]): Declared[] {
   if (!mcpJson) return [];
-  if (!isObject(mcpJson.mcpServers)) {
+  if (!Predicate.isObject(mcpJson.mcpServers)) {
     warnings.push(
       `${MCP_JSON} has no \`mcpServers\` object, so no MCP server is listed from it. Declare them as \`{ "mcpServers": { "<name>": { "command": "…" } } }\`.`,
     );
@@ -334,13 +332,13 @@ function declaredServers(mcpJson: Json | null, warnings: string[]): Declared[] {
   }
   return Object.entries(mcpJson.mcpServers).map(([name, spec]): Declared => {
     const bare: Declared = { name, type: 'stdio', written: null, command: null, args: [], env: {}, url: null, invalid: null };
-    if (!isObject(spec))
+    if (!Predicate.isObject(spec))
       return { ...bare, invalid: `${MCP_JSON} declares ${name} as something other than an object, so it is not started.` };
     const command = typeof spec.command === 'string' && spec.command ? spec.command : null;
     const url = typeof spec.url === 'string' && spec.url ? spec.url : null;
     const args = Array.isArray(spec.args) && spec.args.every((arg) => typeof arg === 'string') ? spec.args : null;
     const env =
-      isObject(spec.env) && Object.values(spec.env).every((value) => typeof value === 'string')
+      Predicate.isObject(spec.env) && Object.values(spec.env).every((value) => typeof value === 'string')
         ? (spec.env as Record<string, string>)
         : null;
     const declared = {

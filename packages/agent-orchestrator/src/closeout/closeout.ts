@@ -6,9 +6,10 @@
  * `advance.verb.ts` files each step with `closeoutSchemaOf`, and the controllers read the engine's record with `parseCloseout`; nothing
  * here reads a disk or calls the engine.
  */
-import { isObject, JUDGE_ROUTE, LOOP_REPLIES, outputFields, type StepSpec } from '../step/step.ts';
+import { JUDGE_ROUTE, LOOP_REPLIES, outputFields, type StepSpec } from '../step/step.ts';
 import { digestOf } from '../revisions/revisions.ts';
 import type { Outcome } from 'objects';
+import { isObject } from 'effect/Predicate';
 import {
   artifactsOf,
   bodyOf,

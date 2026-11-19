@@ -2,7 +2,7 @@
  * Filing a task and what comes after it from a person: admitting it, stopping it, answering it and closing it, each with
  * what it refuses. Each journals a fact and returns; the pass (`engine.ts`) acts on it.
  */
-import { Effect, Schema } from 'effect';
+import { Effect, Predicate, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { awaitsAdmission, fold, verbTakes, type Input, type State, type TaskResources } from '../domain.ts';
@@ -91,8 +91,6 @@ const priorityRefusalOf = (priority: unknown): string | undefined =>
 /** A value as a refusal shows it: a number as written, anything else as JSON. */
 const shownValue = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringify(v));
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-
 /**
  * Why a task's `resources.<part>` (`limits` or `requests`) cannot be held, or `undefined`: anything but an object of `memory` alone,
  * and a `memory` that is no quantity `memoryBytesOf` reads (`memoryQuantityRefusal`'s words).
@@ -100,7 +98,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 const memoryPartRefusalOf = (part: 'limits' | 'requests', given: unknown): string | undefined => {
   if (given === undefined) return undefined;
   const noun = part === 'limits' ? 'limit' : 'request';
-  if (!isObject(given))
+  if (!Predicate.isObject(given))
     return `\`resources.${part}: ${shownValue(given)}\` is not a set of ${part}. Give \`{ memory: '8Gi' }\`, or leave it out.`;
   const unheld = Object.keys(given).find((k) => k !== 'memory');
   if (unheld !== undefined)
@@ -121,7 +119,7 @@ const memoryPartRefusalOf = (part: 'limits' | 'requests', given: unknown): strin
  */
 const resourcesRefusalOf = (resources: unknown): string | undefined => {
   if (resources === undefined) return undefined;
-  if (!isObject(resources))
+  if (!Predicate.isObject(resources))
     return `\`resources: ${shownValue(resources)}\` is not a container's resources. Give \`{ limits: { memory: '8Gi' } }\`, or leave it out.`;
   const other = Object.keys(resources).find((k) => k !== 'limits' && k !== 'requests');
   if (other !== undefined)

@@ -2,15 +2,14 @@ import type { Outcome as SignedOff } from 'objects';
 import type { StepTry } from './api/tries.ts';
 import type { AttemptEnd } from './api/tries.ts';
 import type { Frozen } from './frozen.ts';
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+import { isObject } from 'effect/Predicate';
 
 /**
  * A field's `description` in its schema, when it has one: what a yes or a no means.
  * @param schema The field's schema, of any shape.
  */
 export const descriptionOf = (schema: unknown): string | null =>
-  isRecord(schema) && typeof schema.description === 'string' ? schema.description : null;
+  isObject(schema) && typeof schema.description === 'string' ? schema.description : null;
 
 /**
  * Who said how a try ended, and what: the agent, in its statement, or in one that could not be read; the machine, in the reason its

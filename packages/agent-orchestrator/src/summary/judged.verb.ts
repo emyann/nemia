@@ -12,7 +12,7 @@ import { answerIn, onYouWords } from '../list/list.ts';
 import { listReading } from '../list/list.verb.ts';
 import { type BranchReader, branchStandings, landedOf } from '../branches/branches.store.ts';
 import { askedOf, branchesAsked, resultSteps } from '../branches/index.ts';
-import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spentWord } from '../status/status.ts';
+import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spendKnown, spentWord } from '../status/status.ts';
 import { closeoutOf, deniedOf, unreadOf } from '../views/views.verb.ts';
 import { wordOfView, type EnginePhase } from '../views/views-words.ts';
 import { holdAdvice, holdNeedsYou, holdWord, type ParentRun, type Wait, waitAdvice, waitWord } from '../wait/wait.ts';
@@ -86,18 +86,27 @@ function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly StepSpec[
  * What sessions cost, as the package adds it up off the engine's `usage.costUsd` (`Spend`: `stepSpend`, `runSpend`): the dollars of the
  * attempts that ended with a cost on them, how many did (`measured`), and how many ended with none (`unmeasured`) — a session's cost is
  * known only once it ends, a job's with its result, and one killed first, or on a
- * model its harness could not price, has none. An attempt still running is in neither. `said` is the package's word for it (`spentWord`):
- * `$4.20`, and `≥$4.20` where an ended attempt has no cost on it, so a part never reads as the whole. Null wherever no attempt was
- * measured: a cost nobody measured is not $0.
+ * model its harness could not price, has none. An attempt still running is in neither: what it has spent so far, as its harness last
+ * said it, is `live` (its dollars and when it said them), absent where none at work said one. `said` is the package's word for it
+ * (`spentWord`): `$4.20`, `≥$4.20` where an ended attempt has no cost on it, so a part never reads as the whole, and `$32.32 so far` with
+ * the live figure added in. Null wherever no attempt was measured and none at work said a figure: a cost nobody measured is not $0.
  */
-export type Spent = { usd: number; measured: number; unmeasured: number; said: string };
+export type Spent = { usd: number; measured: number; unmeasured: number; live?: { usd: number; at: string }; said: string };
 
 /**
  * A spend as the board is given it (`Spent`), or null when nothing of it was measured.
  * @param spend The spend as it was measured.
  */
 export const spentOf = (spend: Spend): Spent | null =>
-  spend.measured ? { usd: spend.usd, measured: spend.measured, unmeasured: spend.unmeasured, said: spentWord(spend) } : null;
+  spendKnown(spend)
+    ? {
+        usd: spend.usd,
+        measured: spend.measured,
+        unmeasured: spend.unmeasured,
+        ...(spend.live ? { live: spend.live } : {}),
+        said: spentWord(spend),
+      }
+    : null;
 
 /**
  * What a run started `--after` still waits on, as `nemia ls` and `nemia decide` say it — never worded here.

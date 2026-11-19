@@ -5,7 +5,7 @@ import { expect, userEvent, within } from 'storybook/test';
 import type { PartSize } from '@/lib/stepPart';
 import type { RunDetail } from '@/lib/runView';
 import { StepPart } from './StepPart';
-import { CODES, NOW, PLAN, measured, runOf, stepOf, toldInLayers, tryOf } from '../../../../.storybook/fixtures/steps';
+import { CODES, NOW, PLAN, measured, runOf, spendingSoFar, stepOf, toldInLayers, tryOf } from '../../../../.storybook/fixtures/steps';
 import { skippedHeadings } from '../../../../.storybook/play';
 
 /**
@@ -21,6 +21,7 @@ const client = new QueryClient({ defaultOptions: { queries: { enabled: false, re
 const RUNS = {
   toCome: runOf(stepOf(CODES.come, [])),
   atWork: runOf(stepOf(CODES.work, [tryOf(1, CODES.work, false, null)])),
+  spendingSoFar: runOf(spendingSoFar(stepOf(CODES.work, [tryOf(1, CODES.refused, true, PLAN, false), tryOf(2, CODES.work, false, null)]))),
   waitsOnYou: runOf(measured(stepOf(CODES.gate, [tryOf(1, CODES.gate, true, PLAN)], true))),
   done: runOf(measured(stepOf(CODES.done, [tryOf(1, CODES.done, true, PLAN)]))),
   told: runOf(toldInLayers(stepOf(CODES.work, [tryOf(1, CODES.work, false, null)]))),
@@ -83,6 +84,20 @@ export const AtWork: StoryObj = {
   play: async ({ canvasElement }) => {
     const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
     await expect(card.textContent).toMatch(/not measured yet/);
+  },
+};
+
+/**
+ * A step at work whose session said what it has spent so far, with no budget: the earlier try's cost and the live one, so far, in
+ * words where it used to say not measured yet. Drawn from its args, the run.
+ */
+export const AtWorkSpending: StoryObj<{ run: RunDetail }> = {
+  args: { run: RUNS.spendingSoFar },
+  render: ({ run }) => <Sizes run={run} />,
+  play: async ({ canvasElement }) => {
+    const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
+    await expect(card.querySelector('[data-step-spend="words"]')?.textContent).toMatch(/^Spent\s*\$32\.32 so far/);
+    await expect(card.textContent).not.toMatch(/not measured yet/);
   },
 };
 

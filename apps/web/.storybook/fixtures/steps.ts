@@ -234,6 +234,13 @@ export const measured = (step: StepView): StepView => ({
   budget: { usd: 5, said: '$5', of: '$1.25 of $5', over: false },
 });
 
+/** `step` at work, with no budget, whose session has said what it spent so far, a try before it measured: $32.32 so far. */
+export const spendingSoFar = (step: StepView): StepView => ({
+  ...step,
+  spent: { usd: 16.06, measured: 1, unmeasured: 0, live: { usd: 16.26, at: NOW.toISOString() }, said: '$32.32 so far' },
+  budget: null,
+});
+
 /**
  * `step` told in layers whose words write their headings at every depth a step's file does — a `##`, a `###` straight under the layer,
  * a `#` — and its task in parts, a run it waited on among them: what `Told` draws on its detail, opened.

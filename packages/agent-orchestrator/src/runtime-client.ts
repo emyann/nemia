@@ -127,9 +127,10 @@ export { configRefusal } from 'agent-runtime';
 export { trustedFolder } from 'agent-runtime';
 /**
  * A harness's trust of a folder a factory names, in the runtime's words: read as it is now (`folderTrust`), and given (`trustFolder`),
- * under the repository the place answered for the folder; each `undefined` for a harness that keeps no trust.
+ * under the repository the place answered for the folder; and taken back from a run's home and every folder inside it as the run is
+ * removed (`untrustFolder`); each `undefined` for a harness that keeps no trust.
  */
-export { folderTrust, trustFolder, type FolderTrust, type FolderTrusted } from 'agent-runtime';
+export { folderTrust, trustFolder, untrustFolder, type FolderTrust, type FolderTrusted, type FolderUntrusted } from 'agent-runtime';
 /** Where each harness keeps its user's own agent files, listed as the sources' `harness` place. */
 export { userAgentFolders } from 'agent-runtime';
 /**

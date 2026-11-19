@@ -95,3 +95,51 @@ export const untrustedNote = (trust: TrustRead | undefined, factory?: string): s
       `so the rules counted above may not reach the session at all. ${
         factory === undefined ? `Run ${trust.harness} in ${trust.folder} once and accept its prompt` : trustCommandOf(factory)
       } gives it.`;
+
+/**
+ * A harness's trust of one folder that a write left not given: the harness by name, the folder, its file, why it is never kept, and
+ * why the write did not take it.
+ */
+export type TrustNotGiven = { harness: string; folder: string; file: string; never: string | null; refused: string | null };
+
+/**
+ * The runtime's words `refused` without the hand step they end on (running the harness in the folder once, at its prompt), which
+ * Nemia takes in the person's place: cut with the `: ` or `, or ` before it. Pure.
+ * @param refused The runtime's words of why the trust was not written.
+ * @param not The harness and the folder the words name.
+ */
+export const withoutHandStep = (refused: string, not: Pick<TrustNotGiven, 'harness' | 'folder'>): string => {
+  const at = refused.lastIndexOf(`run ${not.harness} in ${not.folder} once `);
+  if (at < 0) return refused;
+  const head = refused.slice(0, at);
+  const cut = [': ', ', or '].find((one) => head.endsWith(one));
+  return cut === undefined ? refused : head.slice(0, -cut.length);
+};
+
+/**
+ * Why a run's home, the copy of its factory's home its sessions start in, could not be trusted by its harness, and what a person does
+ * so it can: a folder the harness never keeps a trust of (`never`), a write that threw (`threw`, its words), or a file of the harness's
+ * that did not take the trust, with the runtime's reason (`refused`). Offers no command to run the harness by hand, since Nemia gives
+ * the trust itself once the file can take it. Pure.
+ * @param not The trust as it reads after the write.
+ * @param threw The words of the error the write threw, or undefined where it answered.
+ */
+export function homeTrustRefused(not: TrustNotGiven, threw?: string): string {
+  const head = `${not.harness} could not trust the run's home ${not.folder}, so the allow rules of its settings would be dropped`;
+  if (threw !== undefined)
+    return `${head}: ${not.file} could not be written (${threw}). Make that file readable and writable by the user the store runs as`;
+  if (not.never !== null)
+    return `${head}: ${not.never}, so nothing was written in ${not.file}. Run the store (WF_ROOT) outside the home directory`;
+  const why = not.refused === null ? `${not.file} was left as it is` : withoutHandStep(not.refused, not);
+  return `${head}: ${why}. Make ${not.file} read as a JSON object again, or move it aside, and make it readable and writable by the user the store runs as`;
+}
+
+/**
+ * Why the records a harness keeps of a run's home were left in its file when the run was removed, and what a person does about them.
+ * Pure.
+ * @param harness The harness by name.
+ * @param folder The run's homes folder, every record at or under which was to go.
+ * @param why The runtime's words of why they stayed, or the words of what the removal threw.
+ */
+export const homeUntrustRefused = (harness: string, folder: string, why: string): string =>
+  `${harness} still keeps its records of the run's home ${folder}: ${why}`;

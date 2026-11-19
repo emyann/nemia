@@ -9,6 +9,7 @@
  * `memory.verb.ts`.
  */
 import path from 'node:path';
+import { type TrustNotGiven, withoutHandStep } from '../trust/trust.ts';
 import { DEMAND_OFF } from '../demand/demand.ts';
 import { FACTORY_LEVEL_FORM, LEVELS, type Level } from '../level/level.ts';
 
@@ -170,26 +171,8 @@ export const quietOf: QuietOf = (read) => {
   return { marked, quiet: marked && read.idleSince !== null && read.now - read.idleSince >= read.restAfterMs };
 };
 
-/**
- * What the keeper reads of a trust its write left not given: the harness, the folder, the harness's file, why it is never kept, and why
- * the write did not take it (`refused`, the runtime's words, null where none were said).
- */
-export type TrustNotGiven = { harness: string; folder: string; file: string; never: string | null; refused: string | null };
-
 /** What the keeper says once its next beat may give the trust. */
 const NEXT_BEAT = 'the keeper gives the trust at its next beat, and files her session';
-
-/**
- * The runtime's words `refused` without the hand step they end on (running the harness in her folder once, at its prompt), which the
- * keeper takes in the person's place: cut with the `: ` or `, or ` before it. Pure.
- */
-const withoutHandStep = (refused: string, not: TrustNotGiven): string => {
-  const at = refused.lastIndexOf(`run ${not.harness} in ${not.folder} once `);
-  if (at < 0) return refused;
-  const head = refused.slice(0, at);
-  const cut = [': ', ', or '].find((one) => head.endsWith(one));
-  return cut === undefined ? refused : head.slice(0, -cut.length);
-};
 
 /**
  * Why the keeper's write of her harness's trust left her folder not trusted, and what a person does so the next beat gives it, in words

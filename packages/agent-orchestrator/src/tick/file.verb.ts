@@ -65,6 +65,7 @@ import { keysOf } from '../stats/index.ts';
 import type { WorkflowCosts } from '../costs/index.ts';
 import { costsRead } from '../costs/costs.verb.ts';
 import { serversFiling, unsignedStep } from '../factory/servers/servers.verb.ts';
+import { trustRunHome } from '../trust/home.verb.ts';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
@@ -142,6 +143,16 @@ const asRead = (f: Filing): Engine => reportedEngine(f.e, [...f.reads.views.valu
 /** Close the task held open a filing replaces, where it waits for a word (`Closer`): the engine's refusal as a note, or undefined. */
 const closeFirst = (f: Filing, name: string, taskId: string | null | undefined): Effect.Effect<string | undefined> =>
   taskId && f.closer.awaitsWord(taskId) ? f.closer.closeWaiting(name, taskId) : Effect.succeed(undefined);
+
+/**
+ * Whether `step`'s session would start in a run's home its harness does not trust, and cannot be made to (`trustRunHome`): the step is
+ * left unfiled on this pass, with a note that names the fix, and the next pass asks again.
+ */
+const homeUntrusted = (f: Filing, step: StepSpec): boolean => {
+  const why = trustRunHome(f.home, f.run, [step]);
+  if (why !== undefined) f.notes.push(`${step.name}: not filed — ${why}; the next pass asks again`);
+  return why !== undefined;
+};
 
 /**
  * A run's worktree brought to its lockfile before step `name` files a try, a round or a check in it (`keepWorktreeInstalled`), within
@@ -247,6 +258,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   const landing = placeTold(run, f.reads.steps, step, yield* PlaceService, f.heads?.());
   const held = heldAnswered(f, r, step, record);
   const answers = held !== undefined;
+  if (!answers && homeUntrusted(f, step)) return;
   const closeRefused = answers ? undefined : yield* closeFirst(f, r.step, record.taskId);
   if (closeRefused) {
     notes.push(closeRefused);
@@ -399,6 +411,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   const landing = placeTold(run, f.reads.steps, target, yield* PlaceService, f.heads?.());
   const record = recordNamed(run, r.target);
   const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
+  if (homeUntrusted(f, target)) return;
   const refused = yield* closeFirst(f, r.target, record.taskId);
   if (refused) {
     notes.push(refused);
@@ -604,7 +617,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
   for (const name of ready.filter((n) => !scripts.includes(n))) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
-    if (unsignedStep(servers, step, f.notes)) continue;
+    if (unsignedStep(servers, step, f.notes) || homeUntrusted(f, step)) continue;
     const landing = placeTold(run, f.reads.steps, step, placed, f.heads?.());
     const made = yield* withinEffect('act', workspaceFor(home, run, f.reads.steps, step, placed));
     f.notes.push(...cutNotes(name, made));

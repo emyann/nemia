@@ -212,9 +212,18 @@ export { REMOTE_DECLARATION } from './a2a/vocabulary.ts';
 export { ADDED_FOLDER_READS, addedFolderReadsOf, CONFIG_FOLDERS, configFolderIn, type AddedFolderReads } from './harness/config-folders.ts';
 /**
  * A harness's trust of a folder, off its own file: whether it is given (`trustedFolder`), what it is in a person's words
- * (`folderTrust`), and the act of giving it (`trustFolder`); each `undefined` for a harness that keeps none.
+ * (`folderTrust`), the act of giving it (`trustFolder`), and of taking it back from a folder its caller made and every folder inside it
+ * (`untrustFolder`); each `undefined` for a harness that keeps none.
  */
-export { folderTrust, trustFolder, trustedFolder, type FolderTrust, type FolderTrusted } from './harness/trust.ts';
+export {
+  folderTrust,
+  trustFolder,
+  trustedFolder,
+  untrustFolder,
+  type FolderTrust,
+  type FolderTrusted,
+  type FolderUntrusted,
+} from './harness/trust.ts';
 /** Where each harness keeps its user's own agent files, which the store lists to copy into its library. */
 export { userAgentFolders, type UserAgentFolder } from './harness/user-agents.ts';
 /**

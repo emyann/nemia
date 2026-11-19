@@ -53,6 +53,7 @@ import {
   type FactoryInstructionWrite,
   FactoryList,
   FactoryRules,
+  FactoryTrusted,
   VolumeAdded,
   VolumeRemoved,
   type VolumeWrite,
@@ -586,6 +587,9 @@ export const factories = {
   /** `volume` given to the factory `name`: a path or a git URL, marked `:ro` or `:rw`, a writable one a repository it works on. */
   addVolume: (name: string, volume: VolumeWrite): Promise<VolumeAdded> =>
     call((c) => c.factories.addVolume({ params: { factory: name }, payload: volume }), write(VolumeAdded, SETTINGS_WRITTEN)),
+  /** The places of the factory `name` trusted, asking each harness that keeps a trust: what was asked for each place. */
+  trust: (name: string): Promise<FactoryTrusted> =>
+    call((c) => c.factories.trust({ params: { name } }), write(FactoryTrusted, SETTINGS_WRITTEN)),
   /** The volume of the factory `name` at `path` taken off, as it was given. */
   removeVolume: (name: string, path: string): Promise<VolumeRemoved> =>
     call((c) => c.factories.removeVolume({ params: { factory: name }, query: { path } }), write(VolumeRemoved, SETTINGS_WRITTEN)),

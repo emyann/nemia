@@ -596,6 +596,7 @@ export {
   type UpgradeStreamEventName,
 } from './words.ts';
 export { PreviousRelease, Upgrade, UpgradeStart, UpgradeStreamEvent, UpgradesGroup, UpgradesRead } from './upgrade.ts';
+export { FolderNames, FoldersGroup, RepositoryMade, RepositoryMake, RepositoryNew } from './folders.ts';
 export { Fix, FixStart, FixStreamEvent, Readiness, ReadinessFix, ReadinessGroup, ReadinessPiece } from './readiness.ts';
 export { HarnessCheck, HarnessTurn, MilestoneRead, Milestones, TurnStart, missingSaid, readinessSaid, runsWait } from './readiness.ts';
 export { HARNESS_CHECKS, HARNESS_CHECK_STATES, MILESTONES, MILESTONE_STATES, TURN_FAILURES } from './words.ts';

@@ -182,6 +182,12 @@ const RunFileSchema = Schema.StructWithRest(
      * `Sighting.ranIn` where its output says none. Absent where the command gave none, and from a run file spawned before it was written.
      */
     ranIn: Schema.optional(Schema.String),
+    /**
+     * The spend cap its request asked for (`config.budgetUsd`), in dollars, written by the spawn: what tells a run whose harness says
+     * what it has spent so far (`HarnessSpec.transcript.spent`) from one whose harness says none. Absent where it asked none, and
+     * from a run file spawned before it was written, whose record is never read for a spend so far.
+     */
+    capUsd: Schema.optional(Schema.Finite),
     /** For a spec with `input`: what the worker writes on the harness's stdin (`RunInput`). Absent, the run takes no words. */
     input: Schema.optional(
       Schema.Struct({

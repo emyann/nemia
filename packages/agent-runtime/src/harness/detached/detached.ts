@@ -20,7 +20,7 @@
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Denial, Sighting, Usage } from '../../core/index.ts';
+import type { Denial, Sighting, SpentSoFar, Usage } from '../../core/index.ts';
 import { RunnerError, type RunnerOps, type SessionKept, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { forgetFiles, keptOf } from '../forget.ts';
 import { readTranscript } from '../transcript.ts';
@@ -112,11 +112,14 @@ export type HarnessSpec = {
    * byte offset it starts at, and the file, for a refusal to name. Absent, the runner has no `transcript`, and `logs` is what it gives.
    * `records`, optional, finds the record of many sessions in one pass, each id's paths, where `file` asked once an id would
    * list the harness's folders once an id.
+   * `spent`, optional, is what the session at work has spent so far by its record `file`, as the harness wrote it there at or after
+   * `since`, the run's start in ms (`Sighting.spent`); a throw is a line of it that does not decode.
    */
   transcript?: {
     file: (nativeId: string) => string | undefined;
     events: (entry: unknown, offset: number, file: string) => TranscriptEvent[];
     records?: (nativeIds: readonly string[]) => Map<string, string[]>;
+    spent?: (file: string, since: number) => SpentSoFar | undefined;
   };
   /**
    * Why a session of this harness cannot be told anything while it runs, in its own words and saying what to
@@ -263,6 +266,37 @@ const sightingOf = (
   ...(run.image ? { image: run.image } : {}),
   ...(!output?.read.ranIn && run.ranIn ? { ranIn: run.ranIn } : {}),
 });
+
+/**
+ * What a run at work has spent so far, by its harness's own record (`transcript.spent`), read afresh on every look: `{ wrong }` where a
+ * line of it does not decode, and undefined for a spec that reads none, a run with no session id yet, or a record that says none.
+ * A run spawned with no spend cap (`capUsd`) has its record left unread: its harness writes no such line, and a look at work would
+ * read the most of the record's end for nothing.
+ */
+const spentOf = (spec: HarnessSpec, run: RunFile): { spent: SpentSoFar } | { wrong: string } | undefined => {
+  const read = spec.transcript?.spent;
+  const file = read && run.nativeId && run.capUsd !== undefined ? spec.transcript?.file(run.nativeId) : undefined;
+  if (!read || file === undefined) return undefined;
+  try {
+    const spent = read(file, startOf(run));
+    return spent ? { spent } : undefined;
+  } catch (cause) {
+    return { wrong: cause instanceof Error ? cause.message : String(cause) };
+  }
+};
+
+/**
+ * A run's sighting with what it has spent so far (`spentOf`) while it is at work with no measured cost, and the look's `warning` with why
+ * a line of that record did not decode, where one did not.
+ */
+const withSpent = (spec: HarnessSpec, run: RunFile, sighting: Sighting, warning?: string): { sighting: Sighting; warning?: string } => {
+  const live = sighting.state === 'working' && sighting.usage?.costUsd === undefined ? spentOf(spec, run) : undefined;
+  if (live && 'wrong' in live) return { sighting, warning: [warning, live.wrong].filter(Boolean).join('; ') };
+  return { sighting: live ? { ...sighting, spent: live.spent } : sighting, ...(warning === undefined ? {} : { warning }) };
+};
+
+/** The spend cap a request asked for, as its run file keeps it (`RunFile.capUsd`): none where it asked none. */
+const capOf = (r: SpawnRequest): { capUsd?: number } => (r.config?.budgetUsd !== undefined ? { capUsd: r.config.budgetUsd } : {});
 
 /** The file a command's worker reads once at its exit, for a spec that runs a task's command and a task that names one. */
 const terminationOf = (spec: HarnessSpec, r: SpawnRequest): { terminationMessagePath?: string } =>
@@ -913,7 +947,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
     const { as, output, warning } = lookOf(spec, name, run, word, () => outputOf(name, run, word), logFile(name));
     if (as === 'unread') return { warning };
     const usage = usageOf(run, output?.read, all);
-    return { sighting: sightingOf(name, run, word, statementOf(name), output, usage, as === 'failed'), warning };
+    return withSpent(spec, run, sightingOf(name, run, word, statementOf(name), output, usage, as === 'failed'), warning);
   };
 
   return {
@@ -954,7 +988,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
               : {}),
             ...(input ? { input } : {}),
           };
-          fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...bounds, ...limit, ranIn }));
+          fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...capOf(r), ...bounds, ...limit, ranIn }));
 
           const pid = startWorker(runFile(r.name), r.cwd, argv, { log: logFile(r.name), bareIfRefused: limit.memoryLimit === undefined });
           if (pid !== undefined) writeLaunched(launchedFile(r.name), pid);
